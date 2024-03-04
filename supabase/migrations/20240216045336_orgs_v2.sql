@@ -797,3 +797,19 @@ TO authenticated
 USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), id, NULL, NULL))
 WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), id, NULL, NULL));
 
+-- Alter images bucket
+-- DROP POLICY "All user to manage they own folder 1ffg0oo_3" ON storage.objects;
+-- DROP POLICY "All user to manage they own folder 1ffg0oo_2" ON storage.objects;
+-- DROP POLICY "All user to manage they own folder 1ffg0oo_1" ON storage.objects;
+-- DROP POLICY "All user to manage they own folder 1ffg0oo_0" ON storage.objects;
+
+-- CREATE POLICY "Allow org members to select" 
+-- ON storage.objects FOR SELECT 
+-- USING ((bucket_id = 'images'::text) AND ("public"."is_member_of_org"(auth.uid(), ((storage.foldername(name))[0])::uuid)) AND storage.filename(name) = 'org-icon');
+
+-- CREATE POLICY "Allow org members to insert" 
+-- ON storage.objects FOR INSERT  
+-- WITH CHECK ((bucket_id = 'images'::text) AND ("public"."is_member_of_org"(auth.uid(), ((storage.foldername(name))[0])::uuid)) AND storage.filename(name) = 'org-icon');
+
+-- -- (storage.foldername(name))[0]
+-- ((bucket_id = 'images'::text) AND ("public"."is_member_of_org"(auth.uid(), (storage.foldername(name))[0])) AND storage.filename(name) = 'org-icon')
