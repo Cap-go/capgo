@@ -8,6 +8,7 @@ import IconAcount from '~icons/mdi/user'
 import IconPassword from '~icons/mdi/password'
 import IconPlans from '~icons/material-symbols/price-change'
 import IconBilling from '~icons/mingcute/bill-fill'
+// import MdiInvoiceListOutline from '~icons/mdi/invoice-list-outline';
 import IconNotification from '~icons/mdi/message-notification'
 import IconAdmin from '~icons/eos-icons/admin'
 import type { Tab } from '~/components/comp_def'
@@ -15,6 +16,8 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { openPortal } from '~/services/stripe'
 import { isSpoofed } from '~/services/supabase'
+// import ky from 'ky'
+// import { toast } from 'vue-sonner'
 
 const { t } = useI18n()
 const main = useMainStore()
@@ -94,6 +97,41 @@ watchEffect(() => {
   else {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
+  // if (!Capacitor.isNativePlatform()
+  //   && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
+  //   && !organizationTabs.value.find(tab => tab.label === 'invoices')) {
+  //     organizationTabs.value.push(
+  //     {
+  //       label: 'invoices',
+  //       icon: shallowRef(MdiInvoiceListOutline),
+  //       key: '/invoices',
+  //       onClick: async() => {
+  //         // post on that and display a popup to say check your mailbox
+  //         // https://zenvoice.io/api/invoices/send?userId=65e615635afbec6a6d29f6df&email=paul@kick.com
+  //         if (!main.user?.email) return
+  //         ky.get(`https://zenvoice.io/api/invoices/send?userId=65e615635afbec6a6d29f6df&email=${main.user?.email}`, {
+  //           // searchParams: {
+  //           //   userId: '5e615635afbec6a6d29f6df',
+  //           //   email: main.user?.email
+  //           // }
+  //         })
+  //         .then(()=> {
+  //           // check your mailbox toast
+  //           toast.info('Check your email to access to the link')
+  //         })
+  //         .catch(() => {
+  //           toast.error('Cannot find any invoices')
+  //         })
+
+  //         // openBlank(`https://zenvoice.io/p/65e615635afbec6a6d29f6df?email=${main.user?.email}`) old code
+  //       }
+  //     },
+  //   )
+  // }
+  // else {
+  //   organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'invoices')
+  // }
+
   if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['owner'])
     && (main.paying && !organizationTabs.value.find(tab => tab.label === 'usage'))) {
     // push it 2 before the last tab

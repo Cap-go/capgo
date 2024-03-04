@@ -18,7 +18,7 @@ async function presentActionSheetOpen(url: string) {
   }
   displayStore.showActionSheet = true
 }
-function openBlank(link: string) {
+export function openBlank(link: string) {
   console.log('openBlank', link)
   if (Capacitor.getPlatform() === 'ios')
     presentActionSheetOpen(link)

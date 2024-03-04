@@ -1,11 +1,16 @@
+2fa: 2FA 관리
+2fa-code: 2FA 인증코드
+2fa-disabled: 2FA 비활성화
 6-characters-minimum: 최소 6자, 대문자 1개, 소문자 1개, 특수 문자 1개
 Bandwidth: 대역폭
 Current: 현재의
 Filters: 필터
 Override: 우세하다
 Storage: 저장
+ab-testing-progressive-deploy-conflict: AB 테스트와 점진적 배포를 동시에 활성화할 수 없습니다.
 account: 계정
 account-error: 계정을 업데이트하는 동안 오류가 발생했습니다.
+account-id: 계정 ID
 account-password-error: 오류가 발생했습니다. 다시 시도해 주세요.
 account-password-heading: 내 비밀번호 변경
 account-settings: 계정 설정
@@ -23,15 +28,29 @@ activation-notification-desc: 새 앱 버전을 사용할 수 있을 때 알림 
 activation-validate: 확인
 add: 추가하다
 add-another-app: 앱 추가
+add-api-key: 새 API 키를 성공적으로 추가했습니다.
+add-member: 회원 추가
 add-shared-user: 공유 사용자 추가
 add-this-code-to-you: 이 코드를 프로젝트에 추가하십시오.
 add-your-app-to-your: 계정에 앱 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
 admin: 관리자
 afternoon: 오후
+alert-2fa-disable: 2FA를 비활성화할지 확인하세요.
+alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
+alert-add-new-key: 새 API 키 유형 선택
 alert-confirm-delete: 삭제 확인
+alert-confirm-invite: 초대 확인
+alert-confirm-regenerate: API 키 재생성 확인
 alert-delete-message: 삭제하시겠습니까?
+alert-denied-invite: 초대가 거부되었습니다.
+alert-disable-2fa-message: 2FA를 비활성화하시겠습니까?
+alert-generate-new-key: 생성하려는 API 키 유형을 선택하세요.
+alert-no-invite: 이 초대는 더 이상 존재하지 않습니다.
+alert-not-invited: 잘못된 초대입니다. 수락할 수 없습니다.
 alert-not-reverse-message: 이 작업은 되돌릴 수 없습니다.
+alert-regenerate-key: 이 키를 다시 생성하시겠습니까?
+alert-unknown-error: 알 수 없는 오류입니다. 개발자 콘솔을 참조하세요.
 allow-develoment-bui: 개발 빌드 허용
 allow-device-to-self: 장치가 자체 연결하도록 허용
 allow-emulator: 에뮬레이터 허용
@@ -43,6 +62,7 @@ app: 앱
 app-deleted: 앱 삭제됨
 app-id-example: 앱 ID 예시
 app-not-found: 앱을 찾을 수 없음
+app-preview: 앱 미리보기
 are-u-sure: 확실합니까 ?
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
@@ -66,26 +86,40 @@ button-browse: 검색
 button-camera: 카메라
 button-cancel: 취소
 button-delete: 삭제
+button-deny-invite: 부인하다
 button-go: 가다
 button-home: 집
+button-invite: 초대하다
+button-join: 수용하다
 button-options: 옵션
+button-regenerate: 재생성
 button-remove: 제거하다
 button-tabs: 탭
 button-toggle_dark: 다크 모드 전환
 button-toggle_langs: 언어 변경
 by-clicking-on-them: 그들을 클릭하여.
+cancel: 취소
+cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
+cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
+cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
+cannot-download: 번들을 다운로드할 수 없습니다.
 cannot-get-the-test-: 테스트 버전을 받을 수 없습니다
+cannot-invite-owner: 소유자를 조직에 초대할 수 없습니다.
 cannot-save-custom-i: 맞춤 ID를 저장할 수 없습니다.
 cannot-set-this-vers: 이 버전을 설정할 수 없습니다.
+cannot-share: 사용자 ID를 공유할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했습니다.
+cannots-sign-off: 로그할 수 없습니다.
 change: 변화
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel: 채널
+channel-ab-testing: AB 테스트 활성화
+channel-ab-testing-percentage: 보조 버전을 수신하는 사용자 비율
 channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-forced-devices: 강제 장치
@@ -96,6 +130,7 @@ channel-link-fail: 채널을 재정의할 수 없습니다. 문제가 발생했�
 channel-linked: 채널 오버라이드 설정됨
 channel-linking: 채널 링크
 channel-make-now: 기본값으로 설정
+channel-progressive-deploy: 점진적 배포 활성화
 channels: 채널
 check-email: 이메일을 확인하고 확인하십시오
 check-on-web: 웹사이트에서 확인
@@ -109,6 +144,7 @@ confirm-public-desc: |-
 
   다른 기본 채널은 더 이상 기본값이 아닙니다.
 copied-to-clipboard: 클립보드에 복사됨
+copy-account-id: 계정 ID 복사
 copy-command: 복사 명령
 copy-your: 복사
 country: 국가
@@ -127,14 +163,27 @@ delete-account: 계정 삭제
 delete-account-0: 계정 삭제
 delete-your-account: 계정 삭제
 deleted: 삭제
+dependencies:
+  js-yaml: ''
+  openai: ''
 details-and-logs: 세부 정보 및 로그
+devDependencies:
+  '@types/js-yaml': ''
 device: 장치
 device-id: 장치 아이디
 devices: 장치
 devices-using-this-b: 이 번들을 사용하는 기기
+dialog-warning-msg: |-
+  이 정보는 조직 소유자로부터 제공됩니다.
+
+  이 앱의 Capgo 등급을 업그레이드할 수 없습니다.
 did-not-recive-confirm-email: 확인 이메일을 받지 못하셨나요?
+disable: 장애를 입히다
+disable-ab-testing: 장애인 AB 테스트
 disable-auto-downgra: 네이티브에서 자동 다운그레이드 비활성화
 disable-auto-upgrade: 메이저 이상의 자동 업그레이드 비활성화
+disable-progressive-deploy: 비활성화된 점진적 배포
+disableAutoUpdateToMajor: 자동 업데이트 비활성화
 discord: 불화
 discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
@@ -143,6 +192,11 @@ dont-have-an-account: 계정이 없습니까?
 download: 다운로드
 email: 이메일
 email-address: 이메일 주소
+email-does-not-exist: 이 사용자는 존재하지 않습니다.
+enable: 할 수 있게 하다
+enable-2FA: 2FA 활성화
+enabled-ab-testing: AB 테스트 활성화
+enabled-progressive-deploy: 점진적 배포 활성화
 encrypted: 암호화된 번들
 enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
 enter-your-new-passw: 새 비밀번호를 입력하고 확인
@@ -152,11 +206,15 @@ failed: 실패한
 filters: 필터
 first-name: 이름
 force-version: 포스 버전
+force-version-change: 점진적 배포 건너뛰기
 forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
 from: From
 from-device: 장치에서
+general-information: 일반 정보
+generated-new-apikey: 새로운 API 키가 생성되었습니다!
+go-back: 돌아가기
 good: 좋은
 id: ID
 in-your-main-file: 기본 파일에서
@@ -165,13 +223,24 @@ included-in-plan: 계획에 포함됨
 info: 정보
 informations: 정보
 init-capgo-in-your-a: 앱에서 Capgo 초기화
+insert-invite-email: 초대하려는 사용자의 이메일을 입력하세요.
 install: 설치됨
 install-the-capacito: Capacitor 플러그인 설치
 into-your-app-folder: 앱 폴더에.
 invalid-auth: 로그인이 일치하지 않습니다. 다시 시도하십시오.
+invalid-email: 전달된 이메일이 유효하지 않습니다.
+invalid-mfa-code: 잘못된 2FA 코드
+invalid-version: 잘못된 버전
+invite-accepted: 조직 초대가 성공적으로 수락되었습니다.
+invoices: 송장
 is-emulator: 에뮬레이터임
 is-production-app: 프로덕션 앱
+key-admin: 관리자
+key-all: 모두
 key-copied: 클립보드에 복사된 키
+key-read: 읽다
+key-upload: 업로드
+key-write: 쓰다
 language: 언어
 last-name: 성
 last-update: 마지막 업데이트
@@ -188,11 +257,30 @@ login-to-your-accoun: 계정에 로그인
 logout: 로그 아웃
 logs: 로그
 lowerCaseError: 소문자를 포함해야 합니다.
+main: ''
+main-bundle-number: 주요 번들 번호
+major: 주요한
 make-default-android: Android용 기본값으로 설정
 make-default-ios: iOS용 기본값으로 설정
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 mau: 월간 활성 사용자
+member-deleted: 회원을 삭제했습니다.
+members: 회원
+metadata: 메타데이터
+metadata-min-ver-not-set: 현재 번들의 최소 업데이트 버전이 정의되지 않았습니다.
+metadata-not-found: 메타데이터를 찾을 수 없습니다
+mfa-enable-instruction: 인증 앱의 QR 코드를 스캔하여 인증해주세요.
+mfa-enable-instruction-2: 현재 2FA 코드를 입력하세요
+mfa-enabled: 2FA 활성화
+mfa-fail: 2FA를 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
+mfa-invalid-code: 잘못된 2FA 코드입니다. 다시 시도하세요!
+min-update-version: 최소 업데이트 버전
+minor: 미성년자
+misconfigured: 잘못 구성됨
+misconfigured-channels: |-
+  일부 채널이 잘못 구성되었습니다. 
+  해당 채널에 대한 업데이트가 실패합니다!
 mo: 개월
 module-heading: 모듈
 monthly: 월간 간행물
@@ -207,11 +295,16 @@ name: 이름
 need-more-contact-us: |-
   더 필요하십니까? 
   맞춤형 계획을 위해 저희에게 연락하십시오
+'no': 아니요
 no-channel-linked: 채널이 없습니다. 추가하려면 클릭하세요.
+no-channel-linked-no-perm: 채널 없음
 no-data: 데이터 없음
 no-devices: 기기 없음
 no-logs: 로그 없음
+no-permission: 권한이 부족합니다.
 no-version-linked: 버전이 없습니다. 추가하려면 클릭하세요.
+no-version-linked-no-perm: 버전 없음
+none: 없음
 not-found: 찾을 수 없음
 notifications: 알림
 old-onboarding-mode: 오래된 온보딩
@@ -221,6 +314,9 @@ open-channel: 채널 열기
 open-settings: 클릭하여 설정 열기
 open-sidebar: 사이드바 열기
 open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.
+org-changes-saved: 조직이 업데이트되었습니다.
+org-invited-user: 사용자를 조직에 초대했습니다.
+organization-name: 조직 이름
 os-version: OS 버전
 pages: 페이지
 password: 비밀번호
@@ -229,6 +325,7 @@ password-heading: 비밀번호 만들기
 password-hint: 숫자, 문자, 구두점을 6개 이상 조합하여 입력하세요.
 password-new: 새 비밀번호
 percent-fail: 실패율
+permission-changed: 사용자 권한을 성공적으로 변경했습니다.
 personal-information: 개인 정보
 plan-abtest: A/B 테스트
 plan-bandwidth: GB 대역폭
@@ -239,6 +336,8 @@ plan-inactive: 비활성 계획
 plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.
 plan-maker: 소기업 소유주에게 가장 적합
 plan-member: 계획 회원.
+plan-page-warn: 플랜 구매는 귀하가 초대된 조직에 영향을 미치지 않습니다.
+plan-page-warn-2: 그것에 대해 자세히 알아보세요.
 plan-payasyougo: 기업 확장에 가장 적합
 plan-pricing-plans: 요금제
 plan-progressive-deploy: 점진적 배포
@@ -254,8 +353,15 @@ please-choose-your-p: 기본 설정을 선택하십시오
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
 prediction: 예측
+preview: 미리보기 번들
+preview-encrypted: 암호화된 번들을 미리 볼 수 없습니다.
+preview-short: 시사
 price-per-unit-above: 계획보다 높은 단위당 가격
 pro-tip-you-can-copy: '전문가 팁:'
+progressive-bundle-number: 프로그레시브 번들 번호
+progressive-deploy-option: 점진적 배포 옵션 선택
+progressive-deploy-set-percentage: 점진적 배포가 활성화된 경우 보조 버전 비율을 설정할 수 없습니다.
+progressive-percentage: 점진적 배포 상태
 projection: 예측
 recommended: 추천
 recommended-for-you: 당신을 위해 추천 된
@@ -264,11 +370,13 @@ register-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 register-heading: 등록
 register-next: 등록하다
 reload: 새로고침
+removed-apikey: API 키가 삭제되었습니다.
 resend: 재전송
 resend-email: 확인 이메일 재전송
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 save: 저장
+save-changes: 변경 사항을 저장하다
 search: 찾다
 search-bundle: 번들 검색
 search-bundle-id: 번들 ID로 검색
@@ -280,6 +388,8 @@ search-by-name: 이름으로 검색
 search-device: 장치 검색
 search-user: 사용자 검색
 see-usage: 사용법 보기
+select-user-perms: 사용자 권한 선택
+select-user-perms-expanded: 초대된 사용자가 어떤 권한을 가져야 하는지 선택하세요.
 session_key: IvSessionKey
 set-bundle: 번들을 채널로 설정
 settings: 설정
@@ -293,7 +403,10 @@ something-went-wrong-try-again-later: |-
   나중에 다시 시도하십시오.
 special-api-access: 특수 API 액세스
 specialError: 특수 문자를 포함해야 합니다.
+start-new-deploy: 새로운 점진적 배포 시작
 start-using-capgo: '사용 시작:'
+status-complete: 완벽한
+status-failed: 실패한
 stored-externally: 외부에 저장
 submit: 제출하다
 support: 지원하다
@@ -306,6 +419,7 @@ thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
 title: 제목
+tmp-disabled: (일시적으로 비활성화됨)
 to: To
 to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
@@ -313,6 +427,9 @@ top-apps: 나의 앱들
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: '평가판 종료:'
+type: ''
+undefined: 한정되지 않은
+undefined-fail: 정의되지 않음(업데이트가 실패함)
 uninstall: 제거됨
 unlimited-updates: 무제한 업데이트
 unlink-bundle: 번들 연결 해제
@@ -320,6 +437,7 @@ unlink-channel: 채널 연결 해제
 unlink-version: 버전 연결 해제
 update: 업데이트
 updated-at: 업데이트 시간
+updated-min-version: 업데이트된 최소 버전
 upgrade: 업그레이드
 upgrade-now: 지금 업그레이드
 upperCaseError: 대문자를 포함해야 함
@@ -329,17 +447,23 @@ usage-success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 
 usage-title: 총
 use-the-command: 다음 명령을 사용하십시오.
 used-in-period: 기간에 사용
+used-to-create: 이 이메일을 사용하는 계정이 이전에 존재했으므로 다시 만들 수 없습니다.
 user: 사용자
+user-already-invited: 이 사용자는 이미 이 조직에 초대되었습니다.
 validate: 확인
+verify: 확인하다
+verify-2FA: 2FA 확인
 version: 버전
 version-build: 버전 빌드
 version-builtin: 버전 내장
 version-linked: 버전 링크
 version-linking: 번들 링크
 versions: 버전
+warning: 경고!
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
 yearly: 매년
+'yes': 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-reached-the-limi: 한도 도달
 your-api-key: '귀하의 API 키:'

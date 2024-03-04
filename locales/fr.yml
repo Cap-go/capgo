@@ -1,11 +1,18 @@
+2fa: Gérer 2FA
+2fa-code: Code d'authentification 2FA
+2fa-disabled: 2FA désactivé
 6-characters-minimum: 6 caractères minimum, 1 majuscule, 1 minuscule, 1 caractère spécial
 Bandwidth: Bande passante
 Current: Actuel
 Filters: Filtres
 Override: Passer outre
 Storage: Stockage
+ab-testing-progressive-deploy-conflict: >-
+  Les tests AB et le déploiement progressif ne peuvent pas être activés en même
+  temps
 account: Compte
 account-error: Erreur lors de la mise à jour de votre compte
+account-id: Identifiant de compte
 account-password-error: Une erreur s'est produite, veuillez réessayer
 account-password-heading: Changer mon mot de passe
 account-settings: Paramètres du compte
@@ -27,15 +34,29 @@ activation-notification-desc: >-
 activation-validate: Valider
 add: Ajouter
 add-another-app: Ajoutez votre application
+add-api-key: Nouvelle clé API ajoutée avec succès
+add-member: Ajouter un membre
 add-shared-user: Ajouter un utilisateur partagé
 add-this-code-to-you: Ajoutez ce code à votre projet
 add-your-app-to-your: Ajoutez votre application à votre compte
 add-your-first-app-t: "Ajoutez votre première application à votre compte et poussez les mises à jour\_!"
 admin: Administrateur
 afternoon: après-midi
+alert-2fa-disable: Confirmez que vous souhaitez désactiver 2FA
+alert-accept-inviation: "Acceptez-vous l'invitation à %ORG%\_?"
+alert-add-new-key: Sélectionnez un nouveau type de clé API
 alert-confirm-delete: Confirmation de la suppression
+alert-confirm-invite: Confirmer l'invitation
+alert-confirm-regenerate: Confirmer la régénération de la clé API
 alert-delete-message: Êtes-vous sûr de vouloir supprimer ce
+alert-denied-invite: Invitation refusée
+alert-disable-2fa-message: "Êtes-vous sûr de vouloir désactiver 2FA\_?"
+alert-generate-new-key: Veuillez sélectionner le type de clé API que vous souhaitez générer.
+alert-no-invite: Cette invitation n'existe plus
+alert-not-invited: Invitation invalide, impossible d'accepter
 alert-not-reverse-message: Cette action n'est pas réversible
+alert-regenerate-key: Êtes-vous sûr de vouloir régénérer cette clé
+alert-unknown-error: Erreur inconnue, voir la console de développement
 allow-develoment-bui: Autoriser la compilation de développement
 allow-device-to-self: Autoriser les appareils à s'auto-associer
 allow-emulator: Autoriser les émulateurs
@@ -47,6 +68,7 @@ app: Application
 app-deleted: Application supprimée
 app-id-example: Exemple d'ID d'application
 app-not-found: Application introuvable
+app-preview: Aperçu de l'application
 are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
@@ -70,26 +92,40 @@ button-browse: Parcourir
 button-camera: Caméra
 button-cancel: Annuler
 button-delete: Supprimer
+button-deny-invite: Refuser
 button-go: ALLER
 button-home: Accueil
+button-invite: Inviter
+button-join: Accepter
 button-options: Choix
+button-regenerate: Régénérer
 button-remove: Retirer
 button-tabs: Onglets
 button-toggle_dark: Basculer en mode sombre
 button-toggle_langs: Changer de langue
 by-clicking-on-them: en cliquant dessus.
+cancel: Annuler
+cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
 cannot-delete-bundle: Impossible de supprimer le groupe
 cannot-delete-channel: Impossible de supprimer le canal
+cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
+cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
+cannot-download: Impossible de télécharger le pack
 cannot-get-the-test-: Impossible d'obtenir la version de test
+cannot-invite-owner: Impossible d'inviter le propriétaire dans l'organisation
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
 cannot-set-this-vers: Impossible de définir cette version
+cannot-share: Impossible de partager l'ID utilisateur, vérifiez la console du navigateur
 cannot-test-app-some: Impossible de tester l'application, une erreur s'est produite
+cannots-sign-off: Impossible de se connecter
 change: Changement
 changed-password-suc: Le mot de passe a été changé avec succès
 channel: Canaux
+channel-ab-testing: Activer les tests AB
+channel-ab-testing-percentage: Pourcentage d'utilisateurs recevant la version secondaire
 channel-create: Créer un canal
 channel-deleted: Canal supprimé
 channel-forced-devices: Appareils forcés
@@ -100,6 +136,7 @@ channel-link-fail: Impossible de remplacer le canal, quelque chose de mal s'est 
 channel-linked: Remplacement de canal défini
 channel-linking: Lien vers le canal
 channel-make-now: Mettre par défaut
+channel-progressive-deploy: Activer le déploiement progressif
 channels: Canaux
 check-email: Veuillez vérifier votre e-mail et vérifier
 check-on-web: Vérifier sur le site Web
@@ -117,6 +154,7 @@ confirm-public-desc: >-
 
   Les autres canaux par défaut ne seront plus par défaut.
 copied-to-clipboard: Copié dans le presse-papier
+copy-account-id: copier l'identifiant du compte
 copy-command: Copier la commande
 copy-your: Copiez votre
 country: Pays
@@ -135,14 +173,27 @@ delete-account: Supprimer le compte
 delete-account-0: Supprimer le compte
 delete-your-account: Supprimer votre compte
 deleted: supprimé
+dependencies:
+  js-yaml: ''
+  openai: ''
 details-and-logs: Détails et journaux
+devDependencies:
+  '@types/js-yaml': ''
 device: Appareil
 device-id: Identifiant de l'appareil
 devices: Appareils
 devices-using-this-b: Appareils utilisant cette version
+dialog-warning-msg: |-
+  Ces informations proviennent du propriétaire de l'organisation.
+
+  Vous ne pouvez pas mettre à niveau le niveau Capgo pour cette application
 did-not-recive-confirm-email: Vous n'avez pas reçu d'email de confirmation?
+disable: Désactiver
+disable-ab-testing: Tests AB désactivés
 disable-auto-downgra: Désactiver la rétrogradation automatique en natif
 disable-auto-upgrade: Désactiver la mise à niveau automatique au-dessus d'une version majeure
+disable-progressive-deploy: Déploiement progressif désactivé
+disableAutoUpdateToMajor: Désactiver la mise à jour automatique
 discord: Discord
 discover-module-in-a: Découvrir le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
@@ -151,6 +202,11 @@ dont-have-an-account: "Vous n'avez pas de compte\_?"
 download: Télécharger
 email: E-mail
 email-address: Adresse e-mail
+email-does-not-exist: Cet utilisateur n'existe pas
+enable: Activer
+enable-2FA: Activer 2FA
+enabled-ab-testing: Tests AB activés
+enabled-progressive-deploy: Déploiement progressif activé
 encrypted: mise a jour chiffrés
 enter-your-email-add: >-
   Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
@@ -162,6 +218,7 @@ failed: Échoué
 filters: Filtres
 first-name: Prénom
 force-version: Version forcée
+force-version-change: Ignorer le déploiement progressif
 forgot: Oublié
 forgot-check-email: >-
   Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
@@ -169,6 +226,9 @@ forgot-check-email: >-
 forgot-success: Mot de passe mis à jour avec succès
 from: Du
 from-device: depuis l'appareil
+general-information: Informations générales
+generated-new-apikey: "Génération d'une nouvelle clé API\_!"
+go-back: Retourner
 good: Bien
 id: Identifiant
 in-your-main-file: Dans votre fichier principal
@@ -177,13 +237,24 @@ included-in-plan: Inclus dans le forfait
 info: Information
 informations: Informations
 init-capgo-in-your-a: Init Capgo dans votre application
+insert-invite-email: Insérez l'e-mail de l'utilisateur que vous souhaitez inviter
 install: installée
 install-the-capacito: Installer le plugin Capacitor
 into-your-app-folder: Dans votre dossier d'application.
 invalid-auth: Vos identifiants ne correspondent pas, réessayez.
+invalid-email: L'e-mail transmis n'est pas valide
+invalid-mfa-code: Code 2FA invalide
+invalid-version: Version Semver invalide
+invite-accepted: Invitation d'organisation acceptée avec succès
+invoices: factures
 is-emulator: Est-ce un émulateur
 is-production-app: Est-ce l'application de Production
+key-admin: Administrateur
+key-all: Tous
 key-copied: Clé copiée dans votre presse-papiers
+key-read: Lire
+key-upload: Télécharger
+key-write: Écrire
 language: Langue
 last-name: Nom de famille
 last-update: Dernière mise à jour
@@ -200,11 +271,30 @@ login-to-your-accoun: Connectez-vous à votre compte
 logout: Se déconnecter
 logs: Journaux
 lowerCaseError: Doit contenir des lettres minuscules
+main: ''
+main-bundle-number: Numéro du forfait principal
+major: Majeur
+make-default-android: Définir par défaut pour Android
+make-default-ios: Définir par défaut pour iOS
 make-normal: Rendre normal
 making-this-channel-: >-
   Pour rendre ce canal "normal", vous devrez configurer un autre canal par
   défaut ou laisser l'appareil s'auto-attribuer.
 mau: Utilisateurs actifs mensuels
+member-deleted: Membre supprimé avec succès
+members: Membres
+metadata: Métadonnées
+metadata-min-ver-not-set: La version de mise à jour minimale pour le bundle actuel n'est pas définie
+metadata-not-found: métadonnées introuvables
+mfa-enable-instruction: Veuillez scanner le code QR dans l'application d'authentification et vérifier
+mfa-enable-instruction-2: Veuillez saisir le code 2FA actuel
+mfa-enabled: 2FA activé
+mfa-fail: Impossible de modifier 2FA, veuillez vérifier la console du navigateur
+mfa-invalid-code: "Code 2FA invalide, réessayez\_!"
+min-update-version: Version de mise à jour minimale
+minor: Mineure
+misconfigured: Mal configuré
+misconfigured-channels: "Certaines chaînes sont mal configurées. \nLes mises à jour échoueront pour ces chaînes\_!"
 mo: mo
 module-heading: Modules
 monthly: Mensuel
@@ -219,11 +309,16 @@ name: Nom
 need-more-contact-us: |-
   Besoin de plus ? 
   Contactez-nous pour un plan sur mesure
+'no': Non
 no-channel-linked: Pas de canal, cliquez pour ajouter
+no-channel-linked-no-perm: Aucune chaîne
 no-data: Pas de données
 no-devices: Aucun appareil
 no-logs: Aucun journal
+no-permission: Permissions insuffisantes
 no-version-linked: Pas de version, cliquez pour ajouter
+no-version-linked-no-perm: Aucune version
+none: Aucun
 not-found: Pas trouvé
 notifications: Avis
 old-onboarding-mode: ancienne intégration
@@ -233,6 +328,9 @@ open-channel: Canal ouvert
 open-settings: Cliquez pour ouvrir les paramètres
 open-sidebar: Ouvrir la barre latérale
 open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jour
+org-changes-saved: Organisation mise à jour avec succès
+org-invited-user: L'utilisateur a été invité avec succès dans l'organisation
+organization-name: nom de l'organisation
 os-version: Version du système d'exploitation
 pages: pages
 password: Mot de passe
@@ -243,6 +341,7 @@ password-hint: >-
   ponctuation.
 password-new: nouveau mot de passe
 percent-fail: Pourcentage d'échec
+permission-changed: L'autorisation de l'utilisateur a été modifiée avec succès
 personal-information: Informations personnelles
 plan-abtest: Test A/B
 plan-bandwidth: Bande passante Go
@@ -253,6 +352,10 @@ plan-inactive: Forfait inactif
 plan-is-the-best-pla: plan est le meilleur plan pour vos besoins.
 plan-maker: Idéal pour les propriétaires de petites entreprises
 plan-member: membre du plan.
+plan-page-warn: >-
+  L’achat d’un forfait n’affectera pas les organisations dans lesquelles vous
+  êtes invité.
+plan-page-warn-2: Apprenez-en davantage.
 plan-payasyougo: Idéal pour les entreprises évolutives
 plan-pricing-plans: Forfaits tarifaires
 plan-progressive-deploy: Déploiement progressif
@@ -268,8 +371,17 @@ please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 plugin-version: Version du plug-in
 prediction: Prédiction
+preview: Offre groupée d'aperçu
+preview-encrypted: Impossible de prévisualiser le bundle chiffré
+preview-short: Aperçu
 price-per-unit-above: Prix ​​par unité au-dessus du plan
 pro-tip-you-can-copy: "Conseil de pro\_: vous pouvez copier le"
+progressive-bundle-number: Numéro de forfait progressif
+progressive-deploy-option: Sélectionnez l'option de déploiement progressif
+progressive-deploy-set-percentage: >-
+  Vous ne pouvez pas définir le pourcentage de version secondaire lorsque le
+  déploiement progressif est activé
+progressive-percentage: Statut de déploiement progressif
 projection: Projections
 recommended: Recommandé
 recommended-for-you: Recommandé pour vous
@@ -278,11 +390,13 @@ register-desc: Remplissez les champs suivants pour finaliser votre inscription
 register-heading: Inscription
 register-next: Enregistrer
 reload: Recharger
+removed-apikey: La clé API a été supprimée avec succès
 resend: Renvoyer
 resend-email: Renvoyer l'email de confirmation
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
 save: Économisez
+save-changes: Sauvegarder les modifications
 search: Recherche
 search-bundle: Recherche par version
 search-bundle-id: Rechercher par ID de groupe
@@ -294,6 +408,8 @@ search-by-name: Rechercher par nom
 search-device: Rechercher un appareil
 search-user: Rechercher un utilisateur
 see-usage: Voir l'utilisation
+select-user-perms: Sélectionnez les autorisations de l'utilisateur
+select-user-perms-expanded: Sélectionnez quelle autorisation l'utilisateur invité doit avoir
 session_key: Session ID
 set-bundle: Définir le groupe sur le canal
 settings: Paramètres
@@ -305,7 +421,10 @@ size-not-found: Introuvable
 something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
 special-api-access: Accès API privilégié
 specialError: Doit contenir des caractères spéciaux
+start-new-deploy: Démarrer un nouveau déploiement progressif
 start-using-capgo: "Commencez à utiliser\_:"
+status-complete: complet
+status-failed: échoué
 stored-externally: stocké en externe
 submit: Soumettre
 support: Support
@@ -318,6 +437,7 @@ thank-you-for-choosi: Merci d'avoir choisi Capgo !
 the: Le
 this-page-will-self-: Cette page s'actualisera automatiquement
 title: titre
+tmp-disabled: (Temporairement désactivé)
 to: Au
 to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
@@ -325,6 +445,9 @@ top-apps: Mes applications
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
+type: ''
+undefined: indéfini
+undefined-fail: Non défini (les mises à jour échoueront)
 uninstall: Désinstaller
 unlimited-updates: Mises à jour illimitées
 unlink-bundle: Dissocier le groupe
@@ -332,6 +455,7 @@ unlink-channel: Dissocier le canal
 unlink-version: Dissocier la version
 update: Mise à jour
 updated-at: Mis à jour à
+updated-min-version: Version minimale mise à jour
 upgrade: Améliorer
 upgrade-now: Mettre à jour maintenant
 upperCaseError: Doit contenir des lettres majuscules
@@ -341,17 +465,23 @@ usage-success: Votre plan a été configuré, cette page sera mise à jour dans 
 usage-title: Total
 use-the-command: "Utilisez la commande\_:"
 used-in-period: Utilisé pendant la période
+used-to-create: Le compte avec cette adresse e-mail existait auparavant, impossible à recréer
 user: Utilisateur
+user-already-invited: Cet utilisateur est déjà invité dans cette organisation
 validate: Valider
+verify: Vérifier
+verify-2FA: Vérifier 2FA
 version: Version
 version-build: Version de construction
 version-builtin: Version intégrée
 version-linked: Lien vers la version
 version-linking: Lien vers le forfait
 versions: Versions
+warning: Avertissement!
 welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
 yearly: Annuel
+'yes': Oui
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-reached-the-limi: Limite atteinte
 your-api-key: "Votre clé API\_:"

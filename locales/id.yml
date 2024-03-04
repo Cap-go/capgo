@@ -1,11 +1,16 @@
+2fa: Kelola 2FA
+2fa-code: Kode otentikasi 2FA
+2fa-disabled: Dinonaktifkan 2FA
 6-characters-minimum: Minimal 6 karakter, 1 huruf besar, 1 huruf kecil, 1 karakter khusus
 Bandwidth: Bandwidth
 Current: Saat ini
 Filters: Filter
 Override: Mengesampingkan
 Storage: Penyimpanan
+ab-testing-progressive-deploy-conflict: Pengujian AB dan penerapan progresif tidak dapat diaktifkan secara bersamaan
 account: Akun
 account-error: Terjadi kesalahan saat memperbarui akun Anda
+account-id: ID Akun
 account-password-error: Terjadi kesalahan, harap coba lagi
 account-password-heading: Ubah kata sandi saya
 account-settings: Pengaturan akun
@@ -23,15 +28,29 @@ activation-notification-desc: Saya menerima untuk menerima pemberitahuan ketika 
 activation-validate: Mengesahkan
 add: Menambahkan
 add-another-app: Tambahkan aplikasi Anda
+add-api-key: Berhasil menambahkan kunci API baru
+add-member: Tambahkan anggota
 add-shared-user: Tambahkan pengguna bersama
 add-this-code-to-you: Tambahkan kode ini ke proyek Anda
 add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
 admin: Admin
 afternoon: sore
+alert-2fa-disable: Konfirmasikan bahwa Anda ingin menonaktifkan 2FA
+alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
+alert-add-new-key: Pilih jenis kunci API baru
 alert-confirm-delete: Konfirmasi Hapus
+alert-confirm-invite: Konfirmasikan undangan
+alert-confirm-regenerate: Konfirmasikan pembuatan ulang kunci API
 alert-delete-message: Apa kamu yakin ingin menghapus ini
+alert-denied-invite: Undangan ditolak
+alert-disable-2fa-message: Apakah Anda yakin ingin menonaktifkan 2FA?
+alert-generate-new-key: Silakan pilih jenis kunci API yang ingin Anda hasilkan.
+alert-no-invite: Undangan ini sudah tidak ada lagi
+alert-not-invited: Undangan tidak valid, tidak dapat diterima
 alert-not-reverse-message: Tindakan ini tidak dapat dibatalkan
+alert-regenerate-key: Apakah Anda yakin ingin membuat ulang kunci ini
+alert-unknown-error: Kesalahan tidak diketahui, lihat konsol pengembang
 allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 allow-emulator: Izinkan Emulator
@@ -43,6 +62,7 @@ app: Aplikasi
 app-deleted: Aplikasi dihapus
 app-id-example: Contoh ID aplikasi
 app-not-found: Aplikasi tidak ditemukan
+app-preview: Pratinjau aplikasi
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
@@ -66,26 +86,40 @@ button-browse: Jelajahi
 button-camera: Kamera
 button-cancel: Membatalkan
 button-delete: Menghapus
+button-deny-invite: Membantah
 button-go: PERGI
 button-home: Rumah
+button-invite: Mengundang
+button-join: Menerima
 button-options: Pilihan
+button-regenerate: Diperbarui
 button-remove: Menghapus
 button-tabs: Tab
 button-toggle_dark: Alihkan mode gelap
 button-toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
+cancel: Membatalkan
+cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
+cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
+cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
+cannot-download: Tidak dapat mengunduh bundel
 cannot-get-the-test-: Tidak bisa mendapatkan versi uji
+cannot-invite-owner: Tidak dapat mengundang pemilik ke organisasi
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 cannot-set-this-vers: Tidak dapat menyetel versi ini
+cannot-share: Tidak dapat membagikan id pengguna, periksa konsol browser
 cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
+cannots-sign-off: Tidak dapat masuk
 change: Mengubah
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
+channel-ab-testing: Aktifkan pengujian AB
+channel-ab-testing-percentage: Persentase pengguna yang menerima versi sekunder
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-forced-devices: Perangkat Terpaksa
@@ -96,6 +130,7 @@ channel-link-fail: Tidak dapat mengganti saluran, terjadi kesalahan
 channel-linked: Penimpaan saluran disetel
 channel-linking: Tautkan ke saluran
 channel-make-now: Jadikan bawaan
+channel-progressive-deploy: Aktifkan penerapan progresif
 channels: Saluran
 check-email: Silakan periksa email Anda dan verifikasi
 check-on-web: Periksa di situs web
@@ -113,6 +148,7 @@ confirm-public-desc: >-
 
   Saluran default lainnya tidak akan menjadi default lagi.
 copied-to-clipboard: Disalin ke papan klip
+copy-account-id: salin id akun
 copy-command: Salin perintah
 copy-your: Salin Anda
 country: Negara
@@ -131,14 +167,27 @@ delete-account: Hapus akun
 delete-account-0: Hapus akun
 delete-your-account: Hapus akun anda
 deleted: dihapus
+dependencies:
+  js-yaml: ''
+  openai: ''
 details-and-logs: Detail dan log
+devDependencies:
+  '@types/js-yaml': ''
 device: Perangkat
 device-id: ID perangkat
 devices: Perangkat
 devices-using-this-b: Perangkat yang menggunakan bundel ini
+dialog-warning-msg: |-
+  Informasi ini berasal dari pemilik organisasi.
+
+  Anda tidak dapat meningkatkan tingkat capgo untuk aplikasi ini
 did-not-recive-confirm-email: Tidak menerima email konfirmasi?
+disable: Cacat
+disable-ab-testing: Pengujian AB dinonaktifkan
 disable-auto-downgra: Nonaktifkan downgrade otomatis di bawah native
 disable-auto-upgrade: Nonaktifkan pemutakhiran otomatis di atas mayor
+disable-progressive-deploy: Menonaktifkan penerapan progresif
+disableAutoUpdateToMajor: Nonaktifkan pembaruan otomatis
 discord: Perselisihan
 discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
@@ -147,6 +196,11 @@ dont-have-an-account: Belum punya akun?
 download: Unduh
 email: Surel
 email-address: Alamat email
+email-does-not-exist: Pengguna ini tidak ada
+enable: Memungkinkan
+enable-2FA: Aktifkan 2FA
+enabled-ab-testing: Pengujian AB diaktifkan
+enabled-progressive-deploy: Mengaktifkan penerapan progresif
 encrypted: Bundel terenkripsi
 enter-your-email-add: >-
   Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
@@ -158,6 +212,7 @@ failed: Gagal
 filters: Filter
 first-name: Nama depan
 force-version: Versi paksa
+force-version-change: Lewati penerapan progresif
 forgot: Lupa
 forgot-check-email: >-
   Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
@@ -165,6 +220,9 @@ forgot-check-email: >-
 forgot-success: Kata sandi berhasil diperbarui
 from: Dari
 from-device: dari perangkat
+general-information: Informasi Umum
+generated-new-apikey: Menghasilkan kunci API baru!
+go-back: Kembali
 good: Bagus
 id: PENGENAL
 in-your-main-file: Di file utama Anda
@@ -173,13 +231,24 @@ included-in-plan: Termasuk dalam rencana
 info: Informasi
 informations: Informasi
 init-capgo-in-your-a: Init Capgo di aplikasi Anda
+insert-invite-email: Masukkan email pengguna yang ingin Anda undang
 install: Terpasang
 install-the-capacito: Instal plugin Kapasitor
 into-your-app-folder: Ke dalam folder aplikasi Anda.
 invalid-auth: Login Anda tidak cocok, coba lagi.
+invalid-email: Email yang diteruskan tidak valid
+invalid-mfa-code: Kode 2FA tidak valid
+invalid-version: Versi semver tidak valid
+invite-accepted: Berhasil menerima undangan organisasi
+invoices: faktur
 is-emulator: Apakah Emulator
 is-production-app: Apakah aplikasi Produksi
+key-admin: Admin
+key-all: Semua
 key-copied: Kunci disalin di papan klip Anda
+key-read: Membaca
+key-upload: Mengunggah
+key-write: Menulis
 language: Bahasa
 last-name: nama keluarga
 last-update: Pembaharuan Terakhir
@@ -196,6 +265,9 @@ login-to-your-accoun: masuk ke akun Anda
 logout: Keluar
 logs: Log
 lowerCaseError: Harus berisi huruf kecil
+main: ''
+main-bundle-number: Nomor bundel utama
+major: Besar
 make-default-android: Jadikan default untuk Android
 make-default-ios: Jadikan default untuk iOS
 make-normal: Jadikan normal
@@ -203,6 +275,22 @@ making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
 mau: Pengguna aktif bulanan
+member-deleted: Berhasil menghapus anggota
+members: Anggota
+metadata: Metadata
+metadata-min-ver-not-set: Versi pembaruan minimal untuk bundel saat ini tidak ditentukan
+metadata-not-found: metadata tidak ditemukan
+mfa-enable-instruction: Silakan pindai kode QR di aplikasi autentikator dan verifikasi
+mfa-enable-instruction-2: Silakan ketik kode 2FA saat ini
+mfa-enabled: Mengaktifkan 2FA
+mfa-fail: Tidak dapat mengubah 2FA, silakan periksa konsol browser
+mfa-invalid-code: Kode 2FA tidak valid, coba lagi!
+min-update-version: Versi pembaruan minimal
+minor: Minor
+misconfigured: Salah dikonfigurasi
+misconfigured-channels: |-
+  Beberapa saluran salah dikonfigurasi. 
+  Pembaruan akan gagal untuk saluran tersebut!
 mo: bulan
 module-heading: Modul
 monthly: Bulanan
@@ -217,11 +305,16 @@ name: Nama
 need-more-contact-us: |-
   Butuh lebih banyak? 
   Hubungi kami untuk rencana yang disesuaikan
+'no': TIDAK
 no-channel-linked: Tidak ada saluran, klik untuk menambahkan
+no-channel-linked-no-perm: Tidak ada saluran
 no-data: Tidak ada data
 no-devices: Tidak ada perangkat
 no-logs: Tidak ada log
+no-permission: Izin tidak memadai
 no-version-linked: Tidak ada versi, klik untuk menambahkan
+no-version-linked-no-perm: Tidak ada versi
+none: Tidak ada
 not-found: Tidak ditemukan
 notifications: Notifikasi
 old-onboarding-mode: orientasi lama
@@ -231,6 +324,9 @@ open-channel: Buka saluran
 open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
+org-changes-saved: Organisasi berhasil diperbarui
+org-invited-user: Berhasil mengundang pengguna ke org
+organization-name: Nama Organisasi
 os-version: versi OS
 pages: Halaman
 password: Kata sandi
@@ -239,6 +335,7 @@ password-heading: Buat Kata Sandi
 password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
 password-new: kata sandi baru
 percent-fail: Persentase gagal
+permission-changed: Berhasil mengubah izin pengguna
 personal-information: Informasi pribadi
 plan-abtest: Pengujian A/B
 plan-bandwidth: Bandwidth GB
@@ -249,6 +346,8 @@ plan-inactive: Rencana tidak aktif
 plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
 plan-maker: Terbaik untuk pemilik usaha kecil
 plan-member: anggota rencana.
+plan-page-warn: Membeli paket tidak akan memengaruhi organisasi tempat Anda diundang.
+plan-page-warn-2: Pelajari lebih lanjut tentang hal itu.
 plan-payasyougo: Terbaik untuk perusahaan skala
 plan-pricing-plans: Paket Harga
 plan-progressive-deploy: Penyebaran progresif
@@ -264,8 +363,17 @@ please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
 prediction: Ramalan
+preview: Paket pratinjau
+preview-encrypted: Tidak dapat melihat pratinjau paket yang dienkripsi
+preview-short: pratinjau
 price-per-unit-above: Harga per unit di atas rencana
 pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
+progressive-bundle-number: Nomor bundel progresif
+progressive-deploy-option: Pilih opsi penerapan progresif
+progressive-deploy-set-percentage: >-
+  Anda tidak dapat menetapkan persentase versi sekunder ketika penerapan
+  progresif diaktifkan
+progressive-percentage: Status penerapan progresif
 projection: Proyeksi
 recommended: Direkomendasikan
 recommended-for-you: Direkomendasikan untukmu
@@ -274,11 +382,13 @@ register-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
 register-heading: Registrasi
 register-next: Daftar
 reload: Muat ulang
+removed-apikey: Kunci API telah berhasil dihapus
 resend: Kirim ulang
 resend-email: Kirim Ulang Email Konfirmasi
 reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 save: Menghemat
+save-changes: Simpan perubahan
 search: Mencari
 search-bundle: Bundel Pencarian
 search-bundle-id: Cari berdasarkan bundel ID
@@ -290,6 +400,8 @@ search-by-name: Cari berdasarkan nama
 search-device: Cari perangkat
 search-user: Cari Pengguna
 see-usage: Lihat penggunaan
+select-user-perms: Pilih izin pengguna
+select-user-perms-expanded: Pilih izin mana yang harus dimiliki oleh pengguna yang diundang
 session_key: IvSessionKey
 set-bundle: Tetapkan bundel ke saluran
 settings: Pengaturan
@@ -303,7 +415,10 @@ something-went-wrong-try-again-later: |-
   Coba lagi nanti.
 special-api-access: Akses API khusus
 specialError: Harus mengandung karakter khusus
+start-new-deploy: Mulai penerapan progresif baru
 start-using-capgo: 'Mulai menggunakan:'
+status-complete: menyelesaikan
+status-failed: gagal
 stored-externally: disimpan secara eksternal
 submit: Kirim
 support: Mendukung
@@ -316,6 +431,7 @@ thank-you-for-choosi: Terima kasih telah memilih Capgo!
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri
 title: judul
+tmp-disabled: (Dinonaktifkan sementara)
 to: Ke
 to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
@@ -323,6 +439,9 @@ top-apps: Aplikasi saya
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
+type: ''
+undefined: belum diartikan
+undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
 unlimited-updates: Pembaruan tanpa batas
 unlink-bundle: Putuskan tautan bundel
@@ -330,6 +449,7 @@ unlink-channel: Batalkan tautan saluran
 unlink-version: Batalkan tautan versi
 update: Memperbarui
 updated-at: Diperbarui pada
+updated-min-version: Versi minimal yang diperbarui
 upgrade: Meningkatkan
 upgrade-now: Tingkatkan sekarang
 upperCaseError: Harus berisi huruf besar
@@ -341,17 +461,23 @@ usage-success: >-
 usage-title: Total
 use-the-command: 'Gunakan perintah:'
 used-in-period: Digunakan dalam periode
+used-to-create: Akun dengan email ini dulunya ada, tidak dapat dibuat ulang
 user: Pengguna
+user-already-invited: Pengguna ini sudah diundang ke organisasi ini
 validate: Mengesahkan
+verify: Memeriksa
+verify-2FA: Verifikasi 2FA
 version: 'Versi: kapan'
 version-build: Pembuatan versi
 version-builtin: Versi bawaan
 version-linked: Tautan versi
 version-linking: Tautan ke bundel
 versions: Versi
+warning: Peringatan!
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 yearly: Tahunan
+'yes': Ya
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai
 your-api-key: 'Kunci API Anda:'

@@ -225,6 +225,7 @@ invalid-email: Passed email is not valid
 invalid-mfa-code: Invalid 2FA code
 invalid-version: Invalid semver version
 invite-accepted: Successfully accepted oranization inviation
+invoices: invoices
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-admin: Admin
