@@ -316,11 +316,11 @@ Begin
 End;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) FROM public;
-REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) TO postgres;
-GRANT EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" character varying) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" uuid) FROM public;
+REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" uuid) TO postgres;
+GRANT EXECUTE ON FUNCTION public.has_app_right_userid("appid" character varying, "right" user_min_right, "userid" uuid) TO service_role;
 
 CREATE OR REPLACE FUNCTION "public"."has_app_right"("appid" character varying, "right" user_min_right)
  RETURNS boolean
