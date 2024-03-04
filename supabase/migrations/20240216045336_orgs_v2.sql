@@ -790,3 +790,10 @@ CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."orgs"
 AS PERMISSIVE FOR SELECT
 TO anon, authenticated
 USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]), id, NULL, NULL));
+
+CREATE POLICY "Allow update for auth (admin+)" ON "public"."orgs"
+AS PERMISSIVE FOR UPDATE
+TO authenticated
+USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), id, NULL, NULL))
+WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), id, NULL, NULL));
+
