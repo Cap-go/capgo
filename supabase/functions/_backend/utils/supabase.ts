@@ -10,6 +10,8 @@ import type { Order } from './types.ts'
 import { readMauFromClickHouse, sendStatsAndDevice } from './clickhouse.ts'
 import type { AppActivity } from './clickhouse.ts'
 
+export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
+
 // Import Supabase client
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
