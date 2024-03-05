@@ -185,6 +185,11 @@ async function post(c: Context, body: AppStats) {
             event: 'update fail',
             icon: '⚠️',
             user_id: appVersion.user_id,
+            tags: {
+              app_id,
+              device_id,
+              version_id: appVersion.id,
+            },
             notify: false,
           }).catch()
         }
