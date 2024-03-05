@@ -87,7 +87,7 @@ async function requestInfosPostgres(
     .limit(1)
     .then(data => data.at(0))
 
-  let channelDevice = drizzleCient
+  let channelDeviceReq = drizzleCient
     .select({
       channel_devices: {
         device_id: schema.channel_devices.device_id,
@@ -138,15 +138,16 @@ async function requestInfosPostgres(
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
 
+  let channelDevice;
   if (defaultChannel) {
-    channelDevice = channelDevice
+    channelDevice = channelDeviceReq
       .where(and(
         eq(schema.channel_devices.app_id, app_id),
         eq(schema.channels.name, defaultChannel),
       ))
   }
   else {
-    channelDevice = channelDevice
+    channelDevice = channelDeviceReq
       .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
   }
   channelDevice = channelDevice
@@ -224,6 +225,7 @@ async function getAppOwnerPostgres(appId: string, drizzleCient: ReturnType<typeo
     return appOwner
   }
   catch (e: any) {
+    console.error('getAppOwnerPostgres', e)
     return null
   }
 }

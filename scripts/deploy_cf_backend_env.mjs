@@ -1,45 +1,46 @@
 import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { exit } from 'process';
+import { parse } from 'dotenv';
 
 // Check if the environment file name is provided as a command-line argument
 const envFileName = process.argv[2];
 const envName = process.argv[3];
 if (!envFileName) {
-  console.error('Please provide the environment file name as second parameter.');
+  console.error('Please provide the environment file name as the second parameter.');
   exit(1);
 }
 if (!envName) {
-  console.error('Please provide the worker name as third parameter.');
+  console.error('Please provide the worker name as the third parameter.');
   exit(1);
 }
 
-// Read the environment file
+// Resolve and check the existence of the .env file
 const envFilePath = resolve(envFileName);
-let env;
+if (!existsSync(envFilePath)) {
+  console.error(`Failed to read the environment file at ${envFilePath}.`);
+  exit(1);
+}
+
+let envContent;
 try {
-  env = readFileSync(envFilePath, 'utf8');
+  envContent = readFileSync(envFilePath, 'utf8');
 } catch (error) {
   console.error(`Failed to read the environment file at ${envFilePath}:`, error);
   exit(1);
 }
 
-const envVars = env.split('\n').filter((line) => line.trim() !== '').filter((line) => !line.startsWith('#'));
+// Use dotenv.parse to convert the file content into an object
+const customEnv = parse(envContent);
 
-console.log('Environment file', envFileName);
-console.log('worker Name', envName);
-console.log('Environment variables', envVars);
+console.log('Environment file:', envFileName);
+console.log('Worker Name:', envName);
+console.log('Environment variables', customEnv);
 
-const envJson = envVars.reduce((acc, envVar) => {
-  const [key, value] = envVar.split('=');
-  acc[key] = value;
-  return acc;
-}, {});
 
-// Convert the environment variables to JSON string
-const secrets = JSON.stringify(envJson, null, 2);
-console.log('Secrets', secrets);
+// Convert the environment variables to a JSON string
+const secrets = JSON.stringify(customEnv, null, 2);
 
 // Construct the command to execute
 const command = `echo '${secrets.replace(/'/g, "'\\''")}' | wrangler secret:bulk --name ${envName}`;
