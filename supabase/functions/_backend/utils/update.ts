@@ -87,7 +87,7 @@ async function requestInfosPostgres(
     .limit(1)
     .then(data => data.at(0))
 
-  let channelDeviceReq = drizzleCient
+  const channelDeviceReq = drizzleCient
     .select({
       channel_devices: {
         device_id: schema.channel_devices.device_id,
@@ -138,7 +138,7 @@ async function requestInfosPostgres(
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
 
-  let channelDevice;
+  let channelDevice
   if (defaultChannel) {
     channelDevice = channelDeviceReq
       .where(and(
