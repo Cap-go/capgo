@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { S3Client } from '@capgo/s3-lite-client'
+import { S3Client } from '@bradenmacdonald/s3-lite-client'
 
 import { getEnv } from './utils.ts'
 

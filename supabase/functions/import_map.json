@@ -16,7 +16,7 @@
     "drizzle-orm/pg-core": "https://esm.sh/drizzle-orm@0.29.3/pg-core?target=deno",
     "drizzle-orm/sqlite-core": "https://esm.sh/drizzle-orm@0.29.3/sqlite-core?target=deno",
     "drizzle-orm/postgres-js": "https://esm.sh/drizzle-orm@0.29.3/postgres-js?target=deno",
-    "@capgo/s3-lite-client": "https://deno.land/x/s3_lite_client@0.7.0/mod.ts",
+    "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@^0.7.3",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3?target=deno",
     "crypto-random-string": "https://esm.sh/crypto-random-string@5.0.0?target=deno",
     "semver": "https://esm.sh/semver@7.6.0?target=deno",
