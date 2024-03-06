@@ -33,7 +33,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getDrizzlePostgres(c: Context) {
-  const supaUrl = getEnv(c, 'SUPABASE_DB_URL')!
+  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
   console.log('getDrizzlePostgres', supaUrl)
 
   const pgClient = postgres(supaUrl)
@@ -443,8 +443,13 @@ export async function update(c: Context, body: AppInfos) {
     let signedURL = version.external_url || ''
     if (version.bucket_id && !version.external_url) {
       const res = await getBundleUrl(c, version.storage_provider, `apps/${appOwner.user_id}/${app_id}/versions`, version.bucket_id)
-      if (res)
+      if (res) {
+        // const fuckedUrl = new URL(res)
+        // if (fuckedUrl.searchParams.get('X-Amz-Credential'))
+        //   fuckedUrl.searchParams.set('X-Amz-Credential', '25ce8abb1f6387d2bb3b126b4ded7784%2F20240306%2Fauto%2Fs3%2Faws4_request')
+        // signedURL = fuckedUrl.toString()
         signedURL = res
+      }
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)

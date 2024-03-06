@@ -57,14 +57,15 @@ app.route('/device', devices)
 
 // Plugin API
 app.route('/channel_self', channel_self)
-// app.route('/updates', updates)
-app.post('/updates', async (c) => {
-  // TODO remove temporary fix until we find why this is not working
-  const body = await c.req.json()
-  const response = await ky.post('https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/updates', { json: body })
-  const data = await response.json()
-  return c.json(data)
-})
+app.route('/updates', updates)
+// if endpoind fail in cloudflare, use this
+// app.post('/updates', async (c) => {
+//   // TODO remove temporary fix until we find why this is not working
+//   const body = await c.req.json()
+//   const response = await ky.post('https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/updates', { json: body })
+//   const data = await response.json()
+//   return c.json(data)
+// })
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
 app.route('/set_custom_id', setCustomId)
