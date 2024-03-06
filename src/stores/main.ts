@@ -72,7 +72,7 @@ export const useMainStore = defineStore('main', () => {
     })
   }
 
-  const filterDashboard = async (appId: string, rangeStart?: string, rangeEnd?: string) => {
+  const filterDashboard = async (appId: string) => {
     return dashboard.value.filter(d => d.app_id === appId)
   }
 

@@ -2,6 +2,5 @@ dist
 public
 **/supabase.types*
 supabase
-supabase/functions/_backend/utils/supabase.types.ts
 supabase/functions/_backend/scripts/*
 CHANGELOG.md
