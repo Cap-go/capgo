@@ -1,8 +1,8 @@
-import type { Context } from 'hono';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl as getSignedUrlSDK } from "@aws-sdk/s3-request-presigner";
+import type { Context } from 'hono'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 
-import { getEnv } from './utils.ts';
+import { getEnv } from './utils.ts'
 
 function initS3(c: Context, clientSideOnly?: boolean) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
@@ -17,7 +17,7 @@ function initS3(c: Context, clientSideOnly?: boolean) {
     },
     endpoint: `https://${storageEndpoint}`,
     region: storageRegion ?? 'us-east-1',
-    forcePathStyle: true, 
+    forcePathStyle: true,
   }
   console.log('initS3', params)
 
@@ -25,58 +25,59 @@ function initS3(c: Context, clientSideOnly?: boolean) {
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
-  const client = initS3(c);
+  const client = initS3(c)
   const command = new PutObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
-  });
-  const url = await getSignedUrlSDK(client, command,  { expiresIn: expirySeconds });
-  return url;
+  })
+  const url = await getSignedUrlSDK(client, command, { expiresIn: expirySeconds })
+  return url
 }
 
 async function deleteObject(c: Context, fileId: string) {
-  const client = initS3(c);
+  const client = initS3(c)
   const command = new DeleteObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
-  });
-  return client.send(command);
+  })
+  return client.send(command)
 }
 
 async function checkIfExist(c: Context, fileId: string) {
-  const client = initS3(c);
+  const client = initS3(c)
   try {
     const command = new HeadObjectCommand({
       Bucket: getEnv(c, 'S3_BUCKET'),
       Key: fileId,
-    });
-    await client.send(command);
-    return true;
-  } catch (error) {
-    return false;
+    })
+    await client.send(command)
+    return true
+  }
+  catch (error) {
+    return false
   }
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initS3(c);
+  const client = initS3(c)
   const command = new GetObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
-  });
-  const url = await getSignedUrlSDK(client, command, { expiresIn: expirySeconds });
-  return url;
+  })
+  const url = await getSignedUrlSDK(client, command, { expiresIn: expirySeconds })
+  return url
 }
 
 async function getSizeChecksum(c: Context, fileId: string) {
-  const client = initS3(c);
+  const client = initS3(c)
   const command = new HeadObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
-  });
-  const { ContentLength, Metadata } = await client.send(command);
-  const size = ContentLength;
+  })
+  const { ContentLength, Metadata } = await client.send(command)
+  const size = ContentLength
   const checksum = Metadata ? Metadata['x-amz-meta-crc32'] : ''
-  return { size, checksum };
+  return { size, checksum }
 }
 
 export const s3 = {
@@ -85,4 +86,4 @@ export const s3 = {
   checkIfExist,
   getSignedUrl,
   getUploadUrl,
-};
+}
