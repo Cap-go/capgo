@@ -1,11 +1,16 @@
+2fa: 管理 2FA
+2fa-code: 2FA验证码
+2fa-disabled: 禁用 2FA
 6-characters-minimum: 最少 6 个字符，1 个大写字母，1 个小写字母，1 个特殊字符
 Bandwidth: 带宽
 Current: 当前的
 Filters: 过滤器
 Override: 覆盖
 Storage: 贮存
+ab-testing-progressive-deploy-conflict: AB测试和渐进式部署不能同时启用
 account: 帐户
 account-error: 更新您的帐户时出错
+account-id: 帐户ID
 account-password-error: 发生错误，请重试
 account-password-heading: 修改我的密码
 account-settings: 帐号设定
@@ -23,15 +28,29 @@ activation-notification-desc: 我同意在新应用版本可用时收到通知
 activation-validate: 证实
 add: 添加
 add-another-app: 添加您的应用
+add-api-key: 成功添加新的 API 密钥
+add-member: 添加会员
 add-shared-user: 添加共享用户
 add-this-code-to-you: 将此代码添加到您的项目中
 add-your-app-to-your: 将您的应用程序添加到您的帐户
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
 admin: 行政
 afternoon: 下午
+alert-2fa-disable: 确认您要禁用 2FA
+alert-accept-inviation: 您接受%ORG% 的邀请吗？
+alert-add-new-key: 选择新的 API 密钥类型
 alert-confirm-delete: 确认删除
+alert-confirm-invite: 确认邀请
+alert-confirm-regenerate: 确认重新生成 API 密钥
 alert-delete-message: 你确定要删除这个吗
+alert-denied-invite: 邀请被拒绝
+alert-disable-2fa-message: 您确定要禁用 2FA 吗？
+alert-generate-new-key: 请选择您要生成的 API 密钥的类型。
+alert-no-invite: 该邀请已不存在
+alert-not-invited: 邀请无效，无法接受
 alert-not-reverse-message: 此操作不可逆
+alert-regenerate-key: 您确定要重新生成此密钥吗
+alert-unknown-error: 未知错误，请参阅开发控制台
 allow-develoment-bui: 允许开发构建
 allow-device-to-self: 允许设备自关联
 allow-emulator: 允许模拟器
@@ -43,6 +62,7 @@ app: 应用程序
 app-deleted: 应用已删除
 app-id-example: 应用 ID 示例
 app-not-found: 找不到应用
+app-preview: 应用预览
 are-u-sure: 你确定吗 ？
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
@@ -66,26 +86,40 @@ button-browse: 浏览
 button-camera: 相机
 button-cancel: 取消
 button-delete: 删除
+button-deny-invite: 否定
 button-go: 去
 button-home: 家
+button-invite: 邀请
+button-join: 接受
 button-options: 选项
+button-regenerate: 再生
 button-remove: 消除
 button-tabs: 选项卡
 button-toggle_dark: 切换深色模式
 button-toggle_langs: 更改语言
 by-clicking-on-them: 通过点击它们。
+cancel: 取消
+cannot-change-permission: 无法更改权限，请检查浏览器控制台
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-app-version: 无法删除应用版本
 cannot-delete-bundle: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
+cannot-delete-member: 无法删除成员，请检查浏览器控制台
+cannot-delete-owner: 无法从组织中删除所有者
+cannot-download: 无法下载捆绑包
 cannot-get-the-test-: 无法获取测试版
+cannot-invite-owner: 无法邀请所有者加入组织
 cannot-save-custom-i: 无法保存自定义 ID
 cannot-set-this-vers: 无法设置此版本
+cannot-share: 无法共享用户 ID，请检查浏览器控制台
 cannot-test-app-some: 无法测试应用程序发生错误
+cannots-sign-off: 无法登录
 change: 改变
 changed-password-suc: 密码修改成功
 channel: 渠道
+channel-ab-testing: 启用AB测试
+channel-ab-testing-percentage: 接收辅助版本的用户百分比
 channel-create: 创建频道
 channel-deleted: 频道已删除
 channel-forced-devices: 强制设备
@@ -96,6 +130,7 @@ channel-link-fail: 无法覆盖频道发生错误
 channel-linked: 通道覆盖设置
 channel-linking: 链接到频道
 channel-make-now: 使默认
+channel-progressive-deploy: 启用渐进式部署
 channels: 频道
 check-email: 请检查您的电子邮件并验证
 check-on-web: 在网站上查看
@@ -109,6 +144,7 @@ confirm-public-desc: |-
 
   其他默认频道将不再默认。
 copied-to-clipboard: 复制到剪贴板
+copy-account-id: 复制帐户 ID
 copy-command: 复制指令
 copy-your: 复制你的
 country: 国家
@@ -127,14 +163,27 @@ delete-account: 删除帐户
 delete-account-0: 删除帐户
 delete-your-account: 删除您的帐户
 deleted: 删除
+dependencies:
+  js-yaml: ''
+  openai: ''
 details-and-logs: 详细信息和日志
+devDependencies:
+  '@types/js-yaml': ''
 device: 设备
 device-id: 设备ID
 devices: 设备
 devices-using-this-b: 使用此捆绑包的设备
+dialog-warning-msg: |-
+  此信息来自组织所有者。
+
+  您无法升级此应用程序的 capgo 等级
 did-not-recive-confirm-email: 没有收到确认邮件吗？
+disable: 禁用
+disable-ab-testing: 禁用AB测试
 disable-auto-downgra: 在本机下禁用自动降级
 disable-auto-upgrade: 禁用主要以上的自动升级
+disable-progressive-deploy: 禁用渐进式部署
+disableAutoUpdateToMajor: 禁用自动更新
 discord: 不和谐
 discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
@@ -143,6 +192,11 @@ dont-have-an-account: 没有帐户？
 download: 下载
 email: 电子邮件
 email-address: 电子邮件地址
+email-does-not-exist: 该用户不存在
+enable: 使能够
+enable-2FA: 启用 2FA
+enabled-ab-testing: 启用AB测试
+enabled-progressive-deploy: 启用渐进式部署
 encrypted: 加密包
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
 enter-your-new-passw: 输入您的新密码并确认
@@ -152,11 +206,15 @@ failed: 失败的
 filters: 过滤器
 first-name: 名
 force-version: 强制版本
+force-version-change: 跳过渐进式部署
 forgot: 忘记
 forgot-check-email: 检查您的电子邮件以获取重置密码的链接
 forgot-success: 密码更新成功
 from: 从
 from-device: 从设备
+general-information: 一般信息
+generated-new-apikey: 已生成新的 API 密钥！
+go-back: 回去
 good: 好的
 id: ID
 in-your-main-file: 在你的主文件中
@@ -165,13 +223,24 @@ included-in-plan: 包含在计划中
 info: 信息
 informations: 资讯
 init-capgo-in-your-a: 在您的应用中初始化 Capgo
+insert-invite-email: 插入您要邀请的用户的电子邮件
 install: 已安装
 install-the-capacito: 安装电容器插件
 into-your-app-folder: 进入您的应用程序文件夹。
 invalid-auth: 您的登录信息不匹配，请重试。
+invalid-email: 传递的电子邮件无效
+invalid-mfa-code: 2FA 代码无效
+invalid-version: 语义版本无效
+invite-accepted: 成功接受组织邀请
+invoices: 发票
 is-emulator: 是模拟器
 is-production-app: 是生产应用
+key-admin: 行政
+key-all: 全部
 key-copied: 复制到剪贴板的密钥
+key-read: 读
+key-upload: 上传
+key-write: 写
 language: 语言
 last-name: 姓
 last-update: 最后更新
@@ -188,11 +257,30 @@ login-to-your-accoun: 登录到您的帐户
 logout: 登出
 logs: 日志
 lowerCaseError: 应包含小写字母
+main: ''
+main-bundle-number: 主束编号
+major: 主要的
 make-default-android: 为 Android 设置默认值
 make-default-ios: 为 iOS 设置默认值
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 mau: 月活跃用户
+member-deleted: 删除会员成功
+members: 会员
+metadata: 元数据
+metadata-min-ver-not-set: 当前捆绑包的最小更新版本未定义
+metadata-not-found: 未找到元数据
+mfa-enable-instruction: 请扫描验证器应用程序中的二维码并验证
+mfa-enable-instruction-2: 请输入当前的 2FA 代码
+mfa-enabled: 启用 2FA
+mfa-fail: 无法更改 2FA，请检查浏览器控制台
+mfa-invalid-code: 2FA 代码无效，请重试！
+min-update-version: 最小更新版本
+minor: 次要的
+misconfigured: 配置错误
+misconfigured-channels: |-
+  某些通道配置错误。
+  这些频道的更新将失败！
 mo: 月
 module-heading: 模块
 monthly: 每月
@@ -207,11 +295,16 @@ name: 姓名
 need-more-contact-us: |-
   需要更多 ？
   联系我们获取量身定制的计划
+'no': 不
 no-channel-linked: 暂无频道，点击添加
+no-channel-linked-no-perm: 无频道
 no-data: 没有数据
 no-devices: 没有设备
 no-logs: 没有日志
+no-permission: 权限不足
 no-version-linked: 暂无版本，点击添加
+no-version-linked-no-perm: 无版本
+none: 没有任何
 not-found: 未找到
 notifications: 通知
 old-onboarding-mode: 旧入职
@@ -221,6 +314,9 @@ open-channel: 打开通道
 open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新
+org-changes-saved: 组织更新成功
+org-invited-user: 已成功邀请用户加入组织
+organization-name: 机构名称
 os-version: 操作系统版本
 pages: 页数
 password: 密码
@@ -229,6 +325,7 @@ password-heading: 创建密码
 password-hint: 输入至少 6 个数字、字母和标点符号的组合。
 password-new: 新密码
 percent-fail: 失败百分比
+permission-changed: 成功更改用户权限
 personal-information: 个人信息
 plan-abtest: A / B测试
 plan-bandwidth: 国标带宽
@@ -239,6 +336,8 @@ plan-inactive: 计划无效
 plan-is-the-best-pla: 计划是满足您需求的最佳计划。
 plan-maker: 最适合小企业主
 plan-member: 计划成员。
+plan-page-warn: 购买计划不会影响您受邀加入的组织。
+plan-page-warn-2: 了解更多相关信息。
 plan-payasyougo: 最适合规模化企业
 plan-pricing-plans: 定价计划
 plan-progressive-deploy: 渐进式部署
@@ -254,8 +353,15 @@ please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
 plugin-version: 插件版本
 prediction: 预言
+preview: 预览捆绑包
+preview-encrypted: 无法预览加密包
+preview-short: 预览
 price-per-unit-above: 每单位价格高于计划
 pro-tip-you-can-copy: 专业提示：您可以复制
+progressive-bundle-number: 渐进束数
+progressive-deploy-option: 选择渐进式部署选项
+progressive-deploy-set-percentage: 启用渐进式部署时无法设置次要版本百分比
+progressive-percentage: 渐进式部署状态
 projection: 预测
 recommended: 受到推崇的
 recommended-for-you: 为你推荐
@@ -264,11 +370,13 @@ register-desc: 填写以下字段以完成您的注册
 register-heading: 登记
 register-next: 登记
 reload: 重新加载
+removed-apikey: API密钥已成功删除
 resend: 重新发送
 resend-email: 重新发送确认邮件
 reset-password: 重设密码
 reset-your-password: 重置你的密码
 save: 保存
+save-changes: 保存更改
 search: 搜索
 search-bundle: 搜索包
 search-bundle-id: 按包 ID 搜索
@@ -280,6 +388,8 @@ search-by-name: 按名称搜索
 search-device: 搜索设备
 search-user: 搜索用户
 see-usage: 查看用法
+select-user-perms: 选择用户的权限
+select-user-perms-expanded: 选择受邀用户应拥有的权限
 session_key: Iv会话密钥
 set-bundle: 将捆绑包设置为频道
 settings: 设置
@@ -293,7 +403,10 @@ something-went-wrong-try-again-later: |-
   稍后再试。
 special-api-access: 特殊API访问
 specialError: 应包含特殊字符
+start-new-deploy: 开始新的渐进式部署
 start-using-capgo: 开始使用：
+status-complete: 完全的
+status-failed: 失败的
 stored-externally: 外部存储
 submit: 提交
 support: 支持
@@ -306,6 +419,7 @@ thank-you-for-choosi: 感谢您选择凯普高！
 the: 这
 this-page-will-self-: 此页面会自动刷新
 title: 标题
+tmp-disabled: （暂时禁用）
 to: 至
 to-live-reload: 住重新加载。
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
@@ -313,6 +427,9 @@ top-apps: 我的应用
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
+type: ''
+undefined: 不明确的
+undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载
 unlimited-updates: 无限更新
 unlink-bundle: 取消链接包
@@ -320,6 +437,7 @@ unlink-channel: 取消链接频道
 unlink-version: 取消链接版本
 update: 更新
 updated-at: 更新于
+updated-min-version: 更新了最小版本
 upgrade: 升级
 upgrade-now: 现在升级
 upperCaseError: 应包含大写字母
@@ -329,17 +447,23 @@ usage-success: 您的计划已设置此页面将在几分钟内更新
 usage-title: 全部的
 use-the-command: 使用命令：
 used-in-period: 使用期间
+used-to-create: 使用此电子邮件的帐户曾经存在，无法重新创建
 user: 用户
+user-already-invited: 该用户已被邀请加入该组织
 validate: 证实
+verify: 核实
+verify-2FA: 验证 2FA
 version: 版本
 version-build: 版本构建
 version-builtin: 版本内置
 version-linked: 版本链接
 version-linking: 捆绑包链接
 versions: 版本
+warning: 警告！
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
 yearly: 每年
+'yes': 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-reached-the-limi: 达到限制
 your-api-key: 您的 API 密钥：

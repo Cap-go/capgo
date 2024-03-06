@@ -1,11 +1,16 @@
+2fa: 2FA'yı yönet
+2fa-code: 2FA kimlik doğrulama kodu
+2fa-disabled: 2FA devre dışı bırakıldı
 6-characters-minimum: Minimum 6 karakter, 1 büyük harf, 1 küçük harf, 1 özel karakter
 Bandwidth: Bant genişliği
 Current: Akım
 Filters: Filtreler
 Override: Geçersiz kıl
 Storage: Depolamak
+ab-testing-progressive-deploy-conflict: AB testi ve aşamalı dağıtım aynı anda etkinleştirilemez
 account: Hesap
 account-error: Hesabınız güncellenirken hata oluştu
+account-id: Hesap kimliği
 account-password-error: Hata oluştu, lütfen tekrar deneyin
 account-password-heading: Şifremi Değiştir
 account-settings: Hesap ayarları
@@ -23,15 +28,29 @@ activation-notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim
 activation-validate: Doğrula
 add: Eklemek
 add-another-app: uygulamanızı ekleyin
+add-api-key: Yeni API anahtarı başarıyla eklendi
+add-member: Üye ekle
 add-shared-user: Paylaşılan kullanıcı ekle
 add-this-code-to-you: Bu kodu projenize ekleyin
 add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
 admin: yönetici
 afternoon: öğleden sonra
+alert-2fa-disable: 2FA'yı devre dışı bırakmak istediğinizi onaylayın
+alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
+alert-add-new-key: Yeni API anahtarı türünü seçin
 alert-confirm-delete: Silmeyi Onayla
+alert-confirm-invite: Daveti onayla
+alert-confirm-regenerate: API anahtarının yeniden oluşturulmasını onaylayın
 alert-delete-message: Bunu silmek istediğinizden emin misiniz
+alert-denied-invite: Davet reddedildi
+alert-disable-2fa-message: 2FA'yı devre dışı bırakmak istediğinizden emin misiniz?
+alert-generate-new-key: Lütfen oluşturmak istediğiniz API anahtarının türünü seçin.
+alert-no-invite: Bu davetiye artık mevcut değil
+alert-not-invited: Geçersiz davet, kabul edilemiyor
 alert-not-reverse-message: Bu eylem geri alınamaz
+alert-regenerate-key: Bu anahtarı yeniden oluşturmak istediğinizden emin misiniz?
+alert-unknown-error: Bilinmeyen hata, geliştirici konsoluna bakın
 allow-develoment-bui: Geliştirme derlemesine izin ver
 allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
 allow-emulator: Öykünücülere İzin Ver
@@ -43,6 +62,7 @@ app: Uygulama
 app-deleted: Uygulama silindi
 app-id-example: Uygulama kimliği örneği
 app-not-found: Uygulama bulunamadı
+app-preview: Uygulama önizlemesi
 are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
@@ -66,26 +86,40 @@ button-browse: Araştır
 button-camera: Kamera
 button-cancel: İptal etmek
 button-delete: Silmek
+button-deny-invite: Reddetmek
 button-go: GİTMEK
 button-home: Ev
+button-invite: Davet etmek
+button-join: Kabul etmek
 button-options: Seçenekler
+button-regenerate: Yenile
 button-remove: Kaldırmak
 button-tabs: Sekmeler
 button-toggle_dark: Karanlık modu değiştir
 button-toggle_langs: Dilleri değiştir
 by-clicking-on-them: üzerlerine tıklayarak.
+cancel: İptal etmek
+cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-bundle: Paket silinemiyor
 cannot-delete-channel: kanal silinemiyor
+cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
+cannot-delete-owner: Sahibi kuruluştan silinemiyor
+cannot-download: Paket indirilemiyor
 cannot-get-the-test-: Test sürümü alınamıyor
+cannot-invite-owner: Sahibi kuruluşa davet edilemiyor
 cannot-save-custom-i: Özel kimlik kaydedilemiyor
 cannot-set-this-vers: Bu sürüm ayarlanamıyor
+cannot-share: Kullanıcı kimliği paylaşılamıyor, tarayıcı konsolunu kontrol edin
 cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
+cannots-sign-off: Oturum açılamıyor
 change: Değiştirmek
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
+channel-ab-testing: AB testini etkinleştir
+channel-ab-testing-percentage: İkincil sürümü alan kullanıcıların yüzdesi
 channel-create: Kanal oluştur
 channel-deleted: kanal silindi
 channel-forced-devices: Zorla cihazlar
@@ -96,6 +130,7 @@ channel-link-fail: Kanal geçersiz kılınamıyor yanlış bir şey oldu
 channel-linked: Kanal geçersiz kılma ayarlandı
 channel-linking: kanala bağlantı
 channel-make-now: Varsayılan yap
+channel-progressive-deploy: Aşamalı dağıtımı etkinleştir
 channels: Kanallar
 check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
 check-on-web: Web sitesinde kontrol edin
@@ -111,6 +146,7 @@ confirm-public-desc: >-
 
   Diğer varsayılan kanallar artık varsayılan olmayacak.
 copied-to-clipboard: Panoya kopyalandı
+copy-account-id: hesap kimliğini kopyala
 copy-command: Komutu kopyala
 copy-your: kopyala
 country: Ülke
@@ -129,14 +165,27 @@ delete-account: Hesabı sil
 delete-account-0: Hesabı sil
 delete-your-account: Hesabını sil
 deleted: silindi
+dependencies:
+  js-yaml: ''
+  openai: ''
 details-and-logs: Ayrıntılar ve günlükler
+devDependencies:
+  '@types/js-yaml': ''
 device: Cihaz
 device-id: Cihaz Kimliği
 devices: Cihazlar
 devices-using-this-b: Bu paketi kullanan cihazlar
+dialog-warning-msg: |-
+  Bu bilgi kuruluş sahibinden gelir.
+
+  Bu uygulamanın capgo katmanını yükseltemezsiniz
 did-not-recive-confirm-email: Onay e-postası almadınız mı?
+disable: Devre dışı bırakmak
+disable-ab-testing: Engelli AB testi
 disable-auto-downgra: Yerel altında otomatik düşürmeyi devre dışı bırak
 disable-auto-upgrade: Binbaşının üzerinde otomatik yükseltmeyi devre dışı bırak
+disable-progressive-deploy: Aşamalı dağıtım devre dışı bırakıldı
+disableAutoUpdateToMajor: Otomatik güncellemeyi devre dışı bırak
 discord: Anlaşmazlık
 discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
@@ -145,6 +194,11 @@ dont-have-an-account: Hesabınız yok mu?
 download: İndirmek
 email: E-posta
 email-address: E-posta adresi
+email-does-not-exist: Böyle bir kullanıcı yoktur
+enable: Olanak vermek
+enable-2FA: 2FA'yı etkinleştir
+enabled-ab-testing: AB testi etkinleştirildi
+enabled-progressive-deploy: Etkin aşamalı dağıtım
 encrypted: Şifrelenmiş paketler
 enter-your-email-add: >-
   E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
@@ -156,11 +210,15 @@ failed: Arızalı
 filters: Filtreler
 first-name: İlk adı
 force-version: Kuvvet versiyonu
+force-version-change: Aşamalı dağıtımı atla
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
 from: Kimden
 from-device: cihazdan
+general-information: Genel Bilgiler
+generated-new-apikey: Yeni API anahtarı oluşturuldu!
+go-back: Geri gitmek
 good: İyi
 id: İD
 in-your-main-file: ana dosyanızda
@@ -169,13 +227,24 @@ included-in-plan: Plana dahil
 info: Bilgi
 informations: bilgiler
 init-capgo-in-your-a: Uygulamanızda Capgo'yu Başlatın
+insert-invite-email: Davet etmek istediğiniz kullanıcının e-posta adresini ekleyin
 install: Kurulmuş
 install-the-capacito: Kapasitör eklentisini kurun
 into-your-app-folder: Uygulama klasörünüze.
 invalid-auth: Oturum açma bilgileriniz eşleşmedi, tekrar deneyin.
+invalid-email: İletilen e-posta geçerli değil
+invalid-mfa-code: Geçersiz 2FA kodu
+invalid-version: Geçersiz semver sürümü
+invite-accepted: Organizasyon daveti başarıyla kabul edildi
+invoices: faturalar
 is-emulator: Emülatör mü
 is-production-app: Üretim uygulaması mı
+key-admin: Yönetici
+key-all: Tüm
 key-copied: Anahtar panonuza kopyalandı
+key-read: Okumak
+key-upload: Yüklemek
+key-write: Yazmak
 language: Dil
 last-name: Soy isim
 last-update: Son Güncelleme
@@ -192,6 +261,9 @@ login-to-your-accoun: hesabınıza giriş yapın
 logout: Çıkış Yap
 logs: Kütükler
 lowerCaseError: Küçük harf içermelidir
+main: ''
+main-bundle-number: Ana paket numarası
+major: Ana
 make-default-android: Android için varsayılan yap
 make-default-ios: iOS için varsayılan yap
 make-normal: normal yap
@@ -199,6 +271,22 @@ making-this-channel-: >-
   Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
   veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
 mau: Aylık aktif kullanıcılar
+member-deleted: Üye başarıyla silindi
+members: Üyeler
+metadata: Meta veriler
+metadata-min-ver-not-set: Mevcut paket için minimum güncelleme sürümü tanımsız
+metadata-not-found: meta veri bulunamadı
+mfa-enable-instruction: Lütfen kimlik doğrulama uygulamasındaki QR kodunu tarayın ve doğrulayın
+mfa-enable-instruction-2: Lütfen mevcut 2FA kodunu yazın
+mfa-enabled: 2FA etkinleştirildi
+mfa-fail: 2FA değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
+mfa-invalid-code: Geçersiz 2FA kodu, tekrar deneyin!
+min-update-version: Minimum güncelleme sürümü
+minor: Küçük
+misconfigured: Yanlış yapılandırılmış
+misconfigured-channels: |-
+  Bazı kanallar yanlış yapılandırılmış. 
+  Bu kanallar için güncellemeler başarısız olacaktır!
 mo: Ay
 module-heading: Modüller
 monthly: Aylık
@@ -213,11 +301,16 @@ name: İsim
 need-more-contact-us: |-
   Daha fazlasına ihtiyaç var ? 
   Size özel plan için bize ulaşın
+'no': HAYIR
 no-channel-linked: Kanal yok, eklemek için tıklayın
+no-channel-linked-no-perm: Kanal yok
 no-data: Veri yok
 no-devices: Cihaz yok
 no-logs: günlük yok
+no-permission: Yetersiz yetkiler
 no-version-linked: Sürüm yok, eklemek için tıklayın
+no-version-linked-no-perm: Sürüm yok
+none: Hiçbiri
 not-found: Bulunamadı
 notifications: Bildirimler
 old-onboarding-mode: eski işe alım
@@ -227,6 +320,9 @@ open-channel: kanalı aç
 open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
 open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
+org-changes-saved: Kuruluş başarıyla güncellendi
+org-invited-user: Kullanıcı başarıyla kuruluşa davet edildi
+organization-name: Kuruluş Adı
 os-version: OS sürümü
 pages: Sayfalar
 password: Şifre
@@ -235,6 +331,7 @@ password-heading: Şifre oluştur
 password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon girin.
 password-new: Yeni Şifre
 percent-fail: Başarısız yüzde
+permission-changed: Kullanıcı izni başarıyla değiştirildi
 personal-information: Kişisel bilgiler
 plan-abtest: A / B testi
 plan-bandwidth: GB Bant Genişliği
@@ -247,6 +344,8 @@ plan-inactive: Plan etkin değil
 plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
 plan-maker: Küçük işletme sahipleri için en iyisi
 plan-member: plan üyesi.
+plan-page-warn: Plan satın almanız, davet edildiğiniz organizasyonları etkilemeyecektir.
+plan-page-warn-2: Bu konuda daha fazla bilgi edinin.
 plan-payasyougo: İşletmeleri ölçeklendirmek için en iyisi
 plan-pricing-plans: Fiyatlandırma Planları
 plan-progressive-deploy: aşamalı dağıtım
@@ -262,8 +361,15 @@ please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
 prediction: Tahmin
+preview: Paketi önizle
+preview-encrypted: Şifrelenmiş paket önizlenemiyor
+preview-short: Ön izleme
 price-per-unit-above: Planın üzerindeki birim başına fiyat
 pro-tip-you-can-copy: 'Profesyonel ipucu: kopyalayabilirsiniz'
+progressive-bundle-number: Aşamalı paket numarası
+progressive-deploy-option: Aşamalı dağıtım seçeneğini seçin
+progressive-deploy-set-percentage: Aşamalı dağıtım etkinleştirildiğinde ikincil sürüm yüzdesini ayarlayamazsınız
+progressive-percentage: Aşamalı dağıtım durumu
 projection: Projeksiyonlar
 recommended: Tavsiye edilen
 recommended-for-you: Sizin için önerilen
@@ -272,11 +378,13 @@ register-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
 register-heading: Kayıt
 register-next: Kayıt olmak
 reload: Tekrar yükle
+removed-apikey: API anahtarı başarıyla silindi
 resend: Tekrar gönder
 resend-email: Yeniden Onay E-postası Gönder
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
 save: kaydeder
+save-changes: Değişiklikleri Kaydet
 search: Aramak
 search-bundle: Paket Ara
 search-bundle-id: Paket kimliğine göre ara
@@ -288,6 +396,8 @@ search-by-name: Ada göre ara
 search-device: Cihaz ara
 search-user: Kullanıcı Ara
 see-usage: Kullanıma bakın
+select-user-perms: Kullanıcının izinlerini seçin
+select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
 set-bundle: Paketi kanala ayarla
 settings: Ayarlar
@@ -301,7 +411,10 @@ something-went-wrong-try-again-later: |-
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
 specialError: Özel karakterler içermelidir
+start-new-deploy: Yeni aşamalı dağıtımı başlatın
 start-using-capgo: 'Kullanmaya başla:'
+status-complete: tamamlamak
+status-failed: arızalı
 stored-externally: harici olarak depolanır
 submit: Göndermek
 support: Destek
@@ -314,6 +427,7 @@ thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
 title: başlık
+tmp-disabled: (Geçici olarak devre dışı bırakıldı)
 to: için
 to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
@@ -321,6 +435,9 @@ top-apps: Benim uygulamalarım
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
+type: ''
+undefined: Tanımsız
+undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
 unlimited-updates: Sınırsız güncelleme
 unlink-bundle: Paketin bağlantısını kaldır
@@ -328,6 +445,7 @@ unlink-channel: Kanalın bağlantısını kaldır
 unlink-version: Sürümün bağlantısını kaldır
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
+updated-min-version: Minimum sürüm güncellendi
 upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
 upperCaseError: Büyük harfler içermelidir
@@ -337,17 +455,23 @@ usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellen
 usage-title: Toplam
 use-the-command: 'Şu komutu kullanın:'
 used-in-period: Döneminde kullanıldı
+used-to-create: Bu e-postaya sahip hesap önceden mevcuttu, yeniden oluşturulamıyor
 user: kullanıcı
+user-already-invited: Bu kullanıcı zaten bu kuruluşa davet edildi
 validate: Doğrula
+verify: Doğrulamak
+verify-2FA: 2FA'yı doğrulayın
 version: Sürüm
 version-build: Sürüm oluşturma
 version-builtin: Sürüm yerleşik
 version-linked: Sürüm bağlantısı
 version-linking: Paket bağlantısı
 versions: Versiyonlar
+warning: Uyarı!
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
 yearly: Yıllık
+'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
 your-api-key: 'API anahtarınız:'

@@ -1,11 +1,16 @@
+2fa: Zarządzaj 2FA
+2fa-code: Kod uwierzytelniający 2FA
+2fa-disabled: Wyłączone 2FA
 6-characters-minimum: Minimum 6 znaków, 1 wielka litera, 1 mała litera, 1 znak specjalny
 Bandwidth: Przepustowość łącza
 Current: Aktualny
 Filters: Filtry
 Override: Nadpisanie
 Storage: Składowanie
+ab-testing-progressive-deploy-conflict: Nie można jednocześnie włączyć testów AB i wdrażania stopniowego
 account: Konto
 account-error: Błąd podczas aktualizowania konta
+account-id: ID konta
 account-password-error: Wystąpił błąd, spróbuj ponownie
 account-password-heading: Zmień moje hasło
 account-settings: Ustawienia konta
@@ -26,19 +31,28 @@ activation-validate: Uprawomocnić
 add: Dodać
 add-another-app: Dodaj swoją aplikację
 add-api-key: Pomyślnie dodano nowy klucz API
+add-member: Dodaj członka
 add-shared-user: Dodaj udostępnionego użytkownika
 add-this-code-to-you: Dodaj ten kod do swojego projektu
 add-your-app-to-your: Dodaj swoją aplikację do swojego konta
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysyłajmy aktualizacje!
 admin: Admin
 afternoon: popołudnie
+alert-2fa-disable: Potwierdź, że chcesz wyłączyć 2FA
+alert-accept-inviation: Czy akceptujesz zaproszenie do %ORG%?
 alert-add-new-key: Wybór typu klucza do wygenerowania
 alert-confirm-delete: Potwierdź usunięcie
+alert-confirm-invite: Potwierdź zaproszenie
 alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
+alert-denied-invite: Zaproszenie odrzucone
+alert-disable-2fa-message: Czy na pewno chcesz wyłączyć 2FA?
 alert-generate-new-key: Proszę wybrać typ klucza API który chcesz wygenerować.
+alert-no-invite: To zaproszenie już nie istnieje
+alert-not-invited: Nieprawidłowe zaproszenie, nie można przyjąć
 alert-not-reverse-message: Ta czynność nie jest odwracalna
 alert-regenerate-key: Czy napewno chcesz zregenerować ten klucz?
+alert-unknown-error: Nieznany błąd, zobacz konsolę deweloperską
 allow-develoment-bui: Zezwalaj na kompilację deweloperską
 allow-device-to-self: Zezwól urządzeniom na samopowiązanie
 allow-emulator: Zezwalaj na emulatory
@@ -50,6 +64,7 @@ app: Aplikacja
 app-deleted: Usunięto aplikację
 app-id-example: Przykład identyfikatora aplikacji
 app-not-found: Nie znaleziono aplikacji
+app-preview: Podgląd aplikacji
 are-u-sure: Jesteś pewny ?
 available-in-the-san: Dostępne w aplikacji piaskownicy
 back-to-login-page: Powrót do strony logowania
@@ -73,8 +88,11 @@ button-browse: Przeglądać
 button-camera: Kamera
 button-cancel: Anulować
 button-delete: Usuwać
+button-deny-invite: Zaprzeczyć
 button-go: IŚĆ
 button-home: Dom
+button-invite: Zapraszać
+button-join: Zaakceptować
 button-options: Opcje
 button-regenerate: Regeneruj
 button-remove: Usunąć
@@ -82,15 +100,23 @@ button-tabs: Zakładki
 button-toggle_dark: Przełącz tryb ciemny
 button-toggle_langs: Zmień języki
 by-clicking-on-them: klikając na nie.
+cancel: Anulować
+cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
 cannot-delete-bundle: Nie można usunąć pakietu
 cannot-delete-channel: Nie można usunąć kanału
+cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
+cannot-delete-owner: Nie można usunąć właściciela z organizacji
+cannot-download: Nie można pobrać pakietu
 cannot-get-the-test-: Nie można pobrać wersji testowej
+cannot-invite-owner: Nie można zaprosić właściciela do organizacji
 cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
 cannot-set-this-vers: Nie można ustawić tej wersji
+cannot-share: Nie można udostępnić identyfikatora użytkownika. Sprawdź konsolę przeglądarki
 cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
+cannots-sign-off: Nie można się zalogować
 change: Zmiana
 changed-password-suc: Hasło zostało zmienione pomyślnie
 channel: Kanał
@@ -106,6 +132,7 @@ channel-link-fail: Nie można zastąpić kanału. Wystąpił błąd
 channel-linked: Ustawiono zastąpienie kanału
 channel-linking: Link do kanału
 channel-make-now: Ustaw jako domyślne
+channel-progressive-deploy: Włącz wdrażanie stopniowe
 channels: Kanały
 check-email: Sprawdź swój e-mail i zweryfikuj
 check-on-web: Sprawdź na stronie internetowej
@@ -123,6 +150,7 @@ confirm-public-desc: >-
 
   Inne domyślne kanały nie będą już domyślne.
 copied-to-clipboard: Skopiowane do schowka
+copy-account-id: skopiuj identyfikator konta
 copy-command: Kopiuj polecenie
 copy-your: Skopiuj swój
 country: Kraj
@@ -141,15 +169,27 @@ delete-account: Usuń konto
 delete-account-0: Usuń konto
 delete-your-account: Usuń swoje konto
 deleted: usunięte
+dependencies:
+  js-yaml: ''
+  openai: ''
 details-and-logs: Szczegóły i logi
+devDependencies:
+  '@types/js-yaml': ''
 device: Urządzenie
 device-id: Identyfikator urzadzenia
 devices: Urządzenia
 devices-using-this-b: Urządzenia korzystające z tego pakietu
+dialog-warning-msg: |-
+  Te informacje pochodzą od właściciela organizacji.
+
+  Nie możesz uaktualnić poziomu capgo dla tej aplikacji
 did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
+disable: Wyłączyć
 disable-ab-testing: Wyłączono testy AB
 disable-auto-downgra: Wyłącz automatyczne obniżanie wersji natywnej
 disable-auto-upgrade: Wyłącz automatyczną aktualizację powyżej wersji głównej
+disable-progressive-deploy: Wyłączono wdrażanie progresywne
+disableAutoUpdateToMajor: Wyłącz automatyczną aktualizację
 discord: Niezgoda
 discover-module-in-a: Odkryj moduł w Awesome-capacitor
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
@@ -158,7 +198,11 @@ dont-have-an-account: Nie masz konta?
 download: Pobierać
 email: E-mail
 email-address: Adres e-mail
+email-does-not-exist: Ten użytkownik nie istnieje
+enable: Włączać
+enable-2FA: Włącz 2FA
 enabled-ab-testing: Włączono testy AB
+enabled-progressive-deploy: Włączono wdrażanie progresywne
 encrypted: Zaszyfrowane pakiety
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
@@ -168,12 +212,15 @@ failed: Przegrany
 filters: Filtry
 first-name: Imię
 force-version: Wersja na siłę
+force-version-change: Pomiń wdrażanie stopniowe
 forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione
 from: od
 from-device: z urządzenia
+general-information: Ogólne informacje
 generated-new-apikey: Nowy klucz API został wygenerowany!
+go-back: Wróć
 good: Dobry
 id: ID
 in-your-main-file: W twoim głównym pliku
@@ -182,16 +229,24 @@ included-in-plan: Zawarte w planie
 info: Informacja
 informations: Informacje
 init-capgo-in-your-a: Zainicjuj Capgo w swojej aplikacji
+insert-invite-email: Wpisz adres e-mail użytkownika, którego chcesz zaprosić
 install: Zainstalowane
 install-the-capacito: Zainstaluj wtyczkę Kondensator
 into-your-app-folder: Do folderu aplikacji.
 invalid-auth: Twój login się nie zgadza, spróbuj ponownie.
+invalid-email: Przekazany adres e-mail jest nieprawidłowy
+invalid-mfa-code: Nieprawidłowy kod 2FA
+invalid-version: Nieprawidłowa wersja serwera
+invite-accepted: Zaproszenie do oranizacji zostało przyjęte pomyślnie
+invoices: faktury
 is-emulator: jest emulatorem
 is-production-app: Czy aplikacja produkcyjna
+key-admin: Admin
 key-all: Wszystko
 key-copied: Klucz skopiowany do schowka
 key-read: Odczyt
 key-upload: Przesył
+key-write: Pisać
 language: Język
 last-name: Nazwisko
 last-update: Ostatnia aktualizacja
@@ -208,6 +263,9 @@ login-to-your-accoun: Zaloguj się na swoje konto
 logout: Wyloguj
 logs: Logi
 lowerCaseError: Powinien zawierać małe litery
+main: ''
+main-bundle-number: Główny numer pakietu
+major: Główny
 make-default-android: Ustaw jako domyślny dla Androida
 make-default-ios: Ustaw jako domyślny dla iOS
 make-normal: Zrób normalne
@@ -215,6 +273,22 @@ making-this-channel-: >-
   Ustawienie tego kanału jako „normalnego” będzie wymagało skonfigurowania
   innego domyślnego kanału lub umożliwienia samoprzypisania przez urządzenie.
 mau: Miesięczna liczba aktywnych użytkowników
+member-deleted: Pomyślnie usunięto członka
+members: Członkowie
+metadata: Metadane
+metadata-min-ver-not-set: Minimalna wersja aktualizacji dla bieżącego pakietu jest niezdefiniowana
+metadata-not-found: nie znaleziono metadanych
+mfa-enable-instruction: Zeskanuj kod QR w aplikacji uwierzytelniającej i sprawdź
+mfa-enable-instruction-2: Proszę wpisać aktualny kod 2FA
+mfa-enabled: Włączono 2FA
+mfa-fail: Nie można zmienić 2FA, sprawdź konsolę przeglądarki
+mfa-invalid-code: Nieprawidłowy kod 2FA, spróbuj ponownie!
+min-update-version: Minimalna wersja aktualizacji
+minor: Drobny
+misconfigured: Źle skonfigurowany
+misconfigured-channels: |-
+  Niektóre kanały są źle skonfigurowane. 
+  Aktualizacje tych kanałów nie powiodą się!
 mo: mo
 module-heading: Moduły
 monthly: Miesięczny
@@ -229,11 +303,16 @@ name: Nazwa
 need-more-contact-us: |-
   Potrzeba więcej ? 
   Skontaktuj się z nami, aby uzyskać dostosowany plan
+'no': NIE
 no-channel-linked: Brak kanału, kliknij, aby dodać
+no-channel-linked-no-perm: Brak kanału
 no-data: Brak danych
 no-devices: Brak urządzeń
 no-logs: Brak dzienników
+no-permission: Niewystarczające uprawnienia
 no-version-linked: Brak wersji, kliknij, aby dodać
+no-version-linked-no-perm: Brak wersji
+none: Nic
 not-found: Nie znaleziono
 notifications: Powiadomienia
 old-onboarding-mode: stary wstęp
@@ -243,6 +322,9 @@ open-channel: Otwórz kanał
 open-settings: Kliknij, aby otworzyć ustawienia
 open-sidebar: Otwórz pasek boczny
 open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację
+org-changes-saved: Organizacja została pomyślnie zaktualizowana
+org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
+organization-name: Nazwa organizacji
 os-version: Wersja systemu operacyjnego
 pages: Strony
 password: Hasło
@@ -251,6 +333,7 @@ password-heading: Stwórz hasło
 password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
 password-new: nowe hasło
 percent-fail: Procent niepowodzeń
+permission-changed: Pomyślnie zmieniono uprawnienia użytkownika
 personal-information: Informacje osobiste
 plan-abtest: Testy A/B
 plan-bandwidth: GB Przepustowość
@@ -261,6 +344,10 @@ plan-inactive: Plan nieaktywny
 plan-is-the-best-pla: plan to najlepszy plan dla Twoich potrzeb.
 plan-maker: Najlepsze dla właścicieli małych firm
 plan-member: członek planu.
+plan-page-warn: >-
+  Zakup planu nie będzie miał wpływu na organizacje, do których zostaniesz
+  zaproszony.
+plan-page-warn-2: Dowiedz się więcej na ten temat.
 plan-payasyougo: Najlepsze do skalowania przedsiębiorstw
 plan-pricing-plans: Plany cenowe
 plan-progressive-deploy: Wdrażanie progresywne
@@ -276,8 +363,17 @@ please-choose-your-p: Wybierz swoje preferencje
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 plugin-version: Wersja wtyczki
 prediction: Prognoza
+preview: Podgląd pakietu
+preview-encrypted: Nie można wyświetlić podglądu zaszyfrowanego pakietu
+preview-short: zapowiedź
 price-per-unit-above: Cena za jednostkę powyżej planu
 pro-tip-you-can-copy: 'Pro wskazówka: możesz skopiować plik'
+progressive-bundle-number: Progresywny numer pakietu
+progressive-deploy-option: Wybierz opcję wdrażania stopniowego
+progressive-deploy-set-percentage: >-
+  Nie można ustawić procentu wersji dodatkowej, gdy włączone jest wdrażanie
+  progresywne
+progressive-percentage: Stan wdrażania progresywnego
 projection: projekcje
 recommended: Zalecana
 recommended-for-you: polecany dla Ciebie
@@ -292,6 +388,7 @@ resend-email: Wyślij ponownie email z potwierdzeniem
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
 save: Zapisuje
+save-changes: Zapisz zmiany
 search: Szukaj
 search-bundle: Wyszukaj pakiet
 search-bundle-id: Wyszukaj według identyfikatora pakietu
@@ -303,6 +400,8 @@ search-by-name: Szukaj według nazwy
 search-device: Wyszukaj urządzenie
 search-user: Wyszukaj użytkownika
 see-usage: Zobacz użycie
+select-user-perms: Wybierz uprawnienia użytkownika
+select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
 session_key: Klucz IVSesji
 set-bundle: Ustaw pakiet na kanał
 settings: Ustawienia
@@ -316,7 +415,10 @@ something-went-wrong-try-again-later: |-
   Spróbuj ponownie później.
 special-api-access: Specjalny dostęp do API
 specialError: Powinien zawierać znaki specjalne
+start-new-deploy: Rozpocznij nowe, stopniowe wdrażanie
 start-using-capgo: 'Zacząć używać:'
+status-complete: kompletny
+status-failed: przegrany
 stored-externally: przechowywane na zewnątrz
 submit: Składać
 support: Wsparcie
@@ -329,6 +431,7 @@ thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 the: The
 this-page-will-self-: Ta strona odświeży się samoczynnie
 title: tytuł
+tmp-disabled: (Tymczasowo wyłączone)
 to: do
 to-live-reload: przeładować na żywo.
 to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
@@ -336,6 +439,9 @@ top-apps: Moje aplikacje
 trial-left: Pozostałe dni
 trial-plan-expired: Wersja czasowa wygasła
 trial-plan-expires-in: Próba kończy się za
+type: ''
+undefined: nieokreślony
+undefined-fail: Niezdefiniowany (aktualizacje nie powiodą się)
 uninstall: Odinstalowano
 unlimited-updates: Nieograniczone aktualizacje
 unlink-bundle: Odłącz pakiet
@@ -343,6 +449,7 @@ unlink-channel: Odłącz kanał
 unlink-version: Odłącz wersję
 update: Aktualizacja
 updated-at: Zaktualizowano o godz
+updated-min-version: Zaktualizowana wersja minimalna
 upgrade: Aktualizacja
 upgrade-now: Ulepsz teraz
 upperCaseError: Powinien zawierać wielkie litery
@@ -354,17 +461,23 @@ usage-success: >-
 usage-title: Całkowity
 use-the-command: 'Użyj polecenia:'
 used-in-period: Używany w okresie
+used-to-create: Konto z tym adresem e-mail istniało już wcześniej i nie można go odtworzyć
 user: Użytkownik
+user-already-invited: Ten użytkownik jest już zaproszony do tej organizacji
 validate: Uprawomocnić
+verify: Zweryfikować
+verify-2FA: Zweryfikuj 2FA
 version: Wersja
 version-build: Budowa wersji
 version-builtin: Wersja wbudowana
 version-linked: Link do wersji
 version-linking: Link do pakietu
 versions: Wersje
+warning: Ostrzeżenie!
 welcome-to: Witamy w
 welcome-to-your-capg: Witamy na pulpicie nawigacyjnym Capgo
 yearly: Rocznie
+'yes': Tak
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-reached-the-limi: Limit osiągnięty
 your-api-key: 'Twój klucz API:'
