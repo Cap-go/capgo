@@ -37,7 +37,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     const prices = data.data
     console.log('prices stripe', prices)
     prices.forEach((price: any) => {
-      if (price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
+      if (price.recurring && price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
       if (price.billing_scheme === 'per_unit' && price.active && price?.recurring?.usage_type !== 'licensed')
         meteredIds.push(price.id)
