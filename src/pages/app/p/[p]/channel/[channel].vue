@@ -49,7 +49,7 @@ watch(channel, async (channel) => {
     return
   }
 
-  role.value = await organizationStore.getCurrentRole(channel.created_by, channel.app_id, channel.id)
+  role.value = await organizationStore.getCurrentRoleForApp(channel.app_id)
   console.log(role.value)
 })
 
@@ -126,7 +126,6 @@ async function getChannel() {
             minUpdateVersion
           ),
           created_at,
-          created_by,
           app_id,
           allow_emulator,
           allow_dev,
@@ -154,9 +153,6 @@ async function getChannel() {
 
     channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
     secondaryVersionPercentage.value = (data.secondaryVersionPercentage * 100) | 0
-
-    // Conversion of type '{ id: number; name: string; public: boolean; version: { id: unknown; name: unknown; app_id: unknown; bucket_id: unknown; created_at: unknown; }[]; created_at: string; allow_emulator: boolean; allow_dev: boolean; allow_device_self_set: boolean; ... 7 more ...; secondVersion: number | null; }' to type '{ allow_dev: boolean; allow_device_self_set: boolean; allow_emulator: boolean; android: boolean; app_id: string; beta: boolean; created_at: string; created_by: string; disableAutoUpdateToMajor: boolean; ... 9 more ...; version: number; } & Channel' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
-    // Type '{ id: number; name: string; public: boolean; version: { id: unknown; name: unknown; app_id: unknown; bucket_id: unknown; created_at: unknown; }[]; created_at: string; allow_emulator: boolean; allow_dev: boolean; allow_device_self_set: boolean; ... 7 more ...; secondVersion: number | null; }' is missing the following properties from type '{ allow_dev: boolean; allow_device_self_set: boolean; allow_emulator: boolean; android: boolean; app_id: string; beta: boolean; created_at: string; created_by: string; disableAutoUpdateToMajor: boolean; ... 9 more ...; version: number; }': app_id, beta, created_byts(2352)
   }
   catch (error) {
     console.error(error)
@@ -169,7 +165,7 @@ async function reload() {
 }
 
 async function saveChannelChange(key: string, val: any) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -209,7 +205,7 @@ watchEffect(async () => {
 })
 
 async function makeDefault(val = true) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -314,7 +310,7 @@ async function getUnknownVersion(): Promise<number> {
 async function openPannel() {
   if (!channel.value || !main.auth)
     return
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -343,7 +339,7 @@ async function openPannel() {
 }
 
 async function enableAbTesting() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -374,7 +370,7 @@ async function enableAbTesting() {
 }
 
 async function enableProgressiveDeploy() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -405,7 +401,7 @@ async function enableProgressiveDeploy() {
 }
 
 const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -419,7 +415,7 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
 const debouncedInformAboutProgressiveDeployPercentageSet = debounce(() => {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -435,14 +431,14 @@ async function setSecondaryVersionPercentage(percentage: number) {
 }
 
 function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
-  if (channel.value?.enable_progressive_deploy || !(role.value && organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner']))) {
+  if (channel.value?.enable_progressive_deploy || !(role.value && organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin']))) {
     debouncedInformAboutProgressiveDeployPercentageSet()
     event.preventDefault()
   }
 }
 
 function guardChangeAutoUpdate(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -450,7 +446,7 @@ function guardChangeAutoUpdate(event: Event) {
 }
 
 async function onChangeAutoUpdate(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     event.preventDefault()
     if (channel?.value?.disableAutoUpdate)

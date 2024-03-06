@@ -127,7 +127,6 @@ export interface Database {
           session_key: string | null
           storage_provider: string
           updated_at: string | null
-          user_id: string | null
         }
         Insert: {
           app_id: string
@@ -144,7 +143,6 @@ export interface Database {
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
-          user_id?: string | null
         }
         Update: {
           app_id?: string
@@ -161,7 +159,6 @@ export interface Database {
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -256,7 +253,6 @@ export interface Database {
           retention: number
           tmp_id: string | null
           updated_at: string | null
-          user_id: string | null
         }
         Insert: {
           app_id: string
@@ -269,7 +265,6 @@ export interface Database {
           retention?: number
           tmp_id?: string | null
           updated_at?: string | null
-          user_id?: string | null
         }
         Update: {
           app_id?: string
@@ -282,16 +277,8 @@ export interface Database {
           retention?: number
           tmp_id?: string | null
           updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "apps_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "owner_org_id_fkey"
             columns: ["owner_org"]
@@ -362,7 +349,6 @@ export interface Database {
           app_id: string
           beta: boolean
           created_at: string
-          created_by: string | null
           disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative: boolean
           enable_progressive_deploy: boolean
@@ -375,7 +361,6 @@ export interface Database {
           secondaryVersionPercentage: number
           secondVersion: number | null
           updated_at: string
-          user_id: string | null
           version: number
         }
         Insert: {
@@ -386,7 +371,6 @@ export interface Database {
           app_id: string
           beta?: boolean
           created_at?: string
-          created_by?: string | null
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -399,7 +383,6 @@ export interface Database {
           secondaryVersionPercentage?: number
           secondVersion?: number | null
           updated_at?: string
-          user_id?: string | null
           version: number
         }
         Update: {
@@ -410,7 +393,6 @@ export interface Database {
           app_id?: string
           beta?: boolean
           created_at?: string
-          created_by?: string | null
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -423,7 +405,6 @@ export interface Database {
           secondaryVersionPercentage?: number
           secondVersion?: number | null
           updated_at?: string
-          user_id?: string | null
           version?: number
         }
         Relationships: [
@@ -1569,14 +1550,6 @@ export interface Database {
         }
         Returns: boolean
       }
-      has_app_right_userid: {
-        Args: {
-          appid: string
-          right: Database["public"]["Enums"]["user_min_right"]
-          userid: string
-        }
-        Returns: boolean
-      }
       has_min_right: {
         Args: {
           _userid: string
@@ -1732,10 +1705,6 @@ export interface Database {
             }
             Returns: boolean
           }
-      is_god: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       is_good_plan_v5: {
         Args: {
           userid: string
@@ -1894,7 +1863,6 @@ export interface Database {
         | "invite_upload"
         | "invite_write"
         | "invite_admin"
-        | "invite_super_admin"
         | "read"
         | "upload"
         | "write"

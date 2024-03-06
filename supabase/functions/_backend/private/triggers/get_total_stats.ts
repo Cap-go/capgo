@@ -18,7 +18,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<dataDevice>()
     console.log('body', body)
-    return c.json(await getSDashboardV2(c, null, body.userId, body.startDate, body.endDate, body.appId))
+    return c.json(await getSDashboardV2(c, '', body.startDate, body.endDate, body.appId, body.userId))
   }
   catch (e) {
     return c.json({ status: 'Cannot get dashboard', error: JSON.stringify(e) }, 500)

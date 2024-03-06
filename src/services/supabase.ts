@@ -9,6 +9,7 @@ import type { Database } from '~/types/supabase.types'
 let supaClient: SupabaseClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
+export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 
 interface CapgoConfig {
   supaHost: string
@@ -173,12 +174,12 @@ export interface appUsage {
   storage_deleted: number
   uninstall: number
 }
-export async function getAllDashboard(userId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
+export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
   const token = (await useSupabase().auth.getSession()).data.session?.access_token
   const data = await ky
     .post(`${defaultApiHost}/private/dashboard`, {
       json: {
-        userId,
+        orgId,
         startDate,
         endDate,
       },
@@ -193,13 +194,14 @@ export async function getAllDashboard(userId: string, startDate?: string, endDat
   return data
 }
 
-export async function getTotaAppStorage(userid?: string, appid?: string): Promise<number> {
-  if (!userid)
+export async function getTotaAppStorage(orgId?: string, appid?: string): Promise<number> {
+  if (!orgId)
     return 0
   if (!appid)
-    return getTotalStorage(userid)
+    return getTotalStorage(orgId)
+
   const { data, error } = await useSupabase()
-    .rpc('get_total_app_storage_size', { userid, appid })
+    .rpc('get_total_app_storage_size_orgs', { org_id: orgId, app_id: appid })
     .single()
   if (error)
     throw new Error(error.message)
@@ -207,11 +209,11 @@ export async function getTotaAppStorage(userid?: string, appid?: string): Promis
   return data || 0
 }
 
-export async function getTotalStorage(userid?: string): Promise<number> {
-  if (!userid)
+export async function getTotalStorage(orgId?: string): Promise<number> {
+  if (!orgId)
     return 0
   const { data, error } = await useSupabase()
-    .rpc('get_total_storage_size', { userid })
+    .rpc('get_total_storage_size_org', { org_id: orgId })
     .single()
   if (error)
     throw new Error(error.message)
