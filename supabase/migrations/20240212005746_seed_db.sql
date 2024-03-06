@@ -1,3 +1,6 @@
+-- This migration file can be updated
+-- It does not have to be keep up-to-date in prod as it's only using during the seeding process
+
 CREATE OR REPLACE FUNCTION reset_and_seed_data()
 RETURNS void AS $$
 BEGIN
