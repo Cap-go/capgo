@@ -20,6 +20,14 @@ DROP TRIGGER replicate_devices_override_insert ON "public"."devices_override";
 DROP TRIGGER replicate_devices_override_update ON "public"."devices_override";
 DROP TRIGGER replicate_devices_override_drop ON "public"."devices_override";
 
+DROP FUNCTION "public"."post_replication_sql"(sql_query text);
+DROP FUNCTION "public"."post_replication_sql"(sql_query text, params text[]);
+DROP FUNCTION "public"."replicate_insert"();
+DROP FUNCTION "public"."replicate_update"();
+DROP FUNCTION "public"."replicate_drop"();
+DROP FUNCTION "public"."replicate_drop_double"();
+DROP FUNCTION "public"."replicate_update_double"();
+
 CREATE OR REPLACE FUNCTION public.http_post_helper(function_name text, function_type text, body jsonb) 
 RETURNS bigint 
 LANGUAGE plpgsql 
