@@ -1,10 +1,9 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
+import { EMPTY_UUID, hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
-import { EMPTY_UUID } from '../../../../src/services/supabase.ts'
 
 interface ChannelSet {
   app_id: string
