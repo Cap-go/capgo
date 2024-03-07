@@ -47,6 +47,11 @@ app.post('/', async (c: Context) => {
       // get toal categ
       reqTotal.eq('native_script', true)
     }
+    else if (mode === 'capgo') {
+      req.eq('capgo', true)
+      // get toal categ
+      reqTotal.eq('capgo', true)
+    }
     else {
       req = req.eq('capacitor', true)
       // get toal categ
