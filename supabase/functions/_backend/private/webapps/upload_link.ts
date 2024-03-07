@@ -25,7 +25,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       console.log('_errorUserId', _errorUserId)
       return c.json({ status: 'Error User not found' }, 500)
     }
-    const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
+    const filePath = `apps/${userId}/${body.app_id}/versions/${body.bucket_id}`
     // check if app version exist
     const { error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
@@ -33,7 +33,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .eq('bucket_id', body.bucket_id)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
-      .eq('user_id', userId)
+      .eq('user_id', apikey.user_id)
       .single()
     if (errorVersion) {
       console.log('errorVersion', errorVersion)
@@ -43,7 +43,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .from('apps')
       .select('app_id')
       .eq('app_id', body.app_id)
-      .eq('user_id', userId)
+      .eq('user_id', apikey.user_id)
       .single()
     if (errorApp) {
       console.log('errorApp', errorApp)
