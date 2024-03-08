@@ -423,13 +423,15 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
   if (!auth)
     client = supabaseAdmin(c)
 
-  const reqOwner = await client
-    .rpc('has_app_right', { appid: appId, right: 'read' })
-    .then((r) => {
-      console.log(r)
-      return r
-    })
-    .then(res => res.data || false)
+  const reqOwner = auth
+    ? await client
+      .rpc('has_app_right', { appid: appId, right: 'read' })
+      .then((r) => {
+        console.log(r)
+        return r
+      })
+      .then(res => res.data || false)
+    : true
   if (!reqOwner) {
     const reqAdmin = await client
       .rpc('is_admin')
