@@ -74,6 +74,7 @@ app.post('/', async (c: Context) => {
     return update(c, body)
   }
   catch (e) {
+    console.log('error', JSON.stringify(e))
     return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 500)
   }
 })

@@ -472,7 +472,7 @@ validate: Valider
 verify: Vérifier
 verify-2FA: Vérifier 2FA
 version: Version
-version-build: Version de construction
+version-build: Version installée
 version-builtin: Version intégrée
 version-linked: Lien vers la version
 version-linking: Lien vers le forfait

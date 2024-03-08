@@ -8,6 +8,7 @@ echo "📦 Install CocoaPods"
 brew install cocoapods
 brew install node@20
 brew link node@20
+pod --version
 node -v
 npm -v
 

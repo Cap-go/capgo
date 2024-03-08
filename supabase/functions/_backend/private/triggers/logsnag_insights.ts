@@ -11,7 +11,6 @@ interface GlobalStats {
   updates: PromiseLike<number>
   users: PromiseLike<number>
   stars: Promise<number>
-  trial: PromiseLike<number>
   onboarded: PromiseLike<number>
   need_upgrade: PromiseLike<number>
   paying: PromiseLike<number>
@@ -42,11 +41,6 @@ function getStats(c: Context): GlobalStats {
       .select('*', { count: 'exact' })
       .then(res => res.count || 0),
     stars: getGithubStars(),
-    trial: supabase.rpc('count_all_trial', {}).single().then((res) => {
-      if (res.error || !res.data)
-        console.log('count_all_trial', res.error)
-      return res.data || 0
-    }),
     paying: supabase.rpc('count_all_paying', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('count_all_paying', res.error)
@@ -62,25 +56,10 @@ function getStats(c: Context): GlobalStats {
         console.log('count_all_need_upgrade', res.error)
       return res.data || 0
     }),
-    plans: supabase.from('plans').select('name, stripe_id').then(({ data: planNames, error }) => {
-      if (error || !planNames) {
-        console.log('get plans', error)
-        return {}
-      }
-      return supabase.rpc('count_all_plans', {}).then((res) => {
-        if (res.error || !res.data) {
-          console.log('count_all_plan', res.error)
-          return {}
-        }
-        // create object with name and count
-        const plans: any = {}
-        for (const plan of res.data) {
-          const name = planNames.find(p => p.stripe_id === plan.product_id)?.name
-          if (name)
-            plans[name] = plan.count
-        }
-        return plans
-      })
+    plans: supabase.rpc('count_all_plans_v2', {}).single().then((res) => {
+      if (res.error || !res.data)
+        console.log('count_all_plans_v2', res.error)
+      return res.data || {}
     }),
   }
 }
@@ -96,7 +75,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       updates,
       users,
       stars,
-      trial,
       paying,
       onboarded,
       need_upgrade,
@@ -106,14 +84,13 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       res.updates,
       res.users,
       res.stars,
-      res.trial,
       res.paying,
       res.onboarded,
       res.need_upgrade,
       res.plans,
     ])
     const not_paying = users - paying
-    console.log('All Promises', apps, updates, users, stars, trial, paying, onboarded, need_upgrade, plans)
+    console.log('All Promises', apps, updates, users, stars, paying, onboarded, need_upgrade, plans)
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
@@ -122,7 +99,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       apps,
       updates,
       stars,
-      trial,
       paying,
       onboarded,
       need_upgrade,
@@ -162,7 +138,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       },
       {
         title: 'User trial',
-        value: trial,
+        value: plans.Trial,
         icon: '👶',
       },
       {

@@ -72,11 +72,11 @@ function convertKey(key: string) {
 const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
 const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
 
-async function openChangePlan(planId: string, index: number) {
+async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // get the current url
   isSubscribeLoading.value[index] = true
-  if (planId)
-    await openCheckout(planId, window.location.href, window.location.href, isYearly.value)
+  if (plan.stripe_id)
+    await openCheckout(plan.stripe_id, window.location.href, window.location.href, plan.price_y !== plan.price_m ? isYearly.value : false)
   isSubscribeLoading.value[index] = false
 }
 
@@ -256,7 +256,7 @@ const hightLights = computed<Stat[]>(() => ([
               v-if="p.stripe_id !== 'free'"
               :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
-              :disabled="isDisabled(p)" @click="openChangePlan(p.stripe_id, index)"
+              :disabled="isDisabled(p)" @click="openChangePlan(p, index)"
             >
               <svg v-if="isSubscribeLoading[index]" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle dark:text-gray-900 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle

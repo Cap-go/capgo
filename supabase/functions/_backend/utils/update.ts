@@ -33,7 +33,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getDrizzlePostgres(c: Context) {
-  const supaUrl = getEnv(c, 'SUPABASE_DB_URL')!
+  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
   console.log('getDrizzlePostgres', supaUrl)
 
   const pgClient = postgres(supaUrl)
@@ -87,7 +87,7 @@ async function requestInfosPostgres(
     .limit(1)
     .then(data => data.at(0))
 
-  let channelDevice = drizzleCient
+  const channelDeviceReq = drizzleCient
     .select({
       channel_devices: {
         device_id: schema.channel_devices.device_id,
@@ -138,15 +138,16 @@ async function requestInfosPostgres(
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
 
+  let channelDevice
   if (defaultChannel) {
-    channelDevice = channelDevice
+    channelDevice = channelDeviceReq
       .where(and(
         eq(schema.channel_devices.app_id, app_id),
         eq(schema.channels.name, defaultChannel),
       ))
   }
   else {
-    channelDevice = channelDevice
+    channelDevice = channelDeviceReq
       .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
   }
   channelDevice = channelDevice
@@ -235,6 +236,7 @@ async function getAppOwnerPostgres(
     return appOwner
   }
   catch (e: any) {
+    console.error('getAppOwnerPostgres', e)
     return null
   }
 }
@@ -454,6 +456,7 @@ export async function update(c: Context, body: AppInfos) {
       const res = await getBundleUrl(c, version.storage_provider, `apps/${appOwner.orgs.created_by}/${app_id}/versions`, version.bucket_id)
       if (res)
         signedURL = res
+      }
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
