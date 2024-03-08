@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import { app } from '../_backend/private/webapps/config.ts'
+import { app } from '../_backend/private/config.ts'
 
 // TODO: deprecated remove when everyone use the new CLI
 const functionName = 'get_config'

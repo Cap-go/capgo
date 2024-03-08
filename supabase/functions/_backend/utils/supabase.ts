@@ -489,7 +489,7 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         console.log('order', col.key, col.sortable)
-        req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
+        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
   }
@@ -576,7 +576,7 @@ export async function getSStats(c: Context, auth: string, appId: string, deviceI
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         console.log('order', col.key, col.sortable)
-        req = req.order(col.key as any, { ascending: col.sortable === 'asc' })
+        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
   }
