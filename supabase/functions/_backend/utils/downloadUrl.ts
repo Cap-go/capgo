@@ -1,20 +1,16 @@
 import type { Context } from 'hono'
 import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
+import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
 // const EXPIRATION_SECONDS = 120
 
-export async function getBundleUrl(c: Context, platform: string, path: string, bucket_id: string) {
-  if (platform === 'supabase') {
-    const { data } = await supabaseAdmin(c)
-      .storage
-      .from(path)
-      .createSignedUrl(bucket_id, EXPIRATION_SECONDS)
-    return data?.signedUrl
-  }
-  else if (platform === 'r2' && bucket_id.endsWith('.zip')) {
-    return await s3.getSignedUrl(c, `${path}/${bucket_id}`, EXPIRATION_SECONDS)
-  }
+export async function getBundleUrl(c: Context, ownerOrg: string, version: Database['public']['Tables']['app_versions']['Row']) {
+  if (version.storage_provider === 'r2' && version.bucket_id && version.bucket_id?.endsWith('.zip'))
+    return await s3.getSignedUrl(c, `apps/${ownerOrg}/${version.app_id}/versions/${version.bucket_id}`, EXPIRATION_SECONDS)
+  else if (version.storage_provider === 'r2' && version.r2_path && !version.bucket_id)
+    return await s3.getSignedUrl(c, version.r2_path, EXPIRATION_SECONDS)
+
   return null
 }

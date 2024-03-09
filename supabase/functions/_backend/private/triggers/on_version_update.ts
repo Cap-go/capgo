@@ -11,7 +11,7 @@ import { s3 } from '../../utils/s3.ts'
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const record = body.record
 
-  if (!record.bucket_id) {
+  if (!record.bucket_id && !record.r2_path) {
     console.log('no bucket_id')
     return c.json(BRES)
   }
@@ -27,12 +27,12 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
     console.log('no id')
     return c.json(BRES)
   }
-  const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
-  const existV2 = await s3.checkIfExist(c, v2Path)
+  const v2Path = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
+  const existV2 = v2Path ? await s3.checkIfExist(c, v2Path) : false
 
   if (existV2 && record.storage_provider === 'r2') {
     // pdate size and checksum
-    console.log('V2', record.bucket_id)
+    console.log('V2', record.bucket_id, record.r2_path)
     const { size, checksum } = await s3.getSizeChecksum(c, v2Path)
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
@@ -58,7 +58,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  if (!record.bucket_id) {
+  if (!record.bucket_id && !record.r2_path) {
     console.log('no bucket_id')
     return c.json(BRES)
   }
@@ -66,9 +66,14 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     console.log('no app_id or user_id')
     return c.json(BRES)
   }
-  console.log('Delete', record.bucket_id)
+  console.log('Delete', record.bucket_id, record.r2_path)
 
-  const v2Path = `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}`
+  const v2Path = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
+  if (!v2Path) {
+    console.log('No r2 path')
+    return c.json(BRES)
+  }
+
   const existV2 = await s3.checkIfExist(c, v2Path)
 
   if (existV2) {
@@ -104,12 +109,17 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .eq('id', record.id)
   if (errorUpdate)
     console.log('error', errorUpdate)
-  const { error: errorDelete } = await supabaseAdmin(c)
-    .storage
-    .from(`apps/${record.user_id}/${record.app_id}/versions`)
-    .remove([record.bucket_id])
-  if (errorDelete)
-    console.log('errorDelete from supabase storage', record.bucket_id, errorDelete)
+
+  if (record.bucket_id) {
+    const { error: errorDelete } = await supabaseAdmin(c)
+      .storage
+      .from(`apps/${record.user_id}/${record.app_id}/versions`)
+      .remove([record.bucket_id])
+
+    if (errorDelete)
+      console.log('errorDelete from supabase storage', record.bucket_id, errorDelete)
+  }
+
   return c.json(BRES)
 }
 
@@ -134,7 +144,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log('no app_id or user_id')
       return c.json(BRES)
     }
-    if (!record.bucket_id) {
+    if (!record.bucket_id && !record.r2_path) {
       console.log('no bucket_id')
       return c.json(BRES)
     }

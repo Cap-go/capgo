@@ -1,14 +1,14 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../../utils/hono.ts'
-import { isAdmin, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 import { getBundleUrl } from '../../utils/downloadUrl.ts'
 
 interface DataDownload {
   app_id: string
   storage_provider: string
   user_id?: string
-  bucket_id: string
+  id: number
 }
 
 export const app = new Hono()
@@ -29,9 +29,31 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (error || !auth || !auth.user)
       return c.json({ status: 'not authorize' }, 400)
 
-    const admin = await isAdmin(c, auth.user.id)
-    const userId = (admin && body.user_id) ? body.user_id : auth.user.id
-    const url = await getBundleUrl(c, body.storage_provider, `apps/${userId}/${body.app_id}/versions`, body.bucket_id)
+    const userId = auth.user.id
+
+    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+      return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+
+    const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
+      .from('app_versions')
+      .select('*, owner_org ( created_by )')
+      .eq('app_id', body.app_id)
+      .eq('id', body.id)
+      .single()
+
+    const ownerOrg = (bundle?.owner_org as any).created_by
+
+    if (getBundleError) {
+      console.error('getBundleError', getBundleError)
+      return c.json({ status: 'Error unknow' }, 500)
+    }
+
+    if (!ownerOrg) {
+      console.error('cannotGetOwnerOrg', bundle)
+      return c.json({ status: 'Error unknow' }, 500)
+    }
+
+    const url = await getBundleUrl(c, ownerOrg, bundle)
     if (!url)
       return c.json({ status: 'Error unknow' }, 500)
     return c.json({ url })

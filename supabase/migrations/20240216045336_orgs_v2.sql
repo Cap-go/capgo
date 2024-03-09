@@ -359,6 +359,20 @@ $$BEGIN
    RETURN NEW;
 END;$$;
 
+CREATE OR REPLACE FUNCTION "public"."guard_r2_path"() RETURNS trigger
+   LANGUAGE plpgsql AS
+$$BEGIN
+  IF NEW."r2_path" is not distinct from NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW."r2_path" is distinct from (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, encode(NEW.app_id::bytea, 'base64'), NEW.id)) THEN
+    RAISE EXCEPTION 'The expected r2_path is %', (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, encode(NEW.app_id::bytea, 'base64'), NEW.id));
+  END IF;
+
+   RETURN NEW;
+END;$$;
+
 CREATE OR REPLACE FUNCTION "public"."force_valid_user_id_on_app"() RETURNS trigger
    LANGUAGE plpgsql AS
 $$BEGIN
@@ -796,6 +810,15 @@ AS PERMISSIVE FOR UPDATE
 TO authenticated
 USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), id, NULL, NULL))
 WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), id, NULL, NULL));
+
+-- Alter app_versions with new path
+ALTER TABLE app_versions ADD COLUMN r2_path character varying;
+
+-- zzz to ensure it runs after "force_valid_owner_org_app_versions"
+CREATE TRIGGER zzz_guard_r2_path
+   BEFORE INSERT OR UPDATE ON "public"."app_versions" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."guard_r2_path"();  
+
 
 -- Alter images bucket
 -- DROP POLICY "All user to manage they own folder 1ffg0oo_3" ON storage.objects;
