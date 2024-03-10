@@ -289,7 +289,7 @@ async function testOkPost(backendBaseUrl: URL, supabase: SupabaseType) {
     .update({ allow_device_self_set: true })
     .eq('name', 'no_access')
 
-  assert (channelUpdateError === null, `Error while updating no_access channel: ${channelUpdateError}`)
+  assert (channelUpdateError === null, `Error while updating no_access channel: ${JSON.stringify(channelUpdateError)}`)
 
   try {
     const response = await fetchEndpoint(backendBaseUrl, 'POST', baseData)
@@ -347,21 +347,21 @@ async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType)
   baseData.device_id = crypto.randomUUID()
 
   const { data: noAccessChannel, error: noAccessChannelError } = await supabase.from('channels')
-    .select('id, created_by')
+    .select('id, owner_org')
     .eq('name', 'no_access')
     .single()
 
   assert (!!noAccessChannel && !noAccessChannelError, `Error while fetching no_access channel: ${noAccessChannelError}`)
 
   const noAccessId = noAccessChannel!.id
-  const created_by = noAccessChannel!.created_by
+  const ownerOrg = noAccessChannel!.owner_org
 
   const { error } = await supabase.from('channel_devices')
     .upsert({
       app_id: baseData.app_id,
       channel_id: noAccessId,
       device_id: baseData.device_id,
-      created_by,
+      owner_org: ownerOrg,
     })
 
   assert (error === null, `Error while inserting channel_device: ${error}`)
@@ -385,7 +385,7 @@ async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType)
       .delete()
       .eq('device_id', baseData.device_id)
       .eq('app_id', baseData.app_id)
-      .eq('created_by', created_by)
+      .eq('owner_org', ownerOrg)
       .eq('channel_id', noAccessId)
       .single()
 
@@ -409,21 +409,21 @@ async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseTy
   baseData.device_id = crypto.randomUUID()
 
   const { data: productionChannel, error: productionChannelError } = await supabase.from('channels')
-    .select('id, created_by')
+    .select('id, owner_org')
     .eq('name', 'production')
     .single()
 
   assert (!!productionChannel && !productionChannelError, `Error while fetching no_access channel: ${productionChannelError}`)
 
   const productionId = productionChannel!.id
-  const created_by = productionChannel!.created_by
+  const ownerOrg = productionChannel!.owner_org
 
   const { error } = await supabase.from('channel_devices')
     .upsert({
       app_id: baseData.app_id,
       channel_id: productionId,
       device_id: baseData.device_id,
-      created_by,
+      owner_org: ownerOrg,
     })
 
   assert (error === null, `Error while inserting channel_device: ${error}`)
@@ -445,7 +445,7 @@ async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseTy
       .delete()
       .eq('device_id', baseData.device_id)
       .eq('app_id', baseData.app_id)
-      .eq('created_by', created_by)
+      .eq('owner_org', ownerOrg)
       .eq('channel_id', productionId)
       .single()
 
@@ -469,7 +469,7 @@ async function testPostWithDefaultChannel(backendBaseUrl: URL, supabase: Supabas
     .update({ allow_device_self_set: true })
     .eq('name', 'no_access')
     .eq('app_id', baseData.app_id)
-    .select('id, created_by')
+    .select('id, owner_org')
     .single()
 
   assert (channelUpdateError === null, `Error while updating no_access channel: ${channelUpdateError}`)
@@ -482,7 +482,7 @@ async function testPostWithDefaultChannel(backendBaseUrl: URL, supabase: Supabas
         app_id: baseData.app_id,
         channel_id: noAccessData!.id,
         device_id: baseData.device_id,
-        created_by: noAccessData!.created_by,
+        owner_org: noAccessData!.owner_org,
       })
 
     assert(overwriteUpsertError === null, `Error while inserting channel_device: ${overwriteUpsertError}`)

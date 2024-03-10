@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { checkAppOwner, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
@@ -17,7 +17,7 @@ async function deleteBundle(c: Context, body: GetLatest, apikey: Database['publi
   if (!body.version)
     return c.json({ status: 'Missing version' }, 400)
 
-  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
+  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
@@ -54,7 +54,7 @@ async function get(c: Context, body: GetLatest, apikey: Database['public']['Tabl
     if (!body.app_id)
       return c.json({ status: 'Missing app_id' }, 400)
 
-    if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
+    if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'read')))
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
     const fetchOffset = body.page == null ? 0 : body.page

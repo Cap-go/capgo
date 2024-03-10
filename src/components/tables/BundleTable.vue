@@ -19,11 +19,13 @@ const props = defineProps<{
 const element: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'] = {} as any
 
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
+const role = ref<OrganizationRole | null>(null)
 const offset = 10
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const router = useRouter()
+const organizationStore = useOrganizationStore()
 const total = ref(0)
 const search = ref('')
 const elements = ref<(typeof element)[]>([])
@@ -114,6 +116,12 @@ async function refreshData() {
 }
 async function deleteOne(one: typeof element) {
   // console.log('deleteBundle', bundle)
+
+  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   if (one.deleted || await didCancel(t('version')))
     return
   try {
@@ -212,9 +220,11 @@ async function openOne(one: typeof element) {
 }
 onMounted(async () => {
   await refreshData()
+  role.value = await organizationStore.getCurrentRoleForApp(props.appId)
 })
 watch(props, async () => {
   await refreshData()
+  role.value = await organizationStore.getCurrentRoleForApp(props.appId)
 })
 </script>
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import colors from 'tailwindcss/colors'
 import { useI18n } from 'vue-i18n'
+import { storeToRefs } from 'pinia'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import { getPlans, getTotaAppStorage } from '~/services/supabase'
@@ -18,6 +19,7 @@ const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 const { t } = useI18n()
 
 const noData = computed(() => false)
+const loadedAlready = ref(false)
 // const noData = computed(() => datas.value.mau.length == 0)
 
 const datas = ref({
@@ -27,6 +29,9 @@ const datas = ref({
 })
 const isLoading = ref(true)
 const main = useMainStore()
+const organizationStore = useOrganizationStore()
+
+const { dashboard } = storeToRefs(main)
 
 const allLimits = computed(() => {
   return plans.value.reduce((p, plan) => {
@@ -46,17 +51,17 @@ const allLimits = computed(() => {
 
 async function getAppStats() {
   if (props.appId)
-    return main.filterDashboard(props.appId, main.cycleInfo?.subscription_anchor_start, main.cycleInfo?.subscription_anchor_end)
+    return main.filterDashboard(props.appId, organizationStore.currentOrganization?.subscription_start, organizationStore.currentOrganization?.subscription_end)
 
   return main.dashboard
 }
 
 async function getUsages() {
-  const currentStorage = bytesToGb(await getTotaAppStorage(main.auth?.id, props.appId))
+  const currentStorage = bytesToGb(await getTotaAppStorage(organizationStore.currentOrganization?.gid, props.appId))
   const data = await getAppStats()
   if (data && data.length > 0) {
-    const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-    const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
+    const cycleStart = organizationStore.currentOrganization?.subscription_start ? new Date(organizationStore.currentOrganization?.subscription_start) : null
+    const cycleEnd = organizationStore.currentOrganization?.subscription_end ? new Date(organizationStore.currentOrganization?.subscription_end) : null
     let graphDays = getDaysInCurrentMonth()
     if (cycleStart && cycleEnd)
       graphDays = getDaysBetweenDates(cycleStart.toString(), cycleEnd.toString())
@@ -91,6 +96,11 @@ async function getUsages() {
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
+  else {
+    datas.value.mau = []
+    datas.value.storage = []
+    datas.value.bandwidth = []
+  }
   datas.value.mau = datas.value.mau.filter(i => i)
   datas.value.storage = datas.value.storage.filter(i => i)
   datas.value.bandwidth = datas.value.bandwidth.filter(i => i)
@@ -98,6 +108,7 @@ async function getUsages() {
 
 async function loadData() {
   isLoading.value = true
+
   await getPlans().then((pls) => {
     plans.value.length = 0
     plans.value.push(...pls)
@@ -105,7 +116,19 @@ async function loadData() {
   await getUsages()
   isLoading.value = false
 }
-loadData()
+
+watch(dashboard, async (_dashboard) => {
+  if (loadedAlready.value) {
+    await getUsages()
+  }
+  else {
+    loadedAlready.value = true
+    await loadData()
+  }
+})
+
+if (main.dashboardFetched)
+  loadData()
 </script>
 
 <template>

@@ -12,7 +12,7 @@ import { toast } from 'vue-sonner'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { EMPTY_UUID, useSupabase } from '~/services/supabase'
 import IconTrash from '~icons/heroicons/trash?raw'
 import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
 import { useDisplayStore } from '~/stores/display'
@@ -22,7 +22,6 @@ import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   appId: string
-  appOwner: string
 }>()
 
 const emit = defineEmits<{
@@ -105,7 +104,7 @@ async function addChannel() {
           name: newChannel.value,
           app_id: props.appId,
           version: versionId.value,
-          created_by: props.appOwner,
+          owner_org: EMPTY_UUID,
         },
       ])
       .select()
@@ -138,7 +137,6 @@ async function getData() {
           secondVersion (
             minUpdateVersion
           ),
-          created_by,
           created_at,
           updated_at,
           disableAutoUpdate,
@@ -206,7 +204,7 @@ async function refreshData() {
 }
 async function deleteOne(one: typeof element) {
   // console.log('deleteBundle', bundle)
-  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(one.created_by, one.app_id, one.id), ['admin', 'owner'])) {
+  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(one.app_id), ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -282,7 +280,7 @@ async function reload() {
 }
 
 async function openAddChannel() {
-  if (organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(props.appOwner, props.appId), ['admin', 'owner']))
+  if (organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['admin', 'super_admin']))
     addChannelModal.value = true
 
   else

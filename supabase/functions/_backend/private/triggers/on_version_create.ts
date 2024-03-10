@@ -34,18 +34,18 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         last_version: record.name,
       })
       .eq('app_id', record.app_id)
-      .eq('user_id', record.user_id)
+      .eq('owner_org', record.owner_org)
     if (errorUpdate)
       console.log('errorUpdate', errorUpdate)
 
-    if (!record.bucket_id) {
+    if (!record.bucket_id && !record.r2_path) {
       console.log('No bucket_id')
       const { error: dbError } = await supabaseAdmin(c)
         .from('app_versions_meta')
         .insert({
           id: record.id,
           app_id: record.app_id,
-          user_id: record.user_id,
+          owner_org: record.owner_org,
           checksum: '',
           size: 0,
         })
@@ -71,7 +71,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       .insert({
         id: record.id,
         app_id: record.app_id,
-        user_id: record.user_id,
+        owner_org: record.owner_org,
         checksum,
         size,
       })

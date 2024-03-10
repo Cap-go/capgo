@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { gt } from 'semver'
 import { toast } from 'vue-sonner'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { EMPTY_UUID, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
@@ -193,21 +193,8 @@ async function getDevice() {
 }
 
 async function getOrgRole() {
-  const supabaseAppFetch = supabase.from('apps')
-    .select('user_id')
-    .eq('app_id', packageId.value)
-    .single()
-
-  const orgFetch = organizationStore.dedupFetchOrganizations()
-  const allFetch = await Promise.all([supabaseAppFetch, orgFetch])
-  const { data, error } = allFetch[0]
-
-  if (error || !data) {
-    console.error(`Cannot get role, error:\n${error}`)
-    return
-  }
-
-  role.value = await organizationStore.getCurrentRole(data.user_id, packageId.value, undefined)
+  await organizationStore.awaitInitialLoad()
+  role.value = await organizationStore.getCurrentRoleForApp(packageId.value)
 }
 
 function minVersion(val: string, min = '4.6.99') {
@@ -236,7 +223,7 @@ async function upsertDevVersion(device: string, v: Database['public']['Tables'][
       device_id: device,
       version: v.id,
       app_id: packageId.value,
-      created_by: main.user?.id,
+      owner_org: EMPTY_UUID,
     })
 }
 async function didCancel(name: string) {
@@ -286,7 +273,7 @@ async function delDevVersion(device: string) {
     .eq('app_id', packageId.value)
 }
 async function updateOverride() {
-  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])
+  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
     toast.error(t('no-permission'))
@@ -346,7 +333,7 @@ async function upsertDevChannel(device: string, channel: Database['public']['Tab
       device_id: device,
       channel_id: channel.id,
       app_id: packageId.value,
-      created_by: main.user.id,
+      owner_org: EMPTY_UUID,
     })
 }
 async function delDevChannel(device: string) {
@@ -361,7 +348,7 @@ async function delDevChannel(device: string) {
 
 async function updateChannel() {
   const buttons = []
-  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])
+  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm && !channelDevice.value) {
     toast.error(t('no-permission'))
@@ -438,7 +425,7 @@ watchEffect(async () => {
 })
 
 function guardCustomID(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -453,7 +440,7 @@ function guardCustomID(event: Event) {
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <dl :key="reloadCount" class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
-          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])" @update:value="saveCustomId" @click="guardCustomID" />
+          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])" @update:value="saveCustomId" @click="guardCustomID" />
           <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
           <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
           <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
@@ -463,8 +450,8 @@ function guardCustomID(event: Event) {
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow id="update-version" :label="t('force-version')" :value="deviceOverride?.version?.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write']) ? 'no-version-linked' : 'no-version-linked-no-perm')" :is-link="true" @click="updateOverride()" />
-          <InfoRow id="update-channel" :label="t('channel-link')" :value="channelDevice?.channel_id.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write']) ? 'no-channel-linked' : 'no-channel-linked-no-perm')" :is-link="true" @click="updateChannel()" />
+          <InfoRow id="update-version" :label="t('force-version')" :value="deviceOverride?.version?.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) ? 'no-version-linked' : 'no-version-linked-no-perm')" :is-link="true" @click="updateOverride()" />
+          <InfoRow id="update-channel" :label="t('channel-link')" :value="channelDevice?.channel_id.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) ? 'no-channel-linked' : 'no-channel-linked-no-perm')" :is-link="true" @click="updateChannel()" />
         </dl>
       </div>
     </div>

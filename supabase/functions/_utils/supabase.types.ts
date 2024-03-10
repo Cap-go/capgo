@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -66,7 +66,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       app_usage: {
@@ -120,18 +120,13 @@ export type Database = {
           deleted: boolean
           external_url: string | null
           id: number
-          manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
           minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
           owner_org: string
-          r2_path: string | null
           session_key: string | null
           storage_provider: string
           updated_at: string | null
-          user_id: string | null
         }
         Insert: {
           app_id: string
@@ -141,18 +136,13 @@ export type Database = {
           deleted?: boolean
           external_url?: string | null
           id?: number
-          manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
           minUpdateVersion?: string | null
           name: string
           native_packages?: Json[] | null
           owner_org: string
-          r2_path?: string | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
-          user_id?: string | null
         }
         Update: {
           app_id?: string
@@ -162,18 +152,13 @@ export type Database = {
           deleted?: boolean
           external_url?: string | null
           id?: number
-          manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
           minUpdateVersion?: string | null
           name?: string
           native_packages?: Json[] | null
           owner_org?: string
-          r2_path?: string | null
           session_key?: string | null
           storage_provider?: string
           updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -189,7 +174,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       app_versions_meta: {
@@ -253,7 +238,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       apps: {
@@ -268,7 +253,6 @@ export type Database = {
           retention: number
           tmp_id: string | null
           updated_at: string | null
-          user_id: string | null
         }
         Insert: {
           app_id: string
@@ -281,7 +265,6 @@ export type Database = {
           retention?: number
           tmp_id?: string | null
           updated_at?: string | null
-          user_id?: string | null
         }
         Update: {
           app_id?: string
@@ -294,23 +277,15 @@ export type Database = {
           retention?: number
           tmp_id?: string | null
           updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "apps_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "owner_org_id_fkey"
             columns: ["owner_org"]
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       channel_devices: {
@@ -362,7 +337,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       channels: {
@@ -374,7 +349,6 @@ export type Database = {
           app_id: string
           beta: boolean
           created_at: string
-          created_by: string | null
           disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative: boolean
           enable_progressive_deploy: boolean
@@ -397,7 +371,6 @@ export type Database = {
           app_id: string
           beta?: boolean
           created_at?: string
-          created_by?: string | null
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -420,7 +393,6 @@ export type Database = {
           app_id?: string
           beta?: boolean
           created_at?: string
-          created_by?: string | null
           disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
           disableAutoUpdateUnderNative?: boolean
           enable_progressive_deploy?: boolean
@@ -463,7 +435,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       deleted_account: {
@@ -578,7 +550,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       global_stats: {
@@ -691,7 +663,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       org_users: {
@@ -753,7 +725,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       orgs: {
@@ -788,7 +760,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       plans: {
@@ -1063,7 +1035,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["stripe_id"]
-          },
+          }
         ]
       }
       users: {
@@ -1126,7 +1098,7 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
       workers: {
@@ -1226,13 +1198,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           product_id: string
-          count: number
-        }[]
-      }
-      count_all_plans_v2: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          plan_name: string
           count: number
         }[]
       }
@@ -1450,43 +1415,25 @@ export type Database = {
           is_canceled: boolean
         }[]
       }
-      get_orgs_v4:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              gid: string
-              created_by: string
-              logo: string
-              name: string
-              role: string
-              paying: boolean
-              trial_left: number
-              can_use_more: boolean
-              is_canceled: boolean
-              app_count: number
-              subscription_start: string
-              subscription_end: string
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              gid: string
-              created_by: string
-              logo: string
-              name: string
-              role: string
-              paying: boolean
-              trial_left: number
-              can_use_more: boolean
-              is_canceled: boolean
-              app_count: number
-              subscription_start: string
-              subscription_end: string
-            }[]
-          }
+      get_orgs_v4: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          gid: string
+          created_by: string
+          logo: string
+          name: string
+          role: string
+          paying: boolean
+          trial_left: number
+          can_use_more: boolean
+          is_canceled: boolean
+          app_count: number
+          subscription_start: string
+          subscription_end: string
+        }[]
+      }
       get_plan_usage_percent:
         | {
             Args: Record<PropertyKey, never>
@@ -1532,6 +1479,13 @@ export type Database = {
       get_total_storage_size:
         | {
             Args: Record<PropertyKey, never>
+            Returns: number
+          }
+        | {
+            Args: {
+              appid: string
+              userid: string
+            }
             Returns: number
           }
         | {
@@ -1593,14 +1547,6 @@ export type Database = {
         Args: {
           appid: string
           right: Database["public"]["Enums"]["user_min_right"]
-        }
-        Returns: boolean
-      }
-      has_app_right_userid: {
-        Args: {
-          appid: string
-          right: Database["public"]["Enums"]["user_min_right"]
-          userid: string
         }
         Returns: boolean
       }
@@ -1844,6 +1790,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      permited_get_cycle_info: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          subscription_anchor_start: string
+          subscription_anchor_end: string
+        }[]
+      }
       post_replication_sql:
         | {
             Args: {
@@ -1908,7 +1863,6 @@ export type Database = {
         | "invite_upload"
         | "invite_write"
         | "invite_admin"
-        | "invite_super_admin"
         | "read"
         | "upload"
         | "write"
@@ -1917,11 +1871,6 @@ export type Database = {
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
-      manifest_entry: {
-        file_name: string
-        s3_path: string
-        file_hash: string
-      }
       orgs_table: {
         id: string
         created_by: string
@@ -2053,7 +2002,7 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "buckets"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
     }
@@ -2125,16 +2074,14 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
-
 export type Tables<
   PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
         Database[PublicTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never = never
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
       Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
@@ -2142,68 +2089,68 @@ export type Tables<
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
+  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
+      Database["public"]["Views"])
+  ? (Database["public"]["Tables"] &
+      Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
     : never
+  : never
 
 export type TablesInsert<
   PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+    | keyof Database["public"]["Tables"]
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never = never
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
     : never
+  : never
 
 export type TablesUpdate<
   PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+    | keyof Database["public"]["Tables"]
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
     ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never = never
 > = PublicTableNameOrOptions extends { schema: keyof Database }
   ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
     : never
+  : never
 
 export type Enums<
   PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
+    | keyof Database["public"]["Enums"]
     | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
     ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never = never
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
   ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
-    : never
+  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
+  ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+  : never
 

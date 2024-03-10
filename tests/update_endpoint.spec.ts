@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto'
 import type { APIRequestContext } from '@playwright/test'
 import { test } from '@playwright/test'
 import { z } from 'zod'
-import { useSupabaseAdmin } from './utils'
+import { EMPTY_UUID, useSupabaseAdmin } from './utils'
 import { expect } from './zodUtils'
 import type { Database } from '~/types/supabase.types'
 
@@ -302,7 +302,7 @@ backendTest.describe('Test update logic', () => {
             device_id: uuid,
             channel_id: 23,
             app_id: updateAndroidBaseData.app_id,
-            created_by: defaultUserId,
+            owner_org: EMPTY_UUID,
           })
         expect(error).toBeFalsy()
 
@@ -354,7 +354,7 @@ backendTest.describe('Test update logic', () => {
             device_id: uuid,
             version: 9601,
             app_id: updateAndroidBaseData.app_id,
-            created_by: defaultUserId,
+            owner_org: EMPTY_UUID,
           })
         expect(error).toBeFalsy()
 

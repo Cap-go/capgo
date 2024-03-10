@@ -52,7 +52,7 @@ test.describe('Test organization invite', () => {
       await expect(members).toHaveLength(1)
 
       const member = members[0]
-      await expect(member.email).toBe('test@capgo.app')
+      await expect(member.email).toBe(`test@capgo.app (super admin)`)
       await expect(member.isDeletable).toBeFalsy()
       await expect(member.isModifiable).toBeFalsy()
 
@@ -87,8 +87,8 @@ test.describe('Test organization invite', () => {
 
       await expect(error).toBeNull()
       await expect(orgUsers).toBeTruthy()
-      await expect(orgUsers).toHaveLength(1) // 1 because owner is not in this list
-      await expect((orgUsers![0].user_id as any).email).toBe('test2@capgo.app')
+      await expect(orgUsers).toHaveLength(2) // 2 because owner IS in this list
+      await expect(orgUsers?.find(user => (user.user_id as any).email === 'test2@capgo.app')).toBeTruthy()
     })
   }
 })
@@ -112,16 +112,20 @@ test.describe('Test organization invitation accept', () => {
 
         const { error: error1 } = await supabase.from('org_users')
           .delete()
-          .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+          .eq('user_id', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5')
 
         await expect(error1).toBeFalsy()
 
         const { error: error2 } = await supabase.from('org_users')
-          .insert({
+          .insert([{
             user_id: '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
             user_right: `invite_${inviteType}` as any,
             org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
-          })
+          }, {
+            user_id: '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
+            user_right: `super_admin` as any,
+            org_id: '34a8c55d-2d0f-4652-a43f-684c7a9403ac',
+          }])
 
         await expect(error2).toBeFalsy()
       })
@@ -171,6 +175,7 @@ test.describe('Test organization invitation accept', () => {
         const { data: orgUser, error: orgUserError } = await supabase.from('org_users')
           .select('user_right')
           .eq('user_id', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5')
+          .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
           .single()
 
         await expect(orgUserError).toBeFalsy()
@@ -249,7 +254,7 @@ test.describe('Test organization system permissions', () => {
       changeOrgPicture: true,
       changeOrgName: true,
     },
-    owner: {
+    super_admin: {
       deleteChannel: true,
       addChannel: true,
       changeChannelToggle: true,
@@ -375,11 +380,14 @@ test.describe('Test organization system permissions', () => {
         await expect(users).toBeGreaterThanOrEqual(0) // Check if getting stats works
 
         if (inviteType !== 'owner') {
-          const sharedAppsLocator = await page.locator('#shared')
+          const appsLocator = await page.locator('#my_apps')
 
-          const allSharedApps = await sharedAppsLocator.locator('#top_apps > tbody > tr').all()
-          await expect(allSharedApps).toHaveLength(1)
-          await allSharedApps[0].click()
+          // This assumes that the loading works correctly.
+          // Since test2@capgo.app does not have apps of it's own the default org should be the one that owns com--demo--app
+          // We don't test that but if that assumtion fails the test will fail here
+          const allApps = await appsLocator.locator('#top_apps > tbody > tr').all()
+          await expect(allApps).toHaveLength(1)
+          await allApps[0].click()
           await page.waitForURL('**\/com--demo--app')
         }
         else {
@@ -801,7 +809,9 @@ test.describe('Test organization system permissions', () => {
         await expect(clientSupabaseUser.data.user).toBeTruthy()
 
         const currentUserId = clientSupabaseUser!.data!.user!.id
-        await expect(currentOrgDetails.created_by).toBe(currentUserId)
+        // Not, because we SHOULD never use the test2@capgo.app org as the defualt one
+        // test2@capgo.app owns no apps - thus we should allways default to the test@capgo.app user id
+        await expect(currentOrgDetails.created_by).not.toBe(currentUserId)
 
         // Let's select the 'demo org'
 
@@ -931,7 +941,7 @@ test.describe('Test organization system permissions', () => {
         expect(allMembersSupaCount).toBeTruthy
         expect(allChannelsCount).toBeGreaterThan(0)
 
-        await expect(allMembersLocator).toHaveCount(allMembersSupaCount! + 1)
+        await expect(allMembersLocator).toHaveCount(allMembersSupaCount!)
 
         const mappedMembers = await Promise.all((await allMembersLocator.all()).map(async (memberLocator) => {
           const canEdit = await memberLocator.locator('wrench-button').isVisible()
@@ -943,8 +953,9 @@ test.describe('Test organization system permissions', () => {
 
         expect(clientSupabaseUser.data?.user?.email).toBeTruthy()
         const selfSupabaseUserEmail = clientSupabaseUser.data!.user!.email
+        expect(selfSupabaseUserEmail).toBeTruthy()
 
-        const selfMember = await mappedMembers.find(user => user.email === selfSupabaseUserEmail)
+        const selfMember = await mappedMembers.find(user => user.email.includes(selfSupabaseUserEmail!))
         expect(selfMember).toBeTruthy()
         expect(selfMember?.canEdit).toBeFalsy()
         expect(selfMember?.canRemove).toBeFalsy()
