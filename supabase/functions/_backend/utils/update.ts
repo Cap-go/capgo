@@ -10,7 +10,7 @@ import { isAllowedAction } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
 import { sendNotif, sendNotifOrg } from './notifications.ts'
-import { getBundleUrl } from './downloadUrl.ts'
+import { getBundleUrl, getDownloadUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
 
@@ -79,6 +79,8 @@ async function requestInfosPostgres(
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
         minUpdateVersion: versionAlias.minUpdateVersion,
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        // manifest: schema.app_versions.manifest,
       },
     })
     .from(schema.devices_override)
@@ -103,6 +105,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -114,6 +117,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
       },
       channels: {
         id: schema.channels.id,
@@ -156,7 +160,7 @@ async function requestInfosPostgres(
 
   // v => version
   // sv => secondversion
-  const channel = drizzleCient
+  const channela = drizzleCient
     .select({
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -168,6 +172,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -179,6 +184,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
       },
       channels: {
         id: schema.channels.id,
@@ -206,7 +212,10 @@ async function requestInfosPostgres(
       eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
     ))
     .limit(1)
-    .then(data => data.at(0))
+
+  console.log(channela.toSQL())
+  const channel = channela.then(data => data.at(0))
+  // .then(data => data.at(0))
 
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
@@ -354,6 +363,7 @@ export async function update(c: Context, body: AppInfos) {
     const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, alias, drizzleCient, schema)
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
+    console.log(channelData)
 
     if (!versionData) {
       console.log('No version data found')
@@ -443,7 +453,7 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
 
-    if (!version.bucket_id && !version.external_url) {
+    if (!version.bucket_id && !version.external_url && version.storage_provider !== 'r2-partial') {
       console.log(id, 'Cannot get bundle', app_id, version)
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -452,11 +462,10 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     let signedURL = version.external_url || ''
-    if (version.bucket_id && !version.external_url) {
+    if (version.bucket_id && !version.external_url && version.storage_provider === 'r2') {
       const res = await getBundleUrl(c, appOwner.orgs.created_by, version)
       if (res)
         signedURL = res
-      }
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
@@ -578,7 +587,7 @@ export async function update(c: Context, body: AppInfos) {
       }
     }
     //  check signedURL and if it's url
-    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
+    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://')) && version.storage_provider === 'r2') {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id, new Date().toISOString())
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
@@ -586,6 +595,31 @@ export async function update(c: Context, body: AppInfos) {
         error: 'no_bundle',
       }, 200)
     }
+
+    // Here we will get the manifest
+    if (version.storage_provider === 'r2-partial') {
+      const preManifest = version.manifest
+      const finalManifest = await Promise.all(preManifest.map(async (entry) => {
+        try {
+          const downloadUrl = await getDownloadUrl(c, entry.s3_path)
+          return {
+            file_name: entry.file_name,
+            file_hash: entry.file_hash,
+            download_url: downloadUrl,
+          }
+        }
+        catch (e: any) {
+          console.error(`Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}`)
+          return null
+        }
+      }))
+
+      if (finalManifest.find(val => val === null))
+        return c.json({ error: 'internal_error' }, 500)
+
+      return c.json(finalManifest)
+    }
+
     // console.log(id, 'save stats', device_id)
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())

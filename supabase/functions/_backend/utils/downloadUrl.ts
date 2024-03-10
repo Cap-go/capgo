@@ -3,8 +3,8 @@ import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 
-const EXPIRATION_SECONDS = 604800
-// const EXPIRATION_SECONDS = 120
+// const EXPIRATION_SECONDS = 604800
+const EXPIRATION_SECONDS = 120
 
 export async function getBundleUrl(c: Context, ownerOrg: string, version: Database['public']['Tables']['app_versions']['Row']) {
   if (version.storage_provider === 'r2' && version.bucket_id && version.bucket_id?.endsWith('.zip'))
@@ -13,4 +13,9 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: Databa
     return await s3.getSignedUrl(c, version.r2_path, EXPIRATION_SECONDS)
 
   return null
+}
+
+// used for partial
+export function getDownloadUrl(c: Context, path: string) {
+  return s3.getSignedUrl(c, path, EXPIRATION_SECONDS)
 }

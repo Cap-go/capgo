@@ -63,7 +63,7 @@ async function checkIfExist(c: Context, fileId: string) {
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initS3(c)
+  const client = initS3(c, true)
   const command = new GetObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
