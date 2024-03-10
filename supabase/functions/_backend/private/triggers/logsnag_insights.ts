@@ -56,10 +56,10 @@ function getStats(c: Context): GlobalStats {
         console.log('count_all_need_upgrade', res.error)
       return res.data || 0
     }),
-    plans: supabase.rpc('count_all_plans_v2', {}).single().then((res) => {
+    plans: supabase.rpc('count_all_plans_v2', {}).then((res) => {
       if (res.error || !res.data)
         console.log('count_all_plans_v2', res.error)
-      return res.data || {}
+      return res.data ? new Map(res.data.map(plan => [plan.plan_name, plan.count])) : {}
     }),
   }
 }
@@ -153,27 +153,27 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       },
       {
         title: 'Free plan',
-        value: plans.Free,
+        value: plans.Free ?? 0,
         icon: '🆓',
       },
       {
         title: 'Solo Plan',
-        value: plans.Solo,
+        value: plans.Solo ?? 0,
         icon: '🎸',
       },
       {
         title: 'Maker Plan',
-        value: plans.Maker,
+        value: plans.Maker ?? 0,
         icon: '🤝',
       },
       {
         title: 'Team plan',
-        value: plans.Team,
+        value: plans.Team ?? 0,
         icon: '👏',
       },
       {
         title: 'Pay as you go plan',
-        value: plans['Pay as you go'],
+        value: plans['Pay as you go'] ?? 0,
         icon: '📈',
       },
     ]).catch((e) => {
