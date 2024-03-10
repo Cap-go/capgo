@@ -125,12 +125,12 @@ export function unspoofUser() {
   return true
 }
 
-export async function downloadUrl(provider: string, userId: string, appId: string, bucketId: string): Promise<string> {
+export async function downloadUrl(provider: string, userId: string, appId: string, id: number): Promise<string> {
   const data = {
     user_id: userId,
     app_id: appId,
     storage_provider: provider,
-    bucket_id: bucketId,
+    id,
   }
   const res = await useSupabase().functions.invoke('private/download_link', { body: JSON.stringify(data) })
   return res.data.url
