@@ -21,7 +21,7 @@ import {
   isLimited,
   reverseDomainRegex,
 } from '../../utils/utils.ts'
-import { getSDevice, supabaseAdmin } from '../../utils/supabase.ts'
+import { getSDevice, supabaseAdmin, updateOnpremStats } from '../../utils/supabase.ts'
 import type { AppStats } from '../../utils/types.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { sendNotif } from '../../utils/notifications.ts'
@@ -113,22 +113,22 @@ async function post(c: Context, body: AppStats) {
       .single()
     if (!appOwner) {
       // TODO: transfer to clickhouse
-      // if (app_id) {
-      //   await supabaseAdmin()
-      //     .from('store_apps')
-      //     .upsert({
-      //       app_id,
-      //       onprem: true,
-      //       capacitor: true,
-      //       capgo: true,
-      //     })
-      // }
-      // if (action === 'get') {
-      //   await updateOnpremStats({
-      //     app_id,
-      //     updates: 1,
-      //   })
-      // }
+      if (app_id) {
+        await supabaseAdmin(c)
+          .from('store_apps')
+          .upsert({
+            app_id,
+            onprem: true,
+            capacitor: true,
+            capgo: true,
+          })
+      }
+      if (action === 'get') {
+        await updateOnpremStats(c, {
+          app_id,
+          updates: 1,
+        })
+      }
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
