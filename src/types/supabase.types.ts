@@ -1280,6 +1280,13 @@ export type Database = {
           count: number
         }[]
       }
+      count_all_plans_v2: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          plan_name: string
+          count: number
+        }[]
+      }
       count_all_trial: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -1298,13 +1305,6 @@ export type Database = {
       delete_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
-      }
-      exist_app: {
-        Args: {
-          appid: string
-          apikey: string
-        }
-        Returns: boolean
       }
       exist_app_v2: {
         Args: {
@@ -1474,16 +1474,6 @@ export type Database = {
         }
         Returns: string
       }
-      get_orgs: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          id: string
-          logo: string
-          name: string
-        }[]
-      }
       get_orgs_v2: {
         Args: {
           userid: string
@@ -1512,17 +1502,12 @@ export type Database = {
           is_canceled: boolean
         }[]
       }
-      get_plan_usage_percent:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: number
-          }
+      get_plan_usage_percent: {
+        Args: {
+          userid: string
+        }
+        Returns: number
+      }
       get_total_app_storage_size:
         | {
             Args: {
@@ -1537,57 +1522,6 @@ export type Database = {
             }
             Returns: number
           }
-      get_total_stats_v2:
-        | {
-            Args: {
-              dateid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-              dateid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-      get_total_stats_v3:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-      get_total_stats_v4: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
       get_total_stats_v5: {
         Args: {
           userid: string
@@ -1827,28 +1761,18 @@ export type Database = {
             }
             Returns: boolean
           }
-      is_good_plan_v3:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
-      is_good_plan_v4:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
+      is_good_plan_v3: {
+        Args: {
+          userid: string
+        }
+        Returns: boolean
+      }
+      is_good_plan_v5: {
+        Args: {
+          userid: string
+        }
+        Returns: boolean
+      }
       is_member_of_org: {
         Args: {
           user_id: string
@@ -1857,12 +1781,6 @@ export type Database = {
         Returns: boolean
       }
       is_not_deleted: {
-        Args: {
-          email_check: string
-        }
-        Returns: boolean
-      }
-      is_not_deleted_v2: {
         Args: {
           email_check: string
         }

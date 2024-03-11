@@ -36,5 +36,5 @@ bun run mobile
 # install native dependencies
 echo "📦 Install native dependencies"
 bun run sync:ios
-cd ios/App
-pod install
+# cd ios/App
+# pod install
