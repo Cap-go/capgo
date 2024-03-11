@@ -56,10 +56,16 @@ function getStats(c: Context): GlobalStats {
         console.log('count_all_need_upgrade', res.error)
       return res.data || 0
     }),
-    plans: supabase.rpc('count_all_plans_v2', {}).single().then((res) => {
+    plans: supabase.rpc('count_all_plans_v2').then((res) => {
       if (res.error || !res.data)
         console.log('count_all_plans_v2', res.error)
       return res.data || {}
+    }).then((data: any) => {
+      const total: PlanTotal = {}
+      for (const plan of data) {
+        total[plan.plan_name] = plan.count
+      }
+      return total
     }),
   }
 }
