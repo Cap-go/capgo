@@ -8,6 +8,7 @@ interface dataUpload {
   name: string
   app_id: string
   is_expo?: boolean
+  bucket_id?: string
 }
 
 export const app = new Hono()
@@ -41,10 +42,11 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       return c.json({ status: 'Error App not found' }, 500)
     }
 
+    // console.log(body.name ?? body.bucket_id?.split('.')[0] ?? '')
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id')
-      .eq('name', body.name)
+      .eq(body.name ? 'name' : 'bucket_id', body.name ? body.name : body.bucket_id ?? '')
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
       .eq('user_id', userId)

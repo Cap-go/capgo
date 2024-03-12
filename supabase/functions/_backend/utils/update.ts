@@ -79,6 +79,7 @@ async function requestInfosPostgres(
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
         minUpdateVersion: versionAlias.minUpdateVersion,
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
     })
     .from(schema.devices_override)
@@ -103,6 +104,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -114,6 +116,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+        r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
       },
       channels: {
         id: schema.channels.id,
@@ -168,6 +171,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -179,6 +183,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+        r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
       },
       channels: {
         id: schema.channels.id,
@@ -443,7 +448,7 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
 
-    if (!version.bucket_id && !version.external_url) {
+    if (!version.bucket_id && !version.external_url && !version.r2_path) {
       console.log(id, 'Cannot get bundle', app_id, version)
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -452,11 +457,10 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     let signedURL = version.external_url || ''
-    if (version.bucket_id && !version.external_url) {
-      const res = await getBundleUrl(c, appOwner.orgs.created_by, version)
+    if ((version.bucket_id || version.r2_path) && !version.external_url) {
+      const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
       if (res)
         signedURL = res
-      }
     }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)

@@ -29,6 +29,7 @@ export const app_versions = pgTable('app_versions', {
   session_key: varchar('session_key'),
   storage_provider: text('storage_provider').default('r2').notNull(),
   minUpdateVersion: varchar('minUpdateVersion'),
+  r2_path: varchar('r2_path'),
 })
 
 export const channels = pgTable('channels', {
