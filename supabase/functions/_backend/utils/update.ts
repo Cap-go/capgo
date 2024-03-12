@@ -79,6 +79,7 @@ async function requestInfosPostgres(
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
         minUpdateVersion: versionAlias.minUpdateVersion,
+        r2_path: versionAlias.r2_path,
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
         // manifest: schema.app_versions.manifest,
       },
@@ -87,6 +88,7 @@ async function requestInfosPostgres(
     .innerJoin(versionAlias, eq(schema.devices_override.version, versionAlias.id))
     .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
     .limit(1)
+  // console.log(deviceOverwrite.toSQL().sql, deviceOverwrite.toSQL().params)
     .then(data => data.at(0))
 
   const channelDeviceReq = drizzleCient
@@ -105,6 +107,7 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       secondVersion: {
@@ -117,7 +120,8 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(secondVersionAlias.manifest).as('svmanifest'),
       },
       channels: {
         id: schema.channels.id,
@@ -173,6 +177,7 @@ async function requestInfosPostgres(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -184,7 +189,8 @@ async function requestInfosPostgres(
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(secondVersionAlias.manifest).as('svmanifest'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
       },
       channels: {
         id: schema.channels.id,
@@ -213,7 +219,6 @@ async function requestInfosPostgres(
     ))
     .limit(1)
 
-  console.log(channela.toSQL())
   const channel = channela.then(data => data.at(0))
   // .then(data => data.at(0))
 
@@ -251,6 +256,7 @@ async function getAppOwnerPostgres(
 }
 
 export async function update(c: Context, body: AppInfos) {
+  console.log('magic', c.req.header('Capgo-Update-Manifest'))
   const { alias, schema, drizzleCient } = getDrizzlePostgres(c)
 
   const LogSnag = logsnag(c)
@@ -453,7 +459,7 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
 
-    if (!version.bucket_id && !version.external_url && version.storage_provider !== 'r2-partial') {
+    if (!version.bucket_id && !version.external_url && !version.r2_path && version.storage_provider !== 'r2-partial') {
       console.log(id, 'Cannot get bundle', app_id, version)
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -462,8 +468,8 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     let signedURL = version.external_url || ''
-    if (version.bucket_id && !version.external_url && version.storage_provider === 'r2') {
-      const res = await getBundleUrl(c, appOwner.orgs.created_by, version)
+    if (!version.external_url && version.storage_provider === 'r2') {
+      const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
       if (res)
         signedURL = res
     }
@@ -617,7 +623,7 @@ export async function update(c: Context, body: AppInfos) {
       if (finalManifest.find(val => val === null))
         return c.json({ error: 'internal_error' }, 500)
 
-      return c.json(finalManifest)
+      return c.json({ version: version.name, manifest: finalManifest })
     }
 
     // console.log(id, 'save stats', device_id)
