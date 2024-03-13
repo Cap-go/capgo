@@ -103,6 +103,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const newData: Database['public']['Tables']['global_stats']['Insert'] = {
       date_id,
       apps,
+      trial: plans.Trial,
+      users,
       updates,
       stars,
       paying,
