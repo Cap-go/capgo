@@ -62,9 +62,9 @@ function getStats(c: Context): GlobalStats {
       return res.data || {}
     }).then((data: any) => {
       const total: PlanTotal = {}
-      for (const plan of data) {
+      for (const plan of data)
         total[plan.plan_name] = plan.count
-      }
+
       return total
     }),
   }
