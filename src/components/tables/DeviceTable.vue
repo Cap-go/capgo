@@ -135,7 +135,7 @@ async function getData() {
     const versionData = await Promise.all(versionPromises)
     versionData.forEach((version, index) => {
       if (version.error)
-        finalData[index].version = { name: 'unknown'} as any
+        finalData[index].version = { name: 'unknown' } as any
       else
         finalData[index].version = version.data as any
     })
