@@ -145,7 +145,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       {
         title: 'Apps actives',
         value: actives.apps,
-        icon: '📱💃',
+        icon: '💃',
       },
       {
         title: 'Updates',
@@ -160,7 +160,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       {
         title: 'Users actives',
         value: actives.users,
-        icon: '👨💃',
+        icon: '🎉',
       },
       {
         title: 'User need upgrade',
