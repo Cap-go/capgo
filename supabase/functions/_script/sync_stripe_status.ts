@@ -13,7 +13,7 @@ const stripe = Stripe('****')
 
 // create a function who loop on stripe_info 1000 by 1000 and return the complete list
 async function getAllStripeInfos() {
-  let stripeInfos: {subscription_id: string, customer_id: string, status: string}[] = []
+  let stripeInfos: {subscription_id: string, customer_id: string, status: string, price_id: string}[] = []
   let offset = 0
   const limit = 1000
   let count = 0
@@ -21,7 +21,7 @@ async function getAllStripeInfos() {
   do {
     const { data, error } = await supabase
       .from('stripe_info')
-      .select('subscription_id, customer_id, status')
+      .select('subscription_id, customer_id, status, price_id')
       .range(offset, offset + limit - 1)
     if (error) {
       console.error('Error fetching data from Supabase:', error)
@@ -57,6 +57,8 @@ async function updateStripeStatus() {
     }
     try {
       const subscription = await stripe.subscriptions.retrieve(stripeInfo.subscription_id)
+      // console.log('subscription', subscription)
+      // break;
       // Check if the subscription status is not succeeded
       if (subscription.status !== 'active' && stripeInfo.status === 'succeeded') {
         // Update the status in Supabase to canceled
@@ -72,6 +74,9 @@ async function updateStripeStatus() {
           console.log(`Updated status to canceled for customer_id: ${stripeInfo.customer_id}`)
       } else if (!subscription) {
         console.log('this customer is not found', stripeInfo.customer_id)
+      }
+      else if (subscription && subscription.status === 'active' && subscription.plan.id !== stripeInfo.price_id) {
+        console.log('this customer is wrong subscription', stripeInfo.customer_id, subscription.plan.id, stripeInfo.price_id)
       }
       count++
     }
