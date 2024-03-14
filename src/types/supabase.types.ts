@@ -655,6 +655,8 @@ export type Database = {
           not_paying: number | null
           onboarded: number | null
           paying: number | null
+          paying_monthly: number | null
+          paying_yearly: number | null
           stars: number
           trial: number | null
           updates: number
@@ -670,6 +672,8 @@ export type Database = {
           not_paying?: number | null
           onboarded?: number | null
           paying?: number | null
+          paying_monthly?: number | null
+          paying_yearly?: number | null
           stars: number
           trial?: number | null
           updates: number
@@ -685,6 +689,8 @@ export type Database = {
           not_paying?: number | null
           onboarded?: number | null
           paying?: number | null
+          paying_monthly?: number | null
+          paying_yearly?: number | null
           stars?: number
           trial?: number | null
           updates?: number
@@ -1394,6 +1400,14 @@ export type Database = {
             }
             Returns: string
           }
+      get_customer_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          yearly: number
+          monthly: number
+          total: number
+        }[]
+      }
       get_cycle_info:
         | {
             Args: Record<PropertyKey, never>
