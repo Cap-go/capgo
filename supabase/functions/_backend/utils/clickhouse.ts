@@ -200,7 +200,7 @@ export async function reactActiveApps(c: Context) {
   const query = `SELECT DISTINCT app_id
   FROM logs
   WHERE created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
-    AND created_at < CURRENT_DATE() FORMAT JSON`
+    AND created_at < CURRENT_DATE() and action = 'get' FORMAT JSON`
   console.log('sending to Clickhouse body', query)
   const searchParams = {
     query,
