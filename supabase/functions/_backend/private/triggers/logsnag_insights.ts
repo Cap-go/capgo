@@ -4,8 +4,10 @@ import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { logsnag } from '../../utils/logsnag.ts'
+import { reactActiveApps } from '../../utils/clickhouse.ts';
 
 interface PlanTotal { [key: string]: number }
+interface Actives { users: number, apps: number}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -15,6 +17,7 @@ interface GlobalStats {
   need_upgrade: PromiseLike<number>
   paying: PromiseLike<number>
   plans: PromiseLike<PlanTotal>
+  actives: Promise<Actives>
 }
 
 async function getGithubStars(): Promise<number> {
@@ -67,6 +70,17 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
+    actives: reactActiveApps(c).then(async(res) => {
+      try {
+        const app_ids = res.data.map((app) => app.app_id)
+        console.log('app_ids', app_ids)
+        const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
+        return { apps: res.rows, users: res2.data || 0 }
+      } catch (e) {
+        console.error('count_active_users error', e)
+      }
+      return { apps: res.rows, users: 0 }
+    }),
   }
 }
 
@@ -85,6 +99,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       onboarded,
       need_upgrade,
       plans,
+      actives,
     ] = await Promise.all([
       res.apps,
       res.updates,
@@ -94,6 +109,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       res.onboarded,
       res.need_upgrade,
       res.plans,
+      res.actives,
     ])
     const not_paying = users - paying
     console.log('All Promises', apps, updates, users, stars, paying, onboarded, need_upgrade, plans)
@@ -106,6 +122,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       trial: plans.Trial,
       users,
       updates,
+      apps_active: actives.apps,
+      users_active: actives.users,
       stars,
       paying,
       onboarded,
@@ -125,6 +143,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         icon: '📱',
       },
       {
+        title: 'Apps actives',
+        value: actives.apps,
+        icon: '📱💃',
+      },
+      {
         title: 'Updates',
         value: updates,
         icon: '📲',
@@ -133,6 +156,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         title: 'User Count',
         value: users,
         icon: '👨',
+      },
+      {
+        title: 'Users actives',
+        value: actives.users,
+        icon: '👨💃',
       },
       {
         title: 'User need upgrade',

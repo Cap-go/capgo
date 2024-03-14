@@ -648,6 +648,7 @@ export type Database = {
       global_stats: {
         Row: {
           apps: number
+          apps_active: number | null
           created_at: string | null
           date_id: string
           need_upgrade: number | null
@@ -658,9 +659,11 @@ export type Database = {
           trial: number | null
           updates: number
           users: number | null
+          users_active: number | null
         }
         Insert: {
           apps: number
+          apps_active?: number | null
           created_at?: string | null
           date_id: string
           need_upgrade?: number | null
@@ -671,9 +674,11 @@ export type Database = {
           trial?: number | null
           updates: number
           users?: number | null
+          users_active?: number | null
         }
         Update: {
           apps?: number
+          apps_active?: number | null
           created_at?: string | null
           date_id?: string
           need_upgrade?: number | null
@@ -684,6 +689,7 @@ export type Database = {
           trial?: number | null
           updates?: number
           users?: number | null
+          users_active?: number | null
         }
         Relationships: []
       }
@@ -1254,6 +1260,12 @@ export type Database = {
         Args: {
           val: number
           max_val: number
+        }
+        Returns: number
+      }
+      count_active_users: {
+        Args: {
+          app_ids: string[]
         }
         Returns: number
       }
