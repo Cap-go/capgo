@@ -75,8 +75,10 @@ async function updateStripeStatus() {
       } else if (!subscription) {
         console.log('this customer is not found', stripeInfo.customer_id)
       }
-      else if (subscription && subscription.status === 'active' && subscription.plan.id !== stripeInfo.price_id) {
+      else if (subscription && stripeInfo.price_id && subscription.plan && subscription.plan.id !== stripeInfo.price_id) {
         console.log('this customer is wrong subscription', stripeInfo.customer_id, subscription.plan.id, stripeInfo.price_id)
+      } else if (subscription && stripeInfo.price_id && !subscription.plan) {
+        console.log('this customer don\'t have plan', stripeInfo.customer_id, subscription.status, subscription.id)
       }
       count++
     }
