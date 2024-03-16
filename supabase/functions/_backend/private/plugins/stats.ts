@@ -114,21 +114,21 @@ async function post(c: Context, body: AppStats) {
     if (!appOwner) {
       // TODO: transfer to clickhouse
       if (app_id) {
-        await supabaseAdmin(c)
-          .from('store_apps')
-          .upsert({
-            app_id,
-            onprem: true,
-            capacitor: true,
-            capgo: true,
-          })
-      }
-      if (action === 'get') {
-        await updateOnpremStats(c, {
-          app_id,
-          updates: 1,
-        })
-      }
+      //   await supabaseAdmin(c)
+      //     .from('store_apps')
+      //     .upsert({
+      //       app_id,
+      //       onprem: true,
+      //       capacitor: true,
+      //       capgo: true,
+      //     })
+      // }
+      // if (action === 'get') {
+      //   await updateOnpremStats(c, {
+      //     app_id,
+      //     updates: 1,
+      //   })
+      // }
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
