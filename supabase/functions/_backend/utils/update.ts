@@ -561,7 +561,7 @@ export async function update(c: Context, body: AppInfos) {
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
       if (channelData.channels.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
-        console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
+        console.log(id, 'Cannot revert under native version', version.name, version_build, device_id, new Date().toISOString())
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
         return c.json({
           message: 'Cannot revert under native version',
