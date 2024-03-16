@@ -113,7 +113,7 @@ async function post(c: Context, body: AppStats) {
       .single()
     if (!appOwner) {
       // TODO: transfer to clickhouse
-      if (app_id) {
+      // if (app_id) {
       //   await supabaseAdmin(c)
       //     .from('store_apps')
       //     .upsert({
