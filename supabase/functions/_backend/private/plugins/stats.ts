@@ -21,7 +21,7 @@ import {
   isLimited,
   reverseDomainRegex,
 } from '../../utils/utils.ts'
-import { getSDevice, supabaseAdmin, updateOnpremStats } from '../../utils/supabase.ts'
+import { getSDevice, supabaseAdmin } from '../../utils/supabase.ts'
 import type { AppStats } from '../../utils/types.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { sendNotif } from '../../utils/notifications.ts'
