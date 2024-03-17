@@ -161,7 +161,7 @@
     "vue-chartjs": "^5.3.0",
     "vue-demi": "0.14.7",
     "vue-i18n": "9.9.1",
-    "vue-router": "4.2.5",
+    "vue-router": "4.3.0",
     "vue-sonner": "^1.0.3",
     "zod": "^3.22.4"
   },
