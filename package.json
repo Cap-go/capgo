@@ -154,7 +154,7 @@
     "stripe": "^14.17.0",
     "unplugin-auto-import": "^0.17.5",
     "unplugin-vue-macros": "^2.7.10",
-    "unplugin-vue-router": "^0.7.0",
+    "unplugin-vue-router": "^0.8.4",
     "vite-plugin-vue-devtools": "^7.0.15",
     "vite-plugin-webfont-dl": "^3.9.1",
     "vue": "3.4.19",
