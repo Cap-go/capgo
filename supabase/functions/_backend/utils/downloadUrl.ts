@@ -1,7 +1,5 @@
 import type { Context } from 'hono'
 import { s3 } from './s3.ts'
-import { supabaseAdmin } from './supabase.ts'
-import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
 // const EXPIRATION_SECONDS = 120

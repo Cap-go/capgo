@@ -67,8 +67,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           json: {
             appIds: appsBatch.map(app => app.app_id),
           },
-        ...options,
-      }))
+          ...options,
+        }))
       }
     }
     if (appsToGetInfo?.length) {
@@ -77,8 +77,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           json: {
             appId: appsToGetInfo[i],
           },
-        ...options,
-      }))
+          ...options,
+        }))
       }
     }
     if (appsToGetSimilar?.length) {
@@ -92,7 +92,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           json: {
             appIds: appsSimilarBatch.map(app => app.app_id),
           },
-        ...options,
+          ...options,
         }))
       }
     }

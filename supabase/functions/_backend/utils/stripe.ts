@@ -83,7 +83,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
         price: prices.priceId,
         quantity: 1,
       },
-      ...prices.meteredIds.map((priceId) => ({
+      ...prices.meteredIds.map(priceId => ({
         price: priceId,
       })),
     ],

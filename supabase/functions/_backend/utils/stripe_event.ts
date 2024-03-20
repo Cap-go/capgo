@@ -22,7 +22,7 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   )
 }
 
-export function extractDataEvent(event:  Stripe.Event): Database['public']['Tables']['stripe_info']['Insert'] {
+export function extractDataEvent(event: Stripe.Event): Database['public']['Tables']['stripe_info']['Insert'] {
   const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',

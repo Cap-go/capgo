@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { hasAppRight, getSStats, supabaseAdmin } from '../utils/supabase.ts'
+import { getSStats, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { checkKey } from '../utils/utils.ts'
 import type { Order } from '../utils/types.ts'
 import type { Database } from '../utils/supabase.types.ts'

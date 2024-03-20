@@ -18,7 +18,6 @@ import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
 import { sendStatsAndDevice } from './clickhouse.ts'
 
-
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
     version: string
@@ -606,6 +605,6 @@ export async function update(c: Context, body: AppInfos) {
     }, 500)
   }
   finally {
-      await pgClient.end()
+    await pgClient.end()
   }
 }
