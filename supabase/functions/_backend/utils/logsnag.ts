@@ -3,7 +3,7 @@ import { LogSnag } from '@logsnag/node'
 import type { Context } from 'hono'
 import { getEnv } from './utils.ts'
 
-interface LogSnagExt extends LogSnag {
+interface LogSnagExt {
   insights: (data: { title: string, value: string | boolean | number, icon: string }[]) => Promise<void>
 }
 
@@ -29,7 +29,7 @@ function logsnag(c: Context) {
       all.push(ls.insight.track(d))
     await Promise.all(all)
   }
-  return ls as LogSnagExt
+  return ls as LogSnagExt & LogSnag
 }
 
 // const logsnag = { publish: lsg.publish, insight, ...lsg }

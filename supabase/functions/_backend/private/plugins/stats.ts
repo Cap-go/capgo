@@ -114,7 +114,7 @@ async function post(c: Context, body: AppStats) {
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
-      //   await supabaseAdmin()
+      //   await supabaseAdmin(c)
       //     .from('store_apps')
       //     .upsert({
       //       app_id,
@@ -124,7 +124,7 @@ async function post(c: Context, body: AppStats) {
       //     })
       // }
       // if (action === 'get') {
-      //   await updateOnpremStats({
+      //   await updateOnpremStats(c, {
       //     app_id,
       //     updates: 1,
       //   })

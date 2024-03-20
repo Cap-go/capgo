@@ -1,40 +1,43 @@
 #!/usr/bin/env bash
 
+set -e
 set -x
 
 export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
 # Install CocoaPods
 echo "📦 Install CocoaPods"
 brew install cocoapods
-brew install node@20
-brew link node@20
-pod --version
+brew install node@18
+brew link node@18
 node -v
 npm -v
-
-# Go up in folder structure
-cd ../../..
-echo $PWD
 
 # Install bun
 echo "📦 Install bun"
 brew tap oven-sh/bun
 brew install bun 
 
+echo "Move to the project root"
+echo $PWD
+cd ../../..
+echo $PWD
+
 # Install dependencies
 echo "📦 Install dependencies"
-bun install --frozen-lockfile
+bun install
 
 # create assets
 echo "🌆 Create Assets"
-bun run capacitor-assets
+npm run capacitor-assets
 
 # Build the app
 echo "🚀 Build code"
-bun run mobile
+npm run mobile
 
 # install native dependencies
 echo "📦 Install native dependencies"
-bun run sync:ios
-cd ios/App
-pod install
+npm run sync:ios
+
+
+echo "Move back to the ci_scripts directory"
+cd ios/App/ci_scripts

@@ -575,42 +575,54 @@ export type Database = {
       global_stats: {
         Row: {
           apps: number
+          apps_active: number | null
           created_at: string | null
           date_id: string
           need_upgrade: number | null
           not_paying: number | null
           onboarded: number | null
           paying: number | null
+          paying_monthly: number | null
+          paying_yearly: number | null
           stars: number
           trial: number | null
           updates: number
           users: number | null
+          users_active: number | null
         }
         Insert: {
           apps: number
+          apps_active?: number | null
           created_at?: string | null
           date_id: string
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
           paying?: number | null
+          paying_monthly?: number | null
+          paying_yearly?: number | null
           stars: number
           trial?: number | null
           updates: number
           users?: number | null
+          users_active?: number | null
         }
         Update: {
           apps?: number
+          apps_active?: number | null
           created_at?: string | null
           date_id?: string
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
           paying?: number | null
+          paying_monthly?: number | null
+          paying_yearly?: number | null
           stars?: number
           trial?: number | null
           updates?: number
           users?: number | null
+          users_active?: number | null
         }
         Relationships: []
       }
@@ -1197,6 +1209,12 @@ export type Database = {
         }
         Returns: number
       }
+      count_active_users: {
+        Args: {
+          app_ids: string[]
+        }
+        Returns: number
+      }
       count_all_apps: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -1206,10 +1224,6 @@ export type Database = {
         Returns: number
       }
       count_all_onboarded: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      count_all_paying: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
@@ -1315,6 +1329,14 @@ export type Database = {
             }
             Returns: string
           }
+      get_customer_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          yearly: number
+          monthly: number
+          total: number
+        }[]
+      }
       get_cycle_info:
         | {
             Args: Record<PropertyKey, never>

@@ -42,7 +42,6 @@ import { app as on_version_update } from '../supabase/functions/_backend/private
 import { app as on_version_delete } from '../supabase/functions/_backend/private/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/private/triggers/stripe_event.ts'
 import { app as get_total_stats } from '../supabase/functions/_backend/private/triggers/get_total_stats.ts'
-import ky from 'ky'
 
 
 const app = new Hono()
