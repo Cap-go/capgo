@@ -215,21 +215,21 @@ export async function reactActiveApps(c: Context) {
       .then(res => res.json<ApiActiveAppsResponse>())
     console.log('reactActiveApps ok', response)
     response.data = convertDataWithMeta(response.data, response.meta)
-    console.log('reactActiveApps ok type', response)  
+    console.log('reactActiveApps ok type', response)
     return response
-  } catch (e) {
+  }
+  catch (e) {
     console.log('reactActiveApps error', e)
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
       console.log('reactActiveApps errorJson', errorJson)
     }
-    return { data: [], meta: [], rows: 0, statistics: 
-      {   
+    return { data: [], meta: [], rows: 0, statistics:
+      {
         bytes_read: 0,
         elapsed: 0,
-        rows_read: 0 
-    } 
-    } as ApiActiveAppsResponse
+        rows_read: 0,
+      } } as ApiActiveAppsResponse
   }
 }
 

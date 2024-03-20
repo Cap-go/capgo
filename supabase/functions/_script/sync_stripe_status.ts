@@ -13,7 +13,7 @@ const stripe = Stripe('****')
 
 // create a function who loop on stripe_info 1000 by 1000 and return the complete list
 async function getAllStripeInfos() {
-  let stripeInfos: {subscription_id: string, customer_id: string, status: string, price_id: string}[] = []
+  let stripeInfos: { subscription_id: string, customer_id: string, status: string, price_id: string }[] = []
   let offset = 0
   const limit = 1000
   let count = 0
@@ -72,12 +72,14 @@ async function updateStripeStatus() {
           console.error('Error updating status in Supabase:', updateError)
         else
           console.log(`Updated status to canceled for customer_id: ${stripeInfo.customer_id}`)
-      } else if (!subscription) {
+      }
+      else if (!subscription) {
         console.log('this customer is not found', stripeInfo.customer_id)
       }
       else if (subscription && stripeInfo.price_id && subscription.plan && subscription.plan.id !== stripeInfo.price_id) {
         console.log('this customer is wrong subscription', stripeInfo.customer_id, subscription.plan.id, stripeInfo.price_id)
-      } else if (subscription && stripeInfo.price_id && !subscription.plan) {
+      }
+      else if (subscription && stripeInfo.price_id && !subscription.plan) {
         console.log('this customer don\'t have plan', stripeInfo.customer_id, subscription.status, subscription.id)
       }
       count++

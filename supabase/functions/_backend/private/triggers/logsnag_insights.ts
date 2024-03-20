@@ -4,11 +4,11 @@ import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { logsnag } from '../../utils/logsnag.ts'
-import { reactActiveApps } from '../../utils/clickhouse.ts';
+import { reactActiveApps } from '../../utils/clickhouse.ts'
 
 interface PlanTotal { [key: string]: number }
-interface Actives { users: number, apps: number}
-interface CustomerCount { total: number, yearly: number, monthly: number}
+interface Actives { users: number, apps: number }
+interface CustomerCount { total: number, yearly: number, monthly: number }
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -48,7 +48,7 @@ function getStats(c: Context): GlobalStats {
     customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
       if (res.error || !res.data)
         console.log('get_customer_counts', res.error)
-      return res.data || { total: 0, yearly: 0, monthly: 0}
+      return res.data || { total: 0, yearly: 0, monthly: 0 }
     }),
     onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
       if (res.error || !res.data)
@@ -71,13 +71,14 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
-    actives: reactActiveApps(c).then(async(res) => {
+    actives: reactActiveApps(c).then(async (res) => {
       try {
-        const app_ids = res.data.map((app) => app.app_id)
+        const app_ids = res.data.map(app => app.app_id)
         console.log('app_ids', app_ids)
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
         return { apps: res.rows, users: res2.data || 0 }
-      } catch (e) {
+      }
+      catch (e) {
         console.error('count_active_users error', e)
       }
       return { apps: res.rows, users: 0 }

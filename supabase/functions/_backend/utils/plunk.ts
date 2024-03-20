@@ -47,23 +47,20 @@ function getConfigHeaders(c: Context) {
 }
 
 function convertToString(obj: any): any {
-  if (typeof obj !== 'object' || obj === null) {
-    return obj;
-  }
+  if (typeof obj !== 'object' || obj === null)
+    return obj
 
-  if (Array.isArray(obj)) {
-    return obj.map(convertToString);
-  }
+  if (Array.isArray(obj))
+    return obj.map(convertToString)
 
-  const convertedObj: { [key: string]: string } = {};
+  const convertedObj: { [key: string]: string } = {}
 
   for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      convertedObj[key] = String(obj[key]);
-    }
+    if (Object.prototype.hasOwnProperty.call(obj, key))
+      convertedObj[key] = String(obj[key])
   }
 
-  return convertedObj;
+  return convertedObj
 }
 
 export async function trackEvent(c: Context, email: string, data: any, event: string) {
