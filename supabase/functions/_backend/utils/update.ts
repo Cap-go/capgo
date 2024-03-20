@@ -18,10 +18,14 @@ import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
 import { sendStatsAndDevice } from './clickhouse.ts'
 
-let globalPgClient = null as ReturnType<typeof postgres> | null
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
-  const res: any = {
+  const res: {
+    version: string
+    url: string
+    session_key?: string
+    checksum?: string | null
+  } = {
     version: version.name,
     url: signedURL,
   }
@@ -37,8 +41,7 @@ function getDrizzlePostgres(c: Context) {
   console.log('getDrizzlePostgres', supaUrl)
 
   const pgClient = postgres(supaUrl)
-  globalPgClient = pgClient
-  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any) }
+  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient), pgClient }
 }
 
 async function requestInfosPostgres(
@@ -247,7 +250,7 @@ async function getAppOwnerPostgres(
 }
 
 export async function update(c: Context, body: AppInfos) {
-  const { alias, schema, drizzleCient } = getDrizzlePostgres(c)
+  const { alias, schema, drizzleCient, pgClient } = getDrizzlePostgres(c)
 
   const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
@@ -603,7 +606,6 @@ export async function update(c: Context, body: AppInfos) {
     }, 500)
   }
   finally {
-    if (globalPgClient)
-      await globalPgClient.end()
+      await pgClient.end()
   }
 }

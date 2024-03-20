@@ -1,0 +1,99 @@
+import { Hono } from 'hono/tiny'
+import type { Context } from 'hono'
+import { s3 } from '../utils/s3.ts'
+import { middlewareKey } from '../utils/hono.ts'
+import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+
+interface dataUpload {
+  name: string
+  app_id: string
+  is_expo?: boolean
+  bucket_id?: string
+}
+
+export const app = new Hono()
+
+app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
+  try {
+    const body = await c.req.json<dataUpload>()
+    console.log('body', body)
+    const apikey = c.get('apikey')
+    const capgkey = c.get('capgkey')
+    console.log('apikey', apikey)
+    console.log('capgkey', capgkey)
+    const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+      .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
+    if (_errorUserId) {
+      console.log('_errorUserId', _errorUserId)
+      return c.json({ status: 'Error User not found' }, 500)
+    }
+
+    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+      return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+
+    const { data: app, error: errorApp } = await supabaseAdmin(c)
+      .from('apps')
+      .select('app_id, owner_org')
+      .eq('app_id', body.app_id)
+      // .eq('user_id', userId)
+      .single()
+    if (errorApp) {
+      console.log('errorApp', errorApp)
+      return c.json({ status: 'Error App not found' }, 500)
+    }
+
+    // console.log(body.name ?? body.bucket_id?.split('.')[0] ?? '')
+    const { data: version, error: errorVersion } = await supabaseAdmin(c)
+      .from('app_versions')
+      .select('id')
+      .eq(body.name ? 'name' : 'bucket_id', body.name ? body.name : body.bucket_id ?? '')
+      .eq('app_id', body.app_id)
+      .eq('storage_provider', 'r2-direct')
+      .eq('user_id', apikey.user_id)
+      .single()
+    if (errorVersion) {
+      console.log('errorVersion', errorVersion)
+      return c.json({ status: 'Error App or Version not found' }, 500)
+    }
+
+    // const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
+    const filePath = `orgs/${app.owner_org}/apps/${btoa(app.app_id)}/${version.id}.zip`
+    console.log(filePath)
+    // check if app version exist
+
+    console.log('s3.checkIfExist', filePath)
+
+    // check if object exist in r2
+    const exist = await s3.checkIfExist(c, filePath)
+    if (exist) {
+      console.log('exist', exist)
+      return c.json({ status: 'Error already exist' }, 500)
+    }
+    console.log('s3.getUploadUrl', filePath)
+    const url = await s3.getUploadUrl(c, filePath)
+    console.log('url', url)
+    if (!url) {
+      console.log('no url found')
+      return c.json({ status: 'Error unknow' }, 500)
+    }
+
+    // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/Y29tLmRlbW8uYXBw/11.zip
+    // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/Y29tLmRlbW8uYXBw/11.zip
+    const { error: changeError } = await supabaseAdmin(c)
+      .from('app_versions')
+      .update({ r2_path: filePath })
+      .eq('id', version.id)
+
+    if (changeError) {
+      console.error('Cannot update supabase', changeError)
+      return c.json({ status: 'Error unknow' }, 500)
+    }
+
+    console.log('url', filePath, url)
+    return c.json({ url })
+  }
+  catch (e) {
+    console.log('error', e)
+    return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
+  }
+})
