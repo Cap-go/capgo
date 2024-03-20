@@ -151,7 +151,6 @@
     "postgres": "^3.4.3",
     "prism-theme-vars": "^0.2.4",
     "semver": "^7.6.0",
-    "sharp": "^0.33.2",
     "stripe": "^14.17.0",
     "unplugin-auto-import": "^0.17.5",
     "unplugin-vue-macros": "^2.7.10",
