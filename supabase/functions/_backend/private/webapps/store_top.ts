@@ -7,7 +7,7 @@ export const app = new Hono()
 
 app.use('/', useCors)
 
-app.post('/', async (c: Context) => {
+app.get('/', async (c: Context) => {
   try {
     // count allapps
     const mode = c.req.query('mode') || 'capacitor'
