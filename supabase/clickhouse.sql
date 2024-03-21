@@ -88,42 +88,53 @@ PARTITION BY toYYYYMM(created_at)
 ORDER BY (app_id, device_id, created_at)
 PRIMARY KEY (app_id, device_id, created_at);
 
-CREATE TABLE IF NOT EXISTS logs_daily
+CREATE TABLE IF NOT EXISTS logs_daily_raw
 (
     date Date,
     app_id String,
     version Int64, -- Using the version from the logs table
-    get UInt64,
-    fail UInt64,
-    install UInt64,
-    uninstall UInt64,
-    bandwidth Int64,
-    record_version DateTime64(6) -- Using the created_at timestamp for deduplication
-) ENGINE = ReplacingMergeTree(record_version)
+    get AggregateFunction(countIf, UInt64, UInt8),
+    fail AggregateFunction(countIf, UInt64, UInt8),
+    install AggregateFunction(countIf, UInt64, UInt8),
+    uninstall AggregateFunction(countIf, UInt64, UInt8),
+    bandwidth AggregateFunction(sumIf, Int64, UInt8),
+) ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_id, version);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS logs_daily_mv
-TO logs_daily
+CREATE MATERIALIZED VIEW IF NOT EXISTS logs_daily_raw_mv
+TO logs_daily_raw
 AS
 SELECT
     toDate(l.created_at) AS date,
     l.app_id,
     l.version, -- Using the version from the logs table
-    countIf(l.action = 'get') AS get,
-    countIf(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
-    countIf(l.action = 'set') AS install,
-    countIf(l.action = 'uninstall') AS uninstall,
+    countIfState(l.action = 'get') AS get,
+    countIfState(l.action IN ('set_fail', 'update_fail', 'download_fail')) AS fail,
+    countIfState(l.action = 'set') AS install,
+    countIfState(l.action = 'uninstall') AS uninstall,
     -- Calculate the bandwidth by summing the size from the app_versions_meta table
     -- for 'get' actions, where there is a matching version.
-    sumIf(a.size, l.action = 'get' AND a.id = l.version AND a.app_id = l.app_id) AS bandwidth,
-    max(l.created_at) AS record_version -- Using the maximum created_at timestamp as the record version
+    sumIfState(a.size, l.action = 'get' AND a.id = l.version AND a.app_id = l.app_id) AS bandwidth
 FROM logs AS l
 LEFT JOIN app_versions_meta AS a ON l.app_id = a.app_id AND l.version = a.id
 GROUP BY
     date,
     l.app_id,
     l.version;
+
+CREATE VIEW logs_daily AS 
+SELECT 
+  date, 
+  app_id, 
+  version, 
+  countIfMerge(get) as get, 
+  countIfMerge(fail) as fail, 
+  countIfMerge(install) as install, 
+  countIfMerge(uninstall) as uninstall, 
+  sumIfMerge(bandwidth) as bandwidth 
+  from logs_daily_raw 
+  GROUP BY (date, app_id, version);
 
 CREATE TABLE IF NOT EXISTS app_storage_daily
 (
