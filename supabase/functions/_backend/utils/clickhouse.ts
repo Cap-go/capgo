@@ -233,6 +233,56 @@ export async function reactActiveApps(c: Context) {
   }
 }
 
+interface ApiCountResponse {
+  data: { count: number }[]
+  meta: any[]
+  rows: number
+  statistics: {
+    bytes_read: number
+    elapsed: number
+    rows_read: number
+  }
+}
+
+export async function countFromClickHouse(c: Context, table: string, appId: string) {
+  const query = `
+  SELECT COUNT(*) as count
+  FROM ${table}
+  WHERE app_id = {app_id:String}
+  FORMAT JSON
+  `
+  const params: Record<string, any> = {
+    param_app_id: appId,
+  }
+  console.log('sending to Clickhouse body', query)
+  const searchParams = new URLSearchParams()
+  searchParams.append('query', query)
+  searchParams.append('http_write_exception_in_output_format', "1")
+  Object.entries(params).forEach(([key, value]) => {
+    searchParams.append(key, Array.isArray(value) ? JSON.stringify(value) : value)
+  })
+  console.log('sending to Clickhouse searchParams', searchParams)
+  try {
+    const response = await ky.post(clickHouseURL(c), {
+      searchParams,
+      headers: getHeaders(c),
+    })
+      .then(res => res.json<ApiCountResponse>())
+    console.log('countFromClickHouse ok', response)
+    response.data = convertDataWithMeta(response.data, response.meta)
+    console.log('countFromClickHouse ok type', response)
+    return response.data[0].count
+  }
+  catch (e) {
+    console.log('countFromClickHouse error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.log('countFromClickHouse errorJson', errorJson)
+    }
+    return 0
+  }
+}
+
 export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
   try {
     const query = mauQuery(startDate, endDate, apps)

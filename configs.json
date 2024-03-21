@@ -1,21 +1,25 @@
 {
   "base_domain": {
     "prod": "web.capgo.app",
+    "preprod": "web-preprod.capgo.app",
     "development": "development.capgo.app",
     "local": "localhost:3332"
   },
   "supa_anon": {
     "prod": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2d3pwb2F6bXhrcW9zcmRld3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDgwNzAyNzUsImV4cCI6MjAyMzY0NjI3NX0.snaF6idn1toeFB4oN7Gax1e0OfiPjDO28ep91SYbkKA",
+    "preprod": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2d3pwb2F6bXhrcW9zcmRld3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDgwNzAyNzUsImV4cCI6MjAyMzY0NjI3NX0.snaF6idn1toeFB4oN7Gax1e0OfiPjDO28ep91SYbkKA",
     "development": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1Y3N5YnZuaGF2b2dkbXp3dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTQ1Mzk1MDYsImV4cCI6MTk3MDExNTUwNn0.HyuZmo_EjF5fgZQU3g37bdNardK1CLHgxXmYqtr59bo",
     "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
   },
   "supa_url": {
     "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
+    "preprod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
     "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
     "local": "http://localhost:54321"
   },
   "api_domain": {
     "prod": "api.capgo.app",
+    "preprod": "api-preprod.capgo.app",
     "development": "api-dev.capgo.app",
     "local": "localhost:54321/functions/v1"
   }
