@@ -35,7 +35,6 @@ function generateDefaultJsonCliConfig(baseUrl: URL) {
     appId: 'com.demo.app',
     appName: 'demoApp',
     webDir: 'dist',
-    bundledWebRuntime: false,
     plugins: {
       CapacitorUpdater: {
         autoUpdate: true,

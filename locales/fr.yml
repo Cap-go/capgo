@@ -80,7 +80,7 @@ billing: Facturation
 build-your-app-and-s: créer votre application et synchroniser
 build-your-code-and-: Télécharger sur Capgo votre code
 bulk-upload: Transfert groupé
-bundle: Empaqueter
+bundle: bundle
 bundle-deleted: Groupe supprimé
 bundle-is-linked-channel: Le bundle est lié à un canal, dissociez-le d'abord
 bundle-is-linked-device: Le bundle est lié à l'appareil, dissociez-le d'abord

@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'ee.forgr.capacitor_go',
   appName: 'Capgo',
   webDir: 'dist',
-  bundledWebRuntime: false,
   plugins: {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],

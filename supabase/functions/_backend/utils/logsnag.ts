@@ -15,14 +15,14 @@ function logsnag(c: Context) {
     })
     : {
         publish: () => Promise.resolve(true),
-        track: () => Promise.resolve(true),
+        track: (_obj: any) => Promise.resolve(true),
         insight: {
-          track: () => Promise.resolve(true),
+          track: (_obj: any) => Promise.resolve(true),
           increment: () => Promise.resolve(true),
         },
         insights: () => Promise.resolve(true),
       };
-  (ls as LogSnagExt).insights = async (data: { title: string, value: string | boolean | number, icon: string }[]) => {
+  (ls as LogSnagExt & LogSnag).insights = async (data: { title: string, value: string | boolean | number, icon: string }[]) => {
     const all = []
     console.log('logsnag', data)
     for (const d of data)

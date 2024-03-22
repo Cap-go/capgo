@@ -12,7 +12,7 @@ import {
   supabaseAdmin,
 } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { recordUsage, setTreshold } from './stripe.ts'
+import { recordUsage, setThreshold } from './stripe.ts'
 import { trackEvent } from './plunk.ts'
 
 function planToInt(plan: string) {
@@ -99,7 +99,7 @@ async function setMetered(c: Context, customer_id: string | null, userId: string
     .single()
   if (data && data.subscription_metered) {
     try {
-      await setTreshold(c, customer_id)
+      await setThreshold(c, customer_id)
     }
     catch (error) {
       console.log('error setTreshold', error)

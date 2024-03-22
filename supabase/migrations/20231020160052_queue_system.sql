@@ -123,7 +123,7 @@ REVOKE ALL PRIVILEGES ON FUNCTION schedule_jobs
 SELECT cron.schedule(
     'process_tasks_subminute',
     '* * * * *',
-    $$ SELECT schedule_jobs(); $$
+    $$SELECT schedule_jobs();$$
 );
 
 CREATE OR REPLACE FUNCTION public.trigger_http_queue_post_to_function() 

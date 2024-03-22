@@ -43,8 +43,8 @@ async function main() {
   if (error2)
     throw error1
 
-  const oldUserId = (oldUser as any).user_id as string
-  const newUserId = (newUser as any).id as string
+  const oldUserId = oldUser.user_id as string
+  const newUserId = newUser.id as string
 
   console.log(`old id: ${JSON.stringify(oldUserId)}`)
   console.log(`new id: ${JSON.stringify(newUserId)}`)

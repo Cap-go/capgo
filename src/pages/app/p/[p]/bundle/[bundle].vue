@@ -45,7 +45,8 @@ watch(version, async (version) => {
     return
   }
 
-  role.value = await organizationStore.getCurrentRole(version.user_id, version.app_id, undefined)
+  await organizationStore.awaitInitialLoad()
+  role.value = await organizationStore.getCurrentRoleForApp(version.app_id)
   console.log(role.value)
 })
 
@@ -160,7 +161,7 @@ async function setChannelSkipProgressive(channel: Database['public']['Tables']['
 async function ASChannelChooser() {
   if (!version.value)
     return
-  if (role.value && !(role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+  if (role.value && !(role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
     toast.error(t('no-permission'))
     return
   }
@@ -335,7 +336,7 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
   }
 
   // Push set-bundle if role > read
-  if (displayStore.actionSheetOption.buttons && role.value && (role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+  if (displayStore.actionSheetOption.buttons && role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
     displayStore.actionSheetOption.buttons.splice(0, 0, {
       text: t('set-bundle'),
       handler: () => {
@@ -356,7 +357,7 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
         openChannelLink()
       },
     })
-    if (role.value && (role.value === 'admin' || role.value === 'owner' || role.value === 'write')) {
+    if (role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
       displayStore.actionSheetOption.buttons.splice(baseIndex + 1, 0, {
         text: t('unlink-channel'),
         handler: async () => {
@@ -548,7 +549,7 @@ async function saveCustomId(input: string) {
 // })
 
 function guardMinAutoUpdate(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -556,7 +557,7 @@ function guardMinAutoUpdate(event: Event) {
 }
 
 function preventInputChangePerm(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'owner', 'write'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     event.preventDefault()
     return false
   }
@@ -582,7 +583,7 @@ function preventInputChangePerm(event: Event) {
             <InfoRow
               v-if="showBundleMetadataInput" id="metadata-bundle"
               :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''"
-              :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'owner', 'write'])"
+              :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])"
               @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
             />
             <!-- meta devices -->

@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { checkAppOwner, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
+import { EMPTY_UUID, hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
@@ -25,7 +25,7 @@ interface GetDevice {
 }
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id || !(await checkAppOwner(c, apikey.user_id, body.app_id)))
+  if (!body.app_id || !(await hasAppRight(c, body.app_id, apikey.user_id, 'read')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // get one channel or all channels
@@ -92,7 +92,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
 }
 
 export async function deleteChannel(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
+  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'admin')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
@@ -124,6 +124,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
     version: -1,
+    owner_org: EMPTY_UUID,
   }
   if (body.version) {
     const { data, error: vError } = await supabaseAdmin(c)
