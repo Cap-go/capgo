@@ -119,17 +119,16 @@ function findMobileCol(name: MobileColType) {
   return props.columns ? props.columns.find(col => col.mobile === name) : undefined
 }
 
-async function prev() {
-  console.log('prev')
-  if (props.currentPage > 1) {
-    emit('prev')
-    emit('update:currentPage', props.currentPage - 1)
-    emit('reload')
-  }
+function canNext() {
+  return props.currentPage < Math.ceil(props.total / offset.value)
 }
+function canPrev() {
+  return props.currentPage > 1
+}
+
 async function next() {
   console.log('next')
-  if (props.currentPage < Math.ceil(props.total / offset.value)) {
+  if (canNext()) {
     emit('next')
     emit('update:currentPage', props.currentPage + 1)
     emit('reload')
@@ -137,15 +136,23 @@ async function next() {
 }
 async function fastForward() {
   console.log('fastForward')
-  if (props.currentPage < Math.ceil(props.total / offset.value)) {
+  if (canNext()) {
     emit('fastForward')
     emit('update:currentPage', Math.ceil(props.total / offset.value))
     emit('reload')
   }
 }
+async function prev() {
+  console.log('prev')
+  if (canPrev()) {
+    emit('prev')
+    emit('update:currentPage', props.currentPage - 1)
+    emit('reload')
+  }
+}
 async function fastBackward() {
   console.log('fastBackward')
-  if (props.currentPage > 1) {
+  if (canPrev()) {
     emit('fastBackward')
     emit('update:currentPage', 1)
     emit('reload')
@@ -260,30 +267,30 @@ onMounted(() => {
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">Showing</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
-          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-100 dark:text-gray-400 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white" @click="fastBackward">
+          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canPrev() }" :disabled="!canPrev()" @click="fastBackward">
             <span class="sr-only">Fast Backward</span>
             <IconFastBackward />
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-100 dark:text-gray-400 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white" @click="prev">
+          <button class="block px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canPrev() }" :disabled="!canPrev()" @click="prev">
             <span class="sr-only">Previous</span>
             <IconPrev />
           </button>
         </li>
         <li>
-          <button aria-current="page" class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 hover:bg-blue-100 dark:text-white hover:text-blue-700">
+          <button aria-current="page" class="z-10 px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white" disabled>
             {{ currentPage }}
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-100 dark:text-gray-400 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white" @click="next">
+          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canNext() }" :disabled="!canNext()" @click="next">
             <span class="sr-only">Next</span>
             <IconNext />
           </button>
         </li>
         <li>
-          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-100 dark:text-gray-400 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white" @click="fastForward">
+          <button class="block px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400" :class="{ 'hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white': canNext() }" :disabled="!canNext()" @click="fastForward">
             <span class="sr-only"> Fast Forward </span>
             <IconFastForward />
           </button>

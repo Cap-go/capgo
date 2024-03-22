@@ -135,11 +135,9 @@ async function getData() {
     const versionData = await Promise.all(versionPromises)
     versionData.forEach((version, index) => {
       if (version.error)
-        throw new Error(`Cannot get version ${index}. Error: ${version.error}`)
-
-      // Not the best way to do this but it works
-      // This is dangereus, but due to the lack of foreign key it is the only way to do it
-      finalData[index].version = version.data as any
+        finalData[index].version = { name: 'unknown' } as any
+      else
+        finalData[index].version = version.data as any
     })
 
     elements.value.push(...finalData as any)

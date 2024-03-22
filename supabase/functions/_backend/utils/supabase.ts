@@ -7,7 +7,7 @@ import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
-import { readMauFromClickHouse, sendStatsAndDevice } from './clickhouse.ts'
+import { countFromClickHouse, readMauFromClickHouse, sendStatsAndDevice } from './clickhouse.ts'
 import type { AppActivity } from './clickhouse.ts'
 
 // Import Supabase client
@@ -441,13 +441,7 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
   }
   client = supabaseAdmin(c)
 
-  const reqCount = count
-    ? client
-      .from('clickhouse_devices')
-      .select('', { count: 'exact', head: true })
-      .eq('app_id', appId)
-      .then(res => res.count || 0)
-    : 0
+  const reqCount = countFromClickHouse(c, 'devices_u', appId)
   let req = client
     .from('clickhouse_devices')
     .select()
@@ -524,13 +518,7 @@ export async function getSStats(c: Context, auth: string, appId: string, deviceI
   }
   client = supabaseAdmin(c)
 
-  const reqCount = count
-    ? client
-      .from('clickhouse_logs')
-      .select('', { count: 'exact', head: true })
-      .eq('app_id', appId)
-      .then(res => res.count || 0)
-    : 0
+  const reqCount = countFromClickHouse(c, 'logs', appId)
   let req = client
     .from('clickhouse_logs')
     .select(`

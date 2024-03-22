@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.500.0",
+  "version": "10.524.0",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -30,6 +30,7 @@
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",
+    "preprod-serve": "BRANCH=preprod vite",
     "dev-ios": "cap sync && cap run ios",
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",

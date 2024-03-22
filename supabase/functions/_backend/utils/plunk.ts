@@ -46,6 +46,23 @@ function getConfigHeaders(c: Context) {
   }
 }
 
+function convertToString(obj: any): any {
+  if (typeof obj !== 'object' || obj === null)
+    return obj
+
+  if (Array.isArray(obj))
+    return obj.map(convertToString)
+
+  const convertedObj: { [key: string]: string } = {}
+
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key))
+      convertedObj[key] = String(obj[key])
+  }
+
+  return convertedObj
+}
+
 export async function trackEvent(c: Context, email: string, data: any, event: string) {
   if (!hasPlunk(c))
     return
@@ -55,7 +72,7 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
       json: {
         email,
         event,
-        data: shallowCleanObject(data),
+        data: convertToString(shallowCleanObject(data)),
       },
       headers: getConfigHeaders(c),
     })

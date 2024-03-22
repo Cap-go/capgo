@@ -129,6 +129,17 @@ interface ApiResponse {
   statistics: Statistics
 }
 
+export interface AppActives {
+  app_id: string
+}
+
+export interface ApiActiveAppsResponse {
+  data: AppActives[]
+  meta: MetaInfo[]
+  rows: number
+  statistics?: Statistics
+}
+
 function mauQuery(startDate: string, endDate: string, apps: string[]) {
   const startDateFormatted = new Date(startDate).toISOString().split('T')[0]
   const endDateFormatted = new Date(endDate).toISOString().split('T')[0]
@@ -183,6 +194,93 @@ function convertDataWithMeta(data: any[], meta: MetaInfo[]) {
       })
     return newObj
   })
+}
+
+export async function reactActiveApps(c: Context) {
+  const query = `SELECT DISTINCT app_id
+  FROM logs
+  WHERE created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
+    AND created_at < CURRENT_DATE() and action = 'get' FORMAT JSON`
+  console.log('sending to Clickhouse body', query)
+  const searchParams = {
+    query,
+    http_write_exception_in_output_format: 1,
+  }
+  console.log('sending to Clickhouse searchParams', searchParams)
+  try {
+    const response = await ky.post(clickHouseURL(c), {
+      searchParams,
+      headers: getHeaders(c),
+    })
+      .then(res => res.json<ApiActiveAppsResponse>())
+    console.log('reactActiveApps ok', response)
+    response.data = convertDataWithMeta(response.data, response.meta)
+    console.log('reactActiveApps ok type', response)
+    return response
+  }
+  catch (e) {
+    console.log('reactActiveApps error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.log('reactActiveApps errorJson', errorJson)
+    }
+    return { data: [], meta: [], rows: 0, statistics:
+      {
+        bytes_read: 0,
+        elapsed: 0,
+        rows_read: 0,
+      } } as ApiActiveAppsResponse
+  }
+}
+
+interface ApiCountResponse {
+  data: { count: number }[]
+  meta: any[]
+  rows: number
+  statistics: {
+    bytes_read: number
+    elapsed: number
+    rows_read: number
+  }
+}
+
+export async function countFromClickHouse(c: Context, table: string, appId: string) {
+  const query = `
+  SELECT COUNT(*) as count
+  FROM ${table}
+  WHERE app_id = {app_id:String}
+  FORMAT JSON
+  `
+  const params: Record<string, any> = {
+    param_app_id: appId,
+  }
+  console.log('sending to Clickhouse body', query)
+  const searchParams = new URLSearchParams()
+  searchParams.append('query', query)
+  searchParams.append('http_write_exception_in_output_format', "1")
+  Object.entries(params).forEach(([key, value]) => {
+    searchParams.append(key, Array.isArray(value) ? JSON.stringify(value) : value)
+  })
+  console.log('sending to Clickhouse searchParams', searchParams)
+  try {
+    const response = await ky.post(clickHouseURL(c), {
+      searchParams,
+      headers: getHeaders(c),
+    })
+      .then(res => res.json<ApiCountResponse>())
+    console.log('countFromClickHouse ok', response)
+    response.data = convertDataWithMeta(response.data, response.meta)
+    console.log('countFromClickHouse ok type', response)
+    return response.data[0].count
+  }
+  catch (e) {
+    console.log('countFromClickHouse error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.log('countFromClickHouse errorJson', errorJson)
+    }
+    return 0
+  }
 }
 
 export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {

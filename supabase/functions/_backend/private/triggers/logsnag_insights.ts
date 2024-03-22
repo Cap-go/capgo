@@ -4,8 +4,11 @@ import { BRES, middlewareAPISecret } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { logsnag } from '../../utils/logsnag.ts'
+import { reactActiveApps } from '../../utils/clickhouse.ts'
 
 interface PlanTotal { [key: string]: number }
+interface Actives { users: number, apps: number }
+interface CustomerCount { total: number, yearly: number, monthly: number }
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -13,8 +16,9 @@ interface GlobalStats {
   stars: Promise<number>
   onboarded: PromiseLike<number>
   need_upgrade: PromiseLike<number>
-  paying: PromiseLike<number>
+  customers: PromiseLike<CustomerCount>
   plans: PromiseLike<PlanTotal>
+  actives: Promise<Actives>
 }
 
 async function getGithubStars(): Promise<number> {
@@ -41,10 +45,10 @@ function getStats(c: Context): GlobalStats {
       .select('*', { count: 'exact' })
       .then(res => res.count || 0),
     stars: getGithubStars(),
-    paying: supabase.rpc('count_all_paying', {}).single().then((res) => {
+    customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log('count_all_paying', res.error)
-      return res.data || 0
+        console.log('get_customer_counts', res.error)
+      return res.data || { total: 0, yearly: 0, monthly: 0 }
     }),
     onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
       if (res.error || !res.data)
@@ -75,31 +79,39 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       updates,
       users,
       stars,
-      paying,
+      customers,
       onboarded,
       need_upgrade,
       plans,
+      actives,
     ] = await Promise.all([
       res.apps,
       res.updates,
       res.users,
       res.stars,
-      res.paying,
+      res.customers,
       res.onboarded,
       res.need_upgrade,
       res.plans,
+      res.actives,
     ])
-    const not_paying = users - paying
-    console.log('All Promises', apps, updates, users, stars, paying, onboarded, need_upgrade, plans)
+    const not_paying = users - customers.total
+    console.log('All Promises', apps, updates, users, stars, customers, onboarded, need_upgrade, plans)
     // console.log('app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
     const newData: Database['public']['Tables']['global_stats']['Insert'] = {
       date_id,
       apps,
+      trial: plans.Trial,
+      users,
       updates,
+      apps_active: actives.apps,
+      users_active: actives.users,
       stars,
-      paying,
+      paying: customers.total,
+      paying_yearly: customers.yearly,
+      paying_monthly: customers.monthly,
       onboarded,
       need_upgrade,
       not_paying,
@@ -117,6 +129,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         icon: '📱',
       },
       {
+        title: 'Apps actives',
+        value: actives.apps,
+        icon: '💃',
+      },
+      {
         title: 'Updates',
         value: updates,
         icon: '📲',
@@ -125,6 +142,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         title: 'User Count',
         value: users,
         icon: '👨',
+      },
+      {
+        title: 'Users actives',
+        value: actives.users,
+        icon: '🎉',
       },
       {
         title: 'User need upgrade',
@@ -143,8 +165,18 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       },
       {
         title: 'User paying',
-        value: paying,
+        value: customers.total,
         icon: '💰',
+      },
+      {
+        title: 'User yearly',
+        value: `${(customers.yearly * 100 / customers.total).toFixed(0)}% - ${customers.yearly}`,
+        icon: '🧧',
+      },
+      {
+        title: 'User monthly',
+        value: `${(customers.monthly * 100 / customers.total).toFixed(0)}% - ${customers.monthly}`,
+        icon: '🗓️',
       },
       {
         title: 'User not paying',
