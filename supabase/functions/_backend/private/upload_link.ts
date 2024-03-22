@@ -5,9 +5,8 @@ import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
 interface dataUpload {
-  name: string
+  name?: string
   app_id: string
-  is_expo?: boolean
   bucket_id?: string
 }
 
@@ -40,6 +39,10 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     if (errorApp) {
       console.log('errorApp', errorApp)
       return c.json({ status: 'Error App not found' }, 500)
+    }
+
+    if ((body.name && body.bucket_id) || (!body.name && !body.bucket_id)) {
+      return c.json({ status: 'Error name or bucket_id' }, 500)
     }
 
     // console.log(body.name ?? body.bucket_id?.split('.')[0] ?? '')
