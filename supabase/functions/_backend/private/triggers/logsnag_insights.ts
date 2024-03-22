@@ -60,28 +60,10 @@ function getStats(c: Context): GlobalStats {
         console.log('count_all_need_upgrade', res.error)
       return res.data || 0
     }),
-    plans: supabase.rpc('count_all_plans_v2').then((res) => {
+    plans: supabase.rpc('count_all_plans_v2', {}).then((res) => {
       if (res.error || !res.data)
         console.log('count_all_plans_v2', res.error)
-      return res.data || {}
-    }).then((data: any) => {
-      const total: PlanTotal = {}
-      for (const plan of data)
-        total[plan.plan_name] = plan.count
-
-      return total
-    }),
-    actives: reactActiveApps(c).then(async (res) => {
-      try {
-        const app_ids = res.data.map(app => app.app_id)
-        console.log('app_ids', app_ids)
-        const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
-        return { apps: res.rows, users: res2.data || 0 }
-      }
-      catch (e) {
-        console.error('count_active_users error', e)
-      }
-      return { apps: res.rows, users: 0 }
+      return res.data ? new Map(res.data.map(plan => [plan.plan_name, plan.count])) : {}
     }),
   }
 }
@@ -203,27 +185,27 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       },
       {
         title: 'Free plan',
-        value: plans.Free,
+        value: plans.Free ?? 0,
         icon: '🆓',
       },
       {
         title: 'Solo Plan',
-        value: `${(plans.Solo * 100 / customers.total).toFixed(0)}% - ${plans.Solo}`,
+        value: plans.Solo ?? 0,
         icon: '🎸',
       },
       {
         title: 'Maker Plan',
-        value: `${(plans.Maker * 100 / customers.total).toFixed(0)}% - ${plans.Maker}`,
+        value: plans.Maker ?? 0,
         icon: '🤝',
       },
       {
         title: 'Team plan',
-        value: `${(plans.Team * 100 / customers.total).toFixed(0)}% - ${plans.Team}`,
+        value: plans.Team ?? 0,
         icon: '👏',
       },
       {
         title: 'Pay as you go plan',
-        value: `${(plans['Pay as you go'] * 100 / customers.total).toFixed(0)}% - ${plans['Pay as you go']}`,
+        value: plans['Pay as you go'] ?? 0,
         icon: '📈',
       },
     ]).catch((e) => {
