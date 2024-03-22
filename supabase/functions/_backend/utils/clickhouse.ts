@@ -257,7 +257,7 @@ export async function countFromClickHouse(c: Context, table: string, appId: stri
   console.log('sending to Clickhouse body', query)
   const searchParams = new URLSearchParams()
   searchParams.append('query', query)
-  searchParams.append('http_write_exception_in_output_format', "1")
+  searchParams.append('http_write_exception_in_output_format', '1')
   Object.entries(params).forEach(([key, value]) => {
     searchParams.append(key, Array.isArray(value) ? JSON.stringify(value) : value)
   })

@@ -447,7 +447,7 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
   }
   client = supabaseAdmin(c)
 
-  const reqCount = countFromClickHouse(c, 'devices_u', appId)
+  const reqCount = count ? countFromClickHouse(c, 'devices_u', appId) : 0
   let req = client
     .from('clickhouse_devices')
     .select()
@@ -524,7 +524,7 @@ export async function getSStats(c: Context, auth: string, appId: string, deviceI
   }
   client = supabaseAdmin(c)
 
-  const reqCount = countFromClickHouse(c, 'logs', appId)
+  const reqCount = count ? countFromClickHouse(c, 'logs', appId) : 0
   let req = client
     .from('clickhouse_logs')
     .select(`
