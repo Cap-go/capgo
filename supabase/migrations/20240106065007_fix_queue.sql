@@ -110,7 +110,7 @@ $$ LANGUAGE plpgsql;
 SELECT cron.schedule(
     'process_requests_from_queue',
     '* * * * *',
-    $$ SELECT process_requested_jobs(); $$
+    $$SELECT process_requested_jobs();$$
 );
 
 REVOKE ALL PRIVILEGES ON FUNCTION process_requested_jobs
