@@ -66,6 +66,7 @@ app: Приложение
 app-deleted: Приложение удалено
 app-id-example: Пример идентификатора приложения
 app-not-found: Приложение не найдено
+app-perm: Разрешение приложения
 app-preview: Предварительный просмотр приложения
 are-u-sure: Вы уверены ?
 available-in-the-san: Доступно в приложении песочницы
@@ -209,6 +210,8 @@ enter-your-new-passw: Введите новый пароль и подтверд
 external-storage: Внешнее хранилище
 fail: Установка не удалась
 failed: Неуспешный
+fast-backward: Быстро назад
+fast-forward: Перемотка вперед
 filters: Фильтры
 first-name: Имя
 force-version: Принудительная версия
@@ -245,6 +248,7 @@ key-admin: Админ
 key-all: Все
 key-copied: Ключ скопирован в буфер обмена
 key-read: Читать
+key-super-admin: Суперадминистратор
 key-upload: Загрузить
 key-write: Писать
 language: Язык
@@ -303,6 +307,7 @@ name: Имя
 need-more-contact-us: |-
   Нужно больше ? 
   Свяжитесь с нами для индивидуального плана
+next: Следующий
 'no': нет
 no-channel-linked: Нет канала, нажмите, чтобы добавить
 no-channel-linked-no-perm: Нет канала
@@ -364,6 +369,7 @@ prediction: Прогноз
 preview: Предварительный пакет
 preview-encrypted: Невозможно просмотреть зашифрованный пакет
 preview-short: предварительный просмотр
+previous: Предыдущий
 price-per-unit-above: Цена за единицу сверх плана
 pro-tip-you-can-copy: 'Совет: вы можете скопировать'
 progressive-bundle-number: Прогрессивный номер пакета
@@ -405,6 +411,7 @@ set-bundle: Установить пакет на канал
 settings: Настройки
 shared-apps: Общие приложения
 shared-users: Доступно
+showing: Показаны
 sign-out: Выход
 size: Размер
 size-not-found: Не найдено
@@ -434,6 +441,7 @@ to: По
 to-live-reload: жить перезагрузить.
 to-open-encrypted-bu: 'Чтобы открыть зашифрованный пакет, используйте команду:'
 top-apps: Мои приложения
+top-apps-v2: Программы
 trial-left: дней осталось
 trial-plan-expired: Пробная версия истекла
 trial-plan-expires-in: Испытание заканчивается через
@@ -441,6 +449,7 @@ type: ''
 undefined: неопределенный
 undefined-fail: Не определено (обновления не будут выполнены)
 uninstall: Удалено
+unknown: неизвестный
 unlimited-updates: Неограниченные обновления
 unlink-bundle: Отключить группу
 unlink-channel: Отключить канал
@@ -476,6 +485,7 @@ versions: Версии
 warning: Предупреждение!
 welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
+write-key: Писать
 yearly: Ежегодно
 'yes': да
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.

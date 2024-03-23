@@ -62,6 +62,7 @@ app: アプリ
 app-deleted: アプリを削除しました
 app-id-example: アプリ ID の例
 app-not-found: アプリが見つかりません
+app-perm: アプリの許可
 app-preview: アプリのプレビュー
 are-u-sure: 本気ですか ？
 available-in-the-san: サンドボックス アプリで利用可能
@@ -203,6 +204,8 @@ enter-your-new-passw: 新しいパスワードを入力して確認します
 external-storage: 外部記憶装置
 fail: インストールに失敗しました
 failed: 失敗した
+fast-backward: 早戻し
+fast-forward: 早送り
 filters: フィルター
 first-name: ファーストネーム
 force-version: 強制バージョン
@@ -239,6 +242,7 @@ key-admin: 管理者
 key-all: 全て
 key-copied: クリップボードにコピーされたキー
 key-read: 読む
+key-super-admin: スーパー管理者
 key-upload: アップロード
 key-write: 書く
 language: 言語
@@ -295,6 +299,7 @@ name: 名前
 need-more-contact-us: |-
   もっといります ？
   オーダーメイドプランはお問い合わせください
+next: 次
 'no': いいえ
 no-channel-linked: チャンネルがありません。クリックして追加してください
 no-channel-linked-no-perm: チャンネルがありません
@@ -356,6 +361,7 @@ prediction: 予測
 preview: プレビューバンドル
 preview-encrypted: 暗号化されたバンドルをプレビューできません
 preview-short: プレビュー
+previous: 前の
 price-per-unit-above: 上記プランの1台あたりの価格
 pro-tip-you-can-copy: 'プロのヒント: をコピーできます'
 progressive-bundle-number: プログレッシブバンドル番号
@@ -395,6 +401,7 @@ set-bundle: バンドルをチャネルに設定
 settings: 設定
 shared-apps: 共有アプリ
 shared-users: 共有先
+showing: 表示中
 sign-out: サインアウト
 size: サイズ
 size-not-found: 見つかりません
@@ -424,6 +431,7 @@ to: 請求先
 to-live-reload: リロードを生きます。
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps: 私のアプリ
+top-apps-v2: アプリ
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
@@ -431,6 +439,7 @@ type: ''
 undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
+unknown: 未知
 unlimited-updates: 無制限のアップデート
 unlink-bundle: バンドルのリンクを解除
 unlink-channel: チャンネルのリンクを解除
@@ -462,6 +471,7 @@ versions: バージョン
 warning: 警告！
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
+write-key: 書く
 yearly: 毎年
 'yes': はい
 you-can-change-your-: ここで個人情報を変更できます。

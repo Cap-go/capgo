@@ -197,6 +197,8 @@ enter-your-new-passw: Enter your new password and confirm
 external-storage: External storage
 fail: Install failed
 failed: Failed
+fast-backward: Fast Backward
+fast-forward: Fast Forward
 filters: Filters
 first-name: First name
 force-version: Force version
@@ -287,6 +289,7 @@ my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+next: Next
 'no': 'no'
 no-channel-linked: No channel, click to add
 no-channel-linked-no-perm: No channel
@@ -348,6 +351,7 @@ prediction: Prediction
 preview: Preview bundle
 preview-encrypted: Cannot preview encypted bundle
 preview-short: preview
+previous: Previous
 price-per-unit-above: Price per unit above plan
 pro-tip-you-can-copy: 'Pro tip: you can copy the'
 progressive-bundle-number: Progressive bundle number
@@ -387,6 +391,7 @@ set-bundle: Set bundle to channel
 settings: Settings
 shared-apps: Shared Apps
 shared-users: Shared to
+showing: Showing
 sign-out: Sign Out
 size: Size
 size-not-found: Not found

@@ -62,6 +62,7 @@ app: 앱
 app-deleted: 앱 삭제됨
 app-id-example: 앱 ID 예시
 app-not-found: 앱을 찾을 수 없음
+app-perm: 앱 권한
 app-preview: 앱 미리보기
 are-u-sure: 확실합니까 ?
 available-in-the-san: 샌드박스 앱에서 사용 가능
@@ -203,6 +204,8 @@ enter-your-new-passw: 새 비밀번호를 입력하고 확인
 external-storage: 외부 저장
 fail: 설치 실패
 failed: 실패한
+fast-backward: 빨리 뒤로
+fast-forward: 빨리 감기
 filters: 필터
 first-name: 이름
 force-version: 포스 버전
@@ -239,6 +242,7 @@ key-admin: 관리자
 key-all: 모두
 key-copied: 클립보드에 복사된 키
 key-read: 읽다
+key-super-admin: 최고 관리자
 key-upload: 업로드
 key-write: 쓰다
 language: 언어
@@ -295,6 +299,7 @@ name: 이름
 need-more-contact-us: |-
   더 필요하십니까? 
   맞춤형 계획을 위해 저희에게 연락하십시오
+next: 다음
 'no': 아니요
 no-channel-linked: 채널이 없습니다. 추가하려면 클릭하세요.
 no-channel-linked-no-perm: 채널 없음
@@ -356,6 +361,7 @@ prediction: 예측
 preview: 미리보기 번들
 preview-encrypted: 암호화된 번들을 미리 볼 수 없습니다.
 preview-short: 시사
+previous: 이전의
 price-per-unit-above: 계획보다 높은 단위당 가격
 pro-tip-you-can-copy: '전문가 팁:'
 progressive-bundle-number: 프로그레시브 번들 번호
@@ -395,6 +401,7 @@ set-bundle: 번들을 채널로 설정
 settings: 설정
 shared-apps: 공유 앱
 shared-users: 공유 대상
+showing: 전시
 sign-out: 로그아웃
 size: 크기
 size-not-found: 찾을 수 없음
@@ -424,6 +431,7 @@ to: To
 to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps: 나의 앱들
+top-apps-v2: 앱
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: '평가판 종료:'
@@ -431,6 +439,7 @@ type: ''
 undefined: 한정되지 않은
 undefined-fail: 정의되지 않음(업데이트가 실패함)
 uninstall: 제거됨
+unknown: 알려지지 않은
 unlimited-updates: 무제한 업데이트
 unlink-bundle: 번들 연결 해제
 unlink-channel: 채널 연결 해제
@@ -462,6 +471,7 @@ versions: 버전
 warning: 경고!
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
+write-key: 쓰다
 yearly: 매년
 'yes': 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
