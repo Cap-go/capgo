@@ -38,16 +38,6 @@ AFTER UPDATE ON public.app_versions
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_update');
 
-CREATE TRIGGER on_devices_override_update 
-AFTER INSERT or UPDATE or DELETE ON public.devices_override 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_device_update');
-
-CREATE TRIGGER on_channel_devices_update 
-AFTER INSERT or UPDATE or DELETE ON public.channel_devices 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_device_update');
-
 -- Create cron jobs
 -- Set old versions to deleted after retention passed 
 SELECT cron.schedule('Delete old app version', '40 0 * * *', $$CALL update_app_versions_retention()$$);
