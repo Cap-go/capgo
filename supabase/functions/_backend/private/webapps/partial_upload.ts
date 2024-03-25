@@ -35,8 +35,9 @@ function isValidFilePath(path: string) {
 }
 
 function manifestEntryToS3Path(entry: ManifestEntry, basePath: string) {
-  const extension = entry.file.split('.').at(-1)
-  return `${basePath}/${entry.hash}${extension ? `.${extension}` : ''}`
+  const extensionSplit = entry.file.split('.')
+  const extension = extensionSplit.length > 1 ? extensionSplit.at(-1) : null
+  return `${basePath}/${entry.hash}${extension ? `.${extension}` : ''}.gz`
 }
 
 app.post('/upload', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
@@ -120,6 +121,6 @@ app.post('/upload', middlewareKey(['all', 'write', 'upload']), async (c: Context
     return c.json({ error: 'internal error' }, 500)
   }
 
-  console.log('Manifest!!', uploadManifest)
+  console.log('Manifest!!', parsedBody.manifest)
   return c.json(uploadManifest)
 })
