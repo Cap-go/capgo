@@ -623,7 +623,7 @@ export async function update(c: Context, body: AppInfos) {
       if (finalManifest.find(val => val === null))
         return c.json({ error: 'internal_error' }, 500)
 
-      return c.json({ version: version.name, manifest: finalManifest })
+      return c.json({ version: version.name, manifest: finalManifest, ...(version.session_key ? { session_key: version.session_key } : {}) })
     }
 
     // console.log(id, 'save stats', device_id)
