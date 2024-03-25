@@ -158,8 +158,8 @@ SELECT
   SUM(COALESCE(logs_daily.fail, 0)) AS fail,
   SUM(COALESCE(logs_daily.install, 0)) AS install,
   SUM(COALESCE(logs_daily.uninstall, 0)) AS uninstall,
-  SUM(app_storage_daily.storage_added) AS storage_added,
-  SUM(app_storage_daily.storage_deleted) AS storage_deleted
+  MAX(app_storage_daily.storage_added) AS storage_added,
+  MAX(app_storage_daily.storage_deleted) AS storage_deleted
 FROM 
   (SELECT 
       daily_device.app_id,
