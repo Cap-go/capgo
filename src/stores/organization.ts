@@ -71,7 +71,6 @@ export const useOrganizationStore = defineStore('organization', () => {
   watch(_organizations, async (organizationsMap) => {
     const organizations = Array.from(organizationsMap.values())
 
-    const a = await supabase.from('org_users').select('*')
     const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, owner_org')
 
     if (error) {
