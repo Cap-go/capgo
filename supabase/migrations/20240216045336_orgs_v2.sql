@@ -92,7 +92,7 @@ Begin
   mode=ANY(keymode)
   limit 1 into api_key;
 
-  if api_key IS NOT NULL THEN
+  if api_key IS DISTINCT FROM NULL THEN
     RETURN api_key.user_id;
   END IF;
 
