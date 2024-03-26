@@ -72,7 +72,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     const organizations = Array.from(organizationsMap.values())
 
     const a = await supabase.from('org_users').select('*')
-    console.log(organizations, a.data)
     const { error, data: allAppsByOwner } = await supabase.from('apps').select('app_id, owner_org')
 
     if (error) {
@@ -143,17 +142,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!currentOrgId)
       return []
 
-    console.log('fetch members!')
-
-    const uid = (await supabase.auth.getUser()).data.user?.id
-    console.log(uid)
-
     const { data, error } = await supabase
       .rpc('get_org_members', {
         guild_id: currentOrgId,
       })
 
-    console.log(data)
     if (error || data === null) {
       console.log('Cannot get org members!', error)
       return []
@@ -167,7 +160,6 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const fetchOrganizations = async () => {
-    console.log('fetch orgs')
     const main = useMainStore()
 
     const userId = main.user?.id
