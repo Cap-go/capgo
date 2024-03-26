@@ -21,6 +21,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits(['reload'])
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
@@ -128,6 +129,18 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 
+const perm = computed(() => {
+  console.log(props.app.name, organizationStore.getOrgByAppId(props.app.app_id))
+  if (props.app.name) {
+    const org = organizationStore.getOrgByAppId(props.app.app_id)
+
+    return org?.role ?? t('unknown')
+  }
+  else {
+    return t('unknown')
+  }
+})
+
 watchEffect(async () => {
   if (route.path.endsWith('/app/home'))
     await refreshData()
@@ -148,17 +161,17 @@ watchEffect(async () => {
         </div>
       </div>
     </td>
-    <td class="w-1/4 p-2">
+    <td class="w-1/5 p-2">
       <div class="text-center">
         {{ props.app.last_version }}
       </div>
     </td>
-    <td class="w-1/4 p-2">
+    <td class="w-1/5 p-2">
       <div class="text-center">
         {{ formatDate(props.app.updated_at || "") }}
       </div>
     </td>
-    <td class="w-1/4 p-2">
+    <td class="w-1/5 p-2">
       <div v-if="!isLoading && !props.channel" class="text-center">
         {{ mauNb }}
       </div>
@@ -166,7 +179,12 @@ watchEffect(async () => {
         {{ props.channel }}
       </div>
     </td>
-    <td class="w-1/4 p-2" @click.stop="deleteApp(app)">
+    <td class="w-1/5 p-2">
+      <div class="text-center">
+        {{ perm }}
+      </div>
+    </td>
+    <td class="w-1/5 p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
         <IconTrash v-if="!channel && deleteButton" class="mr-4 text-lg text-red-600" />
       </div>

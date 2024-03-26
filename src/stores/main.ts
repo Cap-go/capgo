@@ -28,6 +28,7 @@ export const useMainStore = defineStore('main', () => {
   const dashboard = ref<appUsage[]>([])
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
+  const dashboardFetched = ref<boolean>(false)
 
   const totalDownload = ref<number>(0)
 
@@ -50,11 +51,12 @@ export const useMainStore = defineStore('main', () => {
       }, 300)
     })
   }
-  const updateDashboard = async (rangeStart?: string, rangeEnd?: string) => {
-    dashboard.value = await getAllDashboard(user.value?.id || '', rangeStart, rangeEnd)
+  const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
+    dashboard.value = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
     totalStorage.value = await getTotalStorage()
+    dashboardFetched.value = true
   }
 
   const getTotalStats = () => {
@@ -70,10 +72,7 @@ export const useMainStore = defineStore('main', () => {
     })
   }
 
-  const filterDashboard = async (appId: string, rangeStart?: string, rangeEnd?: string, refetch = false) => {
-    if (refetch)
-      await updateDashboard(rangeStart, rangeEnd)
-
+  const filterDashboard = async (appId: string) => {
     return dashboard.value.filter(d => d.app_id === appId)
   }
 
@@ -85,6 +84,7 @@ export const useMainStore = defineStore('main', () => {
     totalStorage,
     totalDevices,
     totalDownload,
+    dashboardFetched,
     updateDashboard,
     getTotalStats,
     filterDashboard,

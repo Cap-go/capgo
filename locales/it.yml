@@ -66,6 +66,7 @@ app: App
 app-deleted: Applicazione eliminata
 app-id-example: Esempio di ID app
 app-not-found: App non trovata
+app-perm: Autorizzazione dell'app
 app-preview: Anteprima dell'app
 are-u-sure: Sei sicuro ?
 available-in-the-san: Disponibile nell'app sandbox
@@ -213,6 +214,8 @@ enter-your-new-passw: Inserisci la tua nuova password e conferma
 external-storage: Archiviazione esterna
 fail: Installazione non riuscita
 failed: Fallito
+fast-backward: Indietro veloce
+fast-forward: Avanti veloce
 filters: Filtri
 first-name: Nome di battesimo
 force-version: Versione forzata
@@ -249,6 +252,7 @@ key-admin: Ammin
 key-all: Tutto
 key-copied: Chiave copiata negli appunti
 key-read: Leggere
+key-super-admin: Super amministratore
 key-upload: Caricamento
 key-write: Scrivere
 language: Lingua
@@ -307,6 +311,7 @@ name: Nome
 need-more-contact-us: |-
   Bisogno di piu ? 
   Contattaci per un piano su misura
+next: Prossimo
 'no': 'NO'
 no-channel-linked: Nessun canale, fai clic per aggiungere
 no-channel-linked-no-perm: Nessun canale
@@ -370,6 +375,7 @@ prediction: Predizione
 preview: Pacchetto di anteprima
 preview-encrypted: Impossibile visualizzare l'anteprima del pacchetto crittografato
 preview-short: anteprima
+previous: Precedente
 price-per-unit-above: Prezzo per unità sopra il piano
 pro-tip-you-can-copy: 'Suggerimento pro: puoi copiare il file'
 progressive-bundle-number: Numero progressivo del fascio
@@ -413,6 +419,7 @@ set-bundle: Imposta il pacchetto sul canale
 settings: Impostazioni
 shared-apps: App condivise
 shared-users: Condiviso con
+showing: Mostrando
 sign-out: Disconnessione
 size: Misurare
 size-not-found: Non trovato
@@ -442,6 +449,7 @@ to: A
 to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
 top-apps: Le mie applicazioni
+top-apps-v2: App
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
@@ -449,6 +457,7 @@ type: ''
 undefined: non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato
+unknown: sconosciuto
 unlimited-updates: Aggiornamenti illimitati
 unlink-bundle: Scollega gruppo
 unlink-channel: Scollega canale
@@ -480,6 +489,7 @@ versions: Versioni
 warning: Avvertimento!
 welcome-to: Benvenuto a
 welcome-to-your-capg: Benvenuto nella dashboard di Capgo
+write-key: Scrivere
 yearly: Annuale
 'yes': SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.

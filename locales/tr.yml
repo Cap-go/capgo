@@ -62,6 +62,7 @@ app: Uygulama
 app-deleted: Uygulama silindi
 app-id-example: Uygulama kimliği örneği
 app-not-found: Uygulama bulunamadı
+app-perm: Uygulama izni
 app-preview: Uygulama önizlemesi
 are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
@@ -207,6 +208,8 @@ enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 external-storage: Harici depolama
 fail: Yükleme başarısız
 failed: Arızalı
+fast-backward: Hızlı Geriye Dön
+fast-forward: İleri sar
 filters: Filtreler
 first-name: İlk adı
 force-version: Kuvvet versiyonu
@@ -243,6 +246,7 @@ key-admin: Yönetici
 key-all: Tüm
 key-copied: Anahtar panonuza kopyalandı
 key-read: Okumak
+key-super-admin: Süper yönetici
 key-upload: Yüklemek
 key-write: Yazmak
 language: Dil
@@ -301,6 +305,7 @@ name: İsim
 need-more-contact-us: |-
   Daha fazlasına ihtiyaç var ? 
   Size özel plan için bize ulaşın
+next: Sonraki
 'no': HAYIR
 no-channel-linked: Kanal yok, eklemek için tıklayın
 no-channel-linked-no-perm: Kanal yok
@@ -364,6 +369,7 @@ prediction: Tahmin
 preview: Paketi önizle
 preview-encrypted: Şifrelenmiş paket önizlenemiyor
 preview-short: Ön izleme
+previous: Öncesi
 price-per-unit-above: Planın üzerindeki birim başına fiyat
 pro-tip-you-can-copy: 'Profesyonel ipucu: kopyalayabilirsiniz'
 progressive-bundle-number: Aşamalı paket numarası
@@ -403,6 +409,7 @@ set-bundle: Paketi kanala ayarla
 settings: Ayarlar
 shared-apps: Paylaşılan Uygulamalar
 shared-users: 'şuraya paylaşıldı:'
+showing: Gösterilen
 sign-out: Oturumu Kapat
 size: Boyut
 size-not-found: Bulunamadı
@@ -432,6 +439,7 @@ to: için
 to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
+top-apps-v2: Uygulamalar
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
@@ -439,6 +447,7 @@ type: ''
 undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
+unknown: Bilinmeyen
 unlimited-updates: Sınırsız güncelleme
 unlink-bundle: Paketin bağlantısını kaldır
 unlink-channel: Kanalın bağlantısını kaldır
@@ -470,6 +479,7 @@ versions: Versiyonlar
 warning: Uyarı!
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
+write-key: Yazmak
 yearly: Yıllık
 'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.

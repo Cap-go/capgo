@@ -1,3 +1,6 @@
+-- This migration file can be updated
+-- It does not have to be keep up-to-date in prod as it's only using during the seeding process
+
 CREATE OR REPLACE FUNCTION reset_and_seed_data()
 RETURNS void AS $$
 BEGIN
@@ -38,9 +41,9 @@ BEGIN
     ('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
     INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
-    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0k8TO6HVln6A', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
-    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0kknt1qWFkZx', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months'),
-    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0f3M6UCQ8g5Q', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now(), now() + interval '1 months');
+    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0k8TO6HVln6A', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
+    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0kknt1qWFkZx', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
+    (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0f3M6UCQ8g5Q', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days');
 
     INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
     ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Pa0k8TO6HVln6A', NULL),
@@ -52,40 +55,43 @@ BEGIN
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Demo org'),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Test2 org');
 
-    -- INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "created_at", "updated_at") VALUES
-    -- ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6aa76066-55ef-4238-ade6-0b32334a4097', 'write', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00');
+    INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
+    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"user_min_right", null, null),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"user_min_right", null, null),
+    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"user_min_right", null, null);
 
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
     (911, '2022-07-12 12:06:18.822406+00', '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'upload', '2022-07-12 12:06:18.822406+00'),
     (912, '2022-07-12 12:06:22.425878+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', '2022-07-12 12:06:22.425878+00'),
     (913, '2022-07-12 12:06:36.468855+00', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', '2022-07-12 12:06:36.468855+00'),
+    (916, '2022-07-12 12:06:36.468855+00', '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', '2022-07-12 12:06:36.468855+00'),
     (914, '2022-07-12 12:06:36.468855+00', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', '2022-07-12 12:06:36.468855+00'),
     (915, '2022-07-12 12:06:36.468855+00', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', '2022-07-12 12:06:36.468855+00');
 
-    INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "user_id", "name", "last_version", "updated_at", "tmp_id") VALUES
-    ('2022-03-07 14:08:28.910887+00', 'com.demoadmin.app', '', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'Demo Admin app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792'),
-    ('2022-03-07 14:08:28.910887+00', 'com.demo.app', '', '6aa76066-55ef-4238-ade6-0b32334a4097', 'Demo app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792');
+    INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "tmp_id", "owner_org", "user_id") VALUES
+    ('2022-03-07 14:08:28.910887+00', 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
+    ('2022-03-07 14:08:28.910887+00', 'com.demo.app', '', 'Demo app', '1.0.0', '2023-03-20 00:46:33.006797+00', 'f8b37304-0fb8-48b2-9ef8-ff3d7c50a792', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
 
-    INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "user_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider") VALUES
-    (9655, now(), 'com.demo.app', '1.0.1', 'test-bucket.zip', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '', NULL, 'r2-direct'),
-    (9654, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '3885ee49', NULL, 'r2'),
-    (9653, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '9d4f798a', NULL, 'r2'),
-    (9652, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '44913a9f', NULL, 'r2'),
-    (9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', NULL, '9f74e70a', NULL, 'r2'),
-    (1884, now(), 'com.demo.app', 'builtin', NULL, '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 't', NULL, NULL, NULL, 'supabase'),
-    (1883, now(), 'com.demo.app', 'unknown', NULL, '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 't', NULL, NULL, NULL, 'supabase');
+    INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org") VALUES
+    (9655, now(), 'com.demo.app', '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (9654, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (9653, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (9652, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (1884, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (1883, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
 
-    INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "user_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-    (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:33.664139+00', '', 0, 9655, 10),
-    (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:46:33.664139+00', '3885ee49', 1012506, 9654, 10),
-    (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:33:16.912242+00', '9d4f798a', 1012529, 9653, 20),
-    (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-20 00:29:35.189367+00', '44913a9f', 1012541, 9652, 30),
-    (now(), 'com.demo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
+    INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
+    (now(), 'com.demo.app', '2023-03-20 00:46:33.664139+00', '', 0, 9655, 10),
+    (now(), 'com.demo.app', '2023-03-20 00:46:33.664139+00', '3885ee49', 1012506, 9654, 10),
+    (now(), 'com.demo.app', '2023-03-20 00:33:16.912242+00', '9d4f798a', 1012529, 9653, 20),
+    (now(), 'com.demo.app', '2023-03-20 00:29:35.189367+00', '44913a9f', 1012541, 9652, 30),
+    (now(), 'com.demo.app', '2023-03-16 16:28:44.815867+00', '9f74e70a', 1012548, 9601, 40);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "created_by", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-    (22, now(), 'production', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
-    (23, now(), 'no_access', 'com.demo.app', 9653, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
-    (24, now(), 'two_default', 'com.demo.app', 9654, '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
+    (22, now(), 'production', 'com.demo.app', 9654, '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
+    (23, now(), 'no_access', 'com.demo.app', 9653, '2023-02-28 10:50:58.246133+00', 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
+    (24, now(), 'two_default', 'com.demo.app', 9654, '2023-02-28 10:50:58.246133+00', 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
 
     INSERT INTO "public"."devices" ("created_at", "updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
     (now(), '2023-01-29 08:09:32.324+00', '00009a6b-eefe-490a-9c60-8e965132ae51', 9654, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
@@ -129,9 +135,11 @@ BEGIN
     ("gen_random_uuid"(), 'com.demo.app', '2023-03-30', 20, 180948, 0, 2441264, 1, 2, 3, 4);
 
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM public;
 REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.reset_and_seed_data() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.reset_and_seed_data() TO postgres;
+GRANT EXECUTE ON FUNCTION public.reset_and_seed_data() TO service_role;

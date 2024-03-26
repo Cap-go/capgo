@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { checkAppOwner, getSDevice, supabaseAdmin } from '../utils/supabase.ts'
+import { EMPTY_UUID, getSDevice, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
@@ -25,7 +25,7 @@ function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'
 }
 
 async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id || !(await checkAppOwner(c, apikey.user_id, body.app_id)))
+  if (!body.app_id || !(await hasAppRight(c, body.app_id, apikey.user_id, 'read')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // if device_id get one device
@@ -79,7 +79,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
   if (!body.device_id || !body.app_id)
     return c.json({ status: 'Cannot find device' }, 400)
 
-  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
+  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   // find device
@@ -107,7 +107,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
         device_id: body.device_id,
         version: dataVersion.id,
         app_id: body.app_id,
-        created_by: apikey.user_id,
+        owner_org: EMPTY_UUID,
       })
     if (dbErrorDev)
       return c.json({ status: 'Cannot save device override', error: dbErrorDev }, 400)
@@ -130,7 +130,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
         device_id: body.device_id,
         channel_id: dataChannel.id,
         app_id: body.app_id,
-        created_by: apikey.user_id,
+        owner_org: EMPTY_UUID,
       })
     if (dbErrorDev)
       return c.json({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
@@ -139,7 +139,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
 }
 
 export async function deleteOverride(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await checkAppOwner(c, apikey.user_id, body.app_id)))
+  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {

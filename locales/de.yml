@@ -70,6 +70,7 @@ app: App
 app-deleted: Anwendung gelöscht
 app-id-example: App-ID-Beispiel
 app-not-found: Anwendung nicht gefunden
+app-perm: App-Berechtigung
 app-preview: App-Vorschau
 are-u-sure: Bist du dir sicher ?
 available-in-the-san: Verfügbar in der Sandbox-App
@@ -217,6 +218,8 @@ enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 external-storage: Externer Speicher
 fail: Installation fehlgeschlagen
 failed: Fehlgeschlagen
+fast-backward: Schneller Rücklauf
+fast-forward: Schneller Vorlauf
 filters: Filter
 first-name: Vorname
 force-version: Force-Version
@@ -255,6 +258,7 @@ key-admin: Administrator
 key-all: Alle
 key-copied: Schlüssel in Ihre Zwischenablage kopiert
 key-read: Lesen
+key-super-admin: Höchster Vorgesetzter
 key-upload: Hochladen
 key-write: Schreiben
 language: Sprache
@@ -315,6 +319,7 @@ name: Name
 need-more-contact-us: |-
   Brauche mehr ? 
   Kontaktieren Sie uns für einen maßgeschneiderten Plan
+next: Nächste
 'no': NEIN
 no-channel-linked: Kein Kanal, zum Hinzufügen klicken
 no-channel-linked-no-perm: Kein Kanal
@@ -382,6 +387,7 @@ prediction: Vorhersage
 preview: Vorschaupaket
 preview-encrypted: Es kann keine Vorschau des verschlüsselten Pakets angezeigt werden
 preview-short: Vorschau
+previous: Vorherige
 price-per-unit-above: Preis pro Einheit über Plan
 pro-tip-you-can-copy: 'Pro-Tipp: Sie können die'
 progressive-bundle-number: Progressive Bündelnummer
@@ -423,6 +429,7 @@ set-bundle: Bündel auf Kanal setzen
 settings: Einstellungen
 shared-apps: Geteilte Apps
 shared-users: Geteilt an
+showing: Zeigt
 sign-out: Austragen
 size: Größe
 size-not-found: Nicht gefunden
@@ -452,6 +459,7 @@ to: Bis
 to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
+top-apps-v2: Apps
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
@@ -459,6 +467,7 @@ type: ''
 undefined: nicht definiert
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert
+unknown: Unbekannt
 unlimited-updates: Unbegrenzte Updates
 unlink-bundle: Bündel aufheben
 unlink-channel: Verknüpfung des Kanals aufheben
@@ -492,6 +501,7 @@ versions: Versionen
 warning: Warnung!
 welcome-to: Willkommen zu
 welcome-to-your-capg: Willkommen auf Ihrem Capgo-Dashboard
+write-key: Schreiben
 yearly: Jährlich
 'yes': Ja
 you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.

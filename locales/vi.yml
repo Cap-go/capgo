@@ -66,6 +66,7 @@ app: Ứng dụng
 app-deleted: Đã xóa ứng dụng
 app-id-example: Ví dụ về ID ứng dụng
 app-not-found: Không tìm thấy ứng dụng
+app-perm: Quyền ứng dụng
 app-preview: Xem trước ứng dụng
 are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
@@ -209,6 +210,8 @@ enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
 failed: Thất bại
+fast-backward: Lùi nhanh
+fast-forward: Nhanh về phía trước
 filters: bộ lọc
 first-name: Họ
 force-version: Phiên bản bắt buộc
@@ -245,6 +248,7 @@ key-admin: Quản trị viên
 key-all: Tất cả
 key-copied: Đã sao chép khóa vào khay nhớ tạm của bạn
 key-read: Đọc
+key-super-admin: Quản trị viên cấp cao
 key-upload: Tải lên
 key-write: Viết
 language: Ngôn ngữ
@@ -303,6 +307,7 @@ name: Tên
 need-more-contact-us: |-
   Cần thêm? 
   Liên hệ với chúng tôi để có kế hoạch phù hợp
+next: Kế tiếp
 'no': KHÔNG
 no-channel-linked: Không có kênh, nhấp để thêm
 no-channel-linked-no-perm: Không có kênh
@@ -364,6 +369,7 @@ prediction: Sự dự đoán
 preview: Gói xem trước
 preview-encrypted: Không thể xem trước gói đã mã hóa
 preview-short: xem trước
+previous: Trước
 price-per-unit-above: Giá mỗi căn trên kế hoạch
 pro-tip-you-can-copy: 'Mẹo chuyên nghiệp: bạn có thể sao chép'
 progressive-bundle-number: Số gói lũy tiến
@@ -403,6 +409,7 @@ set-bundle: Đặt gói thành kênh
 settings: Cài đặt
 shared-apps: Ứng dụng được chia sẻ
 shared-users: Đã chia sẻ với
+showing: Đang hiển thị
 sign-out: Đăng xuất
 size: Kích cỡ
 size-not-found: Không tìm thấy
@@ -432,6 +439,7 @@ to: ĐẾN
 to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
+top-apps-v2: Ứng dụng
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
@@ -439,6 +447,7 @@ type: ''
 undefined: không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt
+unknown: không xác định
 unlimited-updates: cập nhật không giới hạn
 unlink-bundle: Hủy liên kết gói
 unlink-channel: Hủy liên kết kênh
@@ -472,6 +481,7 @@ versions: phiên bản
 warning: Cảnh báo!
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Bảng điều khiển Capgo của bạn
+write-key: Viết
 yearly: hàng năm
 'yes': Đúng
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.

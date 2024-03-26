@@ -53,6 +53,9 @@ async function addNewApiKey() {
     case 'upload-button':
       databaseKeyType = 'upload'
       break
+    case 'write-button':
+      databaseKeyType = 'write'
+      break
     case 'all-button':
       databaseKeyType = 'all'
       break
@@ -177,6 +180,10 @@ async function showAddNewKeyModal() {
       {
         text: t('key-upload'),
         id: 'upload-button',
+      },
+      {
+        text: t('write-key'),
+        id: 'write-button',
       },
       {
         text: t('key-all'),

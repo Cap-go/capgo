@@ -3,7 +3,7 @@ import debounce from 'lodash.debounce'
 import { ref, watch } from 'vue'
 
 defineProps({
-  searchIcon: { type: String as any, default: '' },
+  searchIcon: { type: String, default: '' },
   searchPlaceholder: { type: String, default: '' },
 })
 

@@ -50,8 +50,7 @@ async function updloadPhotoUser(data: string, fileName: string, contentType: str
       console.error('upload error', dbError)
       return
     }
-
-    main.user = usr as any
+    main.user = usr
   }
 
   await uploadPhotoShared(data, fileName, contentType, isLoading, userCallback)

@@ -62,6 +62,7 @@ app: 应用程序
 app-deleted: 应用已删除
 app-id-example: 应用 ID 示例
 app-not-found: 找不到应用
+app-perm: 应用程序权限
 app-preview: 应用预览
 are-u-sure: 你确定吗 ？
 available-in-the-san: 在沙盒应用程序中可用
@@ -203,6 +204,8 @@ enter-your-new-passw: 输入您的新密码并确认
 external-storage: 外置储存
 fail: 安装失败
 failed: 失败的
+fast-backward: 快退
+fast-forward: 快进
 filters: 过滤器
 first-name: 名
 force-version: 强制版本
@@ -239,6 +242,7 @@ key-admin: 行政
 key-all: 全部
 key-copied: 复制到剪贴板的密钥
 key-read: 读
+key-super-admin: 超级管理员
 key-upload: 上传
 key-write: 写
 language: 语言
@@ -295,6 +299,7 @@ name: 姓名
 need-more-contact-us: |-
   需要更多 ？
   联系我们获取量身定制的计划
+next: 下一个
 'no': 不
 no-channel-linked: 暂无频道，点击添加
 no-channel-linked-no-perm: 无频道
@@ -356,6 +361,7 @@ prediction: 预言
 preview: 预览捆绑包
 preview-encrypted: 无法预览加密包
 preview-short: 预览
+previous: 以前的
 price-per-unit-above: 每单位价格高于计划
 pro-tip-you-can-copy: 专业提示：您可以复制
 progressive-bundle-number: 渐进束数
@@ -395,6 +401,7 @@ set-bundle: 将捆绑包设置为频道
 settings: 设置
 shared-apps: 共享应用
 shared-users: 分享给
+showing: 显示中
 sign-out: 登出
 size: 尺寸
 size-not-found: 未找到
@@ -424,6 +431,7 @@ to: 至
 to-live-reload: 住重新加载。
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps: 我的应用
+top-apps-v2: 应用
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
@@ -431,6 +439,7 @@ type: ''
 undefined: 不明确的
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载
+unknown: 未知
 unlimited-updates: 无限更新
 unlink-bundle: 取消链接包
 unlink-channel: 取消链接频道
@@ -462,6 +471,7 @@ versions: 版本
 warning: 警告！
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
+write-key: 写
 yearly: 每年
 'yes': 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。

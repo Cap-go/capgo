@@ -62,6 +62,7 @@ app: Aplikasi
 app-deleted: Aplikasi dihapus
 app-id-example: Contoh ID aplikasi
 app-not-found: Aplikasi tidak ditemukan
+app-perm: Izin aplikasi
 app-preview: Pratinjau aplikasi
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
@@ -209,6 +210,8 @@ enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 external-storage: Penyimpanan luar
 fail: Instal gagal
 failed: Gagal
+fast-backward: Mundur Cepat
+fast-forward: Maju Cepat
 filters: Filter
 first-name: Nama depan
 force-version: Versi paksa
@@ -247,6 +250,7 @@ key-admin: Admin
 key-all: Semua
 key-copied: Kunci disalin di papan klip Anda
 key-read: Membaca
+key-super-admin: Admin super
 key-upload: Mengunggah
 key-write: Menulis
 language: Bahasa
@@ -305,6 +309,7 @@ name: Nama
 need-more-contact-us: |-
   Butuh lebih banyak? 
   Hubungi kami untuk rencana yang disesuaikan
+next: Berikutnya
 'no': TIDAK
 no-channel-linked: Tidak ada saluran, klik untuk menambahkan
 no-channel-linked-no-perm: Tidak ada saluran
@@ -366,6 +371,7 @@ prediction: Ramalan
 preview: Paket pratinjau
 preview-encrypted: Tidak dapat melihat pratinjau paket yang dienkripsi
 preview-short: pratinjau
+previous: Sebelumnya
 price-per-unit-above: Harga per unit di atas rencana
 pro-tip-you-can-copy: 'Kiat pro: Anda dapat menyalin'
 progressive-bundle-number: Nomor bundel progresif
@@ -407,6 +413,7 @@ set-bundle: Tetapkan bundel ke saluran
 settings: Pengaturan
 shared-apps: Aplikasi Bersama
 shared-users: Dibagikan ke
+showing: Menampilkan
 sign-out: Keluar
 size: Ukuran
 size-not-found: Tidak ditemukan
@@ -436,6 +443,7 @@ to: Ke
 to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
+top-apps-v2: Aplikasi
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
@@ -443,6 +451,7 @@ type: ''
 undefined: belum diartikan
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
+unknown: tidak dikenal
 unlimited-updates: Pembaruan tanpa batas
 unlink-bundle: Putuskan tautan bundel
 unlink-channel: Batalkan tautan saluran
@@ -476,6 +485,7 @@ versions: Versi
 warning: Peringatan!
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
+write-key: Menulis
 yearly: Tahunan
 'yes': Ya
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.

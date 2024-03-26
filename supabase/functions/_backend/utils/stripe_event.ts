@@ -22,7 +22,7 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   )
 }
 
-export function extractDataEvent(event: any): Database['public']['Tables']['stripe_info']['Insert'] {
+export function extractDataEvent(event: Stripe.Event): Database['public']['Tables']['stripe_info']['Insert'] {
   const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',
@@ -38,7 +38,7 @@ export function extractDataEvent(event: any): Database['public']['Tables']['stri
   console.log('event', JSON.stringify(event, null, 2))
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
-      const subscription = event.data.object as any
+      const subscription = event.data.object
       const res = parsePriceIds(subscription.items.data)
       data.price_id = res.priceId
       if (res.productId)
@@ -56,7 +56,7 @@ export function extractDataEvent(event: any): Database['public']['Tables']['stri
       data.customer_id = String(subscription.customer)
     }
     else if (event.type === 'customer.subscription.deleted') {
-      const charge = event.data.object as any
+      const charge = event.data.object
       data.status = 'canceled'
       data.customer_id = String(charge.customer)
       data.subscription_id = charge.id
