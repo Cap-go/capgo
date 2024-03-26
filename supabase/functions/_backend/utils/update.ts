@@ -459,6 +459,24 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
 
+    if (version.storage_provider === 'r2-partial' && semver.lt(plugin_version, '6.0.0')) {
+      console.log(id, 'Cannot update, partial update is not supported by plugin < 6.0. Plugin ver:', plugin_version)
+      await sendStatsAndDevice(c, device, [{ action: 'partialUpdateNotSupported' }])
+      return c.json({
+        message: 'Cannot update, your plugin version does not support partial update which is required for this bundle',
+        error: 'needs_plugin_update',
+      }, 200)
+    }
+
+    if ((version.storage_provider === 'r2' || version.storage_provider === 'external') && semver.gte(plugin_version, '6.0.0')) {
+      console.log(id, 'Cannot update, monolithic (zip) update is not supported by plugin > 6.0. Partial is required. Plugin ver:', plugin_version)
+      await sendStatsAndDevice(c, device, [{ action: 'partialUpdateNotSupported' }])
+      return c.json({
+        message: 'Cannot update, monolithic (zip) update is not supported by plugin > 6.0. Partial bundle is required',
+        error: 'broken_bundle_for_partial',
+      }, 200)
+    }
+
     if (!version.bucket_id && !version.external_url && !version.r2_path && version.storage_provider !== 'r2-partial') {
       console.log(id, 'Cannot get bundle', app_id, version)
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
