@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { categories } from '../utils/gplay_categ.ts'
-import { getAppsToProcess } from '../utils/clickhouse.ts';
+import { getAppsToProcess } from '../utils/clickhouse.ts'
 
 const toGetFramwork = 500
 const toGetInfo = 500

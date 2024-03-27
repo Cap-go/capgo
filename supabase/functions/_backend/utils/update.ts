@@ -15,8 +15,8 @@ import { appIdToUrl } from './conversion.ts'
 
 import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
-import { sendStatsAndDevice, saveStoreInfo } from './clickhouse.ts'
-import { getEnv } from './utils.ts';
+import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
+import { getEnv } from './utils.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {

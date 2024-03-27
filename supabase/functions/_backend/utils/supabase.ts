@@ -96,11 +96,10 @@ export async function getAppsFromSupabase(c: Context): Promise<string[]> {
       break
     }
 
-    if (data.length === 0) {
+    if (data.length === 0)
       break
-    }
 
-    apps = [...apps, ...data.map((row) => row.app_id)]
+    apps = [...apps, ...data.map(row => row.app_id)]
     page++
   }
 

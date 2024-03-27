@@ -3,7 +3,7 @@ import ky from 'ky'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
-import { getAppsFromSupabase } from './supabase.ts';
+import { getAppsFromSupabase } from './supabase.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
@@ -226,7 +226,8 @@ async function executeClickHouseQuery(c: Context, query: string, params: Record<
     console.log('Query executed successfully', response)
     response.data = convertDataWithMeta(response.data, response.meta)
     return response
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error executing ClickHouse query', error)
 
     if (error.name === 'HTTPError') {
@@ -268,12 +269,12 @@ export async function getTopApps(c: Context, mode: string, limit: number) {
     SELECT url, title, icon, summary, installs, category
     FROM store_apps
     WHERE 1=1
-      ${mode === 'cordova' ? "AND cordova = 1 AND capacitor = 0" : ""}
-      ${mode === 'flutter' ? "AND flutter = 1" : ""}
-      ${mode === 'reactNative' ? "AND react_native = 1" : ""}
-      ${mode === 'nativeScript' ? "AND native_script = 1" : ""}
-      ${mode === 'capgo' ? "AND capgo = 1" : ""}
-      ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? "AND capacitor = 1" : ""}
+      ${mode === 'cordova' ? 'AND cordova = 1 AND capacitor = 0' : ''}
+      ${mode === 'flutter' ? 'AND flutter = 1' : ''}
+      ${mode === 'reactNative' ? 'AND react_native = 1' : ''}
+      ${mode === 'nativeScript' ? 'AND native_script = 1' : ''}
+      ${mode === 'capgo' ? 'AND capgo = 1' : ''}
+      ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? 'AND capacitor = 1' : ''}
     ORDER BY installs DESC
     LIMIT {param_limit:UInt64}
   `
@@ -289,12 +290,12 @@ export async function getTotalAppsByMode(c: Context, mode: string) {
     SELECT COUNT(*) AS total
     FROM store_apps
     WHERE 1=1
-      ${mode === 'cordova' ? "AND cordova = 1 AND capacitor = 0" : ""}
-      ${mode === 'flutter' ? "AND flutter = 1" : ""}
-      ${mode === 'reactNative' ? "AND react_native = 1" : ""}
-      ${mode === 'nativeScript' ? "AND native_script = 1" : ""}
-      ${mode === 'capgo' ? "AND capgo = 1" : ""}
-      ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? "AND capacitor = 1" : ""}
+      ${mode === 'cordova' ? 'AND cordova = 1 AND capacitor = 0' : ''}
+      ${mode === 'flutter' ? 'AND flutter = 1' : ''}
+      ${mode === 'reactNative' ? 'AND react_native = 1' : ''}
+      ${mode === 'nativeScript' ? 'AND native_script = 1' : ''}
+      ${mode === 'capgo' ? 'AND capgo = 1' : ''}
+      ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? 'AND capacitor = 1' : ''}
   `
 
   const result = await executeClickHouseQuery(c, query)
@@ -317,12 +318,11 @@ export async function getStoreAppById(c: Context, appId: string) {
 
 function prefixParams(params: Record<string, any>): Record<string, any> {
   const prefixedParams: Record<string, any> = {}
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params))
     prefixedParams[`param_${key}`] = value
-  }
+
   return prefixedParams
 }
-
 
 export async function saveStoreInfo(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
   // Save in ClickHouse
@@ -335,14 +335,14 @@ export async function saveStoreInfo(c: Context, apps: (Database['public']['Table
   const columns = Object.keys(noDup[0])
   const values = noDup.map((app) => {
     const convertedApp = convertAllDatesToCH(app)
-    return `(${columns.map((column) => `{${convertedApp[column]}}`).join(', ')})`
+    return `(${columns.map(column => `{${convertedApp[column]}}`).join(', ')})`
   }).join(', ')
 
   const query = `
     INSERT INTO store_apps (${columns.join(', ')})
     VALUES ${values}
     ON DUPLICATE KEY UPDATE
-      ${columns.map((column) => `${column} = VALUES(${column})`).join(', ')}
+      ${columns.map(column => `${column} = VALUES(${column})`).join(', ')}
     SETTINGS async_insert=1, wait_for_async_insert=0
   `
 
@@ -351,7 +351,8 @@ export async function saveStoreInfo(c: Context, apps: (Database['public']['Table
   try {
     await executeClickHouseQuery(c, query, params)
     console.log('saveStoreInfo success')
-  } catch (error) {
+  }
+  catch (error) {
     console.error('saveStoreInfo error', error)
   }
 }
@@ -385,7 +386,8 @@ async function countUpdatesFromClickHouse(c: Context): Promise<number> {
   try {
     const response = await executeClickHouseQuery(c, query)
     return response.data[0].count || 0
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error counting updates from ClickHouse', error)
     return 0
   }
@@ -401,7 +403,8 @@ async function countUpdatesFromLogs(c: Context): Promise<number> {
   try {
     const response = await executeClickHouseQuery(c, query)
     return response.data[0].count || 0
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error counting updates from logs', error)
     return 0
   }
@@ -416,8 +419,9 @@ async function getAppsFromClickHouse(c: Context): Promise<string[]> {
 
   try {
     const response = await executeClickHouseQuery(c, query)
-    return response.data.map((row) => row.app_id)
-  } catch (error) {
+    return response.data.map(row => row.app_id)
+  }
+  catch (error) {
     console.error('Error getting apps from ClickHouse', error)
     return []
   }

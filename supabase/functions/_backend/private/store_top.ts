@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { useCors } from '../utils/hono.ts'
-import { getTopApps, getTotalAppsByMode } from '../utils/clickhouse.ts';
+import { getTopApps, getTotalAppsByMode } from '../utils/clickhouse.ts'
 
 export const app = new Hono()
 
@@ -11,9 +11,9 @@ app.get('/', async (c: Context) => {
   try {
     // count allapps
     const mode = c.req.query('mode') || 'capacitor'
-    
+
     const countTotal = await getTotalAppsByMode(c, mode)
-    const data = await getTopApps(c, mode, 100) 
+    const data = await getTopApps(c, mode, 100)
 
     const totalCategory = countTotal || 0
 

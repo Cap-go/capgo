@@ -29,7 +29,7 @@ import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/clickhouse.ts'
-import { sendStatsAndDevice, saveStoreInfo } from '../utils/clickhouse.ts'
+import { saveStoreInfo, sendStatsAndDevice } from '../utils/clickhouse.ts'
 
 const failActions = [
   'set_fail',
@@ -121,9 +121,9 @@ async function post(c: Context, body: AppStats) {
           capgo: true,
         }])
       }
-      if (action === 'get') {
+      if (action === 'get')
         await updateInClickHouse(c, app_id, 1)
-      }
+
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
