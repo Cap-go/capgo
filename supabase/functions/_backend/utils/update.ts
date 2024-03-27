@@ -20,7 +20,6 @@ import { getEnv } from './utils.ts'
 
 // import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
 
-
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
     version: string
