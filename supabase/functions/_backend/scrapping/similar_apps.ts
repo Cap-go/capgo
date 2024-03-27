@@ -4,7 +4,7 @@ import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { countries } from '../utils/gplay_categ.ts'
-import { saveStoreInfo } from '../utils/clickhouse.ts'
+import { bulkUpdateStoreApps, saveStoreInfo } from '../utils/clickhouse.ts'
 
 export const app = new Hono()
 
@@ -54,20 +54,20 @@ async function getSimilar(c: Context, appId: string, country = 'us') {
     if (!res.length)
       return []
     // set to_get_similar to false
-    await saveStoreInfo(c, [{
+    await saveStoreInfo(c, {
       app_id: appId,
       to_get_similar: false,
-    }])
+    })
     console.log('getSimilar', appId, country, res.length)
     return res
   }
   catch (e) {
     console.log('error getAppInfo', e)
-    await saveStoreInfo(c, [{
+    await saveStoreInfo(c, {
       app_id: appId,
       to_get_similar: false,
       error_get_similar: JSON.stringify(e),
-    }])
+    })
   }
   return []
 }
@@ -100,7 +100,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     const toSave = await Promise.all(all)
     const flattenToSave = toSave.flat()
-    await saveStoreInfo(c, flattenToSave)
+    await bulkUpdateStoreApps(c, flattenToSave)
     return c.json(BRES)
   }
   catch (e) {

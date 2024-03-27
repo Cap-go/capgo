@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { getStoreAppById, saveStoreInfo } from '../utils/clickhouse.ts'
+import { bulkUpdateStoreApps, getStoreAppById, saveStoreInfo } from '../utils/clickhouse.ts'
 import { countries } from '../utils/gplay_categ.ts'
 
 export const app = new Hono()
@@ -66,11 +66,11 @@ async function getInfo(c: Context, appId: string) {
     const res = (!data || !data.lang) ? await findLang(appId) : await getAppInfo(appId, data.lang)
     if (!res) {
       console.error('no lang found', appId)
-      await saveStoreInfo(c, [{
+      await saveStoreInfo(c, {
         app_id: appId,
         to_get_info: false,
         error_get_info: 'no lang found',
-      }])
+      })
       return []
     }
     console.log('getInfo', appId, res)
@@ -78,11 +78,11 @@ async function getInfo(c: Context, appId: string) {
   }
   catch (e) {
     console.log('error getAppInfo', e)
-    await saveStoreInfo(c, [{
+    await saveStoreInfo(c, {
       app_id: appId,
       to_get_info: false,
       error_get_framework: JSON.stringify(e),
-    }])
+    })
   }
   return []
 }
@@ -105,7 +105,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     const toSave = await Promise.all(all)
     const flattenToSave = toSave.flat()
-    await saveStoreInfo(c, flattenToSave)
+    await bulkUpdateStoreApps(c, flattenToSave)
     return c.json(BRES)
   }
   catch (e) {

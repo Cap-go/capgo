@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { saveStoreInfo } from '../utils/clickhouse.ts'
+import { bulkUpdateStoreApps } from '../utils/clickhouse.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { countries } from '../utils/gplay_categ.ts'
 
@@ -86,7 +86,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     const toSave = await Promise.all(all)
     const flattenToSave = toSave.flat()
-    await saveStoreInfo(c, flattenToSave)
+    await bulkUpdateStoreApps(c, flattenToSave)
     return c.json(BRES)
   }
   catch (e) {

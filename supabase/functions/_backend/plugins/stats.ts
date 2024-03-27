@@ -29,7 +29,7 @@ import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/clickhouse.ts'
-import { saveStoreInfo, sendStatsAndDevice } from '../utils/clickhouse.ts'
+import { saveStoreInfo, sendStatsAndDevice, updateInClickHouse } from '../utils/clickhouse.ts'
 
 const failActions = [
   'set_fail',
@@ -114,12 +114,12 @@ async function post(c: Context, body: AppStats) {
     if (!appOwner) {
       // TODO: transfer to clickhouse
       if (app_id) {
-        await saveStoreInfo(c, [{
+        await saveStoreInfo(c, {
           app_id,
           onprem: true,
           capacitor: true,
           capgo: true,
-        }])
+        })
       }
       if (action === 'get')
         await updateInClickHouse(c, app_id, 1)

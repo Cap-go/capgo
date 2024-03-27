@@ -324,18 +324,59 @@ function prefixParams(params: Record<string, any>): Record<string, any> {
   return prefixedParams
 }
 
-export async function saveStoreInfo(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
-  // Save in ClickHouse
+function getClickHouseType(value: any): string {
+  if (typeof value === 'string')
+    return ':String'
+  else if (typeof value === 'number')
+    return ':Float64'
+  else if (typeof value === 'boolean')
+    return ':UInt8'
+  else if (value instanceof Date)
+    return ':DateTime'
+  else
+    return ''
+}
+
+export async function saveStoreInfo(c: Context, app: Database['public']['Tables']['store_apps']['Insert']) {
+  // Update a single app in ClickHouse
+  const columns: (keyof Database['public']['Tables']['store_apps']['Insert'])[] = Object.keys(app) as (keyof Database['public']['Tables']['store_apps']['Insert'])[]
+  const values = columns.map((column) => {
+    const value = app[column]
+    const type = getClickHouseType(value)
+    return `{${column}}${type}`
+  }).join(', ')
+
+  const query = `
+    INSERT INTO store_apps (${columns.join(', ')})
+    VALUES (${values})
+    ON DUPLICATE KEY UPDATE
+      ${columns.map(column => `${column} = VALUES(${column})`).join(', ')}
+  `
+
+  const params = prefixParams(convertAllDatesToCH(app))
+
+  try {
+    await executeClickHouseQuery(c, query, params)
+    console.log('updateStoreApp success')
+  }
+  catch (error) {
+    console.error('updateStoreApp error', error)
+    throw error
+  }
+}
+
+export async function bulkUpdateStoreApps(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+  // Update a list of apps in ClickHouse (internal use only)
   if (!apps.length)
     return
 
   const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
-  console.log('saveStoreInfo', noDup.length)
+  console.log('bulkUpdateStoreApps', noDup.length)
 
   const columns = Object.keys(noDup[0])
   const values = noDup.map((app) => {
     const convertedApp = convertAllDatesToCH(app)
-    return `(${columns.map(column => `{${convertedApp[column]}}`).join(', ')})`
+    return `(${columns.map(column => `'${convertedApp[column]}'`).join(', ')})`
   }).join(', ')
 
   const query = `
@@ -346,14 +387,12 @@ export async function saveStoreInfo(c: Context, apps: (Database['public']['Table
     SETTINGS async_insert=1, wait_for_async_insert=0
   `
 
-  const params = prefixParams(noDup.reduce((acc, app) => ({ ...acc, ...convertAllDatesToCH(app) }), {}))
-
   try {
-    await executeClickHouseQuery(c, query, params)
-    console.log('saveStoreInfo success')
+    await executeClickHouseQuery(c, query)
+    console.log('bulkUpdateStoreApps success')
   }
   catch (error) {
-    console.error('saveStoreInfo error', error)
+    console.error('bulkUpdateStoreApps error', error)
   }
 }
 

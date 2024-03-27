@@ -111,7 +111,7 @@ async function getInfoCap(c: Context, appId: string) {
     // remove from list apps already in supabase
     const res = await isCapacitor(appId)
     // save in supabase
-    await saveStoreInfo(c, [{
+    await saveStoreInfo(c, {
       app_id: appId,
       capacitor: res.capacitor,
       cordova: res.cordova,
@@ -122,16 +122,16 @@ async function getInfoCap(c: Context, appId: string) {
       native_script: res.native_script,
       flutter: res.flutter,
       to_get_framework: false,
-    }])
+    })
     console.log('getInfoCap', appId, res)
   }
   catch (e) {
     console.log('error getInfoCap', e)
-    await saveStoreInfo(c, [{
+    await saveStoreInfo(c, {
       app_id: appId,
       to_get_framework: false,
       error_get_framework: JSON.stringify(e),
-    }])
+    })
   }
 }
 
