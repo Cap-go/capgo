@@ -258,6 +258,40 @@ CREATE TABLE IF NOT EXISTS daily_aggregate_logs
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, version);
 
+CREATE TABLE store_apps (
+    created_at DateTime DEFAULT now(),
+    url String DEFAULT '',
+    app_id String,
+    title String DEFAULT '',
+    summary String DEFAULT '',
+    icon String DEFAULT '',
+    free UInt8 DEFAULT 1,
+    category String DEFAULT '',
+    capacitor UInt8 DEFAULT 0,
+    developer_email String DEFAULT '',
+    installs UInt64 DEFAULT 0,
+    developer String DEFAULT '',
+    score Float64 DEFAULT 0,
+    to_get_framework UInt8 DEFAULT 1,
+    onprem UInt8 DEFAULT 0,
+    updates AggregateFunction(sum, UInt64),
+    to_get_info UInt8 DEFAULT 1,
+    error_get_framework String DEFAULT '',
+    to_get_similar UInt8 DEFAULT 1,
+    error_get_similar String DEFAULT '',
+    updated_at DateTime DEFAULT now(),
+    error_get_info String DEFAULT '',
+    cordova UInt8 DEFAULT 0,
+    react_native UInt8 DEFAULT 0,
+    capgo UInt8 DEFAULT 0,
+    kotlin UInt8 DEFAULT 0,
+    flutter UInt8 DEFAULT 0,
+    native_script UInt8 DEFAULT 0,
+    lang String DEFAULT '',
+    developer_id String DEFAULT ''
+) ENGINE = AggregatingMergeTree()
+ORDER BY (app_id);
+
 -- Create a Materialized View that aggregates data daily
 CREATE MATERIALIZED VIEW IF NOT EXISTS daily_aggregate_logs_mv TO daily_aggregate_logs AS
 SELECT 

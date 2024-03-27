@@ -324,48 +324,34 @@ function prefixParams(params: Record<string, any>): Record<string, any> {
   return prefixedParams
 }
 
-function getClickHouseType(value: any): string {
-  if (typeof value === 'string')
-    return ':String'
-  else if (typeof value === 'number')
-    return ':Float64'
-  else if (typeof value === 'boolean')
-    return ':UInt8'
-  else if (value instanceof Date)
-    return ':DateTime'
-  else
-    return ''
-}
-
 export async function saveStoreInfo(c: Context, app: Database['public']['Tables']['store_apps']['Insert']) {
-  // Update a single app in ClickHouse
-  const columns: (keyof Database['public']['Tables']['store_apps']['Insert'])[] = Object.keys(app) as (keyof Database['public']['Tables']['store_apps']['Insert'])[]
+  // Save a single app in ClickHouse
+  const columns: (keyof Database['public']['Tables']['store_apps']['Insert'])[] = Object.keys({ updates: 0, ...app }) as (keyof Database['public']['Tables']['store_apps']['Insert'])[]
   const values = columns.map((column) => {
     const value = app[column]
-    const type = getClickHouseType(value)
-    return `{${column}}${type}`
+    if (column === 'updates')
+      return `sumState(${value})`
+    else
+      return `'${value}'`
   }).join(', ')
 
   const query = `
     INSERT INTO store_apps (${columns.join(', ')})
     VALUES (${values})
-    ON DUPLICATE KEY UPDATE
-      ${columns.map(column => `${column} = VALUES(${column})`).join(', ')}
+    SETTINGS async_insert=1, wait_for_async_insert=0
   `
 
-  const params = prefixParams(convertAllDatesToCH(app))
-
   try {
-    await executeClickHouseQuery(c, query, params)
-    console.log('updateStoreApp success')
+    await executeClickHouseQuery(c, query)
+    console.log('saveStoreInfo success')
   }
   catch (error) {
-    console.error('updateStoreApp error', error)
+    console.error('saveStoreInfo error', error)
     throw error
   }
 }
 
-export async function bulkUpdateStoreApps(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+export async function bulkUpdateStoreApps(apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
   // Update a list of apps in ClickHouse (internal use only)
   if (!apps.length)
     return
@@ -375,15 +361,19 @@ export async function bulkUpdateStoreApps(c: Context, apps: (Database['public'][
 
   const columns = Object.keys(noDup[0])
   const values = noDup.map((app) => {
-    const convertedApp = convertAllDatesToCH(app)
-    return `(${columns.map(column => `'${convertedApp[column]}'`).join(', ')})`
+    const convertedApp = convertAllDatesToCH({ updates: 0, ...app })
+    return `(${columns.map((column) => {
+      const value = convertedApp[column]
+      if (column === 'updates')
+        return `sumState(${value})`
+      else
+        return `'${value}'`
+    }).join(', ')})`
   }).join(', ')
 
   const query = `
     INSERT INTO store_apps (${columns.join(', ')})
     VALUES ${values}
-    ON DUPLICATE KEY UPDATE
-      ${columns.map(column => `${column} = VALUES(${column})`).join(', ')}
     SETTINGS async_insert=1, wait_for_async_insert=0
   `
 
@@ -401,8 +391,8 @@ export async function updateInClickHouse(c: Context, appId: string, updates: num
     return Promise.resolve()
 
   const query = `
-    ALTER TABLE store_apps
-    UPDATE updates = updates + {updates:UInt64}
+    INSERT INTO store_apps (app_id, updates)
+    SELECT {app_id:String}, sumState({updates:UInt64})
     WHERE app_id = {app_id:String}
     SETTINGS async_insert=1, wait_for_async_insert=0
   `
