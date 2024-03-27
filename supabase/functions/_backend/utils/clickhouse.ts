@@ -161,7 +161,7 @@ SELECT
   first_device_logs.app_id as app_id,
   first_device_logs.first_log_date AS date,
   COUNT(DISTINCT first_device_logs.device_id) as mau,
-  SUM(logs_daily.bandwidth) AS bandwidth,
+  0 AS bandwidth,
   SUM(COALESCE(logs_daily.get, 0)) AS get,
   SUM(COALESCE(logs_daily.fail, 0)) AS fail,
   SUM(COALESCE(logs_daily.install, 0)) AS install,
