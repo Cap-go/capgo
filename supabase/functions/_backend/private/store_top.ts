@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { useCors } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { getTopApps, getTotalAppsByMode } from '../utils/clickhouse.ts';
 
 export const app = new Hono()
 
@@ -11,65 +11,19 @@ app.get('/', async (c: Context) => {
   try {
     // count allapps
     const mode = c.req.query('mode') || 'capacitor'
-    const { count } = await supabaseAdmin(c)
-      .from('store_apps')
-      .select('*', { count: 'exact', head: true })
-    const total = count || 0
+    
+    const countTotal = await getTotalAppsByMode(c, mode)
+    const data = await getTopApps(c, mode, 100) 
 
-    let req = supabaseAdmin(c)
-      .from('store_apps')
-      .select('url, title, icon, summary, installs, category')
-      .order('installs', { ascending: false })
-      .limit(100)
-    const reqTotal = supabaseAdmin(c)
-      .from('store_apps')
-      .select('*', { count: 'exact', head: true })
-
-    if (mode === 'cordova') {
-      req = req.eq('cordova', true)
-        .eq('capacitor', false)
-      // get toal categ
-      reqTotal.eq('cordova', true)
-        .eq('capacitor', false)
-    }
-    else if (mode === 'flutter') {
-      req = req.eq('flutter', true)
-      // get toal categ
-      reqTotal.eq('flutter', true)
-    }
-    else if (mode === 'reactNative') {
-      req = req.eq('react_native', true)
-      // get toal categ
-      reqTotal.eq('react_native', true)
-    }
-    else if (mode === 'nativeScript') {
-      req.eq('native_script', true)
-      // get toal categ
-      reqTotal.eq('native_script', true)
-    }
-    else if (mode === 'capgo') {
-      req.eq('capgo', true)
-      // get toal categ
-      reqTotal.eq('capgo', true)
-    }
-    else {
-      req = req.eq('capacitor', true)
-      // get toal categ
-      reqTotal.eq('capacitor', true)
-    }
-
-    const { data, error } = await req
-    const { count: countTotal } = await reqTotal
     const totalCategory = countTotal || 0
 
-    if (data && !error) {
+    if (data) {
       return c.json({
         apps: data || [],
         // calculate percentage usage
-        usage: ((totalCategory * 100) / total).toFixed(2),
+        usage: ((totalCategory * 100) / countTotal).toFixed(2),
       })
     }
-    console.log('Supabase error:', error)
     return c.json({
       status: 'Error unknow',
     }, 500)

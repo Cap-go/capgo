@@ -3,6 +3,7 @@ import ky from 'ky'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
+import { getAppsFromSupabase } from './supabase.ts';
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
@@ -122,8 +123,15 @@ interface Statistics {
   rows_read: number
 }
 
-interface ApiResponse {
+interface ApiActivityResponse {
   data: AppActivity[]
+  meta: MetaInfo[]
+  rows: number
+  statistics: Statistics
+}
+
+interface ApiResponse {
+  data: any[]
   meta: MetaInfo[]
   rows: number
   statistics: Statistics
@@ -188,12 +196,250 @@ function convertDataWithMeta(data: any[], meta: MetaInfo[]) {
       .forEach(([key, value]) => {
         const index = meta.findIndex(m => m.name === key)
         if (meta[index].type === 'UInt64' || meta[index].type === 'Int64' || meta[index].type === 'Int32' || meta[index].type === 'UInt32')
-          newObj[key] = Number.parseInt(value)
+          newObj[key] = Number.parseInt(value as string)
         else
           newObj[key] = value
       })
     return newObj
   })
+}
+
+async function executeClickHouseQuery(c: Context, query: string, params: Record<string, any> = {}): Promise<ApiResponse> {
+  console.log('Sending to ClickHouse body', query)
+
+  const searchParams = new URLSearchParams()
+  searchParams.append('query', query)
+  searchParams.append('http_write_exception_in_output_format', '1')
+
+  Object.entries(params).forEach(([key, value]) => {
+    searchParams.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value))
+  })
+
+  console.log('Sending to ClickHouse searchParams', searchParams)
+
+  try {
+    const response = await ky.post(clickHouseURL(c), {
+      searchParams,
+      headers: getHeaders(c),
+    }).json<ApiResponse>()
+
+    console.log('Query executed successfully', response)
+    response.data = convertDataWithMeta(response.data, response.meta)
+    return response
+  } catch (error) {
+    console.error('Error executing ClickHouse query', error)
+
+    if (error.name === 'HTTPError') {
+      const errorJson = await error.response.json()
+      console.error('Error details', errorJson)
+    }
+
+    // Return a default response in case of an error
+    return {
+      data: [],
+      meta: [],
+      rows: 0,
+      statistics: {
+        bytes_read: 0,
+        elapsed: 0,
+        rows_read: 0,
+      },
+    }
+  }
+}
+
+export async function getAppsToProcess(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
+  const query = `
+    SELECT *
+    FROM store_apps
+    WHERE ${flag} = 1
+    ORDER BY created_at ASC
+    LIMIT {param_limit:UInt64}
+  `
+
+  const params = prefixParams({ limit })
+
+  const result = await executeClickHouseQuery(c, query, params)
+  return result.data
+}
+
+export async function getTopApps(c: Context, mode: string, limit: number) {
+  const query = `
+    SELECT url, title, icon, summary, installs, category
+    FROM store_apps
+    WHERE 1=1
+      ${mode === 'cordova' ? "AND cordova = 1 AND capacitor = 0" : ""}
+      ${mode === 'flutter' ? "AND flutter = 1" : ""}
+      ${mode === 'reactNative' ? "AND react_native = 1" : ""}
+      ${mode === 'nativeScript' ? "AND native_script = 1" : ""}
+      ${mode === 'capgo' ? "AND capgo = 1" : ""}
+      ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? "AND capacitor = 1" : ""}
+    ORDER BY installs DESC
+    LIMIT {param_limit:UInt64}
+  `
+
+  const params = prefixParams({ limit })
+
+  const result = await executeClickHouseQuery(c, query, params)
+  return result.data
+}
+
+export async function getTotalAppsByMode(c: Context, mode: string) {
+  const query = `
+    SELECT COUNT(*) AS total
+    FROM store_apps
+    WHERE 1=1
+      ${mode === 'cordova' ? "AND cordova = 1 AND capacitor = 0" : ""}
+      ${mode === 'flutter' ? "AND flutter = 1" : ""}
+      ${mode === 'reactNative' ? "AND react_native = 1" : ""}
+      ${mode === 'nativeScript' ? "AND native_script = 1" : ""}
+      ${mode === 'capgo' ? "AND capgo = 1" : ""}
+      ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? "AND capacitor = 1" : ""}
+  `
+
+  const result = await executeClickHouseQuery(c, query)
+  return result.data[0].total
+}
+
+export async function getStoreAppById(c: Context, appId: string) {
+  const query = `
+    SELECT *
+    FROM store_apps
+    WHERE app_id = {param_app_id:String}
+    LIMIT 1
+  `
+
+  const params = prefixParams({ app_id: appId })
+
+  const result = await executeClickHouseQuery(c, query, params)
+  return result.data[0]
+}
+
+function prefixParams(params: Record<string, any>): Record<string, any> {
+  const prefixedParams: Record<string, any> = {}
+  for (const [key, value] of Object.entries(params)) {
+    prefixedParams[`param_${key}`] = value
+  }
+  return prefixedParams
+}
+
+
+export async function saveStoreInfo(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+  // Save in ClickHouse
+  if (!apps.length)
+    return
+
+  const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
+  console.log('saveStoreInfo', noDup.length)
+
+  const columns = Object.keys(noDup[0])
+  const values = noDup.map((app) => {
+    const convertedApp = convertAllDatesToCH(app)
+    return `(${columns.map((column) => `{${convertedApp[column]}}`).join(', ')})`
+  }).join(', ')
+
+  const query = `
+    INSERT INTO store_apps (${columns.join(', ')})
+    VALUES ${values}
+    ON DUPLICATE KEY UPDATE
+      ${columns.map((column) => `${column} = VALUES(${column})`).join(', ')}
+    SETTINGS async_insert=1, wait_for_async_insert=0
+  `
+
+  const params = prefixParams(noDup.reduce((acc, app) => ({ ...acc, ...convertAllDatesToCH(app) }), {}))
+
+  try {
+    await executeClickHouseQuery(c, query, params)
+    console.log('saveStoreInfo success')
+  } catch (error) {
+    console.error('saveStoreInfo error', error)
+  }
+}
+
+export async function updateInClickHouse(c: Context, appId: string, updates: number) {
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve()
+
+  const query = `
+    ALTER TABLE store_apps
+    UPDATE updates = updates + {updates:UInt64}
+    WHERE app_id = {app_id:String}
+    SETTINGS async_insert=1, wait_for_async_insert=0
+  `
+
+  const params = prefixParams({
+    updates,
+    app_id: appId,
+  })
+
+  await executeClickHouseQuery(c, query, params)
+}
+
+async function countUpdatesFromClickHouse(c: Context): Promise<number> {
+  const query = `
+    SELECT SUM(updates) + SUM(installs) AS count
+    FROM store_apps
+    WHERE onprem = 1 OR capgo = 1
+  `
+
+  try {
+    const response = await executeClickHouseQuery(c, query)
+    return response.data[0].count || 0
+  } catch (error) {
+    console.error('Error counting updates from ClickHouse', error)
+    return 0
+  }
+}
+
+async function countUpdatesFromLogs(c: Context): Promise<number> {
+  const query = `
+    SELECT COUNT(*) AS count
+    FROM logs
+    WHERE action = 'set'
+  `
+
+  try {
+    const response = await executeClickHouseQuery(c, query)
+    return response.data[0].count || 0
+  } catch (error) {
+    console.error('Error counting updates from logs', error)
+    return 0
+  }
+}
+
+async function getAppsFromClickHouse(c: Context): Promise<string[]> {
+  const query = `
+    SELECT DISTINCT app_id
+    FROM store_apps
+    WHERE (onprem = 1 OR capgo = 1) AND url != ''
+  `
+
+  try {
+    const response = await executeClickHouseQuery(c, query)
+    return response.data.map((row) => row.app_id)
+  } catch (error) {
+    console.error('Error getting apps from ClickHouse', error)
+    return []
+  }
+}
+
+export async function countAllApps(c: Context): Promise<number> {
+  const [clickHouseApps, supabaseApps] = await Promise.all([
+    getAppsFromClickHouse(c),
+    getAppsFromSupabase(c),
+  ])
+
+  const allApps = [...new Set([...clickHouseApps, ...supabaseApps])]
+  return allApps.length
+}
+
+export async function countAllUpdates(c: Context): Promise<number> {
+  const [storeAppsCount, logsCount] = await Promise.all([
+    countUpdatesFromClickHouse(c),
+    countUpdatesFromLogs(c),
+  ])
+
+  return storeAppsCount + logsCount
 }
 
 export async function reactActiveApps(c: Context) {
@@ -296,7 +542,7 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
       searchParams,
       headers: getHeaders(c),
     })
-      .then(res => res.json<ApiResponse>())
+      .then(res => res.json<ApiActivityResponse>())
     console.log('readMauFromClickHouse ok', response)
     response.data = convertDataWithMeta(response.data, response.meta)
     console.log('readMauFromClickHouse ok type', response)
@@ -351,9 +597,9 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
       device_id: device.device_id,
       action,
       app_id: device.app_id,
-      version_build: device.version_build,
+      version_build: device.version_build ?? '',
       version: versionId || device.version, // Use the provided versionId if available
-      platform: device.platform,
+      platform: device.platform ?? 'android',
     }
     return JSON.stringify(convertAllDatesToCH(stat))
   }).join('\n')

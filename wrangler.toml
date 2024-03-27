@@ -2,3 +2,7 @@ name = "capgo_api-preprod"
 compatibility_date = "2023-12-01"
 main = "./cloudflare_workers/index.ts"
 compatibility_flags = ["nodejs_compat"]
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "0f1d77550db142fbb17cb6b3ee659a06"

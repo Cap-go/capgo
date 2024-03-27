@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       apikeys: {
@@ -69,12 +44,78 @@ export type Database = {
           },
         ]
       }
+      app_stats: {
+        Row: {
+          app_id: string
+          bandwidth: number
+          channels: number
+          created_at: string | null
+          date_id: string
+          devices: number
+          devices_real: number
+          mlu: number
+          mlu_real: number
+          shared: number
+          updated_at: string | null
+          user_id: string
+          version_size: number
+          versions: number
+        }
+        Insert: {
+          app_id: string
+          bandwidth?: number
+          channels?: number
+          created_at?: string | null
+          date_id?: string
+          devices?: number
+          devices_real?: number
+          mlu?: number
+          mlu_real?: number
+          shared?: number
+          updated_at?: string | null
+          user_id: string
+          version_size?: number
+          versions?: number
+        }
+        Update: {
+          app_id?: string
+          bandwidth?: number
+          channels?: number
+          created_at?: string | null
+          date_id?: string
+          devices?: number
+          devices_real?: number
+          mlu?: number
+          mlu_real?: number
+          shared?: number
+          updated_at?: string | null
+          user_id?: string
+          version_size?: number
+          versions?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_stats_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "app_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_usage: {
         Row: {
           app_id: string
           bandwidth: number
           date: string | null
-          fail: number
+          fails: number
           get: number
           id: string
           install: number
@@ -87,7 +128,7 @@ export type Database = {
           app_id: string
           bandwidth?: number
           date?: string | null
-          fail?: number
+          fails?: number
           get?: number
           id?: string
           install?: number
@@ -100,7 +141,7 @@ export type Database = {
           app_id?: string
           bandwidth?: number
           date?: string | null
-          fail?: number
+          fails?: number
           get?: number
           id?: string
           install?: number
@@ -252,12 +293,11 @@ export type Database = {
           app_id: string
           created_at: string | null
           icon_url: string
-          id: number
+          id: string | null
           last_version: string | null
           name: string | null
           owner_org: string
           retention: number
-          tmp_id: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -265,12 +305,11 @@ export type Database = {
           app_id: string
           created_at?: string | null
           icon_url: string
-          id?: number
+          id?: string | null
           last_version?: string | null
           name?: string | null
           owner_org: string
           retention?: number
-          tmp_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -278,12 +317,11 @@ export type Database = {
           app_id?: string
           created_at?: string | null
           icon_url?: string
-          id?: number
+          id?: string | null
           last_version?: string | null
           name?: string | null
           owner_org?: string
           retention?: number
-          tmp_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -303,6 +341,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      auth_uid: {
+        Row: {
+          uid: string | null
+        }
+        Insert: {
+          uid?: string | null
+        }
+        Update: {
+          uid?: string | null
+        }
+        Relationships: []
       }
       channel_devices: {
         Row: {
@@ -457,6 +507,183 @@ export type Database = {
           },
         ]
       }
+      clickhouse_app_usage: {
+        Row: {
+          app_id: string | null
+          bandwidth: number | null
+          date: string | null
+          fail: number | null
+          get: number | null
+          install: number | null
+          mau: number | null
+          storage_added: number | null
+          storage_deleted: number | null
+          uninstall: number | null
+        }
+        Insert: {
+          app_id?: string | null
+          bandwidth?: number | null
+          date?: string | null
+          fail?: number | null
+          get?: number | null
+          install?: number | null
+          mau?: number | null
+          storage_added?: number | null
+          storage_deleted?: number | null
+          uninstall?: number | null
+        }
+        Update: {
+          app_id?: string | null
+          bandwidth?: number | null
+          date?: string | null
+          fail?: number | null
+          get?: number | null
+          install?: number | null
+          mau?: number | null
+          storage_added?: number | null
+          storage_deleted?: number | null
+          uninstall?: number | null
+        }
+        Relationships: []
+      }
+      clickhouse_app_usage_parm: {
+        Row: {
+          _app_list: string | null
+          _end_date: string | null
+          _start_date: string | null
+          app_id: string | null
+          bandwidth: number | null
+          date: string | null
+          fail: number | null
+          get: number | null
+          install: number | null
+          mau: number | null
+          storage_added: number | null
+          storage_deleted: number | null
+          uninstall: number | null
+        }
+        Insert: {
+          _app_list?: string | null
+          _end_date?: string | null
+          _start_date?: string | null
+          app_id?: string | null
+          bandwidth?: number | null
+          date?: string | null
+          fail?: number | null
+          get?: number | null
+          install?: number | null
+          mau?: number | null
+          storage_added?: number | null
+          storage_deleted?: number | null
+          uninstall?: number | null
+        }
+        Update: {
+          _app_list?: string | null
+          _end_date?: string | null
+          _start_date?: string | null
+          app_id?: string | null
+          bandwidth?: number | null
+          date?: string | null
+          fail?: number | null
+          get?: number | null
+          install?: number | null
+          mau?: number | null
+          storage_added?: number | null
+          storage_deleted?: number | null
+          uninstall?: number | null
+        }
+        Relationships: []
+      }
+      clickhouse_devices: {
+        Row: {
+          app_id: string | null
+          created_at: string | null
+          custom_id: string | null
+          device_id: string | null
+          is_emulator: boolean | null
+          is_prod: boolean | null
+          os_version: string | null
+          platform: string | null
+          plugin_version: string | null
+          updated_at: string | null
+          version: number | null
+          version_build: string | null
+        }
+        Insert: {
+          app_id?: string | null
+          created_at?: string | null
+          custom_id?: string | null
+          device_id?: string | null
+          is_emulator?: boolean | null
+          is_prod?: boolean | null
+          os_version?: string | null
+          platform?: string | null
+          plugin_version?: string | null
+          updated_at?: string | null
+          version?: number | null
+          version_build?: string | null
+        }
+        Update: {
+          app_id?: string | null
+          created_at?: string | null
+          custom_id?: string | null
+          device_id?: string | null
+          is_emulator?: boolean | null
+          is_prod?: boolean | null
+          os_version?: string | null
+          platform?: string | null
+          plugin_version?: string | null
+          updated_at?: string | null
+          version?: number | null
+          version_build?: string | null
+        }
+        Relationships: []
+      }
+      clickhouse_logs: {
+        Row: {
+          action: string | null
+          app_id: string | null
+          created_at: string | null
+          device_id: string | null
+          platform: string | null
+          version: number | null
+          version_build: string | null
+        }
+        Insert: {
+          action?: string | null
+          app_id?: string | null
+          created_at?: string | null
+          device_id?: string | null
+          platform?: string | null
+          version?: number | null
+          version_build?: string | null
+        }
+        Update: {
+          action?: string | null
+          app_id?: string | null
+          created_at?: string | null
+          device_id?: string | null
+          platform?: string | null
+          version?: number | null
+          version_build?: string | null
+        }
+        Relationships: []
+      }
+      cycle_info: {
+        Row: {
+          subscription_anchor_end: string | null
+          subscription_anchor_start: string | null
+        }
+        Insert: {
+          subscription_anchor_end?: string | null
+          subscription_anchor_start?: string | null
+        }
+        Update: {
+          subscription_anchor_end?: string | null
+          subscription_anchor_start?: string | null
+        }
+        Relationships: []
+      }
       deleted_account: {
         Row: {
           created_at: string | null
@@ -465,7 +692,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email: string
+          email?: string
           id?: string
         }
         Update: {
@@ -796,11 +1023,8 @@ export type Database = {
       }
       plans: {
         Row: {
-          abtest: boolean
-          app: number
           bandwidth: number
           bandwidth_unit: number | null
-          channel: number
           created_at: string
           description: string
           id: string
@@ -815,21 +1039,14 @@ export type Database = {
           price_m_storage_id: string | null
           price_y: number
           price_y_id: string
-          progressive_deploy: boolean
-          shared: number
           storage: number
           storage_unit: number | null
           stripe_id: string
-          update: number
           updated_at: string
-          version: number
         }
         Insert: {
-          abtest?: boolean
-          app?: number
           bandwidth: number
           bandwidth_unit?: number | null
-          channel?: number
           created_at?: string
           description?: string
           id?: string
@@ -844,21 +1061,14 @@ export type Database = {
           price_m_storage_id?: string | null
           price_y?: number
           price_y_id: string
-          progressive_deploy?: boolean
-          shared?: number
           storage: number
           storage_unit?: number | null
           stripe_id?: string
-          update?: number
           updated_at?: string
-          version?: number
         }
         Update: {
-          abtest?: boolean
-          app?: number
           bandwidth?: number
           bandwidth_unit?: number | null
-          channel?: number
           created_at?: string
           description?: string
           id?: string
@@ -873,14 +1083,10 @@ export type Database = {
           price_m_storage_id?: string | null
           price_y?: number
           price_y_id?: string
-          progressive_deploy?: boolean
-          shared?: number
           storage?: number
           storage_unit?: number | null
           stripe_id?: string
-          update?: number
           updated_at?: string
-          version?: number
         }
         Relationships: []
       }
@@ -1158,6 +1364,14 @@ export type Database = {
         }
         Returns: string
       }
+      calculate_cycle_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      calculate_daily_app_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_min_rights:
         | {
             Args: {
@@ -1227,6 +1441,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      count_all_paying: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       count_all_plans: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1248,6 +1466,13 @@ export type Database = {
       count_all_updates: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      create_partitions: {
+        Args: {
+          start_date: string
+          num_years: number
+        }
+        Returns: undefined
       }
       delete_user: {
         Args: Record<PropertyKey, never>
@@ -1386,13 +1611,25 @@ export type Database = {
         }
         Returns: string
       }
+      get_infos: {
+        Args: {
+          appid: string
+          deviceid: string
+          versionname: string
+        }
+        Returns: {
+          current_version_id: number
+          versiondata: Json
+          channel: Json
+        }[]
+      }
       get_max_plan:
         | {
             Args: Record<PropertyKey, never>
             Returns: {
               mau: number
-              storage: number
               bandwidth: number
+              storage: number
             }[]
           }
         | {
@@ -1500,17 +1737,12 @@ export type Database = {
               subscription_end: string
             }[]
           }
-      get_plan_usage_percent:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: number
-          }
+      get_plan_usage_percent: {
+        Args: {
+          userid: string
+        }
+        Returns: number
+      }
       get_total_app_storage_size:
         | {
             Args: {
@@ -1549,7 +1781,20 @@ export type Database = {
           }
         | {
             Args: {
+              appid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
               userid: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              userid: string
+              appid: string
             }
             Returns: number
           }
@@ -1772,6 +2017,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_good_plan_v3: {
+        Args: {
+          userid: string
+        }
+        Returns: boolean
+      }
       is_good_plan_v5: {
         Args: {
           userid: string
@@ -1879,13 +2130,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      remove_enum_value: {
-        Args: {
-          enum_type: unknown
-          enum_value: string
-        }
-        Returns: undefined
-      }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1898,14 +2142,27 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      update_app_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: undefined
+          }
+        | {
+            Args: {
+              minutes_interval: number
+            }
+            Returns: undefined
+          }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
     }
     Enums: {
+      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
+      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       queue_job_status: "inserted" | "requested" | "failed"
       stripe_status:
@@ -1915,7 +2172,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "last_saved" | "5min" | "day" | "cycle"
+      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -1930,205 +2187,29 @@ export type Database = {
       user_role: "read" | "upload" | "write" | "admin"
     }
     CompositeTypes: {
+      match_plan: {
+        name: string | null
+      }
       orgs_table: {
-        id: string
-        created_by: string
-        created_at: string
-        updated_at: string
-        logo: string
-        name: string
+        id: string | null
+        created_by: string | null
+        created_at: string | null
+        updated_at: string | null
+        logo: string | null
+        name: string | null
       }
       owned_orgs: {
-        id: string
-        created_by: string
-        logo: string
-        name: string
-        role: string
+        id: string | null
+        created_by: string | null
+        logo: string | null
+        name: string | null
+        role: string | null
       }
       stats_table: {
-        mau: number
-        bandwidth: number
-        storage: number
+        mau: number | null
+        bandwidth: number | null
+        storage: number | null
       }
-    }
-  }
-  storage: {
-    Tables: {
-      buckets: {
-        Row: {
-          allowed_mime_types: string[] | null
-          avif_autodetection: boolean | null
-          created_at: string | null
-          file_size_limit: number | null
-          id: string
-          name: string
-          owner: string | null
-          owner_id: string | null
-          public: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          allowed_mime_types?: string[] | null
-          avif_autodetection?: boolean | null
-          created_at?: string | null
-          file_size_limit?: number | null
-          id: string
-          name: string
-          owner?: string | null
-          owner_id?: string | null
-          public?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          allowed_mime_types?: string[] | null
-          avif_autodetection?: boolean | null
-          created_at?: string | null
-          file_size_limit?: number | null
-          id?: string
-          name?: string
-          owner?: string | null
-          owner_id?: string | null
-          public?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      migrations: {
-        Row: {
-          executed_at: string | null
-          hash: string
-          id: number
-          name: string
-        }
-        Insert: {
-          executed_at?: string | null
-          hash: string
-          id: number
-          name: string
-        }
-        Update: {
-          executed_at?: string | null
-          hash?: string
-          id?: number
-          name?: string
-        }
-        Relationships: []
-      }
-      objects: {
-        Row: {
-          bucket_id: string | null
-          created_at: string | null
-          id: string
-          last_accessed_at: string | null
-          metadata: Json | null
-          name: string | null
-          owner: string | null
-          owner_id: string | null
-          path_tokens: string[] | null
-          updated_at: string | null
-          version: string | null
-        }
-        Insert: {
-          bucket_id?: string | null
-          created_at?: string | null
-          id?: string
-          last_accessed_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          owner?: string | null
-          owner_id?: string | null
-          path_tokens?: string[] | null
-          updated_at?: string | null
-          version?: string | null
-        }
-        Update: {
-          bucket_id?: string | null
-          created_at?: string | null
-          id?: string
-          last_accessed_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          owner?: string | null
-          owner_id?: string | null
-          path_tokens?: string[] | null
-          updated_at?: string | null
-          version?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "objects_bucketId_fkey"
-            columns: ["bucket_id"]
-            isOneToOne: false
-            referencedRelation: "buckets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      can_insert_object: {
-        Args: {
-          bucketid: string
-          name: string
-          owner: string
-          metadata: Json
-        }
-        Returns: undefined
-      }
-      extension: {
-        Args: {
-          name: string
-        }
-        Returns: string
-      }
-      filename: {
-        Args: {
-          name: string
-        }
-        Returns: string
-      }
-      foldername: {
-        Args: {
-          name: string
-        }
-        Returns: unknown
-      }
-      get_size_by_bucket: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          size: number
-          bucket_id: string
-        }[]
-      }
-      search: {
-        Args: {
-          prefix: string
-          bucketname: string
-          limits?: number
-          levels?: number
-          offsets?: number
-          search?: string
-          sortcolumn?: string
-          sortorder?: string
-        }
-        Returns: {
-          name: string
-          id: string
-          updated_at: string
-          created_at: string
-          last_accessed_at: string
-          metadata: Json
-        }[]
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
     }
   }
 }
@@ -2214,4 +2295,3 @@ export type Enums<
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
     ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
-

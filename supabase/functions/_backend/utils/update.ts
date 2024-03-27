@@ -5,7 +5,6 @@ import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias as alias_postgres } from 'drizzle-orm/pg-core'
 import postgres from 'postgres'
-import { getEnv } from './utils.ts'
 import { isAllowedAction } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
@@ -16,7 +15,8 @@ import { appIdToUrl } from './conversion.ts'
 
 import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
-import { sendStatsAndDevice } from './clickhouse.ts'
+import { sendStatsAndDevice, saveStoreInfo } from './clickhouse.ts'
+import { getEnv } from './utils.ts';
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
@@ -36,7 +36,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getDrizzlePostgres(c: Context) {
-  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
+  const supaUrl = c.env.HYPERDRIVE ? c.env.HYPERDRIVE.connectionString : getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
   console.log('getDrizzlePostgres', supaUrl)
 
   const pgClient = postgres(supaUrl)
@@ -275,16 +275,14 @@ export async function update(c: Context, body: AppInfos) {
     const appOwner = await getAppOwnerPostgres(app_id, alias, drizzleCient, schema)
     if (!appOwner) {
       // TODO: transfer to clickhouse
-      // if (app_id) {
-      //   await supabaseAdmin()
-      //     .from('store_apps')
-      //     .upsert({
-      //       app_id,
-      //       onprem: true,
-      //       capacitor: true,
-      //       capgo: true,
-      //     })
-      // }
+      if (app_id) {
+        await saveStoreInfo(c, [{
+          app_id,
+          onprem: true,
+          capacitor: true,
+          capgo: true,
+        }])
+      }
       console.log(id, 'App not found', app_id, new Date().toISOString())
       return c.json({
         message: 'App not found',

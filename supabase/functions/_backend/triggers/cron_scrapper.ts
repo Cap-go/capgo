@@ -2,8 +2,8 @@ import ky from 'ky'
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
 import { categories } from '../utils/gplay_categ.ts'
+import { getAppsToProcess } from '../utils/clickhouse.ts';
 
 const toGetFramwork = 500
 const toGetInfo = 500
@@ -20,26 +20,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         apisecret: API_SECRET,
       },
     }
-    const { data: appsToGetFramework } = await supabaseAdmin(c)
-      .from('store_apps')
-      .select()
-      .eq('to_get_framework', true)
-      .limit(toGetFramwork)
-      .order('created_at', { ascending: true })
+    const appsToGetFramework = await getAppsToProcess(c, 'to_get_framework', toGetFramwork)
 
-    const { data: appsToGetInfo } = await supabaseAdmin(c)
-      .from('store_apps')
-      .select()
-      .eq('to_get_info', true)
-      .limit(toGetInfo)
-      .order('created_at', { ascending: true })
+    const appsToGetInfo = await getAppsToProcess(c, 'to_get_info', toGetInfo)
 
-    const { data: appsToGetSimilar } = await supabaseAdmin(c)
-      .from('store_apps')
-      .select()
-      .eq('to_get_similar', true)
-      .limit(toGetSimilar)
-      .order('created_at', { ascending: true })
+    const appsToGetSimilar = await getAppsToProcess(c, 'to_get_similar', toGetSimilar)
 
     const all = []
     const pageSize = 10

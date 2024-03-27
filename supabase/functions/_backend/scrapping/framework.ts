@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import AdmZip from 'adm-zip'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { saveStoreInfo } from '../utils/clickhouse.ts'
 
 export const app = new Hono()
 
@@ -111,35 +111,27 @@ async function getInfoCap(c: Context, appId: string) {
     // remove from list apps already in supabase
     const res = await isCapacitor(appId)
     // save in supabase
-    const { error } = await supabaseAdmin(c)
-      .from('store_apps')
-      .upsert({
-        app_id: appId,
-        capacitor: res.capacitor,
-        cordova: res.cordova,
-        react_native: res.react_native,
-        capgo: res.capgo,
-        onprem: res.onprem,
-        kotlin: res.kotlin,
-        native_script: res.native_script,
-        flutter: res.flutter,
-        to_get_framework: false,
-      })
-    if (error)
-      console.log('error', error)
+    await saveStoreInfo(c, [{
+      app_id: appId,
+      capacitor: res.capacitor,
+      cordova: res.cordova,
+      react_native: res.react_native,
+      capgo: res.capgo,
+      onprem: res.onprem,
+      kotlin: res.kotlin,
+      native_script: res.native_script,
+      flutter: res.flutter,
+      to_get_framework: false,
+    }])
     console.log('getInfoCap', appId, res)
   }
   catch (e) {
     console.log('error getInfoCap', e)
-    const { error } = await supabaseAdmin(c)
-      .from('store_apps')
-      .upsert({
-        app_id: appId,
-        to_get_framework: false,
-        error_get_framework: JSON.stringify(e),
-      })
-    if (error)
-      console.log('error insert', error)
+    await saveStoreInfo(c, [{
+      app_id: appId,
+      to_get_framework: false,
+      error_get_framework: JSON.stringify(e),
+    }])
   }
 }
 

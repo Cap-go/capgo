@@ -5,7 +5,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { reactActiveApps } from '../utils/clickhouse.ts'
+import { countAllApps, countAllUpdates, reactActiveApps } from '../utils/clickhouse.ts'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -30,16 +30,8 @@ async function getGithubStars(): Promise<number> {
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
   return {
-    apps: supabase.rpc('count_all_apps', {}).single().then((res) => {
-      if (res.error || !res.data)
-        console.log('count_all_apps', res.error)
-      return res.data || 0
-    }),
-    updates: supabase.rpc('count_all_updates', {}).single().then((res) => {
-      if (res.error || !res.data)
-        console.log('count_all_updates', res.error)
-      return res.data || 0
-    }),
+    apps: countAllApps(c),
+    updates: countAllUpdates(c),
     users: supabase
       .from('users')
       .select('*', { count: 'exact' })

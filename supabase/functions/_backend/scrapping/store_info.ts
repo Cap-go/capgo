@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { saveStoreInfo, supabaseAdmin } from '../utils/supabase.ts'
+import { getStoreAppById, saveStoreInfo } from '../utils/clickhouse.ts'
 import { countries } from '../utils/gplay_categ.ts'
 
 export const app = new Hono()
@@ -61,22 +61,16 @@ async function findLang(appId: string) {
 async function getInfo(c: Context, appId: string) {
   try {
     // console.log('getInfo', appId)
-    const { data } = await supabaseAdmin(c)
-      .from('store_apps')
-      .select()
-      .eq('app_id', appId)
-      .single()
+    const data = await getStoreAppById(c, appId)
 
     const res = (!data || !data.lang) ? await findLang(appId) : await getAppInfo(appId, data.lang)
     if (!res) {
       console.error('no lang found', appId)
-      await supabaseAdmin(c)
-        .from('store_apps')
-        .upsert({
-          app_id: appId,
-          to_get_info: false,
-          error_get_info: 'no lang found',
-        })
+      await saveStoreInfo(c, [{
+        app_id: appId,
+        to_get_info: false,
+        error_get_info: 'no lang found',
+      }])
       return []
     }
     console.log('getInfo', appId, res)
@@ -84,15 +78,11 @@ async function getInfo(c: Context, appId: string) {
   }
   catch (e) {
     console.log('error getAppInfo', e)
-    const { error } = await supabaseAdmin(c)
-      .from('store_apps')
-      .upsert({
-        app_id: appId,
-        to_get_info: false,
-        error_get_info: JSON.stringify(e),
-      })
-    if (error)
-      console.log('error insert', error)
+    await saveStoreInfo(c, [{
+      app_id: appId,
+      to_get_info: false,
+      error_get_framework: JSON.stringify(e),
+    }])
   }
   return []
 }

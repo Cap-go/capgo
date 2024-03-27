@@ -80,11 +80,31 @@ export function updateOrCreateVersion(c: Context, update: Database['public']['Ta
     .eq('name', update.name)
 }
 
-export async function updateOnpremStats(c: Context, increment: Database['public']['Functions']['increment_store']['Args']) {
-  const { error } = await supabaseAdmin(c)
-    .rpc('increment_store', increment)
-  if (error)
-    console.error('increment_store', error)
+export async function getAppsFromSupabase(c: Context): Promise<string[]> {
+  const limit = 1000
+  let page = 0
+  let apps: string[] = []
+
+  while (true) {
+    const { data, error } = await supabaseAdmin(c)
+      .from('apps')
+      .select('app_id')
+      .range(page * limit, (page + 1) * limit - 1)
+
+    if (error) {
+      console.error('Error getting apps from Supabase', error)
+      break
+    }
+
+    if (data.length === 0) {
+      break
+    }
+
+    apps = [...apps, ...data.map((row) => row.app_id)]
+    page++
+  }
+
+  return apps
 }
 
 export function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
@@ -653,19 +673,6 @@ export function userToPerson(user: Database['public']['Tables']['users']['Row'],
     country: user.country ? user.country : undefined,
   }
   return person
-}
-
-export async function saveStoreInfo(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
-  // save in supabase
-  if (!apps.length)
-    return
-  const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
-  console.log('saveStoreInfo', noDup.length)
-  const { error } = await supabaseAdmin(c)
-    .from('store_apps')
-    .upsert(noDup)
-  if (error)
-    console.error('saveStoreInfo error', error)
 }
 
 export async function customerToSegment(c: Context, userId: string, price_id: string, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
