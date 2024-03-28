@@ -127,6 +127,7 @@ interface Statistics {
   rows_read: number
 }
 
+// eslint-disable-next-line unused-imports/no-unused-vars
 interface ApiActivityResponse {
   data: AppActivity[]
   meta: MetaInfo[]
@@ -152,6 +153,7 @@ export interface ApiActiveAppsResponse {
   statistics?: Statistics
 }
 
+// eslint-disable-next-line unused-imports/no-unused-vars
 function mauQuery(startDate: string, endDate: string, apps: string[]) {
   const startDateFormatted = new Date(startDate).toISOString().split('T')[0]
   const endDateFormatted = new Date(endDate).toISOString().split('T')[0]
