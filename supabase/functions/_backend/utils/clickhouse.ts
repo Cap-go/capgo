@@ -7,9 +7,11 @@ import { getAppsFromSupabase } from './supabase.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
+// eslint-disable-next-line unused-imports/no-unused-vars
 export function isClickHouseEnabled(c: Context) {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
-  return !!clickHouseURL(c)
+  // return !!clickHouseURL(c)
+  return false
 }
 function clickHouseURL(c: Context) {
   return getEnv(c, 'CLICKHOUSE_URL')
@@ -46,6 +48,8 @@ function createInsertQuery(tableName: string) {
 }
 
 async function sendClickHouse(c: Context, body: string, table: string) {
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve()
   try {
     console.log('sending to Clickhouse body', table, body)
     const searchParams = {
@@ -205,6 +209,8 @@ function convertDataWithMeta(data: any[], meta: MetaInfo[]) {
 }
 
 async function executeClickHouseQuery(c: Context, query: string, params: Record<string, any> = {}): Promise<ApiResponse> {
+  if (!isClickHouseEnabled(c))
+    return Promise.reject(new Error('Disabled clickhouse'))
   console.log('Sending to ClickHouse body', query)
 
   const searchParams = new URLSearchParams()
@@ -250,6 +256,8 @@ async function executeClickHouseQuery(c: Context, query: string, params: Record<
 }
 
 export async function getAppsToProcess(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
+  if (!isClickHouseEnabled(c))
+    return Promise.reject(new Error('Disabled clickhouse'))
   const query = `
     SELECT *
     FROM store_apps
@@ -265,6 +273,8 @@ export async function getAppsToProcess(c: Context, flag: 'to_get_framework' | 't
 }
 
 export async function getTopApps(c: Context, mode: string, limit: number) {
+  if (!isClickHouseEnabled(c))
+    return Promise.reject(new Error('Disabled clickhouse'))
   const query = `
     SELECT url, title, icon, summary, installs, category
     FROM store_apps
@@ -286,6 +296,8 @@ export async function getTopApps(c: Context, mode: string, limit: number) {
 }
 
 export async function getTotalAppsByMode(c: Context, mode: string) {
+  if (!isClickHouseEnabled(c))
+    return Promise.reject(new Error('Disabled clickhouse'))
   const query = `
     SELECT COUNT(*) AS total
     FROM store_apps
@@ -303,6 +315,8 @@ export async function getTotalAppsByMode(c: Context, mode: string) {
 }
 
 export async function getStoreAppById(c: Context, appId: string) {
+  if (!isClickHouseEnabled(c))
+    return Promise.reject(new Error('Disabled clickhouse'))
   const query = `
     SELECT *
     FROM store_apps
@@ -325,6 +339,8 @@ function prefixParams(params: Record<string, any>): Record<string, any> {
 }
 
 export async function saveStoreInfo(c: Context, app: Database['public']['Tables']['store_apps']['Insert']) {
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve()
   // Save a single app in ClickHouse
   const columns: (keyof Database['public']['Tables']['store_apps']['Insert'])[] = Object.keys({ updates: 0, ...app }) as (keyof Database['public']['Tables']['store_apps']['Insert'])[]
   const values = columns.map((column) => {
@@ -352,6 +368,8 @@ export async function saveStoreInfo(c: Context, app: Database['public']['Tables'
 }
 
 export async function bulkUpdateStoreApps(apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve()
   // Update a list of apps in ClickHouse (internal use only)
   if (!apps.length)
     return
@@ -389,6 +407,8 @@ export async function bulkUpdateStoreApps(apps: (Database['public']['Tables']['s
 export async function updateInClickHouse(c: Context, appId: string, updates: number) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve()
 
   const query = `
     INSERT INTO store_apps (app_id, updates)
@@ -406,6 +426,8 @@ export async function updateInClickHouse(c: Context, appId: string, updates: num
 }
 
 async function countUpdatesFromClickHouse(c: Context): Promise<number> {
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve(0)
   const query = `
     SELECT SUM(updates) + SUM(installs) AS count
     FROM store_apps
@@ -423,6 +445,8 @@ async function countUpdatesFromClickHouse(c: Context): Promise<number> {
 }
 
 async function countUpdatesFromLogs(c: Context): Promise<number> {
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve(0)
   const query = `
     SELECT COUNT(*) AS count
     FROM logs
@@ -440,6 +464,8 @@ async function countUpdatesFromLogs(c: Context): Promise<number> {
 }
 
 async function getAppsFromClickHouse(c: Context): Promise<string[]> {
+  if (!isClickHouseEnabled(c))
+    return []
   const query = `
     SELECT DISTINCT app_id
     FROM store_apps
@@ -562,33 +588,35 @@ export async function countFromClickHouse(c: Context, table: string, appId: stri
   }
 }
 
+// eslint-disable-next-line unused-imports/no-unused-vars
 export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
-  try {
-    const query = mauQuery(startDate, endDate, apps)
-    console.log('sending to Clickhouse body', query)
-    const searchParams = {
-      query,
-      http_write_exception_in_output_format: 1,
-    }
-    console.log('sending to Clickhouse searchParams', searchParams)
-    const response = await ky.post(clickHouseURL(c), {
-      searchParams,
-      headers: getHeaders(c),
-    })
-      .then(res => res.json<ApiActivityResponse>())
-    console.log('readMauFromClickHouse ok', response)
-    response.data = convertDataWithMeta(response.data, response.meta)
-    console.log('readMauFromClickHouse ok type', response)
-    return response
-  }
-  catch (e) {
-    console.log('readMauFromClickHouse error', e)
-    if (e.name === 'HTTPError') {
-      const errorJson = await e.response.json()
-      console.log('readMauFromClickHouse errorJson', errorJson)
-    }
-    return { data: null, meta: null, rows: 0, statistics: null }
-  }
+  return { data: null, meta: null, rows: 0, statistics: null }
+  // try {
+  //   const query = mauQuery(startDate, endDate, apps)
+  //   console.log('sending to Clickhouse body', query)
+  //   const searchParams = {
+  //     query,
+  //     http_write_exception_in_output_format: 1,
+  //   }
+  //   console.log('sending to Clickhouse searchParams', searchParams)
+  //   const response = await ky.post(clickHouseURL(c), {
+  //     searchParams,
+  //     headers: getHeaders(c),
+  //   })
+  //     .then(res => res.json<ApiActivityResponse>())
+  //   console.log('readMauFromClickHouse ok', response)
+  //   response.data = convertDataWithMeta(response.data, response.meta)
+  //   console.log('readMauFromClickHouse ok type', response)
+  //   return response
+  // }
+  // catch (e) {
+  //   console.log('readMauFromClickHouse error', e)
+  //   if (e.name === 'HTTPError') {
+  //     const errorJson = await e.response.json()
+  //     console.log('readMauFromClickHouse errorJson', errorJson)
+  //   }
+  //   return { data: null, meta: null, rows: 0, statistics: null }
+  // }
 }
 
 interface ClickHouseMeta {
