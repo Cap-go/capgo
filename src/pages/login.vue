@@ -73,6 +73,7 @@ async function submit(form: { email: string, password: string, code: string }) {
 
         mfaChallangeId.value = challenge.id
         stauts.value = '2fa'
+        isLoading.value = false
       }
       else {
         await nextLogin()
