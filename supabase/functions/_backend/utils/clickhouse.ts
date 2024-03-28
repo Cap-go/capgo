@@ -7,7 +7,6 @@ import { getAppsFromSupabase } from './supabase.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
-// eslint-disable-next-line unused-imports/no-unused-vars
 export function isClickHouseEnabled(c: Context) {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
   return !!clickHouseURL(c)
@@ -127,7 +126,6 @@ interface Statistics {
   rows_read: number
 }
 
-// eslint-disable-next-line unused-imports/no-unused-vars
 interface ApiActivityResponse {
   data: AppActivity[]
   meta: MetaInfo[]
@@ -153,7 +151,6 @@ export interface ApiActiveAppsResponse {
   statistics?: Statistics
 }
 
-// eslint-disable-next-line unused-imports/no-unused-vars
 function mauQuery(startDate: string, endDate: string, apps: string[]) {
   const startDateFormatted = new Date(startDate).toISOString().split('T')[0]
   const endDateFormatted = new Date(endDate).toISOString().split('T')[0]
@@ -590,7 +587,6 @@ export async function countFromClickHouse(c: Context, table: string, appId: stri
   }
 }
 
-// eslint-disable-next-line unused-imports/no-unused-vars
 export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
   if (!isClickHouseEnabled(c))
     return { data: null, meta: null, rows: 0, statistics: null }
