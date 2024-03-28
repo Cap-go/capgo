@@ -631,34 +631,8 @@ export async function createApiKey(c: Context, userId: string) {
   return Promise.resolve()
 }
 
-export async function createdefaultOrg(c: Context, userId: string, name = 'Default') {
-  // check if user has apikeys
-  const total = await supabaseAdmin(c)
-    .from('orgs')
-    .select('created_by', { count: 'exact', head: true })
-    .eq('created_by', userId)
-    .then(res => res.count || 0)
-
-  if (total === 0) {
-    // create apikeys
-    const { data, error } = await supabaseAdmin(c)
-      .from('orgs')
-      .insert(
-        {
-          created_by: userId,
-          logo: '',
-          name: `${name} organization`,
-        },
-      )
-      .select()
-      .single()
-      // create org_users admin from data.id
-    if (error)
-      console.error('createdefaultOrg error', error)
-
-    if (data)
-      return Promise.resolve()
-  }
+export async function createdefaultOrg(_c: Context, _userId: string, _name = 'Default') {
+  /// We no longer do that in the backend, we have a postgres trigger
   return Promise.resolve()
 }
 
