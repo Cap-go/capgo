@@ -10,8 +10,8 @@ export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices'
 // eslint-disable-next-line unused-imports/no-unused-vars
 export function isClickHouseEnabled(c: Context) {
   // console.log(!!clickHouseURL(), !!clickHouseUser(), !!clickHousePassword())
-  // return !!clickHouseURL(c)
-  return false
+  return !!clickHouseURL(c)
+  // return false
 }
 function clickHouseURL(c: Context) {
   return getEnv(c, 'CLICKHOUSE_URL')
@@ -592,33 +592,34 @@ export async function countFromClickHouse(c: Context, table: string, appId: stri
 
 // eslint-disable-next-line unused-imports/no-unused-vars
 export async function readMauFromClickHouse(c: Context, startDate: string, endDate: string, apps: string[]) {
-  return { data: null, meta: null, rows: 0, statistics: null }
-  // try {
-  //   const query = mauQuery(startDate, endDate, apps)
-  //   console.log('sending to Clickhouse body', query)
-  //   const searchParams = {
-  //     query,
-  //     http_write_exception_in_output_format: 1,
-  //   }
-  //   console.log('sending to Clickhouse searchParams', searchParams)
-  //   const response = await ky.post(clickHouseURL(c), {
-  //     searchParams,
-  //     headers: getHeaders(c),
-  //   })
-  //     .then(res => res.json<ApiActivityResponse>())
-  //   console.log('readMauFromClickHouse ok', response)
-  //   response.data = convertDataWithMeta(response.data, response.meta)
-  //   console.log('readMauFromClickHouse ok type', response)
-  //   return response
-  // }
-  // catch (e) {
-  //   console.log('readMauFromClickHouse error', e)
-  //   if (e.name === 'HTTPError') {
-  //     const errorJson = await e.response.json()
-  //     console.log('readMauFromClickHouse errorJson', errorJson)
-  //   }
-  //   return { data: null, meta: null, rows: 0, statistics: null }
-  // }
+  if (!isClickHouseEnabled(c))
+    return { data: null, meta: null, rows: 0, statistics: null }
+  try {
+    const query = mauQuery(startDate, endDate, apps)
+    console.log('sending to Clickhouse body', query)
+    const searchParams = {
+      query,
+      http_write_exception_in_output_format: 1,
+    }
+    console.log('sending to Clickhouse searchParams', searchParams)
+    const response = await ky.post(clickHouseURL(c), {
+      searchParams,
+      headers: getHeaders(c),
+    })
+      .then(res => res.json<ApiActivityResponse>())
+    console.log('readMauFromClickHouse ok', response)
+    response.data = convertDataWithMeta(response.data, response.meta)
+    console.log('readMauFromClickHouse ok type', response)
+    return response
+  }
+  catch (e) {
+    console.log('readMauFromClickHouse error', e)
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.log('readMauFromClickHouse errorJson', errorJson)
+    }
+    return { data: null, meta: null, rows: 0, statistics: null }
+  }
 }
 
 interface ClickHouseMeta {

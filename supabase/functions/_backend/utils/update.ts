@@ -38,7 +38,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getDrizzlePostgres(c: Context) {
-  const supaUrl = c.env.HYPERDRIVE ? c.env.HYPERDRIVE.connectionString : getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
+  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
+  // const supaUrl = c.env.HYPERDRIVE ? c.env.HYPERDRIVE.connectionString : getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
   console.log('getDrizzlePostgres', supaUrl)
 
   const pgClient = postgres(supaUrl)
