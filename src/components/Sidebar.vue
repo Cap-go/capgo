@@ -51,7 +51,7 @@ const tabs = ref<Tab[]>([
     key: '/app/home',
   },
   {
-    label: t('api-keys'),
+    label: `CLI ${t('api-keys')}`,
     icon: shallowRef(IconApiKey),
     key: '/dashboard/apikeys',
   },

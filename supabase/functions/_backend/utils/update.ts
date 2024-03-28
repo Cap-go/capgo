@@ -15,8 +15,8 @@ import { appIdToUrl } from './conversion.ts'
 
 import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
-import { sendStatsAndDevice } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
+import { sendStatsAndDevice } from './clickhouse.ts'
 
 // import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
 

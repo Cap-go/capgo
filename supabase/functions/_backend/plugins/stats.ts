@@ -165,7 +165,7 @@ async function post(c: Context, body: AppStats) {
           const oldDevice = res.data[0]
           const oldVersion = oldDevice.version
           if (oldVersion !== appVersion.id)
-            statsActions.push({ action: 'uninstall', versionId: oldVersion })
+            statsActions.push({ action: 'uninstall', versionId: oldVersion ?? undefined })
         }
       }
       else if (failActions.includes(action)) {
@@ -181,7 +181,7 @@ async function post(c: Context, body: AppStats) {
             channel: 'updates',
             event: 'update fail',
             icon: '⚠️',
-            user_id: appVersion.user_id,
+            user_id: appVersion.user_id ?? undefined,
             tags: {
               app_id,
               device_id,

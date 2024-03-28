@@ -208,23 +208,23 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
     <div class="mb-6 flex flex-row w-[66.666667%] ml-auto mr-auto">
       <!-- Title -->
       <h1 class="ml-2 text-2xl font-bold text-slate-800 md:text-3xl dark:text-white">
-        {{ t('api-keys') }}
+        CLI {{ t('api-keys') }}
       </h1>
-      <button class=" ml-auto mr-2" @click="addNewApiKey()">
+      <button class="ml-auto mr-2 " @click="addNewApiKey()">
         <Plus class="text-green-500" />
       </button>
     </div>
     <div class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800 overflow-hidden">
+      <div class="flex flex-col overflow-hidden overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
           <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true">
-            <button class="w-7 h-7 bg-transparent ml-auto" @click="regenrateKey(app)">
+            <button class="ml-auto bg-transparent w-7 h-7" @click="regenrateKey(app)">
               <Pencil class="mr-4 text-lg" />
             </button>
-            <button class="w-7 h-7 bg-transparent ml-auto" @click="copyKey(app)">
+            <button class="ml-auto bg-transparent w-7 h-7" @click="copyKey(app)">
               <Clipboard class="mr-4 text-lg" />
             </button>
-            <button class="w-7 h-7 bg-transparent ml-4" @click="deleteKey(app)">
+            <button class="ml-4 bg-transparent w-7 h-7" @click="deleteKey(app)">
               <Trash class="mr-4 text-lg text-red-600" />
             </button>
           </InfoRow>
