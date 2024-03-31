@@ -30,7 +30,7 @@
 
 <br>
 
-## Features (FORCE TEST)
+## Features (FORCE TEST 2)
 
 - ⚡️ Test webapp directly in your phone with native API
 
