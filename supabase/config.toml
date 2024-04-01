@@ -135,6 +135,9 @@ verify_jwt = false
 [functions.set_custom_id]
 verify_jwt = false
 
+[functions.partial_upload]
+verify_jwt = false
+
 # DEPRECATED TODO: to remove when all user got the latest CLI
 
 [functions.upload_link]

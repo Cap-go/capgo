@@ -7,7 +7,8 @@ import { getEnv } from './utils.ts'
 function initS3(c: Context, clientSideOnly?: boolean) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
-  const storageEndpoint = !clientSideOnly ? getEnv(c, 'S3_ENDPOINT') : getEnv(c, 'S3_ENDPOINT').replace('host.docker.internal', '127.0.0.1')
+  const toReplace = clientSideOnly && getEnv(c, 'S3_LOCAL_REPLACE') ? getEnv(c, 'S3_LOCAL_REPLACE') : '127.0.0.1'
+  const storageEndpoint = !clientSideOnly ? getEnv(c, 'S3_ENDPOINT') : getEnv(c, 'S3_ENDPOINT').replace('host.docker.internal', toReplace)
   const useSsl = getEnv(c, 'S3_SSL') !== 'false'
 
   const storageRegion = getEnv(c, 'S3_REGION')
