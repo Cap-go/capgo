@@ -72,11 +72,12 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
         role: 'admin',
         handler: () => permision = invite ? 'invite_admin' : 'admin',
       },
-      {
-        text: t('key-super-admin'),
-        role: 'super_admin',
-        handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
-      },
+      // TODO: Allow it back when billing is linked to organization instead of user
+      // {
+      //   text: t('key-super-admin'),
+      //   role: 'super_admin',
+      //   handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
+      // },
     ],
   }
   displayStore.showDialog = true
@@ -238,7 +239,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
 </script>
 
 <template>
-  <div class="h-full p-8 max-h-fit grow md:pb-0 overflow-hidden">
+  <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0">
     <div class="flex justify-between w-full">
       <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
         {{ t('members') }}
@@ -261,7 +262,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
                 <p>{{ 'N/A' }}</p>
               </div>
             </div>
-            <div id="user-email" class="mt-auto mb-auto ml-1/3 mr-1/3 text-center">
+            <div id="user-email" class="mt-auto mb-auto text-center ml-1/3 mr-1/3">
               {{ `${member.email} (${member.role.replaceAll('_', ' ')})` }}
             </div>
             <div class="mt-auto mb-auto mr-4">
