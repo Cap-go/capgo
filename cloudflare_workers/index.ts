@@ -51,6 +51,7 @@ const appFront = new Hono()
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
+app.route('/channels', channels) // TODO: deprecated remove when everyone use the new endpoint
 app.route('/channel', channels)
 app.route('/device', devices)
 
