@@ -51,7 +51,7 @@ const appFront = new Hono()
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
-app.route('/channels', channels)
+app.route('/channel', channels)
 app.route('/device', devices)
 
 // Plugin API
