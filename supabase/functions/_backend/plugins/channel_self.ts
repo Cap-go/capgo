@@ -163,7 +163,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       console.error('Channel does not permit self set', { dbError, dataChannel })
       return c.json({
         message: `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`,
-        error: 'channel_not_found',
+        error: 'channel_set_from_plugin_not_allowed',
       }, 400)
     }
 
