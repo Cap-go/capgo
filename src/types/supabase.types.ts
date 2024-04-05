@@ -1120,105 +1120,6 @@ export type Database = {
         }
         Relationships: []
       }
-      store_apps: {
-        Row: {
-          app_id: string
-          capacitor: boolean
-          capgo: boolean
-          category: string
-          cordova: boolean
-          created_at: string | null
-          developer: string
-          developer_email: string
-          developer_id: string | null
-          error_get_framework: string
-          error_get_info: string
-          error_get_similar: string
-          flutter: boolean
-          free: boolean
-          icon: string
-          installs: number
-          kotlin: boolean
-          lang: string | null
-          native_script: boolean
-          onprem: boolean
-          react_native: boolean
-          score: number
-          summary: string
-          title: string
-          to_get_framework: boolean
-          to_get_info: boolean
-          to_get_similar: boolean
-          updated_at: string
-          updates: number
-          url: string
-        }
-        Insert: {
-          app_id: string
-          capacitor?: boolean
-          capgo?: boolean
-          category?: string
-          cordova?: boolean
-          created_at?: string | null
-          developer?: string
-          developer_email?: string
-          developer_id?: string | null
-          error_get_framework?: string
-          error_get_info?: string
-          error_get_similar?: string
-          flutter?: boolean
-          free?: boolean
-          icon?: string
-          installs?: number
-          kotlin?: boolean
-          lang?: string | null
-          native_script?: boolean
-          onprem?: boolean
-          react_native?: boolean
-          score?: number
-          summary?: string
-          title?: string
-          to_get_framework?: boolean
-          to_get_info?: boolean
-          to_get_similar?: boolean
-          updated_at?: string
-          updates?: number
-          url?: string
-        }
-        Update: {
-          app_id?: string
-          capacitor?: boolean
-          capgo?: boolean
-          category?: string
-          cordova?: boolean
-          created_at?: string | null
-          developer?: string
-          developer_email?: string
-          developer_id?: string | null
-          error_get_framework?: string
-          error_get_info?: string
-          error_get_similar?: string
-          flutter?: boolean
-          free?: boolean
-          icon?: string
-          installs?: number
-          kotlin?: boolean
-          lang?: string | null
-          native_script?: boolean
-          onprem?: boolean
-          react_native?: boolean
-          score?: number
-          summary?: string
-          title?: string
-          to_get_framework?: boolean
-          to_get_info?: boolean
-          to_get_similar?: boolean
-          updated_at?: string
-          updates?: number
-          url?: string
-        }
-        Relationships: []
-      }
       stripe_info: {
         Row: {
           created_at: string
@@ -1429,10 +1330,6 @@ export type Database = {
         }
         Returns: number
       }
-      count_all_apps: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       count_all_need_upgrade: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -1460,10 +1357,6 @@ export type Database = {
         }[]
       }
       count_all_trial: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      count_all_updates: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
@@ -1885,13 +1778,6 @@ export type Database = {
           body: Json
         }
         Returns: number
-      }
-      increment_store: {
-        Args: {
-          app_id: string
-          updates: number
-        }
-        Returns: undefined
       }
       invite_user_to_org: {
         Args: {
