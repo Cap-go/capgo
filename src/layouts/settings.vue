@@ -72,8 +72,8 @@ watch(type, (val) => {
 })
 
 watchEffect(() => {
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && !tabs.value.find(tab => tab.label === 'plans')) {
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin', 'admin'])
+    && !organizationTabs.value.find(tab => tab.label === 'plans')) {
     organizationTabs.value.push(
       {
         label: 'plans',
@@ -82,11 +82,11 @@ watchEffect(() => {
       },
     )
   }
-  else {
+  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin', 'admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
   }
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
     && !organizationTabs.value.find(tab => tab.label === 'billing')) {
     organizationTabs.value.push({
       label: 'billing',
@@ -95,7 +95,7 @@ watchEffect(() => {
       onClick: openPortal,
     })
   }
-  else {
+  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin', 'admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
   // if (!Capacitor.isNativePlatform()

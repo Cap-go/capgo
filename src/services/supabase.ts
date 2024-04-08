@@ -293,6 +293,10 @@ export async function isPaying(userid?: string): Promise<boolean> {
   return data || false
 }
 
+export function getBuiltinPlans(): Database['public']['Tables']['plans']['Row'][] {
+  return JSON.parse(import.meta.env.payment_plans)
+}
+
 export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
   const { data: plans } = await useSupabase()
     .from('plans')
@@ -314,19 +318,19 @@ export async function isAllowedAction(userid?: string): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(userid?: string): Promise<number> {
-  if (!userid)
+export async function getPlanUsagePercent(orgId?: string): Promise<number> {
+  if (!orgId)
     return 0
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent', { userid })
+    .rpc('get_plan_usage_percent_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
   return data || 0
 }
 
-export async function getTotalStats(userid?: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
-  if (!userid) {
+export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
+  if (!orgId) {
     return {
       mau: 0,
       bandwidth: 0,
@@ -334,13 +338,13 @@ export async function getTotalStats(userid?: string): Promise<Database['public']
     }
   }
   const { data, error } = await useSupabase()
-    .rpc('get_total_stats_v5', { userid })
+    .rpc('get_total_stats_v5_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
   // console.log('getTotalStats', data, error)
 
-  return data as any as Database['public']['Functions']['get_total_stats_v5']['Returns'][0] || {
+  return data as any as Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0] || {
     mau: 0,
     bandwidth: 0,
     storage: 0,
@@ -352,6 +356,18 @@ export async function getCurrentPlanName(userid?: string): Promise<string> {
     return 'Free'
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name', { userid })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || 'Free'
+}
+
+export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
+  if (!orgId)
+    return 'Free'
+  const { data, error } = await useSupabase()
+    .rpc('get_current_plan_name_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)

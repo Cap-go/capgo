@@ -55,7 +55,7 @@ export async function openPortal() {
   return null
 }
 
-export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) {
+export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
 //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
@@ -70,6 +70,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         successUrl,
         cancelUrl,
         reccurence: isYear ? 'year' : 'month',
+        orgId
       }),
     })
     displayStore.showLoader = false

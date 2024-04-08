@@ -6,7 +6,7 @@ import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v4']['Returns']>
+export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v5']['Returns']>
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
@@ -32,6 +32,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
   const _initialLoadPromise = ref(Promise.withResolvers())
+  const _initialized = ref(false)
 
   const organizations: ComputedRef<Organization[]> = computed(
     () => {
@@ -165,9 +166,23 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!userId)
       return
 
+    if (!_initialized.value) {
+      const listner = supabase.auth.onAuthStateChange((event: any) => {
+        if (event === 'SIGNED_OUT') {
+          listner.data.subscription.unsubscribe()
+          // Remove all from orgs
+          _organizations.value = new Map()
+          _organizationsByAppId.value = new Map()
+          _initialLoadPromise.value = Promise.withResolvers()
+          currentOrganization.value = undefined
+          currentRole.value = null
+        }
+      })
+    }
+
     // We have RLS that ensure that we only selct rows where we are member or owner
     const { data, error } = await supabase
-      .rpc('get_orgs_v4')
+      .rpc('get_orgs_v5')
 
     if (error)
       throw error

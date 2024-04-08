@@ -12,6 +12,12 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
   return { url: session.url }
 }
 
+export async function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
+  return getStripe(c).customers.update(customerId, 
+    { email: newEmail, name: newEmail, metadata: { email: newEmail } }
+  )
+}
+
 async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []

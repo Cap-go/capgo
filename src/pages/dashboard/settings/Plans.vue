@@ -2,26 +2,28 @@
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
 import { Capacitor } from '@capacitor/core'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getBuiltinPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
+import { storeToRefs } from 'pinia'
+import test from './particles.json'
 
 function openSupport() {
   openMessenger()
 }
 
 const { t } = useI18n()
-const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
+const plans = ref<Database['public']['Tables']['plans']['Row'][]>(getBuiltinPlans())
 const displayPlans = computed(() => {
   return plans.value.filter(plan => plan.stripe_id !== 'free')
 })
+
 const stats = ref({
   mau: 0,
   storage: 0,
@@ -29,9 +31,10 @@ const stats = ref({
 } as Database['public']['Functions']['get_total_stats_v5']['Returns'][0])
 const planSuggest = ref('')
 const planCurrrent = ref('')
-const planPercent = ref(0)
+const planPercent = ref(-1)
 const snag = useLogSnag()
-const isLoading = ref(false)
+const isUsageLoading = ref(false)
+const thankYouPage = ref(false)
 const isSubscribeLoading = ref<Array<boolean>>([])
 const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
@@ -39,6 +42,8 @@ const route = useRoute()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isMobile = Capacitor.isNativePlatform()
+
+const { currentOrganization } = storeToRefs(organizationStore)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   const features = [
@@ -76,7 +81,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id)
-    await openCheckout(plan.stripe_id, window.location.href, window.location.href, plan.price_y !== plan.price_m ? isYearly.value : false)
+    await openCheckout(plan.stripe_id, window.location.href, window.location.href, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
   isSubscribeLoading.value[index] = false
 }
 
@@ -90,8 +95,9 @@ function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | '
   }
 }
 
+
 function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): boolean {
-  return plan.price_y !== plan.price_m && t === 'y'
+  return t === 'y'
 }
 
 // function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
@@ -100,27 +106,32 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 
 async function getUsages() {
   // get aapp_stats
-  if (!main.user?.id)
+  if (!currentOrganization?.value?.gid)
     return
-  stats.value = await getTotalStats(main.auth?.id)
+  stats.value = await getTotalStats(currentOrganization.value?.gid)
   await findBestPlan(stats.value).then(res => planSuggest.value = res)
 }
 
 async function loadData() {
-  isLoading.value = true
-  await getPlans().then((pls) => {
-    plans.value.length = 0
-    plans.value.push(...pls)
-  })
-  await getUsages()
-  await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
-  try {
-    await getPlanUsagePercent(main.auth?.id).then(res => planPercent.value = res)
-  }
-  catch (error) {
-    console.log(error)
-  }
-  isLoading.value = false
+  isUsageLoading.value = true
+
+  await organizationStore.awaitInitialLoad()
+
+  await Promise.all([
+    getPlans().then((pls) => {
+      const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
+      newPlans.push(...pls)
+      plans.value = newPlans
+    }),
+    getUsages(),
+    getCurrentPlanNameOrg(currentOrganization.value?.gid).then(res => {
+      planCurrrent.value = res
+    }),
+    getPlanUsagePercent(currentOrganization.value?.gid).then(res => {
+      planPercent.value = res
+    }).catch(err => console.log(err))
+  ])
+  isUsageLoading.value = false
 }
 
 watch(
@@ -129,19 +140,50 @@ watch(
     if (myPlan && !prevMyPlan) {
       loadData()
       // reGenerate annotations
-      isLoading.value = false
+      isUsageLoading.value = true
     }
     else if (prevMyPlan && !myPlan) {
-      isLoading.value = true
+      isUsageLoading.value = true
     }
   },
 )
+
+watch(currentOrganization, async () => {
+  if (isUsageLoading.value) {
+    return
+  }
+
+  isSubscribeLoading.value.fill(true, plans.value.length)
+  isUsageLoading.value = true
+  planCurrrent.value = ''
+  planPercent.value = -1
+  stats.value = {
+    mau: 0,
+    storage: 0,
+    bandwidth: 0,
+  }
+
+  await Promise.all([
+    getUsages(),
+    getCurrentPlanNameOrg(currentOrganization.value?.gid).then(res => {
+      planCurrrent.value = res
+    }),
+    getPlanUsagePercent(currentOrganization.value?.gid).then(res => {
+      planPercent.value = res
+    }).catch(err => console.log(err))
+  ])
+  isUsageLoading.value = false
+
+  isUsageLoading.value = false
+  isSubscribeLoading.value.fill(false, plans.value.length)
+})
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
-      toast.success(t('usage-success'))
+      // toast.success(t('usage-success'))
+      thankYouPage.value = true
     }
     else if (main.user?.id) {
       loadData()
@@ -156,7 +198,7 @@ watchEffect(async () => {
   }
 })
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
-  return (currentPlan.value?.name === plan.name && main.paying) || isMobile
+  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying) || isMobile
 }
 
 const hightLights = computed<Stat[]>(() => ([
@@ -166,7 +208,7 @@ const hightLights = computed<Stat[]>(() => ([
   },
   {
     label: t('usage'),
-    value: `${planPercent.value.toLocaleString()} %`,
+    value: planPercent.value > -1 ? `${planPercent.value.toLocaleString()}%` : undefined,
   },
   {
     label: t('best-plan'),
@@ -176,7 +218,7 @@ const hightLights = computed<Stat[]>(() => ([
 </script>
 
 <template>
-  <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
+  <div v-if="!thankYouPage" class="h-full bg-white max-h-fit dark:bg-gray-800">
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
@@ -227,7 +269,7 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </div>
       <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="(p, index) in displayPlans" :key="p.id" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+        <div v-for="(p, index) in displayPlans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -249,7 +291,9 @@ const hightLights = computed<Stat[]>(() => ([
               {{ t(convertKey(p.description)) }}
             </p>
             <p class="mt-8">
-              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">${{ getPrice(p, segmentVal) }}</span>
+              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">
+                ${{ getPrice(p, segmentVal) }}
+              </span>
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
             <button
@@ -272,7 +316,7 @@ const hightLights = computed<Stat[]>(() => ([
               {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-8">
-              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} ${{ p.price_y }}</span>
+              <span class="text-gray-900 dark:text-white">{{ p.price_m !== p.price_y ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ p.price_y }}</span>
             </p>
           </div>
           <div class="px-6 pt-6 pb-8">
@@ -425,6 +469,20 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </section>
     </div>
+  </div>
+  <div v-else class=" w-full overflow-hidden relative">
+      <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
+        <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+        {{ t('thank-you-for-sub') }}
+        <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
+        <router-link class="mt-[40vh]" to="/app/home">
+          <span class="text-blue-600 text-xl">{{ t('use-capgo') }} 🚀</span>
+        </router-link>
+      </div>
+      <vue-particles class="h-full w-full absolute z-0"
+            id="tsparticles"
+            :options="test"
+        />
   </div>
 </template>
 

@@ -71,6 +71,7 @@ base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billed-annually-at: Billed annually at
+billed-monthly-at: Billed monthly at
 billing: Billing
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
@@ -194,6 +195,7 @@ enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
+error: Error
 external-storage: External storage
 fail: Install failed
 failed: Failed
@@ -278,6 +280,7 @@ minor: Minor
 misconfigured: Misconfigured
 misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
 mo: mo
+modify-org-info: You can modify the organization's informations here.
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -310,7 +313,10 @@ open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
 org-changes-saved: Organization updated successfully
+org-changes-set-email-not-unique: The management email is not unique, please select a different one
+org-changes-set-email-other-error: Cannot set the management email, please contant support
 org-invited-user: Successfully invited user to org
+organization-email: Organization's management email
 organization-name: Organization Name
 os-version: OS version
 pages: Pages
@@ -411,6 +417,7 @@ terms-of-use: Terms of Use
 test-your-update-in-: Test your update in your app
 tests: tests
 thank-you-for-choosi: Thank you for choosing Capgo !
+thank-you-for-sub: Thank You for subscribing to Capgo
 the: The
 this-page-will-self-: This page will self refresh
 title: title
@@ -441,6 +448,7 @@ url: URL
 usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-title: Total
+use-capgo: Use Capgo
 use-the-command: 'Use the command:'
 used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate

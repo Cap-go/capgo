@@ -147,11 +147,28 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
     .rpc('has_app_right_userid', { appid: appId, right, userid })
 
   if (error) {
-    console.error(error)
+    console.error('has_app_right_userid error', error)
     return false
   }
 
   return data
+}
+
+export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
+  const userRight = await supabaseAdmin(c).rpc("check_min_rights", {
+    min_right: 'super_admin',
+    org_id: orgId,
+    user_id: userId,
+    channel_id: null as any,
+    app_id: null as any,
+  })
+
+  if (userRight.error || userRight.data) {
+    console.error('check_min_rights (hasOrgRight) error', userRight.error)
+    return false
+  }
+
+  return userRight.data
 }
 
 export async function getCurrentPlanName(c: Context, userId: string): Promise<string> {
@@ -402,7 +419,7 @@ export async function getSDashboardV2(c: Context, auth: string, orgId: string, s
   console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let client = supabaseClient(c, auth)
-  const userId = (await client.auth.getUser()).data.user?.id
+  // const userId = (await client.auth.getUser()).data.user?.id
   if (!auth)
     client = supabaseAdmin(c)
 
@@ -421,11 +438,11 @@ export async function getSDashboardV2(c: Context, auth: string, orgId: string, s
     appIds.push(appId)
   }
   else {
-    console.log('getSDashboard V2 get apps', userId)
-    if (!userId)
+    console.log('getSDashboard V2 get apps', orgId)
+    if (!orgId)
       return []
     // get all user apps id
-    console.log('userId', userId)
+    console.log('orgId', orgId)
     const resAppIds = await client
       .from('apps')
       .select('app_id')
