@@ -42,11 +42,11 @@ import { app as on_version_update } from '../supabase/functions/_backend/trigger
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
+import { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
 
-
-const app = new Hono()
-const appTriggers = new Hono()
-const appFront = new Hono()
+const app = new Hono<{ Bindings: Bindings }>()
+const appTriggers = new Hono<{ Bindings: Bindings }>()
+const appFront = new Hono<{ Bindings: Bindings }>()
 
 // Public API
 app.route('/ok', ok)

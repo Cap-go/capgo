@@ -11,7 +11,7 @@ interface ChannelSet {
   version?: string
   public?: boolean
   disableAutoUpdateUnderNative?: boolean
-  disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
+  disableAutoUpdate?: Database['public']['Enums']['disable_update']
   ios?: boolean
   android?: boolean
   allow_device_self_set?: boolean
