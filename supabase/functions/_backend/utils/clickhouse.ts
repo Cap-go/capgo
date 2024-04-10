@@ -677,8 +677,8 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   ]).catch((error) => {
     console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
   })
-  if (c.waitUntil)
-    return c.waitUntil(jobs)
+  if (c.executionCtx.waitUntil)
+    return c.executionCtx.waitUntil(jobs)
 
   return jobs
 }
