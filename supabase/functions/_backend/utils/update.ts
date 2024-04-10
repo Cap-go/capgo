@@ -17,6 +17,7 @@ import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 import { sendStatsAndDevice } from './clickhouse.ts'
+import { createStatsBandwidth, createStatsMau } from './cloudflare.ts'
 
 // import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
 
@@ -459,12 +460,6 @@ export async function update(c: Context, body: AppInfos) {
         error: 'no_bundle',
       }, 200)
     }
-    let signedURL = version.external_url || ''
-    if ((version.bucket_id || version.r2_path) && !version.external_url) {
-      const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
-      if (res)
-        signedURL = res
-    }
 
     // console.log('signedURL', device_id, signedURL, version_name, version.name)
     if (version_name === version.name) {
@@ -584,6 +579,15 @@ export async function update(c: Context, body: AppInfos) {
         }, 200)
       }
     }
+    let signedURL = version.external_url || ''
+    let fileSize = 0
+    if ((version.bucket_id || version.r2_path) && !version.external_url) {
+      const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
+      if (res) {
+        fileSize = res.size
+        signedURL = res.url
+      }
+    }
     //  check signedURL and if it's url
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
       console.log(id, 'Cannot get bundle signedURL', signedURL, app_id, new Date().toISOString())
@@ -594,6 +598,8 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
+    createStatsMau(c, device_id, app_id)
+    createStatsBandwidth(c, device_id, app_id, fileSize)
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
     return c.json(resToVersion(plugin_version, signedURL, version as any), 200)

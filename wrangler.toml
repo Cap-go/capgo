@@ -10,3 +10,11 @@ id = "0f1d77550db142fbb17cb6b3ee659a06"
 [[queues.producers]]
 binding = "QUEUE"
 queue = "capgo-prod"
+
+[[analytics_engine_datasets]]
+binding = "APP_USAGE"
+dataset = "app_usage"
+
+[[analytics_engine_datasets]]
+binding = "BANDWIDTH_USAGE"
+dataset = "bandwidth_usage"

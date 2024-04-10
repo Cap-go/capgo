@@ -749,3 +749,55 @@ export async function createStripeCustomer(c: Context, user: Database['public'][
   })
   console.log('stripe_info done')
 }
+
+export function trackBandwidthUsage(
+  c: Context,
+  deviceId: string,
+  appId: string,
+  fileSize: number,
+) {
+  return supabaseAdmin(c)
+    .from('bandwidth_usage')
+    .insert([
+      {
+        device_id: deviceId,
+        app_id: appId,
+        file_size: fileSize,
+      },
+    ])
+}
+
+export async function trackDeviceUsage(
+  c: Context,
+  deviceId: string,
+  appId: string,
+) {
+  await supabaseAdmin(c)
+    .from('devices_usage')
+    .insert([
+      {
+        device_id: deviceId,
+        app_id: appId,
+      },
+    ])
+}
+
+// export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
+//   const { data } = await supabaseAdmin(c)
+//     .from('devices_usage')
+//     .select()
+//     .eq('app_id', app_id)
+//     .gte('timestamp', period_start)
+//     .lte('timestamp', period_end)
+//   return data
+// }
+
+// export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
+//   const { data } = await supabaseAdmin(c)
+//     .from('bandwidth_usage')
+//     .select()
+//     .eq('app_id', app_id)
+//     .gte('timestamp', period_start)
+//     .lte('timestamp', period_end)
+//   return data
+// }

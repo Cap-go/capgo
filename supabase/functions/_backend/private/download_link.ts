@@ -53,10 +53,10 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'Error unknow' }, 500)
     }
 
-    const url = await getBundleUrl(c, ownerOrg, bundle)
-    if (!url)
+    const data = await getBundleUrl(c, ownerOrg, bundle)
+    if (!data)
       return c.json({ status: 'Error unknow' }, 500)
-    return c.json({ url })
+    return c.json({ url: data.url })
   }
   catch (e) {
     return c.json({ status: 'Cannot get download link', error: JSON.stringify(e) }, 500)
