@@ -19,13 +19,20 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: { buck
   if (!path)
     return null
 
-  const [signedUrl, { size: fileSize }] = await Promise.all([
-    s3.getSignedUrl(c, path, EXPIRATION_SECONDS),
-    s3.getSizeChecksum(c, path),
-  ])
-
-  url = signedUrl
-  size = fileSize ?? 0
-
-  return { url, size }
+  try {
+    const [signedUrl, { size: fileSize }] = await Promise.all([
+      s3.getSignedUrl(c, path, EXPIRATION_SECONDS),
+      s3.getSizeChecksum(c, path),
+    ])
+    console.log('getBundleUrl', signedUrl, fileSize)
+  
+    url = signedUrl
+    size = fileSize ?? 0
+  
+    return { url, size }
+  }
+  catch (error) {
+    console.error('getBundleUrl', error)
+  }
+  return null
 }

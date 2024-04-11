@@ -5,7 +5,7 @@ import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias as alias_postgres } from 'drizzle-orm/pg-core'
 import postgres from 'postgres'
-import { isAllowedAction, trackBandwidthUsage, trackDeviceUsage } from './supabase.ts'
+import { isAllowedAction } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
 import { sendNotif, sendNotifOrg } from './notifications.ts'
@@ -17,6 +17,7 @@ import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 import { sendStatsAndDevice } from './clickhouse.ts'
+import { createStatsBandwidth, createStatsMau } from './stats.ts';
 
 // import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
 
@@ -43,7 +44,7 @@ function getDrizzlePostgres(c: Context) {
   console.log('getDrizzlePostgres', supaUrl)
 
   const pgClient = postgres(supaUrl)
-  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient), pgClient }
+  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any), pgClient }
 }
 
 async function requestInfosPostgres(
@@ -597,8 +598,8 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    trackDeviceUsage(c, device_id, app_id)
-    trackBandwidthUsage(c, device_id, app_id, fileSize)
+    createStatsMau(c, device_id, app_id)
+    createStatsBandwidth(c, device_id, app_id, fileSize)
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
     return c.json(resToVersion(plugin_version, signedURL, version as any), 200)

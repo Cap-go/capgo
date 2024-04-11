@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import ky from 'ky'
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 
@@ -78,9 +79,11 @@ async function getSizeChecksum(c: Context, fileId: string) {
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
   })
-  const { ContentLength, Metadata } = await client.send(command)
-  const size = ContentLength
-  const checksum = Metadata ? Metadata['x-amz-meta-crc32'] : ''
+  const url = await getSignedUrlSDK(client, command)
+  const response = await ky.head(url)
+  const contentLength = response.headers.get('content-length')
+  const checksum = response.headers.get('x-amz-meta-crc32')
+  const size = contentLength ? parseInt(contentLength, 10) : 0
   return { size, checksum }
 }
 
