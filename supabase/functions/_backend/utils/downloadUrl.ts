@@ -25,10 +25,10 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: { buck
       s3.getSizeChecksum(c, path),
     ])
     console.log('getBundleUrl', signedUrl, fileSize)
-  
+
     url = signedUrl
     size = fileSize ?? 0
-  
+
     return { url, size }
   }
   catch (error) {

@@ -51,6 +51,7 @@ async function deleteObject(c: Context, fileId: string) {
 async function checkIfExist(c: Context, fileId: string) {
   const client = initS3(c)
   try {
+    // TODO: migrate to ky.head
     const command = new HeadObjectCommand({
       Bucket: getEnv(c, 'S3_BUCKET'),
       Key: fileId,
@@ -83,7 +84,7 @@ async function getSizeChecksum(c: Context, fileId: string) {
   const response = await ky.head(url)
   const contentLength = response.headers.get('content-length')
   const checksum = response.headers.get('x-amz-meta-crc32')
-  const size = contentLength ? parseInt(contentLength, 10) : 0
+  const size = contentLength ? Number.parseInt(contentLength, 10) : 0
   return { size, checksum }
 }
 

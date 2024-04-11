@@ -17,7 +17,7 @@ import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 import { sendStatsAndDevice } from './clickhouse.ts'
-import { createStatsBandwidth, createStatsMau } from './stats.ts';
+import { createStatsBandwidth, createStatsMau } from './stats.ts'
 
 // import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
 
