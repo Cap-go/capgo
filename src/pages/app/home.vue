@@ -21,6 +21,7 @@ const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const { currentOrganization } = storeToRefs(organizationStore)
 
 async function getMyApps() {
+  await organizationStore.awaitInitialLoad()
   const currentGid = organizationStore.currentOrganization?.gid
 
   if (!currentGid) {

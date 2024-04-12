@@ -38,7 +38,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     const LogSnag = logsnag(c)
     await Promise.all([
-      createStripeCustomer(c, record as any),
+      // createStripeCustomer(c, record as any),
       trackEvent(c, record.email, {
         first_name: record.first_name || '',
         last_name: record.last_name || '',

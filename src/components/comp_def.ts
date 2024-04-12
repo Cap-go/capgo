@@ -5,7 +5,7 @@ export type MobileColType = 'header' | 'title' | 'footer' | 'after' | 'none'
 
 export interface Stat {
   label: string | ComposerTranslation
-  value: string | number | Ref<number> | undefined
+  value: string | Ref<string> | number | Ref<number> | undefined
   link?: string
 }
 export interface TableSort {

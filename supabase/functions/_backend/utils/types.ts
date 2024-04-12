@@ -18,6 +18,7 @@ export interface AppInfos {
 }
 export interface AppStats extends AppInfos {
   action: string
+  old_version_name?: string
   version?: number
 }
 

@@ -25,7 +25,7 @@ export function openBlank(link: string) {
   else
     window.open(link, '_blank')
 }
-export async function openPortal() {
+export async function openPortal(orgId: string) {
 //   console.log('openPortal')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
@@ -35,7 +35,7 @@ export async function openPortal() {
   displayStore.showLoader = true
   try {
     const resp = await supabase.functions.invoke('private/stripe_portal', {
-      body: JSON.stringify({ callbackUrl: window.location.href }),
+      body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
     })
     console.error('stripe_portal', resp)
     displayStore.showLoader = false
@@ -55,7 +55,7 @@ export async function openPortal() {
   return null
 }
 
-export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean) {
+export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
 //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
@@ -70,6 +70,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         successUrl,
         cancelUrl,
         reccurence: isYear ? 'year' : 'month',
+        orgId
       }),
     })
     displayStore.showLoader = false

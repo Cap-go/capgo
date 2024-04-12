@@ -7,6 +7,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { pickPhoto, takePhoto } from '~/services/photos'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 
 const { t } = useI18n()
 
@@ -21,13 +22,16 @@ onMounted(async () => {
 })
 
 const { currentOrganization } = storeToRefs(organizationStore)
-const name = computed({
-  get: () => currentOrganization.value?.name ?? '',
-  set: (val) => {
-    if (currentOrganization.value)
-      currentOrganization.value.name = val
-  },
+const name = ref(currentOrganization.value?.name ?? '')
+const email = ref(currentOrganization.value?.management_email ?? '')
+
+watch(currentOrganization, (newOrg) => {
+  if (!!newOrg) {
+    name.value = newOrg.name
+    email.value = newOrg.management_email
+  }
 })
+
 async function presentActionSheet() {
   if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
@@ -76,6 +80,14 @@ async function saveChanges() {
     return
   }
 
+  const orgCopy = Object.assign({}, currentOrganization.value);
+
+  // Optimistic update
+  currentOrganization.value.name = name.value
+  currentOrganization.value.management_email = email.value
+  isLoading.value = true
+
+  // Update name only
   const { error } = await supabase
     .from('orgs')
     .update({ name: name.value })
@@ -84,10 +96,52 @@ async function saveChanges() {
   if (error) {
     // TODO: INFORM USER THAT HE IS NOT ORG OWNER
     console.log(`Cannot save changes: ${error}`)
+
+    // Revert the optimistic update
+    currentOrganization.value.name = orgCopy.name
+    isLoading.value = false
     return
   }
+  
+  let hasErrored = false
+  if (orgCopy.management_email != email.value) {
+    // The management emial has changed, call the edge function
+    console.log('Edge fn')
 
-  toast.success(t('org-changes-saved'))
+    const { error } = await supabase.functions.invoke("private/set_org_email", { 
+      body: {
+        emial: email.value,
+        org_id: orgCopy.gid
+      } 
+    })
+
+    if (error) {
+      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+        const json = await error.context.json()
+        if (json.status && typeof json.status === 'string') {
+          if (json.status === 'email_not_unique') {
+            toast.error(t('org-changes-set-email-not-unique'))
+          } else {
+            toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
+          } 
+        } else {
+          toast.error(t('org-changes-set-email-other-error'))
+        }
+      } else {
+        toast.error(t('org-changes-set-email-other-error'))
+      }
+
+      // Revert the optimistic update
+      currentOrganization.value.management_email = orgCopy.management_email
+      hasErrored = true
+    }
+
+    console.log(error)
+  }
+
+  isLoading.value = false
+  if (!hasErrored)
+    toast.success(t('org-changes-saved'))
 }
 
 function onInputClick(event: MouseEvent) {
@@ -100,13 +154,13 @@ function onInputClick(event: MouseEvent) {
 const acronym = computed(() => {
   let res = 'N/A'
   // use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
-  if (currentOrganization.value?.name) {
-    const words = currentOrganization.value.name.split(' ')
-    if (words.length > 1)
-      res = words[0][0] + words[1][0]
-    else
-      res = words[0].slice(0, 2)
-  }
+  // if (currentOrganization.value?.name) {
+  //   const words = currentOrganization.value.name.split(' ')
+  //   if (words.length > 1)
+  //     res = words[0][0] + words[1][0]
+  //   else
+  //     res = words[0].slice(0, 2)
+  // }
   return res.toUpperCase()
 })
 
@@ -125,7 +179,7 @@ function onInputKeyDown(event: Event) {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="currentOrganization?.logo"
+                v-if="!!currentOrganization?.logo"
                 id="org-avatar" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
                 width="80" height="80" alt="User upload"
               >
@@ -141,10 +195,14 @@ function onInputKeyDown(event: Event) {
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
           {{ t('general-information') }}
         </h2>
-        <div>{{ 'You can modify the organization\'s informations here.' }}</div>
-        <div class="mb-6">
+        <div>{{ t('modify-org-info') }}</div>
+        <div class="mb-6 mt-3">
           <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-name') }}</label>
           <input id="base-input" v-model="name " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
+        </div>
+        <div class="mb-6 mt-3">
+          <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-email') }}</label>
+          <input id="base-input" v-model="email " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
         </div>
       </div>
       <footer style="margin-top: auto">
@@ -164,7 +222,7 @@ function onInputKeyDown(event: Event) {
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('save-changes') }}
               </span>
-              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+              <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>
           </div>
         </div>

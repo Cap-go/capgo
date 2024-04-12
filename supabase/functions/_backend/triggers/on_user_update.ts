@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
-import { createApiKey, createStripeCustomer } from '../utils/supabase.ts'
+import { createApiKey } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { checkPlan } from '../utils/plans.ts'
 import { updateCustomer } from '../utils/stripe.ts'
@@ -32,10 +32,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     }
     await createApiKey(c, record.id)
-    if (!record.customer_id)
-      await createStripeCustomer(c, record as any)
-    else
-      await updateCustomer(c, record.customer_id, record.email, record.billing_email, record.id, `${record.first_name || ''} ${record.last_name || ''}`)
+     // else
+      //await updateCustomer(c, record.customer_id, record.email, record.billing_email, record.id, `${record.first_name || ''} ${record.last_name || ''}`)
       // TODO: send emailing to customer to tell them that their billing will change and set auto email to the new ones.
       // const now = new Date()
       // // check if we are the 5 day of the month
@@ -45,7 +43,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       //     await setBillingPeriod(customer.subscription_id)
       // }
 
-    await checkPlan(c, record.id)
+    // await checkPlan(c, record.id)
     return c.json(BRES)
   }
   catch (e) {

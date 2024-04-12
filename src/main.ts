@@ -1,6 +1,9 @@
 // register vue composition api globally
 import { createApp } from 'vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import Particles from "@tsparticles/vue3";
+import { loadSlim } from "@tsparticles/slim";
+import { loadFull } from "tsparticles";
 
 // Cannot use official router here because of the IonTab hack
 import { createRouter, createWebHistory } from 'vue-router/auto'
@@ -26,6 +29,11 @@ app.use(plugin, defaultConfig({
     classes: generateClasses(formkit),
   },
 }))
+app.use(Particles, {
+  init: async (engine) => {
+    await loadFull(engine)
+  }
+})
 CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts

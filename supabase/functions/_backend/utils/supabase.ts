@@ -147,11 +147,30 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
     .rpc('has_app_right_userid', { appid: appId, right, userid })
 
   if (error) {
-    console.error(error)
+    console.error('has_app_right_userid error', error)
     return false
   }
 
   return data
+}
+
+export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
+  const userRight = await supabaseAdmin(c).rpc("check_min_rights", {
+    min_right: right,
+    org_id: orgId,
+    user_id: userId,
+    channel_id: null as any,
+    app_id: null as any,
+  })
+
+  console.log(userRight)
+
+  if (userRight.error || !userRight.data) {
+    console.error('check_min_rights (hasOrgRight) error', userRight.error)
+    return false
+  }
+
+  return userRight.data
 }
 
 export async function getCurrentPlanName(c: Context, userId: string): Promise<string> {
@@ -180,30 +199,30 @@ export async function getPlanUsagePercent(c: Context, userId: string): Promise<n
   return data || 0
 }
 
-export async function isGoodPlan(c: Context, userId: string): Promise<boolean> {
+export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_good_plan_v5', { userid: userId })
+      .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()
       .throwOnError()
     return data || false
   }
   catch (error) {
-    console.error('isGoodPlan error', userId, error)
+    console.error('isGoodPlan error', orgId, error)
   }
   return false
 }
 
-export async function isOnboarded(c: Context, userId: string): Promise<boolean> {
+export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_onboarded', { userid: userId })
+      .rpc('is_onboarded_org', { orgid: orgId })
       .single()
       .throwOnError()
     return data || false
   }
   catch (error) {
-    console.error('isOnboarded error', userId, error)
+    console.error('isOnboarded error', orgId, error)
   }
   return false
 }
@@ -236,44 +255,44 @@ export async function isOnboardingNeeded(c: Context, userId: string): Promise<bo
   return false
 }
 
-export async function isCanceled(c: Context, userId: string): Promise<boolean> {
+export async function isCanceledOrg(c: Context, orgId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_canceled', { userid: userId })
+      .rpc('is_canceled_org', { orgid: orgId })
       .single()
       .throwOnError()
     return data || false
   }
   catch (error) {
-    console.error('isCanceled error', userId, error)
+    console.error('isCanceled error', orgId, error)
   }
   return false
 }
 
-export async function isPaying(c: Context, userId: string): Promise<boolean> {
+export async function isPayingOrg(c: Context, orgId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_paying', { userid: userId })
+      .rpc('is_paying_org', { orgid: orgId })
       .single()
       .throwOnError()
     return data || false
   }
   catch (error) {
-    console.error('isPaying error', userId, error)
+    console.error('isPayingOrg error', orgId, error)
   }
   return false
 }
 
-export async function isTrial(c: Context, userId: string): Promise<number> {
+export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_trial', { userid: userId })
+      .rpc('is_trial_org', { orgid: orgId })
       .single()
       .throwOnError()
     return data || 0
   }
   catch (error) {
-    console.error('isTrial error', userId, error)
+    console.error('isTrialOrg error', orgId, error)
   }
   return 0
 }
@@ -288,16 +307,16 @@ export async function isAdmin(c: Context, userId: string): Promise<boolean> {
   return data || false
 }
 
-export async function isAllowedAction(c: Context, userId: string): Promise<boolean> {
+export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_allowed_action_user', { userid: userId })
+      .rpc('is_allowed_action_org', { orgid: orgId })
       .single()
       .throwOnError()
     return data || false
   }
   catch (error) {
-    console.error('isAllowedAction error', userId, error)
+    console.error('isAllowedActionOrg error', orgId, error)
   }
   return false
 }
@@ -402,7 +421,7 @@ export async function getSDashboardV2(c: Context, auth: string, orgId: string, s
   console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
   let client = supabaseClient(c, auth)
-  const userId = (await client.auth.getUser()).data.user?.id
+  // const userId = (await client.auth.getUser()).data.user?.id
   if (!auth)
     client = supabaseAdmin(c)
 
@@ -421,11 +440,11 @@ export async function getSDashboardV2(c: Context, auth: string, orgId: string, s
     appIds.push(appId)
   }
   else {
-    console.log('getSDashboard V2 get apps', userId)
-    if (!userId)
+    console.log('getSDashboard V2 get apps', orgId)
+    if (!orgId)
       return []
     // get all user apps id
-    console.log('userId', userId)
+    console.log('orgId', orgId)
     const resAppIds = await client
       .from('apps')
       .select('app_id')
@@ -648,10 +667,10 @@ export function userToPerson(user: Database['public']['Tables']['users']['Row'],
   return person
 }
 
-export async function customerToSegment(c: Context, userId: string, price_id: string, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
+export async function customerToSegmentOrg(c: Context, orgId: string, price_id: string, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
   const segments: Segments = {
     capgo: true,
-    onboarded: await isOnboarded(c, userId),
+    onboarded: await isOnboardedOrg(c, orgId),
     trial: false,
     trial7: false,
     trial1: false,
@@ -660,12 +679,12 @@ export async function customerToSegment(c: Context, userId: string, price_id: st
     payingMonthly: plan?.price_m_id === price_id,
     plan: plan?.name ?? '',
     overuse: false,
-    canceled: await isCanceled(c, userId),
+    canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,
   }
-  const trialDaysLeft = await isTrial(c, userId)
-  const paying = await isPaying(c, userId)
-  const canUseMore = await isGoodPlan(c, userId)
+  const trialDaysLeft = await isTrialOrg(c, orgId)
+  const paying = await isPayingOrg(c, orgId)
+  const canUseMore = await isGoodPlanOrg(c, orgId)
 
   if (!segments.onboarded)
     return segments
@@ -708,8 +727,8 @@ export async function getStripeCustomer(c: Context, customerId: string) {
   return stripeInfo
 }
 
-export async function createStripeCustomer(c: Context, user: Database['public']['Tables']['users']['Row']) {
-  const customer = await createCustomer(c, user.email, user.id, `${user.first_name || ''} ${user.last_name || ''}`)
+export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
+  const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
@@ -723,28 +742,28 @@ export async function createStripeCustomer(c: Context, user: Database['public'][
     console.log('createInfoError', createInfoError)
 
   const { error: updateUserError } = await supabaseAdmin(c)
-    .from('users')
+    .from('orgs')
     .update({
       customer_id: customer.id,
     })
-    .eq('id', user.id)
+    .eq('id', org.id)
   if (updateUserError)
     console.log('updateUserError', updateUserError)
   const person: Person = {
-    id: user.id,
+    id: org.id,
     customer_id: customer.id,
     product_id: 'free',
-    nickname: `${user.first_name} ${user.last_name}`,
-    avatar: user.image_url ? user.image_url : undefined,
-    country: user.country ? user.country : undefined,
+    nickname: org.name,
+    avatar: org.logo ? org.logo : undefined,
+    // country: user.country ? user.country : undefined,
   }
   const { data: plan } = await supabaseAdmin(c)
     .from('plans')
     .select()
     .eq('stripe_id', customer.id)
     .single()
-  const segment = await customerToSegment(c, user.id, 'free', plan)
-  await addDataContact(c, user.email, { ...person, ...segment }).catch((e) => {
+  const segment = await customerToSegmentOrg(c, org.id, 'free', plan)
+  await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })
   console.log('stripe_info done')
