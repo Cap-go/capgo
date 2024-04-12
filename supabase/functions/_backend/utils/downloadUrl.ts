@@ -16,13 +16,14 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: { buck
   else if (version.storage_provider === 'r2' && version.bucket_id && version.bucket_id?.endsWith('.zip'))
     path = `apps/${ownerOrg}/${version.app_id}/versions/${version.bucket_id}`
 
+  console.log(path)
   if (!path)
     return null
 
   try {
     const [signedUrl, { size: fileSize }] = await Promise.all([
       s3.getSignedUrl(c, path, EXPIRATION_SECONDS),
-      s3.getSizeChecksum(c, path),
+      Promise.resolve({ size: 0 }) //s3.getSizeChecksum(c, path),
     ])
     console.log('getBundleUrl', signedUrl, fileSize)
 

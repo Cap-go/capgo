@@ -2,7 +2,7 @@ import { bigint, boolean, doublePrecision, pgEnum, pgTable, text, timestamp, uui
 
 // do_not_change
 
-export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'version_number', 'none'])
+export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 
 export const apps = pgTable('apps', {
   created_at: timestamp('created_at').notNull().defaultNow(),

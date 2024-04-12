@@ -319,6 +319,7 @@ password-confirmatio: Password confirmation
 password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
+patch: Patch
 percent-fail: Fail percentage
 permission-changed: Successfully changed user permission
 personal-information: Personal Informations

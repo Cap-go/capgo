@@ -2069,7 +2069,7 @@ export type Database = {
     }
     Enums: {
       app_mode: "prod" | "dev" | "livereload"
-      disable_update: "major" | "minor" | "version_number" | "none"
+      disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
