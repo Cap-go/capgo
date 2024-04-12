@@ -769,9 +769,9 @@ export function trackBandwidthUsage(
 
 export function trackVersionUsage(
   c: Context,
-  versionId: number, 
+  versionId: number,
   appId: string,
-  action: string
+  action: string,
 ) {
   return supabaseAdmin(c)
     .from('version_usage')
@@ -779,7 +779,7 @@ export function trackVersionUsage(
       {
         version_id: versionId,
         app_id: appId,
-        action: action,
+        action,
       },
     ])
 }
