@@ -1,7 +1,7 @@
 import { isAdmin } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
-import { isAllowedAction, isCanceled, isGoodPlan, isPaying, isTrial, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import { setUser } from '~/services/chatwoot'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'

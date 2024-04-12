@@ -3,16 +3,16 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
+import { storeToRefs } from 'pinia'
+import test from './particles.json'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getBuiltinPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getBuiltinPlans, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
-import { storeToRefs } from 'pinia'
-import test from './particles.json'
 
 function openSupport() {
   openMessenger()
@@ -28,11 +28,11 @@ const displayStore = useDisplayStore()
 
 interface PlansOrgData {
   stats: Database['public']['Functions']['get_total_stats_v5']['Returns'][0] | undefined
-  planSuggest: string,
-  planCurrrent: string,
-  planPercent: number,
-  paying: boolean,
-  trialDaysLeft: number,
+  planSuggest: string
+  planCurrrent: string
+  planPercent: number
+  paying: boolean
+  trialDaysLeft: number
 }
 
 function defaultPlanOrgData(): PlansOrgData {
@@ -116,7 +116,6 @@ function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | '
   }
 }
 
-
 function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): boolean {
   return t === 'y'
 }
@@ -134,9 +133,9 @@ async function getUsages(orgId: string) {
 }
 
 async function loadData(initial: boolean) {
-  if (!initialLoad.value && !initial) {
+  if (!initialLoad.value && !initial)
     return
-  }
+
   await organizationStore.awaitInitialLoad()
 
   const orgToLoad = currentOrganization.value
@@ -151,21 +150,23 @@ async function loadData(initial: boolean) {
 
   await Promise.all([
     // Plans are not linked to orgs, keep them as is
-    !initial ? getPlans().then((pls) => {
-      const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
-      newPlans.push(...pls)
-      plans.value = newPlans
-    }) : Promise.resolve(),
-    getUsages(orgId).then(res => {
+    !initial
+      ? getPlans().then((pls) => {
+        const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
+        newPlans.push(...pls)
+        plans.value = newPlans
+      })
+      : Promise.resolve(),
+    getUsages(orgId).then((res) => {
       data.stats = res.stats
       data.planSuggest = res.bestPlan
       // updateData()
     }),
-    getCurrentPlanNameOrg(orgId).then(res => {
+    getCurrentPlanNameOrg(orgId).then((res) => {
       data.planCurrrent = res
       // updateData()
     }),
-    getPlanUsagePercent(orgId).then(res => {
+    getPlanUsagePercent(orgId).then((res) => {
       console.log(res)
       data.planPercent = res
       // updateData()
@@ -197,16 +198,15 @@ async function loadData(initial: boolean) {
 // )
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
-
   // isSubscribeLoading.value.fill(true, 0, plans.value.length)
 
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
     if (!initialLoad.value) {
       const orgsMap = organizationStore.getAllOrgs()
       const newOrg = [...orgsMap]
-      .map(([_, a]) => a)
-      .filter(org => org.role.includes('super_admin'))
-      .sort((a, b) => b.app_count - a.app_count)[0]
+        .map(([_, a]) => a)
+        .filter(org => org.role.includes('super_admin'))
+        .sort((a, b) => b.app_count - a.app_count)[0]
 
       if (newOrg) {
         organizationStore.setCurrentOrganization(newOrg.gid)
@@ -227,9 +227,8 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
     await displayStore.onDialogDismiss()
     if (!prevOrg)
       router.push('/app/home')
-    else {
+    else
       organizationStore.setCurrentOrganization(prevOrg.gid)
-    }
   }
 
   await loadData(false)
@@ -272,7 +271,7 @@ const hightLights = computed<Stat[]>(() => ([
   },
   {
     label: t('usage'),
-    value: (currentData.value?.planPercent !== undefined && currentData.value?.planPercent! > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
+    value: (currentData.value.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
   },
   {
     label: t('best-plan'),
@@ -535,18 +534,19 @@ const hightLights = computed<Stat[]>(() => ([
     </div>
   </div>
   <div v-else class="relative w-full overflow-hidden ">
-      <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
-        <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
-        {{ t('thank-you-for-sub') }}
-        <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
-        <router-link class="mt-[40vh]" to="/app/home">
-          <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
-        </router-link>
-      </div>
-      <vue-particles class="absolute z-0 w-full h-full"
-            id="tsparticles"
-            :options="test"
-        />
+    <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
+      <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+      {{ t('thank-you-for-sub') }}
+      <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
+      <router-link class="mt-[40vh]" to="/app/home">
+        <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
+      </router-link>
+    </div>
+    <vue-particles
+      id="tsparticles"
+      class="absolute z-0 w-full h-full"
+      :options="test"
+    />
   </div>
 </template>
 

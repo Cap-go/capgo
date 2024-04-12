@@ -21,7 +21,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
     const { error } = await supabaseAdmin(c)
       .from('notifications')
       .update({
-        orgId: orgId,
+        orgId,
         last_send_at: dayjs().toISOString(),
         total_send: past.total_send + 1,
       })

@@ -236,7 +236,7 @@ async function getAppOwnerPostgres(
         owner_org: schema.apps.owner_org,
         orgs: {
           created_by: schema.orgs.created_by,
-          id: schema.orgs.id
+          id: schema.orgs.id,
         },
       })
       .from(schema.apps)

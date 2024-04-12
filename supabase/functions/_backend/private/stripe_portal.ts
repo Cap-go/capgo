@@ -5,7 +5,7 @@ import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { createPortal } from '../utils/stripe.ts'
 
 interface PortalData {
-  callbackUrl: string,
+  callbackUrl: string
   orgId: string
 }
 

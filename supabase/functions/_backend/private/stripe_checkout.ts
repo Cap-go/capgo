@@ -10,7 +10,7 @@ interface PortalData {
   clientReferenceId?: string
   reccurence: 'month' | 'year'
   successUrl: string
-  cancelUrl: string,
+  cancelUrl: string
   orgId: string
 }
 
@@ -27,9 +27,8 @@ app.post('/', middlewareAuth, async (c: Context) => {
       authorization?.split('Bearer ')[1],
     )
 
-    if (!body.orgId) {
+    if (!body.orgId)
       return c.json({ status: 'No org_id provided' }, 400)
-    }
 
     if (error || !auth || !auth.user || !auth.user.id)
       return c.json({ status: 'not authorize' }, 400)
@@ -44,7 +43,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'not authorize' }, 400)
     if (!org.customer_id)
       return c.json({ status: 'no customer' }, 400)
-    
+
     if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 

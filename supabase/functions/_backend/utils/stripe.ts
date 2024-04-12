@@ -13,8 +13,7 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
 }
 
 export async function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
-  return getStripe(c).customers.update(customerId, 
-    { email: newEmail, name: newEmail, metadata: { email: newEmail } }
+  return getStripe(c).customers.update(customerId, { email: newEmail, name: newEmail, metadata: { email: newEmail } },
   )
 }
 

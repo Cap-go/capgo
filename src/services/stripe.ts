@@ -70,7 +70,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         successUrl,
         cancelUrl,
         reccurence: isYear ? 'year' : 'month',
-        orgId
+        orgId,
       }),
     })
     displayStore.showLoader = false

@@ -2,9 +2,8 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
-import { createStripeCustomer, supabaseAdmin } from '../utils/supabase.ts'
+import { createStripeCustomer } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sendMetaToClickHouse } from '../utils/clickhouse.ts'
 
 export const app = new Hono()
 
@@ -28,9 +27,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     }
 
-    if (!record.customer_id) {
+    if (!record.customer_id)
       createStripeCustomer(c, record as any)
-    }
 
     return c.json(BRES) // skip delete s3 and increment size in new upload
   }

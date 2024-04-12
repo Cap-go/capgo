@@ -3,12 +3,12 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
+import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 
 const bodySchema = z.object({
   emial: z.string().email(),
-  org_id: z.string().uuid()
+  org_id: z.string().uuid(),
 })
 
 export const app = new Hono()
@@ -64,16 +64,16 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (!organization || organizationError) {
       console.error('Cannot get org', organizationError)
       return c.json({ status: 'get_org_internal_error' }, 500)
-    }  
+    }
 
     if (!organization.customer_id) {
       console.error('Organization does not have a customer id', safeBody.org_id)
       return c.json({ status: 'org_does_not_have_customer' }, 400)
     }
-      
+
     const userId = clientData.data.user.id
-    
-    const userRight = await supabaseAdmin.rpc("check_min_rights", {
+
+    const userRight = await supabaseAdmin.rpc('check_min_rights', {
       min_right: 'super_admin',
       org_id: safeBody.org_id,
       user_id: userId,
@@ -94,7 +94,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     await updateCustomerEmail(c, organization.customer_id, safeBody.emial)
 
     // Update supabase
-    const { error: updateOrgErr } = await supabaseAdmin.from('orgs')  
+    const { error: updateOrgErr } = await supabaseAdmin.from('orgs')
       .update({ management_email: safeBody.emial })
       .eq('id', safeBody.org_id)
 

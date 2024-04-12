@@ -22,7 +22,7 @@ const refStats = toRef(() => props.stats)
         </p>
         <div v-else class="lg:order-1 lg:mt-3 flex justify-center">
           <Spinner size="w-10 h-10 ml-auto mr-auto" />
-        </div>        
+        </div>
         <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase font-pj lg:order-2 lg:mt-0">
           {{ s.label }}
         </h3>

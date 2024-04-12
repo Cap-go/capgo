@@ -3,11 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 
 const { t } = useI18n()
 
@@ -26,7 +26,7 @@ const name = ref(currentOrganization.value?.name ?? '')
 const email = ref(currentOrganization.value?.management_email ?? '')
 
 watch(currentOrganization, (newOrg) => {
-  if (!!newOrg) {
+  if (newOrg) {
     name.value = newOrg.name
     email.value = newOrg.management_email
   }
@@ -80,7 +80,7 @@ async function saveChanges() {
     return
   }
 
-  const orgCopy = Object.assign({}, currentOrganization.value);
+  const orgCopy = Object.assign({}, currentOrganization.value)
 
   // Optimistic update
   currentOrganization.value.name = name.value
@@ -102,32 +102,33 @@ async function saveChanges() {
     isLoading.value = false
     return
   }
-  
+
   let hasErrored = false
-  if (orgCopy.management_email != email.value) {
+  if (orgCopy.management_email !== email.value) {
     // The management emial has changed, call the edge function
     console.log('Edge fn')
 
-    const { error } = await supabase.functions.invoke("private/set_org_email", { 
+    const { error } = await supabase.functions.invoke('private/set_org_email', {
       body: {
         emial: email.value,
-        org_id: orgCopy.gid
-      } 
+        org_id: orgCopy.gid,
+      },
     })
 
     if (error) {
       if (error instanceof FunctionsHttpError && error.context instanceof Response) {
         const json = await error.context.json()
         if (json.status && typeof json.status === 'string') {
-          if (json.status === 'email_not_unique') {
+          if (json.status === 'email_not_unique')
             toast.error(t('org-changes-set-email-not-unique'))
-          } else {
+          else
             toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
-          } 
-        } else {
+        }
+        else {
           toast.error(t('org-changes-set-email-other-error'))
         }
-      } else {
+      }
+      else {
         toast.error(t('org-changes-set-email-other-error'))
       }
 
@@ -152,7 +153,7 @@ function onInputClick(event: MouseEvent) {
 }
 
 const acronym = computed(() => {
-  let res = 'N/A'
+  const res = 'N/A'
   // use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
   // if (currentOrganization.value?.name) {
   //   const words = currentOrganization.value.name.split(' ')
@@ -196,11 +197,11 @@ function onInputKeyDown(event: Event) {
           {{ t('general-information') }}
         </h2>
         <div>{{ t('modify-org-info') }}</div>
-        <div class="mb-6 mt-3">
+        <div class="mt-3 mb-6">
           <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-name') }}</label>
           <input id="base-input" v-model="name " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
         </div>
-        <div class="mb-6 mt-3">
+        <div class="mt-3 mb-6">
           <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-email') }}</label>
           <input id="base-input" v-model="email " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
         </div>
