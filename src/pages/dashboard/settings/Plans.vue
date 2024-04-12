@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getBuiltinPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getBuiltinPlans, getTotalStats, isPayingOrg } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
@@ -24,21 +24,39 @@ const displayPlans = computed(() => {
   return plans.value.filter(plan => plan.stripe_id !== 'free')
 })
 
-const stats = ref({
-  mau: 0,
-  storage: 0,
-  bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v5']['Returns'][0])
-const planSuggest = ref('')
-const planCurrrent = ref('')
-const planPercent = ref(-1)
+const displayStore = useDisplayStore()
+
+interface PlansOrgData {
+  stats: Database['public']['Functions']['get_total_stats_v5']['Returns'][0] | undefined
+  planSuggest: string,
+  planCurrrent: string,
+  planPercent: number,
+  paying: boolean,
+  trialDaysLeft: number,
+}
+
+function defaultPlanOrgData(): PlansOrgData {
+  return {
+    stats: undefined,
+    planCurrrent: '',
+    planPercent: -1,
+    planSuggest: '',
+    paying: false,
+    trialDaysLeft: 0,
+  }
+}
+
+const orgsHashmap = ref(new Map<string, PlansOrgData>())
+
 const snag = useLogSnag()
-const isUsageLoading = ref(false)
+// const isUsageLoading = ref(false)
+const initialLoad = ref(false)
 const thankYouPage = ref(false)
 const isSubscribeLoading = ref<Array<boolean>>([])
 const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
+const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isMobile = Capacitor.isNativePlatform()
@@ -74,8 +92,11 @@ function convertKey(key: string) {
     return `plan-${keySplit[1]}`
   return key
 }
-const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
-const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
+
+const currentData = computed(() => orgsHashmap.value.get(currentOrganization.value?.gid ?? ''))
+
+const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === currentData.value?.planSuggest))
+const currentPlan = computed(() => plans.value.find(plan => plan.name === currentData.value?.planCurrrent))
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // get the current url
@@ -104,78 +125,116 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 //   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 // }
 
-async function getUsages() {
+async function getUsages(orgId: string) {
   // get aapp_stats
-  if (!currentOrganization?.value?.gid)
-    return
-  stats.value = await getTotalStats(currentOrganization.value?.gid)
-  await findBestPlan(stats.value).then(res => planSuggest.value = res)
+
+  const stats = await getTotalStats(orgId)
+  const bestPlan = await findBestPlan(stats)
+  return { stats, bestPlan }
 }
 
-async function loadData() {
-  isUsageLoading.value = true
-
+async function loadData(initial: boolean) {
+  if (!initialLoad.value && !initial) {
+    return
+  }
   await organizationStore.awaitInitialLoad()
 
+  const orgToLoad = currentOrganization.value
+  const orgId = orgToLoad?.gid
+  if (!orgId)
+    throw new Error('Cannot get current org id')
+
+  if (orgsHashmap.value.has(orgId))
+    return
+
+  const data = defaultPlanOrgData()
+
   await Promise.all([
-    getPlans().then((pls) => {
+    // Plans are not linked to orgs, keep them as is
+    !initial ? getPlans().then((pls) => {
       const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
       newPlans.push(...pls)
       plans.value = newPlans
+    }) : Promise.resolve(),
+    getUsages(orgId).then(res => {
+      data.stats = res.stats
+      data.planSuggest = res.bestPlan
+      // updateData()
     }),
-    getUsages(),
-    getCurrentPlanNameOrg(currentOrganization.value?.gid).then(res => {
-      planCurrrent.value = res
+    getCurrentPlanNameOrg(orgId).then(res => {
+      data.planCurrrent = res
+      // updateData()
     }),
-    getPlanUsagePercent(currentOrganization.value?.gid).then(res => {
-      planPercent.value = res
-    }).catch(err => console.log(err))
+    getPlanUsagePercent(orgId).then(res => {
+      console.log(res)
+      data.planPercent = res
+      // updateData()
+    }).catch(err => console.log(err)),
+    // isPayingOrg(orgId).then(res => {
+    //   data.paying = res
+    // })
   ])
-  isUsageLoading.value = false
+
+  data.paying = orgToLoad.paying
+  data.trialDaysLeft = orgToLoad.trial_left
+
+  orgsHashmap.value.set(orgId, data)
+  initialLoad.value = true
 }
 
-watch(
-  () => plans.value,
-  (myPlan, prevMyPlan) => {
-    if (myPlan && !prevMyPlan) {
-      loadData()
-      // reGenerate annotations
-      isUsageLoading.value = true
-    }
-    else if (prevMyPlan && !myPlan) {
-      isUsageLoading.value = true
-    }
-  },
-)
+// watch(
+//   () => plans.value,
+//   (myPlan, prevMyPlan) => {
+//     if (myPlan && !prevMyPlan) {
+//       loadData(true)
+//       // reGenerate annotations
+//       isUsageLoading.value = true
+//     }
+//     else if (prevMyPlan && !myPlan) {
+//       isUsageLoading.value = true
+//     }
+//   },
+// )
 
-watch(currentOrganization, async () => {
-  if (isUsageLoading.value) {
-    return
+watch(currentOrganization, async (newOrg, prevOrg) => {
+
+  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
+
+  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
+    if (!initialLoad.value) {
+      const orgsMap = organizationStore.getAllOrgs()
+      const newOrg = [...orgsMap]
+      .map(([_, a]) => a)
+      .filter(org => org.role.includes('super_admin'))
+      .sort((a, b) => b.app_count - a.app_count)[0]
+
+      if (newOrg) {
+        organizationStore.setCurrentOrganization(newOrg.gid)
+        return
+      }
+    }
+
+    displayStore.dialogOption = {
+      header: t('cannot-view-plans'),
+      message: `${t('plans-super-only')}`,
+      buttons: [
+        {
+          text: t('ok'),
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+    if (!prevOrg)
+      router.push('/app/home')
+    else {
+      organizationStore.setCurrentOrganization(prevOrg.gid)
+    }
   }
 
-  isSubscribeLoading.value.fill(true, plans.value.length)
-  isUsageLoading.value = true
-  planCurrrent.value = ''
-  planPercent.value = -1
-  stats.value = {
-    mau: 0,
-    storage: 0,
-    bandwidth: 0,
-  }
+  await loadData(false)
 
-  await Promise.all([
-    getUsages(),
-    getCurrentPlanNameOrg(currentOrganization.value?.gid).then(res => {
-      planCurrrent.value = res
-    }),
-    getPlanUsagePercent(currentOrganization.value?.gid).then(res => {
-      planPercent.value = res
-    }).catch(err => console.log(err))
-  ])
-  isUsageLoading.value = false
-
-  isUsageLoading.value = false
-  isSubscribeLoading.value.fill(false, plans.value.length)
+  // isSubscribeLoading.value.fill(false, 0, plans.value.length)
 })
 
 watchEffect(async () => {
@@ -186,7 +245,12 @@ watchEffect(async () => {
       thankYouPage.value = true
     }
     else if (main.user?.id) {
-      loadData()
+      if (route.query.oid && typeof route.query.oid === 'string') {
+        await organizationStore.awaitInitialLoad()
+        organizationStore.setCurrentOrganization(route.query.oid)
+      }
+
+      loadData(true)
       snag.track({
         channel: 'usage',
         event: 'User visit',
@@ -203,12 +267,12 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: (main.paying || main.trialDaysLeft > 0) ? t('Current') : t('failed'),
+    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0) ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {
     label: t('usage'),
-    value: planPercent.value > -1 ? `${planPercent.value.toLocaleString()}%` : undefined,
+    value: (currentData.value?.planPercent !== undefined && currentData.value?.planPercent! > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
   },
   {
     label: t('best-plan'),
@@ -298,7 +362,7 @@ const hightLights = computed<Stat[]>(() => ([
             </p>
             <button
               v-if="p.stripe_id !== 'free'"
-              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
+              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && currentData?.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="isDisabled(p)" @click="openChangePlan(p, index)"
             >
@@ -313,7 +377,7 @@ const hightLights = computed<Stat[]>(() => ([
                 />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
+              {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && currentData?.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-8">
               <span class="text-gray-900 dark:text-white">{{ p.price_m !== p.price_y ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ p.price_y }}</span>

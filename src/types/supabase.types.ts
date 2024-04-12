@@ -667,32 +667,32 @@ export type Database = {
           created_at: string | null
           id: string
           last_send_at: string
+          owner_org: string
           total_send: number
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           created_at?: string | null
           id: string
           last_send_at?: string
+          owner_org: string
           total_send?: number
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
           last_send_at?: string
+          owner_org?: string
           total_send?: number
           updated_at?: string | null
-          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -1761,6 +1761,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_good_plan_v5_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_member_of_org: {
         Args: {
           user_id: string
@@ -1785,6 +1791,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_onboarded_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_onboarding_needed:
         | {
             Args: Record<PropertyKey, never>

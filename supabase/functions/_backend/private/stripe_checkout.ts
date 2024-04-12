@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { createCheckout } from '../utils/stripe.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -31,7 +31,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'No org_id provided' }, 400)
     }
 
-    if (error || !auth || !auth.user)
+    if (error || !auth || !auth.user || !auth.user.id)
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
     console.log('auth', auth.user.id)
@@ -44,6 +44,9 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'not authorize' }, 400)
     if (!org.customer_id)
       return c.json({ status: 'no customer' }, 400)
+    
+    if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+      return c.json({ status: 'not authorize (orgs right)' }, 400)
 
     console.log('user', org)
     const checkout = await createCheckout(c, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)

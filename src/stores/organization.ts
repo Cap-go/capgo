@@ -187,7 +187,9 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (error)
       throw error
 
-    const organization = data.filter(org => !org.role.includes('invite')).sort((a, b) => b.app_count - a.app_count)[0]
+    const organization = data
+      .filter(org => !org.role.includes('invite'))
+      .sort((a, b) => b.app_count - a.app_count)[0]
     if (!organization) {
       console.log('user has no main organization')
       return
@@ -209,6 +211,10 @@ export const useOrganizationStore = defineStore('organization', () => {
       await fetchOrganizations()
   }
 
+  const getAllOrgs = () => {
+    return _organizations.value
+  }
+
   return {
     organizations,
     currentOrganization,
@@ -218,6 +224,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationToMain,
     getMembers,
     getCurrentRoleForApp,
+    getCurrentRole,
+    getAllOrgs,
     hasPermisisonsInRole,
     fetchOrganizations,
     dedupFetchOrganizations,

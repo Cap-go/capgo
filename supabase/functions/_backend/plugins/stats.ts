@@ -24,7 +24,7 @@ import {
 import { getSDevice, supabaseAdmin } from '../utils/supabase.ts'
 import type { AppStats } from '../utils/types.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sendNotif } from '../utils/notifications.ts'
+import { sendNotifOrg } from '../utils/notifications.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
@@ -152,7 +152,7 @@ async function post(c: Context, body: AppStats) {
 
     const { data: appVersion } = await supabaseAdmin(c)
       .from('app_versions')
-      .select('id, user_id')
+      .select('id, owner_org')
       .eq('app_id', app_id)
       .or(`name.eq.${version_name}`)
       .single()
@@ -170,18 +170,18 @@ async function post(c: Context, body: AppStats) {
       }
       else if (failActions.includes(action)) {
         console.log('FAIL!')
-        const sent = await sendNotif(c, 'user:update_fail', {
+        const sent = await sendNotifOrg(c, 'user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
           current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
-        }, appVersion.user_id, '0 0 * * 1', 'orange')
+        }, appVersion.owner_org, '0 0 * * 1', 'orange')
         if (sent) {
           await logsnag(c).track({
             channel: 'updates',
             event: 'update fail',
             icon: '⚠️',
-            user_id: appVersion.user_id ?? undefined,
+            user_id: appVersion.owner_org ?? undefined,
             tags: {
               app_id,
               device_id,

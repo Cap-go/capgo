@@ -25,6 +25,27 @@ ALTER TABLE ONLY "public"."orgs"
 UPDATE orgs SET
 "customer_id"=(select customer_id from users where users.id=orgs.created_by);
 
+-- Migrate notifications
+ALTER TABLE notifications ADD COLUMN 
+owner_org uuid;
+
+-- Set owner_org
+UPDATE notifications
+SET owner_org=get_user_main_org_id(user_id);
+
+-- Mark owner_org as not null
+-- ALTER TABLE apps
+-- ALTER COLUMN owner_org SET NOT NULL;
+
+ALTER TABLE ONLY "public"."notifications"
+    ADD CONSTRAINT "owner_org_id_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+ALTER TABLE notifications
+ALTER COLUMN owner_org SET NOT NULL;
+
+ALTER TABLE notifications
+DROP COLUMN user_id;
+
 -- Fix org create trigger
 CREATE OR REPLACE FUNCTION generate_org_on_user_create() RETURNS TRIGGER AS $_$
 DECLARE
@@ -37,7 +58,13 @@ BEGIN
     RETURN NEW;
 END $_$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
+CREATE TRIGGER on_org_create 
+AFTER INSERT ON public.orgs 
+FOR EACH ROW 
+EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_organization_create');
+
 -- Change RLS for the plans table - required due to a new build step
+-- This has alredy been changed in prod
 ALTER POLICY "Enable select for anyone" ON "public"."plans" TO anon;
 ALTER POLICY "Enable select for anyone" ON "public"."plans" RENAME TO "Enable select for anyone";
 
@@ -175,7 +202,7 @@ Begin
   from stripe_info
   where customer_id=(SELECT customer_id from orgs where id=orgid)
   AND (
-    (status = 'succeeded') -- is_good_plan = true AND <-- TODO: reenable is_good_plan in the future
+    (status = 'succeeded' AND is_good_plan = true) -- is_good_plan = true AND <-- TODO: reenable is_good_plan in the future
     OR (subscription_id = 'free') -- TODO: allow free plan again
     -- OR (subscription_id = 'free' or subscription_id is null)
     OR (trial_at::date - (now())::date > 0)
@@ -250,6 +277,46 @@ Begin
     RETURN is_paying_and_good_plan_org(orgid);
 End;
 $$;
+
+
+-- Drop some old fn
+DROP FUNCTION public.is_allowed_action(apikey text, appid character varying);
+
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" "text", "appid" "text") RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+Begin
+  RETURN is_allowed_action_org((select owner_org from apps where app_id=appid));
+End;
+$$;
+
+CREATE OR REPLACE FUNCTION "public"."is_onboarded_org"("orgid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  RETURN (SELECT EXISTS (SELECT 1
+  FROM apps
+  WHERE owner_org=orgid)) AND (SELECT EXISTS (SELECT 1
+  FROM app_versions
+  WHERE owner_org=orgid));
+End;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_good_plan_v5_org(orgid uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+    current_plan_total stats_table;
+BEGIN
+  SELECT * INTO current_plan_total FROM public.get_total_stats_v5_org(orgid);
+    RETURN (select 1 from find_fit_plan_v3(
+    current_plan_total.mau,
+    current_plan_total.bandwidth,
+    current_plan_total.storage) where find_fit_plan_v3.name = (SELECT get_current_plan_name_org(orgid)));
+END;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.is_canceled_org(orgid uuid)
  RETURNS boolean

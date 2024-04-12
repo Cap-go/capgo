@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { customerToSegment, supabaseAdmin } from '../utils/supabase.ts'
+import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import type { Person } from '../utils/plunk.ts'
 import { addDataContact, trackEvent } from '../utils/plunk.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -27,15 +27,14 @@ app.post('/', async (c: Context) => {
       return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
 
     // find email from user with customer_id
-    const { error: dbError, data: user } = await supabaseAdmin(c)
-      .from('users')
-      .select(`email,
-      id`)
+    const { error: dbError, data: org } = await supabaseAdmin(c)
+      .from('orgs')
+      .select('id, management_email')
       .eq('customer_id', stripeData.customer_id)
       .single()
     if (dbError)
       return c.json({ error: JSON.stringify(dbError) }, 500)
-    if (!user)
+    if (!org)
       return c.json('no user found', 500)
 
     const { data: customer } = await supabaseAdmin(c)
@@ -53,13 +52,13 @@ app.post('/', async (c: Context) => {
     console.log('stripeData', stripeData)
 
     const userData: Person = {
-      id: user.id,
+      id: org.id,
       customer_id: stripeData.customer_id,
       status: stripeData.status as string,
       price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
     }
-    await addDataContact(c, user.email, userData)
+    await addDataContact(c, org.management_email, userData)
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
       stripeData.status = 'succeeded'
@@ -80,35 +79,35 @@ app.post('/', async (c: Context) => {
           return c.json({ error: JSON.stringify(dbError) }, 500)
 
         const isMonthly = plan.price_m_id === stripeData.price_id
-        const segment = await customerToSegment(c, user.id, stripeData.price_id, plan)
+        const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id, plan)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
-        await addDataContact(c, user.email, userData, segment)
-        await trackEvent(c, user.email, { plan: plan.name }, eventName)
-        await trackEvent(c, user.email, {}, 'user:upgrade')
+        await addDataContact(c, org.management_email, userData, segment)
+        await trackEvent(c, org.management_email, { plan: plan.name }, eventName)
+        await trackEvent(c, org.management_email, {}, 'user:upgrade')
         await LogSnag.track({
           channel: 'usage',
           event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
           icon: '💰',
-          user_id: user.id,
+          user_id: org.management_email,
           notify: status === 'succeeded',
         }).catch()
       }
       else {
-        const segment = await customerToSegment(c, user.id, stripeData.price_id)
-        await addDataContact(c, user.email, userData, segment)
+        const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id)
+        await addDataContact(c, org.management_email, userData, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         stripeData.status = 'succeeded'
-        const segment = await customerToSegment(c, user.id, 'free')
-        await addDataContact(c, user.email, userData, segment)
-        await trackEvent(c, user.email, {}, 'user:cancel')
+        const segment = await customerToSegmentOrg(c, org.id, 'free')
+        await addDataContact(c, org.management_email, userData, segment)
+        await trackEvent(c, org.management_email, {}, 'user:cancel')
         await LogSnag.track({
           channel: 'usage',
           event: 'User cancel',
           icon: '⚠️',
-          user_id: user.id,
+          user_id: org.management_email,
           notify: true,
         }).catch()
       }
@@ -123,8 +122,8 @@ app.post('/', async (c: Context) => {
       }
     }
     else {
-      const segment = await customerToSegment(c, user.id, 'free')
-      await addDataContact(c, user.email, userData, segment)
+      const segment = await customerToSegmentOrg(c, org.id, 'free')
+      await addDataContact(c, org.management_email, userData, segment)
     }
 
     return c.json({ received: true })

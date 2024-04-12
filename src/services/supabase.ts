@@ -221,11 +221,11 @@ export async function getTotalStorage(orgId?: string): Promise<number> {
   return data || 0
 }
 
-export async function isGoodPlan(userid?: string): Promise<boolean> {
-  if (!userid)
+export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
+  if (!orgId)
     return false
   const { data, error } = await useSupabase()
-    .rpc('is_good_plan_v5', { userid })
+    .rpc('is_good_plan_v5_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
@@ -246,11 +246,9 @@ export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['R
   return data || []
 }
 
-export async function isTrial(userid?: string): Promise<number> {
-  if (!userid)
-    return 0
+export async function isTrialOrg(orgId: string): Promise<number> {
   const { data, error } = await useSupabase()
-    .rpc('is_trial', { userid })
+    .rpc('is_trial_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
@@ -281,14 +279,12 @@ export async function isCanceled(userid?: string): Promise<boolean> {
   return data || false
 }
 
-export async function isPaying(userid?: string): Promise<boolean> {
-  if (!userid)
-    return false
+export async function isPayingOrg(orgId: string): Promise<boolean> {
   const { data, error } = await useSupabase()
-    .rpc('is_paying', { userid })
+    .rpc('is_paying_org', { orgid: orgId })
     .single()
   if (error)
-    throw new Error(error.message)
+    console.error('isPayingOrg error', orgId, error)
 
   return data || false
 }

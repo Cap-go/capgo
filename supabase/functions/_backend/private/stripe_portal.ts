@@ -1,11 +1,12 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { createPortal } from '../utils/stripe.ts'
 
 interface PortalData {
-  callbackUrl: string
+  callbackUrl: string,
+  orgId: string
 }
 
 export const app = new Hono()
@@ -21,22 +22,25 @@ app.post('/', middlewareAuth, async (c: Context) => {
       authorization?.split('Bearer ')[1],
     )
 
-    if (error || !auth || !auth.user)
+    if (error || !auth || !auth.user || !auth.user.id)
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
     console.log('auth', auth.user.id)
-    const { data: user, error: dbError } = await supabaseAdmin(c)
-      .from('users')
-      .select()
-      .eq('id', auth.user.id)
+    const { data: org, error: dbError } = await supabaseAdmin(c)
+      .from('orgs')
+      .select('customer_id')
+      .eq('id', body.orgId)
       .single()
-    if (dbError || !user)
+    if (dbError || !org)
       return c.json({ status: 'not authorize' }, 400)
-    if (!user.customer_id)
+    if (!org.customer_id)
       return c.json({ status: 'no customer' }, 400)
 
-    console.log('user', user)
-    const link = await createPortal(c, user.customer_id, body.callbackUrl)
+    if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+      return c.json({ status: 'not authorize (orgs right)' }, 400)
+
+    console.log('org', org)
+    const link = await createPortal(c, org.customer_id, body.callbackUrl)
     return c.json({ url: link.url })
   }
   catch (error) {
