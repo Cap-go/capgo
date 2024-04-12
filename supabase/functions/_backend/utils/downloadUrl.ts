@@ -23,7 +23,7 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: { buck
   try {
     const [signedUrl, { size: fileSize }] = await Promise.all([
       s3.getSignedUrl(c, path, EXPIRATION_SECONDS),
-      Promise.resolve({ size: 0 }) //s3.getSizeChecksum(c, path),
+      s3.getSizeChecksum(c, path),
     ])
     console.log('getBundleUrl', signedUrl, fileSize)
 
