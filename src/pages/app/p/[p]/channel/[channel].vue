@@ -558,16 +558,6 @@ async function onChangeAutoUpdate(event: Event) {
                 />
               </template>
             </k-list-item>
-            <!-- <k-list-item label :title="t('disable-auto-upgrade')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.disableAutoUpdateToMajor"
-                  @change="saveChannelChange('disableAutoUpdateToMajor', !channel?.disableAutoUpdateToMajor)"
-                />
-              </template>
-            </k-list-item> -->
             <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
                 <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">

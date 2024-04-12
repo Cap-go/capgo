@@ -173,7 +173,7 @@ export const defaultGetChannelRes = [{
   created_by: defaultUserId,
   public: true,
   disableAutoUpdateUnderNative: true,
-  disableAutoUpdateToMajor: true,
+  disableAutoUpdate: 'major',
   allow_device_self_set: false,
   allow_emulator: true,
   allow_dev: true,

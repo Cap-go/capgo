@@ -11,7 +11,7 @@ interface ChannelSet {
   version?: string
   public?: boolean
   disableAutoUpdateUnderNative?: boolean
-  disableAutoUpdateToMajor?: boolean
+  disableAutoUpdate?: Database['public']['Enums']['disable_update']
   ios?: boolean
   android?: boolean
   allow_device_self_set?: boolean
@@ -41,7 +41,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         updated_at,
         public,
         disableAutoUpdateUnderNative,
-        disableAutoUpdateToMajor,
+        disableAutoUpdate,
         allow_device_self_set,
         is_emulator,
         is_prod,
@@ -73,7 +73,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         updated_at,
         public,
         disableAutoUpdateUnderNative,
-        disableAutoUpdateToMajor,
+        disableAutoUpdate,
         allow_device_self_set,
         allow_emulator,
         allow_dev,
@@ -117,7 +117,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     name: body.channel,
     ...(body.public == null ? {} : { public: body.public }),
     ...(body.disableAutoUpdateUnderNative == null ? {} : { disableAutoUpdateUnderNative: body.disableAutoUpdateUnderNative }),
-    ...(body.disableAutoUpdateToMajor == null ? {} : { disableAutoUpdateToMajor: body.disableAutoUpdateToMajor }),
+    ...(body.disableAutoUpdate == null ? {} : { disableAutoUpdate: body.disableAutoUpdate }),
     ...(body.allow_device_self_set == null ? {} : { allow_device_self_set: body.allow_device_self_set }),
     ...(body.allow_emulator == null ? {} : { allow_emulator: body.allow_emulator }),
     ...(body.allow_dev == null ? {} : { allow_dev: body.allow_dev }),

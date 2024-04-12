@@ -24,6 +24,7 @@
     "postgres": "https://deno.land/x/postgresjs@v3.4.4/mod.js",
     "lauqe": "https://deno.land/x/equal@v1.5.0/mod.ts",
     "adm-zip": "https://esm.sh/adm-zip@0.5.12?target=deno",
-    "google-play-scraper": "https://esm.sh/google-play-scraper@10.0.0?target=deno"
+    "google-play-scraper": "https://esm.sh/google-play-scraper@10.0.0?target=deno",
+    "@cloudflare/workers-types/2024-04-03": "https://esm.sh/@cloudflare/workers-types@4.20240405.0?target=deno"
   }
 }

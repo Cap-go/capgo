@@ -670,11 +670,15 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     app_id: device.app_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
-  return Promise.all([
+  const jobs = Promise.all([
     sendClickHouse(c, deviceReady, 'devices'),
     sendClickHouse(c, statsData, 'logs'),
     sendClickHouse(c, dailyDeviceReady, 'daily_device'),
   ]).catch((error) => {
     console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
   })
+  if (c.executionCtx.waitUntil)
+    return c.executionCtx.waitUntil(jobs)
+
+  return jobs
 }

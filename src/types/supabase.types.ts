@@ -304,6 +304,42 @@ export type Database = {
           },
         ]
       }
+      auth_uid: {
+        Row: {
+          uid: string | null
+        }
+        Insert: {
+          uid?: string | null
+        }
+        Update: {
+          uid?: string | null
+        }
+        Relationships: []
+      }
+      bandwidth_usage: {
+        Row: {
+          app_id: string
+          device_id: string
+          file_size: number
+          id: number
+          timestamp: string
+        }
+        Insert: {
+          app_id: string
+          device_id: string
+          file_size: number
+          id?: number
+          timestamp?: string
+        }
+        Update: {
+          app_id?: string
+          device_id?: string
+          file_size?: number
+          id?: number
+          timestamp?: string
+        }
+        Relationships: []
+      }
       channel_devices: {
         Row: {
           app_id: string
@@ -571,6 +607,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      devices_usage: {
+        Row: {
+          app_id: string
+          device_id: string
+          id: number
+          timestamp: string
+        }
+        Insert: {
+          app_id: string
+          device_id: string
+          id?: number
+          timestamp?: string
+        }
+        Update: {
+          app_id?: string
+          device_id?: string
+          id?: number
+          timestamp?: string
+        }
+        Relationships: []
       }
       global_stats: {
         Row: {
@@ -1155,6 +1212,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      create_partitions: {
+        Args: {
+          start_date: string
+          num_years: number
+        }
+        Returns: undefined
+      }
       delete_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1357,18 +1421,6 @@ export type Database = {
           app_id: string
         }
         Returns: string
-      }
-      get_orgs_v2: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          gid: string
-          created_by: string
-          logo: string
-          name: string
-          role: string
-        }[]
       }
       get_orgs_v3: {
         Args: {
@@ -1757,12 +1809,6 @@ export type Database = {
           }
       is_good_plan_v5: {
         Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
-      is_good_plan_v5_org: {
-        Args: {
           orgid: string
         }
         Returns: boolean
@@ -1897,6 +1943,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      update_app_usage:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: undefined
+          }
+        | {
+            Args: {
+              minutes_interval: number
+            }
+            Returns: undefined
+          }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean

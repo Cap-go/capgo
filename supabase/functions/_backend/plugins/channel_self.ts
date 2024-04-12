@@ -146,10 +146,9 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     // get channel by name
     const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
       .from('channels')
-      .select()
+      .select('*')
       .eq('app_id', app_id)
       .eq('name', channel)
-      .eq('allow_device_self_set', true)
       .single()
     if (dbError || !dataChannel) {
       console.log(channel, app_id)
@@ -157,6 +156,14 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       return c.json({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
         error: 'channel_not_found',
+      }, 400)
+    }
+
+    if (!dataChannel.allow_device_self_set) {
+      console.error('Channel does not permit self set', { dbError, dataChannel })
+      return c.json({
+        message: `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`,
+        error: 'channel_set_from_plugin_not_allowed',
       }, 400)
     }
 
