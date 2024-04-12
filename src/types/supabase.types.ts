@@ -354,6 +354,30 @@ export type Database = {
         }
         Relationships: []
       }
+      bandwidth_usage: {
+        Row: {
+          app_id: string
+          device_id: string
+          file_size: number
+          id: number
+          timestamp: string
+        }
+        Insert: {
+          app_id: string
+          device_id: string
+          file_size: number
+          id?: number
+          timestamp?: string
+        }
+        Update: {
+          app_id?: string
+          device_id?: string
+          file_size?: number
+          id?: number
+          timestamp?: string
+        }
+        Relationships: []
+      }
       channel_devices: {
         Row: {
           app_id: string
@@ -798,6 +822,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      devices_usage: {
+        Row: {
+          app_id: string
+          device_id: string
+          id: number
+          timestamp: string
+        }
+        Insert: {
+          app_id: string
+          device_id: string
+          id?: number
+          timestamp?: string
+        }
+        Update: {
+          app_id?: string
+          device_id?: string
+          id?: number
+          timestamp?: string
+        }
+        Relationships: []
       }
       global_stats: {
         Row: {
@@ -1565,18 +1610,6 @@ export type Database = {
         }
         Returns: string
       }
-      get_orgs_v2: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          gid: string
-          created_by: string
-          logo: string
-          name: string
-          role: string
-        }[]
-      }
       get_orgs_v3: {
         Args: {
           userid: string
@@ -1903,12 +1936,6 @@ export type Database = {
             }
             Returns: boolean
           }
-      is_good_plan_v3: {
-        Args: {
-          userid: string
-        }
-        Returns: boolean
-      }
       is_good_plan_v5: {
         Args: {
           userid: string
@@ -2021,10 +2048,6 @@ export type Database = {
         Returns: undefined
       }
       retry_failed_jobs: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      schedule_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

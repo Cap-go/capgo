@@ -1,12 +1,17 @@
-name = "capgo_api-preprod"
-compatibility_date = "2023-12-01"
+name = "capgo_api"
+compatibility_date = "2024-04-03"
 main = "./cloudflare_workers/index.ts"
 compatibility_flags = ["nodejs_compat"]
 
-[[hyperdrive]]
-binding = "HYPERDRIVE"
-id = "0f1d77550db142fbb17cb6b3ee659a06"
 
-[[queues.producers]]
-binding = "QUEUE"
-queue = "capgo-prod"
+[[analytics_engine_datasets]]
+binding = "DEVICE_USAGE"
+dataset = "device_usage"
+
+[[analytics_engine_datasets]]
+binding = "BANDWIDTH_USAGE"
+dataset = "bandwidth_usage"
+
+[[analytics_engine_datasets]]
+binding = "VERSION_USAGE"
+dataset = "version_usage"
