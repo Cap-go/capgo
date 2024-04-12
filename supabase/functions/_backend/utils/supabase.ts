@@ -767,6 +767,23 @@ export function trackBandwidthUsage(
     ])
 }
 
+export function trackVersionUsage(
+  c: Context,
+  versionId: number, 
+  appId: string,
+  action: string
+) {
+  return supabaseAdmin(c)
+    .from('version_usage')
+    .insert([
+      {
+        version_id: versionId,
+        app_id: appId,
+        action: action,
+      },
+    ])
+}
+
 export async function trackDeviceUsage(
   c: Context,
   deviceId: string,

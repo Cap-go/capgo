@@ -5,9 +5,13 @@ compatibility_flags = ["nodejs_compat"]
 
 
 [[analytics_engine_datasets]]
-binding = "APP_USAGE"
-dataset = "app_usage"
+binding = "DEVICE_USAGE"
+dataset = "device_usage"
 
 [[analytics_engine_datasets]]
 binding = "BANDWIDTH_USAGE"
 dataset = "bandwidth_usage"
+
+[[analytics_engine_datasets]]
+binding = "VERSION_USAGE"
+dataset = "version_usage"

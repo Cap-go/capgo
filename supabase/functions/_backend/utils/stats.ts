@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import { trackBandwidthUsage, trackDeviceUsage } from './supabase.ts'
-import { trackBandwidthUsageCF, trackDeviceUsageCF } from './cloudflare.ts'
+import { trackBandwidthUsage, trackDeviceUsage, trackVersionUsage } from './supabase.ts'
+import { trackBandwidthUsageCF, trackDeviceUsageCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.APP_USAGE)
@@ -12,6 +12,13 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   if (!c.env.BANDWIDTH_USAGE)
     return trackBandwidthUsage(c, device_id, app_id, file_size)
   return trackBandwidthUsageCF(c, device_id, app_id, file_size)
+}
+
+export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
+export function createStatsVersion(c: Context, version_id: number, app_id: string, action: VersionAction) {
+  if (!c.env.VERSION_USAGE)
+    return trackVersionUsage(c, version_id, app_id, action)
+  return trackVersionUsageCF(c, version_id, app_id, action)
 }
 
 // read mau

@@ -1,16 +1,18 @@
-import type { AnalyticsEngineDataset } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04-03'
 import type { Context } from 'hono'
 
 export interface Bindings {
-  APP_USAGE: AnalyticsEngineDataset
-  BANDWIDTH_USAGE: AnalyticsEngineDataset
+  DEVICE_USAGE: AnalyticsEngineDataPoint
+  BANDWIDTH_USAGE: AnalyticsEngineDataPoint
+  VERSION_USAGE: AnalyticsEngineDataPoint
 }
 
 export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string) {
-  if (!c.env.APP_USAGE)
+  if (!c.env.DEVICE_USAGE)
     return
-  c.env.APP_USAGE.writeDataPoint({
-    blobs: [device_id, app_id],
+  c.env.DEVICE_USAGE.writeDataPoint({
+    blobs: [device_id],
+    indexes: [app_id],
   })
 }
 
@@ -18,8 +20,18 @@ export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: str
   if (!c.env.BANDWIDTH_USAGE)
     return
   c.env.BANDWIDTH_USAGE.writeDataPoint({
-    blobs: [device_id, app_id],
+    blobs: [device_id],
     doubles: [file_size],
+    indexes: [app_id],
+  })
+}
+
+export function trackVersionUsageCF(c: Context, version_id: number, app_id: string, action: string) {
+  if (!c.env.VERSION_USAGE)
+    return
+  c.env.VERSION_USAGE.writeDataPoint({
+    blobs: [app_id, version_id, action],
+    indexes: [app_id],
   })
 }
 

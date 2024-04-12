@@ -17,7 +17,7 @@ import * as schema_postgres from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 import { sendStatsAndDevice } from './clickhouse.ts'
-import { createStatsBandwidth, createStatsMau } from './stats.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion } from './stats.ts'
 
 // import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
 
@@ -598,8 +598,9 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    createStatsMau(c, device_id, app_id)
-    createStatsBandwidth(c, device_id, app_id, fileSize)
+    await createStatsMau(c, device_id, app_id)
+    await createStatsBandwidth(c, device_id, app_id, fileSize)
+    await createStatsVersion(c, version.id, app_id, 'get')
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
     return c.json(resToVersion(plugin_version, signedURL, version as any), 200)

@@ -30,6 +30,7 @@ import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/clickhouse.ts'
 import { sendStatsAndDevice } from '../utils/clickhouse.ts'
+import { createStatsVersion } from '../utils/stats.ts';
 
 // import { saveStoreInfo, sendStatsAndDevice, updateInClickHouse } from '../utils/clickhouse.ts'
 
@@ -160,22 +161,26 @@ async function post(c: Context, body: AppStats) {
     if (appVersion) {
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
+        await createStatsVersion(c, device.version, app_id, 'install')
         const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
         if (res && res.data && res.data.length) {
           const oldDevice = res.data[0]
           const oldVersion = oldDevice.version
-          if (oldVersion !== appVersion.id)
+          if (oldVersion && oldVersion !== appVersion.id) {
+            await createStatsVersion(c, oldVersion, app_id, 'uninstall')
             statsActions.push({ action: 'uninstall', versionId: oldVersion ?? undefined })
+          }
         }
       }
       else if (failActions.includes(action)) {
+        await createStatsVersion(c, appVersion.id, app_id, 'fail')
         console.log('FAIL!')
         const sent = await sendNotif(c, 'user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
           current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
-        }, appVersion.user_id, '0 0 * * 1', 'orange')
+        }, appVersion.user_id ?? '', '0 0 * * 1', 'orange')
         if (sent) {
           await logsnag(c).track({
             channel: 'updates',
