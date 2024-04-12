@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getBuiltinPlans, getTotalStats, isPayingOrg } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getBuiltinPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
@@ -102,7 +102,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id)
-    await openCheckout(plan.stripe_id, window.location.href, window.location.href, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
+    await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `window.location.href}?cancel=1`, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
   isSubscribeLoading.value[index] = false
 }
 
@@ -534,16 +534,16 @@ const hightLights = computed<Stat[]>(() => ([
       </section>
     </div>
   </div>
-  <div v-else class=" w-full overflow-hidden relative">
+  <div v-else class="relative w-full overflow-hidden ">
       <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
         <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
         {{ t('thank-you-for-sub') }}
         <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
         <router-link class="mt-[40vh]" to="/app/home">
-          <span class="text-blue-600 text-xl">{{ t('use-capgo') }} 🚀</span>
+          <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
         </router-link>
       </div>
-      <vue-particles class="h-full w-full absolute z-0"
+      <vue-particles class="absolute z-0 w-full h-full"
             id="tsparticles"
             :options="test"
         />
