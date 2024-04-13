@@ -115,8 +115,10 @@ cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
 cannot-share: Cannot share user id, check browser console
+cannot-show: Cannot show this page
 cannot-test-app-some: Cannot test app something wrong happened
 cannot-view-plans: Cannot view the plans page
+cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
 change: Change
 changed-password-suc: Password changed successfully
@@ -305,6 +307,9 @@ no-version-linked: No version, click to add
 no-version-linked-no-perm: No version
 none: None
 not-found: Not found
+not-paying-org-usage: >-
+  This organization is not paying, cannot show usage for a free trier
+  organization
 notifications: Notifications
 ok: OK
 old-onboarding-mode: old onboarding
@@ -450,6 +455,7 @@ upperCaseError: Should contain uppercase letters
 url: URL
 usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
+usage-super-only: Only super admins are allowed to view usage
 usage-title: Total
 use-capgo: Use Capgo
 use-the-command: 'Use the command:'
