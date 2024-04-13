@@ -271,7 +271,7 @@ const hightLights = computed<Stat[]>(() => ([
   },
   {
     label: t('usage'),
-    value: (currentData.value.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
+    value: (currentData.value && currentData.value?.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
   },
   {
     label: t('best-plan'),
