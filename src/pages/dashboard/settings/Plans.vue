@@ -150,7 +150,7 @@ async function loadData(initial: boolean) {
 
   await Promise.all([
     // Plans are not linked to orgs, keep them as is
-    !initial
+    initial
       ? getPlans().then((pls) => {
         const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
         newPlans.push(...pls)
