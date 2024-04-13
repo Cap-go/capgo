@@ -4,12 +4,12 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import dayjs from 'dayjs'
+import { storeToRefs } from 'pinia'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanNameOrg, getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
-import { storeToRefs } from 'pinia'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -25,7 +25,6 @@ const router = useRouter()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const supabase = useSupabase()
-
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
@@ -98,7 +97,6 @@ async function getUsage(orgId: string) {
   if (cycleInfoSup.error)
     throw cycleInfoSup.error
 
-
   return {
     isPayAsYouGo,
     currentPlan,
@@ -109,7 +107,7 @@ async function getUsage(orgId: string) {
     totalStorage,
     payg_units,
     plan,
-    cycle: cycleInfoSup.data
+    cycle: cycleInfoSup.data,
   }
 }
 
@@ -126,11 +124,12 @@ async function loadData(initial: boolean) {
   await organizationStore.awaitInitialLoad()
   const gid = organizationStore?.currentOrganization?.gid ?? ''
 
-  if (!initial)
+  if (!initial) {
     await getPlans().then((pls) => {
       plans.value.length = 0
       plans.value.push(...pls)
     })
+  }
   getUsage(gid).then((res) => {
     planUsageMap.value?.set(gid, res as any)
   })
@@ -138,54 +137,51 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
-
 watch(currentOrganization, async (newOrg, prevOrg) => {
+  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
+  if (
+    !organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])
+    || !newOrg?.paying
+  ) {
+    if (!initialLoad.value) {
+      const orgsMap = organizationStore.getAllOrgs()
+      const newOrg = [...orgsMap]
+        .map(([_, a]) => a)
+        .filter(org => org.role.includes('super_admin') && org.paying)
+        .sort((a, b) => b.app_count - a.app_count)[0]
 
-// isSubscribeLoading.value.fill(true, 0, plans.value.length)
-if (
-  !organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])
-  || !newOrg?.paying
-) {
-  if (!initialLoad.value) {
-    const orgsMap = organizationStore.getAllOrgs()
-    const newOrg = [...orgsMap]
-    .map(([_, a]) => a)
-    .filter(org => org.role.includes('super_admin') && org.paying)
-    .sort((a, b) => b.app_count - a.app_count)[0]
-
-    if (newOrg) {
-      organizationStore.setCurrentOrganization(newOrg.gid)
-      return
-    } else {
-      router.push('/app/home')
+      if (newOrg) {
+        organizationStore.setCurrentOrganization(newOrg.gid)
+        return
+      }
+      else {
+        router.push('/app/home')
+      }
     }
+
+    const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
+
+    displayStore.dialogOption = {
+      header: paying ? t('cannot-view-usage') : t('cannot-show'),
+      message: paying ? t('usage-super-only') : t('not-paying-org-usage'),
+      buttons: [
+        {
+          text: t('ok'),
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+    if (!prevOrg)
+      router.push('/app/home')
+    else
+      organizationStore.setCurrentOrganization(prevOrg.gid)
   }
 
-  const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
+  await loadData(initialLoad.value)
 
-  displayStore.dialogOption = {
-    header: paying ? t('cannot-view-usage') : t('cannot-show'),
-    message: paying ? t('usage-super-only') : t('not-paying-org-usage'),
-    buttons: [
-      {
-        text: t('ok'),
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  await displayStore.onDialogDismiss()
-  if (!prevOrg)
-    router.push('/app/home')
-  else {
-    organizationStore.setCurrentOrganization(prevOrg.gid)
-  }
-}
-
-await loadData(initialLoad.value)
-
-// isSubscribeLoading.value.fill(false, 0, plans.value.length)
+  // isSubscribeLoading.value.fill(false, 0, plans.value.length)
 })
-
 </script>
 
 <template>
@@ -202,7 +198,9 @@ await loadData(initialLoad.value)
               {{ t('monthly-active-users') }}
             </div>
             <div>
-              <span class="font-semibold">{{ dayjs(planUsage?.cycle.subscription_anchor_start).format('YYYY/MM/D') }}</span> {{ t('to') }} <span class="font-semibold">{{ dayjs(planUsage?.cycle.subscription_anchor_end).format('YYYY/MM/D') }}</span>
+              <span class="font-semibold">{{ dayjs(planUsage?.cycle.subscription_anchor_start).format('YYYY/MM/D')
+              }}</span> {{ t('to') }} <span class="font-semibold">{{
+                dayjs(planUsage?.cycle.subscription_anchor_end).format('YYYY/MM/D') }}</span>
             </div>
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">
