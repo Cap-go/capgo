@@ -65,7 +65,7 @@ EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_organization_cre
 
 -- Change RLS for the plans table - required due to a new build step
 -- This has alredy been changed in prod
-ALTER POLICY "Enable select for authenticated users only" ON "public"."plans" TO anon;
+ALTER POLICY "Enable select for authenticated users only" ON "public"."plans" TO anon, authenticated;
 ALTER POLICY "Enable select for authenticated users only" ON "public"."plans" RENAME TO "Enable select for anyone";
 
 
