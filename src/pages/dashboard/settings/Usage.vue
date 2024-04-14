@@ -4,8 +4,9 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import dayjs from 'dayjs'
+import { storeToRefs } from 'pinia'
 import { useMainStore } from '~/stores/main'
-import { getCurrentPlanName, getPlans, getTotalStorage } from '~/services/supabase'
+import { getCurrentPlanNameOrg, getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
@@ -15,8 +16,15 @@ const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 
 const snag = useLogSnag()
 const isLoading = ref(false)
+const initialLoad = ref(true)
 const route = useRoute()
 const main = useMainStore()
+const organizationStore = useOrganizationStore()
+const displayStore = useDisplayStore()
+const router = useRouter()
+
+const { currentOrganization } = storeToRefs(organizationStore)
+const supabase = useSupabase()
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
@@ -36,11 +44,11 @@ watchEffect(async () => {
   }
 })
 
-async function getUsage() {
+async function getUsage(orgId: string) {
   const usage = main.dashboard
 
   const plan = plans.value.find(p => p.name === 'Pay as you go')!
-  const planCurrrent = await getCurrentPlanName(main.auth?.id)
+  const planCurrrent = await getCurrentPlanNameOrg(orgId)
   const currentPlan = plans.value.find(p => p.name === planCurrrent)
 
   const payg_base = {
@@ -56,7 +64,7 @@ async function getUsage() {
   }
 
   let totalMau = 0
-  const totalStorage = bytesToGb(await getTotalStorage(main.auth?.id))
+  const totalStorage = bytesToGb(await getTotalStorage(orgId))
   let totalBandwidth = 0
 
   usage?.forEach((item) => {
@@ -85,6 +93,10 @@ async function getUsage() {
     return roundNumber(basePrice + totalUsagePrice.value)
   })
 
+  const cycleInfoSup = await supabase.rpc('get_cycle_info_org', { orgid: orgId }).single()
+  if (cycleInfoSup.error)
+    throw cycleInfoSup.error
+
   return {
     isPayAsYouGo,
     currentPlan,
@@ -95,27 +107,89 @@ async function getUsage() {
     totalStorage,
     payg_units,
     plan,
+    cycle: cycleInfoSup.data,
   }
 }
+
+// const planUsageMap = ref<Map<string, Awaited<ReturnType<typeof getUsage>>>>()
+const planUsageMap = ref(new Map<string, Awaited<ReturnType<typeof getUsage>>>())
+const planUsage = computed(() => planUsageMap.value?.get(currentOrganization.value?.gid ?? ''))
 
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
 }
 
-const planUsage = ref<Awaited<ReturnType<typeof getUsage>>>()
+onMounted(async () => {
+  await loadData()
+})
 
 async function loadData() {
+  await organizationStore.awaitInitialLoad()
+  const gid = organizationStore?.currentOrganization?.gid ?? ''
+
+  if (planUsageMap.value.has(gid) || isLoading.value)
+    return
+
   isLoading.value = true
-  await getPlans().then((pls) => {
-    plans.value.length = 0
-    plans.value.push(...pls)
-  })
-  getUsage().then((res) => {
-    planUsage.value = res
+
+  if (initialLoad.value) {
+    await getPlans().then((pls) => {
+      plans.value.length = 0
+      plans.value.push(...pls)
+    })
+  }
+  getUsage(gid).then((res) => {
+    planUsageMap.value?.set(gid, res as any)
   })
   isLoading.value = false
+  initialLoad.value = false
 }
-loadData()
+
+watch(currentOrganization, async (newOrg, prevOrg) => {
+  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
+  if (
+    !organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])
+    || !newOrg?.paying
+  ) {
+    if (!initialLoad.value) {
+      const orgsMap = organizationStore.getAllOrgs()
+      const newOrg = [...orgsMap]
+        .map(([_, a]) => a)
+        .filter(org => org.role.includes('super_admin') && org.paying)
+        .sort((a, b) => b.app_count - a.app_count)[0]
+
+      if (newOrg) {
+        organizationStore.setCurrentOrganization(newOrg.gid)
+        return
+      }
+      else {
+        router.push('/app/home')
+      }
+    }
+
+    const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
+
+    displayStore.dialogOption = {
+      header: paying ? t('cannot-view-usage') : t('cannot-show'),
+      message: paying ? t('usage-super-only') : t('not-paying-org-usage'),
+      buttons: [
+        {
+          text: t('ok'),
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+    if (!prevOrg)
+      router.push('/app/home')
+    else
+      organizationStore.setCurrentOrganization(prevOrg.gid)
+  }
+
+  await loadData()
+
+  // isSubscribeLoading.value.fill(false, 0, plans.value.length)
+})
 </script>
 
 <template>
@@ -132,7 +206,9 @@ loadData()
               {{ t('monthly-active-users') }}
             </div>
             <div>
-              <span class="font-semibold">{{ dayjs(main.cycleInfo?.subscription_anchor_start).format('YYYY/MM/D') }}</span> {{ t('to') }} <span class="font-semibold">{{ dayjs(main.cycleInfo?.subscription_anchor_end).format('YYYY/MM/D') }}</span>
+              <span class="font-semibold">{{ dayjs(planUsage?.cycle.subscription_anchor_start).format('YYYY/MM/D')
+              }}</span> {{ t('to') }} <span class="font-semibold">{{
+                dayjs(planUsage?.cycle.subscription_anchor_end).format('YYYY/MM/D') }}</span>
             </div>
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">

@@ -72,12 +72,11 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
         role: 'admin',
         handler: () => permision = invite ? 'invite_admin' : 'admin',
       },
-      // TODO: Allow it back when billing is linked to organization instead of user
-      // {
-      //   text: t('key-super-admin'),
-      //   role: 'super_admin',
-      //   handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
-      // },
+      {
+        text: t('key-super-admin'),
+        role: 'super_admin',
+        handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
+      },
     ],
   }
   displayStore.showDialog = true

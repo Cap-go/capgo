@@ -2,11 +2,12 @@
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
 import { Capacitor } from '@capacitor/core'
+import { storeToRefs } from 'pinia'
+import test from './particles.json'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanName, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getBuiltinPlans, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
@@ -18,27 +19,49 @@ function openSupport() {
 }
 
 const { t } = useI18n()
-const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
+const plans = ref<Database['public']['Tables']['plans']['Row'][]>(getBuiltinPlans())
 const displayPlans = computed(() => {
   return plans.value.filter(plan => plan.stripe_id !== 'free')
 })
-const stats = ref({
-  mau: 0,
-  storage: 0,
-  bandwidth: 0,
-} as Database['public']['Functions']['get_total_stats_v5']['Returns'][0])
-const planSuggest = ref('')
-const planCurrrent = ref('')
-const planPercent = ref(0)
+
+const displayStore = useDisplayStore()
+
+interface PlansOrgData {
+  stats: Database['public']['Functions']['get_total_stats_v5']['Returns'][0] | undefined
+  planSuggest: string
+  planCurrrent: string
+  planPercent: number
+  paying: boolean
+  trialDaysLeft: number
+}
+
+function defaultPlanOrgData(): PlansOrgData {
+  return {
+    stats: undefined,
+    planCurrrent: '',
+    planPercent: -1,
+    planSuggest: '',
+    paying: false,
+    trialDaysLeft: 0,
+  }
+}
+
+const orgsHashmap = ref(new Map<string, PlansOrgData>())
+
 const snag = useLogSnag()
-const isLoading = ref(false)
+// const isUsageLoading = ref(false)
+const initialLoad = ref(false)
+const thankYouPage = ref(false)
 const isSubscribeLoading = ref<Array<boolean>>([])
 const segmentVal = ref<'m' | 'y'>('y')
 const isYearly = computed(() => segmentVal.value === 'y')
 const route = useRoute()
+const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isMobile = Capacitor.isNativePlatform()
+
+const { currentOrganization } = storeToRefs(organizationStore)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   const features = [
@@ -69,14 +92,17 @@ function convertKey(key: string) {
     return `plan-${keySplit[1]}`
   return key
 }
-const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === planSuggest.value))
-const currentPlan = computed(() => plans.value.find(plan => plan.name === planCurrrent.value))
+
+const currentData = computed(() => orgsHashmap.value.get(currentOrganization.value?.gid ?? ''))
+
+const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === currentData.value?.planSuggest))
+const currentPlan = computed(() => plans.value.find(plan => plan.name === currentData.value?.planCurrrent))
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id)
-    await openCheckout(plan.stripe_id, window.location.href, window.location.href, plan.price_y !== plan.price_m ? isYearly.value : false)
+    await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `${window.location.href}?cancel=1`, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
   isSubscribeLoading.value[index] = false
 }
 
@@ -91,60 +117,139 @@ function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | '
 }
 
 function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): boolean {
-  return plan.price_y !== plan.price_m && t === 'y'
+  return t === 'y'
 }
 
 // function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
 //   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 // }
 
-async function getUsages() {
+async function getUsages(orgId: string) {
   // get aapp_stats
-  if (!main.user?.id)
+
+  const stats = await getTotalStats(orgId)
+  const bestPlan = await findBestPlan(stats)
+  return { stats, bestPlan }
+}
+
+async function loadData(initial: boolean) {
+  if (!initialLoad.value && !initial)
     return
-  stats.value = await getTotalStats(main.auth?.id)
-  await findBestPlan(stats.value).then(res => planSuggest.value = res)
+
+  await organizationStore.awaitInitialLoad()
+
+  const orgToLoad = currentOrganization.value
+  const orgId = orgToLoad?.gid
+  if (!orgId)
+    throw new Error('Cannot get current org id')
+
+  if (orgsHashmap.value.has(orgId))
+    return
+
+  const data = defaultPlanOrgData()
+
+  await Promise.all([
+    // Plans are not linked to orgs, keep them as is
+    initial
+      ? getPlans().then((pls) => {
+        const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
+        newPlans.push(...pls)
+        plans.value = newPlans
+      })
+      : Promise.resolve(),
+    getUsages(orgId).then((res) => {
+      data.stats = res.stats
+      data.planSuggest = res.bestPlan
+      // updateData()
+    }),
+    getCurrentPlanNameOrg(orgId).then((res) => {
+      data.planCurrrent = res
+      // updateData()
+    }),
+    getPlanUsagePercent(orgId).then((res) => {
+      console.log(res)
+      data.planPercent = res
+      // updateData()
+    }).catch(err => console.log(err)),
+    // isPayingOrg(orgId).then(res => {
+    //   data.paying = res
+    // })
+  ])
+
+  data.paying = orgToLoad.paying
+  data.trialDaysLeft = orgToLoad.trial_left
+
+  orgsHashmap.value.set(orgId, data)
+  initialLoad.value = true
 }
 
-async function loadData() {
-  isLoading.value = true
-  await getPlans().then((pls) => {
-    plans.value.length = 0
-    plans.value.push(...pls)
-  })
-  await getUsages()
-  await getCurrentPlanName(main.auth?.id).then(res => planCurrrent.value = res)
-  try {
-    await getPlanUsagePercent(main.auth?.id).then(res => planPercent.value = res)
-  }
-  catch (error) {
-    console.log(error)
-  }
-  isLoading.value = false
-}
+// watch(
+//   () => plans.value,
+//   (myPlan, prevMyPlan) => {
+//     if (myPlan && !prevMyPlan) {
+//       loadData(true)
+//       // reGenerate annotations
+//       isUsageLoading.value = true
+//     }
+//     else if (prevMyPlan && !myPlan) {
+//       isUsageLoading.value = true
+//     }
+//   },
+// )
 
-watch(
-  () => plans.value,
-  (myPlan, prevMyPlan) => {
-    if (myPlan && !prevMyPlan) {
-      loadData()
-      // reGenerate annotations
-      isLoading.value = false
+watch(currentOrganization, async (newOrg, prevOrg) => {
+  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
+
+  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
+    if (!initialLoad.value) {
+      const orgsMap = organizationStore.getAllOrgs()
+      const newOrg = [...orgsMap]
+        .map(([_, a]) => a)
+        .filter(org => org.role.includes('super_admin'))
+        .sort((a, b) => b.app_count - a.app_count)[0]
+
+      if (newOrg) {
+        organizationStore.setCurrentOrganization(newOrg.gid)
+        return
+      }
     }
-    else if (prevMyPlan && !myPlan) {
-      isLoading.value = true
+
+    displayStore.dialogOption = {
+      header: t('cannot-view-plans'),
+      message: `${t('plans-super-only')}`,
+      buttons: [
+        {
+          text: t('ok'),
+        },
+      ],
     }
-  },
-)
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+    if (!prevOrg)
+      router.push('/app/home')
+    else
+      organizationStore.setCurrentOrganization(prevOrg.gid)
+  }
+
+  await loadData(false)
+
+  // isSubscribeLoading.value.fill(false, 0, plans.value.length)
+})
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
-      toast.success(t('usage-success'))
+      // toast.success(t('usage-success'))
+      thankYouPage.value = true
     }
     else if (main.user?.id) {
-      loadData()
+      if (route.query.oid && typeof route.query.oid === 'string') {
+        await organizationStore.awaitInitialLoad()
+        organizationStore.setCurrentOrganization(route.query.oid)
+      }
+
+      loadData(true)
       snag.track({
         channel: 'usage',
         event: 'User visit',
@@ -156,17 +261,17 @@ watchEffect(async () => {
   }
 })
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
-  return (currentPlan.value?.name === plan.name && main.paying) || isMobile
+  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying) || isMobile
 }
 
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: (main.paying || main.trialDaysLeft > 0) ? t('Current') : t('failed'),
+    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0) ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {
     label: t('usage'),
-    value: `${planPercent.value.toLocaleString()} %`,
+    value: (currentData.value && currentData.value?.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
   },
   {
     label: t('best-plan'),
@@ -176,7 +281,7 @@ const hightLights = computed<Stat[]>(() => ([
 </script>
 
 <template>
-  <div v-if="!isLoading" class="h-full bg-white max-h-fit dark:bg-gray-800">
+  <div v-if="!thankYouPage" class="h-full bg-white max-h-fit dark:bg-gray-800">
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
@@ -227,7 +332,7 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </div>
       <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="(p, index) in displayPlans" :key="p.id" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+        <div v-for="(p, index) in displayPlans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -249,12 +354,14 @@ const hightLights = computed<Stat[]>(() => ([
               {{ t(convertKey(p.description)) }}
             </p>
             <p class="mt-8">
-              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">${{ getPrice(p, segmentVal) }}</span>
+              <span class="text-4xl font-extrabold text-gray-900 dark:text-white">
+                ${{ getPrice(p, segmentVal) }}
+              </span>
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
             <button
               v-if="p.stripe_id !== 'free'"
-              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && main.paying }"
+              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && currentData?.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="isDisabled(p)" @click="openChangePlan(p, index)"
             >
@@ -269,10 +376,10 @@ const hightLights = computed<Stat[]>(() => ([
                 />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && main.paying ? t('Current') : t('plan-upgrade')) }}
+              {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && currentData?.paying ? t('Current') : t('plan-upgrade')) }}
             </button>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-8">
-              <span class="text-gray-900 dark:text-white">{{ t('billed-annually-at') }} ${{ p.price_y }}</span>
+              <span class="text-gray-900 dark:text-white">{{ p.price_m !== p.price_y ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ p.price_y }}</span>
             </p>
           </div>
           <div class="px-6 pt-6 pb-8">
@@ -425,6 +532,21 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </section>
     </div>
+  </div>
+  <div v-else class="relative w-full overflow-hidden ">
+    <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
+      <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+      {{ t('thank-you-for-sub') }}
+      <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
+      <router-link class="mt-[40vh]" to="/app/home">
+        <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
+      </router-link>
+    </div>
+    <vue-particles
+      id="tsparticles"
+      class="absolute z-0 w-full h-full"
+      :options="test"
+    />
   </div>
 </template>
 

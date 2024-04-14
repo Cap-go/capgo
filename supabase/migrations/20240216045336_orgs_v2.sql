@@ -36,6 +36,14 @@ Begin
 End;
 $$;
 
+-- Spoof the api key
+-- DO $$
+-- BEGIN
+-- execute format('set request.headers=%L', (select jsonb_build_object('capgkey', 'd3456c8f-7ce7-44c5-9967-a52b8bef35ee')::text));
+-- END $$ LANGUAGE "plpgsql";
+-- SELECT ("current_setting"('request.headers'::"text", true));
+-- 
+
 -- This will allow the usage of apikeys
 CREATE OR REPLACE FUNCTION "public"."get_identity"("keymode" "public"."key_mode"[]) RETURNS uuid
     LANGUAGE "plpgsql" SECURITY DEFINER

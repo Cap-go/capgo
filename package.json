@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.573.0",
+  "version": "10.574.0-alpha.0",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -60,7 +60,8 @@
     "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
     "clickhouse:seed": "cd ./tests_backend/gh_actions && sh ./clickhouse-seed.sh && cd ../..",
     "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && rm -rf /tmp/ch_*",
-    "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts"
+    "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts",
+    "generate-plans": "cd scripts && bun run generate_plans.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
@@ -113,6 +114,8 @@
     "@revenuecat/purchases-capacitor": "^7.5.2",
     "@supabase/supabase-js": "2.39.6",
     "@tailwindcss/forms": "^0.5.7",
+    "@tsparticles/preset-confetti": "^3.0.2",
+    "@tsparticles/vue3": "^3.0.1",
     "@vueuse/components": "^10.9.0",
     "@vueuse/core": "10.7.2",
     "@zip.js/zip.js": "2.7.34",
@@ -153,6 +156,7 @@
     "prism-theme-vars": "^0.2.4",
     "semver": "^7.6.0",
     "stripe": "^14.22.0",
+    "tsparticles": "^3.3.0",
     "unplugin-auto-import": "^0.17.5",
     "unplugin-vue-macros": "^2.7.10",
     "unplugin-vue-router": "^0.7.0",

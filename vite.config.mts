@@ -5,7 +5,7 @@ import VueI18n from '@intlify/unplugin-vue-i18n/vite'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import WebfontDownload from 'vite-plugin-webfont-dl'
 import { VueRouterAutoImports } from 'unplugin-vue-router'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import Vue from '@vitejs/plugin-vue'
 
 // import veauryVitePlugins from 'veaury/vite/index'
@@ -18,7 +18,7 @@ import Components from 'unplugin-vue-components/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import { branch, getRightKey } from './scripts/utils.mjs'
+import { branch, getRightKey, getPlansPath } from './scripts/utils.mjs'
 import pack from './package.json'
 
 function getUrl(key = 'base_domain'): string {
@@ -71,6 +71,7 @@ export default defineConfig({
     VITE_API_HOST: `${getUrl('api_domain')}`,
     VITE_BRANCH: branch,
     package_dependencies: JSON.stringify(pack.dependencies),
+    payment_plans: readFileSync(getPlansPath(), 'utf-8').toString(),
     domain: getUrl(),
     pls_domain: 'web.capgo.app',
     logsnag: 'c124f5e9d0ce5bdd14bbb48f815d5583',

@@ -5,10 +5,10 @@ import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias as alias_postgres } from 'drizzle-orm/pg-core'
 import postgres from 'postgres'
-import { isAllowedAction } from './supabase.ts'
+import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
-import { sendNotif, sendNotifOrg } from './notifications.ts'
+import { sendNotifOrg } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
@@ -229,13 +229,14 @@ async function getAppOwnerPostgres(
   alias: typeof alias_postgres,
   drizzleCient: ReturnType<typeof drizzle_postgress>,
   schema: typeof schema_postgres,
-): Promise<{ owner_org: string, orgs: { created_by: string } } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
     const appOwner = await drizzleCient
       .select({
         owner_org: schema.apps.owner_org,
         orgs: {
           created_by: schema.orgs.created_by,
+          id: schema.orgs.id,
         },
       })
       .from(schema.apps)
@@ -320,7 +321,7 @@ export async function update(c: Context, body: AppInfos) {
     }
     // if plugin_version is < 4 send notif to alert
     if (semver.lt(plugin_version, '5.0.0')) {
-      const sent = await sendNotif(c, 'user:plugin_issue', {
+      const sent = await sendNotifOrg(c, 'user:plugin_issue', {
         current_app_id: app_id,
         current_device_id: device_id,
         current_version_id: version_build,
@@ -404,7 +405,7 @@ export async function update(c: Context, body: AppInfos) {
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    const planValid = await isAllowedAction(c, appOwner.orgs.created_by)
+    const planValid = await isAllowedActionOrg(c, appOwner.orgs.id)
     device.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {

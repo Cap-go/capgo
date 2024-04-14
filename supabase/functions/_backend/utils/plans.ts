@@ -1,18 +1,18 @@
 import type { Context } from 'hono'
-import { logsnag } from './logsnag.ts'
-import { sendNotif } from './notifications.ts'
 import {
   getCurrentPlanName,
   getPlanUsagePercent,
   isFreeUsage,
-  isGoodPlan,
-  isOnboarded,
+  isGoodPlanOrg,
+  isOnboardedOrg,
   isOnboardingNeeded,
-  isTrial,
+  isTrialOrg,
   supabaseAdmin,
 } from './supabase.ts'
+import { sendNotifOrg } from './notifications.ts'
 import type { Database } from './supabase.types.ts'
 import { recordUsage, setThreshold } from './stripe.ts'
+import { logsnag } from './logsnag.ts'
 import { trackEvent } from './plunk.ts'
 
 function planToInt(plan: string) {
@@ -115,7 +115,8 @@ async function setMetered(c: Context, customer_id: string | null, userId: string
   }
 }
 
-export async function checkPlan(c: Context, userId: string): Promise<void> {
+export async function checkPlanOrg(c: Context, userId: string): Promise<void> {
+  // TODO: change the funciton to use the org instead of user id
   try {
     const { data: user, error: userError } = await supabaseAdmin(c)
       .from('users')
@@ -124,7 +125,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
       .single()
     if (userError)
       throw userError
-    if (await isTrial(c, userId)) {
+    if (await isTrialOrg(c, userId)) {
       const { error } = await supabaseAdmin(c)
         .from('stripe_info')
         .update({ is_good_plan: true })
@@ -134,8 +135,8 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         console.error('error.message', error.message)
       return Promise.resolve()
     }
-    const is_good_plan = await isGoodPlan(c, userId)
-    const is_onboarded = await isOnboarded(c, userId)
+    const is_good_plan = await isGoodPlanOrg(c, userId)
+    const is_onboarded = await isOnboardedOrg(c, userId)
     const is_onboarding_needed = await isOnboardingNeeded(c, userId)
     const is_free_usage = await isFreeUsage(c, userId)
     const percentUsage = await getPlanUsagePercent(c, userId)
@@ -160,7 +161,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
           }).catch()
         }
         else if (planToInt(best_plan) > planToInt(current_plan)) {
-          const sent = await sendNotif(c, `user:upgrade_to_${bestPlanKey}`, { current_best_plan: bestPlanKey }, userId, '0 0 * * 1', 'red')
+          const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { current_best_plan: bestPlanKey }, userId, '0 0 * * 1', 'red')
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
             console.log(`user:upgrade_to_${bestPlanKey}`, userId)
@@ -189,7 +190,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
       // check if user is at more than 90%, 50% or 70% of plan usage
       if (percentUsage >= 90) {
         // cron every month * * * * 1
-        const sent = await sendNotif(c, 'user:90_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'red')
+        const sent = await sendNotifOrg(c, 'user:90_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'red')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
           await logsnag(c).track({
@@ -203,7 +204,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
       }
       else if (percentUsage >= 70) {
         // cron every month * * * * 1
-        const sent = await sendNotif(c, 'user:70_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
+        const sent = await sendNotifOrg(c, 'user:70_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
           await logsnag(c).track({
@@ -216,7 +217,7 @@ export async function checkPlan(c: Context, userId: string): Promise<void> {
         }
       }
       else if (percentUsage >= 50) {
-        const sent = await sendNotif(c, 'user:50_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
+        const sent = await sendNotifOrg(c, 'user:50_percent_of_plan', { current_percent: percentUsage }, userId, '0 0 1 * *', 'orange')
         if (sent) {
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
           await logsnag(c).track({
