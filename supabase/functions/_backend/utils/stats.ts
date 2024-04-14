@@ -3,7 +3,7 @@ import { trackBandwidthUsage, trackDeviceUsage, trackVersionUsage } from './supa
 import { trackBandwidthUsageCF, trackDeviceUsageCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
-  if (!c.env.APP_USAGE)
+  if (!c.env.DEVICE_USAGE)
     return trackDeviceUsage(c, device_id, app_id)
   return trackDeviceUsageCF(c, device_id, app_id)
 }
