@@ -120,6 +120,9 @@ function roundNumber(number: number) {
 }
 
 async function loadData(initial: boolean) {
+  if (isLoading.value)
+    return
+
   isLoading.value = true
   await organizationStore.awaitInitialLoad()
   const gid = organizationStore?.currentOrganization?.gid ?? ''
@@ -136,6 +139,11 @@ async function loadData(initial: boolean) {
   isLoading.value = false
   initialLoad.value = true
 }
+
+onMounted(async () => {
+  await organizationStore.awaitInitialLoad()
+  await loadData(true)
+})
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
   // isSubscribeLoading.value.fill(true, 0, plans.value.length)
