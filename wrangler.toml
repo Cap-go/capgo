@@ -15,3 +15,11 @@ dataset = "bandwidth_usage"
 [[analytics_engine_datasets]]
 binding = "VERSION_USAGE"
 dataset = "version_usage"
+
+[[analytics_engine_datasets]]
+binding = "APP_LOGS"
+dataset = "app_logs"
+
+[[analytics_engine_datasets]]
+binding = "DEVICE_INFOS"
+dataset = "devices_infos"
