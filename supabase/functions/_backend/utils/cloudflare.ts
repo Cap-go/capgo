@@ -5,6 +5,8 @@ export interface Bindings {
   DEVICE_USAGE: AnalyticsEngineDataPoint
   BANDWIDTH_USAGE: AnalyticsEngineDataPoint
   VERSION_USAGE: AnalyticsEngineDataPoint
+  APP_LOG: AnalyticsEngineDataPoint
+  DEVICE_INFO: AnalyticsEngineDataPoint
 }
 
 export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string) {
@@ -36,19 +38,21 @@ export function trackVersionUsageCF(c: Context, version_id: number, app_id: stri
 }
 
 export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
-  if (!c.env.APP_LOGS)
+  if (!c.env.APP_LOG)
     return
-  c.env.APP_LOGS.writeDataPoint({
-    blobs: [device_id, action, version_id],
+  c.env.APP_LOG.writeDataPoint({
+    blobs: [device_id, action],
+    doubles: [version_id],
     indexes: [app_id],
   })
 }
 
-export function trackDevicesCF(c: Context, app_id: string, device_id: string, version: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DEVICE_INFOS)
+export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  if (!c.env.DEVICE_INFO)
     return
-  c.env.DEVICE_INFOS.writeDataPoint({
-    blobs: [device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
+  c.env.DEVICE_INFO.writeDataPoint({
+    blobs: [device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
+    doubles: [version_id],
     indexes: [app_id],
   })
 }

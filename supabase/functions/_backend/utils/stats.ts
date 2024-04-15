@@ -22,13 +22,13 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
 }
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
-  if (!c.env.APP_LOGS)
+  if (!c.env.APP_LOG)
     return
   return trackLogsCF(c, app_id, device_id, action, version_id)
 }
 
 export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DEVICE_INFOS)
+  if (!c.env.DEVICE_INFO)
     return
   return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }

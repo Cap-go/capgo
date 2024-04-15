@@ -4,7 +4,7 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import { getAppsFromSupabase } from './supabase.ts'
-import { createStatsDevices, createStatsLogs } from './stats.ts';
+import { createStatsDevices, createStatsLogs } from './stats.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
