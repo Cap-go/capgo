@@ -62,7 +62,7 @@ export function trackMetaCF(c: Context, meta: ClickHouseMeta) {
   if (!c.env.VERSION_META)
     return
   c.env.VERSION_META.writeDataPoint({
-    doubles: [meta.action === 'add' ? meta.size : -meta.size],
+    doubles: [meta.id, meta.action === 'add' ? meta.size : -meta.size],
     indexes: [meta.app_id],
   })
 }
