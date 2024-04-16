@@ -1,5 +1,6 @@
 import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04-03'
 import type { Context } from 'hono'
+import { ClickHouseMeta } from './clickhouse.ts';
 
 export interface Bindings {
   DEVICE_USAGE: AnalyticsEngineDataPoint
@@ -54,6 +55,15 @@ export function trackDevicesCF(c: Context, app_id: string, device_id: string, ve
     blobs: [device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
     doubles: [version_id],
     indexes: [app_id],
+  })
+}
+
+export function trackMetaCF(c: Context, meta: ClickHouseMeta) {
+  if (!c.env.VERSION_META)
+    return
+  c.env.VERSION_META.writeDataPoint({
+    doubles: [meta.action === 'add' ? meta.size : -meta.size],
+    indexes: [meta.app_id],
   })
 }
 

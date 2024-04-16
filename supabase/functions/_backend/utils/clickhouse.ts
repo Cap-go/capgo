@@ -4,7 +4,7 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import { getAppsFromSupabase } from './supabase.ts'
-import { createStatsDevices, createStatsLogs } from './stats.ts'
+import { createStatsDevices, createStatsLogs, createStatsMeta } from './stats.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
@@ -619,7 +619,7 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
   }
 }
 
-interface ClickHouseMeta {
+export interface ClickHouseMeta {
   id: number
   app_id: string
   created_at: string
@@ -632,6 +632,10 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
 
   console.log('sending meta to Clickhouse', meta)
   const metasReady = meta
+    .map(l => {
+      createStatsMeta(c, l)
+      return l
+    })
     .map(convertAllDatesToCH)
     .map(l => JSON.stringify(l)).join('\n')
 
