@@ -632,7 +632,7 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
 
   console.log('sending meta to Clickhouse', meta)
   const metasReady = meta
-    .map(l => {
+    .map((l) => {
       createStatsMeta(c, l)
       return l
     })

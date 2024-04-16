@@ -1,6 +1,6 @@
 import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04-03'
 import type { Context } from 'hono'
-import { ClickHouseMeta } from './clickhouse.ts';
+import type { ClickHouseMeta } from './clickhouse.ts'
 
 export interface Bindings {
   DEVICE_USAGE: AnalyticsEngineDataPoint
