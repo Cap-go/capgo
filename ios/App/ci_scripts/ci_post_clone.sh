@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 
 set -e
@@ -16,6 +17,7 @@ npm -v
 echo "📦 Install bun"
 brew tap oven-sh/bun
 brew install bun 
+bun -v
 
 echo "Move to the project root"
 echo $PWD

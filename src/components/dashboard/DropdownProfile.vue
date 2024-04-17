@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
-import { getCurrentPlanName } from '~/services/supabase'
 import { openMessenger } from '~/services/chatwoot'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
@@ -19,7 +18,6 @@ const { t } = useI18n()
 const router = useRouter()
 const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()
-const planCurrent = ref('')
 const acronym = computed(() => {
   let res = 'MD'
   if (main.user?.first_name && main.user.last_name)
@@ -30,8 +28,6 @@ const acronym = computed(() => {
     res = main.user?.last_name[0]
   return res.toUpperCase()
 })
-
-getCurrentPlanName(main.user?.id).then(res => planCurrent.value = res)
 
 const dropdownOpen = ref(false)
 
@@ -78,11 +74,8 @@ onUnmounted(() => {
     >
       <div v-show="dropdownOpen" class="absolute top-full z-30 mt-1 min-w-44 origin-top-right overflow-hidden border border-slate-200 rounded bg-gray-100 py-1.5 shadow-lg" :class="props.align === 'right' ? 'right-0' : 'left-0'">
         <div class="mb-1 border-b border-slate-200 px-3 pb-2 pt-0.5">
-          <div class="font-medium text-slate-800">
+          <div class="font-medium text-slate-800 mb-1 mt-1">
             {{ `${main.user?.first_name} ${main.user?.last_name}` }}
-          </div>
-          <div class="text-xs font-bold text-slate-900">
-            {{ planCurrent }} plan
           </div>
         </div>
         <ul

@@ -15,16 +15,7 @@ export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
   const path = ref('')
   const user = ref<Database['public']['Tables']['users']['Row']>()
-  const cycleInfo = ref<{
-    subscription_anchor_start: string
-    subscription_anchor_end: string
-  }>()
-  const trialDaysLeft = ref<number>(0)
-  const paying = ref<boolean>(false)
   const isAdmin = ref<boolean>(false)
-  const canceled = ref<boolean>(false)
-  const goodPlan = ref<boolean>(false)
-  const canUseMore = ref<boolean>(false)
   const dashboard = ref<appUsage[]>([])
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
@@ -78,8 +69,8 @@ export const useMainStore = defineStore('main', () => {
 
   return {
     auth,
-    trialDaysLeft,
-    goodPlan,
+    // trialDaysLeft,
+    // goodPlan,
     isAdmin,
     totalStorage,
     totalDevices,
@@ -89,11 +80,11 @@ export const useMainStore = defineStore('main', () => {
     getTotalStats,
     filterDashboard,
     dashboard,
-    canceled,
-    canUseMore,
-    paying,
+    // canceled,
+    // canUseMore,
+    // paying,
     user,
-    cycleInfo,
+    // cycleInfo,
     path,
     logout,
   }

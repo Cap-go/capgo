@@ -1,8 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-
 import { z } from 'zod'
-
 import * as semver from 'semver'
 import {
   INVALID_STRING_APP_ID,
@@ -21,15 +19,16 @@ import {
   isLimited,
   reverseDomainRegex,
 } from '../utils/utils.ts'
-import { getSDevice, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import type { AppStats } from '../utils/types.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sendNotif } from '../utils/notifications.ts'
+import { sendNotifOrg } from '../utils/notifications.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/clickhouse.ts'
 import { sendStatsAndDevice } from '../utils/clickhouse.ts'
+import { createStatsVersion } from '../utils/stats.ts'
 
 // import { saveStoreInfo, sendStatsAndDevice, updateInClickHouse } from '../utils/clickhouse.ts'
 
@@ -55,6 +54,10 @@ export const jsonRequestSchema = z.object({
     required_error: MISSING_STRING_VERSION_NAME,
     invalid_type_error: NON_STRING_VERSION_NAME,
   }),
+  old_version_name: z.optional(z.string({
+    required_error: MISSING_STRING_VERSION_NAME,
+    invalid_type_error: NON_STRING_VERSION_NAME,
+  })),
   version_os: z.string({
     required_error: MISSING_STRING_VERSION_OS,
     invalid_type_error: NON_STRING_VERSION_OS,
@@ -96,6 +99,7 @@ async function post(c: Context, body: AppStats) {
     } = body
     const {
       platform,
+      old_version_name,
       app_id,
       version_os,
       device_id,
@@ -152,7 +156,7 @@ async function post(c: Context, body: AppStats) {
 
     const { data: appVersion } = await supabaseAdmin(c)
       .from('app_versions')
-      .select('id, user_id')
+      .select('id, owner_org')
       .eq('app_id', app_id)
       .or(`name.eq.${version_name}`)
       .single()
@@ -160,28 +164,35 @@ async function post(c: Context, body: AppStats) {
     if (appVersion) {
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
-        const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
-        if (res && res.data && res.data.length) {
-          const oldDevice = res.data[0]
-          const oldVersion = oldDevice.version
-          if (oldVersion !== appVersion.id)
-            statsActions.push({ action: 'uninstall', versionId: oldVersion ?? undefined })
+        await createStatsVersion(c, device.version, app_id, 'install')
+        if (old_version_name) {
+          const { data: oldVersion } = await supabaseAdmin(c)
+            .from('app_versions')
+            .select('id')
+            .eq('app_id', app_id)
+            .eq('name', old_version_name)
+            .single()
+          if (oldVersion && oldVersion.id !== appVersion.id) {
+            await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
+            statsActions.push({ action: 'uninstall', versionId: oldVersion.id })
+          }
         }
       }
       else if (failActions.includes(action)) {
+        await createStatsVersion(c, appVersion.id, app_id, 'fail')
         console.log('FAIL!')
-        const sent = await sendNotif(c, 'user:update_fail', {
+        const sent = await sendNotifOrg(c, 'user:update_fail', {
           current_app_id: app_id,
           current_device_id: device_id,
           current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
-        }, appVersion.user_id, '0 0 * * 1', 'orange')
+        }, appVersion.owner_org, '0 0 * * 1', 'orange')
         if (sent) {
           await logsnag(c).track({
             channel: 'updates',
             event: 'update fail',
             icon: '⚠️',
-            user_id: appVersion.user_id ?? undefined,
+            user_id: appVersion.owner_org ?? undefined,
             tags: {
               app_id,
               device_id,

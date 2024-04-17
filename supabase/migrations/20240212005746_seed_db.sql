@@ -32,7 +32,7 @@ BEGIN
     INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "app", "channel", "update", "version", "shared", "abtest", "progressive_deploy", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
     ('2022-06-05 12:25:28+00', '2022-10-05 16:00:46.563382+00', 'Free', 'plan.free.desc', 0, 0, 'free', 1, 1, 500, 10, 0, 'f', 'f', 'c2f582d7-7dcb-4a65-b8da-82cc74a0645d', 'free', 'free', 0.1, 0.5, 50, 'Best for discover', 0, 0, 0, NULL, NULL, NULL),
     ('2022-05-31 10:59:55+00', '2023-02-18 17:03:23.973973+00', 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 3, 10, 25000, 100, 10, 'f', 'f', '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3, 250, 5000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
-    ('2022-08-24 16:07:00+00', '2023-02-18 17:07:39.265733+00', 'Pay as you go', 'plan.payasyougo.desc', 499, 4799, 'prod_MH5Jh6ajC9e7ZH', 100, 500, 2500000, 1000, 0, 't', 't', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYXUuGH46eYKnWwSmubGnjs', 12, 3000, 40000, 'Best for scalling enterprises', 0.5, 0.9, 0.0006, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
+    ('2022-08-24 16:07:00+00', '2023-02-18 17:07:39.265733+00', 'Pay as you go', 'plan.payasyougo.desc', 499, 4799, 'prod_MH5Jh6ajC9e7ZH', 100, 500, 2500000, 1000, 0, 't', 't', '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12, 3000, 40000, 'Best for scalling enterprises', 0.5, 0.9, 0.0006, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
     ('2022-05-31 10:58:34+00', '2022-05-31 10:58:34+00', 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 1, 2, 2500, 10, 0, 'f', 'f', '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1, 25, 500, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
     ('2022-05-31 11:01:56+00', '2022-10-04 16:03:29.836516+00', 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 10, 50, 250000, 1000, 1000, 't', 't', 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6, 500, 10000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
 
@@ -45,15 +45,18 @@ BEGIN
     (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0kknt1qWFkZx', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
     (now(), '2023-03-21 03:04:42.120379+00', 'free', 'cus_Pa0f3M6UCQ8g5Q', NULL, 'free', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days');
 
+    -- Do not insert new orgs
+    ALTER TABLE users DISABLE TRIGGER generate_org_on_user_create;
     INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
     ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Pa0k8TO6HVln6A', NULL),
     ('2022-06-03 05:54:15+00', '', 'test', 'Capgo', NULL, 'test@capgo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Pa0kknt1qWFkZx', NULL),
     ('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '2023-03-21 01:00:01.707314+00', 'f', 'f', 'f', 'cus_Pa0f3M6UCQ8g5Q', NULL);
+    ALTER TABLE users ENABLE TRIGGER generate_org_on_user_create;
 
-    INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name") VALUES
-    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Admin org'),
-    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Demo org'),
-    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Test2 org');
+    INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name", "management_email", "customer_id") VALUES
+    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A'),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Demo org', 'test@capgo.app', 'cus_Pa0kknt1qWFkZx'),
+    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', '2022-03-07 14:08:28.910887+00', '2022-03-07 14:08:28.910887+00', '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q');
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"user_min_right", null, null),
@@ -134,6 +137,8 @@ BEGIN
     ("gen_random_uuid"(), 'com.demo.app', '2023-03-29', 20, 180948, 0, 2441264, 1, 2, 3, 4),
     ("gen_random_uuid"(), 'com.demo.app', '2023-03-30', 20, 180948, 0, 2441264, 1, 2, 3, 4);
 
+    -- Drop replicated orgs but keet the the seed ones
+    DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

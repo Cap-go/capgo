@@ -56,3 +56,6 @@ supabase/functions/_script/import_d1.sh
 src/types/supabase.types.ts
 supabase/functions/_backend/utils/supabase.types.ts
 .env.alpha
+
+vite\.config\.mts\.timestamp-[A-Za-z0-9]+-([A-Za-z0-9]+(\.[A-Za-z0-9]+)+)
+vite.config.mts.timestamp-1712411621093-7395fe6f168c5.mjs

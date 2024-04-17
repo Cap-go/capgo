@@ -1,4 +1,4 @@
-CREATE TABLE devices_usage (
+CREATE TABLE device_usage (
   id SERIAL PRIMARY KEY,
   device_id VARCHAR(255) NOT NULL,
   app_id VARCHAR(255) NOT NULL,

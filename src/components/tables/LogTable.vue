@@ -131,23 +131,7 @@ columns.value = [
     sortable: false,
     displayFunction: (elem: typeof element) => elem.version.name,
   },
-  {
-    label: t('version-build'),
-    key: 'version_build',
-    mobile: 'after',
-    sortable: false,
-  },
 ]
-
-if (!props.deviceId) {
-  columns.value.push({
-    label: t('device'),
-    key: 'platform',
-    mobile: 'after',
-    sortable: false,
-    displayFunction: (elem: typeof element) => `${elem.device_id} ${elem.platform}`,
-  })
-}
 
 async function reload() {
   console.log('reload')

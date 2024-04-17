@@ -73,7 +73,7 @@ watch(type, (val) => {
 
 watchEffect(() => {
   if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && !tabs.value.find(tab => tab.label === 'plans')) {
+    && !organizationTabs.value.find(tab => tab.label === 'plans')) {
     organizationTabs.value.push(
       {
         label: 'plans',
@@ -82,7 +82,7 @@ watchEffect(() => {
       },
     )
   }
-  else {
+  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
   }
   if (!Capacitor.isNativePlatform()
@@ -92,10 +92,10 @@ watchEffect(() => {
       label: 'billing',
       icon: shallowRef(IconBilling) as any,
       key: '/billing',
-      onClick: openPortal,
+      onClick: () => openPortal(organizationStore.currentOrganization?.gid),
     })
   }
-  else {
+  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
   // if (!Capacitor.isNativePlatform()
@@ -133,8 +133,10 @@ watchEffect(() => {
   //   organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'invoices')
   // }
 
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && (main.paying && !organizationTabs.value.find(tab => tab.label === 'usage'))) {
+  // TODO: reenable after we fix usage
+  if (organizationStore.currentOrganization?.paying
+    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+    && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
     // push it 2 before the last tab
     organizationTabs.value.splice(tabs.value.length - 2, 0, {
       label: 'usage',
@@ -142,8 +144,8 @@ watchEffect(() => {
       key: '/dashboard/settings/usage',
     })
   }
-  else if (!main.paying && organizationTabs.value.find(tab => tab.label === 'usage')) {
-    organizationTabs.value = tabs.value.filter(tab => tab.label !== 'usage')
+  else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
   }
   if ((main.isAdmin || isSpoofed()) && !tabs.value.find(tab => tab.label === 'admin')) {
     tabs.value.push({

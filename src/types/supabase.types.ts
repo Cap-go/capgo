@@ -708,6 +708,99 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_bandwidth: {
+        Row: {
+          app_id: string
+          bandwidth: number
+          date: string
+          id: number
+        }
+        Insert: {
+          app_id: string
+          bandwidth: number
+          date: string
+          id?: number
+        }
+        Update: {
+          app_id?: string
+          bandwidth?: number
+          date?: string
+          id?: number
+        }
+        Relationships: []
+      }
+      daily_mau: {
+        Row: {
+          app_id: string
+          date: string
+          id: number
+          mau: number
+        }
+        Insert: {
+          app_id: string
+          date: string
+          id?: number
+          mau: number
+        }
+        Update: {
+          app_id?: string
+          date?: string
+          id?: number
+          mau?: number
+        }
+        Relationships: []
+      }
+      daily_storage: {
+        Row: {
+          app_id: string
+          date: string
+          id: number
+          storage: number
+        }
+        Insert: {
+          app_id: string
+          date: string
+          id?: number
+          storage: number
+        }
+        Update: {
+          app_id?: string
+          date?: string
+          id?: number
+          storage?: number
+        }
+        Relationships: []
+      }
+      daily_version: {
+        Row: {
+          app_id: string
+          date: string
+          fail: number | null
+          get: number | null
+          install: number | null
+          uninstall: number | null
+          version: number
+        }
+        Insert: {
+          app_id: string
+          date: string
+          fail?: number | null
+          get?: number | null
+          install?: number | null
+          uninstall?: number | null
+          version: number
+        }
+        Update: {
+          app_id?: string
+          date?: string
+          fail?: number | null
+          get?: number | null
+          install?: number | null
+          uninstall?: number | null
+          version?: number
+        }
+        Relationships: []
+      }
       deleted_account: {
         Row: {
           created_at: string | null
@@ -723,6 +816,27 @@ export type Database = {
           created_at?: string | null
           email?: string
           id?: string
+        }
+        Relationships: []
+      }
+      device_usage: {
+        Row: {
+          app_id: string
+          device_id: string
+          id: number
+          timestamp: string
+        }
+        Insert: {
+          app_id: string
+          device_id: string
+          id?: number
+          timestamp?: string
+        }
+        Update: {
+          app_id?: string
+          device_id?: string
+          id?: number
+          timestamp?: string
         }
         Relationships: []
       }
@@ -823,27 +937,6 @@ export type Database = {
           },
         ]
       }
-      devices_usage: {
-        Row: {
-          app_id: string
-          device_id: string
-          id: number
-          timestamp: string
-        }
-        Insert: {
-          app_id: string
-          device_id: string
-          id?: number
-          timestamp?: string
-        }
-        Update: {
-          app_id?: string
-          device_id?: string
-          id?: number
-          timestamp?: string
-        }
-        Relationships: []
-      }
       global_stats: {
         Row: {
           apps: number
@@ -939,32 +1032,32 @@ export type Database = {
           created_at: string | null
           id: string
           last_send_at: string
+          owner_org: string
           total_send: number
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           created_at?: string | null
           id: string
           last_send_at?: string
+          owner_org: string
           total_send?: number
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
           last_send_at?: string
+          owner_org?: string
           total_send?: number
           updated_at?: string | null
-          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "owner_org_id_fkey"
+            columns: ["owner_org"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -1035,24 +1128,30 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string
+          customer_id: string | null
           id: string
           logo: string | null
+          management_email: string
           name: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           created_by: string
+          customer_id?: string | null
           id?: string
           logo?: string | null
+          management_email: string
           name: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           created_by?: string
+          customer_id?: string | null
           id?: string
           logo?: string | null
+          management_email?: string
           name?: string
           updated_at?: string | null
         }
@@ -1063,6 +1162,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orgs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "stripe_info"
+            referencedColumns: ["customer_id"]
           },
         ]
       }
@@ -1162,6 +1268,30 @@ export type Database = {
           platform?: Database["public"]["Enums"]["platform_os"]
           version?: number
           version_build?: string
+        }
+        Relationships: []
+      }
+      storage_usage: {
+        Row: {
+          app_id: string
+          device_id: string
+          file_size: number
+          id: number
+          timestamp: string
+        }
+        Insert: {
+          app_id: string
+          device_id: string
+          file_size: number
+          id?: number
+          timestamp?: string
+        }
+        Update: {
+          app_id?: string
+          device_id?: string
+          file_size?: number
+          id?: number
+          timestamp?: string
         }
         Relationships: []
       }
@@ -1283,6 +1413,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      version_usage: {
+        Row: {
+          action: string
+          app_id: string
+          timestamp: string
+          version: number
+        }
+        Insert: {
+          action: string
+          app_id: string
+          timestamp: string
+          version: number
+        }
+        Update: {
+          action?: string
+          app_id?: string
+          timestamp?: string
+          version?: number
+        }
+        Relationships: []
       }
       workers: {
         Row: {
@@ -1481,6 +1632,16 @@ export type Database = {
               storage: number
             }[]
           }
+      get_current_plan_max_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }[]
+      }
       get_current_plan_name:
         | {
             Args: Record<PropertyKey, never>
@@ -1492,6 +1653,12 @@ export type Database = {
             }
             Returns: string
           }
+      get_current_plan_name_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: string
+      }
       get_customer_counts: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1500,23 +1667,24 @@ export type Database = {
           total: number
         }[]
       }
-      get_cycle_info:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              subscription_anchor_start: string
-              subscription_anchor_end: string
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              subscription_anchor_start: string
-              subscription_anchor_end: string
-            }[]
-          }
+      get_cycle_info: {
+        Args: {
+          userid: string
+        }
+        Returns: {
+          subscription_anchor_start: string
+          subscription_anchor_end: string
+        }[]
+      }
+      get_cycle_info_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: {
+          subscription_anchor_start: string
+          subscription_anchor_end: string
+        }[]
+      }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1663,9 +1831,54 @@ export type Database = {
               subscription_end: string
             }[]
           }
+      get_orgs_v5:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              gid: string
+              created_by: string
+              logo: string
+              name: string
+              role: string
+              paying: boolean
+              trial_left: number
+              can_use_more: boolean
+              is_canceled: boolean
+              app_count: number
+              subscription_start: string
+              subscription_end: string
+              management_email: string
+            }[]
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              gid: string
+              created_by: string
+              logo: string
+              name: string
+              role: string
+              paying: boolean
+              trial_left: number
+              can_use_more: boolean
+              is_canceled: boolean
+              app_count: number
+              subscription_start: string
+              subscription_end: string
+              management_email: string
+            }[]
+          }
       get_plan_usage_percent: {
         Args: {
           userid: string
+        }
+        Returns: number
+      }
+      get_plan_usage_percent_org: {
+        Args: {
+          orgid: string
         }
         Returns: number
       }
@@ -1693,6 +1906,16 @@ export type Database = {
       get_total_stats_v5: {
         Args: {
           userid: string
+        }
+        Returns: {
+          mau: number
+          bandwidth: number
+          storage: number
+        }[]
+      }
+      get_total_stats_v5_org: {
+        Args: {
+          orgid: string
         }
         Returns: {
           mau: number
@@ -1845,6 +2068,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_allowed_action_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_allowed_action_user:
         | {
             Args: Record<PropertyKey, never>
@@ -1925,6 +2154,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_canceled_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_free_usage:
         | {
             Args: Record<PropertyKey, never>
@@ -1939,6 +2174,12 @@ export type Database = {
       is_good_plan_v5: {
         Args: {
           userid: string
+        }
+        Returns: boolean
+      }
+      is_good_plan_v5_org: {
+        Args: {
+          orgid: string
         }
         Returns: boolean
       }
@@ -1966,6 +2207,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_onboarded_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_onboarding_needed:
         | {
             Args: Record<PropertyKey, never>
@@ -2006,6 +2253,18 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_paying_and_good_plan_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
+      is_paying_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_trial:
         | {
             Args: Record<PropertyKey, never>
@@ -2017,6 +2276,12 @@ export type Database = {
             }
             Returns: number
           }
+      is_trial_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: number
+      }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string

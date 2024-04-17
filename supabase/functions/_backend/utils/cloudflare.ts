@@ -1,16 +1,21 @@
-import type { AnalyticsEngineDataset } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04-03'
 import type { Context } from 'hono'
+import type { ClickHouseMeta } from './clickhouse.ts'
 
 export interface Bindings {
-  APP_USAGE: AnalyticsEngineDataset
-  BANDWIDTH_USAGE: AnalyticsEngineDataset
+  DEVICE_USAGE: AnalyticsEngineDataPoint
+  BANDWIDTH_USAGE: AnalyticsEngineDataPoint
+  VERSION_USAGE: AnalyticsEngineDataPoint
+  APP_LOG: AnalyticsEngineDataPoint
+  DEVICE_INFO: AnalyticsEngineDataPoint
 }
 
 export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string) {
-  if (!c.env.APP_USAGE)
+  if (!c.env.DEVICE_USAGE)
     return
-  c.env.APP_USAGE.writeDataPoint({
-    blobs: [device_id, app_id],
+  c.env.DEVICE_USAGE.writeDataPoint({
+    blobs: [device_id],
+    indexes: [app_id],
   })
 }
 
@@ -18,8 +23,47 @@ export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: str
   if (!c.env.BANDWIDTH_USAGE)
     return
   c.env.BANDWIDTH_USAGE.writeDataPoint({
-    blobs: [device_id, app_id],
+    blobs: [device_id],
     doubles: [file_size],
+    indexes: [app_id],
+  })
+}
+
+export function trackVersionUsageCF(c: Context, version_id: number, app_id: string, action: string) {
+  if (!c.env.VERSION_USAGE)
+    return
+  c.env.VERSION_USAGE.writeDataPoint({
+    blobs: [app_id, version_id, action],
+    indexes: [app_id],
+  })
+}
+
+export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+  if (!c.env.APP_LOG)
+    return
+  c.env.APP_LOG.writeDataPoint({
+    blobs: [device_id, action],
+    doubles: [version_id],
+    indexes: [app_id],
+  })
+}
+
+export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  if (!c.env.DEVICE_INFO)
+    return
+  c.env.DEVICE_INFO.writeDataPoint({
+    blobs: [device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
+    doubles: [version_id],
+    indexes: [app_id],
+  })
+}
+
+export function trackMetaCF(c: Context, meta: ClickHouseMeta) {
+  if (!c.env.VERSION_META)
+    return
+  c.env.VERSION_META.writeDataPoint({
+    doubles: [meta.id, meta.action === 'add' ? meta.size : -meta.size],
+    indexes: [meta.app_id],
   })
 }
 

@@ -71,6 +71,7 @@ base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billed-annually-at: Billed annually at
+billed-monthly-at: Billed monthly at
 billing: Billing
 build-your-app-and-s: build your app and sync
 build-your-code-and-: Upload to Capgo your code
@@ -114,7 +115,10 @@ cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
 cannot-share: Cannot share user id, check browser console
+cannot-show: Cannot show this page
 cannot-test-app-some: Cannot test app something wrong happened
+cannot-view-plans: Cannot view the plans page
+cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
 change: Change
 changed-password-suc: Password changed successfully
@@ -194,6 +198,7 @@ enabled-progressive-deploy: Enabled progressive deploy
 encrypted: Encrypted bundles
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
+error: Error
 external-storage: External storage
 fail: Install failed
 failed: Failed
@@ -278,6 +283,7 @@ minor: Minor
 misconfigured: Misconfigured
 misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
 mo: mo
+modify-org-info: You can modify the organization's informations here.
 module-heading: Modules
 monthly: Monthly
 monthly-active-users: Monthly active users
@@ -301,7 +307,11 @@ no-version-linked: No version, click to add
 no-version-linked-no-perm: No version
 none: None
 not-found: Not found
+not-paying-org-usage: >-
+  This organization is not paying, cannot show usage for a free trier
+  organization
 notifications: Notifications
+ok: OK
 old-onboarding-mode: old onboarding
 one-day-left: One day left
 open: Open
@@ -310,7 +320,10 @@ open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
 org-changes-saved: Organization updated successfully
+org-changes-set-email-not-unique: The management email is not unique, please select a different one
+org-changes-set-email-other-error: Cannot set the management email, please contant support
 org-invited-user: Successfully invited user to org
+organization-email: Organization's management email
 organization-name: Organization Name
 os-version: OS version
 pages: Pages
@@ -332,7 +345,7 @@ plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.
 plan-maker: Best for small business owners
 plan-member: plan member.
-plan-page-warn: Buying a plan will not affect the organizations your are invited to.
+plan-page-warn: Buying a plan will ONLY affect the "%ORG_NAME%" organization.
 plan-page-warn-2: Learn more about it.
 plan-payasyougo: Best for scalling enterprises
 plan-pricing-plans: Pricing Plans
@@ -344,6 +357,7 @@ plan-updates: Updates
 plan-upgrade: Subscribe
 plan-whats-included: What's included
 plans: Plans
+plans-super-only: Only super admins are allowed to view plans and billing
 platform: Platform
 please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
@@ -412,6 +426,7 @@ terms-of-use: Terms of Use
 test-your-update-in-: Test your update in your app
 tests: tests
 thank-you-for-choosi: Thank you for choosing Capgo !
+thank-you-for-sub: Thank You for subscribing to Capgo
 the: The
 this-page-will-self-: This page will self refresh
 title: title
@@ -441,7 +456,9 @@ upperCaseError: Should contain uppercase letters
 url: URL
 usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
+usage-super-only: Only super admins are allowed to view usage
 usage-title: Total
+use-capgo: Use Capgo
 use-the-command: 'Use the command:'
 used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate
