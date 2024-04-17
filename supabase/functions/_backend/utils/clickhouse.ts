@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import ky from 'ky'
-import type { Context } from 'hono'
+import type { Context, ExecutionContext } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import { getAppsFromSupabase } from './supabase.ts'
@@ -684,7 +684,16 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   ]).catch((error) => {
     console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
   })
-  if (c.executionCtx.waitUntil)
+
+  let context: ExecutionContext
+  try {
+    context = c.executionCtx
+  } catch (_) {
+    context = null
+  }
+
+
+  if (context && context.waitUntil)
     return c.executionCtx.waitUntil(jobs)
 
   return jobs
