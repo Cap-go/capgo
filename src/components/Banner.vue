@@ -110,6 +110,7 @@ function showInfo() {
 
   displayStore.showDialog = true
 }
+// v-if="isOrgOwner"
 </script>
 
 <template>
@@ -119,10 +120,10 @@ function showInfo() {
       <a class="text-xl font-bold text-black normal-case">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a v-if="isOrgOwner" href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
-      <button v-else class="ml-3 mr-3" @click="showInfo">
+      <a href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <!-- <button v-else class="ml-3 mr-3" @click="showInfo">
         <InformationInfo class="h-10 rounded-full w-10 bg-[#252b36]" />
-      </button>
+      </button> -->
     </div>
   </div>
 </template>

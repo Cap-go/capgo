@@ -290,9 +290,9 @@ const hightLights = computed<Stat[]>(() => ([
         <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
           {{ t('plan-desc') }}<br>
         </p>
-        <div v-if="organizationStore.organizations.length > 1" class="flex flex-row ml-auto mr-auto">
+        <div class="flex flex-row ml-auto mr-auto">
           <p class="mt-2 text-lg text-gray-700 sm:text-center dark:text-white w-fit">
-            {{ t('plan-page-warn') }}
+            {{ t('plan-page-warn').replace('%ORG_NAME%', currentOrganization?.name ?? '') }}
             <a class="text-blue-600" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
             <br>
           </p>
