@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { trackBandwidthUsage, trackDeviceUsage, trackVersionUsage } from './supabase.ts'
-import { trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
+import { readBandwidthUsageCF, readDeviceUsageCF, readStorageUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
 import type { ClickHouseMeta } from './clickhouse.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
@@ -40,16 +40,20 @@ export function createStatsMeta(c: Context, meta: ClickHouseMeta) {
   return trackMetaCF(c, meta)
 }
 
-// read mau
+export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
+  if (!c.env.DEVICE_USAGE)
+    return
+  return readDeviceUsageCF(c, app_id, start_date, end_date)
+}
 
-// export function readStatsMau(c: Context, device_id: string, app_id: string) {
-//   if (!c.env.APP_USAGE)
-//     return readDeviceUsage(c, device_id, app_id)
-//   return readDeviceUsageCF(c, device_id, app_id)
-// }
+export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
+  if (!c.env.BANDWIDTH_USAGE)
+    return
+  return readBandwidthUsageCF(c, app_id, start_date, end_date)
+}
 
-// export function readStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {
-//   if (!c.env.BANDWIDTH_USAGE)
-//     return readBandwidthUsage(c, device_id, app_id, file_size)
-//   return readBandwidthUsageCF(c, device_id, app_id, file_size)
-// }
+export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
+  if (!c.env.STORAGE_USAGE)
+    return
+  return readStorageUsageCF(c, app_id, start_date, end_date)
+}

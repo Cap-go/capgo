@@ -33,14 +33,14 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   if (existV2 && record.storage_provider === 'r2') {
     // pdate size and checksum
     console.log('V2', record.bucket_id, record.r2_path)
-    const { size, checksum } = await s3.getSizeChecksum(c, v2Path)
+    const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
         .from('app_versions_meta')
         .update({
           size,
-          checksum,
+          checksum: checksum ?? '',
         })
         .eq('id', record.id)
       if (errorUpdate)

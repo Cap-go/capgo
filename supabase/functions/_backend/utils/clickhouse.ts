@@ -367,7 +367,7 @@ export async function saveStoreInfo(c: Context, app: Database['public']['Tables'
   }
 }
 
-export async function bulkUpdateStoreApps(apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+export async function bulkUpdateStoreApps(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
   // Update a list of apps in ClickHouse (internal use only)
@@ -685,15 +685,15 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
   })
 
-  let context: ExecutionContext
+  let executionCtx: ExecutionContext | null
   try {
-    context = c.executionCtx
-  } catch (_) {
-    context = null
+    executionCtx = c.executionCtx
+  }
+  catch (_) {
+    executionCtx = null
   }
 
-
-  if (context && context.waitUntil)
+  if (executionCtx?.waitUntil)
     return c.executionCtx.waitUntil(jobs)
 
   return jobs
