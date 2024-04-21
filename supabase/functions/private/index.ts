@@ -11,6 +11,7 @@ import { app as log_as } from '../_backend/private/log_as.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
+import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as get_total_stats } from '../_backend/triggers/get_total_stats.ts'
@@ -33,6 +34,7 @@ appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/upload_link', upload_link)
+appGlobal.route('/delete_failed_version', deleted_failed_version)
 appGlobal.route('/get_total_stats', get_total_stats)
 appGlobal.route('/set_org_email', set_org_email)
 
