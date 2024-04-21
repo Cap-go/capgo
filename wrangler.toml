@@ -1,4 +1,4 @@
-name = "capgo_api"
+name = "capgo_api-preprod"
 compatibility_date = "2024-04-03"
 main = "./cloudflare_workers/index.ts"
 compatibility_flags = ["nodejs_compat"]
