@@ -47,7 +47,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id')
-      .eq('name' , body.name)
+      .eq('name', body.name)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
       .eq('user_id', apikey.user_id)
