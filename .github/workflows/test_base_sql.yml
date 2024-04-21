@@ -14,5 +14,9 @@ jobs:
         with:
           version: 1.162.4
         uses: supabase/setup-cli@v1
+      - name: 🍜 Prepare Supabase ALPHA
+        run: supabase link --project-ref aucsybvnhavogdmzwtcw
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
