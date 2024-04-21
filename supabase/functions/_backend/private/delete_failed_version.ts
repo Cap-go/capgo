@@ -29,10 +29,11 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
     if (!(await hasAppRight(c, body.app_id, userId, 'read')))
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
-    const { data: app, error: errorApp } = await supabaseAdmin(c)
+    const { error: errorApp } = await supabaseAdmin(c)
       .from('apps')
       .select('app_id, owner_org')
       .eq('app_id', body.app_id)
+      
       // .eq('user_id', userId)
       .single()
     if (errorApp) {
@@ -46,25 +47,25 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
     // console.log(body.name ?? body.bucket_id?.split('.')[0] ?? '')
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
-      .select('id')
+      .select('*')
       .eq('name', body.name)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
       .eq('user_id', apikey.user_id)
+      .eq('deleted', false)
       .single()
-    if (errorVersion) {
+    if (errorVersion || version.external_url || !version.r2_path) {
       console.log('errorVersion', errorVersion)
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
-    const filePath = `orgs/${app.owner_org}/apps/${btoa(app.app_id)}/${version.id}.zip`
-    console.log(filePath)
+    console.log(version.r2_path)
     // check if app version exist
 
-    console.log('s3.checkIfExist', filePath)
+    console.log('s3.checkIfExist', version.r2_path)
 
     // check if object exist in r2
-    const exist = await s3.checkIfExist(c, filePath)
+    const exist = await s3.checkIfExist(c, version.r2_path)
     if (exist) {
       console.log('exist', exist)
       return c.json({ status: 'Error already exist' }, 500)
