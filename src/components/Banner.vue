@@ -7,8 +7,6 @@ import { urlToAppId } from '~/services/conversion'
 
 import { useMainStore } from '~/stores/main'
 import { type Organization, useOrganizationStore } from '~/stores/organization'
-import InformationInfo from '~icons/heroicons/information-circle-solid'
-import { useDisplayStore } from '~/stores/display'
 
 defineProps({
   text: { type: String, default: '' },
@@ -17,7 +15,6 @@ defineProps({
 const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
-const displayStore = useDisplayStore()
 
 const route = useRoute()
 const appId = ref('')
@@ -101,16 +98,6 @@ const bannerColor = computed(() => {
 
   return success
 })
-
-function showInfo() {
-  displayStore.dialogOption = {
-    header: t('warning'),
-    message: t('dialog-warning-msg'),
-  }
-
-  displayStore.showDialog = true
-}
-// v-if="isOrgOwner"
 </script>
 
 <template>
