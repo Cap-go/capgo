@@ -9,7 +9,12 @@ export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
 echo "📦 Install CocoaPods"
 brew install cocoapods
 brew install node@18
+brew install vips
 brew link node@18
+
+# Install node-gyp (idk why this is required)
+npm install -g node-gyp
+
 node -v
 npm -v
 
