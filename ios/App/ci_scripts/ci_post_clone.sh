@@ -35,6 +35,10 @@ bun install
 
 # create assets
 echo "🌆 Create Assets"
+# Force install deps to make build from source instead of prebuilt binaries
+# https://sharp.pixelplumbing.com/install#custom-libvips
+npm install -g node-gyp node-addon-api
+# XCode Cloud is literally broken for 2 months now - https://developer.apple.com/forums/thread/738136?answerId=774510022#774510022
 npm run capacitor-assets
 
 # Build the app
