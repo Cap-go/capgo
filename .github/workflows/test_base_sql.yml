@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Supabase CLI
         with:
-          version: 1.148.6
+          version: 1.162.4
         uses: supabase/setup-cli@v1
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
