@@ -43,7 +43,7 @@ import { app as on_version_update } from '../supabase/functions/_backend/trigger
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
-import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
+// import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
 import { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -100,6 +100,6 @@ appTriggers.route('/get_total_stats', get_total_stats)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
-app.route('/test', testAnalytics)
+// app.route('/test', testAnalytics)
 
 export default app
