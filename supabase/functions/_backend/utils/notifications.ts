@@ -21,14 +21,14 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
     const { error } = await supabaseAdmin(c)
       .from('notifications')
       .update({
-        orgId,
+        owner_org: orgId,
         last_send_at: dayjs().toISOString(),
         total_send: past.total_send + 1,
       })
       .eq('id', `${eventName}__${orgId}`)
       .eq('owner_org', orgId)
     if (error)
-      console.log('update notif', error)
+      console.error('update notif error', error)
   }
   else {
     const { error } = await supabaseAdmin(c)
@@ -39,7 +39,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
         last_send_at: dayjs().toISOString(),
       })
     if (error)
-      console.log('insert notif', error)
+      console.error('insert notif', error)
   }
 }
 
