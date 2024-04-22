@@ -83,6 +83,10 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
       name: 'auto',
     },
     tax_id_collection: { enabled: true },
+    saved_payment_method_options: {
+      allow_redisplay_filters: 'always',
+      payment_method_save: true,
+    },
     line_items: [
       {
         price: prices.priceId,
