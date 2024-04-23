@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import type { ClickHouseMeta } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 
-export interface Bindings {
+export type Bindings = {
   DEVICE_USAGE: AnalyticsEngineDataPoint
   BANDWIDTH_USAGE: AnalyticsEngineDataPoint
   VERSION_USAGE: AnalyticsEngineDataPoint
