@@ -1,4 +1,5 @@
 import { Hono } from 'hono/tiny'
+import { sentry } from '@hono/sentry'
 
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
@@ -20,6 +21,12 @@ import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
 
+const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
+if (sentryDsn) {
+  appGlobal.use('*', sentry({
+    dsn: Deno.env.get('SENTRY_DSN_SUPABASE'),
+  }))
+}
 // Webapps API
 
 appGlobal.route('/plans', plans)

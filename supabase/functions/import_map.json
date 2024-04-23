@@ -1,5 +1,6 @@
 {
   "imports": {
+    "@hono/sentry": "npm:@hono/sentry@1.0.1",
     "hono": "https://deno.land/x/hono@v4.1.4/mod.ts",
     "hono/cors": "https://deno.land/x/hono@v4.1.4/middleware/cors/index.ts",
     "hono/tiny": "https://deno.land/x/hono@v4.1.4/preset/tiny.ts",
