@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION public.get_cloudflare_function_url() RETURNS TEXT LANGUAGE SQL AS $$
-    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='cf_function_url';
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='cloudflare_function_url';
 $$ SECURITY DEFINER STABLE PARALLEL SAFE;
 
 CREATE OR REPLACE FUNCTION public.get_netlify_function_url() RETURNS TEXT LANGUAGE SQL AS $$
