@@ -16,11 +16,5 @@ export function getRightKey(keyname) {
     return keys[keyname].local
   return keys[keyname].prod
 }
-export function getPlansPath() {
-  if (branch === 'local')
-    return './generated/plans_local.json'
-  else
-    return './generated/plans_prod.json'
-}
 export const supa_url = getRightKey('supa_url')
 export const supa_anon = getRightKey('supa_anon')

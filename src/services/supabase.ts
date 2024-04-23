@@ -289,10 +289,6 @@ export async function isPayingOrg(orgId: string): Promise<boolean> {
   return data || false
 }
 
-export function getBuiltinPlans(): Database['public']['Tables']['plans']['Row'][] {
-  return JSON.parse(import.meta.env.payment_plans)
-}
-
 export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
   const { data: plans } = await useSupabase()
     .from('plans')

@@ -41,12 +41,6 @@
     "typecheck": "vue-tsc --noEmit",
     "ionic:build": "vite build",
     "ionic:serve": "vite",
-    "d1:clear": "rm -rf .wrangler",
-    "d1:seed": "bunx wrangler d1 execute --local --command \"$(cat ./supabase/d1.sql)\" capgo",
-    "d1:local-srv": "bunx wrangler dev ./cloudflare_workers/d1.js --ip 0.0.0.0 --port 6655",
-    "d1:local-clone": "SUPABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' D1_URL='http://localhost:6655' deno run --allow-all supabase/functions/script/duplicate_in_d1.ts",
-    "d1:reset": "bun d1:clear && bun d1:seed",
-    "d1:generate-migration": "deno run --allow-all supabase/functions/script/generate_d1_replication_sql_migration.ts",
     "cf-build": "wrangler publish --dry-run --outdir=dist_cf",
     "create-sentry-release": "npm run sentry-cli releases new \"1.0.0\" --finalize && npm run sentry-cli releases files \"1.0.0\" upload-sourcemaps ./dist_cf",
     "cf-edge:run": "bunx wrangler dev --port 7777",
@@ -63,8 +57,7 @@
     "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",
     "clickhouse:seed": "cd ./tests_backend/gh_actions && sh ./clickhouse-seed.sh && cd ../..",
     "clickhouse:delete": "docker stop some-clickhouse-server && docker rm some-clickhouse-server && rm -rf /tmp/ch_*",
-    "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts",
-    "generate-plans": "cd scripts && bun run generate_plans.ts"
+    "clickhouse:add-local": "deno run --allow-all supabase/functions/_script/add_clickhouse_to_supabase.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",

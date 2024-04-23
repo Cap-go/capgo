@@ -1,4 +1,4 @@
-import { isAdmin } from './../services/supabase'
+import { getPlans, isAdmin } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
@@ -49,6 +49,10 @@ async function guard(next: any, to: string, from: string) {
         return next('/onboarding/verify_email')
       }
     }
+
+    getPlans().then((pls) => {
+      main.plans = pls
+    })
 
     initStunning(main.user?.customer_id)
     // isTrial(main.auth?.id).then((res) => {

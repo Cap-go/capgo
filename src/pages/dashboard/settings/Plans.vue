@@ -7,7 +7,7 @@ import { storeToRefs } from 'pinia'
 import test from './particles.json'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getBuiltinPlans, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
+import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getPlans, getTotalStats } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
@@ -19,9 +19,10 @@ function openSupport() {
 }
 
 const { t } = useI18n()
-const plans = ref<Database['public']['Tables']['plans']['Row'][]>(getBuiltinPlans())
+const mainStore = useMainStore()
+
 const displayPlans = computed(() => {
-  return plans.value.filter(plan => plan.stripe_id !== 'free')
+  return mainStore.plans.filter(plan => plan.stripe_id !== 'free')
 })
 
 const displayStore = useDisplayStore()
@@ -95,8 +96,8 @@ function convertKey(key: string) {
 
 const currentData = computed(() => orgsHashmap.value.get(currentOrganization.value?.gid ?? ''))
 
-const currentPlanSuggest = computed(() => plans.value.find(plan => plan.name === currentData.value?.planSuggest))
-const currentPlan = computed(() => plans.value.find(plan => plan.name === currentData.value?.planCurrrent))
+const currentPlanSuggest = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
+const currentPlan = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planCurrrent))
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // get the current url
@@ -149,14 +150,6 @@ async function loadData(initial: boolean) {
   const data = defaultPlanOrgData()
 
   await Promise.all([
-    // Plans are not linked to orgs, keep them as is
-    initial
-      ? getPlans().then((pls) => {
-        const newPlans = [] as Database['public']['Tables']['plans']['Row'][]
-        newPlans.push(...pls)
-        plans.value = newPlans
-      })
-      : Promise.resolve(),
     getUsages(orgId).then((res) => {
       data.stats = res.stats
       data.planSuggest = res.bestPlan
