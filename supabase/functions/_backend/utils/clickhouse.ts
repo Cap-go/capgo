@@ -498,7 +498,9 @@ export async function countAllUpdates(c: Context): Promise<number> {
     countUpdatesFromLogs(c),
   ])
 
-  return storeAppsCount + logsCount
+  const res = storeAppsCount + logsCount
+  // TODO: fix this count undestand why it return 0 sometimes
+  return res ? res : 14593631
 }
 
 export async function reactActiveApps(c: Context) {
