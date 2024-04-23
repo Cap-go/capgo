@@ -1,4 +1,5 @@
 import { Hono } from 'hono/tiny'
+import { sentry } from '@hono/sentry'
 
 // Public API
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
@@ -45,11 +46,16 @@ import { app as stripe_event } from '../supabase/functions/_backend/triggers/str
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
 import { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
+import { HTTPException } from 'hono/http-exception'
+import { version } from '../package.json'
 
 const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
 const appFront = new Hono<{ Bindings: Bindings }>()
 
+app.use('*', sentry({
+  release: version
+}))
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
@@ -100,6 +106,22 @@ appTriggers.route('/get_total_stats', get_total_stats)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
-// app.route('/test', testAnalytics)
 
-export default app
+app.get('/test_sentry', (c) => {
+  if (Math.random() < 0.5) {
+    return c.text('Success!')
+  }
+  throw new Error('Failed!')
+})
+
+app.onError((e, c) => {
+  c.get('sentry').captureException(e)
+  if (e instanceof HTTPException) {
+    return e.getResponse()
+  }
+  return c.text('Internal Server Error', 500)
+})
+
+export default {
+  fetch: app.fetch,
+}
