@@ -5,6 +5,8 @@ import dayjs from 'dayjs'
 import type { ClickHouseMeta } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 
+// type is require for the bindings no interface
+// eslint-disable-next-line ts/consistent-type-definitions 
 export type Bindings = {
   DEVICE_USAGE: AnalyticsEngineDataPoint
   BANDWIDTH_USAGE: AnalyticsEngineDataPoint

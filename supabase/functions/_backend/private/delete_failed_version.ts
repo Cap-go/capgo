@@ -33,7 +33,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .from('apps')
       .select('app_id, owner_org')
       .eq('app_id', body.app_id)
-      
+
       // .eq('user_id', userId)
       .single()
     if (errorApp) {
