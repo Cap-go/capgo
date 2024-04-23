@@ -98,6 +98,8 @@ jobs:
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
 
+      - name: Create Sourcemap Sentry
+        run: bun run cf-build
       - name: Create Sentry ALPHA
         if: ${{ contains(github.ref, '-alpha.') }}
         uses: getsentry/action-release@v1
