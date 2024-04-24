@@ -7,7 +7,7 @@
     "hono/adapter": "https://deno.land/x/hono@v4.0.3/helper/adapter/index.ts",
     "hono/utils/buffer": "https://deno.land/x/hono@v4.0.3/utils/buffer.ts",
     "stripe": "npm:stripe@14.17.0",
-    "zod": "https://esm.sh/zod@3.22.4?target=deno",
+    "zod": "https://esm.sh/zod@3.22.5?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.10?target=deno", 
     "ky": "https://esm.sh/ky@1.2.1",
     "@logsnag/node": "https://esm.sh/@logsnag/node@1.0.0?target=deno",

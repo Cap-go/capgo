@@ -10,7 +10,6 @@ const manfiestType = customType <{ data: Database['public']['CompositeTypes']['m
     return 'manifest_entry[]'
   },
   fromDriver(value: unknown) {
-    console.log('from dv', value)
     if (Array.isArray(value)) {
       for (const element of value) {
         if (typeof element !== 'string')
