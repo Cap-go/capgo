@@ -622,11 +622,9 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
 }
 
 export interface ClickHouseMeta {
-  id: number
-  app_id: string
-  created_at: string
+  app_id: string,
+  version_id: number,
   size: number
-  action: 'add' | 'delete'
 }
 export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
   if (!isClickHouseEnabled(c))
@@ -635,7 +633,7 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
   console.log('sending meta to Clickhouse', meta)
   const metasReady = meta
     .map((l) => {
-      createStatsMeta(c, l)
+      createStatsMeta(c, l.app_id, l.version_id, l.size)
       return l
     })
     .map(convertAllDatesToCH)

@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { trackBandwidthUsage, trackDeviceUsage, trackVersionUsage } from './supabase.ts'
+import { trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
 import { readBandwidthUsageCF, readDeviceUsageCF, readStorageUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
 import type { ClickHouseMeta } from './clickhouse.ts'
 
@@ -34,10 +34,10 @@ export function createStatsDevices(c: Context, app_id: string, device_id: string
   return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }
 
-export function createStatsMeta(c: Context, meta: ClickHouseMeta) {
-  if (!c.env.VERSION_META) // TODO: should make it work with supabase too
-    return
-  return trackMetaCF(c, meta)
+export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
+  if (!c.env.VERSION_META)
+    return trackMeta(c, app_id, version_id, size)
+  return trackMetaCF(c, app_id, version_id, size)
 }
 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {

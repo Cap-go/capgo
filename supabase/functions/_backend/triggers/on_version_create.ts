@@ -4,7 +4,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sendMetaToClickHouse } from '../utils/clickhouse.ts'
+import { createStatsMeta } from '../utils/stats.ts';
 
 export const app = new Hono()
 
@@ -75,14 +75,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         checksum,
         size,
       })
-    await sendMetaToClickHouse(c, [{
-
-      id: record.id,
-      created_at: new Date().toISOString(),
-      app_id: record.app_id,
-      size,
-      action: 'add',
-    }])
+    await createStatsMeta(c, record.app_id, record.id, size)
     if (dbError)
       console.error('Cannot create app version meta', dbError)
     return c.json(BRES) // skip delete s3 and increment size in new upload

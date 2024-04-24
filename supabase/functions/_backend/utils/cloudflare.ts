@@ -63,13 +63,13 @@ export function trackDevicesCF(c: Context, app_id: string, device_id: string, ve
   })
 }
 
-export function trackMetaCF(c: Context, meta: ClickHouseMeta) {
+export function trackMetaCF(c: Context, app_id: string, version_id: number, size: number) {
   if (!c.env.VERSION_META)
     return
-  console.log('trackMetaCF', meta)
+  console.log('trackMetaCF', app_id, version_id, size)
   c.env.VERSION_META.writeDataPoint({
-    doubles: [meta.id, meta.action === 'add' ? meta.size : -meta.size],
-    indexes: [meta.app_id],
+    doubles: [version_id, size],
+    indexes: [app_id],
   })
 }
 
