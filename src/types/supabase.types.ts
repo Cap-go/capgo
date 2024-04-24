@@ -1617,6 +1617,10 @@ export type Database = {
         }
         Returns: number
       }
+      get_cloudflare_function_url: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_plan_max:
         | {
             Args: Record<PropertyKey, never>
@@ -1759,6 +1763,10 @@ export type Database = {
             }
             Returns: Database["public"]["CompositeTypes"]["stats_table"]
           }
+      get_netlify_function_url: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_org_members: {
         Args: {
           guild_id: string
