@@ -1694,10 +1694,6 @@ export type Database = {
         }
         Returns: number
       }
-      get_external_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_identity:
         | {
             Args: Record<PropertyKey, never>

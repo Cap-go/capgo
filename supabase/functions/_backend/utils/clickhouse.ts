@@ -425,7 +425,7 @@ export async function updateInClickHouse(c: Context, appId: string, updates: num
   await executeClickHouseQuery(c, query, params)
 }
 
-async function countUpdatesFromClickHouse(c: Context): Promise<number> {
+async function countUpdatesFromStoreAppsClickHouse(c: Context): Promise<number> {
   if (!isClickHouseEnabled(c))
     return Promise.resolve(0)
   const query = `
@@ -444,7 +444,7 @@ async function countUpdatesFromClickHouse(c: Context): Promise<number> {
   }
 }
 
-async function countUpdatesFromLogs(c: Context): Promise<number> {
+async function countUpdatesFromLogsClickHouse(c: Context): Promise<number> {
   if (!isClickHouseEnabled(c))
     return Promise.resolve(0)
   const query = `
@@ -494,8 +494,8 @@ export async function countAllApps(c: Context): Promise<number> {
 
 export async function countAllUpdates(c: Context): Promise<number> {
   const [storeAppsCount, logsCount] = await Promise.all([
-    countUpdatesFromClickHouse(c),
-    countUpdatesFromLogs(c),
+    countUpdatesFromStoreAppsClickHouse(c),
+    countUpdatesFromLogsClickHouse(c),
   ])
 
   const res = storeAppsCount + logsCount
