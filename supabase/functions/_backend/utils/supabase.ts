@@ -824,6 +824,7 @@ export async function trackMeta(
   version_id: number,
   size: number,
 ) {
+  console.log('createStatsMeta', app_id, version_id, size)
   await supabaseAdmin(c)
     .from('version_meta')
     .insert([

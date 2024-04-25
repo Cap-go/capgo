@@ -342,18 +342,6 @@ export type Database = {
           },
         ]
       }
-      auth_uid: {
-        Row: {
-          uid: string | null
-        }
-        Insert: {
-          uid?: string | null
-        }
-        Update: {
-          uid?: string | null
-        }
-        Relationships: []
-      }
       bandwidth_usage: {
         Row: {
           app_id: string
@@ -690,21 +678,6 @@ export type Database = {
           platform?: string | null
           version?: number | null
           version_build?: string | null
-        }
-        Relationships: []
-      }
-      cycle_info: {
-        Row: {
-          subscription_anchor_end: string | null
-          subscription_anchor_start: string | null
-        }
-        Insert: {
-          subscription_anchor_end?: string | null
-          subscription_anchor_start?: string | null
-        }
-        Update: {
-          subscription_anchor_end?: string | null
-          subscription_anchor_start?: string | null
         }
         Relationships: []
       }
@@ -1414,6 +1387,27 @@ export type Database = {
           },
         ]
       }
+      version_meta: {
+        Row: {
+          app_id: string
+          size: number
+          timestamp: string
+          version_id: number
+        }
+        Insert: {
+          app_id: string
+          size: number
+          timestamp: string
+          version_id: number
+        }
+        Update: {
+          app_id?: string
+          size?: number
+          timestamp?: string
+          version_id?: number
+        }
+        Relationships: []
+      }
       version_usage: {
         Row: {
           action: string
@@ -1699,10 +1693,6 @@ export type Database = {
           version_id: number
         }
         Returns: number
-      }
-      get_external_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_identity:
         | {
@@ -2335,6 +2325,10 @@ export type Database = {
             }
             Returns: undefined
           }
+      update_daily_storage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean

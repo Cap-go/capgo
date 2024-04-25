@@ -1,11 +1,3 @@
-CREATE TABLE storage_usage (
-  id SERIAL PRIMARY KEY,
-  device_id VARCHAR(255) NOT NULL,
-  app_id VARCHAR(255) NOT NULL,
-  file_size BIGINT NOT NULL,
-  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE daily_mau (
   id SERIAL PRIMARY KEY,
   app_id VARCHAR(255) NOT NULL,
@@ -49,6 +41,13 @@ CREATE INDEX idx_daily_version_date ON daily_version (date);
 CREATE INDEX idx_daily_version_app_id ON daily_version (app_id);
 CREATE INDEX idx_daily_version_version ON daily_version (version);
 
+CREATE TABLE storage_usage (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(255) NOT NULL,
+  app_id VARCHAR(255) NOT NULL,
+  file_size BIGINT NOT NULL,
+  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE version_usage (
   timestamp TIMESTAMP,
