@@ -28,28 +28,28 @@ CREATE POLICY "Disable for all" ON "public"."bandwidth_usage" USING (false) WITH
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_mau"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+USING ("public"."has_app_right_userid"(app_id, 'read'::"public"."user_min_right", "public"."get_identity"()));
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_bandwidth"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+USING ("public"."has_app_right_userid"(app_id, 'read'::"public"."user_min_right", "public"."get_identity"()));
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+USING ("public"."has_app_right_userid"(app_id, 'read'::"public"."user_min_right", "public"."get_identity"()));
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_version"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+USING ("public"."has_app_right_userid"(app_id, 'read'::"public"."user_min_right", "public"."get_identity"()));
 
 
 -- Add missing rights for old tables
 CREATE POLICY "Allow read for auth (read+)" ON "public"."stats"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+USING ("public"."has_app_right_userid"(app_id, 'read'::"public"."user_min_right", "public"."get_identity"()));
 CREATE POLICY "Allow read for auth (read+)" ON "public"."devices"
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), owner_org, app_id, NULL));
+USING ("public"."has_app_right_userid"(app_id, 'read'::"public"."user_min_right", "public"."get_identity"()));
 
