@@ -24,20 +24,10 @@ AFTER UPDATE ON public.users
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_user_update');
 
-CREATE TRIGGER on_version_create 
-AFTER INSERT ON public.app_versions 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_create');
-
 CREATE TRIGGER on_version_delete
 AFTER DELETE ON public.app_versions 
 FOR EACH ROW 
 EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_delete');
-
-CREATE TRIGGER on_version_update 
-AFTER UPDATE ON public.app_versions 
-FOR EACH ROW 
-EXECUTE FUNCTION public.trigger_http_queue_post_to_function('on_version_update');
 
 -- Create cron jobs
 -- Set old versions to deleted after retention passed 
