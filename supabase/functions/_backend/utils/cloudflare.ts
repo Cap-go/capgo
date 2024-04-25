@@ -2,7 +2,6 @@ import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
-import type { ClickHouseMeta } from './clickhouse.ts'
 import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
@@ -156,8 +155,25 @@ WHERE
 export function readStorageUsageCF(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
   if (!c.env.VERSION_META)
     return
-  const query = ``
-  const queryTotal = ``
+  const query = `SELECT
+  index1 AS app_id,
+  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
+  sum(double2) AS storage
+FROM version_meta
+WHERE
+  timestamp >= toDateTime('${formatDateCF(period_start)}')
+  AND timestamp < toDateTime('${formatDateCF(period_end)}')
+  AND app_id = '${app_id}'
+GROUP BY date
+ORDER BY date;`
+  const queryTotal = `SELECT
+  index1 AS app_id,
+  sum(_sample_interval * double2) AS total_storage
+FROM version_meta
+WHERE
+  timestamp >= toDateTime('${formatDateCF(period_start)}')
+  AND timestamp < toDateTime('${formatDateCF(period_end)}')
+  AND app_id = '${app_id}';`
   if (total)
     return runQueryToCF(c, queryTotal)
 

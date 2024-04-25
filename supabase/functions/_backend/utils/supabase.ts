@@ -828,13 +828,12 @@ export async function trackMeta(
     .from('version_meta')
     .insert([
       {
-        app_id: app_id,
-        version_id: version_id,
-        size: size,
+        app_id,
+        version_id,
+        size,
       },
     ])
 }
-
 
 // export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
 //   const { data } = await supabaseAdmin(c)

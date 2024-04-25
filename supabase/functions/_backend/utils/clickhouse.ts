@@ -500,7 +500,7 @@ export async function countAllUpdates(c: Context): Promise<number> {
 
   const res = storeAppsCount + logsCount
   // TODO: fix this count undestand why it return 0 sometimes
-  return res ? res : 14593631
+  return res || 14593631
 }
 
 export async function reactActiveApps(c: Context) {
@@ -622,8 +622,8 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
 }
 
 export interface ClickHouseMeta {
-  app_id: string,
-  version_id: number,
+  app_id: string
+  version_id: number
   size: number
 }
 export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {

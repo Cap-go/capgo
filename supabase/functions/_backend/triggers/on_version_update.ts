@@ -5,7 +5,7 @@ import type { UpdatePayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { s3 } from '../utils/s3.ts'
-import { createStatsMeta } from '../utils/stats.ts';
+import { createStatsMeta } from '../utils/stats.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
