@@ -46,7 +46,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
 
 function isSendable(last: string, cron: string) {
   const interval = parseCronExpression(cron)
-  const last_send_at = new Date(last)
+  const last_send_at = dayjs(last).toDate()
   const now = new Date()
   const nextDate = interval.getNextDate(last_send_at)
   const sendable = dayjs(now).isAfter(nextDate)
@@ -77,7 +77,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   const { data: notif } = await supabaseAdmin(c)
     .from('notifications')
     .select()
-    .eq('owner_org', org.id)
+    .eq('owner_org', orgId)
     .eq('event', eventName)
     .eq('uniq_id', uniqId)
     .single()
