@@ -1,1 +1,1 @@
-DROP TABLE clickhouse_app_usage;
+DROP TABLE IF EXISTS clickhouse_app_usage;
