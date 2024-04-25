@@ -1,3 +1,4 @@
+import { sentry } from '@hono/sentry'
 import { Hono } from 'hono/tiny'
 
 // Scrapping API
@@ -9,6 +10,13 @@ import { app as storeInfo } from '../_backend/scrapping/store_info.ts'
 
 const functionName = 'scrapping'
 const appGlobal = new Hono().basePath(`/${functionName}`)
+
+const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
+if (sentryDsn) {
+  appGlobal.use('*', sentry({
+    dsn: sentryDsn,
+  }))
+}
 
 // Scrapping API
 

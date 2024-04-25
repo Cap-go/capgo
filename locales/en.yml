@@ -332,6 +332,7 @@ password-confirmatio: Password confirmation
 password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
 password-new: New Password
+patch: Patch
 percent-fail: Fail percentage
 permission-changed: Successfully changed user permission
 personal-information: Personal Informations
@@ -344,7 +345,7 @@ plan-inactive: Plan inactive
 plan-is-the-best-pla: plan is the best plan for your needs.
 plan-maker: Best for small business owners
 plan-member: plan member.
-plan-page-warn: Buying a plan will not affect the organizations your are invited to.
+plan-page-warn: Buying a plan will ONLY affect the "%ORG_NAME%" organization.
 plan-page-warn-2: Learn more about it.
 plan-payasyougo: Best for scalling enterprises
 plan-pricing-plans: Pricing Plans

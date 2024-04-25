@@ -1,0 +1,1 @@
+ALTER TYPE "disable_update" ADD VALUE 'patch' AFTER 'minor';

@@ -40,13 +40,6 @@ const columns = ref<TableColumn[]>([
     head: true,
   },
   {
-    label: t('created-at'),
-    key: 'created_at',
-    mobile: 'none',
-    sortable: true,
-    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
-  },
-  {
     label: t('updated-at'),
     key: 'updated_at',
     mobile: 'header',

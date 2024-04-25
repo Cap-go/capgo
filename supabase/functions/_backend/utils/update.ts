@@ -518,6 +518,24 @@ export async function update(c: Context, body: AppInfos) {
         }, 200)
       }
 
+      console.log(version.name, version_name)
+      if (channelData.channels.disableAutoUpdate === 'patch' && !(
+        semver.patch(version.name) > semver.patch(version_name)
+        && semver.major(version.name) === semver.major(version_name)
+        && semver.minor(version.name) === semver.minor(version_name)
+      )) {
+        console.log(id, 'Cannot upgrade patch version', device_id, new Date().toISOString())
+        await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch' }])
+        return c.json({
+          major: true,
+          message: 'Cannot upgrade patch version',
+          error: 'disable_auto_update_to_patch',
+          version: version.name,
+          old: version_name,
+          aaa: `${semver.patch(version.name)}, ${semver.patch(version_name)}`,
+        }, 200)
+      }
+
       if (channelData.channels.disableAutoUpdate === 'version_number') {
         const minUpdateVersion = version.minUpdateVersion
 

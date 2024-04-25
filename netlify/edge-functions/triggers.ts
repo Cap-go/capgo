@@ -1,3 +1,4 @@
+import { sentry } from '@hono/sentry';
 import { handle } from 'https://deno.land/x/hono@v4.0.0/adapter/netlify/mod.ts'
 import { Hono } from 'hono/tiny'
 
@@ -20,6 +21,13 @@ import { app as get_total_stats } from '../../supabase/functions/_backend/trigge
 
 const functionName = 'triggers'
 const appGlobal = new Hono().basePath(`/${functionName}`)
+
+const sentryDsn = Deno.env.get('SENTRY_DSN_NETLIFY')
+if (sentryDsn) {
+  appGlobal.use('*', sentry({
+    dsn: sentryDsn,
+  }))
+}
 
 appGlobal.route('/clear_app_cache', clear_app_cache)
 appGlobal.route('/clear_device_cache', clear_device_cache)

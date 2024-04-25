@@ -1,4 +1,4 @@
-import { isAdmin } from './../services/supabase'
+import { getPlans, isAdmin } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
@@ -50,23 +50,11 @@ async function guard(next: any, to: string, from: string) {
       }
     }
 
+    getPlans().then((pls) => {
+      main.plans = pls
+    })
+
     initStunning(main.user?.customer_id)
-    // isTrial(main.auth?.id).then((res) => {
-    //   // console.log('isTrial', res)
-    //   main.trialDaysLeft = res
-    // })
-    // isPaying(main.auth?.id).then((res) => {
-    //   main.paying = res
-    // })
-    // isAllowedAction(main.auth?.id).then((res) => {
-    //   main.canUseMore = res
-    // })
-    // isGoodPlan(main.auth?.id).then((res) => {
-    //   main.goodPlan = res
-    // })
-    // isCanceled(main.auth?.id).then((res) => {
-    //   main.canceled = res
-    // })
     isAdmin(main.auth?.id).then((res) => {
       main.isAdmin = res
     })

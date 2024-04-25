@@ -15,6 +15,7 @@ export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
   const path = ref('')
   const user = ref<Database['public']['Tables']['users']['Row']>()
+  const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
   const isAdmin = ref<boolean>(false)
   const dashboard = ref<appUsage[]>([])
   const totalDevices = ref<number>(0)
@@ -71,6 +72,7 @@ export const useMainStore = defineStore('main', () => {
     auth,
     // trialDaysLeft,
     // goodPlan,
+    plans,
     isAdmin,
     totalStorage,
     totalDevices,

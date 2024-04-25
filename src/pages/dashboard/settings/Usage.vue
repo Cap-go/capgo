@@ -16,7 +16,7 @@ const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 
 const snag = useLogSnag()
 const isLoading = ref(false)
-const initialLoad = ref(false)
+const initialLoad = ref(true)
 const route = useRoute()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
@@ -119,12 +119,20 @@ function roundNumber(number: number) {
   return Math.round(number * 100) / 100
 }
 
-async function loadData(initial: boolean) {
-  isLoading.value = true
+onMounted(async () => {
+  await loadData()
+})
+
+async function loadData() {
   await organizationStore.awaitInitialLoad()
   const gid = organizationStore?.currentOrganization?.gid ?? ''
 
-  if (!initial) {
+  if (planUsageMap.value.has(gid) || isLoading.value)
+    return
+
+  isLoading.value = true
+
+  if (initialLoad.value) {
     await getPlans().then((pls) => {
       plans.value.length = 0
       plans.value.push(...pls)
@@ -134,7 +142,7 @@ async function loadData(initial: boolean) {
     planUsageMap.value?.set(gid, res as any)
   })
   isLoading.value = false
-  initialLoad.value = true
+  initialLoad.value = false
 }
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
@@ -178,7 +186,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
       organizationStore.setCurrentOrganization(prevOrg.gid)
   }
 
-  await loadData(initialLoad.value)
+  await loadData()
 
   // isSubscribeLoading.value.fill(false, 0, plans.value.length)
 })

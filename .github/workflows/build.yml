@@ -38,7 +38,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.148.6
+          version: 1.162.4
       - name: Set env PROD
         if: ${{ !contains(github.ref, '-alpha.') }}
         run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS }}" >> $GITHUB_ENV
@@ -97,6 +97,33 @@ jobs:
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
         run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+
+      - name: Create Sourcemap Sentry
+        run: bun run cf-build
+      - name: Create Sentry ALPHA
+        if: ${{ contains(github.ref, '-alpha.') }}
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: staging
+          sourcemaps: dist_cf
+          version: ${{ github.ref }}
+
+      - name: Create Sentry release PROD
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: production
+          sourcemaps: dist_cf
+          version: ${{ github.ref }}
+
   build_android:
     runs-on: ubuntu-latest
     steps:

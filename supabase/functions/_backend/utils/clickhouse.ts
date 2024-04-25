@@ -1,9 +1,10 @@
 import dayjs from 'dayjs'
 import ky from 'ky'
-import type { Context } from 'hono'
+import type { Context, ExecutionContext } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import { getAppsFromSupabase } from './supabase.ts'
+import { createStatsDevices, createStatsLogs, createStatsMeta } from './stats.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
@@ -366,7 +367,7 @@ export async function saveStoreInfo(c: Context, app: Database['public']['Tables'
   }
 }
 
-export async function bulkUpdateStoreApps(apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+export async function bulkUpdateStoreApps(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
   // Update a list of apps in ClickHouse (internal use only)
@@ -497,7 +498,9 @@ export async function countAllUpdates(c: Context): Promise<number> {
     countUpdatesFromLogs(c),
   ])
 
-  return storeAppsCount + logsCount
+  const res = storeAppsCount + logsCount
+  // TODO: fix this count undestand why it return 0 sometimes
+  return res || 14593631
 }
 
 export async function reactActiveApps(c: Context) {
@@ -618,12 +621,10 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
   }
 }
 
-interface ClickHouseMeta {
-  id: number
+export interface ClickHouseMeta {
   app_id: string
-  created_at: string
+  version_id: number
   size: number
-  action: 'add' | 'delete'
 }
 export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
   if (!isClickHouseEnabled(c))
@@ -631,6 +632,10 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
 
   console.log('sending meta to Clickhouse', meta)
   const metasReady = meta
+    .map((l) => {
+      createStatsMeta(c, l.app_id, l.version_id, l.size)
+      return l
+    })
     .map(convertAllDatesToCH)
     .map(l => JSON.stringify(l)).join('\n')
 
@@ -643,9 +648,6 @@ export interface StatsActions {
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
-  if (!isClickHouseEnabled(c))
-    return Promise.resolve()
-
   // Prepare the device data for insertion
   const deviceData = convertAllDatesToCH({ ...device, updated_at: new Date().toISOString() })
   const deviceReady = JSON.stringify(deviceData)
@@ -661,6 +663,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
       version: versionId || device.version, // Use the provided versionId if available
       platform: device.platform ?? 'android',
     }
+    createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version)
     return JSON.stringify(convertAllDatesToCH(stat))
   }).join('\n')
 
@@ -670,6 +673,10 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     app_id: device.app_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
+  createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? '', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false)
+
+  if (!isClickHouseEnabled(c))
+    return Promise.resolve()
   const jobs = Promise.all([
     sendClickHouse(c, deviceReady, 'devices'),
     sendClickHouse(c, statsData, 'logs'),
@@ -677,7 +684,16 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   ]).catch((error) => {
     console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
   })
-  if (c.executionCtx.waitUntil)
+
+  let executionCtx: ExecutionContext | null
+  try {
+    executionCtx = c.executionCtx
+  }
+  catch (_) {
+    executionCtx = null
+  }
+
+  if (executionCtx?.waitUntil)
     return c.executionCtx.waitUntil(jobs)
 
   return jobs

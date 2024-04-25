@@ -818,6 +818,23 @@ export async function trackDeviceUsage(
     ])
 }
 
+export async function trackMeta(
+  c: Context,
+  app_id: string,
+  version_id: number,
+  size: number,
+) {
+  await supabaseAdmin(c)
+    .from('version_meta')
+    .insert([
+      {
+        app_id,
+        version_id,
+        size,
+      },
+    ])
+}
+
 // export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
 //   const { data } = await supabaseAdmin(c)
 //     .from('devices_usage')

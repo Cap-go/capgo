@@ -59,3 +59,4 @@ supabase/functions/_backend/utils/supabase.types.ts
 
 vite\.config\.mts\.timestamp-[A-Za-z0-9]+-([A-Za-z0-9]+(\.[A-Za-z0-9]+)+)
 vite.config.mts.timestamp-1712411621093-7395fe6f168c5.mjs
+dist_cf

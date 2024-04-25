@@ -9,7 +9,12 @@ export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
 echo "📦 Install CocoaPods"
 brew install cocoapods
 brew install node@18
+brew install vips
 brew link node@18
+
+# Install node-gyp (idk why this is required)
+npm install -g node-gyp
+
 node -v
 npm -v
 
@@ -30,6 +35,10 @@ bun install
 
 # create assets
 echo "🌆 Create Assets"
+# Force install deps to make build from source instead of prebuilt binaries
+# https://sharp.pixelplumbing.com/install#custom-libvips
+npm install -g node-gyp node-addon-api
+# XCode Cloud is literally broken for 2 months now - https://developer.apple.com/forums/thread/738136?answerId=774510022#774510022
 npm run capacitor-assets
 
 # Build the app

@@ -1,6 +1,7 @@
 import { Hono } from 'hono/tiny'
 
 // Triggers API
+import { sentry } from '@hono/sentry'
 import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
@@ -20,6 +21,13 @@ import { app as on_organization_create } from '../_backend/triggers/on_organizat
 
 const functionName = 'triggers'
 const appGlobal = new Hono().basePath(`/${functionName}`)
+
+const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
+if (sentryDsn) {
+  appGlobal.use('*', sentry({
+    dsn: sentryDsn,
+  }))
+}
 
 appGlobal.route('/clear_app_cache', clear_app_cache)
 appGlobal.route('/clear_device_cache', clear_device_cache)

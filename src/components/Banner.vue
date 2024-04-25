@@ -7,8 +7,6 @@ import { urlToAppId } from '~/services/conversion'
 
 import { useMainStore } from '~/stores/main'
 import { type Organization, useOrganizationStore } from '~/stores/organization'
-import InformationInfo from '~icons/heroicons/information-circle-solid'
-import { useDisplayStore } from '~/stores/display'
 
 defineProps({
   text: { type: String, default: '' },
@@ -17,7 +15,6 @@ defineProps({
 const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
-const displayStore = useDisplayStore()
 
 const route = useRoute()
 const appId = ref('')
@@ -101,15 +98,6 @@ const bannerColor = computed(() => {
 
   return success
 })
-
-function showInfo() {
-  displayStore.dialogOption = {
-    header: t('warning'),
-    message: t('dialog-warning-msg'),
-  }
-
-  displayStore.showDialog = true
-}
 </script>
 
 <template>
@@ -119,10 +107,10 @@ function showInfo() {
       <a class="text-xl font-bold text-black normal-case">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a v-if="isOrgOwner" href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
-      <button v-else class="ml-3 mr-3" @click="showInfo">
+      <a href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <!-- <button v-else class="ml-3 mr-3" @click="showInfo">
         <InformationInfo class="h-10 rounded-full w-10 bg-[#252b36]" />
-      </button>
+      </button> -->
     </div>
   </div>
 </template>

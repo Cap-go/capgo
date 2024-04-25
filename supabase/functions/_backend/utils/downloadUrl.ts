@@ -16,6 +16,7 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: { buck
   else if (version.storage_provider === 'r2' && version.bucket_id && version.bucket_id?.endsWith('.zip'))
     path = `apps/${ownerOrg}/${version.app_id}/versions/${version.bucket_id}`
 
+  console.log(path)
   if (!path)
     return null
 

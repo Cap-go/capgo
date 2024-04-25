@@ -4,8 +4,8 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sendMetaToClickHouse } from '../utils/clickhouse.ts'
 import { s3 } from '../utils/s3.ts'
+import { createStatsMeta } from '../utils/stats.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
@@ -33,25 +33,19 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   if (existV2 && record.storage_provider === 'r2') {
     // pdate size and checksum
     console.log('V2', record.bucket_id, record.r2_path)
-    const { size, checksum } = await s3.getSizeChecksum(c, v2Path)
+    const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
         .from('app_versions_meta')
         .update({
           size,
-          checksum,
+          checksum: checksum ?? '',
         })
         .eq('id', record.id)
       if (errorUpdate)
         console.log('errorUpdate', errorUpdate)
-      await sendMetaToClickHouse(c, [{
-        id: record.id,
-        created_at: new Date().toISOString(),
-        app_id: record.app_id,
-        size,
-        action: 'add',
-      }])
+      await createStatsMeta(c, record.app_id, record.id, size)
     }
   }
   return c.json(BRES)
@@ -95,13 +89,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     console.log('Cannot find version meta', record.id)
     return c.json(BRES)
   }
-  await sendMetaToClickHouse(c, [{
-    id: record.id,
-    created_at: new Date().toISOString(),
-    app_id: record.app_id,
-    size: data.size,
-    action: 'delete',
-  }])
+  await createStatsMeta(c, record.app_id, record.id, -data.size)
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('app_versions_meta')

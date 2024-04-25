@@ -567,6 +567,9 @@ async function onChangeAutoUpdate(event: Event) {
                   <option value="minor">
                     {{ t('minor') }}
                   </option>
+                  <option value="patch">
+                    {{ t('patch') }}
+                  </option>
                   <option value="version_number">
                     {{ t('metadata') }}
                   </option>

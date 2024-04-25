@@ -1,10 +1,11 @@
 import { Hono } from 'hono/tiny'
+import { sentry } from '@hono/sentry'
 
 // Public API
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
-import { app as channels } from '../supabase/functions/_backend/public/channels.ts'
+import { app as channels } from '../supabase/functions/_backend/public/channel.ts'
 
 // Plugin API
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
@@ -23,6 +24,7 @@ import { app as log_as } from '../supabase/functions/_backend/private/log_as.ts'
 import { app as stripe_checkout } from '../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../supabase/functions/_backend/private/upload_link.ts'
+import { app as deleted_failed_version } from '../supabase/functions/_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../supabase/functions/_backend/private/devices.ts'
 import { app as stats_priv } from '../supabase/functions/_backend/private/stats.ts'
 
@@ -42,12 +44,18 @@ import { app as on_version_update } from '../supabase/functions/_backend/trigger
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
+// import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
 import { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
+import { HTTPException } from 'hono/http-exception'
+import { version } from '../package.json'
 
 const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
 const appFront = new Hono<{ Bindings: Bindings }>()
 
+app.use('*', sentry({
+  release: version
+}))
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
@@ -61,8 +69,6 @@ app.route('/updates', updates)
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
 app.route('/set_custom_id', setCustomId)
-app.route('/get_config', config) // TODO: deprecated remove when everyone use the new CLI
-app.route('/upload_link', upload_link) // TODO: deprecated remove when everyone use the new CLI
 
 // Private API
 appFront.route('/plans', plans)
@@ -77,6 +83,7 @@ appFront.route('/stats', stats_priv)
 appFront.route('/stripe_checkout', stripe_checkout)
 appFront.route('/stripe_portal', stripe_portal)
 appFront.route('/upload_link', upload_link)
+appFront.route('/delete_failed_version', deleted_failed_version)
 
 // Triggers
 
@@ -100,4 +107,21 @@ appTriggers.route('/get_total_stats', get_total_stats)
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
 
-export default app
+app.get('/test_sentry', (c) => {
+  if (Math.random() < 0.5) {
+    return c.text('Success!')
+  }
+  throw new Error('Failed!')
+})
+
+app.onError((e, c) => {
+  c.get('sentry').captureException(e)
+  if (e instanceof HTTPException) {
+    return e.getResponse()
+  }
+  return c.text('Internal Server Error', 500)
+})
+
+export default {
+  fetch: app.fetch,
+}
