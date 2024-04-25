@@ -34,6 +34,8 @@ export function createStatsDevices(c: Context, app_id: string, device_id: string
 }
 
 export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
+  if (size === 0)
+    return
   console.log('createStatsMeta', app_id, version_id, size)
   if (!c.env.VERSION_META)
     return trackMeta(c, app_id, version_id, size)
