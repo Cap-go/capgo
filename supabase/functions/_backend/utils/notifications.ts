@@ -10,7 +10,7 @@ interface EventData {
   [key: string]: any
 }
 
-async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
+async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
   console.log('send notif', eventName, email, color)
   const res = await trackEvent(c, email, eventData, eventName)
   if (!res) {
@@ -21,11 +21,11 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
     const { error } = await supabaseAdmin(c)
       .from('notifications')
       .update({
-        owner_org: orgId,
         last_send_at: dayjs().toISOString(),
         total_send: past.total_send + 1,
       })
-      .eq('id', `${eventName}__${orgId}`)
+      .eq('event', eventName)
+      .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
     if (error)
       console.error('update notif error', error)
@@ -34,7 +34,8 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
     const { error } = await supabaseAdmin(c)
       .from('notifications')
       .insert({
-        id: `${eventName}__${orgId}`,
+        event: eventName,
+        uniq_id: uniqId,
         owner_org: orgId,
         last_send_at: dayjs().toISOString(),
       })
@@ -61,7 +62,7 @@ function isSendable(last: string, cron: string) {
   // return false
 }
 
-export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, cron: string, color: string) {
+export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, color: string) {
   const { data: org, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
     .select()
@@ -77,12 +78,13 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     .from('notifications')
     .select()
     .eq('owner_org', org.id)
-    .eq('id', `${eventName}__${org.id}`)
+    .eq('event', eventName)
+    .eq('uniq_id', uniqId)
     .single()
   // set user data in crisp
   if (!notif) {
-    console.log('notif never sent', eventName, org.id)
-    return sendNow(c, eventName, eventData, org.management_email, orgId, color, null).then(() => true)
+    console.log('notif never sent', eventName, uniqId)
+    return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, color, null).then(() => true)
   }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
@@ -90,7 +92,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     return Promise.resolve(false)
   }
   console.log('notif ready to sent', eventName, orgId)
-  return sendNow(c, eventName, eventData, org.management_email, orgId, color, notif).then(() => true)
+  return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, color, notif).then(() => true)
 }
 
 // dayjs substract one week
