@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import { trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
-import { readBandwidthUsageCF, readDeviceUsageCF, readStorageUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
+import { readBandwidthUsage, readDeviceUsage, trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
+import { readBandwidthUsageCF, readDeviceUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
@@ -46,18 +46,12 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.DEVICE_USAGE)
-    return
+    return readDeviceUsage(c, app_id, start_date, end_date)
   return readDeviceUsageCF(c, app_id, start_date, end_date)
 }
 
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.BANDWIDTH_USAGE)
-    return
+    return readBandwidthUsage(c, app_id, start_date, end_date)
   return readBandwidthUsageCF(c, app_id, start_date, end_date)
-}
-
-export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
-  if (!c.env.STORAGE_USAGE)
-    return
-  return readStorageUsageCF(c, app_id, start_date, end_date)
 }

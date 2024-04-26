@@ -5,14 +5,16 @@ CREATE OR REPLACE FUNCTION read_device_usage(
 )
 RETURNS TABLE (
   date DATE,
-  daily_mau BIGINT
+  mau BIGINT,
+  app_id VARCHAR(255)
 )
 AS $$
 BEGIN
   RETURN QUERY
   SELECT
     DATE_TRUNC('day', timestamp) AS date,
-    COUNT(DISTINCT device_id) AS daily_mau
+    COUNT(DISTINCT device_id) AS mau,
+    app_id
   FROM device_usage
   WHERE
     app_id = p_app_id
@@ -30,14 +32,16 @@ CREATE OR REPLACE FUNCTION read_bandwidth_usage(
 )
 RETURNS TABLE (
   date DATE,
-  bandwidth BIGINT
+  bandwidth BIGINT,
+  app_id VARCHAR(255)
 )
 AS $$
 BEGIN
   RETURN QUERY
   SELECT
     DATE_TRUNC('day', timestamp) AS date,
-    SUM(file_size) AS bandwidth
+    SUM(file_size) AS bandwidth,
+    app_id
   FROM bandwidth_usage
   WHERE
     timestamp >= p_period_start

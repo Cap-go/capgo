@@ -836,22 +836,15 @@ export async function trackMeta(
     ])
 }
 
-// export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-//   const { data } = await supabaseAdmin(c)
-//     .from('devices_usage')
-//     .select()
-//     .eq('app_id', app_id)
-//     .gte('timestamp', period_start)
-//     .lte('timestamp', period_end)
-//   return data
-// }
 
-// export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-//   const { data } = await supabaseAdmin(c)
-//     .from('bandwidth_usage')
-//     .select()
-//     .eq('app_id', app_id)
-//     .gte('timestamp', period_start)
-//     .lte('timestamp', period_end)
-//   return data
-// }
+export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+  .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_bandwidth_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}

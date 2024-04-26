@@ -519,45 +519,6 @@ export type Database = {
           },
         ]
       }
-      clickhouse_app_usage: {
-        Row: {
-          app_id: string | null
-          bandwidth: number | null
-          date: string | null
-          fail: number | null
-          get: number | null
-          install: number | null
-          mau: number | null
-          storage_added: number | null
-          storage_deleted: number | null
-          uninstall: number | null
-        }
-        Insert: {
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Update: {
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Relationships: []
-      }
       clickhouse_app_usage_parm: {
         Row: {
           _app_list: string | null
@@ -1003,26 +964,29 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string | null
-          id: string
+          event: string
           last_send_at: string
           owner_org: string
           total_send: number
+          uniq_id: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
-          id: string
+          event: string
           last_send_at?: string
           owner_org: string
           total_send?: number
+          uniq_id: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
-          id?: string
+          event?: string
           last_send_at?: string
           owner_org?: string
           total_send?: number
+          uniq_id?: string
           updated_at?: string | null
         }
         Relationships: [
@@ -1397,7 +1361,7 @@ export type Database = {
         Insert: {
           app_id: string
           size: number
-          timestamp: string
+          timestamp?: string
           version_id: number
         }
         Update: {
@@ -1418,7 +1382,7 @@ export type Database = {
         Insert: {
           action: string
           app_id: string
-          timestamp: string
+          timestamp?: string
           version: number
         }
         Update: {
@@ -2305,6 +2269,30 @@ export type Database = {
       process_requested_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      read_bandwidth_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          date: string
+          bandwidth: number
+          app_id: string
+        }[]
+      }
+      read_device_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          date: string
+          mau: number
+          app_id: string
+        }[]
       }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>
