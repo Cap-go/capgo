@@ -188,10 +188,10 @@ export interface appUsageV2 {
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageV2[]> {
   const token = (await useSupabase().auth.getSession()).data.session?.access_token
   const resAppIds = await useSupabase()
-  .from('apps')
-  .select('app_id')
-  .eq('owner_org', orgId)
-  .then(res => res.data?.map(app => app.app_id) || [])
+    .from('apps')
+    .select('app_id')
+    .eq('owner_org', orgId)
+    .then(res => res.data?.map(app => app.app_id) || [])
   // read from supabase daily_storage and replace the storage_added and storage_deleted by storage
   const { data: storageData } = await useSupabase()
     .from('daily_storage')
@@ -220,7 +220,7 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
         if (storageApp)
           app.storage = storageApp.storage
       })
-      return data;
+      return data
     })
     .catch(() => {
       return []
