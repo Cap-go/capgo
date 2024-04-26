@@ -82,7 +82,7 @@ async function runQueryToCF<T>(c: Context, query: string) {
 
   const response = await ky.post(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`, {
     headers: {
-      Authorization: `Bearer ${CF_ANALYTICS_TOKEN}`,
+      'Authorization': `Bearer ${CF_ANALYTICS_TOKEN}`,
       'Content-Type': 'text/plain; charset=utf-8',
       'Accept-Encoding': 'gzip, zlib, deflate, zstd, br',
     },
@@ -115,7 +115,8 @@ ORDER BY date, app_id;`
 
   try {
     return await runQueryToCF<DeviceUsageCF[]>(c, query)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('Error reading device usage', e)
   }
   return [] as DeviceUsageCF[]
@@ -144,7 +145,8 @@ ORDER BY date, app_id;`
 
   try {
     return await runQueryToCF<BandwidthUsageCF[]>(c, query)
-  } catch (e) {
+  }
+  catch (e) {
     console.error('Error reading bandwidth usage', e)
   }
   return [] as BandwidthUsageCF[]

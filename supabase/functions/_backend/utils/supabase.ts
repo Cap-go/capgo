@@ -836,10 +836,9 @@ export async function trackMeta(
     ])
 }
 
-
 export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
-  .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+    .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
   return data || []
 }
 

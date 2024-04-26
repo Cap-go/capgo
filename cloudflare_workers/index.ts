@@ -44,8 +44,10 @@ import { app as on_version_update } from '../supabase/functions/_backend/trigger
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
+import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
+
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
-import { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
+import type { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
 import { HTTPException } from 'hono/http-exception'
 import { version } from '../package.json'
 
@@ -102,7 +104,7 @@ appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/get_total_stats', get_total_stats)
-
+appTriggers.route('/cron_stats', cron_stats)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
