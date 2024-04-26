@@ -10,6 +10,8 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import type { Router } from 'vue-router/auto'
 import { defaultConfig, plugin } from '@formkit/vue'
 import { generateClasses } from '@formkit/themes'
+import VueDatePicker from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import App from './App.vue'
 
 // your custom styles here
@@ -33,6 +35,7 @@ app.use(Particles, {
     await loadFull(engine)
   },
 })
+app.component('VueDatePicker', VueDatePicker)
 CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts

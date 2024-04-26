@@ -244,6 +244,9 @@ key-super-admin: Super admin
 key-upload: Upload
 key-write: Write
 language: Language
+last-24-hour: Last 24 hours
+last-3-hour: Last 3 hours
+last-hour: Last hour
 last-name: Last name
 last-update: Last update
 last-upload: Last upload
