@@ -89,7 +89,13 @@ async function runQueryToCF<T>(c: Context, query: string) {
     body: query,
   })
 
-  return response.json<T>()
+  const res = await response.json<{
+    data: T
+    meta: { name: string, type: string }[]
+    rows: number
+    rows_before_limit_at_least: number
+  }>()
+  return res.data
 }
 
 interface DeviceUsageCF {
@@ -113,6 +119,7 @@ WHERE
 GROUP BY app_id, date
 ORDER BY date, app_id;`
 
+  console.log('readDeviceUsageCF query', query)
   try {
     return await runQueryToCF<DeviceUsageCF[]>(c, query)
   }
@@ -143,6 +150,7 @@ WHERE
 GROUP BY date, app_id
 ORDER BY date, app_id;`
 
+  console.log('readBandwidthUsageCF query', query)
   try {
     return await runQueryToCF<BandwidthUsageCF[]>(c, query)
   }
