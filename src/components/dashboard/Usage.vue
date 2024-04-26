@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { getPlans, getTotaAppStorage } from '~/services/supabase'
+import { getPlans, getTotalAppStorage } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
@@ -57,7 +57,7 @@ async function getAppStats() {
 }
 
 async function getUsages() {
-  const currentStorage = bytesToGb(await getTotaAppStorage(organizationStore.currentOrganization?.gid, props.appId))
+  const currentStorage = bytesToGb(await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId))
   const data = await getAppStats()
   if (data && data.length > 0) {
     const cycleStart = organizationStore.currentOrganization?.subscription_start ? new Date(organizationStore.currentOrganization?.subscription_start) : null

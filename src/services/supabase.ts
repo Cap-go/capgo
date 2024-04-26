@@ -194,7 +194,7 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
   return data
 }
 
-export async function getTotaAppStorage(orgId?: string, appid?: string): Promise<number> {
+export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {
   if (!orgId)
     return 0
   if (!appid)
