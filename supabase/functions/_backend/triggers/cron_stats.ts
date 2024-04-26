@@ -25,7 +25,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     let endDate = new Date().toISOString()
     // startDate = yesterday
-    let startDate =  new Date(new Date().setDate(new Date().getDate() - 1)).toISOString()
+    let startDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString()
 
     if (!body.todayOnly) {
       // get the period of the billing of the organization
@@ -48,15 +48,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
-    supabase.from('daily_mau')
-      .upsert(mau)
-      .eq('app_id', body.appId),
-    supabase.from('daily_bandwidth')
-      .upsert(bandwidth)
-      .eq('app_id', body.appId),
-    supabase.from('daily_storage')
-      .upsert(storage)
-      .eq('app_id', body.appId)
+      supabase.from('daily_mau')
+        .upsert(mau)
+        .eq('app_id', body.appId),
+      supabase.from('daily_bandwidth')
+        .upsert(bandwidth)
+        .eq('app_id', body.appId),
+      supabase.from('daily_storage')
+        .upsert(storage)
+        .eq('app_id', body.appId),
     ])
 
     console.log('stats saved')

@@ -57,6 +57,6 @@ export function readStatsBandwidth(c: Context, app_id: string, start_date: strin
 }
 
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
-    // No cloudflare implementation, postgrest is enough
-    return readStorageUsage(c, app_id, start_date, end_date)
+  // No cloudflare implementation, postgrest is enough
+  return readStorageUsage(c, app_id, start_date, end_date)
 }
