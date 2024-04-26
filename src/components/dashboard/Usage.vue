@@ -57,7 +57,8 @@ async function getAppStats() {
 }
 
 async function getUsages() {
-  const currentStorage = bytesToGb(await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId))
+  const currentStorageBytes = await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId)
+  const currentStorage = bytesToGb(currentStorageBytes)
   const data = await getAppStats()
   if (data && data.length > 0) {
     const cycleStart = organizationStore.currentOrganization?.subscription_start ? new Date(organizationStore.currentOrganization?.subscription_start) : null
@@ -69,6 +70,7 @@ async function getUsages() {
     datas.value.mau = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
+    // biome-ignore lint/complexity/noForEach: <explanation>
     data.forEach((item) => {
       if (item.date) {
         const createdAtDate = new Date(item.date)
@@ -78,7 +80,7 @@ async function getUsages() {
         else
           datas.value.mau[dayNumber] = item.mau
 
-        const storageVal = Number.parseFloat(bytesToGb(item.storage_added - item.storage_deleted).toFixed(2))
+        const storageVal = Number.parseFloat(bytesToGb(item.storage ?? 0).toFixed(2))
         if (datas.value.storage[dayNumber])
           datas.value.storage[dayNumber] += storageVal
         else

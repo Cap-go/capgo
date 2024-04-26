@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { appUsage } from './../services/supabase'
+import type { appUsageV2 } from './../services/supabase'
 import {
   getAllDashboard,
   getTotalStorage,
@@ -17,7 +17,7 @@ export const useMainStore = defineStore('main', () => {
   const user = ref<Database['public']['Tables']['users']['Row']>()
   const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
   const isAdmin = ref<boolean>(false)
-  const dashboard = ref<appUsage[]>([])
+  const dashboard = ref<appUsageV2[]>([])
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
   const dashboardFetched = ref<boolean>(false)

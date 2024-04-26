@@ -67,6 +67,7 @@ async function getUsage(orgId: string) {
   const totalStorage = bytesToGb(await getTotalStorage(orgId))
   let totalBandwidth = 0
 
+  // biome-ignore lint/complexity/noForEach: <explanation>
   usage?.forEach((item) => {
     totalMau += item.mau
     // totalStorage += bytesToGb(item.storage_added) - bytesToGb(item.storage_deleted)

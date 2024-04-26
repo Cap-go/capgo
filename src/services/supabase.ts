@@ -174,8 +174,32 @@ export interface appUsage {
   storage_deleted: number
   uninstall: number
 }
-export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
+export interface appUsageV2 {
+  app_id: string
+  bandwidth: number
+  date: string
+  fail: number
+  get: number
+  install: number
+  mau: number
+  storage: number
+  uninstall: number
+}
+export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageV2[]> {
   const token = (await useSupabase().auth.getSession()).data.session?.access_token
+  const resAppIds = await useSupabase()
+  .from('apps')
+  .select('app_id')
+  .eq('owner_org', orgId)
+  .then(res => res.data?.map(app => app.app_id) || [])
+  // read from supabase daily_storage and replace the storage_added and storage_deleted by storage
+  const { data: storageData } = await useSupabase()
+    .from('daily_storage')
+    .select('*')
+    .in('app_id', resAppIds)
+    .gte('date', startDate)
+    .lte('date', endDate)
+  const storage = storageData || []
   const data = await ky
     .post(`${defaultApiHost}/private/dashboard`, {
       json: {
@@ -188,10 +212,20 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
       },
     })
     .then(res => res.json<appUsage[]>())
+    .then(async (data) => {
+      // put storage in the appUsage
+      // biome-ignore lint/complexity/noForEach: <explanation>
+      data.forEach((app) => {
+        const storageApp = storage.find(s => s.app_id === app.app_id && s.date === app.date)
+        if (storageApp)
+          app.storage = storageApp.storage
+      })
+      return data;
+    })
     .catch(() => {
       return []
     })
-  return data
+  return data as appUsageV2[]
 }
 
 export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {

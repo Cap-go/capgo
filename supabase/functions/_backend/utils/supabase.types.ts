@@ -2294,6 +2294,17 @@ export type Database = {
           app_id: string
         }[]
       }
+      read_storage_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          date: string
+          storage: number
+        }[]
+      }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -2313,10 +2324,6 @@ export type Database = {
             }
             Returns: undefined
           }
-      update_daily_storage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
