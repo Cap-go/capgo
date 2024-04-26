@@ -43,6 +43,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       .eq('app_id', body.appId)
 
     console.log('stats saved')
+    return c.json({ status: 'Stats saved' })
   }
   catch (e) {
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
