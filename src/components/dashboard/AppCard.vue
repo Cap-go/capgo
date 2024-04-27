@@ -102,9 +102,8 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
 }
 
 async function loadData() {
-  if (props.app.app_id) {
+  if (props.app.app_id)
     mauNb.value = main.getTotalMauByApp(props.app.app_id)
-  }
 }
 
 async function refreshData() {

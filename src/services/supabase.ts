@@ -5,7 +5,6 @@ import { createClient } from '@supabase/supabase-js'
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
-import { int } from 'drizzle-orm/mysql-core'
 
 let supaClient: SupabaseClient<Database> = null as any
 

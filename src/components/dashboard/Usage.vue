@@ -62,22 +62,22 @@ async function getUsages() {
   const currentStorageBytes = await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId)
   const globalStats = await getAppStats()
   // get current day number
-  let currentDate = new Date();
-  let currentDay = currentDate.getDate();
-  let cycleDay: number | undefined = undefined
+  const currentDate = new Date()
+  const currentDay = currentDate.getDate()
+  let cycleDay: number | undefined
   if (globalStats && globalStats.length > 0) {
-    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date());
-    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date());
+    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 
     if (cycleStart.getDate() === 1) {
-      cycleDay = currentDay;
-    } else {
-      const cycleStartDay = cycleStart.getDate();
-      const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-      cycleDay = (currentDay - cycleStartDay + 1 + daysInMonth) % daysInMonth;
-      if (cycleDay === 0) {
-        cycleDay = daysInMonth;
-      }
+      cycleDay = currentDay
+    }
+    else {
+      const cycleStartDay = cycleStart.getDate()
+      const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+      cycleDay = (currentDay - cycleStartDay + 1 + daysInMonth) % daysInMonth
+      if (cycleDay === 0)
+        cycleDay = daysInMonth
     }
     let graphDays = getDaysInCurrentMonth()
 
@@ -137,7 +137,7 @@ async function loadData() {
     plans.value.length = 0
     plans.value.push(...pls)
     // filter the free plan
-    plans.value = plans.value.filter((plan) => plan.name !== 'Free')
+    plans.value = plans.value.filter(plan => plan.name !== 'Free')
   })
   await getUsages()
   isLoading.value = false
