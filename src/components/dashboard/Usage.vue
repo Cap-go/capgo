@@ -20,6 +20,8 @@ const { t } = useI18n()
 
 const noData = computed(() => false)
 const loadedAlready = ref(false)
+const storageDisplayGb = ref(true)
+const storageUnit = computed(() => storageDisplayGb.value ? 'GB' : 'MB')
 // const noData = computed(() => datas.value.mau.length == 0)
 
 const datas = ref({
@@ -58,7 +60,7 @@ async function getAppStats() {
 
 async function getUsages() {
   const currentStorageBytes = await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId)
-  const currentStorage = bytesToGb(currentStorageBytes)
+  const convertF = bytesToGb
   const data = await getAppStats()
   if (data && data.length > 0) {
     const cycleStart = organizationStore.currentOrganization?.subscription_start ? new Date(organizationStore.currentOrganization?.subscription_start) : null
@@ -80,7 +82,7 @@ async function getUsages() {
         else
           datas.value.mau[dayNumber] = item.mau
 
-        const storageVal = Number.parseFloat(bytesToGb(item.storage ?? 0).toFixed(2))
+        const storageVal = item.storage ?? 0
         if (datas.value.storage[dayNumber])
           datas.value.storage[dayNumber] += storageVal
         else
@@ -94,7 +96,27 @@ async function getUsages() {
     })
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    datas.value.storage[0] = Number.parseFloat((currentStorage - storageVariance).toFixed(2))
+
+    // TODO: maybe allow user to change the unit displayed
+    // check if currentStorageBytes fit more for Gb or Mb display if Gb use bytesToGb else use bytesToMb
+    // if (storageVariance < 1000000000) {
+    //   storageDisplayGb.value = false
+    //   convertF = bytesToMb
+    //   console.log('storageDisplayGb.value', storageDisplayGb.value, storageVariance)
+    // }
+    // const storageVal = Number.parseFloat(convertF(item.storage ?? 0).toFixed(2))
+    // convert all data storagge with convertF
+    datas.value.storage = datas.value.storage.map((item) => {
+      return Number.parseFloat((convertF(item ?? 0).toFixed(2)))
+    })
+
+    const currentStorage = convertF(currentStorageBytes)
+    const storageVarianceConverted = convertF(storageVariance)
+    const initValue = currentStorage - storageVarianceConverted
+
+    datas.value.storage[0] = Number.parseFloat((currentStorage - storageVarianceConverted + (datas.value.storage[0] ?? 0)).toFixed(2))
+    console.log('currentStorage', currentStorage, 'storageVariance', storageVarianceConverted, storageVariance, initValue, datas.value.storage[0])
+
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
@@ -136,11 +158,7 @@ if (main.dashboardFetched)
 <template>
   <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard
-      v-if="!isLoading && props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
-      :datas="datas.mau" :accumulated="true" :title="`${t('montly-active')}`" unit="Users"
-    />
-    <UsageCard
-      v-else-if="!isLoading && !props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
+      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau" :accumulated="true" :title="`${t('montly-active')}`" unit="Users"
     />
     <div
@@ -151,7 +169,7 @@ if (main.dashboardFetched)
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" unit="GB" :accumulated="false"
+      :title="t('Storage')" :unit="storageUnit" :accumulated="false"
     />
     <div
       v-else
