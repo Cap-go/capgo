@@ -62,17 +62,22 @@ async function getUsages() {
   const currentStorageBytes = await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId)
   const globalStats = await getAppStats()
   // get current day number
-  let currentDay = new Date().getDate()
+  let currentDate = new Date();
+  let currentDay = currentDate.getDate();
+  let cycleDay: number | undefined = undefined
   if (globalStats && globalStats.length > 0) {
-    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date());
+    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date());
 
-    // adapt current day to the cycle start
-    if (cycleStart && cycleEnd) {
-      const cycleStartDay = cycleStart.getDate()
-      const cycleEndDay = cycleEnd.getDate()
-      if (currentDay < cycleStartDay || currentDay > cycleEndDay)
-        currentDay = cycleStartDay
+    if (cycleStart.getDate() === 1) {
+      cycleDay = currentDay;
+    } else {
+      const cycleStartDay = cycleStart.getDate();
+      const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+      cycleDay = (currentDay - cycleStartDay + 1 + daysInMonth) % daysInMonth;
+      if (cycleDay === 0) {
+        cycleDay = daysInMonth;
+      }
     }
     let graphDays = getDaysInCurrentMonth()
 
@@ -120,9 +125,9 @@ async function getUsages() {
     datas.value.bandwidth = []
   }
   // slice the lenght of the array to the current day
-  datas.value.mau = datas.value.mau.slice(0, currentDay)
-  datas.value.storage = datas.value.storage.slice(0, currentDay)
-  datas.value.bandwidth = datas.value.bandwidth.slice(0, currentDay)
+  datas.value.mau = datas.value.mau.slice(0, cycleDay)
+  datas.value.storage = datas.value.storage.slice(0, cycleDay)
+  datas.value.bandwidth = datas.value.bandwidth.slice(0, cycleDay)
 }
 
 async function loadData() {

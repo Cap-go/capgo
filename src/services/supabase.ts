@@ -240,9 +240,9 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
       return {
         app_id: appId,
         date,
-        mau: mauApp?.mau || 0,
-        storage: storageApp?.storage || 0,
-        bandwidth: bandwidthApp?.bandwidth || 0,
+        mau: mauApp?.mau ?? 0,
+        storage: storageApp?.storage ?? 0,
+        bandwidth: bandwidthApp?.bandwidth ?? 0,
       }
     })
     return appDays
