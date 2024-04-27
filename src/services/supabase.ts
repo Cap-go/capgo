@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
+import { int } from 'drizzle-orm/mysql-core'
 
 let supaClient: SupabaseClient<Database> = null as any
 
@@ -175,25 +176,24 @@ export interface appUsage {
   storage_deleted: number
   uninstall: number
 }
-export interface appUsageV2 {
+export interface appUsageByApp {
   app_id: string
-  bandwidth: number
   date: string
-  fail: number
-  get: number
-  install: number
+  bandwidth: number
   mau: number
   storage: number
-  uninstall: number
 }
-
 export interface appUsageGlobal {
   date: string
   bandwidth: number
   mau: number
   storage: number
 }
-export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobal[]> {
+export interface appUsageGlobalByApp {
+  global: appUsageGlobal[]
+  byApp: appUsageByApp[]
+}
+export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobalByApp> {
   const resAppIds = await useSupabase()
     .from('apps')
     .select('app_id')
@@ -266,7 +266,10 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     return acc
   }, [])
   // sort by date
-  return reducedData.sort((a, b) => a.date.localeCompare(b.date))
+  return {
+    global: reducedData.sort((a, b) => a.date.localeCompare(b.date)),
+    byApp: data.sort((a, b) => a.date.localeCompare(b.date)),
+  }
 }
 
 export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {
