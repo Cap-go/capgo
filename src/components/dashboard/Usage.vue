@@ -9,7 +9,7 @@ import { getPlans, getTotalAppStorage } from '~/services/supabase'
 import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
+import { bytesToGb, getDaysBetweenDates, toFixed } from '~/services/conversion'
 
 const props = defineProps<{
   appId?: string
@@ -60,12 +60,22 @@ async function getAppStats() {
 
 async function getUsages() {
   const currentStorageBytes = await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId)
-  const convertF = bytesToGb
-  const data = await getAppStats()
-  if (data && data.length > 0) {
-    const cycleStart = organizationStore.currentOrganization?.subscription_start ? new Date(organizationStore.currentOrganization?.subscription_start) : null
-    const cycleEnd = organizationStore.currentOrganization?.subscription_end ? new Date(organizationStore.currentOrganization?.subscription_end) : null
+  const globalStats = await getAppStats()
+  // get current day number
+  let currentDay = new Date().getDate()
+  if (globalStats && globalStats.length > 0) {
+    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+
+    // adapt current day to the cycle start
+    if (cycleStart && cycleEnd) {
+      const cycleStartDay = cycleStart.getDate()
+      const cycleEndDay = cycleEnd.getDate()
+      if (currentDay < cycleStartDay || currentDay > cycleEndDay)
+        currentDay = cycleStartDay
+    }
     let graphDays = getDaysInCurrentMonth()
+
     if (cycleStart && cycleEnd)
       graphDays = getDaysBetweenDates(cycleStart.toString(), cycleEnd.toString())
 
@@ -73,49 +83,33 @@ async function getUsages() {
     datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
     // biome-ignore lint/complexity/noForEach: <explanation>
-    data.forEach((item) => {
+    globalStats.forEach((item, i) => {
       if (item.date) {
-        const createdAtDate = new Date(item.date)
-        const dayNumber = createdAtDate.getDate()
+        const dayNumber = i
         if (datas.value.mau[dayNumber])
           datas.value.mau[dayNumber] += item.mau
         else
           datas.value.mau[dayNumber] = item.mau
 
-        const storageVal = item.storage ?? 0
+        const storageVal = bytesToGb(item.storage ?? 0, 2)
         if (datas.value.storage[dayNumber])
           datas.value.storage[dayNumber] += storageVal
         else
           datas.value.storage[dayNumber] = storageVal
 
+        const bandwidthVal = bytesToGb(item.bandwidth ?? 0, 2)
         if (datas.value.bandwidth[dayNumber])
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] += bandwidthVal
         else
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] = bandwidthVal
       }
     })
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
+    const currentStorage = bytesToGb(currentStorageBytes, 2)
+    const initValue = currentStorage - storageVariance + (datas.value.storage[0] ?? 0)
 
-    // TODO: maybe allow user to change the unit displayed
-    // check if currentStorageBytes fit more for Gb or Mb display if Gb use bytesToGb else use bytesToMb
-    // if (storageVariance < 1000000000) {
-    //   storageDisplayGb.value = false
-    //   convertF = bytesToMb
-    //   console.log('storageDisplayGb.value', storageDisplayGb.value, storageVariance)
-    // }
-    // const storageVal = Number.parseFloat(convertF(item.storage ?? 0).toFixed(2))
-    // convert all data storagge with convertF
-    datas.value.storage = datas.value.storage.map((item) => {
-      return Number.parseFloat((convertF(item ?? 0).toFixed(2)))
-    })
-
-    const currentStorage = convertF(currentStorageBytes)
-    const storageVarianceConverted = convertF(storageVariance)
-    const initValue = currentStorage - storageVarianceConverted
-
-    datas.value.storage[0] = Number.parseFloat((currentStorage - storageVarianceConverted + (datas.value.storage[0] ?? 0)).toFixed(2))
-    console.log('currentStorage', currentStorage, 'storageVariance', storageVarianceConverted, storageVariance, initValue, datas.value.storage[0])
+    datas.value.storage[0] = toFixed(initValue, 2)
 
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
@@ -125,9 +119,10 @@ async function getUsages() {
     datas.value.storage = []
     datas.value.bandwidth = []
   }
-  datas.value.mau = datas.value.mau.filter(i => i)
-  datas.value.storage = datas.value.storage.filter(i => i)
-  datas.value.bandwidth = datas.value.bandwidth.filter(i => i)
+  // slice the lenght of the array to the current day
+  datas.value.mau = datas.value.mau.slice(0, currentDay)
+  datas.value.storage = datas.value.storage.slice(0, currentDay)
+  datas.value.bandwidth = datas.value.bandwidth.slice(0, currentDay)
 }
 
 async function loadData() {

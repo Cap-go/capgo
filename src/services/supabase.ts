@@ -8,7 +8,8 @@ import type { Database } from '~/types/supabase.types'
 
 let supaClient: SupabaseClient<Database> = null as any
 
-export const defaultApiHost = import.meta.env.VITE_API_HOST as string
+// export const defaultApiHost = import.meta.env.VITE_API_HOST as string
+export const defaultApiHost = 'https://api-preprod.capgo.app'
 export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 
 interface CapgoConfig {
@@ -185,8 +186,14 @@ export interface appUsageV2 {
   storage: number
   uninstall: number
 }
-export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageV2[]> {
-  const token = (await useSupabase().auth.getSession()).data.session?.access_token
+
+export interface appUsageGlobal {
+  date: string
+  bandwidth: number
+  mau: number
+  storage: number
+}
+export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobal[]> {
   const resAppIds = await useSupabase()
     .from('apps')
     .select('app_id')
@@ -200,32 +207,66 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     .gte('date', startDate)
     .lte('date', endDate)
   const storage = storageData || []
-  const data = await ky
-    .post(`${defaultApiHost}/private/dashboard`, {
-      json: {
-        orgId,
-        startDate,
-        endDate,
-      },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  // get bandwidth same as daily_storage
+  const { data: bandwidthData } = await useSupabase()
+    .from('daily_bandwidth')
+    .select('*')
+    .in('app_id', resAppIds)
+    .gte('date', startDate)
+    .lte('date', endDate)
+  const bandwidth = bandwidthData || []
+  // get mau same as daily_storage
+  const { data: mauData } = await useSupabase()
+    .from('daily_mau')
+    .select('*')
+    .in('app_id', resAppIds)
+    .gte('date', startDate)
+    .lte('date', endDate)
+  const mau = mauData || []
+  // generate all dates between startDate and endDate
+  const dates: string[] = []
+  let currentDate = new Date(startDate)
+  const end = new Date(endDate)
+  while (currentDate <= end) {
+    dates.push(currentDate.toISOString().split('T')[0])
+    currentDate = new Date(currentDate.setDate(currentDate.getDate() + 1))
+  }
+  const data = resAppIds.flatMap((appId) => {
+    // create only one entry for each day by appId
+    const appDays = dates.map((date) => {
+      const storageApp = storage.find(s => s.app_id === appId && s.date === date)
+      const bandwidthApp = bandwidth.find(s => s.app_id === appId && s.date === date)
+      const mauApp = mau.find(s => s.app_id === appId && s.date === date)
+      return {
+        app_id: appId,
+        date,
+        mau: mauApp?.mau || 0,
+        storage: storageApp?.storage || 0,
+        bandwidth: bandwidthApp?.bandwidth || 0,
+      }
     })
-    .then(res => res.json<appUsage[]>())
-    .then(async (data) => {
-      // put storage in the appUsage
-      // biome-ignore lint/complexity/noForEach: <explanation>
-      data.forEach((app) => {
-        const storageApp = storage.find(s => s.app_id === app.app_id && s.date === app.date)
-        if (storageApp)
-          app.storage = storageApp.storage
+    return appDays
+  })
+  // reduce the list to have only one entry by day with the sum of all apps
+  const reducedData = data.reduce((acc: appUsageGlobal[], current) => {
+    const existing = acc.find(s => s.date === current.date)
+    if (existing) {
+      existing.mau += current.mau
+      existing.storage += current.storage
+      existing.bandwidth += current.bandwidth
+    }
+    else {
+      acc.push({
+        date: current.date,
+        mau: current.mau,
+        storage: current.storage,
+        bandwidth: current.bandwidth,
       })
-      return data
-    })
-    .catch(() => {
-      return []
-    })
-  return data as appUsageV2[]
+    }
+    return acc
+  }, [])
+  // sort by date
+  return reducedData.sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {

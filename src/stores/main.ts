@@ -70,8 +70,6 @@ export const useMainStore = defineStore('main', () => {
 
   return {
     auth,
-    // trialDaysLeft,
-    // goodPlan,
     plans,
     isAdmin,
     totalStorage,
@@ -82,11 +80,7 @@ export const useMainStore = defineStore('main', () => {
     getTotalStats,
     filterDashboard,
     dashboard,
-    // canceled,
-    // canUseMore,
-    // paying,
     user,
-    // cycleInfo,
     path,
     logout,
   }
