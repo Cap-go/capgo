@@ -161,7 +161,7 @@ if (main.dashboardFetched)
   <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
-      :datas="datas.mau" :accumulated="true" :title="`${t('montly-active')}`" unit="Users"
+      :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"
     />
     <div
       v-else
@@ -171,7 +171,7 @@ if (main.dashboardFetched)
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" :unit="storageUnit" :accumulated="false"
+      :title="t('Storage')" :unit="storageUnit"
     />
     <div
       v-else
