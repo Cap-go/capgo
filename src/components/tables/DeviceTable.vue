@@ -177,6 +177,7 @@ onMounted(async () => {
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
+    :app-id="props.appId"
     :search-placeholder="t('search-by-device-id')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"

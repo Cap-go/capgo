@@ -8,7 +8,9 @@ import {
 } from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
 import VueDatePicker from '@vuepic/vue-datepicker'
+import dayjs from 'dayjs'
 import type { MobileColType, TableColumn } from './comp_def'
+import type { Organization } from '~/stores/organization'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
@@ -34,6 +36,7 @@ interface Props {
   currentPage: number
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
+  appId: string
 }
 
 const props = defineProps<Props>()
@@ -57,6 +60,30 @@ const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
 const showTimeDropdown = ref(false)
 const currentGeneralTime = ref<1 | 3 | 24>(1)
+const preciseDates = ref()
+const thisOrganization = ref<Organization | null>(null)
+const organizationStore = useOrganizationStore()
+
+const startTime = computed(() => {
+  const subStart = thisOrganization.value?.subscription_start
+  if (!subStart)
+    return [{ hours: 0, minutes: 0 }, { hours: 0, minutes: 0 }]
+
+  const datePast = dayjs(subStart)
+  const dateNow = dayjs()
+
+  return [
+    {
+      hours: datePast.hour(),
+      minutes: datePast.minute(),
+    },
+    {
+      hours: dateNow.hour(),
+      minutes: dateNow.minute(),
+    },
+  ]
+})
+
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -180,8 +207,13 @@ async function setTime(time: 1 | 3 | 24) {
   // Closing is done in clickLeft
 }
 
-onMounted(() => {
+onMounted(async () => {
   initDropdowns()
+  await organizationStore.awaitInitialLoad()
+  thisOrganization.value = organizationStore.getOrgByAppId(props.appId) ?? null
+
+  if (!thisOrganization.value)
+    console.error('Invalid app??')
 })
 </script>
 
@@ -220,11 +252,23 @@ onMounted(() => {
         <div :class="`flex-auto flex items-center justify-center w-28 hover:bg-gray-700 rounded-r-lg ${currentSelected === 'precise' ? 'bg-gray-100 text-gray-800 hover:text-white' : ''}`" @click="clickRight">
           <div class="fixed z-50">
             <!-- <IconCalendar class="mr-1" /> -->
-            <VueDatePicker v-model="date">
+            <VueDatePicker
+              v-model="preciseDates"
+              :min-date="dayjs(thisOrganization?.subscription_start ?? 0).toDate()"
+              :max-date="new Date()"
+              :start-time="startTime"
+              prevent-min-max-navigation
+              dark
+              range
+              @update:model-value="clickRight"
+            >
               <template #trigger>
-                <p class="clickable-text">
-                  25 Apr
-                </p>
+                <div class="w-28 h-10 flex flex-row justify-center items-center">
+                  <IconCalendar class="mr-1" />
+                  <p>
+                    {{ t('custom') }}
+                  </p>
+                </div>
               </template>
             </VueDatePicker>
           </div>
