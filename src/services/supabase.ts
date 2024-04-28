@@ -386,20 +386,21 @@ export async function isAllowedAction(userid?: string): Promise<boolean> {
 }
 
 interface PlanUsage {
-  total_percent: number;
-  mau_percent: number;
-  bandwidth_percent: number;
-  storage_percent: number;
+  total_percent: number
+  mau_percent: number
+  bandwidth_percent: number
+  storage_percent: number
 }
 
 export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
-  if (!orgId)
+  if (!orgId) {
     return {
       total_percent: 0,
       mau_percent: 0,
       bandwidth_percent: 0,
       storage_percent: 0,
     }
+  }
   const { data, error } = await useSupabase()
     .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
     .single()
