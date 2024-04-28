@@ -1521,6 +1521,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_failed_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       delete_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1567,6 +1571,33 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_app_metrics:
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: {
+              app_id: string
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
+        | {
+            Args: {
+              org_id: string
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              app_id: string
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
       get_app_versions: {
         Args: {
           appid: string
@@ -1658,6 +1689,31 @@ export type Database = {
         }
         Returns: number
       }
+      get_global_metrics:
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: {
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
+        | {
+            Args: {
+              org_id: string
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
       get_identity:
         | {
             Args: Record<PropertyKey, never>
@@ -1865,6 +1921,29 @@ export type Database = {
         }
         Returns: number
       }
+      get_total_metrics:
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
+        | {
+            Args: {
+              org_id: string
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+            }[]
+          }
       get_total_stats_v5: {
         Args: {
           userid: string
