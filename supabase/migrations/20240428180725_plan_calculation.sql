@@ -126,14 +126,6 @@ BEGIN
 END;
 $function$;
 
-ALTER TABLE "public"."plans"
-    DROP COLUMN "app",
-    DROP COLUMN "channel",
-    DROP COLUMN "update",
-    DROP COLUMN "shared",
-    DROP COLUMN "abtest",
-    DROP COLUMN "progressive_deploy";
-
 UPDATE "public"."plans"
 SET
     "storage" = "storage" * 1024 * 1024 * 1024,
