@@ -93,11 +93,7 @@ async function getUsage(orgId: string) {
   const totalPrice = computed(() => {
     return roundNumber(basePrice + totalUsagePrice.value)
   })
-
-  const cycleInfoSup = await supabase.rpc('get_cycle_info_org', { orgid: orgId }).single()
-  if (cycleInfoSup.error)
-    throw cycleInfoSup.error
-
+  
   return {
     isPayAsYouGo,
     currentPlan,
@@ -108,8 +104,11 @@ async function getUsage(orgId: string) {
     totalStorage,
     payg_units,
     plan,
-    cycle: cycleInfoSup.data,
-  }
+    cycle:  {
+      subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
+      subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
+      },
+    }
 }
 
 // const planUsageMap = ref<Map<string, Awaited<ReturnType<typeof getUsage>>>>()
@@ -207,9 +206,9 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
               {{ t('monthly-active-users') }}
             </div>
             <div>
-              <span class="font-semibold">{{ dayjs(planUsage?.cycle.subscription_anchor_start).format('YYYY/MM/D')
+              <span class="font-semibold">{{ planUsage?.cycle.subscription_anchor_start
               }}</span> {{ t('to') }} <span class="font-semibold">{{
-                dayjs(planUsage?.cycle.subscription_anchor_end).format('YYYY/MM/D') }}</span>
+                planUsage?.cycle.subscription_anchor_end }}</span>
             </div>
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">
