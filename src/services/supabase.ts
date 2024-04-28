@@ -385,15 +385,27 @@ export async function isAllowedAction(userid?: string): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(orgId?: string): Promise<number> {
+interface PlanUsage {
+  total_percent: number;
+  mau_percent: number;
+  bandwidth_percent: number;
+  storage_percent: number;
+}
+
+export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
   if (!orgId)
-    return 0
+    return {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    }
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent_org', { orgid: orgId })
+    .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
-  return data || 0
+  return data
 }
 
 export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {

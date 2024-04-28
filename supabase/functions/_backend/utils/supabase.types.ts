@@ -1769,7 +1769,7 @@ export type Database = {
           }
         | {
             Args: {
-              userid: string
+              orgid: string
             }
             Returns: Database["public"]["CompositeTypes"]["stats_table"]
           }
@@ -1894,6 +1894,31 @@ export type Database = {
         }
         Returns: number
       }
+      get_plan_usage_percent_detailed:
+        | {
+            Args: {
+              orgid: string
+            }
+            Returns: {
+              total_percent: number
+              mau_percent: number
+              bandwidth_percent: number
+              storage_percent: number
+            }[]
+          }
+        | {
+            Args: {
+              orgid: string
+              cycle_start: string
+              cycle_end: string
+            }
+            Returns: {
+              total_percent: number
+              mau_percent: number
+              bandwidth_percent: number
+              storage_percent: number
+            }[]
+          }
       get_plan_usage_percent_org: {
         Args: {
           orgid: string
