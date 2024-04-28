@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { useMainStore } from '~/stores/main'
-import { getCurrentPlanNameOrg, getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
+import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
@@ -24,7 +24,6 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 
 const { currentOrganization } = storeToRefs(organizationStore)
-const supabase = useSupabase()
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
@@ -93,7 +92,7 @@ async function getUsage(orgId: string) {
   const totalPrice = computed(() => {
     return roundNumber(basePrice + totalUsagePrice.value)
   })
-  
+
   return {
     isPayAsYouGo,
     currentPlan,
@@ -104,11 +103,11 @@ async function getUsage(orgId: string) {
     totalStorage,
     payg_units,
     plan,
-    cycle:  {
+    cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
-      subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
-      },
-    }
+      subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D'),
+    },
+  }
 }
 
 // const planUsageMap = ref<Map<string, Awaited<ReturnType<typeof getUsage>>>>()

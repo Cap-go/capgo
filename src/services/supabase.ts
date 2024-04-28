@@ -366,12 +366,11 @@ export async function isPayingOrg(orgId: string): Promise<boolean> {
 }
 
 export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
-  const { data: plans } = await useSupabase()
-    .from('plans')
-    .select()
-    .order('price_m')
-    // .neq('stripe_id', 'free')
-  return plans || []
+  const data = await ky
+    .get(`${defaultApiHost}/private/plans`)
+    .then(res => res.json<Database['public']['Tables']['plans']['Row'][]>())
+    .catch(() => [])
+  return data
 }
 
 export async function isAllowedAction(userid?: string): Promise<boolean> {

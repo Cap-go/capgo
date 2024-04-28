@@ -2,6 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { bytesToGb } from '../utils/conversion.ts'
 
 export const app = new Hono()
 
@@ -13,7 +14,13 @@ app.get('/', async (c: Context) => {
       .from('plans')
       .select()
       .order('price_m')
-    return c.json(plans || [])
+    // use bytesToGb function to convert all column storage and bandwidth to GB
+    const plansGb = plans?.map((plan) => {
+      plan.storage = bytesToGb(plan.storage)
+      plan.bandwidth = bytesToGb(plan.bandwidth)
+      return plan
+    })
+    return c.json(plansGb || [])
   }
   catch (e) {
     return c.json({ status: 'Cannot get plans', error: JSON.stringify(e) }, 500)
