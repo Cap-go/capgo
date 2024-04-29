@@ -187,16 +187,28 @@ export async function getCurrentPlanName(c: Context, userId: string): Promise<st
   return ''
 }
 
-export async function getPlanUsagePercent(c: Context, userId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_plan_usage_percent', { userid: userId })
-    .single()
-  if (error) {
-    console.error('getPlanUsagePercent error', error.message)
-    throw new Error(error.message)
-  }
+interface PlanUsage {
+  total_percent: number
+  mau_percent: number
+  bandwidth_percent: number
+  storage_percent: number
+}
 
-  return data || 0
+export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
+  if (!orgId) {
+    return {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
 }
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
@@ -223,20 +235,6 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   }
   catch (error) {
     console.error('isOnboarded error', orgId, error)
-  }
-  return false
-}
-
-export async function isFreeUsage(c: Context, userId: string): Promise<boolean> {
-  try {
-    const { data } = await supabaseAdmin(c)
-      .rpc('is_free_usage', { userid: userId })
-      .single()
-      .throwOnError()
-    return data || false
-  }
-  catch (error) {
-    console.error('isFreeUsage error', userId, error)
   }
   return false
 }

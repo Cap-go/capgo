@@ -2405,6 +2405,7 @@ export type Database = {
           p_period_end: string
         }
         Returns: {
+          app_id: string
           date: string
           storage: number
         }[]

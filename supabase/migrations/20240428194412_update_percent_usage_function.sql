@@ -72,7 +72,7 @@ RETURNS double precision
 LANGUAGE "plpgsql"
 AS $$
 BEGIN
-  RETURN round(((val * 100) / max_val), 2::numeric);
+  RETURN round(((val * 100) / max_val)::numeric, 2);
 END;
 $$;
 
