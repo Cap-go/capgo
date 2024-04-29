@@ -6,7 +6,6 @@ import { storeToRefs } from 'pinia'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import { getPlans, getTotalAppStorage } from '~/services/supabase'
-import MobileStats from '~/components/MobileStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb, getDaysBetweenDates, toFixed } from '~/services/conversion'
@@ -158,7 +157,8 @@ if (main.dashboardFetched)
 </script>
 
 <template>
-  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
+  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6">
+    <!-- TODO: to reactivate when we do the new chart https://github.com/Cap-go/capgo/issues/645 <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''"> -->
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"
@@ -189,6 +189,6 @@ if (main.dashboardFetched)
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <MobileStats v-if="appId" />
+    <!-- <MobileStats v-if="appId" /> -->
   </div>
 </template>

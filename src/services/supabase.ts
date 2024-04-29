@@ -52,27 +52,7 @@ export function useSupabase() {
       persistSession: true,
       detectSessionInUrl: false,
     },
-    // fetch: (requestInfo, requestInit) => {
-    //   const url = requestInfo.toString()
-    //   if (requestInit?.method === 'POST' && (url.includes('/storage/') || url.includes('.functions.supabase.co')))
-    //     return fetch(requestInfo, requestInit)
-    //   return Http.request({
-    //     url,
-    //     method: requestInit?.method,
-    //     headers: requestInit?.headers as any || {},
-    //     data: requestInit?.body,
-    //   })
-    //     .then((data) => {
-    //       const res = typeof data.data === 'string' ? data.data : JSON.stringify(data.data)
-    //       const resp = new Response(res, {
-    //         status: data.status,
-    //         headers: data.headers,
-    //       })
-    //       return resp
-    //     })
-    // },
   }
-  // return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
   if (supaClient)
     return supaClient
 
@@ -162,30 +142,26 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
-export interface appUsage {
-  app_id: string
-  bandwidth: number
-  date: string
-  fail: number
-  get: number
-  install: number
-  mau: number
-  storage_added: number
-  storage_deleted: number
-  uninstall: number
-}
 export interface appUsageByApp {
   app_id: string
   date: string
   bandwidth: number
   mau: number
   storage: number
+  get: number
+  install: number
+  uninstall: number
+  fail: number
 }
 export interface appUsageGlobal {
   date: string
   bandwidth: number
   mau: number
   storage: number
+  get: number
+  install: number
+  uninstall: number
+  fail: number
 }
 export interface appUsageGlobalByApp {
   global: appUsageGlobal[]
@@ -197,30 +173,9 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     .select('app_id')
     .eq('owner_org', orgId)
     .then(res => res.data?.map(app => app.app_id) || [])
-  // read from supabase daily_storage and replace the storage_added and storage_deleted by storage
-  const { data: storageData } = await useSupabase()
-    .from('daily_storage')
-    .select('*')
-    .in('app_id', resAppIds)
-    .gte('date', startDate)
-    .lte('date', endDate)
-  const storage = storageData || []
-  // get bandwidth same as daily_storage
-  const { data: bandwidthData } = await useSupabase()
-    .from('daily_bandwidth')
-    .select('*')
-    .in('app_id', resAppIds)
-    .gte('date', startDate)
-    .lte('date', endDate)
-  const bandwidth = bandwidthData || []
-  // get mau same as daily_storage
-  const { data: mauData } = await useSupabase()
-    .from('daily_mau')
-    .select('*')
-    .in('app_id', resAppIds)
-    .gte('date', startDate)
-    .lte('date', endDate)
-  const mau = mauData || []
+  // get_app_metrics
+  const appMetrics = await getAppMetrics(orgId, startDate, endDate)
+
   // generate all dates between startDate and endDate
   const dates: string[] = []
   let currentDate = new Date(startDate)
@@ -232,15 +187,17 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
   const data = resAppIds.flatMap((appId) => {
     // create only one entry for each day by appId
     const appDays = dates.map((date) => {
-      const storageApp = storage.find(s => s.app_id === appId && s.date === date)
-      const bandwidthApp = bandwidth.find(s => s.app_id === appId && s.date === date)
-      const mauApp = mau.find(s => s.app_id === appId && s.date === date)
+      const appDate = appMetrics.filter(app => app.app_id === appId && app.date === date)[0]
       return {
         app_id: appId,
         date,
-        mau: mauApp?.mau ?? 0,
-        storage: storageApp?.storage ?? 0,
-        bandwidth: bandwidthApp?.bandwidth ?? 0,
+        mau: appDate?.mau ?? 0,
+        storage: appDate?.storage ?? 0,
+        bandwidth: appDate?.bandwidth ?? 0,
+        get: appDate?.get ?? 0,
+        install: appDate?.install ?? 0,
+        uninstall: appDate?.uninstall ?? 0,
+        fail: appDate?.fail ?? 0,
       }
     })
     return appDays
@@ -252,6 +209,10 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
       existing.mau += current.mau
       existing.storage += current.storage
       existing.bandwidth += current.bandwidth
+      existing.get += current.get
+      existing.install += current.install
+      existing.uninstall += current.uninstall
+      existing.fail += current.fail
     }
     else {
       acc.push({
@@ -259,6 +220,10 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
         mau: current.mau,
         storage: current.storage,
         bandwidth: current.bandwidth,
+        get: current.get,
+        install: current.install,
+        uninstall: current.uninstall,
+        fail: current.fail,
       })
     }
     return acc
@@ -466,6 +431,15 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
       storage: stats.storage,
     })
     .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data
+}
+
+export async function getAppMetrics(orgId: string, startDate?: string, endDate?: string): Promise<appUsageByApp[]> {
+  const { data, error } = await useSupabase()
+    .rpc('get_app_metrics', { org_id: orgId, start_date: startDate, end_date: endDate })
   if (error)
     throw new Error(error.message)
 

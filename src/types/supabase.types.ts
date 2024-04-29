@@ -1582,6 +1582,10 @@ export type Database = {
               mau: number
               storage: number
               bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
             }[]
           }
         | {
@@ -1596,6 +1600,10 @@ export type Database = {
               mau: number
               storage: number
               bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
             }[]
           }
       get_app_versions: {
@@ -1699,6 +1707,10 @@ export type Database = {
               mau: number
               storage: number
               bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
             }[]
           }
         | {
@@ -1712,6 +1724,10 @@ export type Database = {
               mau: number
               storage: number
               bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
             }[]
           }
       get_identity:
@@ -1955,6 +1971,10 @@ export type Database = {
               mau: number
               storage: number
               bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
             }[]
           }
         | {
@@ -1967,6 +1987,10 @@ export type Database = {
               mau: number
               storage: number
               bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
             }[]
           }
       get_total_stats_v5: {
@@ -2226,17 +2250,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_free_usage:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
       is_good_plan_v5: {
         Args: {
           userid: string
@@ -2366,11 +2379,23 @@ export type Database = {
             }
             Returns: undefined
           }
+      process_cron_stats_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_current_jobs_if_unlocked: {
         Args: Record<PropertyKey, never>
         Returns: number[]
       }
+      process_free_trial_expired: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_requested_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      process_subscribed_orgs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
