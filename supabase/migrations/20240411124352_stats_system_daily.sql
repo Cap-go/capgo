@@ -30,7 +30,7 @@ CREATE INDEX idx_daily_storage_app_id_date ON daily_storage (app_id, date);
 CREATE TABLE daily_version (
   date DATE,
   app_id VARCHAR(255),
-  version BIGINT,
+  version_id BIGINT,
   get BIGINT,
   fail BIGINT,
   install BIGINT,
@@ -39,7 +39,7 @@ CREATE TABLE daily_version (
 );
 CREATE INDEX idx_daily_version_date ON daily_version (date);
 CREATE INDEX idx_daily_version_app_id ON daily_version (app_id);
-CREATE INDEX idx_daily_version_version ON daily_version (version);
+CREATE INDEX idx_daily_version_version ON daily_version (version_id);
 
 CREATE TABLE storage_usage (
   id SERIAL PRIMARY KEY,
@@ -52,13 +52,13 @@ CREATE TABLE storage_usage (
 CREATE TABLE version_usage (
   timestamp TIMESTAMP,
   app_id VARCHAR(255),
-  version BIGINT,
+  version_id BIGINT,
   action VARCHAR(20),
-  PRIMARY KEY (timestamp, app_id, version, action)
+  PRIMARY KEY (timestamp, app_id, version_id, action)
 );
 CREATE INDEX idx_logs_raw_timestamp ON version_usage (timestamp);
 CREATE INDEX idx_logs_raw_app_id ON version_usage (app_id);
-CREATE INDEX idx_logs_raw_version ON version_usage (version);
+CREATE INDEX idx_logs_raw_version ON version_usage (version_id);
 CREATE INDEX idx_logs_raw_action ON version_usage (action);
 
 

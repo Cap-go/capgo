@@ -159,3 +159,42 @@ ORDER BY date, app_id;`
   }
   return [] as BandwidthUsageCF[]
 }
+
+interface VersionUsageCF {
+  date: string
+  app_id: string
+  version_id: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
+export async function readVersionUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
+  if (!c.env.VERSION_USAGE)
+    return [] as VersionUsageCF[]
+  const query = `SELECT
+  blob1 as app_id,
+  blob2 as version_id,
+  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
+  sum(if(blob3 = 'get', 1, 0)) AS get,
+  sum(if(blob3 = 'fail', 1, 0)) AS fail,
+  sum(if(blob3 = 'install', 1, 0)) AS install,
+  sum(if(blob3 = 'uninstall', 1, 0)) AS uninstall
+FROM version_usage
+WHERE
+  app_id = '${app_id}'
+  AND timestamp >= toDateTime('${formatDateCF(period_start)}')
+  AND timestamp < toDateTime('${formatDateCF(period_end)}')
+GROUP BY date, app_id, version_id
+ORDER BY date;`
+
+  console.log('readVersionUsageCF query', query)
+  try {
+    return await runQueryToCF<VersionUsageCF[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading version usage', e)
+  }
+  return [] as VersionUsageCF[]
+}

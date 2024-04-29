@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import { readBandwidthUsage, readDeviceUsage, readStorageUsage, trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
-import { readBandwidthUsageCF, readDeviceUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
+import { readBandwidthUsage, readDeviceUsage, readStorageUsage, readVersionUsage, trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
+import { readBandwidthUsageCF, readDeviceUsageCF, readVersionUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
@@ -59,4 +59,10 @@ export function readStatsBandwidth(c: Context, app_id: string, start_date: strin
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
   // No cloudflare implementation, postgrest is enough
   return readStorageUsage(c, app_id, start_date, end_date)
+}
+
+export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string) {
+  if (!c.env.VERSION_USAGE)
+    return readVersionUsage(c, app_id, start_date, end_date)
+  return readVersionUsageCF(c, app_id, start_date, end_date)
 }

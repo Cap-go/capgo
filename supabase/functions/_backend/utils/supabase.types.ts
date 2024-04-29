@@ -713,7 +713,7 @@ export type Database = {
           get: number | null
           install: number | null
           uninstall: number | null
-          version: number
+          version_id: number
         }
         Insert: {
           app_id: string
@@ -722,7 +722,7 @@ export type Database = {
           get?: number | null
           install?: number | null
           uninstall?: number | null
-          version: number
+          version_id: number
         }
         Update: {
           app_id?: string
@@ -731,7 +731,7 @@ export type Database = {
           get?: number | null
           install?: number | null
           uninstall?: number | null
-          version?: number
+          version_id?: number
         }
         Relationships: []
       }
@@ -1377,19 +1377,19 @@ export type Database = {
           action: string
           app_id: string
           timestamp: string
-          version: number
+          version_id: number
         }
         Insert: {
           action: string
           app_id: string
           timestamp?: string
-          version: number
+          version_id: number
         }
         Update: {
           action?: string
           app_id?: string
           timestamp?: string
-          version?: number
+          version_id?: number
         }
         Relationships: []
       }
@@ -2408,6 +2408,22 @@ export type Database = {
           app_id: string
           date: string
           storage: number
+        }[]
+      }
+      read_version_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          app_id: string
+          version_id: number
+          date: string
+          get: number
+          fail: number
+          install: number
+          uninstall: number
         }[]
       }
       reset_and_seed_data: {

@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAPISecret, useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { readStatsBandwidth, readStatsMau, readStatsStorage } from '../utils/stats.ts'
+import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 
 interface dataToGet {
   appId?: string
@@ -45,6 +45,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const bandwidth = await readStatsBandwidth(c, body.appId, startDate, endDate)
     // get storage
     const storage = await readStatsStorage(c, body.appId, startDate, endDate)
+    const versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
 
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
@@ -56,6 +57,9 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         .eq('app_id', body.appId),
       supabase.from('daily_storage')
         .upsert(storage)
+        .eq('app_id', body.appId),
+      supabase.from('daily_version')
+        .upsert(versionUsage)
         .eq('app_id', body.appId),
     ])
 

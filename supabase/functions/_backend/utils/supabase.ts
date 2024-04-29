@@ -851,3 +851,9 @@ export async function readStorageUsage(c: Context, app_id: string, period_start:
     .rpc('read_storage_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
   return data || []
 }
+
+export async function readVersionUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
