@@ -160,7 +160,7 @@ async function loadData(initial: boolean) {
       // updateData()
     }),
     getPlanUsagePercent(orgId).then((res) => {
-      console.log(res)
+      // console.log('getPlanUsagePercent', res)
       data.planPercent = res.total_percent
       // updateData()
     }).catch(err => console.log(err)),

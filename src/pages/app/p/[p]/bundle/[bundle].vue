@@ -642,7 +642,7 @@ function preventInputChangePerm(event: Event) {
             />
             <!-- size -->
             <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
-            <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" />
+            <!-- <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" /> -->
           </dl>
         </div>
       </div>
