@@ -78,7 +78,7 @@ export function formatDateCF(date: string | undefined) {
 
 async function runQueryToCF<T>(c: Context, query: string) {
   const CF_ANALYTICS_TOKEN = getEnv(c, 'CF_ANALYTICS_TOKEN')
-  const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ID')
+  const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
 
   const response = await ky.post(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`, {
     headers: {
