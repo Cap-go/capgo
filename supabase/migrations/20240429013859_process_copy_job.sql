@@ -28,6 +28,7 @@ SELECT cron.schedule(
     $$SELECT process_cron_stats_jobs();$$
 );
 
+-- Add back the fonction who was overided by the previous migration unintentionally
 CREATE OR REPLACE FUNCTION process_requested_jobs()
 RETURNS VOID AS $$
 DECLARE
