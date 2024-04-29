@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { s3 } from './s3.ts'
-import { supabaseAdmin } from './supabase.ts';
-import type { Database } from './supabase.types.ts';
+import { supabaseAdmin } from './supabase.ts'
+import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
 // const EXPIRATION_SECONDS = 120
@@ -15,11 +15,10 @@ export async function getBundleUrl(c: Context, ownerOrg: string, version: Databa
 
   // get app_versions_meta to get the size
   const { data: bundleMeta } = await supabaseAdmin(c)
-      .from('app_versions_meta')
-      .select('size')
-      .eq('id', version.id)
-      .single()
-
+    .from('app_versions_meta')
+    .select('size')
+    .eq('id', version.id)
+    .single()
 
   if (version.storage_provider === 'r2' && version.r2_path)
     path = version.r2_path
