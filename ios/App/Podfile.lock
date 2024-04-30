@@ -58,25 +58,25 @@ PODS:
     - Capacitor
   - CapawesomeCapacitorScreenOrientation (6.0.0):
     - Capacitor
-  - CapgoCapacitorCrisp (2.0.16):
+  - CapgoCapacitorCrisp (6.0.1):
     - Capacitor
     - Crisp
-  - CapgoCapacitorFlash (2.0.14):
+  - CapgoCapacitorFlash (6.0.0):
     - Capacitor
-  - CapgoCapacitorMute (2.0.13):
+  - CapgoCapacitorMute (6.0.0):
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorScreenRecorder (5.0.0):
+  - CapgoCapacitorScreenRecorder (6.0.0):
     - Capacitor
-  - CapgoCapacitorUpdater (6.0.1):
+  - CapgoCapacitorUpdater (6.0.2):
     - Alamofire
     - Capacitor
     - SSZipArchive
     - Version
-  - CapgoInappbrowser (1.4.4):
+  - CapgoInappbrowser (6.0.2):
     - Capacitor
-  - CapgoNativeAudio (6.2.7):
+  - CapgoNativeAudio (6.3.2):
     - Capacitor
   - CapgoNativeMarket (0.0.1):
     - Capacitor
@@ -101,7 +101,7 @@ DEPENDENCIES:
   - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorClipboard (from `../../node_modules/@capacitor/clipboard`)"
-  - "CapacitorCommunityKeepAwake (from `../../node_modules/.deno/@capacitor-community+keep-awake@4.0.0/node_modules/@capacitor-community/keep-awake`)"
+  - "CapacitorCommunityKeepAwake (from `../../node_modules/@capacitor-community/keep-awake`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorDevice (from `../../node_modules/@capacitor/device`)"
   - "CapacitorDialog (from `../../node_modules/@capacitor/dialog`)"
@@ -113,9 +113,9 @@ DEPENDENCIES:
   - "CapacitorNetwork (from `../../node_modules/@capacitor/network`)"
   - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
-  - "CapacitorRateApp (from `../../node_modules/.deno/capacitor-rate-app@4.0.3/node_modules/capacitor-rate-app`)"
+  - CapacitorRateApp (from `../../node_modules/capacitor-rate-app`)
   - "CapacitorScreenReader (from `../../node_modules/@capacitor/screen-reader`)"
-  - "CapacitorSecureStoragePlugin (from `../../node_modules/.deno/capacitor-secure-storage-plugin@0.9.0/node_modules/capacitor-secure-storage-plugin`)"
+  - CapacitorSecureStoragePlugin (from `../../node_modules/capacitor-secure-storage-plugin`)
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
@@ -123,15 +123,15 @@ DEPENDENCIES:
   - "CapacitorToast (from `../../node_modules/@capacitor/toast`)"
   - "CapawesomeCapacitorFilePicker (from `../../node_modules/@capawesome/capacitor-file-picker`)"
   - "CapawesomeCapacitorScreenOrientation (from `../../node_modules/@capawesome/capacitor-screen-orientation`)"
-  - "CapgoCapacitorCrisp (from `../../node_modules/.deno/@capgo+capacitor-crisp@2.0.16/node_modules/@capgo/capacitor-crisp`)"
-  - "CapgoCapacitorFlash (from `../../node_modules/.deno/@capgo+capacitor-flash@2.0.14/node_modules/@capgo/capacitor-flash`)"
-  - "CapgoCapacitorMute (from `../../node_modules/.deno/@capgo+capacitor-mute@2.0.13/node_modules/@capgo/capacitor-mute`)"
+  - "CapgoCapacitorCrisp (from `../../node_modules/@capgo/capacitor-crisp`)"
+  - "CapgoCapacitorFlash (from `../../node_modules/@capgo/capacitor-flash`)"
+  - "CapgoCapacitorMute (from `../../node_modules/@capgo/capacitor-mute`)"
   - "CapgoCapacitorNativeBiometric (from `../../node_modules/@capgo/capacitor-native-biometric`)"
-  - "CapgoCapacitorScreenRecorder (from `../../node_modules/.deno/@capgo+capacitor-screen-recorder@5.0.0/node_modules/@capgo/capacitor-screen-recorder`)"
+  - "CapgoCapacitorScreenRecorder (from `../../node_modules/@capgo/capacitor-screen-recorder`)"
   - "CapgoCapacitorUpdater (from `../../node_modules/@capgo/capacitor-updater`)"
   - "CapgoInappbrowser (from `../../node_modules/@capgo/inappbrowser`)"
-  - "CapgoNativeAudio (from `../../node_modules/.deno/@capgo+native-audio@6.2.7/node_modules/@capgo/native-audio`)"
-  - "CapgoNativeMarket (from `../../node_modules/.deno/@capgo+native-market@5.0.5/node_modules/@capgo/native-market`)"
+  - "CapgoNativeAudio (from `../../node_modules/@capgo/native-audio`)"
+  - "CapgoNativeMarket (from `../../node_modules/@capgo/native-market`)"
   - "RevenuecatPurchasesCapacitor (from `../../node_modules/@revenuecat/purchases-capacitor`)"
 
 SPEC REPOS:
@@ -160,7 +160,7 @@ EXTERNAL SOURCES:
   CapacitorClipboard:
     :path: "../../node_modules/@capacitor/clipboard"
   CapacitorCommunityKeepAwake:
-    :path: "../../node_modules/.deno/@capacitor-community+keep-awake@4.0.0/node_modules/@capacitor-community/keep-awake"
+    :path: "../../node_modules/@capacitor-community/keep-awake"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorDevice:
@@ -184,11 +184,11 @@ EXTERNAL SOURCES:
   CapacitorPushNotifications:
     :path: "../../node_modules/@capacitor/push-notifications"
   CapacitorRateApp:
-    :path: "../../node_modules/.deno/capacitor-rate-app@4.0.3/node_modules/capacitor-rate-app"
+    :path: "../../node_modules/capacitor-rate-app"
   CapacitorScreenReader:
     :path: "../../node_modules/@capacitor/screen-reader"
   CapacitorSecureStoragePlugin:
-    :path: "../../node_modules/.deno/capacitor-secure-storage-plugin@0.9.0/node_modules/capacitor-secure-storage-plugin"
+    :path: "../../node_modules/capacitor-secure-storage-plugin"
   CapacitorShare:
     :path: "../../node_modules/@capacitor/share"
   CapacitorSplashScreen:
@@ -204,23 +204,23 @@ EXTERNAL SOURCES:
   CapawesomeCapacitorScreenOrientation:
     :path: "../../node_modules/@capawesome/capacitor-screen-orientation"
   CapgoCapacitorCrisp:
-    :path: "../../node_modules/.deno/@capgo+capacitor-crisp@2.0.16/node_modules/@capgo/capacitor-crisp"
+    :path: "../../node_modules/@capgo/capacitor-crisp"
   CapgoCapacitorFlash:
-    :path: "../../node_modules/.deno/@capgo+capacitor-flash@2.0.14/node_modules/@capgo/capacitor-flash"
+    :path: "../../node_modules/@capgo/capacitor-flash"
   CapgoCapacitorMute:
-    :path: "../../node_modules/.deno/@capgo+capacitor-mute@2.0.13/node_modules/@capgo/capacitor-mute"
+    :path: "../../node_modules/@capgo/capacitor-mute"
   CapgoCapacitorNativeBiometric:
     :path: "../../node_modules/@capgo/capacitor-native-biometric"
   CapgoCapacitorScreenRecorder:
-    :path: "../../node_modules/.deno/@capgo+capacitor-screen-recorder@5.0.0/node_modules/@capgo/capacitor-screen-recorder"
+    :path: "../../node_modules/@capgo/capacitor-screen-recorder"
   CapgoCapacitorUpdater:
     :path: "../../node_modules/@capgo/capacitor-updater"
   CapgoInappbrowser:
     :path: "../../node_modules/@capgo/inappbrowser"
   CapgoNativeAudio:
-    :path: "../../node_modules/.deno/@capgo+native-audio@6.2.7/node_modules/@capgo/native-audio"
+    :path: "../../node_modules/@capgo/native-audio"
   CapgoNativeMarket:
-    :path: "../../node_modules/.deno/@capgo+native-market@5.0.5/node_modules/@capgo/native-market"
+    :path: "../../node_modules/@capgo/native-market"
   RevenuecatPurchasesCapacitor:
     :path: "../../node_modules/@revenuecat/purchases-capacitor"
 
@@ -255,14 +255,14 @@ SPEC CHECKSUMS:
   CapacitorToast: ba573a7bc5dfd622e78d5be126a84ee221da4180
   CapawesomeCapacitorFilePicker: 983e8d272d200897cf1c12cf9a62439fa2fb2c35
   CapawesomeCapacitorScreenOrientation: 82675c41cb616a64630c834b06344515a2849ff3
-  CapgoCapacitorCrisp: 1c602fac83b220bfd23b1cf227a10adb79f4eabb
-  CapgoCapacitorFlash: 884a111cceac9fa87381d5d149734aa6b1ee874e
-  CapgoCapacitorMute: 9b7b7d82c7645914da5477a037cb30da9f85b59c
+  CapgoCapacitorCrisp: 19e8814c6751a07f814b3a83df522eb6a2ab73e0
+  CapgoCapacitorFlash: a570db525cf7d42477e650615b32e933858937f8
+  CapgoCapacitorMute: 4581f843a3b79eaa1106d1ef1ee18a093b7c9907
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
-  CapgoCapacitorScreenRecorder: a4e60b4b73b9797055c3dc9e4b3b7933a2ee1d8e
-  CapgoCapacitorUpdater: cd41134538fde058c797cd852e5dd3fee30d890f
-  CapgoInappbrowser: d956d7e0668a8eb85e72f7183434c05249b5e00a
-  CapgoNativeAudio: 9c9d2ee1683c5e7091d59c3aa7ff5c30c66b9598
+  CapgoCapacitorScreenRecorder: a2481ed4a91333ef354e5e8d564f86d6d161250d
+  CapgoCapacitorUpdater: 129bc6135042cec74592ae55ae7f891824f2251f
+  CapgoInappbrowser: 1d3f1891b49bc9646f8405c6498b6b271f58d67e
+  CapgoNativeAudio: cb169369d3e836b4e490c288818d932d314cfc3b
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
   Crisp: 4d8b0776bdd124db206075cb683a90cff1390864
   PurchasesHybridCommon: 596ac8a54be4e03cc1398b012bd9cdf134111b70
@@ -272,6 +272,6 @@ SPEC CHECKSUMS:
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: 7771707423647ae58475f7f3c437b7495d37b4ff
+PODFILE CHECKSUM: 845b3194c3a5b24bb6f93bfea2423e7ca009f728
 
 COCOAPODS: 1.15.2

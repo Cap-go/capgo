@@ -3,7 +3,7 @@ include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
 include ':capacitor-community-keep-awake'
-project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/.deno/@capacitor-community+keep-awake@4.0.0/node_modules/@capacitor-community/keep-awake/android')
+project(':capacitor-community-keep-awake').projectDir = new File('../node_modules/@capacitor-community/keep-awake/android')
 
 include ':capacitor-action-sheet'
 project(':capacitor-action-sheet').projectDir = new File('../node_modules/@capacitor/action-sheet/android')
@@ -78,19 +78,19 @@ include ':capawesome-capacitor-screen-orientation'
 project(':capawesome-capacitor-screen-orientation').projectDir = new File('../node_modules/@capawesome/capacitor-screen-orientation/android')
 
 include ':capgo-capacitor-crisp'
-project(':capgo-capacitor-crisp').projectDir = new File('../node_modules/.deno/@capgo+capacitor-crisp@2.0.16/node_modules/@capgo/capacitor-crisp/android')
+project(':capgo-capacitor-crisp').projectDir = new File('../node_modules/@capgo/capacitor-crisp/android')
 
 include ':capgo-capacitor-flash'
-project(':capgo-capacitor-flash').projectDir = new File('../node_modules/.deno/@capgo+capacitor-flash@2.0.14/node_modules/@capgo/capacitor-flash/android')
+project(':capgo-capacitor-flash').projectDir = new File('../node_modules/@capgo/capacitor-flash/android')
 
 include ':capgo-capacitor-mute'
-project(':capgo-capacitor-mute').projectDir = new File('../node_modules/.deno/@capgo+capacitor-mute@2.0.13/node_modules/@capgo/capacitor-mute/android')
+project(':capgo-capacitor-mute').projectDir = new File('../node_modules/@capgo/capacitor-mute/android')
 
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../node_modules/@capgo/capacitor-native-biometric/android')
 
 include ':capgo-capacitor-screen-recorder'
-project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/.deno/@capgo+capacitor-screen-recorder@5.0.0/node_modules/@capgo/capacitor-screen-recorder/android')
+project(':capgo-capacitor-screen-recorder').projectDir = new File('../node_modules/@capgo/capacitor-screen-recorder/android')
 
 include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/@capgo/capacitor-updater/android')
@@ -99,16 +99,16 @@ include ':capgo-inappbrowser'
 project(':capgo-inappbrowser').projectDir = new File('../node_modules/@capgo/inappbrowser/android')
 
 include ':capgo-native-audio'
-project(':capgo-native-audio').projectDir = new File('../node_modules/.deno/@capgo+native-audio@6.2.7/node_modules/@capgo/native-audio/android')
+project(':capgo-native-audio').projectDir = new File('../node_modules/@capgo/native-audio/android')
 
 include ':capgo-native-market'
-project(':capgo-native-market').projectDir = new File('../node_modules/.deno/@capgo+native-market@5.0.5/node_modules/@capgo/native-market/android')
+project(':capgo-native-market').projectDir = new File('../node_modules/@capgo/native-market/android')
 
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
 
 include ':capacitor-rate-app'
-project(':capacitor-rate-app').projectDir = new File('../node_modules/.deno/capacitor-rate-app@4.0.3/node_modules/capacitor-rate-app/android')
+project(':capacitor-rate-app').projectDir = new File('../node_modules/capacitor-rate-app/android')
 
 include ':capacitor-secure-storage-plugin'
-project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/.deno/capacitor-secure-storage-plugin@0.9.0/node_modules/capacitor-secure-storage-plugin/android')
+project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/capacitor-secure-storage-plugin/android')
