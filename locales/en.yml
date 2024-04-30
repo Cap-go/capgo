@@ -325,6 +325,7 @@ org-changes-set-email-other-error: Cannot set the management email, please conta
 org-invited-user: Successfully invited user to org
 organization-email: Organization's management email
 organization-name: Organization Name
+organization-settings: Organization settings
 os-version: OS version
 pages: Pages
 password: Password
@@ -485,3 +486,4 @@ your-api-key: 'Your API key:'
 your-are-a: Your are a
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is
+your-settings: Your settings

@@ -347,6 +347,7 @@ org-changes-set-email-other-error: Impossibile impostare l'e-mail di gestione, c
 org-invited-user: Utente invitato all'organizzazione correttamente
 organization-email: E-mail di gestione dell'organizzazione
 organization-name: Nome dell'organizzazione
+organization-settings: Impostazioni dell'organizzazione
 os-version: Versione del sistema operativo
 pages: Pagine
 password: Parola d'ordine
@@ -516,3 +517,4 @@ your-api-key: 'La tua chiave API:'
 your-are-a: Sei un
 your-current-plan-is: Il tuo piano attuale è
 your-current-suggested-plan-is: Il tuo attuale piano suggerito è
+your-settings: Le tue impostazioni

@@ -345,6 +345,7 @@ org-changes-set-email-other-error: >-
 org-invited-user: Пользователь успешно приглашен в организацию.
 organization-email: Электронная почта руководства организации
 organization-name: Название организации
+organization-settings: Настройки организации
 os-version: версия ОС
 pages: Страницы
 password: Пароль
@@ -514,3 +515,4 @@ your-api-key: 'Ваш ключ API:'
 your-are-a: Вы
 your-current-plan-is: Ваш текущий план
 your-current-suggested-plan-is: 'Ваш текущий предлагаемый план:'
+your-settings: Ваши настройки

@@ -333,6 +333,7 @@ org-changes-set-email-other-error: 管理用メールアドレスを設定でき
 org-invited-user: ユーザーを組織に正常に招待しました
 organization-email: 組織の管理メール
 organization-name: 組織名
+organization-settings: 組織の設定
 os-version: OSバージョン
 pages: ページ
 password: パスワード
@@ -496,3 +497,4 @@ your-api-key: 'API キー:'
 your-are-a: あなたは
 your-current-plan-is: 現在のプランは
 your-current-suggested-plan-is: 現在お勧めのプランは
+your-settings: あなたの設定

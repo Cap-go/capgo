@@ -343,6 +343,7 @@ org-changes-set-email-other-error: Không cài đặt được email quản lý,
 org-invited-user: Đã mời thành công người dùng vào tổ chức
 organization-email: Email quản lý của tổ chức
 organization-name: tên tổ chức
+organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
 pages: trang
 password: Mật khẩu
@@ -508,3 +509,4 @@ your-api-key: 'Khóa API của bạn:'
 your-are-a: bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là
+your-settings: Cài đặt của bạn

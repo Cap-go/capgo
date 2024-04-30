@@ -349,6 +349,7 @@ org-changes-set-email-other-error: Impossible de définir l'e-mail de gestion, v
 org-invited-user: L'utilisateur a été invité avec succès dans l'organisation
 organization-email: E-mail de gestion de l'organisation
 organization-name: nom de l'organisation
+organization-settings: Paramètres de l'organisation
 os-version: Version du système d'exploitation
 pages: pages
 password: Mot de passe
@@ -518,3 +519,4 @@ your-api-key: "Votre clé API\_:"
 your-are-a: Vous êtes un
 your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré est
+your-settings: Vos paramètres

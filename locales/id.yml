@@ -345,6 +345,7 @@ org-changes-set-email-other-error: Tidak dapat mengatur email manajemen, silakan
 org-invited-user: Berhasil mengundang pengguna ke org
 organization-email: Email manajemen organisasi
 organization-name: Nama Organisasi
+organization-settings: Pengaturan organisasi
 os-version: versi OS
 pages: Halaman
 password: Kata sandi
@@ -512,3 +513,4 @@ your-api-key: 'Kunci API Anda:'
 your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
+your-settings: Pengaturan Anda

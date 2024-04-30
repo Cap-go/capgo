@@ -339,6 +339,7 @@ org-changes-set-email-other-error: Yönetim e-postası ayarlanamıyor, lütfen d
 org-invited-user: Kullanıcı başarıyla kuruluşa davet edildi
 organization-email: Kuruluşun yönetim e-postası
 organization-name: Kuruluş Adı
+organization-settings: Organizasyon ayarları
 os-version: OS sürümü
 pages: Sayfalar
 password: Şifre
@@ -506,3 +507,4 @@ your-api-key: 'API anahtarınız:'
 your-are-a: Senin alanın
 your-current-plan-is: Mevcut planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'
+your-settings: Ayarlarınız

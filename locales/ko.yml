@@ -333,6 +333,7 @@ org-changes-set-email-other-error: 관리 이메일을 설정할 수 없습니�
 org-invited-user: 사용자를 조직에 초대했습니다.
 organization-email: 조직의 관리 이메일
 organization-name: 조직 이름
+organization-settings: 조직 설정
 os-version: OS 버전
 pages: 페이지
 password: 비밀번호
@@ -496,3 +497,4 @@ your-api-key: '귀하의 API 키:'
 your-are-a: 당신은
 your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은 다음과 같습니다.
+your-settings: 귀하의 설정

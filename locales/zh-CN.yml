@@ -333,6 +333,7 @@ org-changes-set-email-other-error: 无法设置管理邮箱，请联系支持
 org-invited-user: 已成功邀请用户加入组织
 organization-email: 组织的管理电子邮件
 organization-name: 机构名称
+organization-settings: 组织设置
 os-version: 操作系统版本
 pages: 页数
 password: 密码
@@ -496,3 +497,4 @@ your-api-key: 您的 API 密钥：
 your-are-a: 你是一个
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是
+your-settings: 您的设置

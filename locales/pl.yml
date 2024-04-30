@@ -345,6 +345,7 @@ org-changes-set-email-other-error: >-
 org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
 organization-email: Adres e-mail zarządu organizacji
 organization-name: Nazwa organizacji
+organization-settings: Ustawienia organizacji
 os-version: Wersja systemu operacyjnego
 pages: Strony
 password: Hasło
@@ -514,3 +515,4 @@ your-api-key: 'Twój klucz API:'
 your-are-a: Twoja okolica
 your-current-plan-is: Twój obecny plan to
 your-current-suggested-plan-is: Twój aktualny sugerowany plan to
+your-settings: Twoje ustawienia
