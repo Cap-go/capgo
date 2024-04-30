@@ -197,7 +197,7 @@
     "@vue/compiler-sfc": "3.4.19",
     "@vue/server-renderer": "3.4.19",
     "autoprefixer": "^10.4.17",
-    "critters": "0.0.20",
+    "critters": "0.0.22",
     "cross-env": "^7.0.3",
     "deep-diff": "1.0.2",
     "eslint": "8.56.0",
