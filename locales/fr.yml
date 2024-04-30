@@ -68,6 +68,7 @@ app: Application
 app-deleted: Application supprimée
 app-id-example: Exemple d'ID d'application
 app-not-found: Application introuvable
+app-perm: Autorisation de l'application
 app-preview: Aperçu de l'application
 are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
@@ -76,6 +77,7 @@ base: Base
 best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
 billed-annually-at: Facturé annuellement à
+billed-monthly-at: Facturé mensuellement à
 billing: Facturation
 build-your-app-and-s: créer votre application et synchroniser
 build-your-code-and-: Télécharger sur Capgo votre code
@@ -119,7 +121,10 @@ cannot-invite-owner: Impossible d'inviter le propriétaire dans l'organisation
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
 cannot-set-this-vers: Impossible de définir cette version
 cannot-share: Impossible de partager l'ID utilisateur, vérifiez la console du navigateur
+cannot-show: Impossible d'afficher cette page
 cannot-test-app-some: Impossible de tester l'application, une erreur s'est produite
+cannot-view-plans: Impossible d'afficher la page des forfaits
+cannot-view-usage: Impossible d'afficher la page d'utilisation
 cannots-sign-off: Impossible de se connecter
 change: Changement
 changed-password-suc: Le mot de passe a été changé avec succès
@@ -212,9 +217,12 @@ enter-your-email-add: >-
   Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
+error: Erreur
 external-storage: Stockage externe
 fail: Échec de l'installation
 failed: Échoué
+fast-backward: Retour rapide
+fast-forward: Avance rapide
 filters: Filtres
 first-name: Prénom
 force-version: Version forcée
@@ -253,6 +261,7 @@ key-admin: Administrateur
 key-all: Tous
 key-copied: Clé copiée dans votre presse-papiers
 key-read: Lire
+key-super-admin: Super administrateur
 key-upload: Télécharger
 key-write: Écrire
 language: Langue
@@ -296,6 +305,7 @@ minor: Mineure
 misconfigured: Mal configuré
 misconfigured-channels: "Certaines chaînes sont mal configurées. \nLes mises à jour échoueront pour ces chaînes\_!"
 mo: mo
+modify-org-info: Vous pouvez modifier les informations de l'organisation ici.
 module-heading: Modules
 monthly: Mensuel
 monthly-active-users: Utilisateurs actifs mensuels
@@ -309,6 +319,7 @@ name: Nom
 need-more-contact-us: |-
   Besoin de plus ? 
   Contactez-nous pour un plan sur mesure
+next: Suivant
 'no': Non
 no-channel-linked: Pas de canal, cliquez pour ajouter
 no-channel-linked-no-perm: Aucune chaîne
@@ -320,7 +331,11 @@ no-version-linked: Pas de version, cliquez pour ajouter
 no-version-linked-no-perm: Aucune version
 none: Aucun
 not-found: Pas trouvé
+not-paying-org-usage: >-
+  Cette organisation ne paie pas et ne peut pas montrer son utilisation pour une
+  organisation de test gratuite.
 notifications: Avis
+ok: D'ACCORD
 old-onboarding-mode: ancienne intégration
 one-day-left: Reste un jour
 open: Ouvrir
@@ -329,7 +344,10 @@ open-settings: Cliquez pour ouvrir les paramètres
 open-sidebar: Ouvrir la barre latérale
 open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jour
 org-changes-saved: Organisation mise à jour avec succès
+org-changes-set-email-not-unique: L'e-mail de gestion n'est pas unique, veuillez en sélectionner un autre
+org-changes-set-email-other-error: Impossible de définir l'e-mail de gestion, veuillez contacter l'assistance
 org-invited-user: L'utilisateur a été invité avec succès dans l'organisation
+organization-email: E-mail de gestion de l'organisation
 organization-name: nom de l'organisation
 os-version: Version du système d'exploitation
 pages: pages
@@ -340,6 +358,7 @@ password-hint: >-
   Entrez une combinaison d'au moins 6 chiffres, lettres et signes de
   ponctuation.
 password-new: nouveau mot de passe
+patch: Correctif
 percent-fail: Pourcentage d'échec
 permission-changed: L'autorisation de l'utilisateur a été modifiée avec succès
 personal-information: Informations personnelles
@@ -366,6 +385,9 @@ plan-updates: Mises à jour
 plan-upgrade: S'abonner
 plan-whats-included: Ce qui est inclus
 plans: Plans
+plans-super-only: >-
+  Seuls les super-administrateurs sont autorisés à consulter les forfaits et la
+  facturation.
 platform: Plateforme
 please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
@@ -374,6 +396,7 @@ prediction: Prédiction
 preview: Offre groupée d'aperçu
 preview-encrypted: Impossible de prévisualiser le bundle chiffré
 preview-short: Aperçu
+previous: Précédent
 price-per-unit-above: Prix ​​par unité au-dessus du plan
 pro-tip-you-can-copy: "Conseil de pro\_: vous pouvez copier le"
 progressive-bundle-number: Numéro de forfait progressif
@@ -415,6 +438,7 @@ set-bundle: Définir le groupe sur le canal
 settings: Paramètres
 shared-apps: Applications partagées
 shared-users: Partagé avec
+showing: Affichage
 sign-out: Se déconnecter
 size: Taille
 size-not-found: Introuvable
@@ -434,6 +458,7 @@ terms-of-use: Conditions d'utilisation
 test-your-update-in-: Testez votre mise à jour dans votre application
 tests: essais
 thank-you-for-choosi: Merci d'avoir choisi Capgo !
+thank-you-for-sub: Merci de vous être abonné à Capgo
 the: Le
 this-page-will-self-: Cette page s'actualisera automatiquement
 title: titre
@@ -442,6 +467,7 @@ to: Au
 to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
+top-apps-v2: applications
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
@@ -449,6 +475,7 @@ type: ''
 undefined: indéfini
 undefined-fail: Non défini (les mises à jour échoueront)
 uninstall: Désinstaller
+unknown: inconnu
 unlimited-updates: Mises à jour illimitées
 unlink-bundle: Dissocier le groupe
 unlink-channel: Dissocier le canal
@@ -462,7 +489,9 @@ upperCaseError: Doit contenir des lettres majuscules
 url: URL
 usage: Usage
 usage-success: Votre plan a été configuré, cette page sera mise à jour dans quelques minutes
+usage-super-only: Seuls les super-administrateurs sont autorisés à consulter l'utilisation
 usage-title: Total
+use-capgo: Utiliser Capgo
 use-the-command: "Utilisez la commande\_:"
 used-in-period: Utilisé pendant la période
 used-to-create: Le compte avec cette adresse e-mail existait auparavant, impossible à recréer
@@ -480,6 +509,7 @@ versions: Versions
 warning: Avertissement!
 welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
+write-key: Écrire
 yearly: Annuel
 'yes': Oui
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.

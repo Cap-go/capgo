@@ -39,7 +39,9 @@ const loadedLanguages: string[] = []
 
 function setI18nLanguage(lang: Locale) {
   i18n.global.locale.value = lang as any
-  document.querySelector('html')?.setAttribute('lang', lang)
+  localStorage.setItem('lang', lang)
+  if (typeof document !== 'undefined')
+    document.querySelector('html')?.setAttribute('lang', lang)
   return lang
 }
 

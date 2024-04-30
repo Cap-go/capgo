@@ -73,6 +73,7 @@ base: Baza
 best-plan: Najlepszy plan
 bigger-app-size: Większy rozmiar aplikacji
 billed-annually-at: Rozliczane co roku o godz
+billed-monthly-at: Rozliczane miesięcznie o godz
 billing: Dane do faktury
 build-your-app-and-s: zbuduj swoją aplikację i zsynchronizuj
 build-your-code-and-: Prześlij do Capgo swój kod
@@ -116,7 +117,10 @@ cannot-invite-owner: Nie można zaprosić właściciela do organizacji
 cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
 cannot-set-this-vers: Nie można ustawić tej wersji
 cannot-share: Nie można udostępnić identyfikatora użytkownika. Sprawdź konsolę przeglądarki
+cannot-show: Nie można wyświetlić tej strony
 cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
+cannot-view-plans: Nie można wyświetlić strony planów
+cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
 change: Zmiana
 changed-password-suc: Hasło zostało zmienione pomyślnie
@@ -207,6 +211,7 @@ enabled-progressive-deploy: Włączono wdrażanie progresywne
 encrypted: Zaszyfrowane pakiety
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
+error: Błąd
 external-storage: Dysk zewnętrzny
 fail: Instalacja nie powiodła się
 failed: Przegrany
@@ -294,6 +299,7 @@ misconfigured-channels: |-
   Niektóre kanały są źle skonfigurowane. 
   Aktualizacje tych kanałów nie powiodą się!
 mo: mo
+modify-org-info: Tutaj możesz modyfikować dane organizacji.
 module-heading: Moduły
 monthly: Miesięczny
 monthly-active-users: Miesięczna liczba aktywnych użytkowników
@@ -319,7 +325,11 @@ no-version-linked: Brak wersji, kliknij, aby dodać
 no-version-linked-no-perm: Brak wersji
 none: Nic
 not-found: Nie znaleziono
+not-paying-org-usage: >-
+  Ta organizacja nie płaci, nie może wykazać wykorzystania w przypadku
+  organizacji bezpłatnej
 notifications: Powiadomienia
+ok: OK
 old-onboarding-mode: stary wstęp
 one-day-left: Został jeden dzień
 open: otwarty
@@ -328,7 +338,12 @@ open-settings: Kliknij, aby otworzyć ustawienia
 open-sidebar: Otwórz pasek boczny
 open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację
 org-changes-saved: Organizacja została pomyślnie zaktualizowana
+org-changes-set-email-not-unique: Adres e-mail do zarządzania nie jest unikalny. Wybierz inny
+org-changes-set-email-other-error: >-
+  Nie można ustawić adresu e-mail zarządzania. Skontaktuj się z pomocą
+  techniczną
 org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
+organization-email: Adres e-mail zarządu organizacji
 organization-name: Nazwa organizacji
 os-version: Wersja systemu operacyjnego
 pages: Strony
@@ -337,6 +352,7 @@ password-confirmatio: Potwierdzenie hasła
 password-heading: Stwórz hasło
 password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpunkcyjnych.
 password-new: nowe hasło
+patch: Skrawek
 percent-fail: Procent niepowodzeń
 permission-changed: Pomyślnie zmieniono uprawnienia użytkownika
 personal-information: Informacje osobiste
@@ -363,6 +379,7 @@ plan-updates: Aktualizacje
 plan-upgrade: Subskrybenci
 plan-whats-included: Co jest zawarte
 plans: Plany
+plans-super-only: Tylko superadministratorzy mogą przeglądać plany i rozliczenia
 platform: Platforma
 please-choose-your-p: Wybierz swoje preferencje
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
@@ -435,6 +452,7 @@ terms-of-use: Warunki korzystania
 test-your-update-in-: Przetestuj aktualizację w swojej aplikacji
 tests: testy
 thank-you-for-choosi: Dziękujemy za wybranie Capgo!
+thank-you-for-sub: Dziękujemy za subskrypcję Capgo
 the: The
 this-page-will-self-: Ta strona odświeży się samoczynnie
 title: tytuł
@@ -467,7 +485,9 @@ usage: Stosowanie
 usage-success: >-
   Twój plan został skonfigurowany, ta strona zostanie zaktualizowana za kilka
   minut
+usage-super-only: Tylko superadministratorzy mogą przeglądać wykorzystanie
 usage-title: Całkowity
+use-capgo: Użyj Capgo
 use-the-command: 'Użyj polecenia:'
 used-in-period: Używany w okresie
 used-to-create: Konto z tym adresem e-mail istniało już wcześniej i nie można go odtworzyć

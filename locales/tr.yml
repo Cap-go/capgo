@@ -71,6 +71,7 @@ base: Temel
 best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
 billed-annually-at: Yıllık olarak faturalandırılır
+billed-monthly-at: Aylık olarak faturalandırılır
 billing: Faturalandırma
 build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
 build-your-code-and-: Kodunuzu Capgo'ya yükleyin
@@ -114,7 +115,10 @@ cannot-invite-owner: Sahibi kuruluşa davet edilemiyor
 cannot-save-custom-i: Özel kimlik kaydedilemiyor
 cannot-set-this-vers: Bu sürüm ayarlanamıyor
 cannot-share: Kullanıcı kimliği paylaşılamıyor, tarayıcı konsolunu kontrol edin
+cannot-show: Bu sayfa gösterilemiyor
 cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
+cannot-view-plans: Planlar sayfası görüntülenemiyor
+cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
 change: Değiştirmek
 changed-password-suc: parola başarıyla değiştirildi
@@ -205,6 +209,7 @@ enter-your-email-add: >-
   E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
+error: Hata
 external-storage: Harici depolama
 fail: Yükleme başarısız
 failed: Arızalı
@@ -292,6 +297,7 @@ misconfigured-channels: |-
   Bazı kanallar yanlış yapılandırılmış. 
   Bu kanallar için güncellemeler başarısız olacaktır!
 mo: Ay
+modify-org-info: Kuruluşun bilgilerini buradan değiştirebilirsiniz.
 module-heading: Modüller
 monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar
@@ -317,7 +323,9 @@ no-version-linked: Sürüm yok, eklemek için tıklayın
 no-version-linked-no-perm: Sürüm yok
 none: Hiçbiri
 not-found: Bulunamadı
+not-paying-org-usage: Bu kuruluş ödeme yapmıyor, ücretsiz deneme kuruluşu için kullanım gösteremiyor
 notifications: Bildirimler
+ok: TAMAM
 old-onboarding-mode: eski işe alım
 one-day-left: Bir gün kaldı
 open: Açık
@@ -326,7 +334,10 @@ open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
 open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
 org-changes-saved: Kuruluş başarıyla güncellendi
+org-changes-set-email-not-unique: Yönetim e-postası benzersiz değil, lütfen farklı bir e-posta seçin
+org-changes-set-email-other-error: Yönetim e-postası ayarlanamıyor, lütfen desteğe başvurun
 org-invited-user: Kullanıcı başarıyla kuruluşa davet edildi
+organization-email: Kuruluşun yönetim e-postası
 organization-name: Kuruluş Adı
 os-version: OS sürümü
 pages: Sayfalar
@@ -335,6 +346,7 @@ password-confirmatio: Şifre onayı
 password-heading: Şifre oluştur
 password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon girin.
 password-new: Yeni Şifre
+patch: Yama
 percent-fail: Başarısız yüzde
 permission-changed: Kullanıcı izni başarıyla değiştirildi
 personal-information: Kişisel bilgiler
@@ -361,6 +373,9 @@ plan-updates: Güncellemeler
 plan-upgrade: aboneler
 plan-whats-included: Neler dahil
 plans: planlar
+plans-super-only: >-
+  Yalnızca süper yöneticilerin planları ve faturalandırmayı görüntülemesine izin
+  verilir
 platform: platformu
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
@@ -431,6 +446,7 @@ terms-of-use: Kullanım Şartları
 test-your-update-in-: Güncellemenizi uygulamanızda test edin
 tests: testler
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
+thank-you-for-sub: Capgo'ya abone olduğunuz için teşekkür ederiz
 the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
 title: başlık
@@ -461,7 +477,9 @@ upperCaseError: Büyük harfler içermelidir
 url: URL
 usage: Kullanım
 usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
+usage-super-only: Yalnızca süper yöneticilerin kullanımı görüntülemesine izin verilir
 usage-title: Toplam
+use-capgo: Capgo'yu kullan
 use-the-command: 'Şu komutu kullanın:'
 used-in-period: Döneminde kullanıldı
 used-to-create: Bu e-postaya sahip hesap önceden mevcuttu, yeniden oluşturulamıyor

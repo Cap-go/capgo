@@ -71,6 +71,7 @@ base: 根据
 best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
 billed-annually-at: 每年计费于
+billed-monthly-at: 每月计费于
 billing: 计费
 build-your-app-and-s: 构建您的应用程序并同步
 build-your-code-and-: 将您的代码上传到 Capgo
@@ -114,7 +115,10 @@ cannot-invite-owner: 无法邀请所有者加入组织
 cannot-save-custom-i: 无法保存自定义 ID
 cannot-set-this-vers: 无法设置此版本
 cannot-share: 无法共享用户 ID，请检查浏览器控制台
+cannot-show: 无法显示该页面
 cannot-test-app-some: 无法测试应用程序发生错误
+cannot-view-plans: 无法查看计划页面
+cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
 change: 改变
 changed-password-suc: 密码修改成功
@@ -201,6 +205,7 @@ enabled-progressive-deploy: 启用渐进式部署
 encrypted: 加密包
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
 enter-your-new-passw: 输入您的新密码并确认
+error: 错误
 external-storage: 外置储存
 fail: 安装失败
 failed: 失败的
@@ -286,6 +291,7 @@ misconfigured-channels: |-
   某些通道配置错误。
   这些频道的更新将失败！
 mo: 月
+modify-org-info: 您可以在此处修改组织的信息。
 module-heading: 模块
 monthly: 每月
 monthly-active-users: 月活跃用户
@@ -311,7 +317,9 @@ no-version-linked: 暂无版本，点击添加
 no-version-linked-no-perm: 无版本
 none: 没有任何
 not-found: 未找到
+not-paying-org-usage: 该组织未付费，无法显示免费试用组织的使用情况
 notifications: 通知
+ok: 好的
 old-onboarding-mode: 旧入职
 one-day-left: 还剩一天
 open: 打开
@@ -320,7 +328,10 @@ open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新
 org-changes-saved: 组织更新成功
+org-changes-set-email-not-unique: 管理邮箱不唯一，请选择其他邮箱
+org-changes-set-email-other-error: 无法设置管理邮箱，请联系支持
 org-invited-user: 已成功邀请用户加入组织
+organization-email: 组织的管理电子邮件
 organization-name: 机构名称
 os-version: 操作系统版本
 pages: 页数
@@ -329,6 +340,7 @@ password-confirmatio: 确认密码
 password-heading: 创建密码
 password-hint: 输入至少 6 个数字、字母和标点符号的组合。
 password-new: 新密码
+patch: 修补
 percent-fail: 失败百分比
 permission-changed: 成功更改用户权限
 personal-information: 个人信息
@@ -353,6 +365,7 @@ plan-updates: 更新
 plan-upgrade: 订阅
 plan-whats-included: 包括什么
 plans: 计划
+plans-super-only: 仅允许超级管理员查看计划和账单
 platform: 平台
 please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
@@ -423,6 +436,7 @@ terms-of-use: 使用条款
 test-your-update-in-: 在您的应用程序中测试您的更新
 tests: 测试
 thank-you-for-choosi: 感谢您选择凯普高！
+thank-you-for-sub: 感谢您订阅 Capgo
 the: 这
 this-page-will-self-: 此页面会自动刷新
 title: 标题
@@ -453,7 +467,9 @@ upperCaseError: 应包含大写字母
 url: 网址
 usage: 用法
 usage-success: 您的计划已设置此页面将在几分钟内更新
+usage-super-only: 只有超级管理员才可以查看使用情况
 usage-title: 全部的
+use-capgo: 使用卡普戈
 use-the-command: 使用命令：
 used-in-period: 使用期间
 used-to-create: 使用此电子邮件的帐户曾经存在，无法重新创建

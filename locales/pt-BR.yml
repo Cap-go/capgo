@@ -73,6 +73,7 @@ base: Base
 best-plan: melhor plano
 bigger-app-size: Tamanho maior do aplicativo
 billed-annually-at: Faturado anualmente em
+billed-monthly-at: Faturado mensalmente em
 billing: Cobrança
 build-your-app-and-s: crie seu aplicativo e sincronize
 build-your-code-and-: Envie para o Capgo seu código
@@ -116,7 +117,10 @@ cannot-invite-owner: Não é possível convidar o proprietário para a organiza�
 cannot-save-custom-i: Não é possível salvar o ID personalizado
 cannot-set-this-vers: Não é possível definir esta versão
 cannot-share: Não é possível compartilhar o ID do usuário, verifique o console do navegador
+cannot-show: Não é possível mostrar esta página
 cannot-test-app-some: Não é possível testar o aplicativo, algo errado aconteceu
+cannot-view-plans: Não é possível visualizar a página de planos
+cannot-view-usage: Não é possível visualizar a página de uso
 cannots-sign-off: Não é possível registrar
 change: Mudar
 changed-password-suc: Senha alterada com sucesso
@@ -205,6 +209,7 @@ enabled-progressive-deploy: Implantação progressiva habilitada
 encrypted: Pacotes criptografados
 enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha.
 enter-your-new-passw: Digite sua nova senha e confirme
+error: Erro
 external-storage: Armazenamento externo
 fail: Falha na instalação
 failed: Fracassado
@@ -292,6 +297,7 @@ misconfigured-channels: |-
   Alguns canais estão configurados incorretamente. 
   As atualizações falharão para esses canais!
 mo: m
+modify-org-info: Você pode modificar as informações da organização aqui.
 module-heading: Módulos
 monthly: Por mês
 monthly-active-users: Usuários ativos mensais
@@ -317,7 +323,11 @@ no-version-linked: Nenhuma versão, clique para adicionar
 no-version-linked-no-perm: Nenhuma versão
 none: Nenhum
 not-found: Não encontrado
+not-paying-org-usage: >-
+  Esta organização não está pagando e não pode mostrar o uso de uma organização
+  de avaliação gratuita
 notifications: Notificações
+ok: OK
 old-onboarding-mode: integração antiga
 one-day-left: Falta um dia
 open: Abrir
@@ -326,7 +336,12 @@ open-settings: Clique para abrir as configurações
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abra este link para saber como testar sua atualização
 org-changes-saved: Organização atualizada com sucesso
+org-changes-set-email-not-unique: O e-mail de gerenciamento não é único. Selecione outro.
+org-changes-set-email-other-error: >-
+  Não é possível definir o e-mail de gerenciamento. Entre em contato com o
+  suporte
 org-invited-user: Usuário convidado para a organização com sucesso
+organization-email: E-mail de gerenciamento da organização
 organization-name: Nome da organização
 os-version: versão do sistema operacional
 pages: Páginas
@@ -335,6 +350,7 @@ password-confirmatio: ConfirmaÇão Da Senha
 password-heading: Criar senha
 password-hint: Digite uma combinação de pelo menos 6 números, letras e pontuações.
 password-new: Nova Senha
+patch: Correção
 percent-fail: Porcentagem de reprovação
 permission-changed: Permissão do usuário alterada com sucesso
 personal-information: Informações pessoais
@@ -361,6 +377,7 @@ plan-updates: Atualizações
 plan-upgrade: Assinaturas
 plan-whats-included: O que está incluído
 plans: Planos
+plans-super-only: Somente superadministradores têm permissão para visualizar planos e cobranças
 platform: Plataforma
 please-choose-your-p: Escolha suas preferências
 please-upgrade: Atualize seu plano para adicionar mais usuários
@@ -433,6 +450,7 @@ terms-of-use: Termos de uso
 test-your-update-in-: Teste sua atualização em seu aplicativo
 tests: testes
 thank-you-for-choosi: Obrigado por escolher a Capgo!
+thank-you-for-sub: Obrigado por assinar o Capgo
 the: O
 this-page-will-self-: Esta página será atualizada automaticamente
 title: título
@@ -463,7 +481,9 @@ upperCaseError: Deve conter letras maiúsculas
 url: URL
 usage: Uso
 usage-success: Seu plano foi configurado esta página será atualizada, em alguns minutos
+usage-super-only: Somente superadministradores têm permissão para visualizar o uso
 usage-title: Total
+use-capgo: Usar Capgo
 use-the-command: 'Use o comando:'
 used-in-period: Usado no período
 used-to-create: A conta com este e-mail já existia, não é possível recriar

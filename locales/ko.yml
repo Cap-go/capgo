@@ -71,6 +71,7 @@ base: 베이스
 best-plan: 최고의 계획
 bigger-app-size: 더 큰 앱 크기
 billed-annually-at: '매년 청구 금액:'
+billed-monthly-at: '월별 청구 시간:'
 billing: 청구
 build-your-app-and-s: 앱 빌드 및 동기화
 build-your-code-and-: Capgo에 코드 업로드
@@ -114,7 +115,10 @@ cannot-invite-owner: 소유자를 조직에 초대할 수 없습니다.
 cannot-save-custom-i: 맞춤 ID를 저장할 수 없습니다.
 cannot-set-this-vers: 이 버전을 설정할 수 없습니다.
 cannot-share: 사용자 ID를 공유할 수 없습니다. 브라우저 콘솔을 확인하세요.
+cannot-show: 이 페이지를 표시할 수 없습니다
 cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했습니다.
+cannot-view-plans: 계획 페이지를 볼 수 없습니다
+cannot-view-usage: 사용량 페이지를 볼 수 없습니다
 cannots-sign-off: 로그할 수 없습니다.
 change: 변화
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
@@ -201,6 +205,7 @@ enabled-progressive-deploy: 점진적 배포 활성화
 encrypted: 암호화된 번들
 enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
 enter-your-new-passw: 새 비밀번호를 입력하고 확인
+error: 오류
 external-storage: 외부 저장
 fail: 설치 실패
 failed: 실패한
@@ -286,6 +291,7 @@ misconfigured-channels: |-
   일부 채널이 잘못 구성되었습니다. 
   해당 채널에 대한 업데이트가 실패합니다!
 mo: 개월
+modify-org-info: 여기에서 조직의 정보를 수정할 수 있습니다.
 module-heading: 모듈
 monthly: 월간 간행물
 monthly-active-users: 월간 활성 사용자
@@ -311,7 +317,9 @@ no-version-linked: 버전이 없습니다. 추가하려면 클릭하세요.
 no-version-linked-no-perm: 버전 없음
 none: 없음
 not-found: 찾을 수 없음
+not-paying-org-usage: 이 조직은 비용을 지불하지 않으며 무료 평가자 조직의 사용량을 표시할 수 없습니다.
 notifications: 알림
+ok: 좋아요
 old-onboarding-mode: 오래된 온보딩
 one-day-left: 하루 남음
 open: 열려 있는
@@ -320,7 +328,10 @@ open-settings: 클릭하여 설정 열기
 open-sidebar: 사이드바 열기
 open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.
 org-changes-saved: 조직이 업데이트되었습니다.
+org-changes-set-email-not-unique: 관리 이메일이 고유하지 않습니다. 다른 이메일을 선택하세요.
+org-changes-set-email-other-error: 관리 이메일을 설정할 수 없습니다. 지속적인 지원을 부탁드립니다.
 org-invited-user: 사용자를 조직에 초대했습니다.
+organization-email: 조직의 관리 이메일
 organization-name: 조직 이름
 os-version: OS 버전
 pages: 페이지
@@ -329,6 +340,7 @@ password-confirmatio: 비밀번호 확인
 password-heading: 비밀번호 만들기
 password-hint: 숫자, 문자, 구두점을 6개 이상 조합하여 입력하세요.
 password-new: 새 비밀번호
+patch: 반점
 percent-fail: 실패율
 permission-changed: 사용자 권한을 성공적으로 변경했습니다.
 personal-information: 개인 정보
@@ -353,6 +365,7 @@ plan-updates: 업데이트
 plan-upgrade: 구독자
 plan-whats-included: 포함된 것
 plans: 계획
+plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니다.
 platform: 플랫폼
 please-choose-your-p: 기본 설정을 선택하십시오
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
@@ -423,6 +436,7 @@ terms-of-use: 이용약관
 test-your-update-in-: 앱에서 업데이트 테스트
 tests: 테스트
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
+thank-you-for-sub: Capgo를 구독해 주셔서 감사합니다.
 the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
 title: 제목
@@ -453,7 +467,9 @@ upperCaseError: 대문자를 포함해야 함
 url: URL
 usage: 용법
 usage-success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
+usage-super-only: 최고 관리자만 사용량을 볼 수 있습니다.
 usage-title: 총
+use-capgo: 캡고 사용
 use-the-command: 다음 명령을 사용하십시오.
 used-in-period: 기간에 사용
 used-to-create: 이 이메일을 사용하는 계정이 이전에 존재했으므로 다시 만들 수 없습니다.
