@@ -35,7 +35,7 @@ CREATE TABLE daily_version (
   fail BIGINT,
   install BIGINT,
   uninstall BIGINT,
-  PRIMARY KEY (date, app_id, version)
+  PRIMARY KEY (date, app_id, version_id)
 );
 CREATE INDEX idx_daily_version_date ON daily_version (date);
 CREATE INDEX idx_daily_version_app_id ON daily_version (app_id);

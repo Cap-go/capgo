@@ -1,6 +1,7 @@
-SELECT cron.unschedule('Update plan');
+-- SELECT cron.unschedule('Update plan');
 
-drop function read_device_usage(p_app_id VARCHAR(255), p_period_start TIMESTAMP, p_period_end TIMESTAMP);
+-- drop function read_device_usage(p_app_id VARCHAR(255), p_period_start TIMESTAMP, p_period_end TIMESTAMP);
+drop function read_storage_usage;
 CREATE OR REPLACE FUNCTION read_storage_usage(
   p_app_id VARCHAR(255),
   p_period_start TIMESTAMP,
