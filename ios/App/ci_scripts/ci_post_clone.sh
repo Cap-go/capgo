@@ -21,9 +21,12 @@ npm install -g node-gyp node-addon-api
 
 # Install bun
 echo "📦 Install bun"
-brew tap oven-sh/bun
-brew install bun 
+curl -fsSL https://bun.sh/install | bash
+export BUN_INSTALL="~/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
 bun -v
+
 
 echo "Move to the project root"
 echo $PWD
