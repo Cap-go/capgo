@@ -67,7 +67,6 @@
     "@capacitor/android": "^6.0.0",
     "@capacitor/app": "^6.0.0",
     "@capacitor/app-launcher": "^6.0.0",
-    "@capacitor/assets": "3.0.5",
     "@capacitor/browser": "^6.0.0",
     "@capacitor/camera": "^6.0.0",
     "@capacitor/clipboard": "^6.0.0",

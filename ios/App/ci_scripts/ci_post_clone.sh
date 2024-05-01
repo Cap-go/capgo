@@ -38,9 +38,9 @@ echo "📦 Install dependencies"
 bun install
 
 # create assets
-echo "🌆 Create Assets"
-
-npm run capacitor-assets
+# echo "🌆 Create Assets"
+# TODO: add back when Xcode is fixed
+# npm run capacitor-assets
 
 # Build the app
 echo "🚀 Build code"
