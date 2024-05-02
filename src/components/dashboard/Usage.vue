@@ -6,7 +6,7 @@ import { storeToRefs } from 'pinia'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
 import { getPlans, getTotalAppStorage } from '~/services/supabase'
-import { getDaysInCurrentMonth } from '~/services/date'
+import { getDaysInCurrentMonth, getMonthSubscriptionDates } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb, getDaysBetweenDates, toFixed } from '~/services/conversion'
 
@@ -65,8 +65,10 @@ async function getUsages() {
   const currentDay = currentDate.getDate()
   let cycleDay: number | undefined
   if (globalStats && globalStats.length > 0) {
-    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+    // organizationStore.currentOrganization!.subscription_start is bad here
+    // organizationStore DOES NOT guarantee that currentOrganization will be equal to the organization owning an app
+    // getOrgByAppId should be used
+    const [cycleStart, cycleEnd] = getMonthSubscriptionDates(organizationStore.currentOrganization!.subscription_start, organizationStore.currentOrganization!.subscription_end)
 
     if (cycleStart.getDate() === 1) {
       cycleDay = currentDay
@@ -157,7 +159,7 @@ if (main.dashboardFetched)
 </script>
 
 <template>
-  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6">
+  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <!-- TODO: to reactivate when we do the new chart https://github.com/Cap-go/capgo/issues/645 <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''"> -->
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
@@ -189,6 +191,16 @@ if (main.dashboardFetched)
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <!-- <MobileStats v-if="appId" /> -->
+    <MobileStats v-if="appId" />
+    <!-- <UsageCard
+      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
+      :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"
+    />
+    <div
+      v-else
+      class="col-span-full h-[460px] flex flex-col items-center justify-center border border-slate-200 rounded-lg bg-white shadow-lg sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
+    >
+      <Spinner size="w-40 h-40" />
+    </div> -->
   </div>
 </template>

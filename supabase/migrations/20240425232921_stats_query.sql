@@ -14,10 +14,10 @@ BEGIN
   SELECT
     DATE_TRUNC('day', timestamp) AS date,
     COUNT(DISTINCT device_id) AS mau,
-    app_id
+   device_usage.app_id
   FROM device_usage
   WHERE
-    app_id = p_app_id
+    device_usage.app_id = p_app_id
     AND timestamp >= p_period_start
     AND timestamp < p_period_end
   GROUP BY app_id, date
