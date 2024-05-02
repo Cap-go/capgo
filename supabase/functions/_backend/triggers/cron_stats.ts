@@ -47,6 +47,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const storage = await readStatsStorage(c, body.appId, startDate, endDate)
     const versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
 
+    console.log('mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0))
+    console.log('bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0))
+    console.log('storage', storage.length, storage.reduce((acc, curr) => acc + curr.storage, 0))
+    console.log('versionUsage', versionUsage.length, versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0))
+
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
       supabase.from('daily_mau')
@@ -67,6 +72,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json({ status: 'Stats saved' })
   }
   catch (e) {
+    console.error('Error getting stats', e)
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })
