@@ -57,7 +57,7 @@ BEGIN
     VALUES (
       'TRIGGER',
       json_build_object('orgId', org_record.id, 'customerId', org_record.customer_id)::text,
-      'http',
+      'cloudflare',
       'cron_check_plan'
     );
   END LOOP;
