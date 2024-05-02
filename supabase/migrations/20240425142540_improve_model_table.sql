@@ -12,9 +12,9 @@ DROP TABLE IF EXISTS version_usage;
 CREATE TABLE version_usage (
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   app_id VARCHAR(255),
-  version BIGINT,
+  version_id BIGINT,
   action VARCHAR(20),
-  PRIMARY KEY (timestamp, app_id, version, action)
+  PRIMARY KEY (timestamp, app_id, version_id, action)
 );
 
 -- Prevent user to acccess raw data

@@ -14,3 +14,4 @@ SELECT cron.schedule('Update insights', '22 1 * * *', $$SELECT http_post_helper(
 SELECT cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT http_post_helper('cron_email', '', '{}'::jsonb)$$);
 
 SELECT reset_and_seed_data();
+SELECT reset_and_seed_stats_data();
