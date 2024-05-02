@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { appUsage } from './../services/supabase'
+import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
 import {
   getAllDashboard,
   getTotalStorage,
@@ -17,7 +17,8 @@ export const useMainStore = defineStore('main', () => {
   const user = ref<Database['public']['Tables']['users']['Row']>()
   const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
   const isAdmin = ref<boolean>(false)
-  const dashboard = ref<appUsage[]>([])
+  const dashboard = ref<appUsageGlobal[]>([])
+  const dashboardByapp = ref<appUsageByApp[]>([])
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
   const dashboardFetched = ref<boolean>(false)
@@ -44,7 +45,9 @@ export const useMainStore = defineStore('main', () => {
     })
   }
   const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
-    dashboard.value = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
+    const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
+    dashboard.value = dashboardRes.global
+    dashboardByapp.value = dashboardRes.byApp
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
     totalStorage.value = await getTotalStorage()
@@ -64,14 +67,17 @@ export const useMainStore = defineStore('main', () => {
     })
   }
 
-  const filterDashboard = async (appId: string) => {
-    return dashboard.value.filter(d => d.app_id === appId)
+  const filterDashboard = (appId: string) => {
+    return dashboardByapp.value.filter(d => d.app_id === appId)
+  }
+
+  const getTotalMauByApp = (appId: string) => {
+    // dashboardByapp add up all the mau for the appId and return it
+    return dashboardByapp.value.filter(d => d.app_id === appId).reduce((acc: number, cur) => acc + cur.mau, 0)
   }
 
   return {
     auth,
-    // trialDaysLeft,
-    // goodPlan,
     plans,
     isAdmin,
     totalStorage,
@@ -82,11 +88,9 @@ export const useMainStore = defineStore('main', () => {
     getTotalStats,
     filterDashboard,
     dashboard,
-    // canceled,
-    // canUseMore,
-    // paying,
+    dashboardByapp,
+    getTotalMauByApp,
     user,
-    // cycleInfo,
     path,
     logout,
   }

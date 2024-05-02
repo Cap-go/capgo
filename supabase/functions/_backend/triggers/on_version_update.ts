@@ -4,8 +4,8 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sendMetaToClickHouse } from '../utils/clickhouse.ts'
 import { s3 } from '../utils/s3.ts'
+import { createStatsMeta } from '../utils/stats.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
@@ -45,13 +45,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
         .eq('id', record.id)
       if (errorUpdate)
         console.log('errorUpdate', errorUpdate)
-      await sendMetaToClickHouse(c, [{
-        id: record.id,
-        created_at: new Date().toISOString(),
-        app_id: record.app_id,
-        size,
-        action: 'add',
-      }])
+      await createStatsMeta(c, record.app_id, record.id, size)
     }
   }
   return c.json(BRES)
@@ -95,13 +89,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     console.log('Cannot find version meta', record.id)
     return c.json(BRES)
   }
-  await sendMetaToClickHouse(c, [{
-    id: record.id,
-    created_at: new Date().toISOString(),
-    app_id: record.app_id,
-    size: data.size,
-    action: 'delete',
-  }])
+  await createStatsMeta(c, record.app_id, record.id, -data.size)
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('app_versions_meta')

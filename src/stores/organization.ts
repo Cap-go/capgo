@@ -10,20 +10,6 @@ export type Organization = ArrayElement<Database['public']['Functions']['get_org
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
-// TODO Create user rights in database
-// type Right = Database['public']['Tables']['user_rights']['Row']
-
-// const permMap = new Map([
-//   ['invite_read', 0],
-//   ['invite_upload', 0],
-//   ['invite_write', 0],
-//   ['invite_admin', 0],
-//   ['read', 1],
-//   ['upload', 2],
-//   ['write', 3],
-//   ['admin', 4],
-//   ['super_admin', 5],
-// ])
 
 const supabase = useSupabase()
 const main = useMainStore()

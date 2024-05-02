@@ -304,7 +304,7 @@ export async function update(c: Context, body: AppInfos) {
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
       if (sent) {
         await LogSnag.track({
           channel: 'updates',
@@ -326,7 +326,7 @@ export async function update(c: Context, body: AppInfos) {
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
       if (sent) {
         await LogSnag.track({
           channel: 'updates',

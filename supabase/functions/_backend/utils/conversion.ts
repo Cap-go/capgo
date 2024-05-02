@@ -1,8 +1,13 @@
-export function bytesToMb(bytes: number) {
-  return Math.round(((bytes / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100
+export function toFixed(value: number, fixed: number) {
+  if (fixed === 0)
+    return value
+  return Number.parseFloat(value.toFixed(fixed))
 }
-export function bytesToGb(bytes: number) {
-  return Math.round(((bytes / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100
+export function bytesToMb(bytes: number, fixes = 0) {
+  return toFixed(Math.round(((bytes / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100, fixes)
+}
+export function bytesToGb(bytes: number, fixes = 0) {
+  return toFixed(Math.round(((bytes / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100, fixes)
 }
 export function mbToBytes(mb: number) {
   return mb * 1024 * 1024

@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import { useMainStore } from '~/stores/main'
-import { getCurrentPlanNameOrg, getPlans, getTotalStorage, useSupabase } from '~/services/supabase'
+import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
@@ -24,7 +24,6 @@ const displayStore = useDisplayStore()
 const router = useRouter()
 
 const { currentOrganization } = storeToRefs(organizationStore)
-const supabase = useSupabase()
 
 watchEffect(async () => {
   if (route.path === '/dashboard/settings/plans') {
@@ -67,6 +66,7 @@ async function getUsage(orgId: string) {
   const totalStorage = bytesToGb(await getTotalStorage(orgId))
   let totalBandwidth = 0
 
+  // biome-ignore lint/complexity/noForEach: <explanation>
   usage?.forEach((item) => {
     totalMau += item.mau
     // totalStorage += bytesToGb(item.storage_added) - bytesToGb(item.storage_deleted)
@@ -93,10 +93,6 @@ async function getUsage(orgId: string) {
     return roundNumber(basePrice + totalUsagePrice.value)
   })
 
-  const cycleInfoSup = await supabase.rpc('get_cycle_info_org', { orgid: orgId }).single()
-  if (cycleInfoSup.error)
-    throw cycleInfoSup.error
-
   return {
     isPayAsYouGo,
     currentPlan,
@@ -107,7 +103,10 @@ async function getUsage(orgId: string) {
     totalStorage,
     payg_units,
     plan,
-    cycle: cycleInfoSup.data,
+    cycle: {
+      subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
+      subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D'),
+    },
   }
 }
 
@@ -206,9 +205,9 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
               {{ t('monthly-active-users') }}
             </div>
             <div>
-              <span class="font-semibold">{{ dayjs(planUsage?.cycle.subscription_anchor_start).format('YYYY/MM/D')
+              <span class="font-semibold">{{ planUsage?.cycle.subscription_anchor_start
               }}</span> {{ t('to') }} <span class="font-semibold">{{
-                dayjs(planUsage?.cycle.subscription_anchor_end).format('YYYY/MM/D') }}</span>
+                planUsage?.cycle.subscription_anchor_end }}</span>
             </div>
           </div>
           <hr class="my-1 border-t-2 border-gray-300 opacity-70">

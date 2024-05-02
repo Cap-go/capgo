@@ -342,18 +342,6 @@ export type Database = {
           },
         ]
       }
-      auth_uid: {
-        Row: {
-          uid: string | null
-        }
-        Insert: {
-          uid?: string | null
-        }
-        Update: {
-          uid?: string | null
-        }
-        Relationships: []
-      }
       bandwidth_usage: {
         Row: {
           app_id: string
@@ -531,45 +519,6 @@ export type Database = {
           },
         ]
       }
-      clickhouse_app_usage: {
-        Row: {
-          app_id: string | null
-          bandwidth: number | null
-          date: string | null
-          fail: number | null
-          get: number | null
-          install: number | null
-          mau: number | null
-          storage_added: number | null
-          storage_deleted: number | null
-          uninstall: number | null
-        }
-        Insert: {
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Update: {
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Relationships: []
-      }
       clickhouse_app_usage_parm: {
         Row: {
           _app_list: string | null
@@ -693,21 +642,6 @@ export type Database = {
         }
         Relationships: []
       }
-      cycle_info: {
-        Row: {
-          subscription_anchor_end: string | null
-          subscription_anchor_start: string | null
-        }
-        Insert: {
-          subscription_anchor_end?: string | null
-          subscription_anchor_start?: string | null
-        }
-        Update: {
-          subscription_anchor_end?: string | null
-          subscription_anchor_start?: string | null
-        }
-        Relationships: []
-      }
       daily_bandwidth: {
         Row: {
           app_id: string
@@ -779,7 +713,7 @@ export type Database = {
           get: number | null
           install: number | null
           uninstall: number | null
-          version: number
+          version_id: number
         }
         Insert: {
           app_id: string
@@ -788,7 +722,7 @@ export type Database = {
           get?: number | null
           install?: number | null
           uninstall?: number | null
-          version: number
+          version_id: number
         }
         Update: {
           app_id?: string
@@ -797,7 +731,7 @@ export type Database = {
           get?: number | null
           install?: number | null
           uninstall?: number | null
-          version?: number
+          version_id?: number
         }
         Relationships: []
       }
@@ -1030,26 +964,29 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string | null
-          id: string
+          event: string
           last_send_at: string
           owner_org: string
           total_send: number
+          uniq_id: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
-          id: string
+          event: string
           last_send_at?: string
           owner_org: string
           total_send?: number
+          uniq_id: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
-          id?: string
+          event?: string
           last_send_at?: string
           owner_org?: string
           total_send?: number
+          uniq_id?: string
           updated_at?: string | null
         }
         Relationships: [
@@ -1414,24 +1351,45 @@ export type Database = {
           },
         ]
       }
+      version_meta: {
+        Row: {
+          app_id: string
+          size: number
+          timestamp: string
+          version_id: number
+        }
+        Insert: {
+          app_id: string
+          size: number
+          timestamp?: string
+          version_id: number
+        }
+        Update: {
+          app_id?: string
+          size?: number
+          timestamp?: string
+          version_id?: number
+        }
+        Relationships: []
+      }
       version_usage: {
         Row: {
           action: string
           app_id: string
           timestamp: string
-          version: number
+          version_id: number
         }
         Insert: {
           action: string
           app_id: string
-          timestamp: string
-          version: number
+          timestamp?: string
+          version_id: number
         }
         Update: {
           action?: string
           app_id?: string
           timestamp?: string
-          version?: number
+          version_id?: number
         }
         Relationships: []
       }
@@ -1563,6 +1521,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_failed_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       delete_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1609,6 +1571,41 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_app_metrics:
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: {
+              app_id: string
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
+            }[]
+          }
+        | {
+            Args: {
+              org_id: string
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              app_id: string
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
+            }[]
+          }
       get_app_versions: {
         Args: {
           appid: string
@@ -1616,6 +1613,10 @@ export type Database = {
           apikey: string
         }
         Returns: number
+      }
+      get_cloudflare_function_url: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_current_plan_max:
         | {
@@ -1696,10 +1697,39 @@ export type Database = {
         }
         Returns: number
       }
-      get_external_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_global_metrics:
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: {
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
+            }[]
+          }
+        | {
+            Args: {
+              org_id: string
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              date: string
+              mau: number
+              storage: number
+              bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
+            }[]
+          }
       get_identity:
         | {
             Args: Record<PropertyKey, never>
@@ -1755,10 +1785,14 @@ export type Database = {
           }
         | {
             Args: {
-              userid: string
+              orgid: string
             }
             Returns: Database["public"]["CompositeTypes"]["stats_table"]
           }
+      get_netlify_function_url: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_org_members: {
         Args: {
           guild_id: string
@@ -1876,6 +1910,31 @@ export type Database = {
         }
         Returns: number
       }
+      get_plan_usage_percent_detailed:
+        | {
+            Args: {
+              orgid: string
+            }
+            Returns: {
+              total_percent: number
+              mau_percent: number
+              bandwidth_percent: number
+              storage_percent: number
+            }[]
+          }
+        | {
+            Args: {
+              orgid: string
+              cycle_start: string
+              cycle_end: string
+            }
+            Returns: {
+              total_percent: number
+              mau_percent: number
+              bandwidth_percent: number
+              storage_percent: number
+            }[]
+          }
       get_plan_usage_percent_org: {
         Args: {
           orgid: string
@@ -1903,6 +1962,37 @@ export type Database = {
         }
         Returns: number
       }
+      get_total_metrics:
+        | {
+            Args: {
+              org_id: string
+            }
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
+            }[]
+          }
+        | {
+            Args: {
+              org_id: string
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              mau: number
+              storage: number
+              bandwidth: number
+              get: number
+              fail: number
+              install: number
+              uninstall: number
+            }[]
+          }
       get_total_stats_v5: {
         Args: {
           userid: string
@@ -2160,17 +2250,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_free_usage:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
       is_good_plan_v5: {
         Args: {
           userid: string
@@ -2300,13 +2379,77 @@ export type Database = {
             }
             Returns: undefined
           }
+      process_cron_stats_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_current_jobs_if_unlocked: {
         Args: Record<PropertyKey, never>
         Returns: number[]
       }
+      process_free_trial_expired: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_requested_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      process_subscribed_orgs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      read_bandwidth_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          date: string
+          bandwidth: number
+          app_id: string
+        }[]
+      }
+      read_device_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          date: string
+          mau: number
+          app_id: string
+        }[]
+      }
+      read_storage_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          app_id: string
+          date: string
+          storage: number
+        }[]
+      }
+      read_version_usage: {
+        Args: {
+          p_app_id: string
+          p_period_start: string
+          p_period_end: string
+        }
+        Returns: {
+          app_id: string
+          version_id: number
+          date: string
+          get: number
+          fail: number
+          install: number
+          uninstall: number
+        }[]
       }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>

@@ -13,6 +13,7 @@ import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
+import type { ArrayElement } from '~/services/types'
 
 function openSupport() {
   openMessenger()
@@ -32,6 +33,7 @@ interface PlansOrgData {
   planSuggest: string
   planCurrrent: string
   planPercent: number
+  detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>
   paying: boolean
   trialDaysLeft: number
 }
@@ -44,6 +46,12 @@ function defaultPlanOrgData(): PlansOrgData {
     planSuggest: '',
     paying: false,
     trialDaysLeft: 0,
+    detailPlanUsage: {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    },
   }
 }
 
@@ -160,8 +168,9 @@ async function loadData(initial: boolean) {
       // updateData()
     }),
     getPlanUsagePercent(orgId).then((res) => {
-      console.log(res)
-      data.planPercent = res
+      // console.log('getPlanUsagePercent', res)
+      data.planPercent = res.total_percent
+      data.detailPlanUsage = res
       // updateData()
     }).catch(err => console.log(err)),
     // isPayingOrg(orgId).then(res => {
@@ -265,6 +274,21 @@ const hightLights = computed<Stat[]>(() => ([
   {
     label: t('usage'),
     value: (currentData.value && currentData.value?.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
+    informationIcon: () => {
+      if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
+        return
+
+      displayStore.dialogOption = {
+        header: t('detailed-usage-plan'),
+        message: `${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%`,
+        buttons: [
+          {
+            text: t('ok'),
+          },
+        ],
+      }
+      displayStore.showDialog = true
+    },
   },
   {
     label: t('best-plan'),

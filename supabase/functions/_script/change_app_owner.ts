@@ -49,7 +49,7 @@ async function main() {
   console.log(`old id: ${JSON.stringify(oldUserId)}`)
   console.log(`new id: ${JSON.stringify(newUserId)}`)
 
-  console.log(`tmp dir: /tmp/move-tmp`)
+  console.log('tmp dir: /tmp/move-tmp')
   try {
     await Deno.mkdir('/tmp/move-tmp')
   }

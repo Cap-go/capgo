@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
-import { trackBandwidthUsage, trackDeviceUsage, trackVersionUsage } from './supabase.ts'
-import { readBandwidthUsageCF, readDeviceUsageCF, readStorageUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
-import type { ClickHouseMeta } from './clickhouse.ts'
+import { readBandwidthUsage, readDeviceUsage, readStorageUsage, readVersionUsage, trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
+import { readBandwidthUsageCF, readDeviceUsageCF, readVersionUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
@@ -10,6 +9,8 @@ export function createStatsMau(c: Context, device_id: string, app_id: string) {
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {
+  if (file_size === 0)
+    return
   if (!c.env.BANDWIDTH_USAGE)
     return trackBandwidthUsage(c, device_id, app_id, file_size)
   return trackBandwidthUsageCF(c, device_id, app_id, file_size)
@@ -34,26 +35,34 @@ export function createStatsDevices(c: Context, app_id: string, device_id: string
   return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }
 
-export function createStatsMeta(c: Context, meta: ClickHouseMeta) {
-  if (!c.env.VERSION_META) // TODO: should make it work with supabase too
+export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
+  if (size === 0)
     return
-  return trackMetaCF(c, meta)
+  console.log('createStatsMeta', app_id, version_id, size)
+  if (!c.env.VERSION_META)
+    return trackMeta(c, app_id, version_id, size)
+  return trackMetaCF(c, app_id, version_id, size)
 }
 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.DEVICE_USAGE)
-    return
+    return readDeviceUsage(c, app_id, start_date, end_date)
   return readDeviceUsageCF(c, app_id, start_date, end_date)
 }
 
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.BANDWIDTH_USAGE)
-    return
+    return readBandwidthUsage(c, app_id, start_date, end_date)
   return readBandwidthUsageCF(c, app_id, start_date, end_date)
 }
 
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
-  if (!c.env.STORAGE_USAGE)
-    return
-  return readStorageUsageCF(c, app_id, start_date, end_date)
+  // No cloudflare implementation, postgrest is enough
+  return readStorageUsage(c, app_id, start_date, end_date)
+}
+
+export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string) {
+  if (!c.env.VERSION_USAGE)
+    return readVersionUsage(c, app_id, start_date, end_date)
+  return readVersionUsageCF(c, app_id, start_date, end_date)
 }

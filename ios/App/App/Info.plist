@@ -26,8 +26,6 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow Camera feature to try it in the sandbox app your are developing</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Allow Geolocation feature to try it in the sandbox app your are developing</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Allow Geolocation feature to try it in the sandbox app your are developing</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

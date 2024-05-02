@@ -5,9 +5,9 @@ import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 
 import { getEnv } from './utils.ts'
 
-function initS3(c: Context, clientSideOnly?: boolean) {
-  const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
-  const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
+function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
+  const access_key_id = uploadKey ? getEnv(c, 'S3_ACCESS_KEY_ID_UPLOAD') : getEnv(c, 'S3_ACCESS_KEY_ID')
+  const access_key_secret = uploadKey ? getEnv(c, 'S3_SECRET_ACCESS_KEY_UPLOAD') : getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = !clientSideOnly ? getEnv(c, 'S3_ENDPOINT') : getEnv(c, 'S3_ENDPOINT').replace('host.docker.internal', '0.0.0.0')
   const useSsl = getEnv(c, 'S3_SSL') !== 'false'
 
@@ -28,8 +28,8 @@ function initS3(c: Context, clientSideOnly?: boolean) {
   return new S3Client(params)
 }
 
-async function getUploadUrl(c: Context, fileId: string, expirySeconds = 60) {
-  const client = initS3(c, true)
+async function getUploadUrl(c: Context, fileId: string, expirySeconds = 120) {
+  const client = initS3(c, true, true)
 
   const command = new PutObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
@@ -45,7 +45,8 @@ async function deleteObject(c: Context, fileId: string) {
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
   })
-  return client.send(command)
+  await client.send(command)
+  return true
 }
 
 async function checkIfExist(c: Context, fileId: string) {
@@ -65,7 +66,7 @@ async function checkIfExist(c: Context, fileId: string) {
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initS3(c, true)
+  const client = initS3(c, false, true)
   const command = new GetObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,

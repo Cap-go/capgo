@@ -42,7 +42,6 @@ async function guard(next: any, to: string, from: string) {
           main.user = data
         else
           return next('/onboarding/verify_email')
-          // await main.updateDashboard(dataCycle.subscription_anchor_start, dataCycle.subscription_anchor_end)
       }
       catch (error) {
         console.error('auth', error)

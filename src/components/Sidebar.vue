@@ -46,12 +46,12 @@ function openTab(tab: Tab) {
 }
 const tabs = ref<Tab[]>([
   {
-    label: t('dashboard'),
+    label: 'dashboard',
     icon: shallowRef(IconDashboard),
     key: '/app/home',
   },
   {
-    label: `CLI ${t('api-keys')}`,
+    label: 'api-keys',
     icon: shallowRef(IconApiKey),
     key: '/dashboard/apikeys',
   },
@@ -61,14 +61,14 @@ const tabs = ref<Tab[]>([
   //   key: '/dashboard/livereload',
   // },
   {
-    label: t('documentation'),
+    label: 'documentation',
     icon: shallowRef(IconDoc),
     key: '#',
     onClick: () => window.open('https://docs.capgo.app', '_blank'),
     redirect: true,
   },
   {
-    label: t('discord'),
+    label: 'discord',
     icon: shallowRef(IconDiscord),
     key: '#',
     onClick: () => window.open('https://discord.gg/VnYRvBfgA6', '_blank'),
@@ -112,7 +112,7 @@ const tabs = ref<Tab[]>([
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <component :is="tab.icon" class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:sidebar-expanded:opacity-100 2xl:opacity-100 lg:opacity-0" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">{{ tab.label }}</span>
+                    <span class="ml-3 text-sm font-medium duration-200 lg:sidebar-expanded:opacity-100 2xl:opacity-100 lg:opacity-0" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">{{ t(tab.label) }}</span>
                   </div>
                 </div>
               </button>

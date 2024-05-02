@@ -186,7 +186,7 @@ async function post(c: Context, body: AppStats) {
           current_device_id: device_id,
           current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
-        }, appVersion.owner_org, '0 0 * * 1', 'orange')
+        }, appVersion.owner_org, app_id, '0 0 * * 1', 'orange')
         if (sent) {
           await logsnag(c).track({
             channel: 'updates',

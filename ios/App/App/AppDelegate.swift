@@ -58,7 +58,7 @@ extension UIWindow {
                     if (!next.isBuiltin()) {
                         print("✨  Capgo: Resetting to: \(next.toString())")
                         _ = updater.set(bundle: next)
-                        let destHot = updater.getPathHot(id: next.getId())
+                        let destHot = updater.getBundleDirectory(id: next.getId())
                         print("✨  Capgo: Reloading \(next.toString())")
                         vc.setServerBasePath(path: destHot.path)
                     } else {

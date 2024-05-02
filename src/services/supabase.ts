@@ -52,27 +52,7 @@ export function useSupabase() {
       persistSession: true,
       detectSessionInUrl: false,
     },
-    // fetch: (requestInfo, requestInit) => {
-    //   const url = requestInfo.toString()
-    //   if (requestInit?.method === 'POST' && (url.includes('/storage/') || url.includes('.functions.supabase.co')))
-    //     return fetch(requestInfo, requestInit)
-    //   return Http.request({
-    //     url,
-    //     method: requestInit?.method,
-    //     headers: requestInit?.headers as any || {},
-    //     data: requestInit?.body,
-    //   })
-    //     .then((data) => {
-    //       const res = typeof data.data === 'string' ? data.data : JSON.stringify(data.data)
-    //       const resp = new Response(res, {
-    //         status: data.status,
-    //         headers: data.headers,
-    //       })
-    //       return resp
-    //     })
-    // },
   }
-  // return createClient<Database>(supabaseUrl, supabaseAnonKey, options)
   if (supaClient)
     return supaClient
 
@@ -162,39 +142,100 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
-export interface appUsage {
+export interface appUsageByApp {
   app_id: string
-  bandwidth: number
   date: string
-  fail: number
+  bandwidth: number
+  mau: number
+  storage: number
   get: number
   install: number
-  mau: number
-  storage_added: number
-  storage_deleted: number
   uninstall: number
+  fail: number
 }
-export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsage[]> {
-  const token = (await useSupabase().auth.getSession()).data.session?.access_token
-  const data = await ky
-    .post(`${defaultApiHost}/private/dashboard`, {
-      json: {
-        orgId,
-        startDate,
-        endDate,
-      },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+export interface appUsageGlobal {
+  date: string
+  bandwidth: number
+  mau: number
+  storage: number
+  get: number
+  install: number
+  uninstall: number
+  fail: number
+}
+export interface appUsageGlobalByApp {
+  global: appUsageGlobal[]
+  byApp: appUsageByApp[]
+}
+export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobalByApp> {
+  const resAppIds = await useSupabase()
+    .from('apps')
+    .select('app_id')
+    .eq('owner_org', orgId)
+    .then(res => res.data?.map(app => app.app_id) || [])
+  // get_app_metrics
+  const appMetrics = await getAppMetrics(orgId, startDate, endDate)
+
+  // generate all dates between startDate and endDate
+  const dates: string[] = []
+  let currentDate = new Date(startDate)
+  const end = new Date(endDate)
+  while (currentDate <= end) {
+    dates.push(currentDate.toISOString().split('T')[0])
+    currentDate = new Date(currentDate.setDate(currentDate.getDate() + 1))
+  }
+  const data = resAppIds.flatMap((appId) => {
+    // create only one entry for each day by appId
+    const appDays = dates.map((date) => {
+      const appDate = appMetrics.filter(app => app.app_id === appId && app.date === date)[0]
+      return {
+        app_id: appId,
+        date,
+        mau: appDate?.mau ?? 0,
+        storage: appDate?.storage ?? 0,
+        bandwidth: appDate?.bandwidth ?? 0,
+        get: appDate?.get ?? 0,
+        install: appDate?.install ?? 0,
+        uninstall: appDate?.uninstall ?? 0,
+        fail: appDate?.fail ?? 0,
+      }
     })
-    .then(res => res.json<appUsage[]>())
-    .catch(() => {
-      return []
-    })
-  return data
+    return appDays
+  })
+  // reduce the list to have only one entry by day with the sum of all apps
+  const reducedData = data.reduce((acc: appUsageGlobal[], current) => {
+    const existing = acc.find(s => s.date === current.date)
+    if (existing) {
+      existing.mau += current.mau
+      existing.storage += current.storage
+      existing.bandwidth += current.bandwidth
+      existing.get += current.get
+      existing.install += current.install
+      existing.uninstall += current.uninstall
+      existing.fail += current.fail
+    }
+    else {
+      acc.push({
+        date: current.date,
+        mau: current.mau,
+        storage: current.storage,
+        bandwidth: current.bandwidth,
+        get: current.get,
+        install: current.install,
+        uninstall: current.uninstall,
+        fail: current.fail,
+      })
+    }
+    return acc
+  }, [])
+  // sort by date
+  return {
+    global: reducedData.sort((a, b) => a.date.localeCompare(b.date)),
+    byApp: data.sort((a, b) => a.date.localeCompare(b.date)),
+  }
 }
 
-export async function getTotaAppStorage(orgId?: string, appid?: string): Promise<number> {
+export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {
   if (!orgId)
     return 0
   if (!appid)
@@ -290,12 +331,11 @@ export async function isPayingOrg(orgId: string): Promise<boolean> {
 }
 
 export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
-  const { data: plans } = await useSupabase()
-    .from('plans')
-    .select()
-    .order('price_m')
-    // .neq('stripe_id', 'free')
-  return plans || []
+  const data = await ky
+    .get(`${defaultApiHost}/private/plans`)
+    .then(res => res.json<Database['public']['Tables']['plans']['Row'][]>())
+    .catch(() => [])
+  return data
 }
 
 export async function isAllowedAction(userid?: string): Promise<boolean> {
@@ -310,15 +350,28 @@ export async function isAllowedAction(userid?: string): Promise<boolean> {
   return data
 }
 
-export async function getPlanUsagePercent(orgId?: string): Promise<number> {
-  if (!orgId)
-    return 0
+interface PlanUsage {
+  total_percent: number
+  mau_percent: number
+  bandwidth_percent: number
+  storage_percent: number
+}
+
+export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
+  if (!orgId) {
+    return {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    }
+  }
   const { data, error } = await useSupabase()
-    .rpc('get_plan_usage_percent_org', { orgid: orgId })
+    .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
-  return data || 0
+  return data
 }
 
 export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
@@ -378,6 +431,15 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
       storage: stats.storage,
     })
     .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data
+}
+
+export async function getAppMetrics(orgId: string, startDate?: string, endDate?: string): Promise<appUsageByApp[]> {
+  const { data, error } = await useSupabase()
+    .rpc('get_app_metrics', { org_id: orgId, start_date: startDate, end_date: endDate })
   if (error)
     throw new Error(error.message)
 

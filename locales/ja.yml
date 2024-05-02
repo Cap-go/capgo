@@ -71,6 +71,7 @@ base: ベース
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
 billed-annually-at: 毎年請求されます
+billed-monthly-at: 毎月請求されるのは、
 billing: 請求する
 build-your-app-and-s: アプリをビルドして同期する
 build-your-code-and-: コードを Capgo にアップロードする
@@ -114,7 +115,10 @@ cannot-invite-owner: 所有者を組織に招待できません
 cannot-save-custom-i: カスタム ID を保存できません
 cannot-set-this-vers: このバージョンは設定できません
 cannot-share: ユーザー ID を共有できません。ブラウザ コンソールを確認してください
+cannot-show: このページは表示できません
 cannot-test-app-some: アプリをテストできません
+cannot-view-plans: プランページが表示されない
+cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
 change: 変化
 changed-password-suc: パスワードは正常に変更されました
@@ -201,6 +205,7 @@ enabled-progressive-deploy: プログレッシブ展開を有効にしました
 encrypted: 暗号化されたバンドル
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
+error: エラー
 external-storage: 外部記憶装置
 fail: インストールに失敗しました
 failed: 失敗した
@@ -286,6 +291,7 @@ misconfigured-channels: |-
   一部のチャネルが正しく設定されていません。
   これらのチャンネルの更新は失敗します。
 mo: 月
+modify-org-info: ここで組織の情報を変更できます。
 module-heading: モジュール
 monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数
@@ -311,7 +317,9 @@ no-version-linked: バージョンなし、クリックして追加
 no-version-linked-no-perm: バージョンなし
 none: なし
 not-found: 見つかりません
+not-paying-org-usage: この組織は料金を支払っていないため、無料体験組織の使用状況を表示できません
 notifications: 通知
+ok: わかりました
 old-onboarding-mode: 古いオンボーディング
 one-day-left: 残り一日
 open: 開ける
@@ -320,8 +328,12 @@ open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
 open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
 org-changes-saved: 組織が正常に更新されました
+org-changes-set-email-not-unique: 管理用メールアドレスは一意ではありません。別のメールアドレスを選択してください
+org-changes-set-email-other-error: 管理用メールアドレスを設定できません。サポートにお問い合わせください。
 org-invited-user: ユーザーを組織に正常に招待しました
+organization-email: 組織の管理メール
 organization-name: 組織名
+organization-settings: 組織の設定
 os-version: OSバージョン
 pages: ページ
 password: パスワード
@@ -329,6 +341,7 @@ password-confirmatio: パスワードの確認
 password-heading: パスワードの作成
 password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入力してください。
 password-new: 新しいパスワード
+patch: パッチ
 percent-fail: 失敗率
 permission-changed: ユーザー権限が正常に変更されました
 personal-information: 個人情報
@@ -353,6 +366,7 @@ plan-updates: アップデート
 plan-upgrade: 購読者
 plan-whats-included: 含まれるもの
 plans: 予定
+plans-super-only: スーパー管理者のみがプランと請求を表示できます
 platform: プラットホーム
 please-choose-your-p: お好みを選択してください
 please-upgrade: プランをアップグレードしてユーザーを追加してください
@@ -423,6 +437,7 @@ terms-of-use: 利用規約
 test-your-update-in-: アプリで更新をテストする
 tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
+thank-you-for-sub: Capgo をご購読いただきありがとうございます
 the: の
 this-page-will-self-: このページは自動的に更新されます
 title: タイトル
@@ -453,7 +468,9 @@ upperCaseError: 大文字を含める必要があります
 url: URL
 usage: 使用法
 usage-success: プランが設定されました。このページは数分後に更新されます
+usage-super-only: スーパー管理者のみが使用状況を表示できます
 usage-title: 合計
+use-capgo: Capgo を使用する
 use-the-command: 次のコマンドを使用します。
 used-in-period: 期間内に使用
 used-to-create: このメールアドレスを持つアカウントは以前存在していたため、再作成できません
@@ -480,3 +497,4 @@ your-api-key: 'API キー:'
 your-are-a: あなたは
 your-current-plan-is: 現在のプランは
 your-current-suggested-plan-is: 現在お勧めのプランは
+your-settings: あなたの設定

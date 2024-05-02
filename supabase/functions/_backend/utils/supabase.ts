@@ -187,16 +187,28 @@ export async function getCurrentPlanName(c: Context, userId: string): Promise<st
   return ''
 }
 
-export async function getPlanUsagePercent(c: Context, userId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_plan_usage_percent', { userid: userId })
-    .single()
-  if (error) {
-    console.error('getPlanUsagePercent error', error.message)
-    throw new Error(error.message)
-  }
+interface PlanUsage {
+  total_percent: number
+  mau_percent: number
+  bandwidth_percent: number
+  storage_percent: number
+}
 
-  return data || 0
+export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
+  if (!orgId) {
+    return {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
 }
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
@@ -223,20 +235,6 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   }
   catch (error) {
     console.error('isOnboarded error', orgId, error)
-  }
-  return false
-}
-
-export async function isFreeUsage(c: Context, userId: string): Promise<boolean> {
-  try {
-    const { data } = await supabaseAdmin(c)
-      .rpc('is_free_usage', { userid: userId })
-      .single()
-      .throwOnError()
-    return data || false
-  }
-  catch (error) {
-    console.error('isFreeUsage error', userId, error)
   }
   return false
 }
@@ -818,22 +816,44 @@ export async function trackDeviceUsage(
     ])
 }
 
-// export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-//   const { data } = await supabaseAdmin(c)
-//     .from('devices_usage')
-//     .select()
-//     .eq('app_id', app_id)
-//     .gte('timestamp', period_start)
-//     .lte('timestamp', period_end)
-//   return data
-// }
+export async function trackMeta(
+  c: Context,
+  app_id: string,
+  version_id: number,
+  size: number,
+) {
+  console.log('createStatsMeta', app_id, version_id, size)
+  await supabaseAdmin(c)
+    .from('version_meta')
+    .insert([
+      {
+        app_id,
+        version_id,
+        size,
+      },
+    ])
+}
 
-// export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-//   const { data } = await supabaseAdmin(c)
-//     .from('bandwidth_usage')
-//     .select()
-//     .eq('app_id', app_id)
-//     .gte('timestamp', period_start)
-//     .lte('timestamp', period_end)
-//   return data
-// }
+export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_bandwidth_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readStorageUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_storage_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readVersionUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}

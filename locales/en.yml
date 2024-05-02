@@ -67,6 +67,7 @@ app-preview: App preview
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
+bandwith-usage: 'Bandwith usage: '
 base: Base
 best-plan: Best plan
 bigger-app-size: Bigger app size
@@ -168,6 +169,7 @@ delete-account: Delete Account
 delete-account-0: Delete account
 delete-your-account: Delete your account
 deleted: deleted
+detailed-usage-plan: Detailed usage
 details-and-logs: Details and logs
 device: Device
 device-id: Device ID
@@ -272,6 +274,7 @@ making-this-channel-: >-
   Making this channel "normal" will need you to configure an other channel
   default or let device self assign.
 mau: Monthly active users
+mau-usage: 'Monthly active users usage: '
 member-deleted: Successfully deleted member
 members: Members
 metadata: Metadata
@@ -329,6 +332,7 @@ org-changes-set-email-other-error: Cannot set the management email, please conta
 org-invited-user: Successfully invited user to org
 organization-email: Organization's management email
 organization-name: Organization Name
+organization-settings: Organization settings
 os-version: OS version
 pages: Pages
 password: Password
@@ -421,6 +425,7 @@ start-new-deploy: Start new progressive deploy
 start-using-capgo: 'Start using:'
 status-complete: complete
 status-failed: failed
+storage-usage: 'Storage usage: '
 stored-externally: stored externally
 submit: Submit
 support: Support
@@ -489,3 +494,5 @@ your-api-key: 'Your API key:'
 your-are-a: Your are a
 your-current-plan-is: Your current plan is
 your-current-suggested-plan-is: Your current suggested plan is
+your-settings: Your settings
+your-ussage: 'Your usage:'

@@ -169,9 +169,7 @@ SELECT
   SUM(COALESCE(logs_daily.get, 0)) AS get,
   SUM(COALESCE(logs_daily.fail, 0)) AS fail,
   SUM(COALESCE(logs_daily.install, 0)) AS install,
-  SUM(COALESCE(logs_daily.uninstall, 0)) AS uninstall,
-  MAX(app_storage_daily.storage_added) AS storage_added,
-  MAX(app_storage_daily.storage_deleted) AS storage_deleted
+  SUM(COALESCE(logs_daily.uninstall, 0)) AS uninstall
 FROM 
   (SELECT 
       daily_device.app_id,
@@ -184,7 +182,6 @@ FROM
       daily_device.app_id IN app_id_list
   GROUP BY daily_device.app_id, daily_device.device_id) as first_device_logs
 LEFT JOIN logs_daily ON first_device_logs.app_id = logs_daily.app_id AND first_device_logs.first_log_date = logs_daily.date
-LEFT JOIN app_storage_daily ON first_device_logs.app_id = app_storage_daily.app_id AND first_device_logs.first_log_date = app_storage_daily.date
 GROUP BY 
   first_device_logs.app_id, 
   first_device_logs.first_log_date
@@ -425,7 +422,7 @@ export async function updateInClickHouse(c: Context, appId: string, updates: num
   await executeClickHouseQuery(c, query, params)
 }
 
-async function countUpdatesFromClickHouse(c: Context): Promise<number> {
+async function countUpdatesFromStoreAppsClickHouse(c: Context): Promise<number> {
   if (!isClickHouseEnabled(c))
     return Promise.resolve(0)
   const query = `
@@ -444,7 +441,7 @@ async function countUpdatesFromClickHouse(c: Context): Promise<number> {
   }
 }
 
-async function countUpdatesFromLogs(c: Context): Promise<number> {
+async function countUpdatesFromLogsClickHouse(c: Context): Promise<number> {
   if (!isClickHouseEnabled(c))
     return Promise.resolve(0)
   const query = `
@@ -494,13 +491,13 @@ export async function countAllApps(c: Context): Promise<number> {
 
 export async function countAllUpdates(c: Context): Promise<number> {
   const [storeAppsCount, logsCount] = await Promise.all([
-    countUpdatesFromClickHouse(c),
-    countUpdatesFromLogs(c),
+    countUpdatesFromStoreAppsClickHouse(c),
+    countUpdatesFromLogsClickHouse(c),
   ])
 
   const res = storeAppsCount + logsCount
   // TODO: fix this count undestand why it return 0 sometimes
-  return res ? res : 14593631
+  return res || 14593631
 }
 
 export async function reactActiveApps(c: Context) {
@@ -622,11 +619,9 @@ export async function readMauFromClickHouse(c: Context, startDate: string, endDa
 }
 
 export interface ClickHouseMeta {
-  id: number
   app_id: string
-  created_at: string
+  version_id: number
   size: number
-  action: 'add' | 'delete'
 }
 export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
   if (!isClickHouseEnabled(c))
@@ -635,7 +630,7 @@ export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
   console.log('sending meta to Clickhouse', meta)
   const metasReady = meta
     .map((l) => {
-      createStatsMeta(c, l)
+      createStatsMeta(c, l.app_id, l.version_id, l.size)
       return l
     })
     .map(convertAllDatesToCH)

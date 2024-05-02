@@ -46,12 +46,12 @@ const tabs = ref<Tab[]>([
 
 const organizationTabs = ref<Tab[]>([
   {
-    label: t('general-information'),
+    label: 'general-information',
     icon: shallowRef(IconAcount),
     key: '/dashboard/settings/organization/general',
   },
   {
-    label: t('members'),
+    label: 'members',
     icon: shallowRef(IconPassword),
     key: '/dashboard/settings/organization/members',
   },
@@ -180,7 +180,7 @@ displayStore.NavTitle = t('settings')
             :class="type === 'user' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
             aria-current="page"
             @click="gotoMainSettings"
-          >Your settings</a>
+          >{{ t('your-settings') }}</a>
         </li>
         <li class="mr-2">
           <a
@@ -188,7 +188,7 @@ displayStore.NavTitle = t('settings')
             :class="type === 'organization' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
             aria-current="page"
             @click="gotoOrgSettings"
-          >{{ 'Organization settings' }} </a>
+          >{{ t('organization-settings') }} </a>
         </li>
       </ul>
     </div>
