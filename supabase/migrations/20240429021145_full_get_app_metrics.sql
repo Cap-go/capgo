@@ -25,10 +25,10 @@ BEGIN
         COALESCE(dm.mau, 0) AS mau,
         COALESCE(ds.storage, 0) AS storage,
         COALESCE(db.bandwidth, 0) AS bandwidth,
-        COALESCE(dv.get, 0) AS get,
-        COALESCE(dv.fail, 0) AS fail,
-        COALESCE(dv.install, 0) AS install,
-        COALESCE(dv.uninstall, 0) AS uninstall
+        COALESCE(SUM(dv.get)::bigint, 0) AS get,
+        COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
+        COALESCE(SUM(dv.install)::bigint, 0) AS install,
+        COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
     FROM
         apps a
     CROSS JOIN
@@ -42,9 +42,12 @@ BEGIN
     LEFT JOIN
         daily_version dv ON a.app_id = dv.app_id AND d.date::date = dv.date
     WHERE
-        a.owner_org = org_id;
+        a.owner_org = org_id
+    GROUP BY
+        a.app_id, d.date, dm.mau, ds.storage, db.bandwidth;
 END;
 $$;
+
 DROP FUNCTION IF EXISTS get_app_metrics(uuid);
 CREATE OR REPLACE FUNCTION public.get_app_metrics(org_id uuid)
  RETURNS TABLE(app_id character varying, date date, mau bigint, storage bigint, bandwidth bigint, get bigint, fail bigint, install bigint, uninstall bigint)
