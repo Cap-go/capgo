@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Stat } from './comp_def'
+import InformationInfo from '~icons/heroicons/information-circle'
 
 const props = defineProps<{ stats: Stat[], mini?: boolean }>()
 const refStats = toRef(() => props.stats)
@@ -23,9 +24,13 @@ const refStats = toRef(() => props.stats)
         <div v-else class="lg:order-1 lg:mt-3 flex justify-center">
           <Spinner size="w-10 h-10 ml-auto mr-auto" />
         </div>
-        <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase font-pj lg:order-2 lg:mt-0">
-          {{ s.label }}
-        </h3>
+        <div class="flex flex-column items-center flex-row-reverse justify-center">
+          <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase font-pj lg:order-2 lg:mt-0">
+            {{ s.label }}
+          </h3>
+          <InformationInfo v-if="!!s.informationIcon" class="ml-1" @click="s.informationIcon" />
+        </div>
+
       </span>
     </a>
   </template>
