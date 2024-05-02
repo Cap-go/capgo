@@ -36,9 +36,9 @@ BEGIN
     ('images', 'images', NULL, '2021-12-27 23:50:34.743465+00', '2021-12-27 23:50:34.743465+00', 't');
 
     INSERT INTO "public"."stripe_info" ("created_at", "updated_at", "subscription_id", "customer_id", "status", "product_id", "trial_at", "price_id", "is_good_plan", "plan_usage", "subscription_metered", "subscription_anchor_start", "subscription_anchor_end") VALUES
-    (now(), '2023-03-21 03:04:42.120379+00', 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
-    (now(), '2023-03-21 03:04:42.120379+00', 'sub_2', 'cus_Pa0kknt1qWFkZx', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days'),
-    (now(), '2023-03-21 03:04:42.120379+00', 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '1 days', now() + interval '1 months' - interval '1 days');
+    (now(), '2023-03-21 03:04:42.120379+00', 'sub_1', 'cus_Pa0k8TO6HVln6A', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
+    (now(), '2023-03-21 03:04:42.120379+00', 'sub_2', 'cus_Pa0kknt1qWFkZx', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days'),
+    (now(), '2023-03-21 03:04:42.120379+00', 'sub_3', 'cus_Pa0f3M6UCQ8g5Q', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days');
 
     -- Do not insert new orgs
     ALTER TABLE users DISABLE TRIGGER generate_org_on_user_create;
@@ -98,7 +98,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION reset_and_seed_stats_data() RETURNS void AS $$
 DECLARE
-  start_date TIMESTAMP := CURRENT_DATE - INTERVAL '7 days';
+  start_date TIMESTAMP := CURRENT_DATE - INTERVAL '15 days';
   end_date TIMESTAMP := CURRENT_DATE;
   curr_date DATE;
   random_mau INTEGER;
