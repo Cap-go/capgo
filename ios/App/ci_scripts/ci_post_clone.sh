@@ -43,12 +43,12 @@ bun install
 # npm run capacitor-assets
 
 # Build the app
-echo "🚀 Build code"
-npm run mobile
+# echo "🚀 Build code"
+# npm run mobile
 
-# install native dependencies
-echo "📦 Install native dependencies"
-npm run sync:ios
+# # install native dependencies
+# echo "📦 Install native dependencies"
+# npm run sync:ios
 
 
 echo "Move back to the ci_scripts directory"
