@@ -99,6 +99,7 @@ app.post('/', async (c: Context) => {
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
+        const statusCopy = stripeData.status
         stripeData.status = 'succeeded'
         const segment = await customerToSegmentOrg(c, org.id, 'free')
         await addDataContact(c, org.management_email, userData, segment)
@@ -110,16 +111,15 @@ app.post('/', async (c: Context) => {
           user_id: org.management_email,
           notify: true,
         }).catch()
+        stripeData.status = statusCopy
       }
-      else {
-        stripeData.is_good_plan = false
-        const { error: dbError2 } = await supabaseAdmin(c)
-          .from('stripe_info')
-          .update(stripeData)
-          .eq('customer_id', stripeData.customer_id)
-        if (dbError2)
-          return c.json({ error: JSON.stringify(dbError) }, 500)
-      }
+      stripeData.is_good_plan = false
+      const { error: dbError2 } = await supabaseAdmin(c)
+        .from('stripe_info')
+        .update(stripeData)
+        .eq('customer_id', stripeData.customer_id)
+      if (dbError2)
+        return c.json({ error: JSON.stringify(dbError) }, 500)
     }
     else {
       const segment = await customerToSegmentOrg(c, org.id, 'free')
@@ -129,6 +129,7 @@ app.post('/', async (c: Context) => {
     return c.json({ received: true })
   }
   catch (e) {
+    console.log(e)
     return c.json({ status: 'Cannot parse event', error: JSON.stringify(e) }, 500)
   }
 })

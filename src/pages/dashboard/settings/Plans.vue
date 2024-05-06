@@ -106,6 +106,7 @@ const currentData = computed(() => orgsHashmap.value.get(currentOrganization.val
 
 const currentPlanSuggest = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
 const currentPlan = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planCurrrent))
+const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // get the current url
@@ -268,12 +269,12 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0) ? t('Current') : t('failed'),
-    value: currentPlan.value?.name,
+    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value) ? t('Current') : t('failed'),
+    value: !isTrial.value ? currentPlan.value?.name : t('trial'),
   },
   {
     label: t('usage'),
-    value: (currentData.value && currentData.value?.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
+    value: (currentData.value && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
     informationIcon: () => {
       if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
         return
@@ -364,9 +365,14 @@ const hightLights = computed<Stat[]>(() => ([
             </span>
           </div>
           <div class="p-6 border-none">
-            <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              {{ p.name }}
-            </h2>
+            <div class="flex flex-row">
+              <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                {{ p.name }}
+              </h2>
+              <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="ml-auto bg-blue-600 rounded-full px-2">
+                {{ t('trial') }}
+              </h2>
+            </div>
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">
               {{ t(convertKey(p.description)) }}
             </p>
