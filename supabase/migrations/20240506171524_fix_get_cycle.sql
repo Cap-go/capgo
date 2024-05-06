@@ -8,6 +8,10 @@ DECLARE
 BEGIN
     SELECT customer_id INTO customer_id_var FROM orgs WHERE id = orgid;
 
+    if customer_id_var is not distinct from null then
+      return query select now() as subscription_anchor_start, now() + interval '1 month' as subsription_anchor_end;
+    end if;
+
     -- Get the stripe_info using the customer_id
     RETURN QUERY
     with cycle as (
