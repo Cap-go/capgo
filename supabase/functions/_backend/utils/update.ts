@@ -276,7 +276,7 @@ export async function update(c: Context, body: AppInfos) {
       is_prod = true,
     } = body
     // if version_build is not semver, then make it semver
-    const coerce = semver.coerce(version_build)
+    const coerce = semver.coerce(version_build, { includePrerelease: true })
     const appOwner = await getAppOwnerPostgres(app_id, alias, drizzleCient, schema)
     if (!appOwner) {
       // TODO: transfer to clickhouse
