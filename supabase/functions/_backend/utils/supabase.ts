@@ -773,7 +773,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     .select()
     .eq('stripe_id', customer.id)
     .single()
-  const segment = await customerToSegmentOrg(c, org.id,  soloPlan.name, plan)
+  const segment = await customerToSegmentOrg(c, org.id, soloPlan.name, plan)
   await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })
