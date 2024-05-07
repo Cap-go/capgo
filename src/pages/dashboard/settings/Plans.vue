@@ -22,10 +22,6 @@ function openSupport() {
 const { t } = useI18n()
 const mainStore = useMainStore()
 
-const displayPlans = computed(() => {
-  return mainStore.plans.filter(plan => plan.stripe_id !== 'free')
-})
-
 const displayStore = useDisplayStore()
 
 interface PlansOrgData {
@@ -350,7 +346,7 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </div>
       <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="(p, index) in displayPlans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+        <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -369,7 +365,7 @@ const hightLights = computed<Stat[]>(() => ([
               <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
                 {{ p.name }}
               </h2>
-              <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="ml-auto bg-blue-600 rounded-full px-2">
+              <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="px-2 ml-auto bg-blue-600 rounded-full">
                 {{ t('trial') }}
               </h2>
             </div>
@@ -383,7 +379,6 @@ const hightLights = computed<Stat[]>(() => ([
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
             <button
-              v-if="p.stripe_id !== 'free'"
               :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && currentData?.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="isDisabled(p)" @click="openChangePlan(p, index)"

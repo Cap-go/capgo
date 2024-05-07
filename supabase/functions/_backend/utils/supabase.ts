@@ -763,7 +763,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   const person: Person = {
     id: org.id,
     customer_id: customer.id,
-    product_id: 'free',
+    product_id: soloPlan.name,
     nickname: org.name,
     avatar: org.logo ? org.logo : undefined,
     // country: user.country ? user.country : undefined,
@@ -773,7 +773,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     .select()
     .eq('stripe_id', customer.id)
     .single()
-  const segment = await customerToSegmentOrg(c, org.id, 'free', plan)
+  const segment = await customerToSegmentOrg(c, org.id,  soloPlan.name, plan)
   await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })

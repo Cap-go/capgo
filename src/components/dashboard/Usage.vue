@@ -135,8 +135,6 @@ async function loadData() {
   await getPlans().then((pls) => {
     plans.value.length = 0
     plans.value.push(...pls)
-    // filter the free plan
-    plans.value = plans.value.filter(plan => plan.name !== 'Free')
   })
   await getUsages()
   isLoading.value = false

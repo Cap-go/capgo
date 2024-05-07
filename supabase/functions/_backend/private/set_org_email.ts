@@ -41,21 +41,6 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }
 
-    // Verify that the email is unique
-    const { count: emailOrgCount, error: emailOrgError } = await supabaseAdmin.from('orgs')
-      .select('', { count: 'exact' })
-      .eq('management_email', safeBody.emial)
-
-    if (emailOrgError) {
-      console.error('Cannot get org by email', emailOrgError)
-      return c.json({ status: 'get_org_by_email_error' }, 500)
-    }
-
-    if (emailOrgCount && emailOrgCount > 0) {
-      console.error('Email is not unique', safeBody)
-      return c.json({ status: 'email_not_unique' }, 400)
-    }
-
     const { data: organization, error: organizationError } = await supabaseAdmin.from('orgs')
       .select('customer_id, management_email')
       .eq('id', safeBody.org_id)
