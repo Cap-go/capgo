@@ -2,6 +2,8 @@ import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
 
 // Public API
+import type { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
+import { HTTPException } from 'hono/http-exception'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
@@ -45,10 +47,9 @@ import { app as stripe_event } from '../supabase/functions/_backend/triggers/str
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
 import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as cron_plan } from '../supabase/functions/_backend/triggers/cron_plan.ts'
+import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
 
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
-import type { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
-import { HTTPException } from 'hono/http-exception'
 import { version } from '../package.json'
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -56,7 +57,7 @@ const appTriggers = new Hono<{ Bindings: Bindings }>()
 const appFront = new Hono<{ Bindings: Bindings }>()
 
 app.use('*', sentry({
-  release: version
+  release: version,
 }))
 // Public API
 app.route('/ok', ok)
@@ -103,6 +104,7 @@ appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/get_total_stats', get_total_stats)
+appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)
 appTriggers.route('/cron_plan', cron_plan)
 
@@ -110,17 +112,17 @@ app.route('/triggers', appTriggers)
 app.route('/private', appFront)
 
 app.get('/test_sentry', (c) => {
-  if (Math.random() < 0.5) {
+  if (Math.random() < 0.5)
     return c.text('Success!')
-  }
+
   throw new Error('Failed!')
 })
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
-  if (e instanceof HTTPException) {
+  if (e instanceof HTTPException)
     return e.getResponse()
-  }
+
   return c.text('Internal Server Error', 500)
 })
 
