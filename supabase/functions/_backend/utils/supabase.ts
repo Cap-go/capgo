@@ -807,7 +807,7 @@ export async function trackDeviceUsage(
   appId: string,
 ) {
   await supabaseAdmin(c)
-    .from('devices_usage')
+    .from('device_usage')
     .insert([
       {
         device_id: deviceId,
