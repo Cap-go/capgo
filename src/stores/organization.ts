@@ -42,6 +42,16 @@ export const useOrganizationStore = defineStore('organization', () => {
     throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
+  // WARNING: currentOrganization does not guarantee corectness when used in an app-based URL
+  // For example if you try to use this value when fetching app channels it COULD BE incorrect
+  // When trying to fetch an organization in an app based component the following should be used
+  //
+  // const organization = ref(null as null | Organization)
+  // watchEffect(async () => {
+  //  await organizationStore.awaitInitialLoad()
+  //  organization.value = organizationStore.getOrgByAppId(appId.value) ?? null
+  // }
+  //
   const currentOrganization = ref<Organization | undefined>(undefined)
   const currentRole = ref<OrganizationRole | null>(null)
 
