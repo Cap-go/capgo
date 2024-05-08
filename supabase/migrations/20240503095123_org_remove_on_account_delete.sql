@@ -1,5 +1,5 @@
-CREATE OR REPLACE FUNCTION "public"."check_if_users_orgs_can_exist"() RETURNS trigger
-   LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION "public"."check_if_org_can_exist"() RETURNS trigger
+   LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   delete from orgs
   where
@@ -10,18 +10,19 @@ BEGIN
       from
           org_users
       where
-          org_users.org_id = orgs.id
-          AND org_users.user_right = 'super_admin'
-          AND org_users.user_id != get_identity()
+          org_users.user_right = 'super_admin'
+          AND org_users.user_id != OLD.user_id
+          AND org_users.org_id=orgs.id
       ) = 0
-  );
+  ) 
+  AND orgs.id=OLD.org_id;
 
   RETURN OLD;
 END;$$;
 
-CREATE TRIGGER check_if_users_orgs_can_exist_on_account_delete
-   BEFORE DELETE ON "public"."users" FOR EACH ROW
-   EXECUTE PROCEDURE "public"."check_if_users_orgs_can_exist"();
+CREATE TRIGGER check_if_org_can_exist_org_users
+   AFTER DELETE ON "public"."org_users" FOR EACH ROW
+   EXECUTE PROCEDURE "public"."check_if_org_can_exist"();
 
 CREATE TRIGGER on_organization_delete
 AFTER DELETE ON public.orgs 
