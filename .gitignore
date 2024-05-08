@@ -63,3 +63,8 @@ dist_cf
 .gitsecret/keys/random_seed
 !*.secret
 internal/how-to-deploy.md
+internal/cloudflare/.dev.env
+internal/cloudflare/.preprod.env
+internal/cloudflare/.prod.env
+internal/cloudflare/.env.preprod
+internal/cloudflare/.env.prod
