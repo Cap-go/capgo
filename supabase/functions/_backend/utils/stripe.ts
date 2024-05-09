@@ -17,6 +17,18 @@ export async function updateCustomerEmail(c: Context, customerId: string, newEma
   )
 }
 
+export async function cancelSubscription(c: Context, customerId: string) {
+  const stripe = new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'))
+  const allSubscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+  })
+  return Promise.all(
+    allSubscriptions.data.map(sub => stripe.subscriptions.cancel(sub.id)),
+  ).catch((err) => {
+    console.error('Cannot cancle stripe subscription', err)
+  })
+}
+
 async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
