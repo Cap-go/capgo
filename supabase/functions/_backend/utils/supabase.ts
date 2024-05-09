@@ -725,14 +725,27 @@ export async function getStripeCustomer(c: Context, customerId: string) {
   return stripeInfo
 }
 
+export async function getDefaultPlan(c: Context) {
+  const { data: plan } = await supabaseAdmin(c)
+    .from('plans')
+    .select()
+    .eq('name', 'Solo')
+    .single()
+  return plan
+}
+
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
   const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
+  const soloPlan = await getDefaultPlan(c)
+  if (!soloPlan)
+    throw new Error('no default plan')
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({
+      product_id: soloPlan.stripe_id,
       customer_id: customer.id,
       trial_at: trial_at.toISOString(),
     })
@@ -750,7 +763,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   const person: Person = {
     id: org.id,
     customer_id: customer.id,
-    product_id: 'free',
+    product_id: soloPlan.name,
     nickname: org.name,
     avatar: org.logo ? org.logo : undefined,
     // country: user.country ? user.country : undefined,
@@ -760,7 +773,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     .select()
     .eq('stripe_id', customer.id)
     .single()
-  const segment = await customerToSegmentOrg(c, org.id, 'free', plan)
+  const segment = await customerToSegmentOrg(c, org.id, soloPlan.name, plan)
   await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })
@@ -807,7 +820,7 @@ export async function trackDeviceUsage(
   appId: string,
 ) {
   await supabaseAdmin(c)
-    .from('devices_usage')
+    .from('device_usage')
     .insert([
       {
         device_id: deviceId,

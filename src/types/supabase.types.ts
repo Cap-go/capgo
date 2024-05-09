@@ -110,48 +110,6 @@ export type Database = {
           },
         ]
       }
-      app_usage: {
-        Row: {
-          app_id: string
-          bandwidth: number
-          date: string | null
-          fails: number
-          get: number
-          id: string
-          install: number
-          mau: number
-          storage_added: number
-          storage_deleted: number
-          uninstall: number
-        }
-        Insert: {
-          app_id: string
-          bandwidth?: number
-          date?: string | null
-          fails?: number
-          get?: number
-          id?: string
-          install?: number
-          mau?: number
-          storage_added?: number
-          storage_deleted?: number
-          uninstall?: number
-        }
-        Update: {
-          app_id?: string
-          bandwidth?: number
-          date?: string | null
-          fails?: number
-          get?: number
-          id?: string
-          install?: number
-          mau?: number
-          storage_added?: number
-          storage_deleted?: number
-          uninstall?: number
-        }
-        Relationships: []
-      }
       app_versions: {
         Row: {
           app_id: string
@@ -1254,7 +1212,7 @@ export type Database = {
           is_good_plan?: boolean | null
           plan_usage?: number | null
           price_id?: string | null
-          product_id?: string
+          product_id: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
           subscription_anchor_end?: string
           subscription_anchor_start?: string
@@ -2452,6 +2410,10 @@ export type Database = {
         }[]
       }
       reset_and_seed_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_and_seed_stats_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

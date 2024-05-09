@@ -72,7 +72,7 @@ app.post('/', async (c: Context) => {
           .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
-        if (customer && customer.product_id !== 'free' && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
+        if (customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
           await removeOldSubscription(c, customer.subscription_id)
 
         if (dbError2)
@@ -101,7 +101,7 @@ app.post('/', async (c: Context) => {
       if (stripeData.status === 'canceled') {
         const statusCopy = stripeData.status
         stripeData.status = 'succeeded'
-        const segment = await customerToSegmentOrg(c, org.id, 'free')
+        const segment = await customerToSegmentOrg(c, org.id, 'canceled')
         await addDataContact(c, org.management_email, userData, segment)
         await trackEvent(c, org.management_email, {}, 'user:cancel')
         await LogSnag.track({
@@ -122,7 +122,7 @@ app.post('/', async (c: Context) => {
         return c.json({ error: JSON.stringify(dbError) }, 500)
     }
     else {
-      const segment = await customerToSegmentOrg(c, org.id, 'free')
+      const segment = await customerToSegmentOrg(c, org.id, 'canceled')
       await addDataContact(c, org.management_email, userData, segment)
     }
 

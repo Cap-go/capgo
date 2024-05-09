@@ -60,3 +60,11 @@ supabase/functions/_backend/utils/supabase.types.ts
 vite\.config\.mts\.timestamp-[A-Za-z0-9]+-([A-Za-z0-9]+(\.[A-Za-z0-9]+)+)
 vite.config.mts.timestamp-1712411621093-7395fe6f168c5.mjs
 dist_cf
+.gitsecret/keys/random_seed
+!*.secret
+internal/how-to-deploy.md
+internal/cloudflare/.dev.env
+internal/cloudflare/.preprod.env
+internal/cloudflare/.prod.env
+internal/cloudflare/.env.preprod
+internal/cloudflare/.env.prod

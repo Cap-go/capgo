@@ -194,11 +194,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         icon: '🥲',
       },
       {
-        title: 'Free plan',
-        value: plans.Free,
-        icon: '🆓',
-      },
-      {
         title: 'Solo Plan',
         value: `${(plans.Solo * 100 / customers.total).toFixed(0)}% - ${plans.Solo}`,
         icon: '🎸',
