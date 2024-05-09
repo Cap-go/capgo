@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { logsnag } from '../utils/logsnag.ts'
 
 interface dataUpload {
   app_id: string
@@ -85,6 +86,14 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       console.log('errorDelete', errorDelete)
       return c.json({ status: 'Error deleting version' }, 500)
     }
+
+    const LogSnag = logsnag(c)
+    await LogSnag.track({
+      channel: 'upload-failed',
+      event: 'Failed to upload a bundle',
+      user_id: version.owner_org,
+      icon: '💀',
+    })
 
     return c.json({ status: 'Version deleted' })
   }
