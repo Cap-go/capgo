@@ -77,15 +77,10 @@ async function get(c: Context, body: GetDevice, apikey: Database['public']['Tabl
 
 async function post(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.device_id || !body.app_id)
-    return c.json({ status: 'Cannot find device' }, 400)
+    return c.json({ status: 'Missing device_id or app_id' }, 400)
 
   if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-
-  // find device
-  const res = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
-  if (!res || !res.data || !res.data.length)
-    return c.json({ status: 'Cannot find device' }, 400)
 
   if (!body.channel && body.version_id)
     return c.json({ status: 'Cannot set version without channel' }, 400)
@@ -101,6 +96,14 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
     if (dbError || !dataVersion)
       return c.json({ status: 'Cannot find version', error: dbError }, 400)
 
+    const { data: mainChannel } = await supabaseAdmin(c)
+      .from('channels')
+      .select()
+      .eq('app_id', body.app_id)
+      .eq('public', true)
+      .single()
+    if (mainChannel?.version === dataVersion.id)
+      return c.json({ status: 'Cannot set version already in a public channel' }, 400)
     const { error: dbErrorDev } = await supabaseAdmin(c)
       .from('devices_override')
       .upsert({
@@ -124,6 +127,10 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
     if (dbError || !dataChannel)
       return c.json({ status: 'Cannot find channel', error: dbError }, 400)
 
+    if (dataChannel.public) {
+      // if channel is public, we don't set channel_override
+      return c.json({ status: 'Cannot set channel override for public channel' }, 400)
+    }
     const { error: dbErrorDev } = await supabaseAdmin(c)
       .from('channel_devices')
       .upsert({
