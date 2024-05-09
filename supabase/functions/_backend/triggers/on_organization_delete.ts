@@ -4,7 +4,6 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
-import { deleteIt } from './on_version_update.ts'
 
 export const app = new Hono()
 
