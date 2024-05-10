@@ -67,14 +67,14 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-export function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
+export async function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
   if (!c.env.APP_LOG)
     return readStatsSB(c, app_id, start_date, end_date, deviceIds, search)
   return readStatsCF(c, app_id, start_date, end_date, deviceIds, search)
 }
 
-export function readDevices(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
+export function readDevices(c: Context, app_id: string, start_date: string, end_date: string, version_id: string, deviceIds?: string[], search?: string) {
   if (!c.env.DEVICE_INFO)
-    return readDevicesSB(c, app_id, start_date, end_date, deviceIds, search)
-  return readDevicesCF(c, app_id, start_date, end_date, deviceIds, search)
+    return readDevicesSB(c, app_id, start_date, end_date, version_id, deviceIds, search)
+  return readDevicesCF(c, app_id, start_date, end_date, version_id, deviceIds, search)
 }
