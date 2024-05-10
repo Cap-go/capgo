@@ -739,31 +739,11 @@ export async function getSDashboardV2(c: Context, auth: string, orgId: string, s
   return res.data || []
 }
 
-export async function getSDevice(c: Context, auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+export async function getSDevice(c: Context, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
   // do the request to supabase
   console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
 
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  const reqOwner = auth
-    ? await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then((r) => {
-        console.log(r)
-        return r
-      })
-      .then(res => res.data || false)
-    : true
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  client = supabaseAdmin(c)
+  const client = supabaseAdmin(c)
 
   const reqCount = count ? countFromClickHouse(c, 'devices_u', appId) : 0
   let req = client
@@ -817,30 +797,14 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
   // }
 }
 
-export async function getSStats(c: Context, auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
+export async function getSStats(c: Context, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
   // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
+  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
   // getStats ee.forgr.captime undefined  [
   //   { key: "action", sortable: true },
   //   { key: "created_at", sortable: "desc" }
   // ] 0 9
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  const reqOwner = auth
-    ? (await client
-        .rpc('has_app_right', { appid: appId, right: 'read' })
-        .then(res => res.data || false))
-    : true
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  client = supabaseAdmin(c)
+  const client = supabaseAdmin(c)
 
   const reqCount = count ? countFromClickHouse(c, 'logs', appId) : 0
   let req = client

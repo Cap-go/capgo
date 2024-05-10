@@ -673,7 +673,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
   return data || []
 }
 
-export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
   let query = supabase
@@ -700,6 +700,8 @@ export async function readDevicesSB(c: Context, app_id: string, period_start: st
     else
       query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
   }
+  if (version_id)
+    query = query.eq('version_id', version_id)
 
   const { data, error } = await query
 

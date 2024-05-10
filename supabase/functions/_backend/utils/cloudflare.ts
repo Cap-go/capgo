@@ -214,7 +214,7 @@ interface DeviceRowCF {
   timestamp: string
 }
 
-export async function readDevicesCF(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readDevicesCF(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
   if (!c.env.DEVICE_INFO)
     return [] as DeviceRowCF[]
 
@@ -237,6 +237,10 @@ export async function readDevicesCF(c: Context, app_id: string, period_start: st
     else
       searchFilter = `AND (startsWith(device_id, '${search}') OR startsWith(custom_id, '${search}'))`
   }
+  let versionFilter = ''
+  if (version_id)
+    versionFilter = `AND version_id = ${version_id}`
+
   const query = `SELECT
   index1 AS app_id,
   blob1 AS device_id,
@@ -254,6 +258,7 @@ WHERE
   app_id = '${app_id}'
   ${deviceFilter}
   ${searchFilter}
+  ${versionFilter}
   AND updated_at >= toDateTime('${formatDateCF(period_start)}')
   AND updated_at < toDateTime('${formatDateCF(period_end)}')
 GROUP BY app_id, device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, updated_at, version_id
