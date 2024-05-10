@@ -67,7 +67,7 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-export async function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
+export function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
   if (!c.env.APP_LOG)
     return readStatsSB(c, app_id, start_date, end_date, deviceIds, search)
   return readStatsCF(c, app_id, start_date, end_date, deviceIds, search)

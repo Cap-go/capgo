@@ -33,7 +33,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       .rpc('get_user_id', { apikey: authorization, app_id: body.appId })
     if (_errorUserId) {
       console.log('_errorUserId', _errorUserId)
-      return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
+      return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
     }
     if (!(await hasAppRight(c, body.appId, userId, 'read')))
       return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
