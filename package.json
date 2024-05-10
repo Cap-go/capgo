@@ -222,7 +222,7 @@
     "vite-plugin-vue-layouts": "0.11.0",
     "vitest": "1.5.3",
     "vue-tsc": "2.0.15",
-    "wrangler": "^3.52.0"
+    "wrangler": "^3.55.0"
   },
   "husky": {
     "hooks": {

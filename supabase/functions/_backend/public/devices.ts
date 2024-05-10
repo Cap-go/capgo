@@ -1,9 +1,10 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { EMPTY_UUID, getSDevice, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { EMPTY_UUID, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
+import { getSDevice } from '../utils/clickhouse.ts'
 
 interface DeviceLink {
   app_id: string

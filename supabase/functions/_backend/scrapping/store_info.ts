@@ -23,7 +23,7 @@ async function getAppInfo(appId: string, country = 'en') {
   if (!item)
     return null
   // return upgraded
-  const insert: Database['public']['Tables']['store_apps']['Insert'] = {
+  const insert: any = {
     url: item.url || '',
     app_id: item.appId,
     title: item.title || '',
@@ -90,7 +90,7 @@ async function getInfo(c: Context, appId: string) {
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<AppInfo>()
-    const all: Promise<(Database['public']['Tables']['store_apps']['Insert'])[]>[] = []
+    const all: Promise<(any)[]>[] = []
     // remove from list apps already in supabase
     if (body.appId) {
       all.push(getInfo(c, body.appId))

@@ -336,11 +336,11 @@ function prefixParams(params: Record<string, any>): Record<string, any> {
   return prefixedParams
 }
 
-export async function saveStoreInfo(c: Context, app: Database['public']['Tables']['store_apps']['Insert']) {
+export async function saveStoreInfo(c: Context, app: any) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
   // Save a single app in ClickHouse
-  const columns: (keyof Database['public']['Tables']['store_apps']['Insert'])[] = Object.keys({ updates: 0, ...app }) as (keyof Database['public']['Tables']['store_apps']['Insert'])[]
+  const columns: (keyof any)[] = Object.keys({ updates: 0, ...app }) as (keyof any)[]
   const values = columns.map((column) => {
     const value = app[column]
     if (column === 'updates')
@@ -365,7 +365,7 @@ export async function saveStoreInfo(c: Context, app: Database['public']['Tables'
   }
 }
 
-export async function bulkUpdateStoreApps(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+export async function bulkUpdateStoreApps(c: Context, apps: (any)[]) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
   // Update a list of apps in ClickHouse (internal use only)
@@ -807,7 +807,7 @@ export async function getSDevice(c: Context, auth: string, appId: string, versio
       }
     })
   }
-  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] as Database['public']['Tables']['devices']['Row'][] }))
 
   // }
   // else {

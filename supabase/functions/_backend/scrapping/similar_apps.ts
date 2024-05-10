@@ -14,7 +14,7 @@ interface AppInfo {
   countries?: string[]
 }
 
-async function getAppsInfo(appId: string, country: string): Promise<(Database['public']['Tables']['store_apps']['Insert'])[]> {
+async function getAppsInfo(appId: string, country: string): Promise<(any)[]> {
   const { title } = await gplay.app({
     appId,
     // throttle: 50,
@@ -31,7 +31,7 @@ async function getAppsInfo(appId: string, country: string): Promise<(Database['p
   const itemsSearch = title ? await gplay.search({ term: title, num: 250, country }).catch(() => []) : []
 
   return [...itemsSim, ...itemsSearch].map((item) => {
-    const insert: Database['public']['Tables']['store_apps']['Insert'] = {
+    const insert: any = {
       url: item.url || '',
       app_id: item.appId,
       title: item.title || '',
@@ -76,7 +76,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<AppInfo>()
     // remove from list apps already in supabase
-    const all: Promise<(Database['public']['Tables']['store_apps']['Insert'])[]>[] = []
+    const all: Promise<(any)[]>[] = []
     if (body.appId) {
       for (const country of countries)
         all.push(getSimilar(c, body.appId, country))
