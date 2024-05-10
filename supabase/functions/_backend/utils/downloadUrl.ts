@@ -6,7 +6,17 @@ import type { Database } from './supabase.types.ts'
 const EXPIRATION_SECONDS = 604800
 // const EXPIRATION_SECONDS = 120
 
-export async function getBundleUrl(c: Context, ownerOrg: string, version: Database['public']['Tables']['app_versions']['Row']) {
+export async function getBundleUrl(
+  c: Context,
+  ownerOrg: string,
+  version: {
+    id: Database['public']['Tables']['app_versions']['Row']['id']
+    storage_provider: Database['public']['Tables']['app_versions']['Row']['storage_provider']
+    r2_path: Database['public']['Tables']['app_versions']['Row']['r2_path']
+    bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
+    app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
+  },
+) {
   console.log(version)
 
   let path: string | null = null
