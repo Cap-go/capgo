@@ -35,8 +35,6 @@ async function loadAppInfo() {
 
     const usageByApp = main.filterDashboard(id.value)
     updatesNb.value = usageByApp.reduce((acc, cur) => acc + cur.get, 0)
-    // TODO: re implement the count of updates
-    updatesNb.value = 0
     devicesNb.value = usageByApp.reduce((acc, cur) => acc + cur.mau, 0)
 
     promises.push(

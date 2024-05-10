@@ -129,6 +129,8 @@ const acronym = computed(() => {
 const perm = computed(() => {
   // console.log(props.app.name, organizationStore.getOrgByAppId(props.app.app_id))
   if (props.app.name) {
+    // We should call organizationStore.awaitInitialLoad but that is hard as this is a computed value
+    // This creates a potential race condition
     const org = organizationStore.getOrgByAppId(props.app.app_id)
 
     return org?.role ?? t('unknown')

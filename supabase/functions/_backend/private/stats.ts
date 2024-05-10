@@ -1,10 +1,11 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { getSStats, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { checkKey } from '../utils/utils.ts'
 import type { Order } from '../utils/types.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { getSStats } from '../utils/clickhouse.ts'
 
 // get_stats
 

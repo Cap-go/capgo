@@ -2,7 +2,6 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import type { Database } from '../utils/supabase.types.ts'
 import { bulkUpdateStoreApps, getStoreAppById, saveStoreInfo } from '../utils/clickhouse.ts'
 import { countries } from '../utils/gplay_categ.ts'
 
@@ -23,7 +22,7 @@ async function getAppInfo(appId: string, country = 'en') {
   if (!item)
     return null
   // return upgraded
-  const insert: Database['public']['Tables']['store_apps']['Insert'] = {
+  const insert: any = {
     url: item.url || '',
     app_id: item.appId,
     title: item.title || '',
@@ -90,7 +89,7 @@ async function getInfo(c: Context, appId: string) {
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<AppInfo>()
-    const all: Promise<(Database['public']['Tables']['store_apps']['Insert'])[]>[] = []
+    const all: Promise<(any)[]>[] = []
     // remove from list apps already in supabase
     if (body.appId) {
       all.push(getInfo(c, body.appId))

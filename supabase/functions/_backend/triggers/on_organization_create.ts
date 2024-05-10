@@ -30,7 +30,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (!record.customer_id)
       createStripeCustomer(c, record as any)
 
-    return c.json(BRES) // skip delete s3 and increment size in new upload
+    return c.json(BRES)
   }
   catch (e) {
     return c.json({ status: 'Cannot handle org creation', error: JSON.stringify(e) }, 500)

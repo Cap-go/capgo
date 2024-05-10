@@ -28,7 +28,7 @@ function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
   return new S3Client(params)
 }
 
-async function getUploadUrl(c: Context, fileId: string, expirySeconds = 120) {
+async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
   const client = initS3(c, true, true)
 
   const command = new PutObjectCommand({

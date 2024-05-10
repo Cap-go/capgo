@@ -396,28 +396,30 @@ export async function getTotalStats(orgId?: string): Promise<Database['public'][
   }
 }
 
+const DEFAUL_PLAN_NAME = 'Solo'
+
 export async function getCurrentPlanName(userid?: string): Promise<string> {
   if (!userid)
-    return 'Free'
+    return DEFAUL_PLAN_NAME
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name', { userid })
     .single()
   if (error)
     throw new Error(error.message)
 
-  return data || 'Free'
+  return data || DEFAUL_PLAN_NAME
 }
 
 export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
   if (!orgId)
-    return 'Free'
+    return DEFAUL_PLAN_NAME
   const { data, error } = await useSupabase()
     .rpc('get_current_plan_name_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
 
-  return data || 'Free'
+  return data || DEFAUL_PLAN_NAME
 }
 
 export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {

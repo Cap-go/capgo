@@ -21,7 +21,7 @@ const appId = ref('')
 const organization = ref(null as null | Organization)
 const isOrgOwner = ref(false)
 
-watchEffect(() => {
+watchEffect(async () => {
   try {
     if (route.path.includes('/app') && !route.path.includes('home')) {
       const appIdRaw = route.params.p as string || route.params.package as string
@@ -31,6 +31,7 @@ watchEffect(() => {
       }
 
       appId.value = urlToAppId(appIdRaw)
+      await organizationStore.awaitInitialLoad()
       organization.value = organizationStore.getOrgByAppId(appId.value) ?? null
     }
     else if (route.path.includes('/app') && route.path.includes('home')) {

@@ -245,24 +245,6 @@ async function didCancel(name: string) {
   return displayStore.onDialogDismiss()
 }
 
-async function saveCustomId() {
-  console.log('saveCustomId', device.value?.custom_id)
-  if (!device.value?.device_id)
-    return
-  const { error } = await supabase.functions.invoke('set_custom_id', {
-    body: {
-      appId: packageId.value,
-      deviceId: id.value,
-      customId: device.value?.custom_id,
-    },
-  })
-  if (error) {
-    console.error('saveCustomId', error)
-    return
-  }
-  toast.success(t('custom-id-saved'))
-}
-
 async function delDevVersion(device: string) {
   if (await didCancel(t('device')))
     return
@@ -423,14 +405,6 @@ watchEffect(async () => {
     displayStore.defaultBack = `/app/package/${route.params.p}/devices`
   }
 })
-
-function guardCustomID(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
-    toast.error(t('no-permission'))
-    event.preventDefault()
-    return false
-  }
-}
 </script>
 
 <template>
@@ -440,7 +414,7 @@ function guardCustomID(event: Event) {
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <dl :key="reloadCount" class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
-          <InfoRow v-if="device" v-model:value="device.custom_id" editable :label="t('custom-id')" :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])" @update:value="saveCustomId" @click="guardCustomID" />
+          <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
           <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
           <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
           <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
