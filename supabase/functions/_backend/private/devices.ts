@@ -1,8 +1,8 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { getSDevice } from '../utils/supabase.ts'
 import type { Order } from '../utils/types.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { getSDevice } from '../utils/clickhouse.ts'
 
 interface dataDevice {
   appId: string

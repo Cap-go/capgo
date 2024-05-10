@@ -13,7 +13,6 @@ import { app as channels } from '../supabase/functions/_backend/public/channel.t
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as updates } from '../supabase/functions/_backend/plugins/updates.ts'
 import { app as stats } from '../supabase/functions/_backend/plugins/stats.ts'
-import { app as setCustomId } from '../supabase/functions/_backend/plugins/custom_ids.ts'
 
 // Private API
 import { app as plans } from '../supabase/functions/_backend/private/plans.ts'
@@ -71,7 +70,6 @@ app.route('/channel_self', channel_self)
 app.route('/updates', updates)
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
-app.route('/set_custom_id', setCustomId)
 
 // Private API
 appFront.route('/plans', plans)

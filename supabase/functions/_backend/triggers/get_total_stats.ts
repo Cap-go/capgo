@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
-import { getSDashboardV2 } from '../utils/supabase.ts'
 import { middlewareAPISecret, useCors } from '../utils/hono.ts'
+import { getSDashboardV2 } from '../utils/clickhouse.ts'
 
 interface dataDevice {
   orgId: string

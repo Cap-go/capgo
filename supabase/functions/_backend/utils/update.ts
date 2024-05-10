@@ -73,8 +73,8 @@ async function requestInfosPostgres(
     .select({
       device_id: schema.devices_override.device_id,
       app_id: schema.devices_override.app_id,
-      created_at: schema.devices_override.created_at,
-      updated_at: schema.devices_override.updated_at,
+      // created_at: schema.devices_override.created_at,
+      // updated_at: schema.devices_override.updated_at,
       version: {
         id: versionAlias.id,
         name: versionAlias.name,
@@ -126,7 +126,7 @@ async function requestInfosPostgres(
       },
       channels: {
         id: schema.channels.id,
-        created_at: schema.channels.created_at,
+        // created_at: schema.channels.created_at,
         // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
@@ -193,7 +193,7 @@ async function requestInfosPostgres(
       },
       channels: {
         id: schema.channels.id,
-        created_at: schema.channels.created_at,
+        // created_at: schema.channels.created_at,
         // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,

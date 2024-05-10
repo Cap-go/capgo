@@ -6,12 +6,9 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
-import type { Order } from './types.ts'
-import { countFromClickHouse, readMauFromClickHouse, sendStatsAndDevice } from './clickhouse.ts'
-import type { AppActivity } from './clickhouse.ts'
 
 export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
-
+const DEFAULT_LIMIT = 1000
 // Import Supabase client
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
@@ -319,40 +316,6 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
   return false
 }
 
-export async function updateDeviceCustomId(c: Context, auth: string, appId: string, deviceId: string, customId: string) {
-  console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
-
-  const client = supabaseClient(c, auth)
-  const reqOwner = await client
-    .rpc('has_app_right', { appid: appId, right: 'write' })
-    .then(res => res.data || false)
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  console.log('UpdateDeviceCustomId clickhouse')
-  // get the device from clickhouse
-  const device = await supabaseAdmin(c)
-    .from('clickhouse_devices')
-    .select()
-    .eq('app_id', appId)
-    .eq('device_id', deviceId)
-    .limit(1)
-    .single()
-    .then(res => res.data || null)
-  console.log('UpdateDeviceCustomId get device', device)
-  if (!device)
-    return Promise.reject(new Error('device not found'))
-    // send the device to clickhouse
-  return sendStatsAndDevice(c, {
-    ...device,
-    custom_id: customId,
-  }, [{ action: 'setCustomId' }])
-}
-
 export async function getSDashboard(c: Context, auth: string, orgIdQuery: string, startDate: string, endDate: string, appId?: string) {
   console.log(`getSDashboard orgId ${orgIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
@@ -413,206 +376,6 @@ export async function getSDashboard(c: Context, auth: string, orgIdQuery: string
   const res = await req
   console.log('res', res)
   return res.data || []
-}
-
-export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
-  console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
-
-  let client = supabaseClient(c, auth)
-  // const userId = (await client.auth.getUser()).data.user?.id
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  if (appId) {
-    const reqOwner = await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then(res => res.data || false)
-    if (!reqOwner)
-      return Promise.reject(new Error('not allowed'))
-  }
-
-  console.log('appId', appId)
-  const appIds: string[] = []
-
-  if (appId) {
-    appIds.push(appId)
-  }
-  else {
-    console.log('getSDashboard V2 get apps', orgId)
-    if (!orgId)
-      return []
-    // get all user apps id
-    console.log('orgId', orgId)
-    const resAppIds = await client
-      .from('apps')
-      .select('app_id')
-      .eq('owner_org', orgId)
-      .then(res => res.data?.map(app => app.app_id) || [])
-    appIds.push(...resAppIds)
-  }
-
-  console.log('appIds', appIds)
-  const res = await readMauFromClickHouse(c, startDate, endDate, appIds)
-  console.log('res', res)
-  return res.data || []
-}
-
-export async function getSDevice(c: Context, auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
-  // do the request to supabase
-  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
-
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  const reqOwner = auth
-    ? await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then((r) => {
-        console.log(r)
-        return r
-      })
-      .then(res => res.data || false)
-    : true
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  client = supabaseAdmin(c)
-
-  const reqCount = count ? countFromClickHouse(c, 'devices_u', appId) : 0
-  let req = client
-    .from('clickhouse_devices')
-    .select()
-    .eq('app_id', appId)
-
-  if (versionId) {
-    console.log('versionId', versionId)
-    req = req.eq('version', versionId)
-  }
-
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    console.log('range', rangeStart, rangeEnd)
-    req = req.range(rangeStart, rangeEnd)
-  }
-
-  if (deviceIds && deviceIds.length) {
-    console.log('deviceIds', deviceIds)
-    if (deviceIds.length === 1) {
-      req = req.eq('device_id', deviceIds[0])
-      req = req.limit(1)
-    }
-    else {
-      req = req.in('device_id', deviceIds)
-    }
-  }
-  if (search) {
-    console.log('search', search)
-    if (deviceIds && deviceIds.length)
-      req = req.or(`custom_id.like.%${search}%`)
-    else
-      req = req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
-  }
-
-  if (order?.length) {
-    order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        console.log('order', col.key, col.sortable)
-        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
-      }
-    })
-  }
-  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
-
-  // }
-  // else {
-  //   console.log('getDevice enabled')
-  //   // check the rights of the user
-  //   return readDevicesInTinyBird(appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
-  // }
-}
-
-export async function getSStats(c: Context, auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
-  // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
-  // getStats ee.forgr.captime undefined  [
-  //   { key: "action", sortable: true },
-  //   { key: "created_at", sortable: "desc" }
-  // ] 0 9
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  const reqOwner = auth
-    ? (await client
-        .rpc('has_app_right', { appid: appId, right: 'read' })
-        .then(res => res.data || false))
-    : true
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  client = supabaseAdmin(c)
-
-  const reqCount = count ? countFromClickHouse(c, 'logs', appId) : 0
-  let req = client
-    .from('clickhouse_logs')
-    .select(`
-        device_id,
-        action,
-        platform,
-        version_build,
-        version,
-        created_at
-      `)
-    .eq('app_id', appId)
-
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    console.log('range', rangeStart, rangeEnd)
-    req = req.range(rangeStart, rangeEnd)
-  }
-
-  if (after) {
-    console.log('after', after)
-    req = req.gt('created_at', after)
-  }
-
-  if (deviceIds && deviceIds.length) {
-    console.log('deviceIds', deviceIds)
-    if (deviceIds.length === 1)
-      req = req.eq('device_id', deviceIds[0])
-    else
-      req = req.in('device_id', deviceIds)
-  }
-  if (search) {
-    console.log('search', search)
-    if (deviceIds && deviceIds.length)
-      req = req.or(`action.like.%${search}%`)
-    else
-      req = req.or(`device_id.like.%${search}%,action.like.%${search}%`)
-  }
-
-  if (order?.length) {
-    order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        console.log('order', col.key, col.sortable)
-        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
-      }
-    })
-  }
-  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
-  // }
-  // else {
-  //   console.log('getStats enabled')
-  //   // check the rights of the user
-  //   return readLogInTinyBird(appId, deviceId, search, order, rangeStart, rangeEnd)
-  // }
 }
 
 export async function createApiKey(c: Context, userId: string) {
@@ -780,7 +543,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   console.log('stripe_info done')
 }
 
-export function trackBandwidthUsage(
+export function trackBandwidthUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
@@ -797,7 +560,7 @@ export function trackBandwidthUsage(
     ])
 }
 
-export function trackVersionUsage(
+export function trackVersionUsageSB(
   c: Context,
   versionId: number,
   appId: string,
@@ -814,7 +577,7 @@ export function trackVersionUsage(
     ])
 }
 
-export async function trackDeviceUsage(
+export async function trackDeviceUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
@@ -829,7 +592,7 @@ export async function trackDeviceUsage(
     ])
 }
 
-export async function trackMeta(
+export async function trackMetaSB(
   c: Context,
   app_id: string,
   version_id: number,
@@ -847,26 +610,103 @@ export async function trackMeta(
     ])
 }
 
-export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readDeviceUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
   return data || []
 }
 
-export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readBandwidthUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_bandwidth_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
   return data || []
 }
 
-export async function readStorageUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readStatsStorageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_storage_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
   return data || []
 }
 
-export async function readVersionUsage(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readStatsSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+  const supabase = supabaseAdmin(c)
+
+  let query = supabase
+    .from('stats')
+    .select('*')
+    .eq('app_id', app_id)
+    .gte('created_at', new Date(period_start).toISOString())
+    .lt('created_at', new Date(period_end).toISOString())
+    .order('created_at', { ascending: true })
+    .order('app_id', { ascending: true })
+    .limit(limit)
+
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      query = query.eq('device_id', deviceIds[0])
+    else
+      query = query.in('device_id', deviceIds)
+  }
+
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      query = query.ilike('version_build', `${search}%`)
+    else
+      query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error reading stats list', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+  const supabase = supabaseAdmin(c)
+
+  let query = supabase
+    .from('devices')
+    .select('*')
+    .eq('app_id', app_id)
+    .gte('updated_at', new Date(period_start).toISOString())
+    .lt('updated_at', new Date(period_end).toISOString())
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      query = query.eq('device_id', deviceIds[0])
+    else
+      query = query.in('device_id', deviceIds)
+  }
+
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      query = query.ilike('custom_id', `${search}%`)
+    else
+      query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error reading device list', error)
+    return []
+  }
+
   return data || []
 }

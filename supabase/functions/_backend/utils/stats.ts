@@ -1,10 +1,10 @@
 import type { Context } from 'hono'
-import { readBandwidthUsage, readDeviceUsage, readStorageUsage, readVersionUsage, trackBandwidthUsage, trackDeviceUsage, trackMeta, trackVersionUsage } from './supabase.ts'
-import { readBandwidthUsageCF, readDeviceUsageCF, readVersionUsageCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
+import { readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
-    return trackDeviceUsage(c, device_id, app_id)
+    return trackDeviceUsageSB(c, device_id, app_id)
   return trackDeviceUsageCF(c, device_id, app_id)
 }
 
@@ -12,14 +12,14 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   if (file_size === 0)
     return
   if (!c.env.BANDWIDTH_USAGE)
-    return trackBandwidthUsage(c, device_id, app_id, file_size)
+    return trackBandwidthUsageSB(c, device_id, app_id, file_size)
   return trackBandwidthUsageCF(c, device_id, app_id, file_size)
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
 export function createStatsVersion(c: Context, version_id: number, app_id: string, action: VersionAction) {
   if (!c.env.VERSION_USAGE)
-    return trackVersionUsage(c, version_id, app_id, action)
+    return trackVersionUsageSB(c, version_id, app_id, action)
   return trackVersionUsageCF(c, version_id, app_id, action)
 }
 
@@ -40,29 +40,41 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
     return
   console.log('createStatsMeta', app_id, version_id, size)
   if (!c.env.VERSION_META)
-    return trackMeta(c, app_id, version_id, size)
+    return trackMetaSB(c, app_id, version_id, size)
   return trackMetaCF(c, app_id, version_id, size)
 }
 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.DEVICE_USAGE)
-    return readDeviceUsage(c, app_id, start_date, end_date)
+    return readDeviceUsageSB(c, app_id, start_date, end_date)
   return readDeviceUsageCF(c, app_id, start_date, end_date)
 }
 
 export function readStatsBandwidth(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.BANDWIDTH_USAGE)
-    return readBandwidthUsage(c, app_id, start_date, end_date)
+    return readBandwidthUsageSB(c, app_id, start_date, end_date)
   return readBandwidthUsageCF(c, app_id, start_date, end_date)
 }
 
 export function readStatsStorage(c: Context, app_id: string, start_date: string, end_date: string) {
   // No cloudflare implementation, postgrest is enough
-  return readStorageUsage(c, app_id, start_date, end_date)
+  return readStatsStorageSB(c, app_id, start_date, end_date)
 }
 
 export function readStatsVersion(c: Context, app_id: string, start_date: string, end_date: string) {
   if (!c.env.VERSION_USAGE)
-    return readVersionUsage(c, app_id, start_date, end_date)
-  return readVersionUsageCF(c, app_id, start_date, end_date)
+    return readStatsVersionSB(c, app_id, start_date, end_date)
+  return readStatsVersionCF(c, app_id, start_date, end_date)
+}
+
+export function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
+  if (!c.env.APP_LOG)
+    return readStatsSB(c, app_id, start_date, end_date, deviceIds, search)
+  return readStatsCF(c, app_id, start_date, end_date, deviceIds, search)
+}
+
+export function readDevices(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
+  if (!c.env.DEVICE_INFO)
+    return readDevicesSB(c, app_id, start_date, end_date, deviceIds, search)
+  return readDevicesCF(c, app_id, start_date, end_date, deviceIds, search)
 }
