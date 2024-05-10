@@ -220,7 +220,7 @@ onMounted(async () => {
 <template>
   <div class="relative pb-4 pb-20 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between pb-4 md:items-center">
-      <div class="flex mb-2 md:mb-0 h-10">
+      <div class="flex h-10 mb-2 md:mb-0">
         <button class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
@@ -228,28 +228,28 @@ onMounted(async () => {
         </button>
       </div>
       <!-- </div> -->
-      <div class="flex h-10 mr-auto ml-4 border divide-gray-300 rounded-lg text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
-        <div :class="`flex-auto flex-col flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
+      <div class="flex h-10 ml-4 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
+        <div :class="`flex-auto flex-col cursor-pointer flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
           <div class="flex flex-row">
             <IconClock class="mr-1" />
             {{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hour') : t('last-24-hour')) }}
           </div>
-          <div v-if="showTimeDropdown" class="w-32 h-40 bg-gray-800 absolute block z-50 top-14 text-white pointer-events-none">
-            <div class="flex flex-col items-center justify-center pointer-events-auto">
-              <div class="my-auto py-3 hover:bg-gray-700 w-full text-center" @click="setTime(1)">
+          <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
+            <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
+              <div class="w-full py-3 my-auto text-center hover:bg-gray-700" @click="setTime(1)">
                 {{ t('last-hour') }}
               </div>
-              <div class="my-auto py-3 hover:bg-gray-700 w-full text-center" @click="setTime(3)">
+              <div class="w-full py-3 my-auto text-center hover:bg-gray-700" @click="setTime(3)">
                 {{ t('last-3-hour') }}
               </div>
-              <div class="my-auto py-3 hover:bg-gray-700 w-full text-center" @click="setTime(24)">
+              <div class="w-full py-3 my-auto text-center hover:bg-gray-700" @click="setTime(24)">
                 {{ t('last-24-hour') }}
               </div>
             </div>
           </div>
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-600" />
-        <div :class="`flex-auto flex items-center justify-center w-28 hover:bg-gray-700 rounded-r-lg ${currentSelected === 'precise' ? 'bg-gray-100 text-gray-800 hover:text-white' : ''}`" @click="clickRight">
+        <div :class="`flex-auto cursor-pointer flex items-center justify-center w-28 hover:bg-gray-700 rounded-r-lg ${currentSelected === 'precise' ? 'bg-gray-100 text-gray-800 hover:text-white' : ''}`" @click="clickRight">
           <div class="fixed z-50">
             <!-- <IconCalendar class="mr-1" /> -->
             <VueDatePicker
@@ -263,7 +263,7 @@ onMounted(async () => {
               @update:model-value="clickRight"
             >
               <template #trigger>
-                <div class="w-28 h-10 flex flex-row justify-center items-center">
+                <div class="flex flex-row items-center justify-center h-10 w-28">
                   <IconCalendar class="mr-1" />
                   <p>
                     {{ t('custom') }}
