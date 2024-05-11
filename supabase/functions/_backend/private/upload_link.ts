@@ -3,11 +3,14 @@ import type { Context } from 'hono'
 import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
+import { logsnag } from '../utils/logsnag.ts'
 
 interface dataUpload {
   name?: string
   app_id: string
   bucket_id?: string
+  version?: number
 }
 
 export const app = new Hono()
@@ -72,11 +75,33 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       return c.json({ status: 'Error already exist' }, 500)
     }
     console.log('s3.getUploadUrl', filePath)
-    const url = await s3.getUploadUrl(c, filePath)
-    console.log('url', url)
-    if (!url) {
-      console.log('no url found')
-      return c.json({ status: 'Error unknow' }, 500)
+
+    let response: any
+    if (body.version && body.version === 1) {
+      console.log('mul!')
+      const uploadId = await createMultipartRequest(c, filePath, app.owner_org)
+
+      response = { uploadId, key: filePath, url: getMultipartServerUrl(c) }
+    }
+    else {
+      const url = await s3.getUploadUrl(c, filePath)
+      console.log('url', url)
+      if (!url) {
+        console.log('no url found')
+        return c.json({ status: 'Error unknow' }, 500)
+      }
+
+      const LogSnag = logsnag(c)
+      await LogSnag.track({
+        channel: 'upload-get-link',
+        event: 'Upload via single file',
+        icon: '🏛️',
+        user_id: app.owner_org,
+        notify: false,
+      })
+
+      console.log('url', filePath, url)
+      response = { url }
     }
 
     // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/Y29tLmRlbW8uYXBw/11.zip
@@ -91,11 +116,59 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       return c.json({ status: 'Error unknow' }, 500)
     }
 
-    console.log('url', filePath, url)
-    return c.json({ url })
+    return c.json(response)
   }
   catch (e) {
     console.log('error', e)
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })
+
+function getMultipartServerUrl(c: Context) {
+  return new URL(getEnv(c, 'MULTIPART_SERVER'))
+}
+
+async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
+  try {
+    const serverUrl = getMultipartServerUrl(c)
+    const serverSecret = getEnv(c, 'MULTIPART_SECRET')
+
+    const body = {
+      key: path,
+      action: 'mpu-create',
+    }
+
+    const encodedBody = btoa(JSON.stringify(body))
+    serverUrl.searchParams.set('body', encodedBody)
+    console.log('body', encodedBody)
+
+    const response = await fetch(serverUrl, {
+      method: 'POST',
+      headers: {
+        MAGIC_MULTIPART_SECRET: serverSecret,
+      },
+    })
+
+    const json = await response.json()
+    console.log('json', json)
+    if (!json || !json.uploadId || typeof json.uploadId !== 'string') {
+      console.error(`Cannot get uploadId from resonse: ${JSON.stringify(json)}`)
+      return null
+    }
+
+    const LogSnag = logsnag(c)
+    await LogSnag.track({
+      channel: 'upload-get-link',
+      event: 'Upload via multipart',
+      icon: '🏗️',
+      user_id: orgid,
+      notify: false,
+    })
+
+    return json.uploadId
+  }
+  catch (e) {
+    console.error(`Cannot generate multipart. Error: ${e}`)
+    return null
+  }
+}
