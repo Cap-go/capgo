@@ -27,6 +27,7 @@ const supabase = useSupabase()
 const main = useMainStore()
 const { t } = useI18n()
 const snag = useLogSnag()
+const organizationStore = useOrganizationStore()
 
 interface Step {
   title: string
@@ -55,10 +56,13 @@ function setLog() {
       channel: 'onboarding-v2',
       event: `onboarding-step-${step.value}`,
       icon: '👶',
-      user_id: main.user.id,
+      user_id: organizationStore.currentOrganization?.gid,
       notify: false,
     }).catch()
     pushEvent(`user:step-${step.value}`)
+    if (step.value === 1)
+      window.location.reload()
+
     if (step.value === 4)
       pushEvent('user:onboarding-done')
     // TODO add emailing on onboarding done to send blog article versioning
@@ -138,8 +142,9 @@ async function getKey(retry = true): Promise<void> {
 
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    // console.log('watch app change step 1')
+    console.log('watch app change step 1')
     realtimeListener.value = true
+    await organizationStore.awaitInitialLoad()
     mySubscription.value = supabase
       .channel('table-db-changes')
       .on(
@@ -148,10 +153,10 @@ watchEffect(async () => {
           event: 'INSERT',
           schema: 'public',
           table: 'apps',
-          filter: `user_id=eq.${main.user?.id}`,
+          filtr: `owner_org=eq.${organizationStore.currentOrganization?.gid}`,
         },
         (payload) => {
-        // console.log('Change received step 1!', payload)
+          console.log('Change received step 1!', payload)
           setLog()
           step.value += 1
           appId.value = payload.new.id || ''
