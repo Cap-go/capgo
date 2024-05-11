@@ -30,7 +30,7 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DEVICE_INFO) // TODO: should make it work with supabase too
+  if (!c.env.DEVICE_LOG) // TODO: should make it work with supabase too
     return
   return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }
@@ -74,7 +74,7 @@ export function readStats(c: Context, app_id: string, start_date: string, end_da
 }
 
 export function readDevices(c: Context, app_id: string, start_date: string, end_date: string, version_id: string, deviceIds?: string[], search?: string) {
-  if (!c.env.DEVICE_INFO)
+  if (!c.env.DEVICE_LOG)
     return readDevicesSB(c, app_id, start_date, end_date, version_id, deviceIds, search)
   return readDevicesCF(c, app_id, start_date, end_date, version_id, deviceIds, search)
 }

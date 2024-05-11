@@ -54,15 +54,10 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
 }
 
 export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DEVICE_INFO)
+  if (!c.env.DEVICE_LOG)
     return
-  c.env.DEVICE_INFO.writeDataPoint({
-    blobs: [device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
-    doubles: [version_id],
-    indexes: [app_id],
-  })
   c.env.DEVICE_LOG.writeDataPoint({
-    blobs: [platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
+    blobs: [app_id, device_id, platform, plugin_version, os_version, version_build, is_prod, is_emulator, custom_id],
     doubles: [version_id],
     indexes: [`${app_id}__${device_id}`],
   })
@@ -220,7 +215,7 @@ interface DeviceRowCF {
 }
 
 export async function readDevicesCF(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
-  if (!c.env.DEVICE_INFO)
+  if (!c.env.DEVICE_LOG)
     return [] as DeviceRowCF[]
 
   let deviceFilter = ''
@@ -247,20 +242,20 @@ export async function readDevicesCF(c: Context, app_id: string, period_start: st
     versionFilter = `AND version_id = ${version_id}`
 
   const query = `SELECT
-  index1 AS app_id,
-  blob1 AS device_id,
+  blob1 AS app_id,
+  blob2 AS device_id,
   double1 AS version_id,
-  blob2 AS platform,
-  blob3 AS plugin_version,
-  blob4 AS os_version,
-  blob5 AS version_build,
-  blob6 AS custom_id,
+  blob3 AS platform,
+  blob4 AS plugin_version,
+  blob5 AS os_version,
+  blob6 AS version_build,
   blob7 AS is_prod,
   blob8 AS is_emulator,
+  blob9 AS custom_id,
   timestamp AS updated_at
-FROM device_info
+FROM device_log
 WHERE
-  app_id = '${app_id}'
+  startsWith(index1, '${app_id}__')
   ${deviceFilter}
   ${searchFilter}
   ${versionFilter}
