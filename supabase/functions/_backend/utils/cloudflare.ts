@@ -61,6 +61,11 @@ export function trackDevicesCF(c: Context, app_id: string, device_id: string, ve
     doubles: [version_id],
     indexes: [app_id],
   })
+  c.env.DEVICE_LOG.writeDataPoint({
+    blobs: [platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
+    doubles: [version_id],
+    indexes: [`${app_id}__${device_id}`],
+  })
 }
 
 export function trackMetaCF(c: Context, app_id: string, version_id: number, size: number) {

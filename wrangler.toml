@@ -1,7 +1,7 @@
 name = "capgo_api-preprod"
 compatibility_date = "2024-04-03"
 main = "./cloudflare_workers/index.ts"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = [ "nodejs_compat" ]
 
 [placement]
 mode = "smart"
@@ -21,6 +21,10 @@ dataset = "version_usage"
 [[analytics_engine_datasets]]
 binding = "APP_LOG"
 dataset = "app_log"
+
+[[analytics_engine_datasets]]
+binding = "DEVICE_LOG"
+dataset = "device_log"
 
 [[analytics_engine_datasets]]
 binding = "DEVICE_INFO"
