@@ -4,6 +4,7 @@ import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { logsnag } from '../utils/logsnag.ts'
 
 interface dataUpload {
   name?: string
@@ -78,7 +79,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     let response: any
     if (body.version && body.version === 1) {
       console.log('mul!')
-      const uploadId = await createMultipartRequest(c, filePath)
+      const uploadId = await createMultipartRequest(c, filePath, app.owner_org)
 
       response = { uploadId, key: filePath, url: getMultipartServerUrl(c) }
     }
@@ -89,6 +90,15 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
         console.log('no url found')
         return c.json({ status: 'Error unknow' }, 500)
       }
+
+      const LogSnag = logsnag(c)
+      await LogSnag.track({
+        channel: 'upload-get-link',
+        event: 'Upload via single file',
+        icon: '🏛️',
+        user_id: app.owner_org,
+        notify: false,
+      })
 
       console.log('url', filePath, url)
       response = { url }
@@ -118,7 +128,7 @@ function getMultipartServerUrl(c: Context) {
   return new URL(getEnv(c, 'MULTIPART_SERVER'))
 }
 
-async function createMultipartRequest(c: Context, path: string): Promise<string | null> {
+async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
   try {
     const serverUrl = getMultipartServerUrl(c)
     const serverSecret = getEnv(c, 'MULTIPART_SECRET')
@@ -145,6 +155,16 @@ async function createMultipartRequest(c: Context, path: string): Promise<string 
       console.error(`Cannot get uploadId from resonse: ${JSON.stringify(json)}`)
       return null
     }
+
+    const LogSnag = logsnag(c)
+    await LogSnag.track({
+      channel: 'upload-get-link',
+      event: 'Upload via multipart',
+      icon: '🏗️',
+      user_id: orgid,
+      notify: false,
+    })
+
     return json.uploadId
   }
   catch (e) {
