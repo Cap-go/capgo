@@ -88,7 +88,7 @@ app.post('/', async (c: Context) => {
           channel: 'usage',
           event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
           icon: '💰',
-          user_id: org.management_email,
+          user_id: org.id,
           notify: status === 'succeeded',
         }).catch()
       }
@@ -108,7 +108,7 @@ app.post('/', async (c: Context) => {
           channel: 'usage',
           event: 'User cancel',
           icon: '⚠️',
-          user_id: org.management_email,
+          user_id: org.id,
           notify: true,
         }).catch()
         stripeData.status = statusCopy

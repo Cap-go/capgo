@@ -74,6 +74,7 @@ export default defineConfig({
       domain: getUrl(),
       pls_domain: 'web.capgo.app',
       logsnag: 'c124f5e9d0ce5bdd14bbb48f815d5583',
+      logsnag_project: 'capgo',
       crisp: 'e7dbcfa4-91b1-4b74-b563-b9234aeb2eee',
     }, { defineOn: 'import.meta.env' }),
 
