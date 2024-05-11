@@ -12,7 +12,7 @@ export function useLogSnag(): LogSnag {
   }
   const logsnag = new LogSnag({
     token: import.meta.env.logsnag as string,
-    project: 'capgo',
+    project: import.meta.env.logsnag_project,
   })
   return logsnag
 }

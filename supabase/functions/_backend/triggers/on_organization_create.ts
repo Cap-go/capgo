@@ -4,6 +4,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import { createStripeCustomer } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { logsnag } from '../utils/logsnag.ts'
 
 export const app = new Hono()
 
@@ -29,6 +30,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     if (!record.customer_id)
       createStripeCustomer(c, record as any)
+
+    const LogSnag = logsnag(c)
+    LogSnag.track({
+      channel: 'org-created',
+      event: 'Org Created',
+      icon: '🎉',
+      user_id: record.id,
+      notify: true,
+    })
 
     return c.json(BRES)
   }

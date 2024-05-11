@@ -47,6 +47,7 @@ import { app as get_total_stats } from '../supabase/functions/_backend/triggers/
 import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as cron_plan } from '../supabase/functions/_backend/triggers/cron_plan.ts'
 import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
+import { app as on_app_create } from '../supabase/functions/_backend/triggers/on_app_create.ts'
 
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
 import { version } from '../package.json'
@@ -64,6 +65,7 @@ app.route('/bundle', bundle)
 app.route('/channels', channels) // TODO: deprecated remove when everyone use the new endpoint
 app.route('/channel', channels)
 app.route('/device', devices)
+app.route('/on_app_create', on_app_create)
 
 // Plugin API
 app.route('/channel_self', channel_self)
