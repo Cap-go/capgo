@@ -15,10 +15,7 @@ import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSortDown from '~icons/lucide/chevron-down'
-import IconSearch from '~icons/ic/round-search'
 import IconReload from '~icons/tabler/reload'
-import IconDown from '~icons/ic/round-keyboard-arrow-down'
-import IconFilter from '~icons/system-uicons/filtering'
 import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
@@ -54,13 +51,14 @@ const emit = defineEmits([
   'filterClick',
   'rowClick',
   'sortClick',
+  'rangeChange',
 ])
 const { t } = useI18n()
 const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
 const showTimeDropdown = ref(false)
 const currentGeneralTime = ref<1 | 3 | 24>(1)
-const preciseDates = ref()
+const preciseDates = ref<[Date, Date]>()
 const thisOrganization = ref<Organization | null>(null)
 const organizationStore = useOrganizationStore()
 
@@ -93,21 +91,6 @@ const offset = computed(() => {
   return props.elementList.length
 })
 
-const filterList = computed(() => {
-  if (!props.filters)
-    return []
-  return Object.keys(props.filters)
-})
-const filterActivated = computed(() => {
-  if (!props.filters)
-    return []
-  return Object.keys(props.filters).reduce((acc, key) => {
-    if (props.filters![key])
-      acc += 1
-    return acc
-  }, 0)
-})
-
 function sortClick(key: number) {
   if (!props.columns[key].sortable)
     return
@@ -131,6 +114,11 @@ if (props.filters) {
     emit('reload')
   })
 }
+
+watch(preciseDates, () => {
+  console.log('preciseDates', preciseDates.value)
+  emit('rangeChange', preciseDates.value)
+})
 
 watch(searchVal, debounce(() => {
   emit('update:search', searchVal.value)
@@ -203,8 +191,25 @@ async function clickRight() {
 
 async function setTime(time: 1 | 3 | 24) {
   currentGeneralTime.value = time
-  // TODO
-  // Closing is done in clickLeft
+  if (time === 1) {
+    preciseDates.value = [
+      dayjs().subtract(1, 'hour').toDate(),
+      new Date(),
+    ]
+  }
+  else if (time === 3) {
+    preciseDates.value = [
+      dayjs().subtract(3, 'hour').toDate(),
+      new Date(),
+    ]
+  }
+  else {
+    preciseDates.value = [
+      dayjs().subtract(1, 'day').toDate(),
+      new Date(),
+    ]
+  }
+  // TODO: Closing is done in clickLeft
 }
 
 onMounted(async () => {
@@ -218,7 +223,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative pb-4 pb-20 overflow-x-auto md:pb-0">
+  <div class="relative pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between pb-4 md:items-center">
       <div class="flex h-10 mb-2 md:mb-0">
         <button class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import ky from 'ky'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import dayjs from 'dayjs'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
@@ -21,15 +23,12 @@ const supabase = useSupabase()
 const router = useRouter()
 const total = ref(0)
 const search = ref('')
+const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
 const elements = ref<typeof element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
   Override: false,
-})
-const offset = 10
-const currentVersionsNumber = computed(() => {
-  return (currentPage.value - 1) * offset
 })
 const columns = ref<TableColumn[]>([
   {
@@ -89,6 +88,20 @@ async function getDevicesID() {
   const overrideDev = dataOverride?.map(d => d.device_id) || []
   return [...channelDev, ...overrideDev]
 }
+interface deviceData {
+  app_id: string
+  created_at: string
+  custom_id: string
+  device_id: string
+  is_emulator: boolean | null
+  is_prod: boolean | null
+  os_version: string | null
+  platform: Database['public']['Enums']['platform_os'] | null
+  plugin_version: string
+  updated_at: string
+  version_id: number
+  version_build: string | null
+}
 
 async function getData() {
   isLoading.value = true
@@ -97,32 +110,46 @@ async function getData() {
     if (filters.value.Override)
       ids = await getDevicesID()
 
-    const req = await supabase.functions.invoke('private/devices', {
-      body: {
-        // appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number
-        appId: props.appId,
-        versionId: props.versionId,
-        devicesId: ids.length ? ids : undefined,
-        search: search.value ? search.value : undefined,
-        order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
-        rangeStart: currentVersionsNumber.value,
-        rangeEnd: currentVersionsNumber.value + offset - 1,
-      },
-    })
-    const { data, count } = (await req).data
-    if (!data)
+    const { data: currentSession } = await supabase.auth.getSession()!
+    if (!currentSession.session)
       return
+    const currentJwt = currentSession.session.access_token
+    console.log('defaultApiHost', defaultApiHost) //  TODO: remove the custom preprood host when publishing
+    const defaultApiHostPreprod = 'https://api-preprod.capgo.app'
+    const dataD = await ky
+      .post(`${defaultApiHostPreprod}/private/devices`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${currentJwt}` || '',
+        },
+        body: JSON.stringify({
+          api: 'v2', // TODO: remove this when we remove the old api
+          appId: props.appId,
+          versionId: props.versionId,
+          devicesId: ids.length ? ids : undefined,
+          search: search.value ? search.value : undefined,
+          order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+          rangeStart: range.value ? range.value[0].getTime() : undefined,
+          rangeEnd: range.value ? range.value[1].getTime() : undefined,
+        }),
+      })
+      .then(res => res.json<deviceData[]>())
+      .catch((err) => {
+        console.log('Cannot get devices', err)
+        return [] as deviceData[]
+      })
+    console.log('dataD', dataD)
 
-    const versionPromises = data.map((element) => {
+    const versionPromises = dataD.map((element) => {
       return supabase
         .from('app_versions')
         .select('name')
-        .eq('id', element.version)
+        .eq('id', element.version_id)
         .single()
     })
 
     // Cast so that we can set version from the other request
-    const finalData = data as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
+    const finalData = dataD as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
 
     // This is faster then awaiting in a big loop
     const versionData = await Promise.all(versionPromises)
@@ -134,7 +161,6 @@ async function getData() {
     })
 
     elements.value.push(...finalData as any)
-    total.value = count || 0
   }
   catch (error) {
     console.error(error)
@@ -169,6 +195,10 @@ async function openOne(one: typeof element) {
 onMounted(async () => {
   await refreshData()
 })
+function newRange(r: { start: Date, end: Date }) {
+  console.log('newRange', r)
+  range.value = [r.start, r.end]
+}
 </script>
 
 <template>
@@ -181,5 +211,6 @@ onMounted(async () => {
     :search-placeholder="t('search-by-device-id')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"
+    @range-change="newRange($event)"
   />
 </template>
