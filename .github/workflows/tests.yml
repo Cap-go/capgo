@@ -48,4 +48,7 @@ jobs:
           working-directory: .
           # sets the working directory (cwd) for the shell running commands
       # - run: supabase functions serve // TODO: wait for https://github.com/supabase/cli/issues/2267 to be resolved
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
       - run: deno test --allow-all supabase/functions/tests/* --env=supabase/.env.test --import-map=supabase/functions/import_map.json
