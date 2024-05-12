@@ -60,7 +60,7 @@ async function restoreChannel() {
   const copiedChannel = await copiedChannelList.pop()
   expect(copiedChannel).toBeTruthy()
 
-  const { error } = await supabase.from('channels ')
+  const { error } = await supabase.from('channels')
     .update(copiedChannel!.data)
     .eq('id', copiedChannel!.id)
 

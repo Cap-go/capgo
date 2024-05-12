@@ -1,0 +1,25 @@
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  test_base_sql:
+    runs-on: ubuntu-latest	
+    name: "Run test"
+    steps:
+      - name: "Checkout capgo"
+        uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        with:
+          version: 1.162.4
+        uses: supabase/setup-cli@v1
+      - name: 🍜 Prepare Supabase ALPHA
+        run: supabase link --project-ref aucsybvnhavogdmzwtcw
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+      - name: Run Supabase Start
+        run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
+      - run: supabase test db
+      - run: supabase functions serve
+      - run: deno test --allow-all supabase/functions/tests/* --env=supabase/.env.test --import-map=supabase/functions/import_map.json
