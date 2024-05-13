@@ -73,8 +73,10 @@ watchEffect(() => {
 <template>
   <div>
     <TitleHead :big="true" :title="t('activation-heading')" />
-    <section class="flex justify-center">
-      <Spinner size="w-40 h-40" class="my-auto" />
-    </section>
+    <div class="flex h-screen">
+      <div class="m-auto">
+        <Spinner size="w-40 h-40" class="my-auto" />
+      </div>
+    </div>
   </div>
 </template>
