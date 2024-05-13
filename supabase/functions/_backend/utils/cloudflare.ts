@@ -63,16 +63,6 @@ export function trackDevicesCF(c: Context, app_id: string, device_id: string, ve
   })
 }
 
-export function trackMetaCF(c: Context, app_id: string, version_id: number, size: number) {
-  if (!c.env.VERSION_META)
-    return
-  console.log('trackMetaCF', app_id, version_id, size)
-  c.env.VERSION_META.writeDataPoint({
-    doubles: [version_id, size],
-    indexes: [app_id],
-  })
-}
-
 export function formatDateCF(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
 }

@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
-import { readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackMetaCF, trackVersionUsageCF } from './cloudflare.ts'
+import { readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
@@ -39,9 +39,7 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
   if (size === 0)
     return
   console.log('createStatsMeta', app_id, version_id, size)
-  if (!c.env.VERSION_META)
-    return trackMetaSB(c, app_id, version_id, size)
-  return trackMetaCF(c, app_id, version_id, size)
+  return trackMetaSB(c, app_id, version_id, size)
 }
 
 export function readStatsMau(c: Context, app_id: string, start_date: string, end_date: string) {
