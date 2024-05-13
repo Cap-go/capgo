@@ -116,16 +116,6 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
   return res.data.url
 }
 
-export async function existUser(email: string): Promise<string> {
-  const { data, error } = await useSupabase()
-    .rpc('exist_user', { e_mail: email })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data
-}
-
 export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   const supabase = useSupabase()
   const { data: session } = await supabase.auth.getSession()!
@@ -338,18 +328,6 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
   return data
 }
 
-export async function isAllowedAction(userid?: string): Promise<boolean> {
-  if (!userid)
-    return false
-  const { data, error } = await useSupabase()
-    .rpc('is_allowed_action_user', { userid })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data
-}
-
 interface PlanUsage {
   total_percent: number
   mau_percent: number
@@ -374,7 +352,7 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
   return data
 }
 
-export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
+export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0]> {
   if (!orgId) {
     return {
       mau: 0,

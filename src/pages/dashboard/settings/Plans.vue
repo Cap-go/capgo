@@ -25,7 +25,7 @@ const mainStore = useMainStore()
 const displayStore = useDisplayStore()
 
 interface PlansOrgData {
-  stats: Database['public']['Functions']['get_total_stats_v5']['Returns'][0] | undefined
+  stats: Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0] | undefined
   planSuggest: string
   planCurrrent: string
   planPercent: number

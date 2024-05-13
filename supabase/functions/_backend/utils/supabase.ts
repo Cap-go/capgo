@@ -239,7 +239,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
 export async function isOnboardingNeeded(c: Context, userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_onboarding_needed', { userid: userId })
+      .rpc('is_onboarding_needed_org', { orgid: userId })
       .single()
       .throwOnError()
     return data || false
