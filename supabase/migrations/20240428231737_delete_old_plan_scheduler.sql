@@ -17,14 +17,14 @@ BEGIN
   RETURN QUERY
   SELECT
     p_app_id AS app_id,
-    DATE_TRUNC('day', timestamp) AS date,
-    SUM(size) AS storage
+    DATE_TRUNC('day', timestamp)::DATE AS date,
+    SUM(size)::BIGINT AS storage
   FROM version_meta
   WHERE
     timestamp >= p_period_start
     AND timestamp < p_period_end
-    AND app_id = p_app_id
-  GROUP BY app_id, date
+    AND version_meta.app_id = p_app_id
+  GROUP BY version_meta.app_id, date
   ORDER BY date;
 END;
 $$ LANGUAGE plpgsql;
