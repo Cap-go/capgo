@@ -19,7 +19,7 @@ import { initPlausible } from './services/plausible'
 import formkit from './styles/formkit'
 import { getRemoteConfig } from './services/supabase'
 
-const guestPath = ['/login', '/register', '/delete_account', '/forgot_password', '/resend_email', '/onboarding/confirm_email', '/onboarding/verify_email', '/onboarding/activation', '/onboarding/set_password']
+const guestPath = ['/login', '/register', '/delete_account', '/forgot_password', '/resend_email', '/onboarding']
 
 getRemoteConfig()
 const app = createApp(App)
@@ -43,7 +43,7 @@ const router = createRouter({
     const newRoutes = routes.map((route) => {
       if (guestPath.includes(route.path)) {
         route.meta ??= {}
-        route.meta.layout = 'auth'
+        route.meta.layout = 'naked'
       }
       else {
         route.meta ??= {}

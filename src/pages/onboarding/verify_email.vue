@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { User } from '@supabase/gotrue-js'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { User } from '@supabase/supabase-js'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { useMainStore } from '~/stores/main'
 
+const { t } = useI18n()
 const supabase = useSupabase()
 const route = useRoute()
 const router = useRouter()
@@ -70,7 +71,10 @@ watchEffect(() => {
 </script>
 
 <template>
-  <section class="flex justify-center">
-    <Spinner size="w-40 h-40" class="my-auto" />
-  </section>
+  <div>
+    <TitleHead :big="true" :title="t('activation-heading')" />
+    <section class="flex justify-center">
+      <Spinner size="w-40 h-40" class="my-auto" />
+    </section>
+  </div>
 </template>
