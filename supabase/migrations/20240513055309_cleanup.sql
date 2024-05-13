@@ -1,7 +1,6 @@
 drop function count_all_plans;
 drop function count_all_trial;
 drop function exist_user;
--- we could cleanup get_app_versions but it's really bizzare in the upload cli
 drop function "public"."get_current_plan_max"("userid" "uuid");
 drop function "public"."get_current_plan_max"();
 drop function "public"."get_current_plan_name"("userid" "uuid");
@@ -16,15 +15,46 @@ drop function "public"."get_orgs_v4"("userid" "uuid");
 drop function "public"."get_orgs_v4"();
 drop function "public"."get_plan_usage_percent"("userid" "uuid");
 drop function "public"."get_plan_usage_percent"();
--- get_plan_usage_percent_org but idk if we use it. I don;t think so but i am not 100% sure
+drop function "public"."get_plan_usage_percent_org"("orgid" "uuid");
 drop FUNCTION public.get_total_app_storage_size(app_id character varying);
 drop FUNCTION public.get_total_app_storage_size(userid uuid, app_id character varying);
-drop function get_total_stats_v5; -- could break typesafety, we still use the type
+drop function get_total_stats_v5;
 drop function "public"."get_total_storage_size"("userid" "uuid");
 drop function "public"."get_total_storage_size"();
 drop function get_usage_mode_and_last_saved;
--- get_user_main_org_id, get_user_main_org_id_by_app_id- this we should not be using but i would not drop it
--- get_weekly_stats -> we can likely drop but technicly the email uses this
+drop function get_user_main_org_id;
+-- get_user_main_org_id_by_app_id - this we should not be using but i would not drop it it's used in has_app_right
+CREATE or replace FUNCTION "public"."get_weekly_stats"("app_id" character varying)
+RETURNS TABLE(all_updates bigint, failed_updates bigint, open_app bigint) AS $$
+Declare
+  seven_days_ago DATE;
+  all_updates bigint;
+  failed_updates bigint;
+Begin
+  seven_days_ago := CURRENT_DATE - INTERVAL '7 days';
+  
+  SELECT COALESCE(SUM(install), 0)
+  INTO all_updates
+  FROM public.daily_version
+  WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
+  AND app_id = get_weekly_stats.app_id;
+
+  SELECT COALESCE(SUM(fail), 0)
+  INTO failed_updates
+  FROM public.daily_version
+  WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
+  AND app_id = get_weekly_stats.app_id;
+
+  SELECT COALESCE(SUM(get), 0)
+  INTO open_app
+  FROM public.daily_version
+  WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
+  AND app_id = get_weekly_stats.app_id;
+
+  RETURN query (select all_updates, failed_updates, open_app);
+End;
+$$ LANGUAGE plpgsql;
+
 drop function has_min_right;
 drop function has_read_rights;
 drop FUNCTION "public"."is_allowed_action"("apikey" "text"); -- i think we can drop it, please reverify
@@ -32,12 +62,11 @@ drop FUNCTION "public"."is_allowed_action"("apikey" "text"); -- i think we can d
 drop function "public"."is_allowed_action_user"("userid" "uuid");
 drop function "public"."is_allowed_action_user"();
 -- I don;t care too much. Let's leave it
--- drop FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying);
--- drop FUNCTION "public"."is_app_owner"("apikey" text, "appid" character varying)
+drop FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying);
+drop FUNCTION "public"."is_app_owner"("apikey" text, "appid" character varying);
 drop function "public"."is_canceled"("userid" "uuid");
 drop function "public"."is_canceled"();
 drop function is_good_plan_v5;
--- drop function is_member_of_org;
 drop function "public"."is_onboarded"("userid" "uuid");
 drop function "public"."is_onboarded"();
 
