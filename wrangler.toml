@@ -29,7 +29,3 @@ dataset = "device_log"
 [[analytics_engine_datasets]]
 binding = "DEVICE_INFO"
 dataset = "device_info"
-
-[[analytics_engine_datasets]]
-binding = "VERSION_META"
-dataset = "version_meta"
