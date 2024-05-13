@@ -6,9 +6,6 @@
     "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "moduleDetection": "force",
     "paths": {
       "~/*": ["src/*"]
     },
@@ -17,10 +14,10 @@
       "bun-types",
       "vitest",
       "vite/client",
-      "vue/ref-macros",
       "vite-plugin-vue-layouts/client",
       "vite-plugin-pwa/client",
-      "unplugin-vue-macros/macros-global"
+      "unplugin-vue-macros/macros-global",
+      "unplugin-vue-router/client"
     ],
     "allowJs": true,
     "strict": true,

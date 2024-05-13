@@ -4,7 +4,6 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import Particles from '@tsparticles/vue3'
 import { loadFull } from 'tsparticles'
 
-// Cannot use official router here because of the IonTab hack
 import { createRouter, createWebHistory } from 'vue-router/auto'
 import { setupLayouts } from 'virtual:generated-layouts'
 import type { Router } from 'vue-router/auto'
