@@ -24,6 +24,7 @@ drop function "public"."get_total_storage_size"();
 drop function get_usage_mode_and_last_saved;
 drop function get_user_main_org_id;
 -- get_user_main_org_id_by_app_id - this we should not be using but i would not drop it it's used in has_app_right
+drop function get_weekly_stats(app_id character varying);
 CREATE or replace FUNCTION "public"."get_weekly_stats"("app_id" character varying)
 RETURNS TABLE(all_updates bigint, failed_updates bigint, open_app bigint) AS $$
 Declare
@@ -87,4 +88,5 @@ drop function "public"."is_paying_and_good_plan"();
 drop function "public"."is_trial"("userid" "uuid");
 drop function "public"."is_trial"();
 drop function remove_enum_value;
+drop table app_stats;
 drop function trigger_http_post_to_function;

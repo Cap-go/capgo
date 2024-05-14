@@ -131,8 +131,6 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 // }
 
 async function getUsages(orgId: string) {
-  // get aapp_stats
-
   const stats = await getTotalStats(orgId)
   const bestPlan = await findBestPlan(stats)
   return { stats, bestPlan }
