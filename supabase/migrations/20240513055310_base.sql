@@ -16,17 +16,9 @@ ALTER SCHEMA "public" OWNER TO "postgres";
 
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
-CREATE EXTENSION IF NOT EXISTS "pg_tle" WITH SCHEMA "pgtle";
-
-CREATE EXTENSION IF NOT EXISTS "supabase-dbdev" WITH SCHEMA "public";
-
 CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
 
 CREATE EXTENSION IF NOT EXISTS "pgsodium" WITH SCHEMA "pgsodium";
-
-CREATE SCHEMA IF NOT EXISTS "stripe";
-
-ALTER SCHEMA "stripe" OWNER TO "postgres";
 
 CREATE EXTENSION IF NOT EXISTS "http" WITH SCHEMA "extensions";
 
@@ -3905,3 +3897,54 @@ CREATE POLICY "Alow user to insert in they folder 1sbjm_0" ON "storage"."objects
 
 CREATE POLICY "Disable act bucket for users" ON "storage"."buckets" USING (false) WITH CHECK (false);
 
+
+/*---------------------
+---- install dbdev ----
+----------------------
+Requires:
+  - pg_tle: https://github.com/aws/pg_tle
+  - pgsql-http: https://github.com/pramsey/pgsql-http
+*/
+create extension if not exists http with schema extensions;
+create extension if not exists pg_tle;
+drop extension if exists "supabase-dbdev";
+select pgtle.uninstall_extension_if_exists('supabase-dbdev');
+select
+    pgtle.install_extension(
+        'supabase-dbdev',
+        resp.contents ->> 'version',
+        'PostgreSQL package manager',
+        resp.contents ->> 'sql'
+    )
+from http(
+    (
+        'GET',
+        'https://api.database.dev/rest/v1/'
+        || 'package_versions?select=sql,version'
+        || '&package_name=eq.supabase-dbdev'
+        || '&order=version.desc'
+        || '&limit=1',
+        array[
+            (
+                'apiKey',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJp'
+                || 'c3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyY'
+                || 'ndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzI'
+                || 'sImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJ'
+                || 'rzM0AQKsu_5k134s'
+            )::http_header
+        ],
+        null,
+        null
+    )
+) x,
+lateral (
+    select
+        ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
+) resp(contents);
+create extension "supabase-dbdev";
+select dbdev.install('supabase-dbdev');
+drop extension if exists "supabase-dbdev";
+create extension "supabase-dbdev";
+
+select dbdev.install('basejump-supabase_test_helpers');
