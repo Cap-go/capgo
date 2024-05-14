@@ -3233,6 +3233,12 @@ CREATE POLICY "Disable for all" ON "public"."storage_usage" USING (false) WITH C
 
 CREATE POLICY "Disable for all" ON "public"."version_meta" USING (false) WITH CHECK (false);
 
+CREATE POLICY "Allow all for self" ON "public"."deleted_account" USING (("auth"."email"() = "email") AND "public"."is_not_deleted"("email")) WITH CHECK (("auth"."email"() = "email") AND "public"."is_not_deleted"("email"));
+
+CREATE POLICY "Disable for all" ON "public"."job_queue" USING (false) WITH CHECK (false);
+
+CREATE POLICY "Disable for all" ON "public"."workers" USING (false) WITH CHECK (false);
+
 CREATE POLICY "Disable for all" ON "public"."version_usage" USING (false) WITH CHECK (false);
 
 CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
