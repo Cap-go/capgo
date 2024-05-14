@@ -67,6 +67,7 @@ app-preview: 앱 미리보기
 are-u-sure: 확실합니까 ?
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
+bandwith-usage: '대역폭 사용량:'
 base: 베이스
 best-plan: 최고의 계획
 bigger-app-size: 더 큰 앱 크기
@@ -171,6 +172,7 @@ deleted: 삭제
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: 자세한 사용법
 details-and-logs: 세부 정보 및 로그
 devDependencies:
   '@types/js-yaml': ''
@@ -274,6 +276,7 @@ make-default-ios: iOS용 기본값으로 설정
 make-normal: 정상으로 만들기
 making-this-channel-: 이 채널을 "정상"으로 만들려면 다른 채널을 기본값으로 구성하거나 장치가 자체 할당하도록 해야 합니다.
 mau: 월간 활성 사용자
+mau-usage: '월간 활성 사용자 사용량:'
 member-deleted: 회원을 삭제했습니다.
 members: 회원
 metadata: 메타데이터
@@ -368,6 +371,7 @@ plan-whats-included: 포함된 것
 plans: 계획
 plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니다.
 platform: 플랫폼
+please-ask-the-user-to-create-account-first: 먼저 사용자에게 계정을 생성하도록 요청하세요.
 please-choose-your-p: 기본 설정을 선택하십시오
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
@@ -428,6 +432,7 @@ start-new-deploy: 새로운 점진적 배포 시작
 start-using-capgo: '사용 시작:'
 status-complete: 완벽한
 status-failed: 실패한
+storage-usage: '스토리지 사용량:'
 stored-externally: 외부에 저장
 submit: 제출하다
 support: 지원하다
@@ -447,6 +452,7 @@ to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps: 나의 앱들
 top-apps-v2: 앱
+trial: 재판
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: '평가판 종료:'
@@ -498,3 +504,4 @@ your-are-a: 당신은
 your-current-plan-is: 현재 계획은
 your-current-suggested-plan-is: 현재 제안된 계획은 다음과 같습니다.
 your-settings: 귀하의 설정
+your-ussage: '귀하의 사용량:'

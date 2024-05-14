@@ -67,6 +67,7 @@ app-preview: 应用预览
 are-u-sure: 你确定吗 ？
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
+bandwith-usage: 带宽使用情况：
 base: 根据
 best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
@@ -171,6 +172,7 @@ deleted: 删除
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: 详细使用方法
 details-and-logs: 详细信息和日志
 devDependencies:
   '@types/js-yaml': ''
@@ -274,6 +276,7 @@ make-default-ios: 为 iOS 设置默认值
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 mau: 月活跃用户
+mau-usage: 每月活跃用户使用情况：
 member-deleted: 删除会员成功
 members: 会员
 metadata: 元数据
@@ -368,6 +371,7 @@ plan-whats-included: 包括什么
 plans: 计划
 plans-super-only: 仅允许超级管理员查看计划和账单
 platform: 平台
+please-ask-the-user-to-create-account-first: 请先要求用户创建帐户
 please-choose-your-p: 请选择您的喜好
 please-upgrade: 请升级您的计划以添加更多用户
 plugin-version: 插件版本
@@ -428,6 +432,7 @@ start-new-deploy: 开始新的渐进式部署
 start-using-capgo: 开始使用：
 status-complete: 完全的
 status-failed: 失败的
+storage-usage: 存储使用情况：
 stored-externally: 外部存储
 submit: 提交
 support: 支持
@@ -447,6 +452,7 @@ to-live-reload: 住重新加载。
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps: 我的应用
 top-apps-v2: 应用
+trial: 审判
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
@@ -498,3 +504,4 @@ your-are-a: 你是一个
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是
 your-settings: 您的设置
+your-ussage: 您的使用情况：

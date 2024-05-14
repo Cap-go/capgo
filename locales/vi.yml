@@ -71,6 +71,7 @@ app-preview: Xem trước ứng dụng
 are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
+bandwith-usage: 'Sử dụng băng thông:'
 base: Căn cứ
 best-plan: kế hoạch tốt nhất
 bigger-app-size: Kích thước ứng dụng lớn hơn
@@ -175,6 +176,7 @@ deleted: đã xóa
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Cách sử dụng chi tiết
 details-and-logs: Chi tiết và nhật ký
 devDependencies:
   '@types/js-yaml': ''
@@ -282,6 +284,7 @@ making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
   một kênh khác hoặc để thiết bị tự chỉ định.
 mau: Người dùng hoạt động hàng tháng
+mau-usage: 'Mức sử dụng người dùng hoạt động hàng tháng:'
 member-deleted: Đã xóa thành viên thành công
 members: Các thành viên
 metadata: metadata
@@ -378,6 +381,7 @@ plan-whats-included: Bao gồm những gì
 plans: Các kế hoạch
 plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem gói và thanh toán
 platform: Nền tảng
+please-ask-the-user-to-create-account-first: Vui lòng yêu cầu người dùng tạo tài khoản trước
 please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
@@ -438,6 +442,7 @@ start-new-deploy: Bắt đầu triển khai lũy tiến mới
 start-using-capgo: 'Bắt đầu sử dụng:'
 status-complete: hoàn thành
 status-failed: thất bại
+storage-usage: 'Sử dụng lưu trữ:'
 stored-externally: được lưu trữ bên ngoài
 submit: Nộp
 support: Ủng hộ
@@ -457,6 +462,7 @@ to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
 top-apps-v2: Ứng dụng
+trial: sự thử nghiệm
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
@@ -510,3 +516,4 @@ your-are-a: bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là
 your-settings: Cài đặt của bạn
+your-ussage: 'Cách sử dụng của bạn:'

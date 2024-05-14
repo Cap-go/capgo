@@ -67,6 +67,7 @@ app-preview: Pratinjau aplikasi
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
+bandwith-usage: 'Penggunaan bandwidth:'
 base: Basis
 best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
@@ -175,6 +176,7 @@ deleted: dihapus
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Penggunaan terperinci
 details-and-logs: Detail dan log
 devDependencies:
   '@types/js-yaml': ''
@@ -284,6 +286,7 @@ making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
 mau: Pengguna aktif bulanan
+mau-usage: 'Penggunaan pengguna aktif bulanan:'
 member-deleted: Berhasil menghapus anggota
 members: Anggota
 metadata: Metadata
@@ -380,6 +383,7 @@ plan-whats-included: Apa yang disertakan
 plans: Rencana
 plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan
 platform: Platform
+please-ask-the-user-to-create-account-first: Silakan minta pengguna untuk membuat akun terlebih dahulu
 please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
@@ -442,6 +446,7 @@ start-new-deploy: Mulai penerapan progresif baru
 start-using-capgo: 'Mulai menggunakan:'
 status-complete: menyelesaikan
 status-failed: gagal
+storage-usage: 'Penggunaan penyimpanan:'
 stored-externally: disimpan secara eksternal
 submit: Kirim
 support: Mendukung
@@ -461,6 +466,7 @@ to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 top-apps-v2: Aplikasi
+trial: uji coba
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
@@ -514,3 +520,4 @@ your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
 your-settings: Pengaturan Anda
+your-ussage: 'Penggunaan Anda:'

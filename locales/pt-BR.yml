@@ -69,6 +69,7 @@ app-preview: Visualização do aplicativo
 are-u-sure: Tem certeza ?
 available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
+bandwith-usage: 'Uso de largura de banda:'
 base: Base
 best-plan: melhor plano
 bigger-app-size: Tamanho maior do aplicativo
@@ -175,6 +176,7 @@ deleted: excluído
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Uso detalhado
 details-and-logs: Detalhes e registros
 devDependencies:
   '@types/js-yaml': ''
@@ -280,6 +282,7 @@ making-this-channel-: >-
   Tornar este canal "normal" exigirá que você configure um outro padrão de canal
   ou deixe o dispositivo auto-atribuído.
 mau: Usuários ativos mensais
+mau-usage: 'Uso mensal de usuários ativos:'
 member-deleted: Membro excluído com sucesso
 members: Membros
 metadata: Metadados
@@ -380,6 +383,7 @@ plan-whats-included: O que está incluído
 plans: Planos
 plans-super-only: Somente superadministradores têm permissão para visualizar planos e cobranças
 platform: Plataforma
+please-ask-the-user-to-create-account-first: Por favor, peça ao usuário para criar uma conta primeiro
 please-choose-your-p: Escolha suas preferências
 please-upgrade: Atualize seu plano para adicionar mais usuários
 plugin-version: Versão do plug-in
@@ -442,6 +446,7 @@ start-new-deploy: Iniciar uma nova implantação progressiva
 start-using-capgo: 'Comece a usar:'
 status-complete: completo
 status-failed: fracassado
+storage-usage: 'Uso de armazenamento:'
 stored-externally: armazenado externamente
 submit: Enviar
 support: Apoiar
@@ -461,6 +466,7 @@ to-live-reload: para recarregar ao vivo.
 to-open-encrypted-bu: 'Para abrir o pacote criptografado, use o comando:'
 top-apps: Meus aplicativos
 top-apps-v2: Aplicativos
+trial: julgamento
 trial-left: dias restantes
 trial-plan-expired: Versao de teste expirada
 trial-plan-expires-in: O teste termina em
@@ -512,3 +518,4 @@ your-are-a: Sua área
 your-current-plan-is: Seu plano atual é
 your-current-suggested-plan-is: Seu plano sugerido atual é
 your-settings: Suas configurações
+your-ussage: 'Seu uso:'

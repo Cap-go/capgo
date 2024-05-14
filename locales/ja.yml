@@ -67,6 +67,7 @@ app-preview: アプリのプレビュー
 are-u-sure: 本気ですか ？
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
+bandwith-usage: '帯域幅の使用量:'
 base: ベース
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
@@ -171,6 +172,7 @@ deleted: 削除された
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: 詳しい使い方
 details-and-logs: 詳細とログ
 devDependencies:
   '@types/js-yaml': ''
@@ -274,6 +276,7 @@ make-default-ios: iOSのデフォルトにする
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 mau: 月間アクティブ ユーザー数
+mau-usage: '月間アクティブ ユーザーの使用量:'
 member-deleted: メンバーが正常に削除されました
 members: メンバー
 metadata: メタデータ
@@ -368,6 +371,7 @@ plan-whats-included: 含まれるもの
 plans: 予定
 plans-super-only: スーパー管理者のみがプランと請求を表示できます
 platform: プラットホーム
+please-ask-the-user-to-create-account-first: 最初にユーザーにアカウントを作成するように依頼してください
 please-choose-your-p: お好みを選択してください
 please-upgrade: プランをアップグレードしてユーザーを追加してください
 plugin-version: プラグインのバージョン
@@ -428,6 +432,7 @@ start-new-deploy: 新しいプログレッシブ デプロイを開始する
 start-using-capgo: '使用を開始します:'
 status-complete: 完了
 status-failed: 失敗した
+storage-usage: 'ストレージ使用量:'
 stored-externally: 外部保存
 submit: 送信
 support: サポート
@@ -447,6 +452,7 @@ to-live-reload: リロードを生きます。
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps: 私のアプリ
 top-apps-v2: アプリ
+trial: トライアル
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
@@ -498,3 +504,4 @@ your-are-a: あなたは
 your-current-plan-is: 現在のプランは
 your-current-suggested-plan-is: 現在お勧めのプランは
 your-settings: あなたの設定
+your-ussage: 'あなたの用途:'

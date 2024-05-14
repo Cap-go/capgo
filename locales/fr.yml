@@ -73,6 +73,7 @@ app-preview: Aperçu de l'application
 are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
+bandwith-usage: "Utilisation de la bande passante\_:"
 base: Base
 best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
@@ -181,6 +182,7 @@ deleted: supprimé
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Utilisation détaillée
 details-and-logs: Détails et journaux
 devDependencies:
   '@types/js-yaml': ''
@@ -290,6 +292,7 @@ making-this-channel-: >-
   Pour rendre ce canal "normal", vous devrez configurer un autre canal par
   défaut ou laisser l'appareil s'auto-attribuer.
 mau: Utilisateurs actifs mensuels
+mau-usage: "Utilisation mensuelle des utilisateurs actifs\_:"
 member-deleted: Membre supprimé avec succès
 members: Membres
 metadata: Métadonnées
@@ -390,6 +393,7 @@ plans-super-only: >-
   Seuls les super-administrateurs sont autorisés à consulter les forfaits et la
   facturation.
 platform: Plateforme
+please-ask-the-user-to-create-account-first: Veuillez d'abord demander à l'utilisateur de créer un compte
 please-choose-your-p: Veuillez choisir vos préférences
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 plugin-version: Version du plug-in
@@ -450,6 +454,7 @@ start-new-deploy: Démarrer un nouveau déploiement progressif
 start-using-capgo: "Commencez à utiliser\_:"
 status-complete: complet
 status-failed: échoué
+storage-usage: "Utilisation du stockage\_:"
 stored-externally: stocké en externe
 submit: Soumettre
 support: Support
@@ -469,6 +474,7 @@ to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
 top-apps-v2: applications
+trial: procès
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
@@ -520,3 +526,4 @@ your-are-a: Vous êtes un
 your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré est
 your-settings: Vos paramètres
+your-ussage: "Votre utilisation\_:"

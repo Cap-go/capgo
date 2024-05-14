@@ -75,6 +75,7 @@ app-preview: App-Vorschau
 are-u-sure: Bist du dir sicher ?
 available-in-the-san: Verfügbar in der Sandbox-App
 back-to-login-page: Zurück zur Anmeldeseite
+bandwith-usage: 'Bandbreitennutzung:'
 base: Base
 best-plan: Bester Plan
 bigger-app-size: Größere App-Größe
@@ -183,6 +184,7 @@ deleted: gelöscht
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Detaillierte Verwendung
 details-and-logs: Einzelheiten und Protokolle
 devDependencies:
   '@types/js-yaml': ''
@@ -292,6 +294,7 @@ making-this-channel-: >-
   Wenn Sie diesen Kanal „normal“ machen, müssen Sie einen anderen Standardkanal
   konfigurieren oder das Gerät selbst zuweisen lassen.
 mau: Monatlich aktive Benutzer
+mau-usage: 'Monatliche Nutzung aktiver Benutzer:'
 member-deleted: Mitglied erfolgreich gelöscht
 members: Mitglieder
 metadata: Metadaten
@@ -400,6 +403,7 @@ plan-whats-included: Was ist inbegriffen
 plans: Pläne
 plans-super-only: Nur Superadministratoren dürfen Pläne und Abrechnungen einsehen
 platform: Plattform
+please-ask-the-user-to-create-account-first: Bitten Sie den Benutzer, zuerst ein Konto zu erstellen
 please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 plugin-version: Plugin-Version
@@ -462,6 +466,7 @@ start-new-deploy: Starten Sie eine neue progressive Bereitstellung
 start-using-capgo: 'Beginnen Sie mit der Verwendung von:'
 status-complete: vollständig
 status-failed: fehlgeschlagen
+storage-usage: 'Speichernutzung:'
 stored-externally: extern gespeichert
 submit: Einreichen
 support: Unterstützung
@@ -481,6 +486,7 @@ to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
 top-apps-v2: Apps
+trial: Versuch
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
@@ -534,3 +540,4 @@ your-are-a: Dein Gebiet
 your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist
 your-settings: Ihre Einstellungen
+your-ussage: 'Ihre Nutzung:'

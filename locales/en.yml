@@ -363,6 +363,7 @@ plan-whats-included: What's included
 plans: Plans
 plans-super-only: Only super admins are allowed to view plans and billing
 platform: Platform
+please-ask-the-user-to-create-account-first: Please ask the user to create account first
 please-choose-your-p: Please choose your preferences
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version

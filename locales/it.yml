@@ -71,6 +71,7 @@ app-preview: Anteprima dell'app
 are-u-sure: Sei sicuro ?
 available-in-the-san: Disponibile nell'app sandbox
 back-to-login-page: Torna alla pagina di accesso
+bandwith-usage: 'Utilizzo della larghezza di banda:'
 base: Base
 best-plan: Miglior piano
 bigger-app-size: Dimensioni dell'app maggiori
@@ -179,6 +180,7 @@ deleted: cancellato
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Utilizzo dettagliato
 details-and-logs: Dettagli e registri
 devDependencies:
   '@types/js-yaml': ''
@@ -286,6 +288,7 @@ making-this-channel-: >-
   Per rendere questo canale "normale" dovrai configurare un altro canale
   predefinito o lasciare che il dispositivo si assegni automaticamente.
 mau: Utenti attivi mensili
+mau-usage: 'Utilizzo utenti attivi mensili:'
 member-deleted: Membro eliminato con successo
 members: Membri
 metadata: Metadati
@@ -384,6 +387,7 @@ plan-whats-included: Cosa è incluso
 plans: Piani
 plans-super-only: Solo i super amministratori possono visualizzare i piani e la fatturazione
 platform: piattaforma
+please-ask-the-user-to-create-account-first: Chiedi prima all'utente di creare un account
 please-choose-your-p: Scegli le tue preferenze
 please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
@@ -448,6 +452,7 @@ start-new-deploy: Avvia una nuova distribuzione progressiva
 start-using-capgo: 'Inizia a utilizzare:'
 status-complete: completare
 status-failed: fallito
+storage-usage: 'Utilizzo dello spazio di archiviazione:'
 stored-externally: memorizzati esternamente
 submit: Invia
 support: Supporto
@@ -467,6 +472,7 @@ to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
 top-apps: Le mie applicazioni
 top-apps-v2: App
+trial: prova
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
@@ -518,3 +524,4 @@ your-are-a: Sei un
 your-current-plan-is: Il tuo piano attuale è
 your-current-suggested-plan-is: Il tuo attuale piano suggerito è
 your-settings: Le tue impostazioni
+your-ussage: 'Il tuo utilizzo:'
