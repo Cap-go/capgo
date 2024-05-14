@@ -62,9 +62,6 @@ drop FUNCTION "public"."is_allowed_action"("apikey" "text"); -- i think we can d
 -- again, check again
 drop function "public"."is_allowed_action_user"("userid" "uuid");
 drop function "public"."is_allowed_action_user"();
--- I don;t care too much. Let's leave it
-drop FUNCTION "public"."is_app_owner"("userid" "uuid", "appid" character varying);
-drop FUNCTION "public"."is_app_owner"("apikey" text, "appid" character varying);
 drop function "public"."is_canceled"("userid" "uuid");
 drop function "public"."is_canceled"();
 drop function is_good_plan_v5;
@@ -88,5 +85,4 @@ drop function "public"."is_paying_and_good_plan"();
 drop function "public"."is_trial"("userid" "uuid");
 drop function "public"."is_trial"();
 drop function remove_enum_value;
-drop table app_stats;
 drop function trigger_http_post_to_function;
