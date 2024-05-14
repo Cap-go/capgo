@@ -44,72 +44,6 @@ export type Database = {
           },
         ]
       }
-      app_stats: {
-        Row: {
-          app_id: string
-          bandwidth: number
-          channels: number
-          created_at: string | null
-          date_id: string
-          devices: number
-          devices_real: number
-          mlu: number
-          mlu_real: number
-          shared: number
-          updated_at: string | null
-          user_id: string
-          version_size: number
-          versions: number
-        }
-        Insert: {
-          app_id: string
-          bandwidth?: number
-          channels?: number
-          created_at?: string | null
-          date_id?: string
-          devices?: number
-          devices_real?: number
-          mlu?: number
-          mlu_real?: number
-          shared?: number
-          updated_at?: string | null
-          user_id: string
-          version_size?: number
-          versions?: number
-        }
-        Update: {
-          app_id?: string
-          bandwidth?: number
-          channels?: number
-          created_at?: string | null
-          date_id?: string
-          devices?: number
-          devices_real?: number
-          mlu?: number
-          mlu_real?: number
-          shared?: number
-          updated_at?: string | null
-          user_id?: string
-          version_size?: number
-          versions?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_stats_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "app_stats_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       app_versions: {
         Row: {
           app_id: string
@@ -1377,10 +1311,6 @@ export type Database = {
         }
         Returns: string
       }
-      calculate_cycle_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       calculate_daily_app_usage: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1454,30 +1384,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      count_all_plans: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          product_id: string
-          count: number
-        }[]
-      }
       count_all_plans_v2: {
         Args: Record<PropertyKey, never>
         Returns: {
           plan_name: string
           count: number
         }[]
-      }
-      count_all_trial: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      create_partitions: {
-        Args: {
-          start_date: string
-          num_years: number
-        }
-        Returns: undefined
       }
       delete_failed_jobs: {
         Args: Record<PropertyKey, never>
@@ -1500,12 +1412,6 @@ export type Database = {
           apikey: string
         }
         Returns: boolean
-      }
-      exist_user: {
-        Args: {
-          e_mail: string
-        }
-        Returns: string
       }
       find_best_plan_v3: {
         Args: {
@@ -1576,21 +1482,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_current_plan_max:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: string
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
       get_current_plan_max_org: {
         Args: {
           orgid: string
@@ -1601,17 +1492,6 @@ export type Database = {
           storage: number
         }[]
       }
-      get_current_plan_name:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: string
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: string
-          }
       get_current_plan_name_org: {
         Args: {
           orgid: string
@@ -1626,15 +1506,6 @@ export type Database = {
           total: number
         }[]
       }
-      get_cycle_info: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          subscription_anchor_start: string
-          subscription_anchor_end: string
-        }[]
-      }
       get_cycle_info_org: {
         Args: {
           orgid: string
@@ -1647,13 +1518,6 @@ export type Database = {
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
-      }
-      get_devices_version: {
-        Args: {
-          app_id: string
-          version_id: number
-        }
-        Returns: number
       }
       get_global_metrics:
         | {
@@ -1717,25 +1581,6 @@ export type Database = {
           channel: Json
         }[]
       }
-      get_max_plan:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              mau: number
-              storage: number
-              bandwidth: number
-            }[]
-          }
       get_metered_usage:
         | {
             Args: Record<PropertyKey, never>
@@ -1770,59 +1615,6 @@ export type Database = {
         }
         Returns: string
       }
-      get_orgs_v3: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          gid: string
-          created_by: string
-          logo: string
-          name: string
-          role: string
-          paying: boolean
-          trial_left: number
-          can_use_more: boolean
-          is_canceled: boolean
-        }[]
-      }
-      get_orgs_v4:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: {
-              gid: string
-              created_by: string
-              logo: string
-              name: string
-              role: string
-              paying: boolean
-              trial_left: number
-              can_use_more: boolean
-              is_canceled: boolean
-              app_count: number
-              subscription_start: string
-              subscription_end: string
-            }[]
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: {
-              gid: string
-              created_by: string
-              logo: string
-              name: string
-              role: string
-              paying: boolean
-              trial_left: number
-              can_use_more: boolean
-              is_canceled: boolean
-              app_count: number
-              subscription_start: string
-              subscription_end: string
-            }[]
-          }
       get_orgs_v5:
         | {
             Args: Record<PropertyKey, never>
@@ -1862,12 +1654,6 @@ export type Database = {
               management_email: string
             }[]
           }
-      get_plan_usage_percent: {
-        Args: {
-          userid: string
-        }
-        Returns: number
-      }
       get_plan_usage_percent_detailed:
         | {
             Args: {
@@ -1892,26 +1678,6 @@ export type Database = {
               bandwidth_percent: number
               storage_percent: number
             }[]
-          }
-      get_plan_usage_percent_org: {
-        Args: {
-          orgid: string
-        }
-        Returns: number
-      }
-      get_total_app_storage_size:
-        | {
-            Args: {
-              appid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-              appid: string
-            }
-            Returns: number
           }
       get_total_app_storage_size_orgs: {
         Args: {
@@ -1951,16 +1717,6 @@ export type Database = {
               uninstall: number
             }[]
           }
-      get_total_stats_v5: {
-        Args: {
-          userid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
       get_total_stats_v5_org: {
         Args: {
           orgid: string
@@ -1973,18 +1729,8 @@ export type Database = {
       }
       get_total_storage_size:
         | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
-        | {
             Args: {
               appid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
             }
             Returns: number
           }
@@ -2000,13 +1746,6 @@ export type Database = {
           org_id: string
         }
         Returns: number
-      }
-      get_usage_mode_and_last_saved: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          usage_mode: Database["public"]["Enums"]["usage_mode"]
-          last_saved: string
-        }[]
       }
       get_user_id:
         | {
@@ -2059,30 +1798,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      has_min_right: {
-        Args: {
-          _userid: string
-          _orgid: string
-          _right: Database["public"]["Enums"]["user_min_right"]
-          _appid?: string
-          _channelid?: number
-        }
-        Returns: boolean
-      }
-      has_read_rights: {
-        Args: {
-          appid: string
-        }
-        Returns: boolean
-      }
-      http_post_helper: {
-        Args: {
-          function_name: string
-          function_type: string
-          body: Json
-        }
-        Returns: number
-      }
       invite_user_to_org: {
         Args: {
           email: string
@@ -2102,37 +1817,19 @@ export type Database = {
             }
             Returns: boolean
           }
-      is_allowed_action:
-        | {
-            Args: {
-              apikey: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              apikey: string
-              appid: string
-            }
-            Returns: boolean
-          }
+      is_allowed_action: {
+        Args: {
+          apikey: string
+          appid: string
+        }
+        Returns: boolean
+      }
       is_allowed_action_org: {
         Args: {
           orgid: string
         }
         Returns: boolean
       }
-      is_allowed_action_user:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
       is_allowed_capgkey:
         | {
             Args: {
@@ -2191,26 +1888,9 @@ export type Database = {
             }
             Returns: boolean
           }
-      is_canceled:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
       is_canceled_org: {
         Args: {
           orgid: string
-        }
-        Returns: boolean
-      }
-      is_good_plan_v5: {
-        Args: {
-          userid: string
         }
         Returns: boolean
       }
@@ -2233,34 +1913,18 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_onboarded:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
       is_onboarded_org: {
         Args: {
           orgid: string
         }
         Returns: boolean
       }
-      is_onboarding_needed:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
+      is_onboarding_needed_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_owner_of_org: {
         Args: {
           user_id: string
@@ -2268,28 +1932,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_paying:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
-      is_paying_and_good_plan:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: boolean
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: boolean
-          }
       is_paying_and_good_plan_org: {
         Args: {
           orgid: string
@@ -2302,17 +1944,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_trial:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-            }
-            Returns: number
-          }
       is_trial_org: {
         Args: {
           orgid: string
@@ -2323,20 +1954,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      post_replication_sql:
-        | {
-            Args: {
-              sql_query: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              sql_query: string
-              params: string[]
-            }
-            Returns: undefined
-          }
       process_cron_stats_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
