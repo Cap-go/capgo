@@ -1470,32 +1470,6 @@ $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "right" "public"."user_min_right", "user_id" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apikeys
-  WHERE key=apikey
-  AND mode=ANY(keymode))) AND (is_app_owner(get_user_id(apikey), app_id) OR check_min_rights(is_allowed_capgkey.right, get_user_id(apikey), get_user_main_org_id(user_id), app_id, NULL::bigint));
-End;  
-$$;
-
-ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "right" "public"."user_min_right", "user_id" "uuid") OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "channel_id" bigint, "right" "public"."user_min_right", "user_id" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-Begin
-  RETURN (SELECT EXISTS (SELECT 1
-  FROM apikeys
-  WHERE key=apikey
-  AND mode=ANY(keymode))) AND (is_app_owner(get_user_id(apikey), app_id) OR check_min_rights(is_allowed_capgkey.right, get_user_id(apikey), get_user_main_org_id(user_id), app_id, "is_allowed_capgkey"."channel_id"));
-End;
-$$;
-
-ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "channel_id" bigint, "right" "public"."user_min_right", "user_id" "uuid") OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."is_app_owner"("appid" character varying) RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
@@ -3573,14 +3547,6 @@ GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "
 GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "right" "public"."user_min_right", "user_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "right" "public"."user_min_right", "user_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "right" "public"."user_min_right", "user_id" "uuid") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "channel_id" bigint, "right" "public"."user_min_right", "user_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "channel_id" bigint, "right" "public"."user_min_right", "user_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying, "channel_id" bigint, "right" "public"."user_min_right", "user_id" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."is_app_owner"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."is_app_owner"("appid" character varying) TO "authenticated";
