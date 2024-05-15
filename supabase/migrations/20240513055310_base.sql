@@ -2090,6 +2090,10 @@ BEGIN
   INSERT INTO devices (created_at, updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
     (now(), '2023-01-29 08:09:32.324+00', random_uuid, random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
+  --  insert a fix device id for test
+  INSERT INTO devices (created_at, updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+    (now(), '2023-01-29 08:09:32.324+00', '00000000-0000-0000-0000-000000000000', random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
+
   INSERT INTO stats (created_at, platform, action, device_id, version_build, version, app_id) VALUES
     (now(), 'android', 'get', random_uuid, '1.223.0', random_version_id, 'com.demo.app'),
     (now(), 'android', 'get', random_uuid, '1.223.0', random_version_id, 'com.demo.app');

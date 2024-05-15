@@ -676,6 +676,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
 export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
+  console.log('readDevicesSB', app_id, period_start, period_end, version_id, deviceIds, search)
   let query = supabase
     .from('devices')
     .select('*')

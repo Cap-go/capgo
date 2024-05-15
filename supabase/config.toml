@@ -119,7 +119,7 @@ verify_jwt = false
 [functions.bundle]
 verify_jwt = false
 
-[functions.devices]
+[functions.device]
 verify_jwt = false
 
 [functions.channel]
