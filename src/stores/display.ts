@@ -19,6 +19,7 @@ export interface ActionSheetOption {
   input?: boolean
   size?: string
   buttonCenter?: boolean
+  preventAccidentalClose?: boolean
   buttons?: ActionSheetOptionButton[]
 }
 
