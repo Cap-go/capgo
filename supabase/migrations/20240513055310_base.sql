@@ -157,7 +157,7 @@ Declare
 Begin
   SELECT org_users.* FROM org_users
   INTO invite
-  WHERE org_users.org_id=accept_invitation_to_org.org_id and auth.uid()=org_users.user_id;
+  WHERE org_users.org_id=accept_invitation_to_org.org_id and (select auth.uid())=org_users.user_id;
 
   IF invite IS NULL THEN
     return 'NO_INVITE';
@@ -220,7 +220,7 @@ CREATE OR REPLACE FUNCTION "public"."check_min_rights"("min_right" "public"."use
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-    RETURN check_min_rights(auth.uid(), min_right, org_id, app_id, channel_id);
+    RETURN check_min_rights(min_right, (select auth.uid()), org_id, app_id, channel_id);
 END;  
 $$;
 
@@ -397,7 +397,7 @@ ALTER FUNCTION "public"."delete_failed_jobs"() OWNER TO "postgres";
 CREATE OR REPLACE FUNCTION "public"."delete_user"() RETURNS "void"
     LANGUAGE "sql" SECURITY DEFINER
     AS $$
-   delete from auth.users where id = auth.uid();
+   delete from auth.users where id = (select auth.uid());
 $$;
 
 ALTER FUNCTION "public"."delete_user"() OWNER TO "postgres";
@@ -806,7 +806,7 @@ CREATE OR REPLACE FUNCTION "public"."get_metered_usage"() RETURNS double precisi
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-    RETURN get_metered_usage(auth.uid());
+    RETURN get_metered_usage((select auth.uid()));
 END;  
 $$;
 
@@ -847,7 +847,7 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members"("guild_id" "uuid") RETURNS
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 begin
-  IF NOT (is_owner_of_org(auth.uid(), get_org_members.guild_id) OR check_min_rights('read'::user_min_right, auth.uid(), get_org_members.guild_id, NULL::character varying, NULL::bigint)) THEN
+  IF NOT (is_owner_of_org((select auth.uid()), get_org_members.guild_id) OR check_min_rights('read'::user_min_right, (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint)) THEN
     raise exception 'NO_RIGHTS';
   END IF;
 
@@ -1174,7 +1174,7 @@ Begin
   SELECT apps.user_id FROM apps WHERE apps.app_id=get_user_id.app_id into org_owner_id;
   SELECT get_user_main_org_id(org_owner_id) INTO org_id;
 
-  -- (public.is_member_of_org(auth.uid(), org_id) OR public.is_owner_of_org(auth.uid(), org_id))
+  -- (public.is_member_of_org((select auth.uid()), org_id) OR public.is_owner_of_org((select auth.uid()), org_id))
   SELECT user_id
   INTO real_user_id
   FROM apikeys
@@ -1281,7 +1281,7 @@ CREATE OR REPLACE FUNCTION "public"."has_app_right"("appid" character varying, "
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 Begin
-  RETURN has_app_right_userid("appid", "right", auth.uid());
+  RETURN has_app_right_userid("appid", "right", (select auth.uid()));
 End;
 $$;
 
@@ -1355,8 +1355,8 @@ Begin
     return 'NO_ORG';
   END IF;
 
-  IF NOT (org.created_by=auth.uid()) THEN
-      if NOT (check_min_rights('admin'::user_min_right, auth.uid(), invite_user_to_org.org_id, NULL::character varying, NULL::bigint)) THEN
+  IF NOT (org.created_by= (select auth.uid())) THEN
+      if NOT (check_min_rights('admin'::user_min_right, (select auth.uid()), invite_user_to_org.org_id, NULL::character varying, NULL::bigint)) THEN
           return 'NO_RIGHTS';
       END IF;
   END IF;
@@ -1398,7 +1398,7 @@ CREATE OR REPLACE FUNCTION "public"."is_admin"() RETURNS boolean
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-    RETURN is_admin(auth.uid());
+    RETURN is_admin((select auth.uid()));
 END;  
 $$;
 
@@ -1500,7 +1500,7 @@ CREATE OR REPLACE FUNCTION "public"."is_app_owner"("appid" character varying) RE
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
-    RETURN is_app_owner(auth.uid(), appid);
+    RETURN is_app_owner((select auth.uid()), appid);
 END;  
 $$;
 
@@ -1693,12 +1693,12 @@ DECLARE
     is_diffrent boolean;
 BEGIN
     -- API key? We do not care
-    IF auth.uid() IS NULL THEN
+    IF (select auth.uid()) IS NULL THEN
         RETURN NEW;
     END IF;
 
     -- If the user has the 'admin' role then we do not care
-    IF check_min_rights('admin'::user_min_right, auth.uid(), OLD.owner_org, NULL::character varying, NULL::bigint) THEN
+    IF check_min_rights('admin'::user_min_right, (select auth.uid()), OLD.owner_org, NULL::character varying, NULL::bigint) THEN
         RETURN NEW;
     END IF;
 
@@ -1890,7 +1890,7 @@ BEGIN
       'TRIGGER',
       json_build_object('orgId', org_record.id, 'customerId', org_record.customer_id)::text,
       'cloudflare',
-      'cron_check_plan'
+      'cron_stats'
     );
   END LOOP;
 END;
@@ -2241,17 +2241,17 @@ CREATE OR REPLACE FUNCTION "public"."verify_mfa"() RETURNS boolean
     AS $_$
 Begin
   RETURN (
-    array[auth.jwt()->>'aal'] <@ (
+    array[(select coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
       select
           case
             when count(id) > 0 then array['aal2']
             else array['aal1', 'aal2']
           end as aal
         from auth.mfa_factors
-        where auth.uid() = user_id and status = 'verified'
+        where (select auth.uid()) = user_id and status = 'verified'
     )
   ) OR (
-    select array(select (jsonb_path_query(auth.jwt(), '$.amr.method'))) @> ARRAY['"otp"'::jsonb]
+    select array(select jsonb_path_query_array((select auth.jwt()), '$.amr[*].method')) @> ARRAY['"otp"'::jsonb]
   );
 End;  
 $_$;
@@ -3151,7 +3151,7 @@ CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "a
 
 CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "Allow app owner to read" ON "public"."stats" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Allow app owner to read" ON "public"."stats" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"((select auth.uid()), "app_id") OR "public"."is_admin"((select auth.uid()))));
 
 CREATE POLICY "Allow delete for auth (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
@@ -3171,15 +3171,15 @@ CREATE POLICY "Allow insert for auth (write+)" ON "public"."devices_override" FO
 
 CREATE POLICY "Allow insert for auth, api keys (write, all) (admin+)" ON "public"."channels" FOR INSERT TO "authenticated", "anon" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"('{write,all}'::"public"."key_mode"[]), "owner_org", "app_id", NULL::bigint));
 
-CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users" FOR SELECT USING (("public"."is_member_of_org"("auth"."uid"(), "org_id") OR "public"."is_owner_of_org"("auth"."uid"(), "org_id")));
+CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users" FOR SELECT USING (("public"."is_member_of_org"((select auth.uid()), "org_id") OR "public"."is_owner_of_org"((select auth.uid()), "org_id")));
 
-CREATE POLICY "Allow org admin to all" ON "public"."org_users" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "auth"."uid"(), "org_id", NULL::character varying, NULL::bigint));
+CREATE POLICY "Allow org admin to all" ON "public"."org_users" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", (select auth.uid()), "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", (select auth.uid()), "org_id", NULL::character varying, NULL::bigint));
 
-CREATE POLICY "Allow org members to select" ON "public"."devices" FOR SELECT USING ("public"."check_min_rights"('read'::"public"."user_min_right", "auth"."uid"(), "public"."get_user_main_org_id_by_app_id"(("app_id")::"text"), "app_id", NULL::bigint));
+CREATE POLICY "Allow org members to select" ON "public"."devices" FOR SELECT USING ("public"."check_min_rights"('read'::"public"."user_min_right", (select auth.uid()), "public"."get_user_main_org_id_by_app_id"(("app_id")::"text"), "app_id", NULL::bigint));
 
-CREATE POLICY "Allow org owner to all" ON "public"."org_users" TO "authenticated" USING ("public"."is_owner_of_org"("auth"."uid"(), "org_id")) WITH CHECK ("public"."is_owner_of_org"("auth"."uid"(), "org_id"));
+CREATE POLICY "Allow org owner to all" ON "public"."org_users" TO "authenticated" USING ("public"."is_owner_of_org"((select auth.uid()), "org_id")) WITH CHECK ("public"."is_owner_of_org"((select auth.uid()), "org_id"));
 
-CREATE POLICY "Allow owner to update" ON "public"."devices" FOR UPDATE TO "authenticated" USING ("public"."is_app_owner"("auth"."uid"(), "app_id")) WITH CHECK ("public"."is_app_owner"("auth"."uid"(), "app_id"));
+CREATE POLICY "Allow owner to update" ON "public"."devices" FOR UPDATE TO "authenticated" USING ("public"."is_app_owner"((select auth.uid()), "app_id")) WITH CHECK ("public"."is_app_owner"((select auth.uid()), "app_id"));
 
 CREATE POLICY "Allow read for auth (read+)" ON "public"."app_versions_meta" FOR SELECT TO "authenticated", "anon" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
@@ -3199,15 +3199,15 @@ CREATE POLICY "Allow read for auth (read+)" ON "public"."devices_override" FOR S
 
 CREATE POLICY "Allow read for auth (read+)" ON "public"."stats" FOR SELECT TO "authenticated" USING ("public"."has_app_right_userid"("app_id", 'read'::"public"."user_min_right", "public"."get_identity"()));
 
-CREATE POLICY "Allow select app owner" ON "public"."devices" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"("auth"."uid"(), "app_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Allow select app owner" ON "public"."devices" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"((select auth.uid()), "app_id") OR "public"."is_admin"((select auth.uid()))));
 
 CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."channels" FOR SELECT TO "authenticated", "anon" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]), "owner_org", "app_id", NULL::bigint));
 
 CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."orgs" FOR SELECT TO "authenticated", "anon" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]), "id", NULL::character varying, NULL::bigint));
 
-CREATE POLICY "Allow self to modify self" ON "public"."users" TO "authenticated" USING (((("auth"."uid"() = "id") AND "public"."is_not_deleted"(("auth"."email"())::character varying)) OR "public"."is_admin"("auth"."uid"()))) WITH CHECK (((("auth"."uid"() = "id") AND "public"."is_not_deleted"(("auth"."email"())::character varying)) OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Allow self to modify self" ON "public"."users" TO "authenticated" USING (((((select auth.uid()) = "id") AND "public"."is_not_deleted"((select auth.email())::character varying)) OR "public"."is_admin"((select auth.uid())))) WITH CHECK (((((select auth.uid()) = "id") AND "public"."is_not_deleted"((select auth.email())::character varying)) OR "public"."is_admin"((select auth.uid()))));
 
-CREATE POLICY "Allow to self delete" ON "public"."org_users" FOR DELETE USING (("user_id" = "auth"."uid"()));
+CREATE POLICY "Allow to self delete" ON "public"."org_users" FOR DELETE USING (("user_id" = (select auth.uid())));
 
 CREATE POLICY "Allow update for api keys (write,all,upload) (upload+)" ON "public"."app_versions" FOR UPDATE TO "authenticated", "anon" USING ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('upload'::"public"."user_min_right", "public"."get_identity_apikey_only"('{write,all,upload}'::"public"."key_mode"[]), "owner_org", "app_id", NULL::bigint));
 
@@ -3219,9 +3219,9 @@ CREATE POLICY "Allow update for auth, api keys (write, all) (admin+)" ON "public
 
 CREATE POLICY "Allow update for auth, api keys (write, all, upload) (write+)" ON "public"."channels" FOR UPDATE TO "authenticated", "anon" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"('{write,all,upload}'::"public"."key_mode"[]), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"('{write,all,upload}'::"public"."key_mode"[]), "owner_org", "app_id", NULL::bigint));
 
-CREATE POLICY "Allow user to self get" ON "public"."stripe_info" FOR SELECT TO "authenticated" USING ((("auth"."uid"() IN ( SELECT "users"."id"
+CREATE POLICY "Allow user to self get" ON "public"."stripe_info" FOR SELECT TO "authenticated" USING ((((select auth.uid()) IN ( SELECT "users"."id"
    FROM "public"."users"
-  WHERE (("users"."customer_id")::"text" = ("users"."customer_id")::"text"))) OR "public"."is_admin"("auth"."uid"())));
+  WHERE (("users"."customer_id")::"text" = ("users"."customer_id")::"text"))) OR "public"."is_admin"((select auth.uid()))));
 
 CREATE POLICY "Disable for all" ON "public"."bandwidth_usage" USING (false) WITH CHECK (false);
 
@@ -3233,7 +3233,7 @@ CREATE POLICY "Disable for all" ON "public"."storage_usage" USING (false) WITH C
 
 CREATE POLICY "Disable for all" ON "public"."version_meta" USING (false) WITH CHECK (false);
 
-CREATE POLICY "Allow all for self" ON "public"."deleted_account" USING (("auth"."email"() = "email") AND "public"."is_not_deleted"("email")) WITH CHECK (("auth"."email"() = "email") AND "public"."is_not_deleted"("email"));
+CREATE POLICY "Allow all for self" ON "public"."deleted_account" USING ((select auth.email() = "email") AND "public"."is_not_deleted"("email")) WITH CHECK ((select auth.email() = "email") AND "public"."is_not_deleted"("email"));
 
 CREATE POLICY "Disable for all" ON "public"."job_queue" USING (false) WITH CHECK (false);
 
@@ -3241,7 +3241,7 @@ CREATE POLICY "Disable for all" ON "public"."workers" USING (false) WITH CHECK (
 
 CREATE POLICY "Disable for all" ON "public"."version_usage" USING (false) WITH CHECK (false);
 
-CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" TO "authenticated" USING ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"()))) WITH CHECK ((("auth"."uid"() = "user_id") OR "public"."is_admin"("auth"."uid"())));
+CREATE POLICY "Enable all for user based on user_id" ON "public"."apikeys" TO "authenticated" USING ((((select auth.uid()) = "user_id") OR "public"."is_admin"((select auth.uid())))) WITH CHECK ((((select auth.uid()) = "user_id") OR "public"."is_admin"((select auth.uid()))));
 
 CREATE POLICY "Enable select for anyone" ON "public"."plans" FOR SELECT TO "authenticated", "anon" USING (true);
 
@@ -3896,13 +3896,13 @@ RESET ALL;
 
 CREATE POLICY "All all users to act" ON "storage"."objects" USING (true) WITH CHECK (true);
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objects" FOR DELETE USING ((("bucket_id" = 'images'::"text") AND ((("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
+CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objects" FOR DELETE USING ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_1" ON "storage"."objects" FOR UPDATE USING ((("bucket_id" = 'images'::"text") AND ((("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
+CREATE POLICY "All user to manage they own folder 1ffg0oo_1" ON "storage"."objects" FOR UPDATE USING ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_2" ON "storage"."objects" FOR INSERT WITH CHECK ((("bucket_id" = 'images'::"text") AND ((("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
+CREATE POLICY "All user to manage they own folder 1ffg0oo_2" ON "storage"."objects" FOR INSERT WITH CHECK ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_3" ON "storage"."objects" FOR SELECT USING ((("bucket_id" = 'images'::"text") AND ((("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
+CREATE POLICY "All user to manage they own folder 1ffg0oo_3" ON "storage"."objects" FOR SELECT USING ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
 
 CREATE POLICY "Allow apikey manage they folder 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
 
@@ -3912,13 +3912,13 @@ CREATE POLICY "Allow apikey to manage they folder 1sbjm_1" ON "storage"."objects
 
 CREATE POLICY "Allow apikey to select 1sbjm_0" ON "storage"."objects" FOR SELECT TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
 
-CREATE POLICY "Allow user or shared to manage they folder 1sbjm_0" ON "storage"."objects" FOR SELECT TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0])));
+CREATE POLICY "Allow user or shared to manage they folder 1sbjm_0" ON "storage"."objects" FOR SELECT TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
 
-CREATE POLICY "Allow user to delete they folder 1sbjm_0" ON "storage"."objects" FOR DELETE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0])));
+CREATE POLICY "Allow user to delete they folder 1sbjm_0" ON "storage"."objects" FOR DELETE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
 
-CREATE POLICY "Allow user to update version 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0])));
+CREATE POLICY "Allow user to update version 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
 
-CREATE POLICY "Alow user to insert in they folder 1sbjm_0" ON "storage"."objects" FOR INSERT TO "authenticated" WITH CHECK ((("bucket_id" = 'apps'::"text") AND (("auth"."uid"())::"text" = ("storage"."foldername"("name"))[0])));
+CREATE POLICY "Alow user to insert in they folder 1sbjm_0" ON "storage"."objects" FOR INSERT TO "authenticated" WITH CHECK ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
 
 CREATE POLICY "Disable act bucket for users" ON "storage"."buckets" USING (false) WITH CHECK (false);
 
