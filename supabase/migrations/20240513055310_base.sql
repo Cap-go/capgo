@@ -1867,7 +1867,7 @@ BEGIN
       'TRIGGER',
       json_build_object('orgId', org_record.id, 'customerId', org_record.customer_id)::text,
       'cloudflare',
-      'cron_stats'
+      'cron_plan'
     );
   END LOOP;
 END;
