@@ -3151,8 +3151,6 @@ CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "a
 
 CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 
-CREATE POLICY "Allow app owner to read" ON "public"."stats" FOR SELECT TO "authenticated" USING (("public"."is_app_owner"((select auth.uid()), "app_id") OR "public"."is_admin"((select auth.uid()))));
-
 CREATE POLICY "Allow delete for auth (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
 CREATE POLICY "Allow delete for auth (write+)" ON "public"."devices_override" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
@@ -3232,8 +3230,6 @@ CREATE POLICY "Disable for all" ON "public"."notifications" USING (false) WITH C
 CREATE POLICY "Disable for all" ON "public"."storage_usage" USING (false) WITH CHECK (false);
 
 CREATE POLICY "Disable for all" ON "public"."version_meta" USING (false) WITH CHECK (false);
-
-CREATE POLICY "Allow all for self" ON "public"."deleted_account" USING ((select auth.email() = "email") AND "public"."is_not_deleted"("email")) WITH CHECK ((select auth.email() = "email") AND "public"."is_not_deleted"("email"));
 
 CREATE POLICY "Disable for all" ON "public"."job_queue" USING (false) WITH CHECK (false);
 
