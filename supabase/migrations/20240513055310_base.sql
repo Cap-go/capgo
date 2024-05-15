@@ -558,7 +558,7 @@ Begin
   FROM app_versions
   WHERE app_id=appid
   AND name=name_version
-  AND user_id=get_user_id(apikey, appid));
+  AND owner_org=(select gid from get_orgs_v5(get_user_id(apikey, appid))));
 End;  
 $$;
 
@@ -1641,9 +1641,11 @@ $$;
 
 ALTER FUNCTION "public"."is_owner_of_org"("user_id" "uuid", "org_id" "uuid") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
+CREATE OR REPLACE FUNCTION public.is_paying_and_good_plan_org(orgid uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 Begin
   RETURN (SELECT EXISTS (SELECT 1
   from stripe_info
@@ -1654,9 +1656,10 @@ Begin
     -- OR (subscription_id = 'free' or subscription_id is null)
     OR (trial_at::date - (now())::date > 0)
   )
+  )
 );
 End;  
-$$;
+$function$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") OWNER TO "postgres";
 
