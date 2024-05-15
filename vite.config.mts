@@ -153,7 +153,9 @@ export default defineConfig({
     WebfontDownload(),
 
     // https://github.com/webfansplz/vite-plugin-vue-devtools
-    VueDevTools(),
+    VueDevTools({
+      componentInspector: false,
+    }),
   ],
 
   server: {
