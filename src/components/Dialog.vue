@@ -12,6 +12,8 @@ import { useDisplayStore } from '~/stores/display'
 */
 const displayStore = useDisplayStore()
 function close(item?: ActionSheetOptionButton) {
+  if (displayStore?.dialogOption)
+    displayStore.dialogOption.preventAccidentalClose = false
   if (!item?.preventClose)
     displayStore.showDialog = false
   if (item) {
@@ -52,15 +54,24 @@ onMounted(() => {
     },
   }
 
-  const modal: ModalInterface = new Modal(modalElement.value, modalOptions)
+  let modal: ModalInterface = new Modal(modalElement.value, modalOptions)
 
   // watch for changes
   watch(() => displayStore.showDialog, (val) => {
+    const closable = !displayStore.dialogOption?.preventAccidentalClose
+    if (modalOptions.closable !== closable) {
+      modalOptions.closable = closable
+      modal.destroy()
+      modal = new Modal(modalElement.value, modalOptions)
+    }
+
     if (val && modal) {
       displayStore.dialogCanceled = true
       modal.show()
     }
     else if (modal) {
+      if (displayStore?.dialogOption)
+        displayStore.dialogOption.preventAccidentalClose = false
       modal.hide()
     }
   })
