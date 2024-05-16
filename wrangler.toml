@@ -29,3 +29,8 @@ dataset = "device_log"
 [[analytics_engine_datasets]]
 binding = "DEVICE_INFO"
 dataset = "device_info"
+
+[[d1_databases]]
+binding = "DB_DEVICES"
+database_name = "capgo_prod_devices"
+database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
