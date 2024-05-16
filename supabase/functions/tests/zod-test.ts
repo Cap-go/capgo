@@ -1,11 +1,6 @@
 import { assertEquals, assertExists, assertStringIncludes } from 'https://deno.land/std@0.202.0/assert/mod.ts'
 import { z } from 'https://deno.land/x/zod@v3.22.2/mod.ts'
-import {
-  INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME,
-  MISSING_STRING_VERSION_OS,
-  NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS,
-  deviceIdRegex, reverseDomainRegex,
-} from '../supabase/functions/_backend/utils/utils.ts'
+import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, deviceIdRegex, reverseDomainRegex } from '../_backend/utils/utils.ts'
 
 const NO_ERROR = { error: '' }
 // import { jsonRequestSchema as updateRequestSchema } from '../supabase/functions/updates/index.ts'
