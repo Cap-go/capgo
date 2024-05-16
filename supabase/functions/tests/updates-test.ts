@@ -73,6 +73,7 @@ Deno.test('Test new version available', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
+  console.log('json', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.0.0')
 })
@@ -194,6 +195,7 @@ Deno.test('Test channel overwrite', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
+  console.log('json', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.361.0')
 
@@ -229,6 +231,7 @@ Deno.test('Test version overwrite', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
+  console.log('json', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.359.0')
 
@@ -263,7 +266,9 @@ Deno.test('Test with new device', async () => {
 
   const response2 = await postUpdate(baseData)
   assertEquals(response2.status, 200)
-  assertEquals(await response2.json(), { message: 'No new version available' })
+  const json = await response2.json()
+  console.log('json', json)
+  assertEquals(json, { message: 'No new version available' })
 })
 
 // TODO: Fix this test by fixing the code in the project
