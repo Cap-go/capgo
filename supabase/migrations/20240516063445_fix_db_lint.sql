@@ -97,3 +97,34 @@ Begin
   RETURN NULL;
 End;
 $$;
+
+CREATE INDEX finx_apikeys_user_id ON "public"."apikeys" USING btree (user_id);
+CREATE INDEX finx_app_versions_owner_org ON "public"."app_versions" USING btree (owner_org);
+CREATE INDEX finx_app_versions_meta_owner_org ON "public"."app_versions_meta" USING btree (owner_org);
+CREATE INDEX finx_apps_user_id ON "public"."apps" USING btree (user_id);
+CREATE INDEX finx_apps_owner_org ON "public"."apps" USING btree (owner_org);
+CREATE INDEX finx_channel_devices_app_id ON "public"."channel_devices" USING btree (app_id);
+CREATE INDEX finx_channel_devices_channel_id ON "public"."channel_devices" USING btree (channel_id);
+CREATE INDEX finx_channel_devices_owner_org ON "public"."channel_devices" USING btree (owner_org);
+CREATE INDEX finx_devices_override_app_id ON "public"."devices_override" USING btree (app_id);
+CREATE INDEX finx_devices_override_version ON "public"."devices_override" USING btree (version);
+CREATE INDEX finx_devices_override_owner_org ON "public"."devices_override" USING btree (owner_org);
+CREATE INDEX finx_channels_owner_org ON "public"."channels" USING btree (owner_org);
+CREATE INDEX finx_channels_app_id ON "public"."channels" USING btree (app_id);
+CREATE INDEX finx_channels_secondVersion ON "public"."channels" USING btree ("secondVersion");
+CREATE INDEX finx_channels_version ON "public"."channels" USING btree (version);
+CREATE INDEX finx_notifications_owner_org ON "public"."notifications" USING btree (owner_org);
+CREATE INDEX finx_org_users_channel_id ON "public"."org_users" USING btree (channel_id);
+CREATE INDEX finx_org_users_org_id ON "public"."org_users" USING btree (org_id);
+CREATE INDEX finx_org_users_user_id ON "public"."org_users" USING btree (user_id);
+CREATE INDEX finx_orgs_created_by ON "public"."orgs" USING btree (created_by);
+CREATE INDEX finx_orgs_stripe_info ON "public"."stripe_info" USING btree (product_id);
+
+drop index idx_device_usage_timestamp;
+drop index idx_device_usage_device_id;
+drop index idx_device_usage_app_id;
+drop index idx_daily_version_version;
+drop index idx_daily_version_date;
+drop index idx_bandwidth_usage_timestamp;
+drop index idx_bandwidth_usage_device_id;
+drop index idx_bandwidth_usage_app_id;
