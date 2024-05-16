@@ -250,8 +250,6 @@ Deno.test('Test with new device', async () => {
   assertEquals(response.status, 200)
   assertEquals(await response.json(), { message: 'No new version available' })
 
-  await new Promise(resolve => setTimeout(resolve, 3000))
-
   const { error, data } = await supabase.from('devices')
     .select()
     .eq('device_id', uuid)
