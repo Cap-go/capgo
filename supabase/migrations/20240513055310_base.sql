@@ -2087,16 +2087,16 @@ BEGIN
   -- Generate a random UUID
   random_uuid := gen_random_uuid();
 
-  INSERT INTO devices (created_at, updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
-    (now(), now(), random_uuid, random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
+  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+    (now(), random_uuid, random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
   --  insert a fix device id for test
-  INSERT INTO devices (created_at, updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
-    (now(), now(), '00000000-0000-0000-0000-000000000000', random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
+  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+    (now(), '00000000-0000-0000-0000-000000000000', random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
-  INSERT INTO stats (created_at, platform, action, device_id, version_build, version, app_id) VALUES
-    (now(), 'android', 'get', random_uuid, '1.223.0', random_version_id, 'com.demo.app'),
-    (now(), 'android', 'get', random_uuid, '1.223.0', random_version_id, 'com.demo.app');
+  INSERT INTO stats (created_at, action, device_id, version, app_id) VALUES
+    (now(), 'get', random_uuid, random_version_id, 'com.demo.app'),
+    (now(), 'set', random_uuid, random_version_id, 'com.demo.app');
 
   -- Seed data for daily_mau, daily_bandwidth, and daily_storage
   curr_date := start_date::DATE;
@@ -2529,7 +2529,6 @@ ALTER TABLE "public"."device_usage_id_seq" OWNER TO "postgres";
 ALTER SEQUENCE "public"."device_usage_id_seq" OWNED BY "public"."device_usage"."id";
 
 CREATE TABLE IF NOT EXISTS "public"."devices" (
-    "created_at" timestamp with time zone NOT NULL,
     "updated_at" timestamp with time zone NOT NULL,
     "device_id" "text" NOT NULL,
     "version" bigint NOT NULL,
@@ -2688,10 +2687,8 @@ ALTER TABLE "public"."plans" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."stats" (
     "created_at" timestamp with time zone NOT NULL,
-    "platform" "public"."platform_os" NOT NULL,
     "action" "text" NOT NULL,
     "device_id" "text" NOT NULL,
-    "version_build" "text" NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying NOT NULL
 );
@@ -2919,7 +2916,7 @@ CREATE INDEX "devices_app_id_updated_at_idx" ON "public"."devices" USING "btree"
 
 CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
 
-CREATE INDEX "idx_app_id_created_at_devices" ON "public"."devices" USING "btree" ("app_id", "created_at");
+CREATE INDEX "idx_app_id_created_at_devices" ON "public"."devices" USING "btree" ("app_id", "updated_at");
 
 CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
 
@@ -2971,11 +2968,7 @@ CREATE INDEX "idx_stats_app_id_created_at" ON "public"."stats" USING "btree" ("a
 
 CREATE INDEX "idx_stats_app_id_device_id" ON "public"."stats" USING "btree" ("app_id", "device_id");
 
-CREATE INDEX "idx_stats_app_id_platform" ON "public"."stats" USING "btree" ("app_id", "platform");
-
 CREATE INDEX "idx_stats_app_id_version" ON "public"."stats" USING "btree" ("app_id", "version");
-
-CREATE INDEX "idx_stats_app_id_version_build" ON "public"."stats" USING "btree" ("app_id", "version_build");
 
 CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
 

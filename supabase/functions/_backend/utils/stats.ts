@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
-import { readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackDevicesSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
+import type { Database } from './supabase.types.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
@@ -25,13 +26,13 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
   if (!c.env.APP_LOG) // TODO: should make it work with supabase too
-    return
+    return trackLogsSB(c, app_id, device_id, action, version_id)
   return trackLogsCF(c, app_id, device_id, action, version_id)
 }
 
-export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
   if (!c.env.DEVICE_LOG) // TODO: should make it work with supabase too
-    return
+    return trackDevicesSB(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }
 

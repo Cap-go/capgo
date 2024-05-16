@@ -170,20 +170,6 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   return userRight.data
 }
 
-export async function getCurrentPlanName(c: Context, userId: string): Promise<string> {
-  try {
-    const { data } = await supabaseAdmin(c)
-      .rpc('get_current_plan_name', { userid: userId })
-      .single()
-      .throwOnError()
-    return data || ''
-  }
-  catch (error) {
-    console.error('getCurrentPlanName error', userId, error)
-  }
-  return ''
-}
-
 interface PlanUsage {
   total_percent: number
   mau_percent: number
@@ -577,12 +563,12 @@ export function trackVersionUsageSB(
     ])
 }
 
-export async function trackDeviceUsageSB(
+export function trackDeviceUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
 ) {
-  await supabaseAdmin(c)
+  return supabaseAdmin(c)
     .from('device_usage')
     .insert([
       {
@@ -592,14 +578,14 @@ export async function trackDeviceUsageSB(
     ])
 }
 
-export async function trackMetaSB(
+export function trackMetaSB(
   c: Context,
   app_id: string,
   version_id: number,
   size: number,
 ) {
   console.log('createStatsMeta', app_id, version_id, size)
-  await supabaseAdmin(c)
+  return supabaseAdmin(c)
     .from('version_meta')
     .insert([
       {
@@ -608,6 +594,41 @@ export async function trackMetaSB(
         size,
       },
     ])
+}
+
+export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  return supabaseAdmin(c)
+    .from('devices')
+    .upsert(
+      {
+        app_id,
+        updated_at: new Date().toISOString(),
+        device_id,
+        platform,
+        plugin_version,
+        os_version,
+        version_build,
+        custom_id,
+        version,
+        is_prod,
+        is_emulator,
+      },
+    )
+    .eq('device_id', device_id)
+}
+
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+  return supabaseAdmin(c)
+    .from('stats')
+    .insert(
+      {
+        app_id,
+        created_at: new Date().toISOString(),
+        device_id,
+        action,
+        version: version_id,
+      },
+    )
 }
 
 export async function readDeviceUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {

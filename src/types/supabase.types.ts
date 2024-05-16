@@ -669,7 +669,6 @@ export type Database = {
       devices: {
         Row: {
           app_id: string
-          created_at: string
           custom_id: string
           device_id: string
           is_emulator: boolean | null
@@ -683,7 +682,6 @@ export type Database = {
         }
         Insert: {
           app_id: string
-          created_at: string
           custom_id?: string
           device_id: string
           is_emulator?: boolean | null
@@ -697,7 +695,6 @@ export type Database = {
         }
         Update: {
           app_id?: string
-          created_at?: string
           custom_id?: string
           device_id?: string
           is_emulator?: boolean | null
@@ -1076,27 +1073,21 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
-          platform: Database["public"]["Enums"]["platform_os"]
           version: number
-          version_build: string
         }
         Insert: {
           action: string
           app_id: string
           created_at: string
           device_id: string
-          platform: Database["public"]["Enums"]["platform_os"]
           version: number
-          version_build: string
         }
         Update: {
           action?: string
           app_id?: string
           created_at?: string
           device_id?: string
-          platform?: Database["public"]["Enums"]["platform_os"]
           version?: number
-          version_build?: string
         }
         Relationships: []
       }
@@ -1798,6 +1789,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      http_post_helper: {
+        Args: {
+          function_name: string
+          function_type: string
+          body: Json
+        }
+        Returns: number
+      }
       invite_user_to_org: {
         Args: {
           email: string
@@ -1843,27 +1842,6 @@ export type Database = {
               apikey: string
               keymode: Database["public"]["Enums"]["key_mode"][]
               app_id: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              apikey: string
-              keymode: Database["public"]["Enums"]["key_mode"][]
-              app_id: string
-              channel_id: number
-              right: Database["public"]["Enums"]["user_min_right"]
-              user_id: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              apikey: string
-              keymode: Database["public"]["Enums"]["key_mode"][]
-              app_id: string
-              right: Database["public"]["Enums"]["user_min_right"]
-              user_id: string
             }
             Returns: boolean
           }

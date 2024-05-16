@@ -624,21 +624,6 @@ export interface ClickHouseMeta {
   version_id: number
   size: number
 }
-export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
-  if (!isClickHouseEnabled(c))
-    return Promise.resolve()
-
-  console.log('sending meta to Clickhouse', meta)
-  const metasReady = meta
-    .map((l) => {
-      createStatsMeta(c, l.app_id, l.version_id, l.size)
-      return l
-    })
-    .map(convertAllDatesToCH)
-    .map(l => JSON.stringify(l)).join('\n')
-
-  return sendClickHouse(c, metasReady, 'app_versions_meta')
-}
 
 export interface StatsActions {
   action: string
@@ -650,9 +635,10 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   const deviceData = convertAllDatesToCH({ ...device, updated_at: new Date().toISOString() })
   const deviceReady = JSON.stringify(deviceData)
 
+  const jobs = []
   // Prepare the stats data for insertion
   const statsData = statsActions.map(({ action, versionId }) => {
-    const stat: Database['public']['Tables']['stats']['Insert'] = {
+    const stat: any = {
       created_at: new Date().toISOString(),
       device_id: device.device_id,
       action,
@@ -661,7 +647,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
       version: versionId || device.version, // Use the provided versionId if available
       platform: device.platform ?? 'android',
     }
-    createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version)
+    jobs.push(createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version))
     return JSON.stringify(convertAllDatesToCH(stat))
   }).join('\n')
 
@@ -671,17 +657,15 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     app_id: device.app_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
-  createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? '', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false)
+  jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
-  const jobs = Promise.all([
+  jobs.push([
     sendClickHouse(c, deviceReady, 'devices'),
     sendClickHouse(c, statsData, 'logs'),
     sendClickHouse(c, dailyDeviceReady, 'daily_device'),
-  ]).catch((error) => {
-    console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
-  })
+  ])
 
   let executionCtx: ExecutionContext | null
   try {
@@ -692,9 +676,12 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   }
 
   if (executionCtx?.waitUntil)
-    return c.executionCtx.waitUntil(jobs)
+    return c.executionCtx.waitUntil(Promise.all(jobs))
 
-  return jobs
+  return Promise.all(jobs)
+    .catch((error) => {
+      console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
+    })
 }
 
 export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {

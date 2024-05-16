@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
 import { getEnv } from './utils.ts'
+import type { Database } from './supabase.types.ts'
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
@@ -53,7 +54,7 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
   })
 }
 
-export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
   if (!c.env.DEVICE_LOG)
     return
   c.env.DEVICE_LOG.writeDataPoint({
