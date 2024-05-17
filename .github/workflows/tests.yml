@@ -42,7 +42,7 @@ jobs:
 
           log-output: stderr,stdout # same as true
 
-          log-output-if: failure
+          log-output-if: success
           # failure = exit-early or timeout
 
           working-directory: .
