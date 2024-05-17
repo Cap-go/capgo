@@ -5,11 +5,10 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import UsageCard from './UsageCard.vue'
 import { useMainStore } from '~/stores/main'
-import { getPlans, getTotaAppStorage } from '~/services/supabase'
-import MobileStats from '~/components/MobileStats.vue'
+import { getPlans, getTotalAppStorage } from '~/services/supabase'
 import { getDaysInCurrentMonth } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
-import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
+import { bytesToGb, getDaysBetweenDates, toFixed } from '~/services/conversion'
 
 const props = defineProps<{
   appId?: string
@@ -20,6 +19,8 @@ const { t } = useI18n()
 
 const noData = computed(() => false)
 const loadedAlready = ref(false)
+const storageDisplayGb = ref(true)
+const storageUnit = computed(() => storageDisplayGb.value ? 'GB' : 'MB')
 // const noData = computed(() => datas.value.mau.length == 0)
 
 const datas = ref({
@@ -57,42 +58,63 @@ async function getAppStats() {
 }
 
 async function getUsages() {
-  const currentStorage = bytesToGb(await getTotaAppStorage(organizationStore.currentOrganization?.gid, props.appId))
-  const data = await getAppStats()
-  if (data && data.length > 0) {
-    const cycleStart = organizationStore.currentOrganization?.subscription_start ? new Date(organizationStore.currentOrganization?.subscription_start) : null
-    const cycleEnd = organizationStore.currentOrganization?.subscription_end ? new Date(organizationStore.currentOrganization?.subscription_end) : null
+  const currentStorageBytes = await getTotalAppStorage(organizationStore.currentOrganization?.gid, props.appId)
+  const globalStats = await getAppStats()
+  // get current day number
+  const currentDate = new Date()
+  const currentDay = currentDate.getDate()
+  let cycleDay: number | undefined
+  if (globalStats && globalStats.length > 0) {
+    const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+    const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+
+    if (cycleStart.getDate() === 1) {
+      cycleDay = currentDay
+    }
+    else {
+      const cycleStartDay = cycleStart.getDate()
+      const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+      cycleDay = (currentDay - cycleStartDay + 1 + daysInMonth) % daysInMonth
+      if (cycleDay === 0)
+        cycleDay = daysInMonth
+    }
     let graphDays = getDaysInCurrentMonth()
+
     if (cycleStart && cycleEnd)
       graphDays = getDaysBetweenDates(cycleStart.toString(), cycleEnd.toString())
 
     datas.value.mau = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.storage = Array.from({ length: graphDays }).fill(undefined) as number[]
     datas.value.bandwidth = Array.from({ length: graphDays }).fill(undefined) as number[]
-    data.forEach((item) => {
+    // biome-ignore lint/complexity/noForEach: <explanation>
+    globalStats.forEach((item, i) => {
       if (item.date) {
-        const createdAtDate = new Date(item.date)
-        const dayNumber = createdAtDate.getDate()
+        const dayNumber = i
         if (datas.value.mau[dayNumber])
           datas.value.mau[dayNumber] += item.mau
         else
           datas.value.mau[dayNumber] = item.mau
 
-        const storageVal = Number.parseFloat(bytesToGb(item.storage_added - item.storage_deleted).toFixed(2))
+        const storageVal = bytesToGb(item.storage ?? 0, 2)
         if (datas.value.storage[dayNumber])
           datas.value.storage[dayNumber] += storageVal
         else
           datas.value.storage[dayNumber] = storageVal
 
+        const bandwidthVal = bytesToGb(item.bandwidth ?? 0, 2)
         if (datas.value.bandwidth[dayNumber])
-          datas.value.bandwidth[dayNumber] += item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] += bandwidthVal
         else
-          datas.value.bandwidth[dayNumber] = item.bandwidth ? bytesToGb(item.bandwidth) : 0
+          datas.value.bandwidth[dayNumber] = bandwidthVal
       }
     })
 
     const storageVariance = datas.value.storage.reduce((p, c) => (p + (c || 0)), 0)
-    datas.value.storage[0] = Number.parseFloat((currentStorage - storageVariance).toFixed(2))
+    const currentStorage = bytesToGb(currentStorageBytes, 2)
+    const initValue = currentStorage - storageVariance + (datas.value.storage[0] ?? 0)
+
+    datas.value.storage[0] = toFixed(initValue, 2)
+
     if (datas.value.storage[0] < 0)
       datas.value.storage[0] = 0
   }
@@ -101,9 +123,10 @@ async function getUsages() {
     datas.value.storage = []
     datas.value.bandwidth = []
   }
-  datas.value.mau = datas.value.mau.filter(i => i)
-  datas.value.storage = datas.value.storage.filter(i => i)
-  datas.value.bandwidth = datas.value.bandwidth.filter(i => i)
+  // slice the lenght of the array to the current day
+  datas.value.mau = datas.value.mau.slice(0, cycleDay)
+  datas.value.storage = datas.value.storage.slice(0, cycleDay)
+  datas.value.bandwidth = datas.value.bandwidth.slice(0, cycleDay)
 }
 
 async function loadData() {
@@ -132,14 +155,11 @@ if (main.dashboardFetched)
 </script>
 
 <template>
-  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
+  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6">
+    <!-- TODO: to reactivate when we do the new chart https://github.com/Cap-go/capgo/issues/645 <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''"> -->
     <UsageCard
-      v-if="!isLoading && props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
-      :datas="datas.mau" :accumulated="true" :title="`${t('montly-active')}`" unit="Users"
-    />
-    <UsageCard
-      v-else-if="!isLoading && !props.appId" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
-      :datas="datas.mau" :accumulated="true" :title="`${t('montly-active')}`" unit="Users"
+      v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
+      :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"
     />
     <div
       v-else
@@ -149,7 +169,7 @@ if (main.dashboardFetched)
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage"
-      :title="t('Storage')" unit="GB" :accumulated="false"
+      :title="t('Storage')" :unit="storageUnit"
     />
     <div
       v-else
@@ -167,6 +187,6 @@ if (main.dashboardFetched)
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <MobileStats v-if="appId" />
+    <!-- <MobileStats v-if="appId" /> -->
   </div>
 </template>

@@ -73,10 +73,12 @@ app-preview: Vista previa de la aplicación
 are-u-sure: Está seguro ?
 available-in-the-san: Disponible en la aplicación sandbox
 back-to-login-page: Volver a la página de inicio de sesión
+bandwith-usage: 'Uso de ancho de banda:'
 base: Base
 best-plan: mejor plan
 bigger-app-size: Tamaño de aplicación más grande
 billed-annually-at: Facturado anualmente en
+billed-monthly-at: Facturado mensualmente a
 billing: Facturación
 build-your-app-and-s: crea tu aplicación y sincroniza
 build-your-code-and-: Sube a Capgo tu código
@@ -122,7 +124,10 @@ cannot-set-this-vers: No se puede configurar esta versión
 cannot-share: >-
   No se puede compartir la identificación de usuario, verifique la consola del
   navegador
+cannot-show: No se puede mostrar esta página
 cannot-test-app-some: No se puede probar la aplicación. Ocurrió algo incorrecto.
+cannot-view-plans: No puedo ver la página de planes
+cannot-view-usage: No se puede ver la página de uso
 cannots-sign-off: No se puede iniciar sesión
 change: Cambiar
 changed-password-suc: Contraseña cambiada con éxito
@@ -179,6 +184,7 @@ deleted: eliminado
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Uso detallado
 details-and-logs: Detalles y registros
 devDependencies:
   '@types/js-yaml': ''
@@ -215,6 +221,7 @@ enter-your-email-add: >-
   Ingrese su dirección de correo electrónico y le enviaremos un enlace para
   restablecer su contraseña.
 enter-your-new-passw: Ingrese su nueva contraseña y confirme
+error: Error
 external-storage: Almacenamiento externo
 fail: Instalación fallida
 failed: Fallido
@@ -287,6 +294,7 @@ making-this-channel-: >-
   Para hacer que este canal sea "normal", deberá configurar otro canal
   predeterminado o dejar que el dispositivo se auto asigne.
 mau: Usuarios activos mensuales
+mau-usage: 'Uso mensual de usuarios activos:'
 member-deleted: Miembro eliminado exitosamente
 members: Miembros
 metadata: Metadatos
@@ -304,6 +312,7 @@ misconfigured-channels: |-
   Algunos canales están mal configurados. 
   ¡Las actualizaciones fallarán para esos canales!
 mo: mes
+modify-org-info: Puedes modificar los datos de la organización aquí.
 module-heading: Módulos
 monthly: Mensual
 monthly-active-users: Usuarios activos mensuales
@@ -329,7 +338,11 @@ no-version-linked: Sin versión, haga clic para agregar
 no-version-linked-no-perm: Sin versión
 none: Ninguno
 not-found: Extraviado
+not-paying-org-usage: >-
+  Esta organización no paga, no puede mostrar el uso de una organización de
+  prueba gratuita
 notifications: Notificaciones
+ok: DE ACUERDO
 old-onboarding-mode: incorporación antigua
 one-day-left: Queda un día
 open: Abierto
@@ -338,8 +351,14 @@ open-settings: Haga clic para abrir la configuración
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abre este enlace para saber cómo probar tu actualización
 org-changes-saved: Organización actualizada con éxito
+org-changes-set-email-not-unique: El correo electrónico de administración no es único, seleccione uno diferente
+org-changes-set-email-other-error: >-
+  No se puede configurar el correo electrónico de administración, comuníquese
+  con el soporte
 org-invited-user: Usuario invitado exitosamente a la organización
+organization-email: Correo electrónico de gestión de la organización.
 organization-name: Nombre de la Organización
+organization-settings: Configuración de la organización
 os-version: versión del sistema operativo
 pages: Paginas
 password: Contraseña
@@ -349,6 +368,7 @@ password-hint: >-
   Introduzca una combinación de al menos 6 números, letras y signos de
   puntuación.
 password-new: Nueva contraseña
+patch: Parche
 percent-fail: porcentaje de fallas
 permission-changed: Permiso de usuario cambiado exitosamente
 personal-information: Informaciones personales
@@ -375,7 +395,9 @@ plan-updates: Actualizaciones
 plan-upgrade: suscribete
 plan-whats-included: Qué está incluido
 plans: planes
+plans-super-only: Solo los superadministradores pueden ver los planes y la facturación
 platform: Plataforma
+please-ask-the-user-to-create-account-first: Solicite al usuario que primero cree una cuenta.
 please-choose-your-p: Por favor elige tus preferencias
 please-upgrade: Actualice su plan para agregar más usuarios
 plugin-version: Versión del complemento
@@ -438,6 +460,7 @@ start-new-deploy: Iniciar una nueva implementación progresiva
 start-using-capgo: 'Empieza a usar:'
 status-complete: completo
 status-failed: fallido
+storage-usage: 'Uso de almacenamiento:'
 stored-externally: almacenado externamente
 submit: Entregar
 support: Apoyo
@@ -447,6 +470,7 @@ terms-of-use: Condiciones de uso
 test-your-update-in-: Prueba tu actualización en tu aplicación
 tests: pruebas
 thank-you-for-choosi: ¡Gracias por elegir Capgo!
+thank-you-for-sub: Gracias por suscribirte a Capgo
 the: El
 this-page-will-self-: Esta página se actualizará automáticamente
 title: título
@@ -456,6 +480,7 @@ to-live-reload: vivir recargar.
 to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps: Mis aplicaciones
 top-apps-v2: Aplicaciones
+trial: ensayo
 trial-left: Días restantes
 trial-plan-expired: Prueba caducada
 trial-plan-expires-in: El juicio termina en
@@ -477,7 +502,9 @@ upperCaseError: Debe contener letras mayúsculas
 url: URL
 usage: Uso
 usage-success: Su plan ha sido configurado, esta página se actualizará en unos minutos.
+usage-super-only: Solo los superadministradores pueden ver el uso
 usage-title: Total
+use-capgo: Usar capgo
 use-the-command: 'Usa el comando:'
 used-in-period: Usado en periodo
 used-to-create: >-
@@ -506,3 +533,5 @@ your-api-key: 'Su clave API:'
 your-are-a: Tu area
 your-current-plan-is: Su plan actual es
 your-current-suggested-plan-is: Su plan sugerido actual es
+your-settings: Tu configuración
+your-ussage: 'Su uso:'

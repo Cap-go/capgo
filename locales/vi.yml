@@ -71,10 +71,12 @@ app-preview: Xem trước ứng dụng
 are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
+bandwith-usage: 'Sử dụng băng thông:'
 base: Căn cứ
 best-plan: kế hoạch tốt nhất
 bigger-app-size: Kích thước ứng dụng lớn hơn
 billed-annually-at: Thanh toán hàng năm tại
+billed-monthly-at: Thanh toán hàng tháng tại
 billing: thanh toán
 build-your-app-and-s: xây dựng ứng dụng của bạn và đồng bộ hóa
 build-your-code-and-: Tải lên Capgo mã của bạn
@@ -118,7 +120,10 @@ cannot-invite-owner: Không thể mời chủ sở hữu vào tổ chức
 cannot-save-custom-i: Không thể lưu ID tùy chỉnh
 cannot-set-this-vers: Không thể đặt phiên bản này
 cannot-share: Không thể chia sẻ id người dùng, hãy kiểm tra bảng điều khiển trình duyệt
+cannot-show: Không thể hiển thị trang này
 cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
+cannot-view-plans: Không thể xem trang kế hoạch
+cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
 change: Thay đổi
 changed-password-suc: Đã đổi mật khẩu thành công
@@ -171,6 +176,7 @@ deleted: đã xóa
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Cách sử dụng chi tiết
 details-and-logs: Chi tiết và nhật ký
 devDependencies:
   '@types/js-yaml': ''
@@ -207,6 +213,7 @@ enter-your-email-add: >-
   Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
+error: Lỗi
 external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
 failed: Thất bại
@@ -277,6 +284,7 @@ making-this-channel-: >-
   Làm cho kênh này trở thành "bình thường" sẽ cần bạn định cấu hình mặc định cho
   một kênh khác hoặc để thiết bị tự chỉ định.
 mau: Người dùng hoạt động hàng tháng
+mau-usage: 'Mức sử dụng người dùng hoạt động hàng tháng:'
 member-deleted: Đã xóa thành viên thành công
 members: Các thành viên
 metadata: metadata
@@ -294,6 +302,7 @@ misconfigured-channels: |-
   Một số kênh bị định cấu hình sai. 
   Cập nhật sẽ không thành công đối với các kênh đó!
 mo: Th
+modify-org-info: Bạn có thể sửa đổi thông tin của tổ chức tại đây.
 module-heading: mô-đun
 monthly: hàng tháng
 monthly-active-users: Người dùng hoạt động hàng tháng
@@ -319,7 +328,11 @@ no-version-linked: Không có phiên bản, nhấp để thêm
 no-version-linked-no-perm: Không có phiên bản
 none: Không có
 not-found: Không tìm thấy
+not-paying-org-usage: >-
+  Tổ chức này không thanh toán, không thể hiển thị việc sử dụng tổ chức dùng thử
+  miễn phí
 notifications: thông báo
+ok: ĐƯỢC RỒI
 old-onboarding-mode: giới thiệu cũ
 one-day-left: Còn lại một ngày
 open: Mở
@@ -328,8 +341,12 @@ open-settings: Nhấp để mở cài đặt
 open-sidebar: Mở thanh bên
 open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn
 org-changes-saved: Tổ chức được cập nhật thành công
+org-changes-set-email-not-unique: Email quản lý không phải là duy nhất, vui lòng chọn email khác
+org-changes-set-email-other-error: Không cài đặt được email quản lý, vui lòng tiếp tục hỗ trợ
 org-invited-user: Đã mời thành công người dùng vào tổ chức
+organization-email: Email quản lý của tổ chức
 organization-name: tên tổ chức
+organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
 pages: trang
 password: Mật khẩu
@@ -337,6 +354,7 @@ password-confirmatio: xác nhận mật khẩu
 password-heading: Tạo mật khẩu
 password-hint: Nhập kết hợp ít nhất 6 số, chữ cái và dấu chấm câu.
 password-new: mật khẩu mới
+patch: Vá
 percent-fail: tỷ lệ thất bại
 permission-changed: Đã thay đổi thành công quyền của người dùng
 personal-information: Thông tin cá nhân
@@ -361,7 +379,9 @@ plan-updates: cập nhật
 plan-upgrade: Đăng ký
 plan-whats-included: Bao gồm những gì
 plans: Các kế hoạch
+plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem gói và thanh toán
 platform: Nền tảng
+please-ask-the-user-to-create-account-first: Vui lòng yêu cầu người dùng tạo tài khoản trước
 please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
@@ -422,6 +442,7 @@ start-new-deploy: Bắt đầu triển khai lũy tiến mới
 start-using-capgo: 'Bắt đầu sử dụng:'
 status-complete: hoàn thành
 status-failed: thất bại
+storage-usage: 'Sử dụng lưu trữ:'
 stored-externally: được lưu trữ bên ngoài
 submit: Nộp
 support: Ủng hộ
@@ -431,6 +452,7 @@ terms-of-use: Điều khoản sử dụng
 test-your-update-in-: Kiểm tra bản cập nhật của bạn trong ứng dụng của bạn
 tests: kiểm tra
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
+thank-you-for-sub: Cảm ơn bạn đã đăng ký Capgo
 the: Các
 this-page-will-self-: Trang này sẽ tự làm mới
 title: tiêu đề
@@ -440,6 +462,7 @@ to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
 top-apps-v2: Ứng dụng
+trial: sự thử nghiệm
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
@@ -463,7 +486,9 @@ usage: Cách sử dụng
 usage-success: >-
   Kế hoạch của bạn đã được thiết lập, trang này sẽ được cập nhật sau vài phút
   nữa
+usage-super-only: Chỉ quản trị viên cấp cao mới được phép xem mức sử dụng
 usage-title: Tổng cộng
+use-capgo: Sử dụng Capgo
 use-the-command: 'Sử dụng lệnh:'
 used-in-period: Được sử dụng trong kỳ
 used-to-create: Tài khoản có email này đã từng tồn tại, không thể tạo lại
@@ -490,3 +515,5 @@ your-api-key: 'Khóa API của bạn:'
 your-are-a: bạn là một
 your-current-plan-is: Kế hoạch hiện tại của bạn là
 your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là
+your-settings: Cài đặt của bạn
+your-ussage: 'Cách sử dụng của bạn:'

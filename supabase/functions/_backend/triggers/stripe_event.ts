@@ -72,7 +72,7 @@ app.post('/', async (c: Context) => {
           .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
-        if (customer && customer.product_id !== 'free' && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
+        if (customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
           await removeOldSubscription(c, customer.subscription_id)
 
         if (dbError2)
@@ -88,7 +88,7 @@ app.post('/', async (c: Context) => {
           channel: 'usage',
           event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
           icon: '💰',
-          user_id: org.management_email,
+          user_id: org.id,
           notify: status === 'succeeded',
         }).catch()
       }
@@ -99,36 +99,37 @@ app.post('/', async (c: Context) => {
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
+        const statusCopy = stripeData.status
         stripeData.status = 'succeeded'
-        const segment = await customerToSegmentOrg(c, org.id, 'free')
+        const segment = await customerToSegmentOrg(c, org.id, 'canceled')
         await addDataContact(c, org.management_email, userData, segment)
         await trackEvent(c, org.management_email, {}, 'user:cancel')
         await LogSnag.track({
           channel: 'usage',
           event: 'User cancel',
           icon: '⚠️',
-          user_id: org.management_email,
+          user_id: org.id,
           notify: true,
         }).catch()
+        stripeData.status = statusCopy
       }
-      else {
-        stripeData.is_good_plan = false
-        const { error: dbError2 } = await supabaseAdmin(c)
-          .from('stripe_info')
-          .update(stripeData)
-          .eq('customer_id', stripeData.customer_id)
-        if (dbError2)
-          return c.json({ error: JSON.stringify(dbError) }, 500)
-      }
+      stripeData.is_good_plan = false
+      const { error: dbError2 } = await supabaseAdmin(c)
+        .from('stripe_info')
+        .update(stripeData)
+        .eq('customer_id', stripeData.customer_id)
+      if (dbError2)
+        return c.json({ error: JSON.stringify(dbError) }, 500)
     }
     else {
-      const segment = await customerToSegmentOrg(c, org.id, 'free')
+      const segment = await customerToSegmentOrg(c, org.id, 'canceled')
       await addDataContact(c, org.management_email, userData, segment)
     }
 
     return c.json({ received: true })
   }
   catch (e) {
+    console.log(e)
     return c.json({ status: 'Cannot parse event', error: JSON.stringify(e) }, 500)
   }
 })

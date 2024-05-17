@@ -67,10 +67,12 @@ app-preview: Pratinjau aplikasi
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
+bandwith-usage: 'Penggunaan bandwidth:'
 base: Basis
 best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
 billed-annually-at: Ditagih setiap tahun pada
+billed-monthly-at: Ditagih setiap bulan pada
 billing: Penagihan
 build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
 build-your-code-and-: Unggah ke Capgo kode Anda
@@ -114,7 +116,10 @@ cannot-invite-owner: Tidak dapat mengundang pemilik ke organisasi
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 cannot-set-this-vers: Tidak dapat menyetel versi ini
 cannot-share: Tidak dapat membagikan id pengguna, periksa konsol browser
+cannot-show: Tidak dapat menampilkan halaman ini
 cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
+cannot-view-plans: Tidak dapat melihat halaman rencana
+cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
 change: Mengubah
 changed-password-suc: Kata sandi berhasil diubah
@@ -171,6 +176,7 @@ deleted: dihapus
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Penggunaan terperinci
 details-and-logs: Detail dan log
 devDependencies:
   '@types/js-yaml': ''
@@ -207,6 +213,7 @@ enter-your-email-add: >-
   Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
+error: Kesalahan
 external-storage: Penyimpanan luar
 fail: Instal gagal
 failed: Gagal
@@ -279,6 +286,7 @@ making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
 mau: Pengguna aktif bulanan
+mau-usage: 'Penggunaan pengguna aktif bulanan:'
 member-deleted: Berhasil menghapus anggota
 members: Anggota
 metadata: Metadata
@@ -296,6 +304,7 @@ misconfigured-channels: |-
   Beberapa saluran salah dikonfigurasi. 
   Pembaruan akan gagal untuk saluran tersebut!
 mo: bulan
+modify-org-info: Anda dapat mengubah informasi organisasi di sini.
 module-heading: Modul
 monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan
@@ -321,7 +330,11 @@ no-version-linked: Tidak ada versi, klik untuk menambahkan
 no-version-linked-no-perm: Tidak ada versi
 none: Tidak ada
 not-found: Tidak ditemukan
+not-paying-org-usage: >-
+  Organisasi ini tidak membayar, tidak dapat menunjukkan penggunaan untuk
+  organisasi uji coba gratis
 notifications: Notifikasi
+ok: OKE
 old-onboarding-mode: orientasi lama
 one-day-left: Tinggal satu hari
 open: Membuka
@@ -330,8 +343,12 @@ open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
 org-changes-saved: Organisasi berhasil diperbarui
+org-changes-set-email-not-unique: Email manajemen tidak unik, silakan pilih email lain
+org-changes-set-email-other-error: Tidak dapat mengatur email manajemen, silakan hubungi dukungan
 org-invited-user: Berhasil mengundang pengguna ke org
+organization-email: Email manajemen organisasi
 organization-name: Nama Organisasi
+organization-settings: Pengaturan organisasi
 os-version: versi OS
 pages: Halaman
 password: Kata sandi
@@ -339,6 +356,7 @@ password-confirmatio: konfirmasi kata kunci
 password-heading: Buat Kata Sandi
 password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
 password-new: kata sandi baru
+patch: Tambalan
 percent-fail: Persentase gagal
 permission-changed: Berhasil mengubah izin pengguna
 personal-information: Informasi pribadi
@@ -363,7 +381,9 @@ plan-updates: Pembaruan
 plan-upgrade: Berlangganan
 plan-whats-included: Apa yang disertakan
 plans: Rencana
+plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan
 platform: Platform
+please-ask-the-user-to-create-account-first: Silakan minta pengguna untuk membuat akun terlebih dahulu
 please-choose-your-p: Silakan pilih preferensi Anda
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
@@ -426,6 +446,7 @@ start-new-deploy: Mulai penerapan progresif baru
 start-using-capgo: 'Mulai menggunakan:'
 status-complete: menyelesaikan
 status-failed: gagal
+storage-usage: 'Penggunaan penyimpanan:'
 stored-externally: disimpan secara eksternal
 submit: Kirim
 support: Mendukung
@@ -435,6 +456,7 @@ terms-of-use: Syarat Penggunaan
 test-your-update-in-: Uji pembaruan Anda di aplikasi Anda
 tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
+thank-you-for-sub: Terima kasih telah berlangganan Capgo
 the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri
 title: judul
@@ -444,6 +466,7 @@ to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 top-apps-v2: Aplikasi
+trial: uji coba
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
@@ -467,7 +490,9 @@ usage: Penggunaan
 usage-success: >-
   Rencana Anda telah disiapkan, halaman ini akan diperbarui, dalam beberapa
   menit
+usage-super-only: Hanya admin super yang diizinkan melihat penggunaan
 usage-title: Total
+use-capgo: Gunakan Capgo
 use-the-command: 'Gunakan perintah:'
 used-in-period: Digunakan dalam periode
 used-to-create: Akun dengan email ini dulunya ada, tidak dapat dibuat ulang
@@ -494,3 +519,5 @@ your-api-key: 'Kunci API Anda:'
 your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
+your-settings: Pengaturan Anda
+your-ussage: 'Penggunaan Anda:'

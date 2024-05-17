@@ -222,6 +222,7 @@ async function handleMfa() {
       textStyle: 'w-full text-center',
       size: 'max-w-lg',
       buttonCenter: true,
+      preventAccidentalClose: true,
       buttons: [
         {
           text: t('verify'),
@@ -250,6 +251,7 @@ async function handleMfa() {
         textStyle: 'w-full text-center',
         size: 'max-w-lg',
         buttonCenter: true,
+        preventAccidentalClose: true,
         buttons: [
           {
             text: t('verify'),

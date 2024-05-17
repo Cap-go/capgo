@@ -3,7 +3,6 @@ import type { Context } from 'hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { bulkUpdateStoreApps } from '../utils/clickhouse.ts'
-import type { Database } from '../utils/supabase.types.ts'
 import { countries } from '../utils/gplay_categ.ts'
 
 export const app = new Hono()
@@ -27,7 +26,7 @@ async function getList(category = gplay.category.APPLICATION, collection = gplay
     throttle: 50,
   }).catch(() => []))
   const upgraded = res.map((item) => {
-    const row: Database['public']['Tables']['store_apps']['Insert'] = {
+    const row: any = {
       url: item.url || '',
       app_id: item.appId,
       title: item.title || '',
@@ -64,7 +63,7 @@ async function getTop(category = gplay.category.APPLICATION, country = 'us', col
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<TopApk>()
-    const all: Promise<(Database['public']['Tables']['store_apps']['Insert'])[]>[] = []
+    const all: Promise<(any)[]>[] = []
     // console.log('main', url, headers, method, body)
     if (body.countries && body.categories) {
       // call getTop with all countries and categories

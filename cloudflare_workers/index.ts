@@ -2,6 +2,8 @@ import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
 
 // Public API
+import type { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
+import { HTTPException } from 'hono/http-exception'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
@@ -11,7 +13,6 @@ import { app as channels } from '../supabase/functions/_backend/public/channel.t
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as updates } from '../supabase/functions/_backend/plugins/updates.ts'
 import { app as stats } from '../supabase/functions/_backend/plugins/stats.ts'
-import { app as setCustomId } from '../supabase/functions/_backend/plugins/custom_ids.ts'
 
 // Private API
 import { app as plans } from '../supabase/functions/_backend/private/plans.ts'
@@ -32,7 +33,6 @@ import { app as stats_priv } from '../supabase/functions/_backend/private/stats.
 import { app as clear_app_cache } from '../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../supabase/functions/_backend/triggers/clear_device_cache.ts'
 import { app as cron_email } from '../supabase/functions/_backend/triggers/cron_email.ts'
-import { app as cron_good_plan } from '../supabase/functions/_backend/triggers/cron_good_plan.ts'
 import { app as cron_scrapper } from '../supabase/functions/_backend/triggers/cron_scrapper.ts'
 import { app as logsnag_insights } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../supabase/functions/_backend/triggers/on_channel_update.ts'
@@ -44,9 +44,12 @@ import { app as on_version_update } from '../supabase/functions/_backend/trigger
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
 import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
+import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
+import { app as cron_plan } from '../supabase/functions/_backend/triggers/cron_plan.ts'
+import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
+import { app as on_app_create } from '../supabase/functions/_backend/triggers/on_app_create.ts'
+
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
-import { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
-import { HTTPException } from 'hono/http-exception'
 import { version } from '../package.json'
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -54,7 +57,7 @@ const appTriggers = new Hono<{ Bindings: Bindings }>()
 const appFront = new Hono<{ Bindings: Bindings }>()
 
 app.use('*', sentry({
-  release: version
+  release: version,
 }))
 // Public API
 app.route('/ok', ok)
@@ -62,13 +65,13 @@ app.route('/bundle', bundle)
 app.route('/channels', channels) // TODO: deprecated remove when everyone use the new endpoint
 app.route('/channel', channels)
 app.route('/device', devices)
+app.route('/on_app_create', on_app_create)
 
 // Plugin API
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
-app.route('/set_custom_id', setCustomId)
 
 // Private API
 appFront.route('/plans', plans)
@@ -90,7 +93,6 @@ appFront.route('/delete_failed_version', deleted_failed_version)
 appTriggers.route('/clear_app_cache', clear_app_cache)
 appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
-appTriggers.route('/cron_good_plan', cron_good_plan)
 appTriggers.route('/cron_scrapper', cron_scrapper)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/on_channel_update', on_channel_update)
@@ -102,23 +104,25 @@ appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/get_total_stats', get_total_stats)
-
+appTriggers.route('/on_organization_create', on_organization_create)
+appTriggers.route('/cron_stats', cron_stats)
+appTriggers.route('/cron_plan', cron_plan)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
 
 app.get('/test_sentry', (c) => {
-  if (Math.random() < 0.5) {
+  if (Math.random() < 0.5)
     return c.text('Success!')
-  }
+
   throw new Error('Failed!')
 })
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
-  if (e instanceof HTTPException) {
+  if (e instanceof HTTPException)
     return e.getResponse()
-  }
+
   return c.text('Internal Server Error', 500)
 })
 

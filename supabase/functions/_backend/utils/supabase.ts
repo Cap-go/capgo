@@ -6,12 +6,9 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
-import type { Order } from './types.ts'
-import { countFromClickHouse, readMauFromClickHouse, sendStatsAndDevice } from './clickhouse.ts'
-import type { AppActivity } from './clickhouse.ts'
 
 export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
-
+const DEFAULT_LIMIT = 1000
 // Import Supabase client
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
@@ -173,30 +170,28 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   return userRight.data
 }
 
-export async function getCurrentPlanName(c: Context, userId: string): Promise<string> {
-  try {
-    const { data } = await supabaseAdmin(c)
-      .rpc('get_current_plan_name', { userid: userId })
-      .single()
-      .throwOnError()
-    return data || ''
-  }
-  catch (error) {
-    console.error('getCurrentPlanName error', userId, error)
-  }
-  return ''
+interface PlanUsage {
+  total_percent: number
+  mau_percent: number
+  bandwidth_percent: number
+  storage_percent: number
 }
 
-export async function getPlanUsagePercent(c: Context, userId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_plan_usage_percent', { userid: userId })
-    .single()
-  if (error) {
-    console.error('getPlanUsagePercent error', error.message)
-    throw new Error(error.message)
+export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
+  if (!orgId) {
+    return {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    }
   }
-
-  return data || 0
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
 }
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
@@ -227,24 +222,10 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   return false
 }
 
-export async function isFreeUsage(c: Context, userId: string): Promise<boolean> {
-  try {
-    const { data } = await supabaseAdmin(c)
-      .rpc('is_free_usage', { userid: userId })
-      .single()
-      .throwOnError()
-    return data || false
-  }
-  catch (error) {
-    console.error('isFreeUsage error', userId, error)
-  }
-  return false
-}
-
 export async function isOnboardingNeeded(c: Context, userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
-      .rpc('is_onboarding_needed', { userid: userId })
+      .rpc('is_onboarding_needed_org', { orgid: userId })
       .single()
       .throwOnError()
     return data || false
@@ -321,40 +302,6 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
   return false
 }
 
-export async function updateDeviceCustomId(c: Context, auth: string, appId: string, deviceId: string, customId: string) {
-  console.log(`UpdateDeviceCustomId appId ${appId} deviceId ${deviceId} customId ${customId}`)
-
-  const client = supabaseClient(c, auth)
-  const reqOwner = await client
-    .rpc('has_app_right', { appid: appId, right: 'write' })
-    .then(res => res.data || false)
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  console.log('UpdateDeviceCustomId clickhouse')
-  // get the device from clickhouse
-  const device = await supabaseAdmin(c)
-    .from('clickhouse_devices')
-    .select()
-    .eq('app_id', appId)
-    .eq('device_id', deviceId)
-    .limit(1)
-    .single()
-    .then(res => res.data || null)
-  console.log('UpdateDeviceCustomId get device', device)
-  if (!device)
-    return Promise.reject(new Error('device not found'))
-    // send the device to clickhouse
-  return sendStatsAndDevice(c, {
-    ...device,
-    custom_id: customId,
-  }, [{ action: 'setCustomId' }])
-}
-
 export async function getSDashboard(c: Context, auth: string, orgIdQuery: string, startDate: string, endDate: string, appId?: string) {
   console.log(`getSDashboard orgId ${orgIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 
@@ -415,206 +362,6 @@ export async function getSDashboard(c: Context, auth: string, orgIdQuery: string
   const res = await req
   console.log('res', res)
   return res.data || []
-}
-
-export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
-  console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
-
-  let client = supabaseClient(c, auth)
-  // const userId = (await client.auth.getUser()).data.user?.id
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  if (appId) {
-    const reqOwner = await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then(res => res.data || false)
-    if (!reqOwner)
-      return Promise.reject(new Error('not allowed'))
-  }
-
-  console.log('appId', appId)
-  const appIds: string[] = []
-
-  if (appId) {
-    appIds.push(appId)
-  }
-  else {
-    console.log('getSDashboard V2 get apps', orgId)
-    if (!orgId)
-      return []
-    // get all user apps id
-    console.log('orgId', orgId)
-    const resAppIds = await client
-      .from('apps')
-      .select('app_id')
-      .eq('owner_org', orgId)
-      .then(res => res.data?.map(app => app.app_id) || [])
-    appIds.push(...resAppIds)
-  }
-
-  console.log('appIds', appIds)
-  const res = await readMauFromClickHouse(c, startDate, endDate, appIds)
-  console.log('res', res)
-  return res.data || []
-}
-
-export async function getSDevice(c: Context, auth: string, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
-  // do the request to supabase
-  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
-
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  const reqOwner = auth
-    ? await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then((r) => {
-        console.log(r)
-        return r
-      })
-      .then(res => res.data || false)
-    : true
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  client = supabaseAdmin(c)
-
-  const reqCount = count ? countFromClickHouse(c, 'devices_u', appId) : 0
-  let req = client
-    .from('clickhouse_devices')
-    .select()
-    .eq('app_id', appId)
-
-  if (versionId) {
-    console.log('versionId', versionId)
-    req = req.eq('version', versionId)
-  }
-
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    console.log('range', rangeStart, rangeEnd)
-    req = req.range(rangeStart, rangeEnd)
-  }
-
-  if (deviceIds && deviceIds.length) {
-    console.log('deviceIds', deviceIds)
-    if (deviceIds.length === 1) {
-      req = req.eq('device_id', deviceIds[0])
-      req = req.limit(1)
-    }
-    else {
-      req = req.in('device_id', deviceIds)
-    }
-  }
-  if (search) {
-    console.log('search', search)
-    if (deviceIds && deviceIds.length)
-      req = req.or(`custom_id.like.%${search}%`)
-    else
-      req = req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
-  }
-
-  if (order?.length) {
-    order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        console.log('order', col.key, col.sortable)
-        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
-      }
-    })
-  }
-  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
-
-  // }
-  // else {
-  //   console.log('getDevice enabled')
-  //   // check the rights of the user
-  //   return readDevicesInTinyBird(appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
-  // }
-}
-
-export async function getSStats(c: Context, auth: string, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
-  // if (!isTinybirdGetDevicesEnabled()) {
-  console.log(`getStats auth ${auth} appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
-  // getStats ee.forgr.captime undefined  [
-  //   { key: "action", sortable: true },
-  //   { key: "created_at", sortable: "desc" }
-  // ] 0 9
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  const reqOwner = auth
-    ? (await client
-        .rpc('has_app_right', { appid: appId, right: 'read' })
-        .then(res => res.data || false))
-    : true
-  if (!reqOwner) {
-    const reqAdmin = await client
-      .rpc('is_admin')
-      .then(res => res.data || false)
-    if (!reqAdmin)
-      return Promise.reject(new Error('not allowed'))
-  }
-  client = supabaseAdmin(c)
-
-  const reqCount = count ? countFromClickHouse(c, 'logs', appId) : 0
-  let req = client
-    .from('clickhouse_logs')
-    .select(`
-        device_id,
-        action,
-        platform,
-        version_build,
-        version,
-        created_at
-      `)
-    .eq('app_id', appId)
-
-  if (rangeStart !== undefined && rangeEnd !== undefined) {
-    console.log('range', rangeStart, rangeEnd)
-    req = req.range(rangeStart, rangeEnd)
-  }
-
-  if (after) {
-    console.log('after', after)
-    req = req.gt('created_at', after)
-  }
-
-  if (deviceIds && deviceIds.length) {
-    console.log('deviceIds', deviceIds)
-    if (deviceIds.length === 1)
-      req = req.eq('device_id', deviceIds[0])
-    else
-      req = req.in('device_id', deviceIds)
-  }
-  if (search) {
-    console.log('search', search)
-    if (deviceIds && deviceIds.length)
-      req = req.or(`action.like.%${search}%`)
-    else
-      req = req.or(`device_id.like.%${search}%,action.like.%${search}%`)
-  }
-
-  if (order?.length) {
-    order.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        console.log('order', col.key, col.sortable)
-        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
-      }
-    })
-  }
-  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
-  // }
-  // else {
-  //   console.log('getStats enabled')
-  //   // check the rights of the user
-  //   return readLogInTinyBird(appId, deviceId, search, order, rangeStart, rangeEnd)
-  // }
 }
 
 export async function createApiKey(c: Context, userId: string) {
@@ -727,14 +474,27 @@ export async function getStripeCustomer(c: Context, customerId: string) {
   return stripeInfo
 }
 
+export async function getDefaultPlan(c: Context) {
+  const { data: plan } = await supabaseAdmin(c)
+    .from('plans')
+    .select()
+    .eq('name', 'Solo')
+    .single()
+  return plan
+}
+
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
   const customer = await createCustomer(c, org.management_email, org.created_by, org.name)
   // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
+  const soloPlan = await getDefaultPlan(c)
+  if (!soloPlan)
+    throw new Error('no default plan')
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({
+      product_id: soloPlan.stripe_id,
       customer_id: customer.id,
       trial_at: trial_at.toISOString(),
     })
@@ -752,7 +512,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   const person: Person = {
     id: org.id,
     customer_id: customer.id,
-    product_id: 'free',
+    product_id: soloPlan.name,
     nickname: org.name,
     avatar: org.logo ? org.logo : undefined,
     // country: user.country ? user.country : undefined,
@@ -762,14 +522,14 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     .select()
     .eq('stripe_id', customer.id)
     .single()
-  const segment = await customerToSegmentOrg(c, org.id, 'free', plan)
+  const segment = await customerToSegmentOrg(c, org.id, soloPlan.name, plan)
   await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
     console.log('updatePerson error', e)
   })
   console.log('stripe_info done')
 }
 
-export function trackBandwidthUsage(
+export function trackBandwidthUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
@@ -786,7 +546,7 @@ export function trackBandwidthUsage(
     ])
 }
 
-export function trackVersionUsage(
+export function trackVersionUsageSB(
   c: Context,
   versionId: number,
   appId: string,
@@ -803,13 +563,13 @@ export function trackVersionUsage(
     ])
 }
 
-export async function trackDeviceUsage(
+export function trackDeviceUsageSB(
   c: Context,
   deviceId: string,
   appId: string,
 ) {
-  await supabaseAdmin(c)
-    .from('devices_usage')
+  return supabaseAdmin(c)
+    .from('device_usage')
     .insert([
       {
         device_id: deviceId,
@@ -818,14 +578,14 @@ export async function trackDeviceUsage(
     ])
 }
 
-export async function trackMeta(
+export function trackMetaSB(
   c: Context,
   app_id: string,
   version_id: number,
   size: number,
 ) {
   console.log('createStatsMeta', app_id, version_id, size)
-  await supabaseAdmin(c)
+  return supabaseAdmin(c)
     .from('version_meta')
     .insert([
       {
@@ -836,22 +596,154 @@ export async function trackMeta(
     ])
 }
 
-// export async function readDeviceUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-//   const { data } = await supabaseAdmin(c)
-//     .from('devices_usage')
-//     .select()
-//     .eq('app_id', app_id)
-//     .gte('timestamp', period_start)
-//     .lte('timestamp', period_end)
-//   return data
-// }
+export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  return supabaseAdmin(c)
+    .from('devices')
+    .upsert(
+      {
+        app_id,
+        updated_at: new Date().toISOString(),
+        device_id,
+        platform,
+        plugin_version,
+        os_version,
+        version_build,
+        custom_id,
+        version,
+        is_prod,
+        is_emulator,
+      },
+    )
+    .eq('device_id', device_id)
+}
 
-// export async function readBandwidthUsage(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-//   const { data } = await supabaseAdmin(c)
-//     .from('bandwidth_usage')
-//     .select()
-//     .eq('app_id', app_id)
-//     .gte('timestamp', period_start)
-//     .lte('timestamp', period_end)
-//   return data
-// }
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+  return supabaseAdmin(c)
+    .from('stats')
+    .insert(
+      {
+        app_id,
+        created_at: new Date().toISOString(),
+        device_id,
+        action,
+        version: version_id,
+      },
+    )
+}
+
+export async function readDeviceUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readBandwidthUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_bandwidth_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readStatsStorageSB(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_storage_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string) {
+  const { data } = await supabaseAdmin(c)
+    .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+  return data || []
+}
+
+export async function readStatsSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+  const supabase = supabaseAdmin(c)
+
+  let query = supabase
+    .from('stats')
+    .select('*')
+    .eq('app_id', app_id)
+    .gte('created_at', new Date(period_start).toISOString())
+    .lt('created_at', new Date(period_end).toISOString())
+    .order('created_at', { ascending: true })
+    .order('app_id', { ascending: true })
+    .limit(limit)
+
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      query = query.eq('device_id', deviceIds[0])
+    else
+      query = query.in('device_id', deviceIds)
+  }
+
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      query = query.ilike('version_build', `${search}%`)
+    else
+      query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error reading stats list', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+  const supabase = supabaseAdmin(c)
+
+  console.log('readDevicesSB', app_id, period_start, period_end, version_id, deviceIds, search)
+  let query = supabase
+    .from('devices')
+    .select('*')
+    .eq('app_id', app_id)
+    .gte('updated_at', new Date(period_start).toISOString())
+    .lt('updated_at', new Date(period_end).toISOString())
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      query = query.eq('device_id', deviceIds[0])
+    else
+      query = query.in('device_id', deviceIds)
+  }
+
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      query = query.ilike('custom_id', `${search}%`)
+    else
+      query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
+  }
+  if (version_id)
+    query = query.eq('version_id', version_id)
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error reading device list', error)
+    return []
+  }
+
+  return data || []
+}
+const DEFAUL_PLAN_NAME = 'Solo'
+
+export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise<string> {
+  if (!orgId)
+    return DEFAUL_PLAN_NAME
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_current_plan_name_org', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || DEFAUL_PLAN_NAME
+}

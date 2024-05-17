@@ -33,7 +33,7 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
     const promises = []
 
-    const usageByApp = await main.filterDashboard(id.value)
+    const usageByApp = main.filterDashboard(id.value)
     updatesNb.value = usageByApp.reduce((acc, cur) => acc + cur.get, 0)
     devicesNb.value = usageByApp.reduce((acc, cur) => acc + cur.mau, 0)
 

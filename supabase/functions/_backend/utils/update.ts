@@ -39,7 +39,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getDrizzlePostgres(c: Context) {
-  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
+  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL') ? getEnv(c, 'CUSTOM_SUPABASE_DB_URL') : getEnv(c, 'SUPABASE_DB_URL')
   // const supaUrl = c.env.HYPERDRIVE ? c.env.HYPERDRIVE.connectionString : getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
   console.log('getDrizzlePostgres', supaUrl)
 
@@ -73,8 +73,8 @@ async function requestInfosPostgres(
     .select({
       device_id: schema.devices_override.device_id,
       app_id: schema.devices_override.app_id,
-      created_at: schema.devices_override.created_at,
-      updated_at: schema.devices_override.updated_at,
+      // created_at: schema.devices_override.created_at,
+      // updated_at: schema.devices_override.updated_at,
       version: {
         id: versionAlias.id,
         name: versionAlias.name,
@@ -126,7 +126,7 @@ async function requestInfosPostgres(
       },
       channels: {
         id: schema.channels.id,
-        created_at: schema.channels.created_at,
+        // created_at: schema.channels.created_at,
         // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
@@ -193,7 +193,7 @@ async function requestInfosPostgres(
       },
       channels: {
         id: schema.channels.id,
-        created_at: schema.channels.created_at,
+        // created_at: schema.channels.created_at,
         // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
@@ -276,7 +276,7 @@ export async function update(c: Context, body: AppInfos) {
       is_prod = true,
     } = body
     // if version_build is not semver, then make it semver
-    const coerce = semver.coerce(version_build)
+    const coerce = semver.coerce(version_build, { includePrerelease: true })
     const appOwner = await getAppOwnerPostgres(app_id, alias, drizzleCient, schema)
     if (!appOwner) {
       // TODO: transfer to clickhouse

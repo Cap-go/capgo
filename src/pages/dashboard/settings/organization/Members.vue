@@ -161,7 +161,7 @@ function handleSendInvitationOutput(output: string) {
       break
     }
     case 'NO_EMAIL': {
-      toast.error(t('email-does-not-exist'))
+      toast.error(t('please-ask-the-user-to-create-account-first'))
       break
     }
     case 'ALREADY_INVITED': {

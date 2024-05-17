@@ -1,8 +1,9 @@
-import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04-03'
+import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
-import { getEnv } from './utils.ts'
+import { backgroundTask, getEnv } from './utils.ts'
+import type { Database } from './supabase.types.ts'
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
@@ -12,8 +13,10 @@ export type Bindings = {
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
   DEVICE_INFO: AnalyticsEngineDataPoint
+  DB_DEVICES: D1Database
 }
 
+const DEFAULT_LIMIT = 1000
 export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
     return
@@ -52,33 +55,19 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
   })
 }
 
-export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: string, plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DEVICE_INFO)
-    return
-  c.env.DEVICE_INFO.writeDataPoint({
-    blobs: [device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator],
-    doubles: [version_id],
-    indexes: [app_id],
-  })
-}
-
-export function trackMetaCF(c: Context, app_id: string, version_id: number, size: number) {
-  if (!c.env.VERSION_META)
-    return
-  console.log('trackMetaCF', app_id, version_id, size)
-  c.env.VERSION_META.writeDataPoint({
-    doubles: [version_id, size],
-    indexes: [app_id],
-  })
+// deno-lint-ignore no-unused-vars
+// eslint-disable-next-line unused-imports/no-unused-vars
+export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  // TODO
 }
 
 export function formatDateCF(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
 }
 
-async function runQueryToCF(c: Context, query: string) {
+async function runQueryToCF<T>(c: Context, query: string) {
   const CF_ANALYTICS_TOKEN = getEnv(c, 'CF_ANALYTICS_TOKEN')
-  const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ID')
+  const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
 
   const response = await ky.post(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`, {
     headers: {
@@ -89,108 +78,98 @@ async function runQueryToCF(c: Context, query: string) {
     body: query,
   })
 
-  return response.json()
+  const res = await response.json<{
+    data: T
+    meta: { name: string, type: string }[]
+    rows: number
+    rows_before_limit_at_least: number
+  }>()
+  return res.data
 }
 
-export function readDeviceUsageCF(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
+interface DeviceUsageCF {
+  date: string
+  mau: number
+  app_id: string
+}
+
+export async function readDeviceUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
   if (!c.env.DEVICE_USAGE)
-    return
+    return [] as DeviceUsageCF[]
   const query = `SELECT
-  index1 AS app_id,
   toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
-  count(DISTINCT blob1) AS daily_mau
+  count(DISTINCT blob1) AS mau,
+  index1 AS app_id
 FROM device_usage
 WHERE
-  index1 = '${app_id}'
+  app_id = '${app_id}'
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
 GROUP BY app_id, date
-ORDER BY date;`
+ORDER BY date, app_id;`
 
-  const queryTotal = `SELECT
-index1 AS app_id,
-sum(_sample_interval * count(DISTINCT blob1)) as total_mau
-FROM
-device_usage
-WHERE
-timestamp >= toDateTime('${formatDateCF(period_start)}')
-AND timestamp < toDateTime('${formatDateCF(period_end)}')
-AND app_id = '${app_id}'
-GROUP BY app_id;`
-
-  if (total)
-    return runQueryToCF(c, queryTotal)
-
-  return runQueryToCF(c, query)
+  console.log('readDeviceUsageCF query', query)
+  try {
+    return await runQueryToCF<DeviceUsageCF[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading device usage', e)
+  }
+  return [] as DeviceUsageCF[]
 }
 
-export function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
+interface BandwidthUsageCF {
+  date: string
+  bandwidth: number
+  app_id: string
+}
+
+export async function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
   if (!c.env.BANDWIDTH_USAGE)
-    return
+    return [] as BandwidthUsageCF[]
   const query = `SELECT
   toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
-  sum(double1) AS bandwidth
+  sum(double1) AS bandwidth,
+  blob2 AS app_id
 FROM bandwidth_usage
-WHERE
-  timestamp >= toDateTime('${formatDateCF(period_start)}')
-  AND timestamp < toDateTime('${formatDateCF(period_end)}')
-  AND blob2 = '${app_id}'
-GROUP BY date
-ORDER BY date;`
-
-  const queryTotal = `SELECT
-  sum(double1) AS total_bandwidth
-FROM bandwidth_usage
-WHERE
-  timestamp >= toDateTime('${formatDateCF(period_start)}')
-  AND timestamp < toDateTime('${formatDateCF(period_end)}')
-  AND blob2 = '${app_id}';`
-
-  if (total)
-    return runQueryToCF(c, queryTotal)
-
-  return runQueryToCF(c, query)
-}
-
-export function readStorageUsageCF(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
-  if (!c.env.VERSION_META)
-    return
-  const query = `SELECT
-  index1 AS app_id,
-  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
-  sum(double2) AS storage
-FROM version_meta
 WHERE
   timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
   AND app_id = '${app_id}'
-GROUP BY date
-ORDER BY date;`
-  const queryTotal = `SELECT
-  index1 AS app_id,
-  sum(_sample_interval * double2) AS total_storage
-FROM version_meta
-WHERE
-  timestamp >= toDateTime('${formatDateCF(period_start)}')
-  AND timestamp < toDateTime('${formatDateCF(period_end)}')
-  AND app_id = '${app_id}';`
-  if (total)
-    return runQueryToCF(c, queryTotal)
+GROUP BY date, app_id
+ORDER BY date, app_id;`
 
-  return runQueryToCF(c, query)
+  console.log('readBandwidthUsageCF query', query)
+  try {
+    return await runQueryToCF<BandwidthUsageCF[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading bandwidth usage', e)
+  }
+  return [] as BandwidthUsageCF[]
 }
 
-export function readVersionUsageCF(c: Context, app_id: string, period_start: string, period_end: string, total: boolean = true) {
+interface VersionUsageCF {
+  date: string
+  app_id: string
+  version_id: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
+export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string) {
   if (!c.env.VERSION_USAGE)
-    return
+    return [] as VersionUsageCF[]
   const query = `SELECT
   blob1 as app_id,
   blob2 as version_id,
-  intDiv(toUInt32(timestamp), 86400) * 86400 AS date,
-  sum(if(blob3 = 'get', 1, 0)) AS total_get,
-  sum(if(blob3 = 'fail', 1, 0)) AS total_fail,
-  sum(if(blob3 = 'install', 1, 0)) AS total_install,
-  sum(if(blob3 = 'uninstall', 1, 0)) AS total_uninstall
+  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
+  sum(if(blob3 = 'get', 1, 0)) AS get,
+  sum(if(blob3 = 'fail', 1, 0)) AS fail,
+  sum(if(blob3 = 'install', 1, 0)) AS install,
+  sum(if(blob3 = 'uninstall', 1, 0)) AS uninstall
 FROM version_usage
 WHERE
   app_id = '${app_id}'
@@ -199,21 +178,145 @@ WHERE
 GROUP BY date, app_id, version_id
 ORDER BY date;`
 
-  const queryTotal = `SELECT
-toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
-sum(if(blob3 = 'get', 1, 0)) AS total_get,
-sum(if(blob3 = 'fail', 1, 0)) AS total_fail,
-sum(if(blob3 = 'install', 1, 0)) AS total_install,
-sum(if(blob3 = 'uninstall', 1, 0)) AS total_uninstall
-FROM version_usage
+  console.log('readStatsVersionCF query', query)
+  try {
+    return await runQueryToCF<VersionUsageCF[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading version usage', e)
+  }
+  return [] as VersionUsageCF[]
+}
+
+interface DeviceRowCF {
+  app_id: string
+  device_id: string
+  version_id: number
+  platform: string
+  plugin_version: string
+  os_version: string
+  version_build: string
+  custom_id: string
+  is_prod: string
+  is_emulator: string
+  timestamp: string
+}
+
+export async function readDevicesCF(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+  if (!c.env.DEVICE_LOG)
+    return [] as DeviceRowCF[]
+
+  let deviceFilter = ''
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1) {
+      deviceFilter = `AND device_id = '${deviceIds[0]}'`
+    }
+    else {
+      const devicesList = deviceIds.join(',')
+      deviceFilter = `AND device_id IN (${devicesList})`
+    }
+  }
+  let searchFilter = ''
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      searchFilter = `AND startsWith(custom_id, '${search}')`
+    else
+      searchFilter = `AND (startsWith(device_id, '${search}') OR startsWith(custom_id, '${search}'))`
+  }
+  let versionFilter = ''
+  if (version_id)
+    versionFilter = `AND version_id = ${version_id}`
+
+  const query = `SELECT
+  blob1 AS app_id,
+  blob2 AS device_id,
+  double1 AS version_id,
+  blob3 AS platform,
+  blob4 AS plugin_version,
+  blob5 AS os_version,
+  blob6 AS version_build,
+  blob7 AS is_prod,
+  blob8 AS is_emulator,
+  blob9 AS custom_id,
+  timestamp AS updated_at
+FROM device_log
 WHERE
-  timestamp >= toDateTime('${formatDateCF(period_start)}')
-  AND timestamp < toDateTime('${formatDateCF(period_end)}')
-GROUP BY date
-ORDER BY date;`
+  startsWith(index1, '${app_id}__')
+  ${deviceFilter}
+  ${searchFilter}
+  ${versionFilter}
+  AND updated_at >= toDateTime('${formatDateCF(period_start)}')
+  AND updated_at < toDateTime('${formatDateCF(period_end)}')
+GROUP BY app_id, device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, updated_at, version_id
+ORDER BY updated_at DESC
+LIMIT ${limit};`
 
-  if (total)
-    return runQueryToCF(c, queryTotal)
+  console.log('readDevicesCF query', query)
+  try {
+    return await runQueryToCF<DeviceRowCF[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading device list', e)
+  }
+  return [] as DeviceRowCF[]
+}
 
-  return runQueryToCF(c, query)
+interface StatRowCF {
+  app_id: string
+  device_id: string
+  action: string
+  version_id: number
+  created_at: string
+}
+
+export async function readStatsCF(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+  if (!c.env.APP_LOG)
+    return [] as StatRowCF[]
+
+  let deviceFilter = ''
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1) {
+      deviceFilter = `AND device_id = '${deviceIds[0]}'`
+    }
+    else {
+      const devicesList = deviceIds.join(',')
+      deviceFilter = `AND device_id IN (${devicesList})`
+    }
+  }
+  let searchFilter = ''
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      searchFilter = `AND startsWith(custom_id, '${search}')`
+    else
+      searchFilter = `AND (startsWith(device_id, '${search}') OR startsWith(custom_id, '${search}'))`
+  }
+  const query = `SELECT
+  index1 as app_id,
+  blob1 as device_id,
+  blob2 as action,
+  double1 as version_id,
+  timestamp as created_at
+FROM app_log
+WHERE
+  app_id = '${app_id}'
+  ${deviceFilter}
+  ${searchFilter}
+  AND created_at >= toDateTime('${formatDateCF(period_start)}')
+  AND created_at < toDateTime('${formatDateCF(period_end)}')
+GROUP BY app_id, created_at
+ORDER BY created_at, app_id
+LIMIT ${limit};`
+
+  console.log('readStatsCF query', query)
+  try {
+    return await runQueryToCF<StatRowCF[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading stats list', e)
+  }
+  return [] as StatRowCF[]
 }

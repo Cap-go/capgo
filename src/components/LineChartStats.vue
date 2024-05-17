@@ -14,7 +14,6 @@ import annotationPlugin from 'chartjs-plugin-annotation'
 import { useI18n } from 'vue-i18n'
 import { isDark } from '../composables/dark'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
-import { useMainStore } from '~/stores/main'
 
 const props = defineProps({
   accumulated: {
@@ -28,9 +27,9 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const main = useMainStore()
-const cycleStart = main.cycleInfo?.subscription_anchor_start ? new Date(main.cycleInfo?.subscription_anchor_start) : null
-const cycleEnd = main.cycleInfo?.subscription_anchor_end ? new Date(main.cycleInfo?.subscription_anchor_end) : null
+const organizationStore = useOrganizationStore()
+const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 
 Chart.register(
   // Colors,

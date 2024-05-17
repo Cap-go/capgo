@@ -1,15 +1,16 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { getSStats, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
-import { checkKey } from '../utils/utils.ts'
+import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import type { Order } from '../utils/types.ts'
-import type { Database } from '../utils/supabase.types.ts'
+import { getSStats } from '../utils/clickhouse.ts'
+import { readStats } from '../utils/stats.ts'
 
 // get_stats
 
 interface dataStats {
   appId: string
+  api?: 'v2' | null
   devicesId?: string[]
   search?: string
   order?: Order[]
@@ -27,15 +28,29 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const body = await c.req.json<dataStats>()
     console.log('body', body)
     const apikey_string = c.req.header('capgkey')
-    const authorization = apikey_string || c.req.header('authorization') || 'MISSING'
+    const authorization = c.req.header('authorization')
     if (apikey_string) {
-      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(apikey_string, supabaseAdmin(c), ['all', 'write'])
-      if (!apikey)
-        return c.json({ status: 'Missing apikey' }, 400)
-      if (!body.appId || !(await hasAppRight(c, body.appId, apikey.user_id, 'read')))
+      const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+        .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
+      if (_errorUserId || !userId)
+        return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
+      if (!(await hasAppRight(c, body.appId, userId, 'read')))
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }
-    return c.json(await getSStats(c, apikey_string === authorization ? '' : authorization, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
+    else if (authorization) {
+      const reqOwner = await supabaseClient(c, authorization)
+        .rpc('has_app_right', { appid: body.appId, right: 'read' })
+        .then(res => res.data || false)
+      if (!reqOwner)
+        return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
+    }
+    else {
+      return c.json({ status: 'You can\'t access this app auth not found', app_id: body.appId }, 400)
+    }
+
+    if (body.api === 'v2')
+      return c.json(await readStats(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.devicesId, body.search))
+    return c.json(await getSStats(c, body.appId, body.devicesId, body.search, body.order, body.rangeStart, body.rangeEnd, body.after, true))
   }
   catch (e) {
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)

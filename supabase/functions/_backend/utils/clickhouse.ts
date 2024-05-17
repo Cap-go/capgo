@@ -3,8 +3,9 @@ import ky from 'ky'
 import type { Context, ExecutionContext } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
-import { getAppsFromSupabase } from './supabase.ts'
-import { createStatsDevices, createStatsLogs, createStatsMeta } from './stats.ts'
+import { getAppsFromSupabase, supabaseAdmin, supabaseClient } from './supabase.ts'
+import { createStatsDevices, createStatsLogs } from './stats.ts'
+import type { Order } from './types.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 
@@ -169,9 +170,7 @@ SELECT
   SUM(COALESCE(logs_daily.get, 0)) AS get,
   SUM(COALESCE(logs_daily.fail, 0)) AS fail,
   SUM(COALESCE(logs_daily.install, 0)) AS install,
-  SUM(COALESCE(logs_daily.uninstall, 0)) AS uninstall,
-  MAX(app_storage_daily.storage_added) AS storage_added,
-  MAX(app_storage_daily.storage_deleted) AS storage_deleted
+  SUM(COALESCE(logs_daily.uninstall, 0)) AS uninstall
 FROM 
   (SELECT 
       daily_device.app_id,
@@ -184,7 +183,6 @@ FROM
       daily_device.app_id IN app_id_list
   GROUP BY daily_device.app_id, daily_device.device_id) as first_device_logs
 LEFT JOIN logs_daily ON first_device_logs.app_id = logs_daily.app_id AND first_device_logs.first_log_date = logs_daily.date
-LEFT JOIN app_storage_daily ON first_device_logs.app_id = app_storage_daily.app_id AND first_device_logs.first_log_date = app_storage_daily.date
 GROUP BY 
   first_device_logs.app_id, 
   first_device_logs.first_log_date
@@ -338,11 +336,11 @@ function prefixParams(params: Record<string, any>): Record<string, any> {
   return prefixedParams
 }
 
-export async function saveStoreInfo(c: Context, app: Database['public']['Tables']['store_apps']['Insert']) {
+export async function saveStoreInfo(c: Context, app: any) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
   // Save a single app in ClickHouse
-  const columns: (keyof Database['public']['Tables']['store_apps']['Insert'])[] = Object.keys({ updates: 0, ...app }) as (keyof Database['public']['Tables']['store_apps']['Insert'])[]
+  const columns: (keyof any)[] = Object.keys({ updates: 0, ...app }) as (keyof any)[]
   const values = columns.map((column) => {
     const value = app[column]
     if (column === 'updates')
@@ -367,7 +365,7 @@ export async function saveStoreInfo(c: Context, app: Database['public']['Tables'
   }
 }
 
-export async function bulkUpdateStoreApps(c: Context, apps: (Database['public']['Tables']['store_apps']['Insert'])[]) {
+export async function bulkUpdateStoreApps(c: Context, apps: (any)[]) {
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
   // Update a list of apps in ClickHouse (internal use only)
@@ -626,21 +624,6 @@ export interface ClickHouseMeta {
   version_id: number
   size: number
 }
-export function sendMetaToClickHouse(c: Context, meta: ClickHouseMeta[]) {
-  if (!isClickHouseEnabled(c))
-    return Promise.resolve()
-
-  console.log('sending meta to Clickhouse', meta)
-  const metasReady = meta
-    .map((l) => {
-      createStatsMeta(c, l.app_id, l.version_id, l.size)
-      return l
-    })
-    .map(convertAllDatesToCH)
-    .map(l => JSON.stringify(l)).join('\n')
-
-  return sendClickHouse(c, metasReady, 'app_versions_meta')
-}
 
 export interface StatsActions {
   action: string
@@ -652,9 +635,10 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   const deviceData = convertAllDatesToCH({ ...device, updated_at: new Date().toISOString() })
   const deviceReady = JSON.stringify(deviceData)
 
+  const jobs = []
   // Prepare the stats data for insertion
   const statsData = statsActions.map(({ action, versionId }) => {
-    const stat: Database['public']['Tables']['stats']['Insert'] = {
+    const stat: any = {
       created_at: new Date().toISOString(),
       device_id: device.device_id,
       action,
@@ -663,7 +647,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
       version: versionId || device.version, // Use the provided versionId if available
       platform: device.platform ?? 'android',
     }
-    createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version)
+    jobs.push(createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version))
     return JSON.stringify(convertAllDatesToCH(stat))
   }).join('\n')
 
@@ -673,17 +657,15 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     app_id: device.app_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
-  createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? '', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false)
+  jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
   if (!isClickHouseEnabled(c))
     return Promise.resolve()
-  const jobs = Promise.all([
+  jobs.push([
     sendClickHouse(c, deviceReady, 'devices'),
     sendClickHouse(c, statsData, 'logs'),
     sendClickHouse(c, dailyDeviceReady, 'daily_device'),
-  ]).catch((error) => {
-    console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
-  })
+  ])
 
   let executionCtx: ExecutionContext | null
   try {
@@ -694,7 +676,174 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   }
 
   if (executionCtx?.waitUntil)
-    return c.executionCtx.waitUntil(jobs)
+    return c.executionCtx.waitUntil(Promise.all(jobs))
 
-  return jobs
+  return Promise.all(jobs)
+    .catch((error) => {
+      console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
+    })
+}
+
+export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
+  console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
+
+  let client = supabaseClient(c, auth)
+  // const userId = (await client.auth.getUser()).data.user?.id
+  if (!auth)
+    client = supabaseAdmin(c)
+
+  if (appId) {
+    const reqOwner = await client
+      .rpc('has_app_right', { appid: appId, right: 'read' })
+      .then(res => res.data || false)
+    if (!reqOwner)
+      return Promise.reject(new Error('not allowed'))
+  }
+
+  console.log('appId', appId)
+  const appIds: string[] = []
+
+  if (appId) {
+    appIds.push(appId)
+  }
+  else {
+    console.log('getSDashboard V2 get apps', orgId)
+    if (!orgId)
+      return []
+    // get all user apps id
+    console.log('orgId', orgId)
+    const resAppIds = await client
+      .from('apps')
+      .select('app_id')
+      .eq('owner_org', orgId)
+      .then(res => res.data?.map(app => app.app_id) || [])
+    appIds.push(...resAppIds)
+  }
+
+  console.log('appIds', appIds)
+  const res = await readMauFromClickHouse(c, startDate, endDate, appIds)
+  console.log('res', res)
+  return res.data || []
+}
+
+export async function getSDevice(c: Context, appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, count = false) {
+  // do the request to supabase
+  console.log(`getDevice appId ${appId} versionId ${versionId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd}`, order)
+
+  const client = supabaseAdmin(c)
+
+  const reqCount = count ? countFromClickHouse(c, 'devices_u', appId) : 0
+  let req = client
+    .from('clickhouse_devices')
+    .select()
+    .eq('app_id', appId)
+
+  if (versionId) {
+    console.log('versionId', versionId)
+    req = req.eq('version', versionId)
+  }
+
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
+    req = req.range(rangeStart, rangeEnd)
+  }
+
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1) {
+      req = req.eq('device_id', deviceIds[0])
+      req = req.limit(1)
+    }
+    else {
+      req = req.in('device_id', deviceIds)
+    }
+  }
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      req = req.or(`custom_id.like.%${search}%`)
+    else
+      req = req.or(`device_id.like.%${search}%,custom_id.like.%${search}%`)
+  }
+
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
+      }
+    })
+  }
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] as Database['public']['Tables']['devices']['Row'][] }))
+
+  // }
+  // else {
+  //   console.log('getDevice enabled')
+  //   // check the rights of the user
+  //   return readDevicesInTinyBird(appId, versionId, deviceIds, search, order, rangeStart, rangeEnd)
+  // }
+}
+
+export async function getSStats(c: Context, appId: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number, after?: string, count = false) {
+  // if (!isTinybirdGetDevicesEnabled()) {
+  console.log(`getStats appId ${appId} deviceIds ${deviceIds} search ${search} rangeStart ${rangeStart}, rangeEnd ${rangeEnd} after ${after}`, order)
+  // getStats ee.forgr.captime undefined  [
+  //   { key: "action", sortable: true },
+  //   { key: "created_at", sortable: "desc" }
+  // ] 0 9
+  const client = supabaseAdmin(c)
+
+  const reqCount = count ? countFromClickHouse(c, 'logs', appId) : 0
+  let req = client
+    .from('clickhouse_logs')
+    .select(`
+        device_id,
+        action,
+        platform,
+        version_build,
+        version,
+        created_at
+      `)
+    .eq('app_id', appId)
+
+  if (rangeStart !== undefined && rangeEnd !== undefined) {
+    console.log('range', rangeStart, rangeEnd)
+    req = req.range(rangeStart, rangeEnd)
+  }
+
+  if (after) {
+    console.log('after', after)
+    req = req.gt('created_at', after)
+  }
+
+  if (deviceIds && deviceIds.length) {
+    console.log('deviceIds', deviceIds)
+    if (deviceIds.length === 1)
+      req = req.eq('device_id', deviceIds[0])
+    else
+      req = req.in('device_id', deviceIds)
+  }
+  if (search) {
+    console.log('search', search)
+    if (deviceIds && deviceIds.length)
+      req = req.or(`action.like.%${search}%`)
+    else
+      req = req.or(`device_id.like.%${search}%,action.like.%${search}%`)
+  }
+
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        req = req.order(col.key as string, { ascending: col.sortable === 'asc' })
+      }
+    })
+  }
+  return Promise.all([reqCount, req.then(res => res.data || [])]).then(res => ({ count: res[0], data: res[1] }))
+  // }
+  // else {
+  //   console.log('getStats enabled')
+  //   // check the rights of the user
+  //   return readLogInTinyBird(appId, deviceId, search, order, rangeStart, rangeEnd)
+  // }
 }

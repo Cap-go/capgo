@@ -13,6 +13,7 @@ import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
+import type { ArrayElement } from '~/services/types'
 
 function openSupport() {
   openMessenger()
@@ -21,17 +22,14 @@ function openSupport() {
 const { t } = useI18n()
 const mainStore = useMainStore()
 
-const displayPlans = computed(() => {
-  return mainStore.plans.filter(plan => plan.stripe_id !== 'free')
-})
-
 const displayStore = useDisplayStore()
 
 interface PlansOrgData {
-  stats: Database['public']['Functions']['get_total_stats_v5']['Returns'][0] | undefined
+  stats: Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0] | undefined
   planSuggest: string
   planCurrrent: string
   planPercent: number
+  detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>
   paying: boolean
   trialDaysLeft: number
 }
@@ -44,6 +42,12 @@ function defaultPlanOrgData(): PlansOrgData {
     planSuggest: '',
     paying: false,
     trialDaysLeft: 0,
+    detailPlanUsage: {
+      total_percent: 0,
+      mau_percent: 0,
+      bandwidth_percent: 0,
+      storage_percent: 0,
+    },
   }
 }
 
@@ -98,6 +102,7 @@ const currentData = computed(() => orgsHashmap.value.get(currentOrganization.val
 
 const currentPlanSuggest = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
 const currentPlan = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planCurrrent))
+const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // get the current url
@@ -126,8 +131,6 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 // }
 
 async function getUsages(orgId: string) {
-  // get aapp_stats
-
   const stats = await getTotalStats(orgId)
   const bestPlan = await findBestPlan(stats)
   return { stats, bestPlan }
@@ -160,8 +163,9 @@ async function loadData(initial: boolean) {
       // updateData()
     }),
     getPlanUsagePercent(orgId).then((res) => {
-      console.log(res)
-      data.planPercent = res
+      // console.log('getPlanUsagePercent', res)
+      data.planPercent = res.total_percent
+      data.detailPlanUsage = res
       // updateData()
     }).catch(err => console.log(err)),
     // isPayingOrg(orgId).then(res => {
@@ -247,7 +251,7 @@ watchEffect(async () => {
         channel: 'usage',
         event: 'User visit',
         icon: '💳',
-        user_id: main.user.id,
+        user_id: currentOrganization.value?.gid,
         notify: false,
       }).catch()
     }
@@ -259,12 +263,27 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0) ? t('Current') : t('failed'),
-    value: currentPlan.value?.name,
+    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value) ? t('Current') : t('failed'),
+    value: !isTrial.value ? currentPlan.value?.name : t('trial'),
   },
   {
     label: t('usage'),
-    value: (currentData.value && currentData.value?.planPercent && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
+    value: (currentData.value && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
+    informationIcon: () => {
+      if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
+        return
+
+      displayStore.dialogOption = {
+        header: t('detailed-usage-plan'),
+        message: `${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%`,
+        buttons: [
+          {
+            text: t('ok'),
+          },
+        ],
+      }
+      displayStore.showDialog = true
+    },
   },
   {
     label: t('best-plan'),
@@ -325,7 +344,7 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </div>
       <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="(p, index) in displayPlans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
+        <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
           <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -340,9 +359,14 @@ const hightLights = computed<Stat[]>(() => ([
             </span>
           </div>
           <div class="p-6 border-none">
-            <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              {{ p.name }}
-            </h2>
+            <div class="flex flex-row">
+              <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                {{ p.name }}
+              </h2>
+              <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="px-2 ml-auto bg-blue-600 rounded-full">
+                {{ t('trial') }}
+              </h2>
+            </div>
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">
               {{ t(convertKey(p.description)) }}
             </p>
@@ -353,7 +377,6 @@ const hightLights = computed<Stat[]>(() => ([
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
             <button
-              v-if="p.stripe_id !== 'free'"
               :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && currentData?.paying }"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="isDisabled(p)" @click="openChangePlan(p, index)"

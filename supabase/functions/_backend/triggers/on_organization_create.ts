@@ -4,6 +4,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import { createStripeCustomer } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { logsnag } from '../utils/logsnag.ts'
 
 export const app = new Hono()
 
@@ -30,7 +31,16 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (!record.customer_id)
       createStripeCustomer(c, record as any)
 
-    return c.json(BRES) // skip delete s3 and increment size in new upload
+    const LogSnag = logsnag(c)
+    LogSnag.track({
+      channel: 'org-created',
+      event: 'Org Created',
+      icon: '🎉',
+      user_id: record.id,
+      notify: true,
+    })
+
+    return c.json(BRES)
   }
   catch (e) {
     return c.json({ status: 'Cannot handle org creation', error: JSON.stringify(e) }, 500)

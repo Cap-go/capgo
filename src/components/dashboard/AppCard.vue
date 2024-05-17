@@ -102,11 +102,8 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
 }
 
 async function loadData() {
-  if (props.app.app_id) {
-    mauNb.value = main.dashboard
-      .filter(x => x.app_id === props.app.app_id)
-      .reduce((acc, cur) => acc + cur.mau, 0)
-  }
+  if (props.app.app_id)
+    mauNb.value = main.getTotalMauByApp(props.app.app_id)
 }
 
 async function refreshData() {
@@ -132,6 +129,8 @@ const acronym = computed(() => {
 const perm = computed(() => {
   // console.log(props.app.name, organizationStore.getOrgByAppId(props.app.app_id))
   if (props.app.name) {
+    // We should call organizationStore.awaitInitialLoad but that is hard as this is a computed value
+    // This creates a potential race condition
     const org = organizationStore.getOrgByAppId(props.app.app_id)
 
     return org?.role ?? t('unknown')

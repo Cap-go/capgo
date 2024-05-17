@@ -10,20 +10,6 @@ export type Organization = ArrayElement<Database['public']['Functions']['get_org
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
-// TODO Create user rights in database
-// type Right = Database['public']['Tables']['user_rights']['Row']
-
-// const permMap = new Map([
-//   ['invite_read', 0],
-//   ['invite_upload', 0],
-//   ['invite_write', 0],
-//   ['invite_admin', 0],
-//   ['read', 1],
-//   ['upload', 2],
-//   ['write', 3],
-//   ['admin', 4],
-//   ['super_admin', 5],
-// ])
 
 const supabase = useSupabase()
 const main = useMainStore()
@@ -56,6 +42,16 @@ export const useOrganizationStore = defineStore('organization', () => {
     throw new Error(`Cannot find role for (${appOwner}, ${appId}, ${channelId}))`)
   }
 
+  // WARNING: currentOrganization does not guarantee corectness when used in an app-based URL
+  // For example if you try to use this value when fetching app channels it COULD BE incorrect
+  // When trying to fetch an organization in an app based component the following should be used
+  //
+  // const organization = ref(null as null | Organization)
+  // watchEffect(async () => {
+  //  await organizationStore.awaitInitialLoad()
+  //  organization.value = organizationStore.getOrgByAppId(appId.value) ?? null
+  // }
+  //
   const currentOrganization = ref<Organization | undefined>(undefined)
   const currentRole = ref<OrganizationRole | null>(null)
 
