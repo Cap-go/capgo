@@ -26,7 +26,7 @@ jobs:
       - uses: JarvusInnovations/background-action@v1
         name: Bootstrap Edge server
         with:
-          run: supabase functions serve &
+          run: supabase functions serve --env-file=supabase/.env.backend.test &
           wait-on: |
             http-get://127.0.0.1:54321/functions/v1/ok
           # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
