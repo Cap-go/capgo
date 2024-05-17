@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import {
-  getCurrentPlanName,
+  getCurrentPlanNameOrg,
   getPlanUsagePercent,
   isGoodPlanOrg,
   isOnboardedOrg,
@@ -140,7 +140,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       console.log('is_good_plan_v5', orgId, is_good_plan)
       // create dateid var with yyyy-mm with dayjs
       const get_total_stats = await getTotalStats(c, orgId)
-      const current_plan = await getCurrentPlanName(c, orgId)
+      const current_plan = await getCurrentPlanNameOrg(c, orgId)
       if (get_total_stats) {
         const best_plan = await findBestPlan(c, get_total_stats)
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')

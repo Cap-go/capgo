@@ -734,3 +734,16 @@ export async function readDevicesSB(c: Context, app_id: string, period_start: st
 
   return data || []
 }
+const DEFAUL_PLAN_NAME = 'Solo'
+
+export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise<string> {
+  if (!orgId)
+    return DEFAUL_PLAN_NAME
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_current_plan_name_org', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data || DEFAUL_PLAN_NAME
+}

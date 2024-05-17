@@ -376,18 +376,6 @@ export async function getTotalStats(orgId?: string): Promise<Database['public'][
 
 const DEFAUL_PLAN_NAME = 'Solo'
 
-export async function getCurrentPlanName(userid?: string): Promise<string> {
-  if (!userid)
-    return DEFAUL_PLAN_NAME
-  const { data, error } = await useSupabase()
-    .rpc('get_current_plan_name', { userid })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data || DEFAUL_PLAN_NAME
-}
-
 export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
   if (!orgId)
     return DEFAUL_PLAN_NAME
