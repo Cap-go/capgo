@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-t
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
-import { backgroundTask, getEnv } from './utils.ts'
+import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 
 // type is require for the bindings no interface
@@ -57,6 +57,7 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
 
 export async function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
   // TODO: fix this
+  console.log('trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
   //   const updated_at = new Date().toISOString()
