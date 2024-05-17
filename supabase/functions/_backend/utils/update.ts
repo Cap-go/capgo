@@ -362,6 +362,7 @@ export async function update(c: Context, body: AppInfos) {
     }
 
     const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, alias, drizzleCient, schema)
+    await pgClient.end()
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
