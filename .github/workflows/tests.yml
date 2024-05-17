@@ -32,17 +32,17 @@ jobs:
           # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
           # See wait-on section below for all resource types and prefixes
 
-          tail: true # true = stderr,stdout
+          tail: stderr,stdout  # true = stderr,stdout
           # This will allow you to monitor the progress live
 
-          log-output-resume: stderr
+          log-output-resume: stderr,stdout 
           # Eliminates previously output stderr log entries from post-run output
 
           wait-for: 1m
 
           log-output: stderr,stdout # same as true
 
-          log-output-if: success
+          log-output-if: true
           # failure = exit-early or timeout
 
           working-directory: .
