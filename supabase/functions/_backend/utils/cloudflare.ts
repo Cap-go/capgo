@@ -55,26 +55,10 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
   })
 }
 
+// deno-lint-ignore no-unused-vars
+// eslint-disable-next-line unused-imports/no-unused-vars
 export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DB_DEVICES)
-    return
-  const updated_at = new Date().toISOString()
-  const insertD1 = c.env.DB.prepare(`
-  insert into devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-  on conflict (device_id, app_id) do update set
-  updated_at = excluded.updated_at,
-  version = excluded.version,
-  platform = excluded.platform,
-  plugin_version = excluded.plugin_version,
-  os_version = excluded.os_version,
-  version_build = excluded.version_build,
-  custom_id = excluded.custom_id,
-  is_prod = excluded.is_prod,
-  is_emulator = excluded.is_emulator;
-`).bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-    .run()
-  return backgroundTask(c, insertD1)
+  // TODO
 }
 
 export function formatDateCF(date: string | undefined) {
