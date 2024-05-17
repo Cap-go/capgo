@@ -2900,13 +2900,15 @@ ALTER TABLE ONLY "public"."workers"
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
 
+CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
+
 CREATE INDEX "devices_app_id_device_id_updated_at_idx" ON "public"."devices" USING "btree" ("app_id", "device_id", "updated_at");
 
 CREATE INDEX "devices_app_id_updated_at_idx" ON "public"."devices" USING "btree" ("app_id", "updated_at");
 
-CREATE INDEX "idx_app_id_app_versions" ON "public"."app_versions" USING "btree" ("app_id");
-
 CREATE INDEX "idx_app_id_created_at_devices" ON "public"."devices" USING "btree" ("app_id", "updated_at");
+
+CREATE INDEX "idx_app_id_version_devices" ON "public"."devices" USING "btree" ("app_id", "version");
 
 CREATE INDEX "idx_app_id_device_id_channel_devices" ON "public"."channel_devices" USING "btree" ("app_id", "device_id");
 
@@ -2915,8 +2917,6 @@ CREATE INDEX "idx_app_id_device_id_devices_override" ON "public"."devices_overri
 CREATE INDEX "idx_app_id_name_app_versions" ON "public"."app_versions" USING "btree" ("app_id", "name");
 
 CREATE INDEX "idx_app_id_public_channel" ON "public"."channels" USING "btree" ("app_id", "public");
-
-CREATE INDEX "idx_app_id_version_devices" ON "public"."devices" USING "btree" ("app_id", "version");
 
 CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btree" ("created_at");
 

@@ -57,16 +57,29 @@ CREATE TYPE "public"."stats_action" AS ENUM (
 'app_moved_to_background'
 );
 
-ALTER TABLE "public"."stats" DISABLE ROW LEVEL SECURITY;
+DROP TABLE "public"."stats";
 
-DROP POLICY IF EXISTS "Allow apikey to read" ON "public"."stats";
-DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."stats";
+CREATE TABLE IF NOT EXISTS "public"."stats" (
+    "created_at" timestamp with time zone NOT NULL,
+    "action" "public"."stats_action" NOT NULL,
+    "device_id" character varying(36) NOT NULL,
+    "version" bigint NOT NULL,
+    "app_id" character varying(50) NOT NULL
+);
 
--- Modify the "stats" table
-ALTER TABLE "public"."stats"
-ALTER COLUMN "action" TYPE "public"."stats_action" USING "action"::"public"."stats_action",
-ALTER COLUMN "device_id" TYPE character varying(36),
-ALTER COLUMN "app_id" TYPE character varying(50);
+ALTER TABLE "public"."stats" OWNER TO "postgres";
+
+CREATE INDEX "idx_stats_app_id_action" ON "public"."stats" USING "btree" ("app_id", "action");
+
+CREATE INDEX "idx_stats_app_id_created_at" ON "public"."stats" USING "btree" ("app_id", "created_at");
+
+CREATE INDEX "idx_stats_app_id_device_id" ON "public"."stats" USING "btree" ("app_id", "device_id");
+
+CREATE INDEX "idx_stats_app_id_version" ON "public"."stats" USING "btree" ("app_id", "version");
+
+GRANT ALL ON TABLE "public"."stats" TO "anon";
+GRANT ALL ON TABLE "public"."stats" TO "authenticated";
+GRANT ALL ON TABLE "public"."stats" TO "service_role";
 
 CREATE POLICY "Allow apikey to read" ON "public"."stats" FOR SELECT TO "anon" USING ("public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all,write}'::"public"."key_mode"[], "app_id"));
 CREATE POLICY "Allow read for auth (read+)" ON "public"."stats" FOR SELECT TO "authenticated" USING ("public"."has_app_right_userid"("app_id", 'read'::"public"."user_min_right", "public"."get_identity"()));
