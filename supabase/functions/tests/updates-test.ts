@@ -73,7 +73,7 @@ Deno.test('Test new version available', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('json', json)
+  console.log('Test new version available', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.0.0')
 })
@@ -195,7 +195,7 @@ Deno.test('Test channel overwrite', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('json', json)
+  console.log('Test channel overwrite', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.361.0')
 
@@ -231,7 +231,7 @@ Deno.test('Test version overwrite', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('json', json)
+  console.log('Test version overwrite', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.359.0')
 
@@ -267,7 +267,7 @@ Deno.test('Test with new device', async () => {
   const response2 = await postUpdate(baseData)
   assertEquals(response2.status, 200)
   const json = await response2.json()
-  console.log('json', json)
+  console.log('Test with new device', json)
   assertEquals(json, { message: 'No new version available' })
 })
 
