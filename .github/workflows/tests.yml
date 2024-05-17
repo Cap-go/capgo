@@ -51,4 +51,6 @@ jobs:
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
+      - name: "Start minio"
+        run: npm run minio:start && npm run minio:seed
       - run: deno test --allow-all supabase/functions/tests/* --env=supabase/.env.test --import-map=supabase/functions/import_map.json
