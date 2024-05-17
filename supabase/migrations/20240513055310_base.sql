@@ -2851,7 +2851,7 @@ ALTER TABLE ONLY "public"."devices_override"
     ADD CONSTRAINT "devices_override_pkey" PRIMARY KEY ("device_id");
 
 ALTER TABLE ONLY "public"."devices"
-    ADD CONSTRAINT "devices_pkey" PRIMARY KEY ("device_id");
+    ADD CONSTRAINT "devices_pkey" PRIMARY KEY ("app_id", "device_id");
 
 ALTER TABLE ONLY "public"."global_stats"
     ADD CONSTRAINT "global_stats_pkey" PRIMARY KEY ("date_id");

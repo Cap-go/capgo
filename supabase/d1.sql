@@ -15,6 +15,7 @@ CREATE INDEX "idx_stats_app_id_device_id" ON stats("app_id", "device_id");
 
 CREATE INDEX "idx_stats_app_id_version" ON stats("app_id", "version");
 
+-- DROP TABLE IF EXISTS devices;
 CREATE TABLE IF NOT EXISTS devices (
     "updated_at" timestamp with time zone NOT NULL,
     "device_id" "text" NOT NULL,
@@ -26,7 +27,8 @@ CREATE TABLE IF NOT EXISTS devices (
     "version_build" character varying(20) DEFAULT 'builtin',
     "custom_id" character varying(36) DEFAULT '' NOT NULL,
     "is_prod" boolean DEFAULT true,
-    "is_emulator" boolean DEFAULT false
+    "is_emulator" boolean DEFAULT false,
+    PRIMARY KEY ( app_id, device_id)
 );
 
 CREATE INDEX "devices_app_id_device_id_updated_at_idx" ON devices ("app_id", "device_id", "updated_at");

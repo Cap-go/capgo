@@ -61,7 +61,7 @@ export function trackDevicesCF(c: Context, app_id: string, device_id: string, ve
   const updated_at = new Date().toISOString()
   const insertD1 = c.env.DB.prepare(`
   insert into devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
   on conflict (device_id, app_id) do update set
   updated_at = excluded.updated_at,
   version = excluded.version,
@@ -71,7 +71,7 @@ export function trackDevicesCF(c: Context, app_id: string, device_id: string, ve
   version_build = excluded.version_build,
   custom_id = excluded.custom_id,
   is_prod = excluded.is_prod,
-  is_emulator = excluded.is_emulator
+  is_emulator = excluded.is_emulator;
 `).bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
     .run()
   return backgroundTask(c, insertD1)
