@@ -82,6 +82,20 @@ export function isLimited(c: Context, id: string) {
   return Math.random() < app.ignore
 }
 
+export function backgroundTask(c: Context, p: Promise<void>) {
+  let executionCtx: ExecutionContext | null
+  try {
+    executionCtx = c.executionCtx
+  }
+  catch (_) {
+    executionCtx = null
+  }
+
+  if (executionCtx?.waitUntil)
+    return c.executionCtx.waitUntil(p)
+  return p
+}
+
 export function getEnv(c: Context, key: string): string {
   const val = env<any>(c)[key]
   return val || ''

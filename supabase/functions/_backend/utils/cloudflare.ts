@@ -1,8 +1,8 @@
-import type { AnalyticsEngineDataPoint } from '@cloudflare/workers-types/2024-04-03'
+import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
-import { getEnv } from './utils.ts'
+import { backgroundTask, getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 
 // type is require for the bindings no interface
@@ -13,6 +13,7 @@ export type Bindings = {
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
   DEVICE_INFO: AnalyticsEngineDataPoint
+  DB_DEVICES: D1Database
 }
 
 const DEFAULT_LIMIT = 1000
@@ -55,13 +56,25 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
 }
 
 export function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  if (!c.env.DEVICE_LOG)
+  if (!c.env.DB_DEVICES)
     return
-  c.env.DEVICE_LOG.writeDataPoint({
-    blobs: [app_id, device_id, platform, plugin_version, os_version, version_build, is_prod, is_emulator, custom_id],
-    doubles: [version_id],
-    indexes: [`${app_id}__${device_id}`],
-  })
+  const updated_at = new Date().toISOString()
+  const insertD1 = c.env.DB.prepare(`
+  insert into devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  on conflict (device_id, app_id) do update set
+  updated_at = excluded.updated_at,
+  version = excluded.version,
+  platform = excluded.platform,
+  plugin_version = excluded.plugin_version,
+  os_version = excluded.os_version,
+  version_build = excluded.version_build,
+  custom_id = excluded.custom_id,
+  is_prod = excluded.is_prod,
+  is_emulator = excluded.is_emulator
+`).bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+    .run()
+  return backgroundTask(c, insertD1)
 }
 
 export function formatDateCF(date: string | undefined) {
