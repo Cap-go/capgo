@@ -657,7 +657,9 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     app_id: device.app_id,
     date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
   })
-  jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
+  // if any statsActions is get, then we need the device data
+  if (statsActions.some(({ action }) => action === 'get'))
+    jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
   if (!isClickHouseEnabled(c))
     return Promise.resolve()

@@ -25,17 +25,15 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
 }
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
-  if (!c.env.APP_LOG) // TODO: should make it work with supabase too
+  if (!c.env.APP_LOG)
     return trackLogsSB(c, app_id, device_id, action, version_id)
   return trackLogsCF(c, app_id, device_id, action, version_id)
 }
 
 export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  console.log('createStatsDevices', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  return Promise.resolve()
-  // if (!c.env.DB_DEVICES) // TODO: should make it work with supabase too
-  //   return trackDevicesSB(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  // return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+  if (!c.env.DB_DEVICES)
+    return trackDevicesSB(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+  return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }
 
 export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
