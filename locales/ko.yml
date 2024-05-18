@@ -157,6 +157,7 @@ country: 국가
 create-a-free-accoun: 무료 계정 만들기
 created-at: 만든 시간
 current-billing-cycle: 현재 청구 주기
+custom: 관습
 custom-domain: 맞춤 도메인
 custom-id: 맞춤 ID
 custom-id-saved: 맞춤 ID가 저장됨
@@ -253,6 +254,12 @@ key-super-admin: 최고 관리자
 key-upload: 업로드
 key-write: 쓰다
 language: 언어
+last-15-minutes: 지난 15분
+last-24-hour: 지난 24시간
+last-3-hour: 지난 3시간
+last-3-minutes: 지난 3분
+last-hour: 지난 시간
+last-minute: 마지막 순간
 last-name: 성
 last-update: 마지막 업데이트
 last-upload: 마지막 업로드

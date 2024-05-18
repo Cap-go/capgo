@@ -340,7 +340,7 @@ WHERE
   ${searchFilter}
   AND created_at >= toDateTime('${formatDateCF(period_start)}')
   AND created_at < toDateTime('${formatDateCF(period_end)}')
-GROUP BY app_id, created_at
+GROUP BY app_id, created_at, action, device_id, version_id
 ORDER BY created_at, app_id
 LIMIT ${limit};`
 

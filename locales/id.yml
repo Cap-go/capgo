@@ -161,6 +161,7 @@ country: Negara
 create-a-free-accoun: Buat Akun gratis
 created-at: Dibuat di
 current-billing-cycle: Siklus Penagihan Saat Ini
+custom: Kebiasaan
 custom-domain: Domain khusus
 custom-id: ID khusus
 custom-id-saved: ID khusus disimpan
@@ -261,6 +262,12 @@ key-super-admin: Admin super
 key-upload: Mengunggah
 key-write: Menulis
 language: Bahasa
+last-15-minutes: 15 menit terakhir
+last-24-hour: 24 jam terakhir
+last-3-hour: 3 jam terakhir
+last-3-minutes: 3 menit terakhir
+last-hour: Jam terakhir
+last-minute: Menit terakhir
 last-name: nama keluarga
 last-update: Pembaharuan Terakhir
 last-upload: Unggahan terakhir

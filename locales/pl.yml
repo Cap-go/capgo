@@ -163,6 +163,7 @@ country: Kraj
 create-a-free-accoun: Utwórz bezpłatne konto
 created-at: Utworzono o godz
 current-billing-cycle: Obecny cykl płatniczy
+custom: Zwyczaj
 custom-domain: Domena niestandardowa
 custom-id: Identyfikator niestandardowy
 custom-id-saved: Niestandardowy identyfikator został zapisany
@@ -259,6 +260,12 @@ key-super-admin: Super administrator
 key-upload: Przesył
 key-write: Pisać
 language: Język
+last-15-minutes: Ostatnie 15 minut
+last-24-hour: Ostatnie 24 godziny
+last-3-hour: Ostatnie 3 godziny
+last-3-minutes: Ostatnie 3 minuty
+last-hour: Ostatnia godzina
+last-minute: Ostatnia minuta
 last-name: Nazwisko
 last-update: Ostatnia aktualizacja
 last-upload: Ostatnie przesyłanie

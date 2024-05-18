@@ -163,6 +163,7 @@ country: Страна
 create-a-free-accoun: Создать бесплатный аккаунт
 created-at: Создан в
 current-billing-cycle: Текущий цикл выставления счетов
+custom: Обычай
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
 custom-id-saved: Пользовательский идентификатор сохранен
@@ -259,6 +260,12 @@ key-super-admin: Суперадминистратор
 key-upload: Загрузить
 key-write: Писать
 language: Язык
+last-15-minutes: Последние 15 минут
+last-24-hour: Последние 24 часа
+last-3-hour: Последние 3 часа
+last-3-minutes: Последние 3 минуты
+last-hour: Последний час
+last-minute: Последняя минута
 last-name: Фамилия
 last-update: Последнее обновление
 last-upload: Последняя загрузка

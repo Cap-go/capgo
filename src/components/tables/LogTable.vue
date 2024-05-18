@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import ky from 'ky'
+import dayjs from 'dayjs'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { TableColumn } from '../comp_def'
-import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { appIdToUrl } from '~/services/conversion'
@@ -20,13 +21,20 @@ interface Channel {
     id: number
   }
 }
-const element: Database['public']['Tables']['stats']['Row'] & Channel = {} as any
-
+interface LogData {
+  app_id: string
+  device_id: string
+  action: string
+  version_id: number
+  version?: number
+  created_at: string
+}
+const element: LogData & Channel = {} as any
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
-const offset = 10
 const router = useRouter()
 const { t } = useI18n()
 const supabase = useSupabase()
+const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
 const total = ref(0)
 const search = ref('')
 const elements = ref<(typeof element)[]>([])
@@ -34,9 +42,6 @@ const versions = ref<Channel['version'][]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref()
-const currentVersionsNumber = computed(() => {
-  return (currentPage.value - 1) * offset
-})
 
 function findVersion(id: number, versions: { name: string, id: number }[]) {
   return versions.find(elem => elem.id === id)
@@ -46,7 +51,7 @@ async function versionData() {
   try {
     const versionsIdAlreadyFetch = versions.value.map(elem => elem.id)
     const versionsIds = elements.value
-      .map(elem => elem.version)
+      .map(elem => elem.version_id)
       .filter(e => !versionsIdAlreadyFetch.includes(e))
     // console.log('versionsIds', versionsIds)
     if (!versionsIds.length)
@@ -62,7 +67,7 @@ async function versionData() {
       return
     versions.value.push(...res)
     elements.value.forEach((elem) => {
-      elem.version = findVersion(elem.version, versions.value) || { name: 'unknown', id: 0 } as any
+      elem.version = findVersion(elem.version_id, versions.value) || { name: 'unknown', id: 0 } as any
     })
   }
   catch (error) {
@@ -73,22 +78,47 @@ async function versionData() {
 async function getData() {
   isLoading.value = true
   try {
-    const req = await supabase.functions.invoke('private/stats', {
-      body: {
-        appId: props.appId,
-        devicesId: props.deviceId ? [props.deviceId] : undefined,
-        search: search.value ? search.value : undefined,
-        order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
-        rangeStart: currentVersionsNumber.value,
-        rangeEnd: currentVersionsNumber.value + offset - 1,
-      },
-    })
-    const { data, count } = (await req).data
-    if (!data)
+    // const req = await supabase.functions.invoke('private/stats', {
+    //   body: {
+    //     appId: props.appId,
+    //     devicesId: props.deviceId ? [props.deviceId] : undefined,
+    //     search: search.value ? search.value : undefined,
+    //     order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+    //     rangeStart: currentVersionsNumber.value,
+    //     rangeEnd: currentVersionsNumber.value + offset - 1,
+    //   },
+    // })
+    // const { data, count } = (await req).data
+    // if (!data)
+    //   return
+    const { data: currentSession } = await supabase.auth.getSession()!
+    if (!currentSession.session)
       return
-    elements.value.push(...data as any)
-    // console.log('count', count)
-    total.value = count || 0
+    const currentJwt = currentSession.session.access_token
+    const defaultApiHostPreprod = 'https://api-preprod.capgo.app'
+    const dataD = await ky
+      .post(`${defaultApiHostPreprod}/private/stats`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${currentJwt}` || '',
+        },
+        body: JSON.stringify({
+          api: 'v2', // TODO: remove this when we remove the old api
+          appId: props.appId,
+          devicesId: props.deviceId ? [props.deviceId] : undefined,
+          search: search.value ? search.value : undefined,
+          order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+          rangeStart: range.value ? range.value[0].getTime() : undefined,
+          rangeEnd: range.value ? range.value[1].getTime() : undefined,
+        }),
+      })
+      .then(res => res.json<LogData[]>())
+      .catch((err) => {
+        console.log('Cannot get devices', err)
+        return [] as LogData[]
+      })
+    console.log('dataD', dataD)
+    elements.value.push(...dataD as any)
   }
   catch (error) {
     console.error(error)
@@ -111,13 +141,6 @@ async function refreshData() {
 
 columns.value = [
   {
-    label: t('action'),
-    key: 'action',
-    mobile: 'title',
-    sortable: true,
-    head: true,
-  },
-  {
     label: t('created-at'),
     key: 'created_at',
     mobile: 'header',
@@ -125,11 +148,26 @@ columns.value = [
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
+    label: t('device-id'),
+    key: 'device_id',
+    mobile: 'footer',
+    sortable: true,
+    head: true,
+  },
+  {
+    label: t('action'),
+    key: 'action',
+    mobile: 'title',
+    sortable: true,
+    head: true,
+  },
+
+  {
     label: t('version'),
     key: 'version',
-    mobile: 'footer',
+    mobile: 'after',
     sortable: false,
-    displayFunction: (elem: typeof element) => elem.version.name,
+    displayFunction: (elem: typeof element) => elem.version?.name,
   },
 ]
 
@@ -158,11 +196,12 @@ watch(props, async () => {
 </script>
 
 <template>
-  <Table
+  <TableLog
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
     :total="total" :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
+    :app-id="props.appId ?? ''"
     :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"

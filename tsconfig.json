@@ -3,6 +3,7 @@
     "target": "ESNext",
     "jsx": "preserve",
     "lib": ["DOM", "ESNext"],
+    "moduleDetection": "force",
     "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -12,6 +13,7 @@
     "resolveJsonModule": true,
     "types": [
       "@cloudflare/workers-types",
+      "unplugin-icons/types/vue",
       "bun-types",
       "vitest",
       "vite/client",
@@ -20,10 +22,12 @@
       "unplugin-vue-macros/macros-global",
       "unplugin-vue-router/client"
     ],
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "strict": true,
     "strictNullChecks": true,
     "noUnusedLocals": true,
+    "noEmit": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,

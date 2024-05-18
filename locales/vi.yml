@@ -161,6 +161,7 @@ country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
 created-at: tạo tại
 current-billing-cycle: Chu kỳ thanh toán hiện tại
+custom: Phong tục
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
 custom-id-saved: Đã lưu ID tùy chỉnh
@@ -259,6 +260,12 @@ key-super-admin: Quản trị viên cấp cao
 key-upload: Tải lên
 key-write: Viết
 language: Ngôn ngữ
+last-15-minutes: 15 phút cuối
+last-24-hour: 24 giờ qua
+last-3-hour: 3 giờ qua
+last-3-minutes: 3 phút cuối
+last-hour: Giờ cuối cùng
+last-minute: Phút trước
 last-name: Họ
 last-update: Cập nhật cuối cùng
 last-upload: Tải lên lần cuối

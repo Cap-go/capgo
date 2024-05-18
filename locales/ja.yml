@@ -157,6 +157,7 @@ country: 国
 create-a-free-accoun: 無料アカウントを作成
 created-at: で作成
 current-billing-cycle: 現在の請求サイクル
+custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 custom-id-saved: カスタム ID を保存しました
@@ -253,6 +254,12 @@ key-super-admin: スーパー管理者
 key-upload: アップロード
 key-write: 書く
 language: 言語
+last-15-minutes: 最後の 15 分
+last-24-hour: 過去 24 時間
+last-3-hour: 過去 3 時間
+last-3-minutes: 最後の 3 分
+last-hour: 最後の時間
+last-minute: ぎりぎり
 last-name: 苗字
 last-update: 最後の更新
 last-upload: 最後のアップロード

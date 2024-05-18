@@ -167,6 +167,7 @@ country: Pays
 create-a-free-accoun: Créer un compte gratuit
 created-at: Créé à
 current-billing-cycle: Cycle de facturation en cours
+custom: Coutume
 custom-domain: Domaine personnalisé
 custom-id: Identifiant personnalisé
 custom-id-saved: Identifiant personnalisé enregistré
@@ -267,6 +268,12 @@ key-super-admin: Super administrateur
 key-upload: Télécharger
 key-write: Écrire
 language: Langue
+last-15-minutes: 15 dernières minutes
+last-24-hour: Dernières 24 heures
+last-3-hour: 3 dernières heures
+last-3-minutes: 3 dernières minutes
+last-hour: Dernière heure
+last-minute: Dernière minute
 last-name: Nom de famille
 last-update: Dernière mise à jour
 last-upload: Dernier téléchargement
