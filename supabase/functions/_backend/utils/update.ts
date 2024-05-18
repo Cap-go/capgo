@@ -139,6 +139,8 @@ async function requestInfosPostgres(
         secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
         enableAbTesting: schema.channels.enableAbTesting,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        public: schema.channels.public,
       },
     },
     )
@@ -146,20 +148,8 @@ async function requestInfosPostgres(
     .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-
-  let channelDevice
-  if (defaultChannel) {
-    channelDevice = channelDeviceReq
-      .where(and(
-        eq(schema.channel_devices.app_id, app_id),
-        eq(schema.channels.name, defaultChannel),
-      ))
-  }
-  else {
-    channelDevice = channelDeviceReq
-      .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
-  }
-  channelDevice = channelDevice
+    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
+  const channelDevice = channelDeviceReq
     .limit(1)
     .then(data => data.at(0))
 
@@ -206,16 +196,24 @@ async function requestInfosPostgres(
         secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
         enableAbTesting: schema.channels.enableAbTesting,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        public: schema.channels.public,
       },
     })
     .from(schema.channels)
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-    .where(and(
-      eq(schema.channels.public, true),
-      eq(schema.channels.app_id, app_id),
-      eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
-    ))
+    .where(!defaultChannel
+      ? and(
+        eq(schema.channels.public, true),
+        eq(schema.channels.app_id, app_id),
+        eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
+      )
+      : and (
+        eq(schema.channels.app_id, app_id),
+        eq(schema.channels.name, defaultChannel),
+      ),
+    )
     .limit(1)
     .then(data => data.at(0))
 
@@ -504,6 +502,15 @@ export async function update(c: Context, body: AppInfos) {
           error: 'disable_auto_update_to_major',
           version: version.name,
           old: version_name,
+        }, 200)
+      }
+
+      if (!channelData.channels.allow_device_self_set && !channelData.channels.public) {
+        console.log(id, 'Cannot update via a private channel', device_id, new Date().toISOString())
+        await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel' }])
+        return c.json({
+          message: 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self associate" set to true',
+          error: 'cannot_update_via_private_channel',
         }, 200)
       }
 
