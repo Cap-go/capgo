@@ -73,6 +73,7 @@ app-preview: Aperçu de l'application
 are-u-sure: Êtes-vous sûr ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
+bandwith-usage: "Utilisation de la bande passante\_:"
 base: Base
 best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
@@ -166,6 +167,7 @@ country: Pays
 create-a-free-accoun: Créer un compte gratuit
 created-at: Créé à
 current-billing-cycle: Cycle de facturation en cours
+custom: Coutume
 custom-domain: Domaine personnalisé
 custom-id: Identifiant personnalisé
 custom-id-saved: Identifiant personnalisé enregistré
@@ -181,6 +183,7 @@ deleted: supprimé
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Utilisation détaillée
 details-and-logs: Détails et journaux
 devDependencies:
   '@types/js-yaml': ''
@@ -265,6 +268,12 @@ key-super-admin: Super administrateur
 key-upload: Télécharger
 key-write: Écrire
 language: Langue
+last-15-minutes: 15 dernières minutes
+last-24-hour: Dernières 24 heures
+last-3-hour: 3 dernières heures
+last-3-minutes: 3 dernières minutes
+last-hour: Dernière heure
+last-minute: Dernière minute
 last-name: Nom de famille
 last-update: Dernière mise à jour
 last-upload: Dernier téléchargement
@@ -290,6 +299,7 @@ making-this-channel-: >-
   Pour rendre ce canal "normal", vous devrez configurer un autre canal par
   défaut ou laisser l'appareil s'auto-attribuer.
 mau: Utilisateurs actifs mensuels
+mau-usage: "Utilisation mensuelle des utilisateurs actifs\_:"
 member-deleted: Membre supprimé avec succès
 members: Membres
 metadata: Métadonnées
@@ -450,6 +460,7 @@ start-new-deploy: Démarrer un nouveau déploiement progressif
 start-using-capgo: "Commencez à utiliser\_:"
 status-complete: complet
 status-failed: échoué
+storage-usage: "Utilisation du stockage\_:"
 stored-externally: stocké en externe
 submit: Soumettre
 support: Support
@@ -469,6 +480,7 @@ to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
 top-apps-v2: applications
+trial: procès
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
@@ -520,3 +532,4 @@ your-are-a: Vous êtes un
 your-current-plan-is: Votre plan actuel est
 your-current-suggested-plan-is: Votre plan suggéré est
 your-settings: Vos paramètres
+your-ussage: "Votre utilisation\_:"

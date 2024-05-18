@@ -196,7 +196,7 @@ watch(props, async () => {
 </script>
 
 <template>
-  <Table
+  <TableLog
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
     :total="total" :element-list="elements"
     filter-text="Filters"

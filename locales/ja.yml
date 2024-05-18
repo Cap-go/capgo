@@ -67,6 +67,7 @@ app-preview: アプリのプレビュー
 are-u-sure: 本気ですか ？
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
+bandwith-usage: '帯域幅の使用量:'
 base: ベース
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
@@ -156,6 +157,7 @@ country: 国
 create-a-free-accoun: 無料アカウントを作成
 created-at: で作成
 current-billing-cycle: 現在の請求サイクル
+custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 custom-id-saved: カスタム ID を保存しました
@@ -171,6 +173,7 @@ deleted: 削除された
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: 詳しい使い方
 details-and-logs: 詳細とログ
 devDependencies:
   '@types/js-yaml': ''
@@ -251,6 +254,12 @@ key-super-admin: スーパー管理者
 key-upload: アップロード
 key-write: 書く
 language: 言語
+last-15-minutes: 最後の 15 分
+last-24-hour: 過去 24 時間
+last-3-hour: 過去 3 時間
+last-3-minutes: 最後の 3 分
+last-hour: 最後の時間
+last-minute: ぎりぎり
 last-name: 苗字
 last-update: 最後の更新
 last-upload: 最後のアップロード
@@ -274,6 +283,7 @@ make-default-ios: iOSのデフォルトにする
 make-normal: 通常にする
 making-this-channel-: このチャネルを「通常」にするには、他のチャネルのデフォルトを構成するか、デバイスの自己割り当てを許可する必要があります。
 mau: 月間アクティブ ユーザー数
+mau-usage: '月間アクティブ ユーザーの使用量:'
 member-deleted: メンバーが正常に削除されました
 members: メンバー
 metadata: メタデータ
@@ -428,6 +438,7 @@ start-new-deploy: 新しいプログレッシブ デプロイを開始する
 start-using-capgo: '使用を開始します:'
 status-complete: 完了
 status-failed: 失敗した
+storage-usage: 'ストレージ使用量:'
 stored-externally: 外部保存
 submit: 送信
 support: サポート
@@ -447,6 +458,7 @@ to-live-reload: リロードを生きます。
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps: 私のアプリ
 top-apps-v2: アプリ
+trial: トライアル
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
@@ -498,3 +510,4 @@ your-are-a: あなたは
 your-current-plan-is: 現在のプランは
 your-current-suggested-plan-is: 現在お勧めのプランは
 your-settings: あなたの設定
+your-ussage: 'あなたの用途:'

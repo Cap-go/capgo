@@ -75,6 +75,7 @@ app-preview: App-Vorschau
 are-u-sure: Bist du dir sicher ?
 available-in-the-san: Verfügbar in der Sandbox-App
 back-to-login-page: Zurück zur Anmeldeseite
+bandwith-usage: 'Bandbreitennutzung:'
 base: Base
 best-plan: Bester Plan
 bigger-app-size: Größere App-Größe
@@ -168,6 +169,7 @@ country: Land
 create-a-free-accoun: Erstelle einen kostenlosen Account
 created-at: Hergestellt in
 current-billing-cycle: Aktueller Abrechnungszyklus
+custom: Brauch
 custom-domain: Benutzerdefinierten Domain
 custom-id: Benutzerdefinierte ID
 custom-id-saved: Benutzerdefinierte ID gespeichert
@@ -183,6 +185,7 @@ deleted: gelöscht
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Detaillierte Verwendung
 details-and-logs: Einzelheiten und Protokolle
 devDependencies:
   '@types/js-yaml': ''
@@ -267,6 +270,12 @@ key-super-admin: Höchster Vorgesetzter
 key-upload: Hochladen
 key-write: Schreiben
 language: Sprache
+last-15-minutes: Letzte 15 Minuten
+last-24-hour: Letzte 24 Stunden
+last-3-hour: Letzte 3 Stunden
+last-3-minutes: Letzte 3 Minuten
+last-hour: Letzte Stunde
+last-minute: Letzte Minute
 last-name: Familienname, Nachname
 last-update: Letztes Update
 last-upload: Letzter Upload
@@ -292,6 +301,7 @@ making-this-channel-: >-
   Wenn Sie diesen Kanal „normal“ machen, müssen Sie einen anderen Standardkanal
   konfigurieren oder das Gerät selbst zuweisen lassen.
 mau: Monatlich aktive Benutzer
+mau-usage: 'Monatliche Nutzung aktiver Benutzer:'
 member-deleted: Mitglied erfolgreich gelöscht
 members: Mitglieder
 metadata: Metadaten
@@ -462,6 +472,7 @@ start-new-deploy: Starten Sie eine neue progressive Bereitstellung
 start-using-capgo: 'Beginnen Sie mit der Verwendung von:'
 status-complete: vollständig
 status-failed: fehlgeschlagen
+storage-usage: 'Speichernutzung:'
 stored-externally: extern gespeichert
 submit: Einreichen
 support: Unterstützung
@@ -481,6 +492,7 @@ to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
 top-apps-v2: Apps
+trial: Versuch
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
@@ -534,3 +546,4 @@ your-are-a: Dein Gebiet
 your-current-plan-is: Ihr aktueller Plan ist
 your-current-suggested-plan-is: Ihr aktuell vorgeschlagener Plan ist
 your-settings: Ihre Einstellungen
+your-ussage: 'Ihre Nutzung:'

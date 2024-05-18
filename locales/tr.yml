@@ -67,6 +67,7 @@ app-preview: Uygulama önizlemesi
 are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
+bandwith-usage: 'Bant genişliği kullanımı:'
 base: Temel
 best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
@@ -158,6 +159,7 @@ country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
 created-at: oluşturuldu
 current-billing-cycle: Güncel Fatura Döngüsü
+custom: Gelenek
 custom-domain: Özel alan
 custom-id: özel kimlik
 custom-id-saved: Özel kimlik kaydedildi
@@ -173,6 +175,7 @@ deleted: silindi
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Detaylı kullanım
 details-and-logs: Ayrıntılar ve günlükler
 devDependencies:
   '@types/js-yaml': ''
@@ -255,6 +258,12 @@ key-super-admin: Süper yönetici
 key-upload: Yüklemek
 key-write: Yazmak
 language: Dil
+last-15-minutes: Son 15 dakika
+last-24-hour: Son 24 saat
+last-3-hour: Son 3 saat
+last-3-minutes: Son 3 dakika
+last-hour: Son saat
+last-minute: Son dakika
 last-name: Soy isim
 last-update: Son Güncelleme
 last-upload: Son yükleme
@@ -280,6 +289,7 @@ making-this-channel-: >-
   Bu kanalı "normal" yapmak, varsayılan olarak başka bir kanal yapılandırmanızı
   veya cihazın kendi kendine atama yapmasına izin vermenizi gerektirecektir.
 mau: Aylık aktif kullanıcılar
+mau-usage: 'Aylık aktif kullanıcı kullanımı:'
 member-deleted: Üye başarıyla silindi
 members: Üyeler
 metadata: Meta veriler
@@ -438,6 +448,7 @@ start-new-deploy: Yeni aşamalı dağıtımı başlatın
 start-using-capgo: 'Kullanmaya başla:'
 status-complete: tamamlamak
 status-failed: arızalı
+storage-usage: 'Depolama kullanımı:'
 stored-externally: harici olarak depolanır
 submit: Göndermek
 support: Destek
@@ -457,6 +468,7 @@ to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
 top-apps-v2: Uygulamalar
+trial: duruşma
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
@@ -508,3 +520,4 @@ your-are-a: Senin alanın
 your-current-plan-is: Mevcut planınız
 your-current-suggested-plan-is: 'Mevcut önerilen planınız:'
 your-settings: Ayarlarınız
+your-ussage: 'Kullanımınız:'

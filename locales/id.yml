@@ -67,6 +67,7 @@ app-preview: Pratinjau aplikasi
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
+bandwith-usage: 'Penggunaan bandwidth:'
 base: Basis
 best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
@@ -160,6 +161,7 @@ country: Negara
 create-a-free-accoun: Buat Akun gratis
 created-at: Dibuat di
 current-billing-cycle: Siklus Penagihan Saat Ini
+custom: Kebiasaan
 custom-domain: Domain khusus
 custom-id: ID khusus
 custom-id-saved: ID khusus disimpan
@@ -175,6 +177,7 @@ deleted: dihapus
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Penggunaan terperinci
 details-and-logs: Detail dan log
 devDependencies:
   '@types/js-yaml': ''
@@ -259,6 +262,12 @@ key-super-admin: Admin super
 key-upload: Mengunggah
 key-write: Menulis
 language: Bahasa
+last-15-minutes: 15 menit terakhir
+last-24-hour: 24 jam terakhir
+last-3-hour: 3 jam terakhir
+last-3-minutes: 3 menit terakhir
+last-hour: Jam terakhir
+last-minute: Menit terakhir
 last-name: nama keluarga
 last-update: Pembaharuan Terakhir
 last-upload: Unggahan terakhir
@@ -284,6 +293,7 @@ making-this-channel-: >-
   Menjadikan saluran ini "normal" mengharuskan Anda mengonfigurasi saluran lain
   sebagai default atau membiarkan perangkat menetapkan sendiri.
 mau: Pengguna aktif bulanan
+mau-usage: 'Penggunaan pengguna aktif bulanan:'
 member-deleted: Berhasil menghapus anggota
 members: Anggota
 metadata: Metadata
@@ -442,6 +452,7 @@ start-new-deploy: Mulai penerapan progresif baru
 start-using-capgo: 'Mulai menggunakan:'
 status-complete: menyelesaikan
 status-failed: gagal
+storage-usage: 'Penggunaan penyimpanan:'
 stored-externally: disimpan secara eksternal
 submit: Kirim
 support: Mendukung
@@ -461,6 +472,7 @@ to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 top-apps-v2: Aplikasi
+trial: uji coba
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
@@ -514,3 +526,4 @@ your-are-a: Anda adalah
 your-current-plan-is: Rencana Anda saat ini adalah
 your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
 your-settings: Pengaturan Anda
+your-ussage: 'Penggunaan Anda:'

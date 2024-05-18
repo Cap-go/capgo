@@ -39,6 +39,7 @@ declare module 'vue' {
     StatsBar: typeof import('./components/StatsBar.vue')['default']
     Steps: typeof import('./components/dashboard/Steps.vue')['default']
     Table: typeof import('./components/Table.vue')['default']
+    TableLog: typeof import('./components/TableLog.vue')['default']
     Tabs: typeof import('./components/Tabs.vue')['default']
     TabSidebar: typeof import('./components/TabSidebar.vue')['default']
     TitleHead: typeof import('./components/TitleHead.vue')['default']

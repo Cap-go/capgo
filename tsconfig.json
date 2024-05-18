@@ -3,17 +3,16 @@
     "target": "ESNext",
     "jsx": "preserve",
     "lib": ["DOM", "ESNext"],
+    "moduleDetection": "force",
     "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "moduleDetection": "force",
     "paths": {
       "~/*": ["src/*"]
     },
     "resolveJsonModule": true,
     "types": [
+      "unplugin-icons/types/vue",
       "bun-types",
       "vitest",
       "vite/client",
@@ -22,10 +21,12 @@
       "vite-plugin-pwa/client",
       "unplugin-vue-macros/macros-global"
     ],
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "strict": true,
     "strictNullChecks": true,
     "noUnusedLocals": true,
+    "noEmit": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,

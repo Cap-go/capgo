@@ -67,6 +67,7 @@ app-preview: 应用预览
 are-u-sure: 你确定吗 ？
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
+bandwith-usage: 带宽使用情况：
 base: 根据
 best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
@@ -156,6 +157,7 @@ country: 国家
 create-a-free-accoun: 创建一个免费帐户
 created-at: 创建于
 current-billing-cycle: 当前账单周期
+custom: 风俗
 custom-domain: 自定义域
 custom-id: 自定义编号
 custom-id-saved: 自定义 ID 已保存
@@ -171,6 +173,7 @@ deleted: 删除
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: 详细使用方法
 details-and-logs: 详细信息和日志
 devDependencies:
   '@types/js-yaml': ''
@@ -251,6 +254,12 @@ key-super-admin: 超级管理员
 key-upload: 上传
 key-write: 写
 language: 语言
+last-15-minutes: 最后 15 分钟
+last-24-hour: 过去 24 小时
+last-3-hour: 最后 3 小时
+last-3-minutes: 最后3分钟
+last-hour: 上一个小时
+last-minute: 最后一分钟
 last-name: 姓
 last-update: 最后更新
 last-upload: 最后上传
@@ -274,6 +283,7 @@ make-default-ios: 为 iOS 设置默认值
 make-normal: 使正常
 making-this-channel-: 使此频道“正常”将需要您配置其他默认频道或让设备自行分配。
 mau: 月活跃用户
+mau-usage: 每月活跃用户使用情况：
 member-deleted: 删除会员成功
 members: 会员
 metadata: 元数据
@@ -428,6 +438,7 @@ start-new-deploy: 开始新的渐进式部署
 start-using-capgo: 开始使用：
 status-complete: 完全的
 status-failed: 失败的
+storage-usage: 存储使用情况：
 stored-externally: 外部存储
 submit: 提交
 support: 支持
@@ -447,6 +458,7 @@ to-live-reload: 住重新加载。
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps: 我的应用
 top-apps-v2: 应用
+trial: 审判
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
@@ -498,3 +510,4 @@ your-are-a: 你是一个
 your-current-plan-is: 你目前的计划是
 your-current-suggested-plan-is: 您目前建议的计划是
 your-settings: 您的设置
+your-ussage: 您的使用情况：

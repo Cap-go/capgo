@@ -7,20 +7,18 @@ import {
   kListItem,
 } from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
-import VueDatePicker from '@vuepic/vue-datepicker'
-import dayjs from 'dayjs'
 import type { MobileColType, TableColumn } from './comp_def'
-import type { Organization } from '~/stores/organization'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSortDown from '~icons/lucide/chevron-down'
+import IconSearch from '~icons/ic/round-search'
 import IconReload from '~icons/tabler/reload'
+import IconDown from '~icons/ic/round-keyboard-arrow-down'
+import IconFilter from '~icons/system-uicons/filtering'
 import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
-import IconClock from '~icons/heroicons/clock'
-import IconCalendar from '~icons/heroicons/calendar'
 
 interface Props {
   rowClick?: boolean
@@ -33,7 +31,6 @@ interface Props {
   currentPage: number
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
-  appId: string
 }
 
 const props = defineProps<Props>()
@@ -51,37 +48,9 @@ const emit = defineEmits([
   'filterClick',
   'rowClick',
   'sortClick',
-  'rangeChange',
 ])
 const { t } = useI18n()
 const searchVal = ref(props.search || '')
-const currentSelected = ref<'general' | 'precise'>('general')
-const showTimeDropdown = ref(false)
-const currentGeneralTime = ref<1 | 3 | 24>(1)
-const preciseDates = ref<[Date, Date]>()
-const thisOrganization = ref<Organization | null>(null)
-const organizationStore = useOrganizationStore()
-
-const startTime = computed(() => {
-  const subStart = thisOrganization.value?.subscription_start
-  if (!subStart)
-    return [{ hours: 0, minutes: 0 }, { hours: 0, minutes: 0 }]
-
-  const datePast = dayjs(subStart)
-  const dateNow = dayjs()
-
-  return [
-    {
-      hours: datePast.hour(),
-      minutes: datePast.minute(),
-    },
-    {
-      hours: dateNow.hour(),
-      minutes: dateNow.minute(),
-    },
-  ]
-})
-
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -89,6 +58,21 @@ const offset = computed(() => {
   if (!props.elementList)
     return 0
   return props.elementList.length
+})
+
+const filterList = computed(() => {
+  if (!props.filters)
+    return []
+  return Object.keys(props.filters)
+})
+const filterActivated = computed(() => {
+  if (!props.filters)
+    return []
+  return Object.keys(props.filters).reduce((acc, key) => {
+    if (props.filters![key])
+      acc += 1
+    return acc
+  }, 0)
 })
 
 function sortClick(key: number) {
@@ -114,11 +98,6 @@ if (props.filters) {
     emit('reload')
   })
 }
-
-watch(preciseDates, () => {
-  console.log('preciseDates', preciseDates.value)
-  emit('rangeChange', preciseDates.value)
-})
 
 watch(searchVal, debounce(() => {
   emit('update:search', searchVal.value)
@@ -180,103 +159,51 @@ async function fastBackward() {
   }
 }
 
-async function clickLeft() {
-  currentSelected.value = 'general'
-  showTimeDropdown.value = !showTimeDropdown.value
-}
-
-async function clickRight() {
-  currentSelected.value = 'precise'
-}
-
-async function setTime(time: 1 | 3 | 24) {
-  currentGeneralTime.value = time
-  if (time === 1) {
-    preciseDates.value = [
-      dayjs().subtract(1, 'hour').toDate(),
-      new Date(),
-    ]
-  }
-  else if (time === 3) {
-    preciseDates.value = [
-      dayjs().subtract(3, 'hour').toDate(),
-      new Date(),
-    ]
-  }
-  else {
-    preciseDates.value = [
-      dayjs().subtract(1, 'day').toDate(),
-      new Date(),
-    ]
-  }
-  // TODO: Closing is done in clickLeft
-}
-
-onMounted(async () => {
+onMounted(() => {
   initDropdowns()
-  await organizationStore.awaitInitialLoad()
-  thisOrganization.value = organizationStore.getOrgByAppId(props.appId) ?? null
-
-  if (!thisOrganization.value)
-    console.error('Invalid app??')
 })
 </script>
 
 <template>
-  <div class="relative pb-4 overflow-x-auto md:pb-0">
+  <div class="relative pb-4 pb-20 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between pb-4 md:items-center">
-      <div class="flex h-10 mb-2 md:mb-0">
+      <div class="flex mb-2 md:mb-0">
         <button class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
+        <button v-if="filterText && filterList.length" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="relative inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button">
+          <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
+            <!-- uppercase first letter in tailwind -->
+            {{ filterActivated }}
+          </div>
+          <IconFilter class="m-1 mr-2" />
+          <span class="hidden md:block">{{ t(filterText) }}</span>
+          <IconDown class="hidden m-1 ml-2 md:block" />
+        </button>
+        <!-- Dropdown menu -->
+        <div v-if="filterText && filterList.length" id="dropdownRadio" class="z-50 hidden w-48 bg-white border divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
+          <div class="block px-4 py-3 text-sm text-gray-900 md:hidden dark:text-white">
+            <div>{{ t(filterText) }}</div>
+          </div>
+          <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
+            <li v-for="(f, i) in filterList" :key="i">
+              <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
+                <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">
+                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
+              </div>
+            </li>
+          </ul>
+        </div>
       </div>
       <!-- </div> -->
-      <div class="flex h-10 ml-4 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
-        <div :class="`flex-auto flex-col cursor-pointer flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
-          <div class="flex items-center justify-center">
-            <IconClock class="mr-1" />
-            <span>{{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hour') : t('last-24-hour')) }}</span>
-          </div>
-          <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
-            <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
-              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(1)">
-                {{ t('last-hour') }}
-              </div>
-              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(3)">
-                {{ t('last-3-hour') }}
-              </div>
-              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(24)">
-                {{ t('last-24-hour') }}
-              </div>
-            </div>
-          </div>
+      <div class="relative w-70 md:w-auto">
+        <label for="table-search" class="sr-only">{{ searchPlaceholder }}</label>
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <IconSearch class="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </div>
-        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-600" />
-        <div :class="`flex-auto cursor-pointer flex items-center justify-center w-28 hover:bg-gray-700 rounded-r-lg ${currentSelected === 'precise' ? 'bg-gray-100 text-gray-800 hover:text-white' : ''}`" @click="clickRight">
-          <div class="relative">
-            <VueDatePicker
-              v-model="preciseDates"
-              :min-date="dayjs(thisOrganization?.subscription_start ?? 0).toDate()"
-              :max-date="new Date()"
-              :start-time="startTime"
-              prevent-min-max-navigation
-              dark
-              range
-              @update:model-value="clickRight"
-            >
-              <template #trigger>
-                <div class="flex flex-row items-center justify-center h-10 w-28">
-                  <IconCalendar class="mr-1" />
-                  <p>
-                    {{ t('custom') }}
-                  </p>
-                </div>
-              </template>
-            </VueDatePicker>
-          </div>
-        </div>
+        <input id="table-search" v-model="searchVal" type="text" class="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 md:w-80 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :placeholder="searchPlaceholder">
       </div>
     </div>
     <div class="hidden md:block">

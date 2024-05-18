@@ -69,6 +69,7 @@ app-preview: Visualização do aplicativo
 are-u-sure: Tem certeza ?
 available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
+bandwith-usage: 'Uso de largura de banda:'
 base: Base
 best-plan: melhor plano
 bigger-app-size: Tamanho maior do aplicativo
@@ -160,6 +161,7 @@ country: País
 create-a-free-accoun: Criar uma conta gratuita
 created-at: Criado em
 current-billing-cycle: Ciclo de faturamento atual
+custom: Personalizado
 custom-domain: Domínio personalizado
 custom-id: ID personalizado
 custom-id-saved: ID personalizado salvo
@@ -175,6 +177,7 @@ deleted: excluído
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Uso detalhado
 details-and-logs: Detalhes e registros
 devDependencies:
   '@types/js-yaml': ''
@@ -255,6 +258,12 @@ key-super-admin: Superadministrador
 key-upload: Carregar
 key-write: Escrever
 language: Linguagem
+last-15-minutes: Últimos 15 minutos
+last-24-hour: Últimas 24 horas
+last-3-hour: Últimas 3 horas
+last-3-minutes: Últimos 3 minutos
+last-hour: Última hora
+last-minute: Último minuto
 last-name: Sobrenome
 last-update: Última atualização
 last-upload: último upload
@@ -280,6 +289,7 @@ making-this-channel-: >-
   Tornar este canal "normal" exigirá que você configure um outro padrão de canal
   ou deixe o dispositivo auto-atribuído.
 mau: Usuários ativos mensais
+mau-usage: 'Uso mensal de usuários ativos:'
 member-deleted: Membro excluído com sucesso
 members: Membros
 metadata: Metadados
@@ -442,6 +452,7 @@ start-new-deploy: Iniciar uma nova implantação progressiva
 start-using-capgo: 'Comece a usar:'
 status-complete: completo
 status-failed: fracassado
+storage-usage: 'Uso de armazenamento:'
 stored-externally: armazenado externamente
 submit: Enviar
 support: Apoiar
@@ -461,6 +472,7 @@ to-live-reload: para recarregar ao vivo.
 to-open-encrypted-bu: 'Para abrir o pacote criptografado, use o comando:'
 top-apps: Meus aplicativos
 top-apps-v2: Aplicativos
+trial: julgamento
 trial-left: dias restantes
 trial-plan-expired: Versao de teste expirada
 trial-plan-expires-in: O teste termina em
@@ -512,3 +524,4 @@ your-are-a: Sua área
 your-current-plan-is: Seu plano atual é
 your-current-suggested-plan-is: Seu plano sugerido atual é
 your-settings: Suas configurações
+your-ussage: 'Seu uso:'

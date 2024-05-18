@@ -73,6 +73,7 @@ app-preview: Vista previa de la aplicación
 are-u-sure: Está seguro ?
 available-in-the-san: Disponible en la aplicación sandbox
 back-to-login-page: Volver a la página de inicio de sesión
+bandwith-usage: 'Uso de ancho de banda:'
 base: Base
 best-plan: mejor plan
 bigger-app-size: Tamaño de aplicación más grande
@@ -168,6 +169,7 @@ country: País
 create-a-free-accoun: Crea una cuenta nueva
 created-at: Creado en
 current-billing-cycle: Ciclo de facturación actual
+custom: Costumbre
 custom-domain: Dominio personalizado
 custom-id: Identificación personalizada
 custom-id-saved: ID personalizado guardado
@@ -183,6 +185,7 @@ deleted: eliminado
 dependencies:
   js-yaml: ''
   openai: ''
+detailed-usage-plan: Uso detallado
 details-and-logs: Detalles y registros
 devDependencies:
   '@types/js-yaml': ''
@@ -267,6 +270,12 @@ key-super-admin: superadministrador
 key-upload: Subir
 key-write: Escribir
 language: Idioma
+last-15-minutes: últimos 15 minutos
+last-24-hour: Últimas 24 horas
+last-3-hour: Últimas 3 horas
+last-3-minutes: últimos 3 minutos
+last-hour: Ultima hora
+last-minute: Último minuto
 last-name: Apellido
 last-update: Última actualización
 last-upload: última carga
@@ -292,6 +301,7 @@ making-this-channel-: >-
   Para hacer que este canal sea "normal", deberá configurar otro canal
   predeterminado o dejar que el dispositivo se auto asigne.
 mau: Usuarios activos mensuales
+mau-usage: 'Uso mensual de usuarios activos:'
 member-deleted: Miembro eliminado exitosamente
 members: Miembros
 metadata: Metadatos
@@ -456,6 +466,7 @@ start-new-deploy: Iniciar una nueva implementación progresiva
 start-using-capgo: 'Empieza a usar:'
 status-complete: completo
 status-failed: fallido
+storage-usage: 'Uso de almacenamiento:'
 stored-externally: almacenado externamente
 submit: Entregar
 support: Apoyo
@@ -475,6 +486,7 @@ to-live-reload: vivir recargar.
 to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps: Mis aplicaciones
 top-apps-v2: Aplicaciones
+trial: ensayo
 trial-left: Días restantes
 trial-plan-expired: Prueba caducada
 trial-plan-expires-in: El juicio termina en
@@ -528,3 +540,4 @@ your-are-a: Tu area
 your-current-plan-is: Su plan actual es
 your-current-suggested-plan-is: Su plan sugerido actual es
 your-settings: Tu configuración
+your-ussage: 'Su uso:'
