@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-t
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
-import { getEnv } from './utils.ts'
+import { backgroundTask, getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 
 // type is require for the bindings no interface
@@ -64,9 +64,9 @@ export async function trackDevicesCF(c: Context, app_id: string, device_id: stri
   console.log('trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
-  //   const updated_at = new Date().toISOString()
-  //   console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
-  //   const insertD1 = c.env.DB_DEVICES.prepare(`
+  // const updated_at = new Date().toISOString()
+  // console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
+  // const insertD1 = c.env.DB_DEVICES.prepare(`
   //   insert into devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   //   values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
   //   on conflict (device_id, app_id) do update set
@@ -80,19 +80,18 @@ export async function trackDevicesCF(c: Context, app_id: string, device_id: stri
   //   is_prod = excluded.is_prod,
   //   is_emulator = excluded.is_emulator
   // `).bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  //     .run()
+  //   .run()
 
-  //   try {
-  //     const res = await insertD1
-  //     console.log('trackDevicesCF res', res)
-  //     return res
-  //   }
-  //   catch (e) {
-  //     console.error('Error inserting device', e)
-  //   }
+  // try {
+  //   const res = await insertD1
+  //   console.log('trackDevicesCF res', res)
+  //   backgroundTask(c, insertD1)
+  // }
+  // catch (e) {
+  //   console.error('Error inserting device', e)
+  // }
 
-  // return backgroundTask(c, insertD1)
-  // return insertD1.ca
+  // return Promise.resolve()
 }
 
 export function formatDateCF(date: string | undefined) {
