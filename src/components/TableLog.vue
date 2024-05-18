@@ -26,7 +26,6 @@ interface Props {
   filters?: { [key: string]: boolean }
   searchPlaceholder?: string
   search?: string
-  total: number
   currentPage: number
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
@@ -127,7 +126,7 @@ function findMobileCol(name: MobileColType) {
 async function fastBackward() {
   console.log('fastBackward')
   emit('fastBackward')
-  emit('update:currentPage', 1)
+  emit('update:currentPage', props.currentPage - 1)
   emit('reload')
 }
 

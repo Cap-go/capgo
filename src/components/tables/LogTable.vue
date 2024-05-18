@@ -34,13 +34,12 @@ const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const router = useRouter()
 const { t } = useI18n()
 const supabase = useSupabase()
-const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
-const total = ref(0)
 const search = ref('')
 const elements = ref<(typeof element)[]>([])
 const versions = ref<Channel['version'][]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
+const range = ref<[Date, Date]>([dayjs().subtract(1, 'hour').toDate(), new Date()])
 const filters = ref()
 
 function findVersion(id: number, versions: { name: string, id: number }[]) {
@@ -75,6 +74,26 @@ async function versionData() {
   }
 }
 
+const paginatedRange = computed(() => {
+  const rangeStart = range.value ? range.value[0].getTime() : undefined
+  const rangeEnd = range.value ? range.value[1].getTime() : undefined
+
+  if (rangeStart && rangeEnd) {
+    const timeDifference = rangeEnd - rangeStart
+    const pageTimeOffset = timeDifference * (currentPage.value - 1)
+
+    return {
+      rangeStart: rangeStart + pageTimeOffset,
+      rangeEnd: rangeEnd + pageTimeOffset,
+    }
+  }
+
+  return {
+    rangeStart,
+    rangeEnd,
+  }
+})
+
 async function getData() {
   isLoading.value = true
   try {
@@ -82,6 +101,7 @@ async function getData() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
+    console.log('paginatedRange.value', paginatedRange.value, currentPage.value)
     const dataD = await ky
       .post(`${defaultApiHost}/private/stats`, {
         headers: {
@@ -94,8 +114,8 @@ async function getData() {
           devicesId: props.deviceId ? [props.deviceId] : undefined,
           search: search.value ? search.value : undefined,
           order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
-          rangeStart: range.value ? range.value[0].getTime() : undefined,
-          rangeEnd: range.value ? range.value[1].getTime() : undefined,
+          rangeStart: paginatedRange.value.rangeStart,
+          rangeEnd: paginatedRange.value.rangeEnd,
         }),
       })
       .then(res => res.json<LogData[]>())
@@ -184,7 +204,7 @@ watch(props, async () => {
 <template>
   <TableLog
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-    :total="total" :element-list="elements"
+    :element-list="elements"
     filter-text="Filters"
     :is-loading="isLoading"
     :app-id="props.appId ?? ''"
