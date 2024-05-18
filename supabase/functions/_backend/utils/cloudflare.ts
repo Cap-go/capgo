@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-t
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
-import { backgroundTask, getEnv } from './utils.ts'
+import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 
 // type is require for the bindings no interface

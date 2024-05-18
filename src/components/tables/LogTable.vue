@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { TableColumn } from '../comp_def'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
@@ -78,26 +78,12 @@ async function versionData() {
 async function getData() {
   isLoading.value = true
   try {
-    // const req = await supabase.functions.invoke('private/stats', {
-    //   body: {
-    //     appId: props.appId,
-    //     devicesId: props.deviceId ? [props.deviceId] : undefined,
-    //     search: search.value ? search.value : undefined,
-    //     order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
-    //     rangeStart: currentVersionsNumber.value,
-    //     rangeEnd: currentVersionsNumber.value + offset - 1,
-    //   },
-    // })
-    // const { data, count } = (await req).data
-    // if (!data)
-    //   return
     const { data: currentSession } = await supabase.auth.getSession()!
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
-    const defaultApiHostPreprod = 'https://api-preprod.capgo.app'
     const dataD = await ky
-      .post(`${defaultApiHostPreprod}/private/stats`, {
+      .post(`${defaultApiHost}/private/stats`, {
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt}` || '',
