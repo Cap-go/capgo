@@ -201,7 +201,7 @@ onMounted(async () => {
         <div :class="`flex-auto flex-col cursor-pointer flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
           <div class="flex items-center justify-center">
             <IconClock class="mr-1" />
-            <span>{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-hour') : t('last-3-minutes')) }}</span>
+            <span>{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
           </div>
           <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
             <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
