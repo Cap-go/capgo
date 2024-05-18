@@ -2,8 +2,8 @@ import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
 
 // Public API
-import type { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
 import { HTTPException } from 'hono/http-exception'
+import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
