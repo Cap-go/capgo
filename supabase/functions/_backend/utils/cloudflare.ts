@@ -91,7 +91,7 @@ export async function trackDevicesCF(c: Context, app_id: string, device_id: stri
   //   console.error('Error inserting device', e)
   // }
 
-  // return Promise.resolve()
+  return Promise.resolve()
 }
 
 export function formatDateCF(date: string | undefined) {
