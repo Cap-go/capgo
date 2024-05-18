@@ -62,11 +62,10 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
 export async function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
   // TODO: fix this
   console.log('trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  if (!c.env.DB_DEVICES)
-    return Promise.resolve()
-  // const updated_at = new Date().toISOString()
-  // console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
-  // const insertD1 = c.env.DB_DEVICES.prepare(`
+  //   if (!c.env.DB_DEVICES)
+  //     return Promise.resolve()
+  //   const updated_at = new Date().toISOString()
+  //   const query = `
   //   insert into devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
   //   values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
   //   on conflict (device_id, app_id) do update set
@@ -79,17 +78,22 @@ export async function trackDevicesCF(c: Context, app_id: string, device_id: stri
   //   custom_id = excluded.custom_id,
   //   is_prod = excluded.is_prod,
   //   is_emulator = excluded.is_emulator
-  // `).bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  //   .run()
+  // `
+  //   console.log('trackDevicesCF query', query)
+  //   console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
+  //   const insertD1 = c.env.DB_DEVICES
+  //     .prepare(query)
+  //     .bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+  //     .run()
 
-  // try {
-  //   const res = await insertD1
-  //   console.log('trackDevicesCF res', res)
-  //   backgroundTask(c, insertD1)
-  // }
-  // catch (e) {
-  //   console.error('Error inserting device', e)
-  // }
+  //   try {
+  //     const res = await insertD1
+  //     console.log('trackDevicesCF res', res)
+  //     backgroundTask(c, insertD1)
+  //   }
+  //   catch (e) {
+  //     console.error('Error inserting device', e)
+  //   }
 
   return Promise.resolve()
 }
