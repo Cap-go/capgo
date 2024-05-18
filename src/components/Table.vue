@@ -235,19 +235,19 @@ onMounted(async () => {
       <!-- </div> -->
       <div class="flex h-10 ml-4 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
         <div :class="`flex-auto flex-col cursor-pointer flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
-          <div class="flex flex-row">
+          <div class="flex items-center justify-center">
             <IconClock class="mr-1" />
-            {{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hour') : t('last-24-hour')) }}
+            <span>{{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hour') : t('last-24-hour')) }}</span>
           </div>
           <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
             <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
-              <div class="w-full py-3 my-auto text-center hover:bg-gray-700" @click="setTime(1)">
+              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(1)">
                 {{ t('last-hour') }}
               </div>
-              <div class="w-full py-3 my-auto text-center hover:bg-gray-700" @click="setTime(3)">
+              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(3)">
                 {{ t('last-3-hour') }}
               </div>
-              <div class="w-full py-3 my-auto text-center hover:bg-gray-700" @click="setTime(24)">
+              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(24)">
                 {{ t('last-24-hour') }}
               </div>
             </div>
