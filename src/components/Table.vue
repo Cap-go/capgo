@@ -255,8 +255,7 @@ onMounted(async () => {
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-600" />
         <div :class="`flex-auto cursor-pointer flex items-center justify-center w-28 hover:bg-gray-700 rounded-r-lg ${currentSelected === 'precise' ? 'bg-gray-100 text-gray-800 hover:text-white' : ''}`" @click="clickRight">
-          <div class="fixed z-50">
-            <!-- <IconCalendar class="mr-1" /> -->
+          <div class="relative">
             <VueDatePicker
               v-model="preciseDates"
               :min-date="dayjs(thisOrganization?.subscription_start ?? 0).toDate()"

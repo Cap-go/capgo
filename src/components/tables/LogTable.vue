@@ -141,13 +141,6 @@ async function refreshData() {
 
 columns.value = [
   {
-    label: t('action'),
-    key: 'action',
-    mobile: 'title',
-    sortable: true,
-    head: true,
-  },
-  {
     label: t('created-at'),
     key: 'created_at',
     mobile: 'header',
@@ -155,11 +148,26 @@ columns.value = [
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
+    label: t('device-id'),
+    key: 'device_id',
+    mobile: 'footer',
+    sortable: true,
+    head: true,
+  },
+  {
+    label: t('action'),
+    key: 'action',
+    mobile: 'title',
+    sortable: true,
+    head: true,
+  },
+
+  {
     label: t('version'),
     key: 'version',
-    mobile: 'footer',
+    mobile: 'after',
     sortable: false,
-    displayFunction: (elem: typeof element) => elem.version.name,
+    displayFunction: (elem: typeof element) => elem.version?.name,
   },
 ]
 
