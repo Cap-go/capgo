@@ -19,40 +19,44 @@ export type Bindings = {
 const DEFAULT_LIMIT = 1000
 export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
-    return
+    return Promise.resolve()
   c.env.DEVICE_USAGE.writeDataPoint({
     blobs: [device_id],
     indexes: [app_id],
   })
+  return Promise.resolve()
 }
 
 export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: string, file_size: number) {
   if (!c.env.BANDWIDTH_USAGE)
-    return
+    return Promise.resolve()
   c.env.BANDWIDTH_USAGE.writeDataPoint({
     blobs: [device_id],
     doubles: [file_size],
     indexes: [app_id],
   })
+  return Promise.resolve()
 }
 
 export function trackVersionUsageCF(c: Context, version_id: number, app_id: string, action: string) {
   if (!c.env.VERSION_USAGE)
-    return
+    return Promise.resolve()
   c.env.VERSION_USAGE.writeDataPoint({
     blobs: [app_id, version_id, action],
     indexes: [app_id],
   })
+  return Promise.resolve()
 }
 
 export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
   if (!c.env.APP_LOG)
-    return
+    return Promise.resolve()
   c.env.APP_LOG.writeDataPoint({
     blobs: [device_id, action],
     doubles: [version_id],
     indexes: [app_id],
   })
+  return Promise.resolve()
 }
 
 export async function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
