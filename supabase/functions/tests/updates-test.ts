@@ -272,24 +272,22 @@ Deno.test('Test with new device', async () => {
 })
 
 // TODO: Fix this test by fixing the code in the project
-// Deno.test({
-//   name: 'Test direct channel overwrite',
-//   only: true,
-//   fn: async () => {
-//     await resetAndSeedData()
+Deno.test({
+  name: 'Test direct channel overwrite',
+  fn: async () => {
+    await resetAndSeedData()
 
-//     const uuid = crypto.randomUUID()
+    const uuid = crypto.randomUUID()
 
-//     const baseData = getBaseData()
-//     baseData.device_id = uuid;
-//     (baseData as any).defaultChannel = 'no_access'
+    const baseData = getBaseData()
+    baseData.device_id = uuid;
+    (baseData as any).defaultChannel = 'no_access'
 
-//     const response = await postUpdate(baseData)
-//     assertEquals(response.status, 200)
+    const response = await postUpdate(baseData)
+    assertEquals(response.status, 200)
 
-//     const json = await response.json()
-//     console.log('json', json)
-//     updateNewScheme.parse(json)
-//     assertEquals(json.version, '1.361.0')
-//   },
-// })
+    const json = await response.json()
+    updateNewScheme.parse(json)
+    assertEquals(json.version, '1.361.0')
+  },
+})
