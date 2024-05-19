@@ -36,6 +36,11 @@ int main() {
 
   char* newlineChar = strtok(myString, "\n");
   while (newlineChar != NULL) {
+    if (*newlineChar == '#') {
+      newlineChar = strtok(NULL, "\n");
+      continue;
+    }
+
     char* equalSign = strstr(newlineChar, "=");
     if (equalSign != NULL) {
       *equalSign = '\0'; //write a null byte at "="

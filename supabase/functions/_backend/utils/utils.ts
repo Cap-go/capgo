@@ -82,7 +82,7 @@ export function isLimited(c: Context, id: string) {
   return Math.random() < app.ignore
 }
 
-export function backgroundTask(c: Context, p: Promise<void>) {
+export async function backgroundTask<T>(c: Context, p: Promise<T>): Promise<T | null> {
   let executionCtx: ExecutionContext | null
   try {
     executionCtx = c.executionCtx
@@ -91,8 +91,11 @@ export function backgroundTask(c: Context, p: Promise<void>) {
     executionCtx = null
   }
 
-  if (executionCtx?.waitUntil)
-    return c.executionCtx.waitUntil(p)
+  if (executionCtx?.waitUntil) {
+    c.executionCtx.waitUntil(p)
+    return Promise.resolve(null)
+  }
+
   return p
 }
 

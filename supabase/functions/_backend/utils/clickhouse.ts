@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import ky from 'ky'
 import type { Context, ExecutionContext } from 'hono'
 import type { Database } from './supabase.types.ts'
-import { getEnv } from './utils.ts'
+import { backgroundTask, getEnv } from './utils.ts'
 import { getAppsFromSupabase, supabaseAdmin, supabaseClient } from './supabase.ts'
 import { createStatsDevices, createStatsLogs } from './stats.ts'
 import type { Order } from './types.ts'
@@ -635,7 +635,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   const deviceData = convertAllDatesToCH({ ...device, updated_at: new Date().toISOString() })
   const deviceReady = JSON.stringify(deviceData)
 
-  const jobs = []
+  const jobs = [] as Promise<any>[]
   // Prepare the stats data for insertion
   const statsData = statsActions.map(({ action, versionId }) => {
     const stat: any = {
@@ -647,7 +647,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
       version: versionId || device.version, // Use the provided versionId if available
       platform: device.platform ?? 'android',
     }
-    jobs.push(createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version))
+    jobs.push(createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version) as any)
     return JSON.stringify(convertAllDatesToCH(stat))
   }).join('\n')
 
@@ -661,29 +661,17 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   if (statsActions.some(({ action }) => action === 'get'))
     jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
-  if (!isClickHouseEnabled(c))
-    return Promise.resolve()
-  jobs.push([
-    sendClickHouse(c, deviceReady, 'devices'),
-    sendClickHouse(c, statsData, 'logs'),
-    sendClickHouse(c, dailyDeviceReady, 'daily_device'),
-  ])
-
-  let executionCtx: ExecutionContext | null
-  try {
-    executionCtx = c.executionCtx
-  }
-  catch (_) {
-    executionCtx = null
+  if (isClickHouseEnabled(c)) {
+    jobs.push(
+      sendClickHouse(c, deviceReady, 'devices'),
+      sendClickHouse(c, statsData, 'logs'),
+      sendClickHouse(c, dailyDeviceReady, 'daily_device'),
+    )
   }
 
-  if (executionCtx?.waitUntil)
-    return c.executionCtx.waitUntil(Promise.all(jobs))
-
-  return Promise.all(jobs)
-    .catch((error) => {
-      console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
-    })
+  return backgroundTask(c, Promise.all(jobs).catch((error) => {
+    console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
+  }))
 }
 
 export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
