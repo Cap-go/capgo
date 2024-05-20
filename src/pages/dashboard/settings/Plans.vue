@@ -7,7 +7,7 @@ import { storeToRefs } from 'pinia'
 import test from './particles.json'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
-import { findBestPlan, getCurrentPlanNameOrg, getPlanUsagePercent, getTotalStats } from '~/services/supabase'
+import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
 import { openMessenger } from '~/services/chatwoot'
 import type { Database } from '~/types/supabase.types'
@@ -25,7 +25,11 @@ const mainStore = useMainStore()
 const displayStore = useDisplayStore()
 
 interface PlansOrgData {
-  stats: Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0] | undefined
+  stats: {
+    mau: number
+    storage: number
+    bandwidth: number
+  }
   planSuggest: string
   planCurrrent: string
   planPercent: number
@@ -36,7 +40,11 @@ interface PlansOrgData {
 
 function defaultPlanOrgData(): PlansOrgData {
   return {
-    stats: undefined,
+    stats: {
+      mau: 0,
+      storage: 0,
+      bandwidth: 0,
+    },
     planCurrrent: '',
     planPercent: -1,
     planSuggest: '',
@@ -130,12 +138,6 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 //   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 // }
 
-async function getUsages(orgId: string) {
-  const stats = await getTotalStats(orgId)
-  const bestPlan = await findBestPlan(stats)
-  return { stats, bestPlan }
-}
-
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -153,11 +155,6 @@ async function loadData(initial: boolean) {
   const data = defaultPlanOrgData()
 
   await Promise.all([
-    getUsages(orgId).then((res) => {
-      data.stats = res.stats
-      data.planSuggest = res.bestPlan
-      // updateData()
-    }),
     getCurrentPlanNameOrg(orgId).then((res) => {
       data.planCurrrent = res
       // updateData()
@@ -173,6 +170,8 @@ async function loadData(initial: boolean) {
     // })
   ])
 
+  data.stats = main.totalStats
+  data.planSuggest = main.bestPlan
   data.paying = orgToLoad.paying
   data.trialDaysLeft = orgToLoad.trial_left
 

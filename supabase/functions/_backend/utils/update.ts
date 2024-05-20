@@ -14,12 +14,9 @@ import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
 
 import * as schema_postgres from './postgress_schema.ts'
-import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
+import type { DeviceWithoutCreatedAt } from './stats.ts'
 import { getEnv } from './utils.ts'
-import { sendStatsAndDevice } from './clickhouse.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion } from './stats.ts'
-
-// import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {

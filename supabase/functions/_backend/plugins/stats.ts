@@ -26,11 +26,9 @@ import { sendNotifOrg } from '../utils/notifications.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
-import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/clickhouse.ts'
-import { sendStatsAndDevice } from '../utils/clickhouse.ts'
-import { createStatsVersion } from '../utils/stats.ts'
+import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
+import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 
-// import { saveStoreInfo, sendStatsAndDevice, updateInClickHouse } from '../utils/clickhouse.ts'
 
 const failActions = [
   'set_fail',

@@ -62,38 +62,24 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
 export async function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
   // TODO: fix this
   console.log('trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  //   if (!c.env.DB_DEVICES)
-  //     return Promise.resolve()
-  //   const updated_at = new Date().toISOString()
-  //   const query = `
-  //   insert into devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  //   values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-  //   on conflict (device_id, app_id) do update set
-  //   updated_at = excluded.updated_at,
-  //   version = excluded.version,
-  //   platform = excluded.platform,
-  //   plugin_version = excluded.plugin_version,
-  //   os_version = excluded.os_version,
-  //   version_build = excluded.version_build,
-  //   custom_id = excluded.custom_id,
-  //   is_prod = excluded.is_prod,
-  //   is_emulator = excluded.is_emulator
-  // `
-  //   console.log('trackDevicesCF query', query)
-  //   console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
-  //   const insertD1 = c.env.DB_DEVICES
-  //     .prepare(query)
-  //     .bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  //     .run()
-
-  //   try {
-  //     const res = await insertD1
-  //     console.log('trackDevicesCF res', res)
-  //     backgroundTask(c, insertD1)
-  //   }
-  //   catch (e) {
-  //     console.error('Error inserting device', e)
-  //   }
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve()
+  try {
+    const updated_at = new Date().toISOString()
+    const query = `INSERT INTO devices ( updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) ON CONFLICT ( device_id, app_id ) DO UPDATE SET updated_at = excluded.updated_at, version = excluded.version, platform = excluded.platform, plugin_version = excluded.plugin_version, os_version = excluded.os_version, version_build = excluded.version_build, custom_id = excluded.custom_id, is_prod = excluded.is_prod, is_emulator = excluded.is_emulator`
+    console.log('trackDevicesCF query', query)
+    console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
+    const insertD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+      .run()
+    const res = await insertD1
+    console.log('trackDevicesCF res', res)
+    // backgroundTask(c, insertD1)
+  }
+  catch (e) {
+    console.error('Error inserting device', e)
+  }
 
   return Promise.resolve()
 }
@@ -258,41 +244,42 @@ export async function readDevicesCF(c: Context, app_id: string, period_start: st
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      searchFilter = `AND startsWith(custom_id, '${search}')`
+      searchFilter = `AND custom_id LIKE '${search}')`
     else
-      searchFilter = `AND (startsWith(device_id, '${search}') OR startsWith(custom_id, '${search}'))`
+      searchFilter = `AND (device_id LIKE '${search}' OR custom_id LIKE '${search}')`
   }
   let versionFilter = ''
   if (version_id)
     versionFilter = `AND version_id = ${version_id}`
 
   const query = `SELECT
-  blob1 AS app_id,
-  blob2 AS device_id,
-  double1 AS version_id,
-  blob3 AS platform,
-  blob4 AS plugin_version,
-  blob5 AS os_version,
-  blob6 AS version_build,
-  blob7 AS is_prod,
-  blob8 AS is_emulator,
-  blob9 AS custom_id,
-  timestamp AS updated_at
-FROM device_log
+  app_id,
+  DISTINCT device_id,
+  version_id,
+  platform,
+  plugin_version,
+  os_version,
+  version_build,
+  is_prod,
+  is_emulator,
+  custom_id,
+  updated_at
+FROM devices
 WHERE
-  startsWith(index1, '${app_id}__')
+  app_id = '${app_id}'
   ${deviceFilter}
   ${searchFilter}
   ${versionFilter}
   AND updated_at >= toDateTime('${formatDateCF(period_start)}')
   AND updated_at < toDateTime('${formatDateCF(period_end)}')
-GROUP BY app_id, device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, updated_at, version_id
 ORDER BY updated_at DESC
 LIMIT ${limit};`
 
   console.log('readDevicesCF query', query)
   try {
-    return await runQueryToCF<DeviceRowCF[]>(c, query)
+    const stmt = c.env.DB_DEVICES.prepare('SELECT * FROM users WHERE name = ? AND age = ?').bind('John Doe', 41)
+    const { results } = await stmt.all()
+    return results
   }
   catch (e) {
     console.error('Error reading device list', e)

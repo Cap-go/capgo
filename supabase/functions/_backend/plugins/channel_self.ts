@@ -11,8 +11,8 @@ import { EMPTY_UUID, supabaseAdmin } from '../utils/supabase.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import type { DeviceWithoutCreatedAt } from '../utils/clickhouse.ts'
-import { sendStatsAndDevice } from '../utils/clickhouse.ts'
+import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
+import { sendStatsAndDevice } from '../utils/stats.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string

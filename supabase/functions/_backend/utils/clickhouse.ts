@@ -630,62 +630,6 @@ export interface StatsActions {
   versionId?: number
 }
 
-export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
-  // Prepare the device data for insertion
-  const deviceData = convertAllDatesToCH({ ...device, updated_at: new Date().toISOString() })
-  const deviceReady = JSON.stringify(deviceData)
-
-  const jobs = []
-  // Prepare the stats data for insertion
-  const statsData = statsActions.map(({ action, versionId }) => {
-    const stat: any = {
-      created_at: new Date().toISOString(),
-      device_id: device.device_id,
-      action,
-      app_id: device.app_id,
-      version_build: device.version_build ?? '',
-      version: versionId || device.version, // Use the provided versionId if available
-      platform: device.platform ?? 'android',
-    }
-    jobs.push(createStatsLogs(c, stat.app_id, stat.device_id, stat.action, stat.version))
-    return JSON.stringify(convertAllDatesToCH(stat))
-  }).join('\n')
-
-  // Prepare the daily_device data for insertion
-  const dailyDeviceReady = JSON.stringify({
-    device_id: device.device_id,
-    app_id: device.app_id,
-    date: formatDateCH(new Date().toISOString()).split(' ')[0], // Extract the date part only
-  })
-  // if any statsActions is get, then we need the device data
-  if (statsActions.some(({ action }) => action === 'get'))
-    jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
-
-  if (!isClickHouseEnabled(c))
-    return Promise.resolve()
-  jobs.push([
-    sendClickHouse(c, deviceReady, 'devices'),
-    sendClickHouse(c, statsData, 'logs'),
-    sendClickHouse(c, dailyDeviceReady, 'daily_device'),
-  ])
-
-  let executionCtx: ExecutionContext | null
-  try {
-    executionCtx = c.executionCtx
-  }
-  catch (_) {
-    executionCtx = null
-  }
-
-  if (executionCtx?.waitUntil)
-    return c.executionCtx.waitUntil(Promise.all(jobs))
-
-  return Promise.all(jobs)
-    .catch((error) => {
-      console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
-    })
-}
-
 export async function getSDashboardV2(c: Context, auth: string, orgId: string, startDate: string, endDate: string, appId?: string): Promise<AppActivity[]> {
   console.log(`getSDashboardV2 orgId ${orgId} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
 

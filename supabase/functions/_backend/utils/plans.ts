@@ -45,23 +45,6 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
   return data || 'Team'
 }
 
-export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_total_stats_v5', { userid: userId })
-    .single()
-
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
-  }
-
-  return data || {
-    mau: 0,
-    storage: 0,
-    bandwidth: 0,
-  }
-}
-
 export async function getMeterdUsage(c: Context, userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> {
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_metered_usage', { userid: userId })
