@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { ComputedRef } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'

@@ -15,7 +15,6 @@ import { app as on_version_create } from '../_backend/triggers/on_version_create
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
-import { app as get_total_stats } from '../_backend/triggers/get_total_stats.ts'
 import { app as on_organization_create } from '../_backend/triggers/on_organization_create.ts'
 import { app as on_organization_delete } from '../_backend/triggers/on_organization_delete.ts'
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
@@ -47,7 +46,6 @@ appGlobal.route('/on_version_create', on_version_create)
 appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/stripe_event', stripe_event)
-appGlobal.route('/get_total_stats', get_total_stats)
 appGlobal.route('/on_organization_create', on_organization_create)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)

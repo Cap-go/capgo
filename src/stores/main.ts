@@ -3,6 +3,7 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
 import {
+  findBestPlan,
   getAllDashboard,
   getTotalStorage,
   unspoofUser,
@@ -17,6 +18,16 @@ export const useMainStore = defineStore('main', () => {
   const user = ref<Database['public']['Tables']['users']['Row']>()
   const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
   const isAdmin = ref<boolean>(false)
+  const stats = ref<{
+    mau: number
+    bandwidth: number
+    storage: number
+  }>({
+    mau: 0,
+    bandwidth: 0,
+    storage: 0,
+  })
+  const bestPlan = ref<string>('')
   const dashboard = ref<appUsageGlobal[]>([])
   const dashboardByapp = ref<appUsageByApp[]>([])
   const totalDevices = ref<number>(0)
@@ -44,15 +55,6 @@ export const useMainStore = defineStore('main', () => {
       }, 300)
     })
   }
-  const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
-    const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
-    dashboard.value = dashboardRes.global
-    dashboardByapp.value = dashboardRes.byApp
-    totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
-    totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
-    totalStorage.value = await getTotalStorage()
-    dashboardFetched.value = true
-  }
 
   const getTotalStats = () => {
     return dashboard.value.reduce((acc: any, cur: any) => {
@@ -65,6 +67,18 @@ export const useMainStore = defineStore('main', () => {
       bandwidth: 0,
       storage: 0,
     })
+  }
+
+  const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
+    const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
+    dashboard.value = dashboardRes.global
+    dashboardByapp.value = dashboardRes.byApp
+    totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
+    totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
+    totalStorage.value = await getTotalStorage()
+    stats.value = getTotalStats()
+    bestPlan.value = await findBestPlan(stats)
+    dashboardFetched.value = true
   }
 
   const filterDashboard = (appId: string) => {
@@ -85,7 +99,8 @@ export const useMainStore = defineStore('main', () => {
     totalDownload,
     dashboardFetched,
     updateDashboard,
-    getTotalStats,
+    stats,
+    bestPlan,
     filterDashboard,
     dashboard,
     dashboardByapp,

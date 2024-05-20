@@ -43,7 +43,6 @@ import { app as on_version_create } from '../supabase/functions/_backend/trigger
 import { app as on_version_update } from '../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
 import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as cron_plan } from '../supabase/functions/_backend/triggers/cron_plan.ts'
 import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
@@ -103,7 +102,6 @@ appTriggers.route('/on_version_create', on_version_create)
 appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/stripe_event', stripe_event)
-appTriggers.route('/get_total_stats', get_total_stats)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)
 appTriggers.route('/cron_plan', cron_plan)

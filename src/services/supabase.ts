@@ -352,27 +352,6 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
   return data
 }
 
-export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0]> {
-  if (!orgId) {
-    return {
-      mau: 0,
-      bandwidth: 0,
-      storage: 0,
-    }
-  }
-  const { data, error } = await useSupabase()
-    .rpc('get_total_stats_v5_org', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-  // console.log('getTotalStats', data, error)
-
-  return data as any as Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0] || {
-    mau: 0,
-    bandwidth: 0,
-    storage: 0,
-  }
-}
 
 const DEFAUL_PLAN_NAME = 'Solo'
 

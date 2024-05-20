@@ -170,6 +170,36 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   return userRight.data
 }
 
+interface PlanTotal {
+  mau: number
+  bandwidth: number
+  storage: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
+export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTotal> {
+  if (!orgId) {
+    return {
+      mau: 0,
+      bandwidth: 0,
+      storage: 0,
+      get: 0,
+      fail: 0,
+      install: 0,
+      uninstall: 0,
+    }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_total_metrics', { org_id: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
+}
+
 interface PlanUsage {
   total_percent: number
   mau_percent: number
