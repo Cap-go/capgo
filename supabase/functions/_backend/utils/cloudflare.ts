@@ -242,11 +242,11 @@ interface DeviceRowCF {
   custom_id: string
   is_prod: string
   is_emulator: string
-  timestamp: string
+  updated_at: string
 }
 
-export async function readDevicesCF(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
-  if (!c.env.DEVICE_LOG)
+export async function readDevicesCF(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
+  if (!c.env.DB_DEVICES)
     return [] as DeviceRowCF[]
 
   let deviceFilter = ''
@@ -273,32 +273,36 @@ export async function readDevicesCF(c: Context, app_id: string, period_start: st
     versionFilter = `AND version_id = ${version_id}`
 
   const query = `SELECT
-  blob1 AS app_id,
-  blob2 AS device_id,
-  double1 AS version_id,
-  blob3 AS platform,
-  blob4 AS plugin_version,
-  blob5 AS os_version,
-  blob6 AS version_build,
-  blob7 AS is_prod,
-  blob8 AS is_emulator,
-  blob9 AS custom_id,
-  timestamp AS updated_at
-FROM device_log
+  app_id,
+  device_id,
+  version,
+  platform,
+  plugin_version,
+  os_version,
+  version_build,
+  is_prod,
+  is_emulator,
+  custom_id,
+  updated_at
+FROM devices
 WHERE
-  startsWith(index1, '${app_id}__')
+  app_id = '${app_id}'
   ${deviceFilter}
   ${searchFilter}
   ${versionFilter}
-  AND updated_at >= toDateTime('${formatDateCF(period_start)}')
-  AND updated_at < toDateTime('${formatDateCF(period_end)}')
-GROUP BY app_id, device_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, updated_at, version_id
 ORDER BY updated_at DESC
-LIMIT ${limit};`
+LIMIT ${range_end} OFFSET ${range_start}`
 
   console.log('readDevicesCF query', query)
   try {
-    return await runQueryToCF<DeviceRowCF[]>(c, query)
+    console.log('readDevicesCF exec')
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .all()
+    console.log('readDevicesCF exec await')
+    const res = await readD1
+    console.log('readDevicesCF res', res)
+    return res.results
   }
   catch (e) {
     console.error('Error reading device list', e)
