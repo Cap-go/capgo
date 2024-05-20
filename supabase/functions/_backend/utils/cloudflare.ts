@@ -65,28 +65,9 @@ export async function trackDevicesCF(c: Context, app_id: string, device_id: stri
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
   const updated_at = new Date().toISOString()
-  const query = `
-  INSERT INTO devices (
-    updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator
-) VALUES (
-    '${updated_at}', '${device_id}', ${version_id}, '${app_id}', '${platform}', '${plugin_version}', '${os_version}', '${version_build}', '${custom_id}', '${is_prod}', '${is_emulator}'
-) ON CONFLICT (
-    device_id, app_id
-) DO UPDATE SET
-    updated_at = excluded.updated_at,
-    version = excluded.version,
-    platform = excluded.platform,
-    plugin_version = excluded.plugin_version,
-    os_version = excluded.os_version,
-    version_build = excluded.version_build,
-    custom_id = excluded.custom_id,
-    is_prod = excluded.is_prod,
-    is_emulator = excluded.is_emulator`
+  const query = `INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES ('${updated_at}', '${device_id}', ${version_id}, '${app_id}', '${platform}', '${plugin_version}', '${os_version}', '${version_build}', '${custom_id}', '${is_prod}', '${is_emulator}') ON CONFLICT (device_id, app_id) DO UPDATE SET updated_at = excluded.updated_at, version = excluded.version, platform = excluded.platform, plugin_version = excluded.plugin_version, os_version = excluded.os_version, version_build = excluded.version_build, custom_id = excluded.custom_id, is_prod = excluded.is_prod, is_emulator = excluded.is_emulator`
   console.log('trackDevicesCF query', query)
   console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
-  // .prepare(query)
-  // .bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  // .run()
 
   try {
     console.log('trackDevicesCF exec')
