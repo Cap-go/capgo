@@ -440,6 +440,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 }
 
 export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
+  // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE action = 'get'`
 
   console.log('countUpdatesFromLogsCF query', query)
@@ -485,28 +486,6 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
   return [] as StoreApp[]
 }
 
-// export async function getTopApps(c: Context, mode: string, limit: number) {
-//   if (!isClickHouseEnabled(c))
-//     return Promise.reject(new Error('Disabled clickhouse'))
-//   const query = `
-//     SELECT url, title, icon, summary, installs, category
-//     FROM store_apps
-//     WHERE 1=1
-//       ${mode === 'cordova' ? 'AND cordova = 1 AND capacitor = 0' : ''}
-//       ${mode === 'flutter' ? 'AND flutter = 1' : ''}
-//       ${mode === 'reactNative' ? 'AND react_native = 1' : ''}
-//       ${mode === 'nativeScript' ? 'AND native_script = 1' : ''}
-//       ${mode === 'capgo' ? 'AND capgo = 1' : ''}
-//       ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? 'AND capacitor = 1' : ''}
-//     ORDER BY installs DESC
-//     LIMIT {param_limit:UInt64}
-//   `
-
-//   const params = prefixParams({ limit })
-
-//   const result = await executeClickHouseQuery(c, query, params)
-//   return result.data
-// }
 interface topApp {
   url: string
   title: string
@@ -552,24 +531,6 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
   return [] as StoreApp[]
 }
 
-// export async function getTotalAppsByMode(c: Context, mode: string) {
-//   if (!isClickHouseEnabled(c))
-//     return Promise.reject(new Error('Disabled clickhouse'))
-//   const query = `
-//     SELECT COUNT(*) AS total
-//     FROM store_apps
-//     WHERE 1=1
-//       ${mode === 'cordova' ? 'AND cordova = 1 AND capacitor = 0' : ''}
-//       ${mode === 'flutter' ? 'AND flutter = 1' : ''}
-//       ${mode === 'reactNative' ? 'AND react_native = 1' : ''}
-//       ${mode === 'nativeScript' ? 'AND native_script = 1' : ''}
-//       ${mode === 'capgo' ? 'AND capgo = 1' : ''}
-//       ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? 'AND capacitor = 1' : ''}
-//   `
-
-//   const result = await executeClickHouseQuery(c, query)
-//   return result.data[0].total
-// }
 export async function getTotalAppsByModeCF(c: Context, mode: string) {
   if (!c.env.DB_DEVICES)
     return Promise.resolve(0)
@@ -606,128 +567,6 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
   }
   return 0
 }
-
-// function prefixParams(params: Record<string, any>): Record<string, any> {
-//   const prefixedParams: Record<string, any> = {}
-//   for (const [key, value] of Object.entries(params))
-//     prefixedParams[`param_${key}`] = value
-
-//   return prefixedParams
-// }
-
-// export async function getStoreAppById(c: Context, appId: string) {
-//   if (!isClickHouseEnabled(c))
-//     return Promise.reject(new Error('Disabled clickhouse'))
-//   const query = `
-//     SELECT *
-//     FROM store_apps
-//     WHERE app_id = {param_app_id:String}
-//     LIMIT 1
-//   `
-
-//   const params = prefixParams({ app_id: appId })
-
-//   const result = await executeClickHouseQuery(c, query, params)
-//   return result.data[0]
-// }
-
-// export async function saveStoreInfoCF(c: Context, app: any) {
-//   if (!isClickHouseEnabled(c))
-//     return Promise.resolve()
-//   // Save a single app in ClickHouse
-//   const columns: (keyof any)[] = Object.keys({ updates: 0, ...app }) as (keyof any)[]
-//   const values = columns.map((column) => {
-//     const value = app[column]
-//     if (column === 'updates')
-//       return `sumState(${value})`
-//     else
-//       return `'${value}'`
-//   }).join(', ')
-
-//   const query = `
-//     INSERT INTO store_apps (${columns.join(', ')})
-//     VALUES (${values})
-//     SETTINGS async_insert=1, wait_for_async_insert=0
-//   `
-
-//   try {
-//     await executeClickHouseQuery(c, query)
-//     console.log('saveStoreInfoCF success')
-//   }
-//   catch (error) {
-//     console.error('saveStoreInfoCF error', error)
-//     throw error
-//   }
-// }
-
-// export async function bulkUpdateStoreAppsCF(c: Context, apps: (any)[]) {
-//   if (!isClickHouseEnabled(c))
-//     return Promise.resolve()
-//   // Update a list of apps in ClickHouse (internal use only)
-//   if (!apps.length)
-//     return
-
-//   const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
-//   console.log('bulkUpdateStoreAppsCF', noDup.length)
-
-//   const columns = Object.keys(noDup[0])
-//   const values = noDup.map((app) => {
-//     const convertedApp = convertAllDatesToCH({ updates: 0, ...app })
-//     return `(${columns.map((column) => {
-//       const value = convertedApp[column]
-//       if (column === 'updates')
-//         return `sumState(${value})`
-//       else
-//         return `'${value}'`
-//     }).join(', ')})`
-//   }).join(', ')
-
-//   const query = `
-//     INSERT INTO store_apps (${columns.join(', ')})
-//     VALUES ${values}
-//     SETTINGS async_insert=1, wait_for_async_insert=0
-//   `
-
-//   try {
-//     await executeClickHouseQuery(c, query)
-//     console.log('bulkUpdateStoreAppsCF success')
-//   }
-//   catch (error) {
-//     console.error('bulkUpdateStoreAppsCF error', error)
-//   }
-// }
-
-// export async function updateInClickHouse(c: Context, appId: string, updates: number) {
-//   if (!isClickHouseEnabled(c))
-//     return Promise.resolve()
-//   if (!isClickHouseEnabled(c))
-//     return Promise.resolve()
-
-//   const query = `
-//     INSERT INTO store_apps (app_id, updates)
-//     SELECT {app_id:String}, sumState({updates:UInt64})
-//     WHERE app_id = {app_id:String}
-//     SETTINGS async_insert=1, wait_for_async_insert=0
-//   `
-
-//   const params = prefixParams({
-//     updates,
-//     app_id: appId,
-//   })
-
-//   await executeClickHouseQuery(c, query, params)
-// }
-
-// export interface ClickHouseMeta {
-//   app_id: string
-//   version_id: number
-//   size: number
-// }
-
-// export interface StatsActions {
-//   action: string
-//   versionId?: number
-// }
 
 export async function getStoreAppByIdCF(c: Context, appId: string): Promise<StoreApp> {
   if (!c.env.DB_DEVICES)
