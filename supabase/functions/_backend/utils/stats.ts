@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import { readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackDevicesSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
-import { readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
+import { countDevicesSB, readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackDevicesSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesCF, readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
 import type { Database } from './supabase.types.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
@@ -81,6 +81,12 @@ export function readStats(c: Context, app_id: string, start_date: string, end_da
   if (!c.env.APP_LOG)
     return readStatsSB(c, app_id, start_date, end_date, deviceIds, search)
   return readStatsCF(c, app_id, start_date, end_date, deviceIds, search)
+}
+
+export function countDevices(c: Context, app_id: string) {
+  if (!c.env.DEVICE_LOG)
+    return countDevicesSB(c, app_id)
+  return countDevicesCF(c, app_id)
 }
 
 export function readDevices(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {

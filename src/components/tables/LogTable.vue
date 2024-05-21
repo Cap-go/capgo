@@ -109,7 +109,6 @@ async function getData() {
           'authorization': `Bearer ${currentJwt}` || '',
         },
         body: JSON.stringify({
-          api: 'v2', // TODO: remove this when we remove the old api
           appId: props.appId,
           devicesId: props.deviceId ? [props.deviceId] : undefined,
           search: search.value ? search.value : undefined,

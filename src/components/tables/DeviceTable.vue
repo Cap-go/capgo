@@ -98,6 +98,30 @@ interface DeviceData {
   created_at: string
 }
 
+async function countDevices() {
+  const { data: currentSession } = await supabase.auth.getSession()!
+  if (!currentSession.session)
+    return 0
+  const currentJwt = currentSession.session.access_token
+  const dataD = await ky
+    .post(`${defaultApiHost}/private/devices`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${currentJwt}` || '',
+      },
+      body: JSON.stringify({
+        count: true,
+        appId: props.appId,
+      }),
+    })
+    .then(res => res.json<{ count: number }>())
+    .catch((err) => {
+      console.log('Cannot get devices', err)
+      return { count: 0 }
+    })
+  return dataD.count
+}
+
 async function getData() {
   isLoading.value = true
   try {
@@ -116,7 +140,6 @@ async function getData() {
           'authorization': `Bearer ${currentJwt}` || '',
         },
         body: JSON.stringify({
-          api: 'v2', // TODO: remove this when we remove the old api
           appId: props.appId,
           versionId: props.versionId,
           devicesId: ids.length ? ids : undefined,
@@ -154,7 +177,6 @@ async function getData() {
     })
 
     elements.value.push(...finalData as any)
-    total.value = count || 0
   }
   catch (error) {
     console.error(error)
@@ -177,6 +199,7 @@ async function refreshData() {
   try {
     currentPage.value = 1
     elements.value.length = 0
+    total.value = await countDevices()
     await getData()
   }
   catch (error) {

@@ -225,6 +225,27 @@ interface DeviceRowCF {
   updated_at: string
 }
 
+export async function countDevicesCF(c: Context, app_id: string) {
+  if (!c.env.DB_DEVICES)
+    return 0
+
+  const query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1`
+
+  console.log('countDevicesCF query', query)
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .bind(app_id)
+      .first('total')
+    const res = await readD1
+    return res
+  }
+  catch (e) {
+    console.error('Error reading device list', e)
+  }
+  return [] as DeviceRowCF[]
+}
+
 export async function readDevicesCF(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
   if (!c.env.DB_DEVICES)
     return [] as DeviceRowCF[]

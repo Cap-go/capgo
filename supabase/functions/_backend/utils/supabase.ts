@@ -727,7 +727,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
 export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
   const supabase = supabaseAdmin(c)
 
-  console.log('readDevicesSB', app_id, period_start, period_end, version_id, deviceIds, search)
+  console.log('readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search)
   let query = supabase
     .from('devices')
     .select('*')
@@ -762,6 +762,15 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
 
   return data || []
 }
+
+export async function countDevicesSB(c: Context, app_id: string) {
+  const { count } = await supabaseAdmin(c)
+    .from('devices')
+    .select('device_id', { count: 'exact', head: true })
+    .eq('app_id', app_id)
+  return count || 0
+}
+
 const DEFAUL_PLAN_NAME = 'Solo'
 
 export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise<string> {
