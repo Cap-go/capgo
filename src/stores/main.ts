@@ -57,7 +57,7 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const getTotalStats = () => {
-    totalStats.value = dashboard.value.reduce((acc: any, cur: any) => {
+    return dashboard.value.reduce((acc: any, cur: any) => {
       acc.mau += cur.mau
       acc.bandwidth += cur.bandwidth
       acc.storage += cur.storage
@@ -72,13 +72,12 @@ export const useMainStore = defineStore('main', () => {
   const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
     const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
     dashboard.value = dashboardRes.global
-    getTotalStats()
-    bestPlan.value = await findBestPlan(totalStats.value)
-    console.log('dashboard', dashboard.value, totalStats.value, bestPlan.value)
     dashboardByapp.value = dashboardRes.byApp
     totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
     totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
     totalStorage.value = await getTotalStorage()
+    totalStats.value = getTotalStats()
+    bestPlan.value = await findBestPlan(totalStats.value)
     dashboardFetched.value = true
   }
 

@@ -222,11 +222,11 @@ interface DeviceRowCF {
   custom_id: string
   is_prod: string
   is_emulator: string
-  timestamp: string
+  updated_at: string
 }
 
-export async function readDevicesCF(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
-  if (!c.env.DEVICE_LOG)
+export async function readDevicesCF(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
+  if (!c.env.DB_DEVICES)
     return [] as DeviceRowCF[]
 
   let deviceFilter = ''
@@ -254,8 +254,8 @@ export async function readDevicesCF(c: Context, app_id: string, period_start: st
 
   const query = `SELECT
   app_id,
-  DISTINCT device_id,
-  version_id,
+  device_id,
+  version,
   platform,
   plugin_version,
   os_version,
@@ -270,16 +270,19 @@ WHERE
   ${deviceFilter}
   ${searchFilter}
   ${versionFilter}
-  AND updated_at >= toDateTime('${formatDateCF(period_start)}')
-  AND updated_at < toDateTime('${formatDateCF(period_end)}')
 ORDER BY updated_at DESC
-LIMIT ${limit};`
+LIMIT ${range_end} OFFSET ${range_start}`
 
   console.log('readDevicesCF query', query)
   try {
-    const stmt = c.env.DB_DEVICES.prepare('SELECT * FROM users WHERE name = ? AND age = ?').bind('John Doe', 41)
-    const { results } = await stmt.all()
-    return results
+    console.log('readDevicesCF exec')
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .all()
+    console.log('readDevicesCF exec await')
+    const res = await readD1
+    console.log('readDevicesCF res', res)
+    return res.results
   }
   catch (e) {
     console.error('Error reading device list', e)

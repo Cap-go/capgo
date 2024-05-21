@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
+  getTotalStats,
   isGoodPlanOrg,
   isOnboardedOrg,
   isOnboardingNeeded,
@@ -125,7 +126,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       const get_total_stats = await getTotalStats(c, orgId)
       const current_plan = await getCurrentPlanNameOrg(c, orgId)
       if (get_total_stats) {
-        const best_plan = await findBestPlan(c, get_total_stats)
+        const best_plan = await findBestPlan(c, { mau: get_total_stats.mau, storage: get_total_stats.storage, bandwidth: get_total_stats.bandwidth })
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
         await setMetered(c, org.customer_id!, orgId)
         // if (best_plan === 'Free' && current_plan === 'Free') {

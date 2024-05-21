@@ -4,7 +4,6 @@ import { EMPTY_UUID, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
 import { readDevices } from '../utils/stats.ts'
-import { getSDevice } from '../utils/clickhouse.ts'
 import { fetchLimit } from '../utils/utils.ts'
 
 interface DeviceLink {
@@ -17,13 +16,12 @@ interface GetDevice {
   app_id: string
   device_id?: string
   page?: number
-  api?: 'v2'
 }
 
 function filterDeviceKeys(devices: Database['public']['Tables']['devices']['Row'][]) {
   return devices.map((device) => {
-    const { created_at, updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build } = device
-    return { created_at, updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build }
+    const { updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build } = device
+    return { updated_at, device_id, custom_id, is_prod, is_emulator, version, app_id, platform, plugin_version, os_version, version_build }
   })
 }
 
@@ -40,15 +38,9 @@ async function get(c: Context, body: GetDevice, apikey: Database['public']['Tabl
   console.log('rangeEnd', rangeEnd)
   // if device_id get one device
   if (body.device_id) {
-    let res
-    if (body.api === 'v2') {
-      res = await readDevices(c, body.app_id, rangeStart, rangeEnd, undefined, [body.device_id])
-      console.log('res', res)
-    }
-    else {
-      const resData = await getSDevice(c, '', body.app_id, undefined, [body.device_id])
-      res = resData.data
-    }
+    const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id])
+    console.log('res', res)
+
     if (!res || !res.length)
       return c.json({ status: 'Cannot find device' }, 400)
     const dataDevice = filterDeviceKeys(res as any)[0]
@@ -64,18 +56,11 @@ async function get(c: Context, body: GetDevice, apikey: Database['public']['Tabl
     return c.json(dataDevice)
   }
   else {
-    let res
-    if (body.api === 'v2') {
-      res = await readDevices(c, body.app_id, rangeStart, rangeEnd, undefined)
-      console.log('res', res)
-    }
-    else {
-      const fetchOffset = body.page == null ? 0 : body.page
-      const from = fetchOffset * fetchLimit
-      const to = (fetchOffset + 1) * fetchLimit - 1
-      const resData = await getSDevice(c, '', body.app_id, undefined, undefined, undefined, from, to)
-      res = resData.data
-    }
+    const fetchOffset = body.page == null ? 0 : body.page
+    const from = fetchOffset * fetchLimit
+    const to = (fetchOffset + 1) * fetchLimit - 1
+    const res = await readDevices(c, body.app_id, from, to, undefined)
+
     if (!res)
       return c.json([])
     const dataDevices = filterDeviceKeys(res as any)

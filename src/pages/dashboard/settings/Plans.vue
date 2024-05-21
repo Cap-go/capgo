@@ -169,6 +169,8 @@ async function loadData(initial: boolean) {
     //   data.paying = res
     // })
   ])
+  data.stats = main.totalStats
+  data.planSuggest = main.bestPlan
 
   data.stats = main.totalStats
   data.planSuggest = main.bestPlan

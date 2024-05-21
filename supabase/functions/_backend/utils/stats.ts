@@ -3,6 +3,12 @@ import { readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, re
 import { readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
 import type { Database } from './supabase.types.ts'
 
+export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
+export interface StatsActions {
+  action: string
+  versionId?: number
+}
+
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
     return trackDeviceUsageSB(c, device_id, app_id)
@@ -95,8 +101,27 @@ export function readStats(c: Context, app_id: string, start_date: string, end_da
   return readStatsCF(c, app_id, start_date, end_date, deviceIds, search)
 }
 
-export function readDevices(c: Context, app_id: string, start_date: string, end_date: string, version_id?: string, deviceIds?: string[], search?: string) {
+export function readDevices(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
   if (!c.env.DEVICE_LOG)
-    return readDevicesSB(c, app_id, start_date, end_date, version_id, deviceIds, search)
-  return readDevicesCF(c, app_id, start_date, end_date, version_id, deviceIds, search)
+    return readDevicesSB(c, app_id, range_start, range_end, version_id, deviceIds, search)
+  return readDevicesCF(c, app_id, range_start, range_end, version_id, deviceIds, search)
+}
+
+export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
+  // Prepare the device data for insertion
+
+  const jobs = []
+  // Prepare the stats data for insertion
+  statsActions.forEach(({ action, versionId }) => {
+    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionId ?? device.version))
+  })
+
+  // if any statsActions is get, then we need the device data
+  if (statsActions.some(({ action }) => action === 'get'))
+    jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
+
+  return Promise.all(jobs)
+    .catch((error) => {
+      console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
+    })
 }

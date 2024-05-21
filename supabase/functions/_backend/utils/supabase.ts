@@ -170,6 +170,36 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   return userRight.data
 }
 
+interface PlanTotal {
+  mau: number
+  bandwidth: number
+  storage: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
+export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTotal> {
+  if (!orgId) {
+    return {
+      mau: 0,
+      bandwidth: 0,
+      storage: 0,
+      get: 0,
+      fail: 0,
+      install: 0,
+      uninstall: 0,
+    }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_total_metrics', { org_id: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
+}
+
 interface PlanUsage {
   total_percent: number
   mau_percent: number
@@ -694,7 +724,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
   return data || []
 }
 
-export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
   const supabase = supabaseAdmin(c)
 
   console.log('readDevicesSB', app_id, period_start, period_end, version_id, deviceIds, search)
@@ -702,10 +732,8 @@ export async function readDevicesSB(c: Context, app_id: string, period_start: st
     .from('devices')
     .select('*')
     .eq('app_id', app_id)
-    .gte('updated_at', new Date(period_start).toISOString())
-    .lt('updated_at', new Date(period_end).toISOString())
     .order('updated_at', { ascending: false })
-    .limit(limit)
+    .range(range_start, range_end)
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)

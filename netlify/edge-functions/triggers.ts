@@ -1,4 +1,4 @@
-import { sentry } from '@hono/sentry';
+import { sentry } from '@hono/sentry'
 import { handle } from 'https://deno.land/x/hono@v4.0.0/adapter/netlify/mod.ts'
 import { Hono } from 'hono/tiny'
 
@@ -16,7 +16,6 @@ import { app as on_version_create } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as get_total_stats } from '../../supabase/functions/_backend/triggers/get_total_stats.ts'
 import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cron_plan.ts'
 
@@ -43,9 +42,7 @@ appGlobal.route('/on_version_create', on_version_create)
 appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/stripe_event', stripe_event)
-appGlobal.route('/get_total_stats', get_total_stats)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
-
 
 export default handle(appGlobal as any)

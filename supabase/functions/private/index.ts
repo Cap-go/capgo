@@ -14,7 +14,6 @@ import { app as upload_link } from '../_backend/private/upload_link.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
-import { app as get_total_stats } from '../_backend/triggers/get_total_stats.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 
 const functionName = 'private'
@@ -40,7 +39,6 @@ appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/upload_link', upload_link)
 appGlobal.route('/delete_failed_version', deleted_failed_version)
-appGlobal.route('/get_total_stats', get_total_stats)
 appGlobal.route('/set_org_email', set_org_email)
 
 Deno.serve(appGlobal.fetch)
