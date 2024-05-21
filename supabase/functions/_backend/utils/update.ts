@@ -276,7 +276,7 @@ export async function update(c: Context, body: AppInfos) {
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
-      //   await saveStoreInfo(c, {
+      //   await saveStoreInfoCF(c, {
       //     app_id,
       //     onprem: true,
       //     capacitor: true,

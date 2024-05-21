@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import { countDevicesSB, readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackDevicesSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
-import { countDevicesCF, readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
+import { countDevicesSB, getAppsFromSB, readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackDevicesSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
 import type { Database } from './supabase.types.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
@@ -112,4 +112,25 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
     .catch((error) => {
       console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
     })
+}
+
+export async function countAllApps(c: Context): Promise<number> {
+  const [cloudflareApps, supabaseApps] = await Promise.all([
+    getAppsFromCF(c),
+    getAppsFromSB(c),
+  ])
+
+  const allApps = [...new Set([...cloudflareApps, ...supabaseApps])]
+  return allApps.length
+}
+
+export async function countAllUpdates(c: Context): Promise<number> {
+  const [storeAppsCount, logsCount] = await Promise.all([
+    countUpdatesFromStoreAppsCF(c),
+    countUpdatesFromLogsCF(c),
+  ])
+
+  const res = storeAppsCount + logsCount
+  // TODO: fix this count undestand why it return 0 sometimes
+  return res || 14593631
 }

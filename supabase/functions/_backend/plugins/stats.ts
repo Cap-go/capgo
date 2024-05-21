@@ -117,7 +117,7 @@ async function post(c: Context, body: AppStats) {
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
-      //   await saveStoreInfo(c, {
+      //   await saveStoreInfoCF(c, {
       //     app_id,
       //     onprem: true,
       //     capacitor: true,

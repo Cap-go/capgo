@@ -77,7 +77,7 @@ export function updateOrCreateVersion(c: Context, update: Database['public']['Ta
     .eq('name', update.name)
 }
 
-export async function getAppsFromSupabase(c: Context): Promise<string[]> {
+export async function getAppsFromSB(c: Context): Promise<string[]> {
   const limit = 1000
   let page = 0
   let apps: string[] = []
@@ -330,68 +330,6 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
     console.error('isAllowedActionOrg error', orgId, error)
   }
   return false
-}
-
-export async function getSDashboard(c: Context, auth: string, orgIdQuery: string, startDate: string, endDate: string, appId?: string) {
-  console.log(`getSDashboard orgId ${orgIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
-
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  if (appId) {
-    const reqOwner = await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then(res => res.data || false)
-    if (!reqOwner)
-      return Promise.reject(new Error('not allowed'))
-  }
-
-  client = supabaseAdmin(c)
-
-  // console.log('tableName', tableName)
-  let req = client
-    .from('clickhouse_app_usage_parm')
-    .select()
-
-  if (appId) {
-    req = req.eq('_app_list', JSON.stringify([appId]))
-  }
-  else {
-    const userId = (await supabaseClient(c, auth).auth.getUser()).data.user?.id
-    if (!userId)
-      return []
-    // get all user apps id
-    let appIdsReq = supabaseClient(c, auth)
-      .from('apps')
-      .select('app_id')
-      // .eq('user_id', userId)
-
-    if (orgIdQuery)
-      appIdsReq = appIdsReq.eq('owner_org', orgIdQuery)
-
-    const appIds = await appIdsReq.then(res => res.data?.map(app => app.app_id) || [])
-
-    console.log('appIds', appIds)
-    req = req.eq('_app_list', JSON.stringify(appIds))
-  }
-
-  if (startDate) {
-    console.log('startDate', startDate)
-    // convert date string startDate to YYYY-MM-DD
-    const startDateStr = new Date(startDate).toISOString().split('T')[0]
-    req = req.eq('_start_date', startDateStr)
-  }
-  if (endDate) {
-    console.log('endDate', endDate)
-    // convert date string endDate to YYYY-MM-DD
-    const endDateStr = new Date(endDate).toISOString().split('T')[0]
-    req = req.eq('_end_date', endDateStr)
-  }
-
-  const res = await req
-  console.log('res', res)
-  return res.data || []
 }
 
 export async function createApiKey(c: Context, userId: string) {

@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import AdmZip from 'adm-zip'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { saveStoreInfo } from '../utils/clickhouse.ts'
+import { saveStoreInfoCF } from '../utils/cloudflare.ts'
 
 export const app = new Hono()
 
@@ -111,7 +111,7 @@ async function getInfoCap(c: Context, appId: string) {
     // remove from list apps already in supabase
     const res = await isCapacitor(appId)
     // save in supabase
-    await saveStoreInfo(c, {
+    await saveStoreInfoCF(c, {
       app_id: appId,
       capacitor: res.capacitor,
       cordova: res.cordova,
@@ -127,10 +127,9 @@ async function getInfoCap(c: Context, appId: string) {
   }
   catch (e) {
     console.log('error getInfoCap', e)
-    await saveStoreInfo(c, {
+    await saveStoreInfoCF(c, {
       app_id: appId,
       to_get_framework: false,
-      error_get_framework: JSON.stringify(e),
     })
   }
 }

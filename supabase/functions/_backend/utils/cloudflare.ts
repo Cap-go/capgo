@@ -172,6 +172,36 @@ ORDER BY date, app_id;`
   return [] as BandwidthUsageCF[]
 }
 
+interface StoreApp {
+  created_at: string // Assuming ISO string format for datetime
+  app_id: string
+  url: string
+  title: string
+  summary: string
+  icon: string
+  free: boolean
+  category: string
+  capacitor: boolean
+  developer_email: string
+  installs: number
+  developer: string
+  score: number
+  to_get_framework: boolean
+  onprem: boolean
+  updates: number
+  to_get_info: boolean
+  to_get_similar: boolean
+  updated_at: string // Assuming ISO string format for datetime
+  cordova: boolean
+  react_native: boolean
+  capgo: boolean
+  kotlin: boolean
+  flutter: boolean
+  native_script: boolean
+  lang?: string // Optional as it's not NOT NULL
+  developer_id?: string // Optional as it's not NOT NULL
+}
+
 interface VersionUsageCF {
   date: string
   app_id: string
@@ -367,4 +397,418 @@ LIMIT ${limit};`
     console.error('Error reading stats list', e)
   }
   return [] as StatRowCF[]
+}
+
+export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve([])
+
+  const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''`
+  console.log('getAppsFromCF query', query)
+  // use c.env.DB_DEVICES and table store_apps
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .all()
+    const res = await readD1
+    return res
+  }
+  catch (e) {
+    console.error('Error reading app list', e)
+  }
+  return []
+}
+
+export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve(0)
+  // use countUpdatesFromStoreAppsClickHouse as exemple to make it work with Cloudflare
+  const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
+
+  console.log('countUpdatesFromStoreAppsCF query', query)
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .first('count')
+    const res = await readD1
+    return res
+  }
+  catch (e) {
+    console.error('Error counting updates from store apps', e)
+  }
+  return 0
+}
+
+export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
+  const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE action = 'get'`
+
+  console.log('countUpdatesFromLogsCF query', query)
+  try {
+    const readAnalytics = await runQueryToCF<{ count: number }[]>(c, query)
+    return readAnalytics[0].count
+  }
+  catch (e) {
+    console.error('Error counting updates from logs', e)
+  }
+  return 0
+}
+
+export async function reactActiveAppsCF(c: Context) {
+  const query = `SELECT DISTINCT app_id FROM app_log WHERE created_at >= DATE('now', '-1 month') AND created_at < DATE('now') AND action = 'get'`
+  console.log('reactActiveAppsCF query', query)
+  try {
+    const response = await runQueryToCF<{ app_id: string }[]>(c, query)
+    return response
+  }
+  catch (e) {
+    console.error('Error counting active apps', e)
+  }
+  return []
+}
+
+export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve([] as StoreApp[])
+  const query = `SELECT * FROM store_apps WHERE ${flag} = 1 ORDER BY created_at ASC LIMIT ${limit}`
+
+  console.log('getAppsToProcessCF query', query)
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .all()
+    const res = await readD1
+    return res as StoreApp[]
+  }
+  catch (e) {
+    console.error('Error getting apps to process', e)
+  }
+  return [] as StoreApp[]
+}
+
+// export async function getTopApps(c: Context, mode: string, limit: number) {
+//   if (!isClickHouseEnabled(c))
+//     return Promise.reject(new Error('Disabled clickhouse'))
+//   const query = `
+//     SELECT url, title, icon, summary, installs, category
+//     FROM store_apps
+//     WHERE 1=1
+//       ${mode === 'cordova' ? 'AND cordova = 1 AND capacitor = 0' : ''}
+//       ${mode === 'flutter' ? 'AND flutter = 1' : ''}
+//       ${mode === 'reactNative' ? 'AND react_native = 1' : ''}
+//       ${mode === 'nativeScript' ? 'AND native_script = 1' : ''}
+//       ${mode === 'capgo' ? 'AND capgo = 1' : ''}
+//       ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? 'AND capacitor = 1' : ''}
+//     ORDER BY installs DESC
+//     LIMIT {param_limit:UInt64}
+//   `
+
+//   const params = prefixParams({ limit })
+
+//   const result = await executeClickHouseQuery(c, query, params)
+//   return result.data
+// }
+interface topApp {
+  url: string
+  title: string
+  icon: string
+  summary: string
+  installs: number
+  category: string
+}
+export async function getTopAppsCF(c: Context, mode: string, limit: number): Promise<topApp[]> {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve([] as StoreApp[])
+  let modeQuery = ''
+  if (mode === 'cordova')
+    modeQuery = 'cordova = 1 AND capacitor = 0'
+
+  else if (mode === 'flutter')
+    modeQuery = 'flutter = 1'
+
+  else if (mode === 'reactNative')
+    modeQuery = 'react_native = 1'
+
+  else if (mode === 'nativeScript')
+    modeQuery = 'native_script = 1'
+
+  else if (mode === 'capgo')
+    modeQuery = 'capgo = 1'
+  else
+    modeQuery = 'capacitor = 1'
+
+  const query = `SELECT url, title, icon, summary, installs, category FROM store_apps WHERE ${modeQuery} ORDER BY installs DESC LIMIT ${limit}`
+
+  console.log('getTopAppsCF query', query)
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .all()
+    const res = await readD1
+    return res as StoreApp[]
+  }
+  catch (e) {
+    console.error('Error getting top apps', e)
+  }
+  return [] as StoreApp[]
+}
+
+// export async function getTotalAppsByMode(c: Context, mode: string) {
+//   if (!isClickHouseEnabled(c))
+//     return Promise.reject(new Error('Disabled clickhouse'))
+//   const query = `
+//     SELECT COUNT(*) AS total
+//     FROM store_apps
+//     WHERE 1=1
+//       ${mode === 'cordova' ? 'AND cordova = 1 AND capacitor = 0' : ''}
+//       ${mode === 'flutter' ? 'AND flutter = 1' : ''}
+//       ${mode === 'reactNative' ? 'AND react_native = 1' : ''}
+//       ${mode === 'nativeScript' ? 'AND native_script = 1' : ''}
+//       ${mode === 'capgo' ? 'AND capgo = 1' : ''}
+//       ${mode !== 'cordova' && mode !== 'flutter' && mode !== 'reactNative' && mode !== 'nativeScript' && mode !== 'capgo' ? 'AND capacitor = 1' : ''}
+//   `
+
+//   const result = await executeClickHouseQuery(c, query)
+//   return result.data[0].total
+// }
+export async function getTotalAppsByModeCF(c: Context, mode: string) {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve(0)
+  let modeQuery = ''
+  if (mode === 'cordova')
+    modeQuery = 'cordova = 1 AND capacitor = 0'
+
+  else if (mode === 'flutter')
+    modeQuery = 'flutter = 1'
+
+  else if (mode === 'reactNative')
+    modeQuery = 'react_native = 1'
+
+  else if (mode === 'nativeScript')
+    modeQuery = 'native_script = 1'
+
+  else if (mode === 'capgo')
+    modeQuery = 'capgo = 1'
+  else
+    modeQuery = 'capacitor = 1'
+
+  const query = `SELECT COUNT(*) AS total FROM store_apps WHERE ${modeQuery}`
+
+  console.log('getTotalAppsByModeCF query', query)
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .first('total')
+    const res = await readD1
+    return res
+  }
+  catch (e) {
+    console.error('Error getting total apps by mode', e)
+  }
+  return 0
+}
+
+// function prefixParams(params: Record<string, any>): Record<string, any> {
+//   const prefixedParams: Record<string, any> = {}
+//   for (const [key, value] of Object.entries(params))
+//     prefixedParams[`param_${key}`] = value
+
+//   return prefixedParams
+// }
+
+// export async function getStoreAppById(c: Context, appId: string) {
+//   if (!isClickHouseEnabled(c))
+//     return Promise.reject(new Error('Disabled clickhouse'))
+//   const query = `
+//     SELECT *
+//     FROM store_apps
+//     WHERE app_id = {param_app_id:String}
+//     LIMIT 1
+//   `
+
+//   const params = prefixParams({ app_id: appId })
+
+//   const result = await executeClickHouseQuery(c, query, params)
+//   return result.data[0]
+// }
+
+// export async function saveStoreInfoCF(c: Context, app: any) {
+//   if (!isClickHouseEnabled(c))
+//     return Promise.resolve()
+//   // Save a single app in ClickHouse
+//   const columns: (keyof any)[] = Object.keys({ updates: 0, ...app }) as (keyof any)[]
+//   const values = columns.map((column) => {
+//     const value = app[column]
+//     if (column === 'updates')
+//       return `sumState(${value})`
+//     else
+//       return `'${value}'`
+//   }).join(', ')
+
+//   const query = `
+//     INSERT INTO store_apps (${columns.join(', ')})
+//     VALUES (${values})
+//     SETTINGS async_insert=1, wait_for_async_insert=0
+//   `
+
+//   try {
+//     await executeClickHouseQuery(c, query)
+//     console.log('saveStoreInfoCF success')
+//   }
+//   catch (error) {
+//     console.error('saveStoreInfoCF error', error)
+//     throw error
+//   }
+// }
+
+// export async function bulkUpdateStoreAppsCF(c: Context, apps: (any)[]) {
+//   if (!isClickHouseEnabled(c))
+//     return Promise.resolve()
+//   // Update a list of apps in ClickHouse (internal use only)
+//   if (!apps.length)
+//     return
+
+//   const noDup = apps.filter((value, index, self) => index === self.findIndex(t => (t.app_id === value.app_id)))
+//   console.log('bulkUpdateStoreAppsCF', noDup.length)
+
+//   const columns = Object.keys(noDup[0])
+//   const values = noDup.map((app) => {
+//     const convertedApp = convertAllDatesToCH({ updates: 0, ...app })
+//     return `(${columns.map((column) => {
+//       const value = convertedApp[column]
+//       if (column === 'updates')
+//         return `sumState(${value})`
+//       else
+//         return `'${value}'`
+//     }).join(', ')})`
+//   }).join(', ')
+
+//   const query = `
+//     INSERT INTO store_apps (${columns.join(', ')})
+//     VALUES ${values}
+//     SETTINGS async_insert=1, wait_for_async_insert=0
+//   `
+
+//   try {
+//     await executeClickHouseQuery(c, query)
+//     console.log('bulkUpdateStoreAppsCF success')
+//   }
+//   catch (error) {
+//     console.error('bulkUpdateStoreAppsCF error', error)
+//   }
+// }
+
+// export async function updateInClickHouse(c: Context, appId: string, updates: number) {
+//   if (!isClickHouseEnabled(c))
+//     return Promise.resolve()
+//   if (!isClickHouseEnabled(c))
+//     return Promise.resolve()
+
+//   const query = `
+//     INSERT INTO store_apps (app_id, updates)
+//     SELECT {app_id:String}, sumState({updates:UInt64})
+//     WHERE app_id = {app_id:String}
+//     SETTINGS async_insert=1, wait_for_async_insert=0
+//   `
+
+//   const params = prefixParams({
+//     updates,
+//     app_id: appId,
+//   })
+
+//   await executeClickHouseQuery(c, query, params)
+// }
+
+// export interface ClickHouseMeta {
+//   app_id: string
+//   version_id: number
+//   size: number
+// }
+
+// export interface StatsActions {
+//   action: string
+//   versionId?: number
+// }
+
+export async function getStoreAppByIdCF(c: Context, appId: string): Promise<StoreApp> {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve({} as StoreApp)
+  const query = `SELECT * FROM store_apps WHERE app_id = '${appId}' LIMIT 1`
+
+  console.log('getStoreAppByIdCF query', query)
+  try {
+    const readD1 = c.env.DB_DEVICES
+      .prepare(query)
+      .first()
+    const res = await readD1
+    return res
+  }
+  catch (e) {
+    console.error('Error getting store app by id', e)
+  }
+  return {} as StoreApp
+}
+
+export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve()
+
+  const columns = Object.keys(app).filter(column => column !== 'app_id') as (keyof StoreApp)[]
+
+  const placeholders = columns.map(() => '?').join(', ')
+  const updates = columns.map(column => `${column} = EXCLUDED.${column}`).join(', ')
+  const values = columns.map(column => app[column])
+
+  const query = `
+    INSERT INTO store_apps (app_id, ${columns.join(', ')})
+    VALUES (?, ${placeholders})
+    ON CONFLICT(app_id) DO UPDATE SET ${updates};
+  `
+
+  try {
+    const res = await c.env.DB_DEVICES
+      .prepare(query)
+      .bind(app.app_id, ...values)
+      .run()
+    console.log('saveStoreInfoCF result', res)
+  }
+  catch (e) {
+    console.error('Error saving store info', e)
+  }
+
+  return Promise.resolve()
+}
+
+export async function bulkUpdateStoreAppsCF(c: Context, apps: StoreApp[]) {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve()
+
+  if (!apps.length)
+    return Promise.resolve()
+
+  // loop on all apps to insert with saveStoreInfoCF
+  const jobs = []
+  for (const app of apps)
+    jobs.push(saveStoreInfoCF(c, app))
+
+  return Promise.all(jobs)
+}
+
+export async function updateInClickHouse(c: Context, appId: string, updates: number) {
+  if (!c.env.DB_DEVICES)
+    return Promise.resolve()
+
+  const query = `INSERT INTO store_apps (app_id, updates) VALUES (?, ?) ON CONFLICT(app_id) DO UPDATE SET updates = updates + ?`
+
+  try {
+    const res = await c.env.DB_DEVICES
+      .prepare(query)
+      .bind(appId, updates)
+      .run()
+    console.log('updateInClickHouse result', res)
+  }
+  catch (e) {
+    console.error('Error updating in ClickHouse', e)
+  }
+
+  return Promise.resolve()
 }
