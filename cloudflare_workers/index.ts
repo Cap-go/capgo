@@ -3,7 +3,6 @@ import { sentry } from '@hono/sentry'
 
 // Public API
 import { HTTPException } from 'hono/http-exception'
-import { J } from 'ios/App/App/public/assets/index-DfE8Up9t.js'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
