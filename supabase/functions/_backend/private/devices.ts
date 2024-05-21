@@ -2,13 +2,11 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 import type { Order } from '../utils/types.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { getSDevice } from '../utils/clickhouse.ts'
 import { readDevices } from '../utils/stats.ts'
 import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
 interface dataDevice {
   appId: string
-  api?: 'v2' | null
   versionId?: string
   devicesId?: string[]
   deviceIds?: string[] // TODO: remove when migration is done
@@ -47,10 +45,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     else {
       return c.json({ status: 'You can\'t access this app auth not found', app_id: body.appId }, 400)
     }
-    if (body.api === 'v2')
-      return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search))
-
-    return c.json(await getSDevice(c, body.appId, body.versionId, devicesIds, body.search, body.order, body.rangeStart, body.rangeEnd, true))
+    return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search))
   }
   catch (e) {
     return c.json({ status: 'Cannot get devices', error: JSON.stringify(e) }, 500)

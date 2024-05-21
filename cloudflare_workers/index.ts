@@ -19,7 +19,6 @@ import { app as plans } from '../supabase/functions/_backend/private/plans.ts'
 import { app as storeTop } from '../supabase/functions/_backend/private/store_top.ts'
 import { app as publicStats } from '../supabase/functions/_backend/private/public_stats.ts'
 import { app as config } from '../supabase/functions/_backend/private/config.ts'
-import { app as dashboard } from '../supabase/functions/_backend/private/dashboard.ts'
 import { app as download_link } from '../supabase/functions/_backend/private/download_link.ts'
 import { app as log_as } from '../supabase/functions/_backend/private/log_as.ts'
 import { app as stripe_checkout } from '../supabase/functions/_backend/private/stripe_checkout.ts'
@@ -77,7 +76,6 @@ appFront.route('/plans', plans)
 appFront.route('/store_top', storeTop)
 appFront.route('/website_stats', publicStats)
 appFront.route('/config', config)
-appFront.route('/dashboard', dashboard)
 appFront.route('/devices', devices_priv)
 appFront.route('/download_link', download_link)
 appFront.route('/log_as', log_as)

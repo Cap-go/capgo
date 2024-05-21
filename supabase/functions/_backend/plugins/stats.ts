@@ -29,8 +29,6 @@ import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 
-// import { saveStoreInfo, sendStatsAndDevice, updateInClickHouse } from '../utils/clickhouse.ts'
-
 const failActions = [
   'set_fail',
   'update_fail',
