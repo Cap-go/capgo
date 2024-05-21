@@ -90,7 +90,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   const jobs = []
   // Prepare the stats data for insertion
   statsActions.forEach(({ action, versionId }) => {
-    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionId))
+    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionId ?? device.version))
   })
 
   // if any statsActions is get, then we need the device data
