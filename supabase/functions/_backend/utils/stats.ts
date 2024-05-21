@@ -41,24 +41,6 @@ export interface StatsActions {
   versionId?: number
 }
 
-export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
-
-export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
-  const jobs = []
-  // Prepare the stats data for insertion
-  statsActions.forEach(({ action, versionId }) => {
-    jobs.push(createStatsLogs(c, device.app_id, device.device_id, action, versionId || device.version))
-  })
-
-  if (statsActions.some(({ action }) => action === 'get'))
-    jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
-
-  return Promise.all(jobs)
-    .catch((error) => {
-      console.log(`[sendStatsAndDevice] rejected with error: ${error}`)
-    })
-}
-
 export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
   if (!c.env.DB_DEVICES)
     return trackDevicesSB(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)

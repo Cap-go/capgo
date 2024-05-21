@@ -1,10 +1,9 @@
 import dayjs from 'dayjs'
 import ky from 'ky'
-import type { Context, ExecutionContext } from 'hono'
+import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import { getAppsFromSupabase, supabaseAdmin, supabaseClient } from './supabase.ts'
-import { createStatsDevices, createStatsLogs } from './stats.ts'
 import type { Order } from './types.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
