@@ -5,6 +5,7 @@ import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import postgres from 'postgres'
+import { getRuntimeKey } from 'hono/adapter'
 import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
@@ -15,8 +16,8 @@ import { appIdToUrl } from './conversion.ts'
 
 import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
-import { backgroundTask } from './utils.ts'
-// import { backgroundTask, existInEnv, getEnv } from './utils.ts'
+// import { backgroundTask } from './utils.ts'
+import { backgroundTask, existInEnv, getEnv } from './utils.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
@@ -626,17 +627,16 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
 function getDrizzlePostgres(c: Context) {
   // TODO: find why is not always working when we add the IF
-  // if (existInEnv(c, 'HYPERDRIVE')) {
-  console.log('HYPERDRIVE', c.env.HYPERDRIVE.connectionString)
-  return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
-  // }
-  // else
-  //   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-  //     console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-  //     return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 2 })
-  //   }
-  // console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  // return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 2 })
+  if (getRuntimeKey() === 'workerd') {
+    return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
+  }
+  else
+    if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+      console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+      return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 2 })
+    }
+  console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
+  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 2 })
 }
 
 export async function update(c: Context, body: AppInfos) {
