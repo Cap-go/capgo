@@ -38,14 +38,15 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 function getDrizzlePostgres(c: Context) {
   if (c.env.HYPERDRIVE) {
     console.log('HYPERDRIVE', c.env.HYPERDRIVE.connectionString)
-    return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false })
+    return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
   }
-  else if (getEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-  }
+  else
+    if (getEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+      console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+      return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 2 })
+    }
   console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'))
+  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 2 })
 }
 
 async function requestInfosPostgres(
