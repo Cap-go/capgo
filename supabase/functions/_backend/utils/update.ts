@@ -627,14 +627,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
 function getDrizzlePostgres(c: Context) {
   // TODO: find why is not always working when we add the IF
-  if (getRuntimeKey() === 'workerd') {
-    return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
+  // if (getRuntimeKey() === 'workerd') {
+  //   return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
+  // }
+  // else
+  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+    console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 1 })
   }
-  else
-    if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-      console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-      return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 1 })
-    }
   console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
   return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 1 })
 }
