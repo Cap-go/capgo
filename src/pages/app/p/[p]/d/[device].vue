@@ -4,8 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { gt } from 'semver'
 import { toast } from 'vue-sonner'
+import ky from 'ky'
 import { formatDate } from '~/services/date'
-import { EMPTY_UUID, useSupabase } from '~/services/supabase'
+import { EMPTY_UUID, defaultApiHost, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
@@ -166,12 +167,28 @@ async function getDevice() {
   if (!id.value)
     return
   try {
-    const data = await supabase.functions.invoke('private/devices', {
-      body: {
-        appId: packageId.value,
-        deviceIds: [id.value],
-      },
-    }).then(res => res?.data?.data[0])
+    const { data: currentSession } = await supabase.auth.getSession()!
+    if (!currentSession.session)
+      return
+    const currentJwt = currentSession.session.access_token
+    const dataD = await ky
+      .post(`${defaultApiHost}/private/devices`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${currentJwt}` || '',
+        },
+        body: JSON.stringify({
+          appId: packageId.value,
+          deviceIds: [id.value],
+        }),
+      })
+      .then(res => res.json<Database['public']['Tables']['devices']['Row'][]>())
+      .catch((err) => {
+        console.log('Cannot get device', err)
+        return [] as Database['public']['Tables']['devices']['Row'][]
+      })
+
+    const data = dataD[0]
     console.log('getDevice', data)
     const { data: dataVersion } = await supabase
       .from('app_versions')

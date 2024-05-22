@@ -281,14 +281,20 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
     return [] as DeviceRowCF[]
 
   let deviceFilter = ''
+  let rangeStart = range_start
+  let rangeEnd = range_end
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
+      rangeStart = 0
+      rangeEnd = 1
     }
     else {
       const devicesList = deviceIds.join(',')
       deviceFilter = `AND device_id IN (${devicesList})`
+      rangeStart = 0
+      rangeEnd = deviceIds.length
     }
   }
   let searchFilter = ''
@@ -322,7 +328,7 @@ WHERE
   ${searchFilter}
   ${versionFilter}
 ORDER BY updated_at DESC
-LIMIT ${range_end} OFFSET ${range_start}`
+LIMIT ${rangeEnd} OFFSET ${rangeStart}`
 
   console.log('readDevicesCF query', query)
   try {
