@@ -91,8 +91,10 @@ export function backgroundTask(c: Context, p: Promise<void>) {
     executionCtx = null
   }
 
-  if (executionCtx?.waitUntil)
-    return c.executionCtx.waitUntil(p)
+  if (executionCtx?.waitUntil) {
+    c.executionCtx.waitUntil(p)
+    return Promise.resolve(null)
+  }
   return p
 }
 
