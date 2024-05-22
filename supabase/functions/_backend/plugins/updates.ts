@@ -2,7 +2,6 @@ import { Hono } from 'hono/tiny'
 import type { Context } from 'hono'
 
 import { z } from 'zod'
-import { update } from '../utils/update.ts'
 import {
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,
@@ -19,6 +18,7 @@ import {
   reverseDomainRegex,
 } from '../utils/utils.ts'
 import type { AppInfos } from '../utils/types.ts'
+import { updateV2 } from '../utils/update_v2.ts'
 
 export const jsonRequestSchema = z.object({
   app_id: z.string({
@@ -71,7 +71,7 @@ app.post('/', async (c: Context) => {
       }, 400)
     }
 
-    return update(c, body)
+    return updateV2(c, body)
   }
   catch (e) {
     console.log('error', JSON.stringify(e))

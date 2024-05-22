@@ -2058,6 +2058,14 @@ BEGIN
     (23, now(), 'no_access', 'com.demo.app', 9653, now(), 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
     (24, now(), 'two_default', 'com.demo.app', 9654, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
 
+    INSERT INTO "public"."devices_override" ("id", "created_at", "updated_at", "device_id", "app_id", "version", "owner_org") VALUES
+      (1, now(), now(), '00000000-0000-0000-0000-000000000009', 'com.demo.app', 9655, '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+      (2, now(), now(), '00000000-0000-0000-0000-000000000010', 'com.demo.app', 9654, '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+
+    INSERT INTO "public"."channel_devices" ("id", "created_at", "updated_at", "device_id", "channel_id", "app_id", "owner_org") VALUES
+      (1, now(), now(), '00000000-0000-0000-0000-000000000006', 22, 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+      (1, now(), now(), '00000000-0000-0000-0000-000000000007', 23, 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
 END;

@@ -55,6 +55,35 @@ export const channels = pgTable('channels', {
   allow_dev: boolean('allow_dev').notNull().default(true),
 })
 
+export const version_info = pgTable('version_info', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  app_id: varchar('app_id').notNull().references(() => apps.name),
+  device_id: varchar('device_id'),
+  r2_path: varchar('r2_path'),
+  version_id: bigint('version_id', { mode: 'number' }).notNull().references(() => app_versions.id),
+  version_name: varchar('version_name').notNull(),
+  checksum: varchar('checksum'),
+  session_key: varchar('session_key'),
+  bucket_id: varchar('bucket_id'),
+  storage_provider: text('storage_provider').default('r2').notNull(),
+  external_url: varchar('external_url'),
+  min_update_version: varchar('min_update_version'),
+  channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
+  channel_name: varchar('channel_name').notNull(),
+  allow_dev: boolean('allow_dev').default(false),
+  allow_emulator: boolean('allow_emulator').default(false),
+  disable_auto_update_under_native: boolean('disable_auto_update_under_native').default(false),
+  disable_auto_update: varchar('disable_auto_update'),
+  ios: boolean('ios').default(false),
+  android: boolean('android').default(false),
+  secondary_version_percentage: doublePrecision('secondary_version_percentage').default(0),
+  enable_progressive_deploy: boolean('enable_progressive_deploy').default(false),
+  enable_ab_testing: boolean('enable_ab_testing').default(false),
+  allow_device_self_set: boolean('allow_device_self_set').default(false),
+  public: boolean('public').default(false),
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
+})
+
 export const devices_override = pgTable('devices_override', {
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').defaultNow(),

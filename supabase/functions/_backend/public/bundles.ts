@@ -29,8 +29,10 @@ async function deleteBundle(c: Context, body: GetLatest, apikey: Database['publi
         .eq('name', body.version)
         .select()
         .single()
-      if (dbError || !data)
+      if (dbError || !data) {
+        console.error('Cannot delete version', dbError)
         return c.json({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
+      }
     }
     else {
       const { error: dbError } = await supabaseAdmin(c)
@@ -39,11 +41,14 @@ async function deleteBundle(c: Context, body: GetLatest, apikey: Database['publi
           deleted: true,
         })
         .eq('app_id', body.app_id)
-      if (dbError)
+      if (dbError) {
+        console.error('Cannot delete all version', dbError)
         return c.json({ status: 'Cannot delete all version', error: JSON.stringify(dbError) }, 400)
+      }
     }
   }
   catch (e) {
+    console.error('Cannot delete version', e)
     return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
   return c.json(BRES)

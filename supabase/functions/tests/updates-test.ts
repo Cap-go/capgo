@@ -1,5 +1,5 @@
 // Imports
-import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
+import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
 // import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.8.0'
 import { z } from 'https://deno.land/x/zod/mod.ts'
@@ -54,6 +54,7 @@ async function postUpdate(data: object) {
 }
 
 // Tests
+
 Deno.test('Test no new version available', async () => {
   await resetAndSeedData()
 
@@ -80,37 +81,37 @@ Deno.test('Test new version available', async () => {
 })
 
 // TODO: Fix this test, there should be a new device only when a new version is available
-// Deno.test('Test with new device', async () => {
-//   await resetAndSeedData()
+Deno.test('Test with new device', async () => {
+  await resetAndSeedData()
 
-//   const uuid = crypto.randomUUID()
+  const uuid = crypto.randomUUID()
 
-//   const baseData = getBaseData()
-//    baseData.version_name = '1.1.0'
-//   baseData.device_id = uuid
+  const baseData = getBaseData()
+  baseData.version_name = '1.1.0'
+  baseData.device_id = uuid
 
-//   const response = await postUpdate(baseData)
-//   assertEquals(response.status, 200)
-//   assertEquals(await response.json(), { message: 'No new version available' })
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 200)
+  assertEquals((await response.json()).checksum, '3885ee49')
 
-//   const { error, data } = await supabase.from('devices')
-//     .select()
-//     .eq('device_id', uuid)
-//     .single()
-//   assertEquals(error, null)
-//   assert(data)
-//   assertEquals(data.app_id, baseData.app_id)
+  const { error, data } = await supabase.from('devices')
+    .select()
+    .eq('device_id', uuid)
+    .single()
+  assertEquals(error, null)
+  assert(data)
+  assertEquals(data.app_id, baseData.app_id)
 
-//   await supabase.from('devices')
-//     .delete()
-//     .eq('device_id', uuid)
+  await supabase.from('devices')
+    .delete()
+    .eq('device_id', uuid)
 
-//   const response2 = await postUpdate(baseData)
-//   assertEquals(response2.status, 200)
-//   const json = await response2.json()
-//   console.log('Test with new device', json)
-//   assertEquals(json, { message: 'No new version available' })
-// })
+  const response2 = await postUpdate(getBaseData())
+  assertEquals(response2.status, 200)
+  const json = await response2.json()
+  console.log('Test with new device', json)
+  assertEquals(json, { message: 'No new version available' })
+})
 
 Deno.test('Test disable auto update to major', async () => {
   await resetAndSeedData()
@@ -202,6 +203,26 @@ Deno.test('Test with an app that does not exist', async () => {
   assertEquals(json.error, 'app_not_found')
 })
 
+Deno.test({
+  name: 'Test direct channel overwrite',
+  fn: async () => {
+    await resetAndSeedData()
+
+    const uuid = crypto.randomUUID()
+
+    const baseData = getBaseData()
+    baseData.device_id = uuid;
+    (baseData as any).defaultChannel = 'no_access'
+
+    const response = await postUpdate(baseData)
+    assertEquals(response.status, 200)
+
+    const json = await response.json()
+    updateNewScheme.parse(json)
+    assertEquals(json.version, '1.361.0')
+  },
+})
+
 Deno.test('Test channel overwrite', async () => {
   await resetAndSeedData()
 
@@ -272,25 +293,4 @@ Deno.test('Test version overwrite', async () => {
   await supabase.from('devices_override')
     .delete()
     .eq('device_id', uuid)
-})
-
-// TODO: Fix this test by fixing the code in the project
-Deno.test({
-  name: 'Test direct channel overwrite',
-  fn: async () => {
-    await resetAndSeedData()
-
-    const uuid = crypto.randomUUID()
-
-    const baseData = getBaseData()
-    baseData.device_id = uuid;
-    (baseData as any).defaultChannel = 'no_access'
-
-    const response = await postUpdate(baseData)
-    assertEquals(response.status, 200)
-
-    const json = await response.json()
-    updateNewScheme.parse(json)
-    assertEquals(json.version, '1.361.0')
-  },
 })
