@@ -15,7 +15,8 @@ import { appIdToUrl } from './conversion.ts'
 
 import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
-import { backgroundTask, getEnv } from './utils.ts'
+import { backgroundTask } from './utils.ts'
+// import { backgroundTask, existInEnv, getEnv } from './utils.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
@@ -33,21 +34,6 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   if (semver.gte(plugin_version, '4.4.0'))
     res.checksum = version.checksum
   return res
-}
-
-function getDrizzlePostgres(c: Context) {
-  // TODO: find why hyperdrive is not always working
-  // if (c.env.HYPERDRIVE) {
-  //   console.log('HYPERDRIVE', c.env.HYPERDRIVE.connectionString)
-  //   return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
-  // }
-  // else
-  if (getEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 2 })
-  }
-  console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 2 })
 }
 
 async function requestInfosPostgres(
@@ -636,6 +622,21 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       error: 'unknow_error',
     }, 500)
   }
+}
+
+function getDrizzlePostgres(c: Context) {
+  // TODO: find why is not always working when we add the IF
+  // if (existInEnv(c, 'HYPERDRIVE')) {
+  console.log('HYPERDRIVE', c.env.HYPERDRIVE.connectionString)
+  return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
+  // }
+  // else
+  //   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+  //     console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+  //     return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 2 })
+  //   }
+  // console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
+  // return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 2 })
 }
 
 export async function update(c: Context, body: AppInfos) {

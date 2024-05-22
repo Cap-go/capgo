@@ -96,7 +96,12 @@ export function backgroundTask(c: Context, p: Promise<void>) {
   return p
 }
 
+export function existInEnv(c: Context, key: string): boolean {
+  return key in env(c)
+}
+
 export function getEnv(c: Context, key: string): string {
-  const val = env<any>(c)[key]
-  return val || ''
+  if (key in env(c))
+    return env(c)[key] ?? ''
+  return ''
 }

@@ -16,16 +16,16 @@ SELECT results_eq(
     'get_user_id test - key does not exist'
 );
 
--- Test get_user_id with app_id
+-- Test get_org_owner_id with app_id
 SELECT results_eq(
-    'SELECT get_user_id(''ae6e7458-c46d-4c00-aa3b-153b0b8520eb'', ''com.demoadmin.app'')',
+    'SELECT get_org_owner_id(''ae6e7458-c46d-4c00-aa3b-153b0b8520eb'', ''com.demoadmin.app'')',
     $$VALUES ('c591b04e-cf29-4945-b9a0-776d0672061a'::uuid)$$,
-    'get_user_id test with app_id - correct user ID'
+    'get_org_owner_id test with app_id - correct user ID'
 );
 SELECT throws_ok(
-    'SELECT get_user_id(''ae6e7458-c46d-4c00-aa3b-153b0b8520bb'', ''com.demoadmin.app'')',
+    'SELECT get_org_owner_id(''ae6e7458-c46d-4c00-aa3b-153b0b8520bb'', ''com.demoadmin.app'')',
     'NO_RIGHTS',
-    'get_user_id test with app_id - user does not have rights'
+    'get_org_owner_id test with app_id - user does not have rights'
 );
 -- Test get_user_main_org_id_by_app_id
 SELECT results_eq(
