@@ -633,10 +633,10 @@ function getDrizzlePostgres(c: Context) {
   else
     if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
       console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-      return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 2 })
+      return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 1 })
     }
   console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 2 })
+  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 1 })
 }
 
 export async function update(c: Context, body: AppInfos) {
@@ -653,6 +653,6 @@ export async function update(c: Context, body: AppInfos) {
     }, 500)
   }
   // await pgClient.end()
-  backgroundTask(c, pgClient.end as any)
+  backgroundTask(c, () => pgClient.end({ timeout: 1 }))
   return res
 }

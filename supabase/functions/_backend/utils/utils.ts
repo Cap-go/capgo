@@ -1,4 +1,4 @@
-import { env } from 'hono/adapter'
+import { env, getRuntimeKey } from 'hono/adapter'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
@@ -82,16 +82,8 @@ export function isLimited(c: Context, id: string) {
   return Math.random() < app.ignore
 }
 
-export function backgroundTask(c: Context, p: Promise<void>) {
-  let executionCtx: ExecutionContext | null
-  try {
-    executionCtx = c.executionCtx
-  }
-  catch (_) {
-    executionCtx = null
-  }
-
-  if (executionCtx?.waitUntil) {
+export function backgroundTask(c: Context, p: any) {
+  if (getRuntimeKey() === 'workerd') {
     c.executionCtx.waitUntil(p)
     return Promise.resolve(null)
   }
