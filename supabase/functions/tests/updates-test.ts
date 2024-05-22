@@ -1,5 +1,6 @@
 // Imports
-import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
+import { assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
+// import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.8.0'
 import { z } from 'https://deno.land/x/zod/mod.ts'
 
