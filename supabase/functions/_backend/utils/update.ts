@@ -3,7 +3,7 @@ import * as semver from 'semver'
 import type { Context } from 'hono'
 import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
 import { and, eq, or, sql } from 'drizzle-orm'
-import { alias as alias_postgres } from 'drizzle-orm/pg-core'
+import { alias } from 'drizzle-orm/pg-core'
 import postgres from 'postgres'
 import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
@@ -13,9 +13,9 @@ import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
 
-import * as schema_postgres from './postgress_schema.ts'
+import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
-import { getEnv } from './utils.ts'
+import { backgroundTask, getEnv } from './utils.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
@@ -36,12 +36,16 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getDrizzlePostgres(c: Context) {
-  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL') ? getEnv(c, 'CUSTOM_SUPABASE_DB_URL') : getEnv(c, 'SUPABASE_DB_URL')
-  // const supaUrl = c.env.HYPERDRIVE ? c.env.HYPERDRIVE.connectionString : getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
-  console.log('getDrizzlePostgres', supaUrl)
-
-  const pgClient = postgres(supaUrl)
-  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any), pgClient }
+  if (c.env.HYPERDRIVE) {
+    console.log('HYPERDRIVE', c.env.HYPERDRIVE.connectionString)
+    return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false })
+  }
+  else if (getEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
+    console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+  }
+  console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
+  return postgres(getEnv(c, 'SUPABASE_DB_URL'))
 }
 
 async function requestInfosPostgres(
@@ -50,9 +54,7 @@ async function requestInfosPostgres(
   device_id: string,
   version_name: string,
   defaultChannel: string,
-  alias: typeof alias_postgres,
   drizzleCient: ReturnType<typeof drizzle_postgress>,
-  schema: typeof schema_postgres,
 ) {
   const appVersions = drizzleCient
     .select({
@@ -221,9 +223,7 @@ async function requestInfosPostgres(
 
 async function getAppOwnerPostgres(
   appId: string,
-  alias: typeof alias_postgres,
   drizzleCient: ReturnType<typeof drizzle_postgress>,
-  schema: typeof schema_postgres,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
     const appOwner = await drizzleCient
@@ -248,9 +248,7 @@ async function getAppOwnerPostgres(
   }
 }
 
-export async function update(c: Context, body: AppInfos) {
-  const { alias, schema, drizzleCient, pgClient } = getDrizzlePostgres(c)
-
+export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof drizzle_postgress>) {
   const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -272,7 +270,7 @@ export async function update(c: Context, body: AppInfos) {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build, { includePrerelease: true })
-    const appOwner = await getAppOwnerPostgres(app_id, alias, drizzleCient, schema)
+    const appOwner = await getAppOwnerPostgres(app_id, drizzleCient)
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
@@ -356,8 +354,8 @@ export async function update(c: Context, body: AppInfos) {
       updated_at: new Date().toISOString(),
     }
 
-    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, alias, drizzleCient, schema)
-    await pgClient.end()
+    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient)
+
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
@@ -636,7 +634,22 @@ export async function update(c: Context, body: AppInfos) {
       error: 'unknow_error',
     }, 500)
   }
-  finally {
-    await pgClient.end()
+}
+
+export async function update(c: Context, body: AppInfos) {
+  const pgClient = getDrizzlePostgres(c)
+  let res
+  try {
+    res = await updateWithPG(c, body, drizzle_postgress(pgClient as any))
   }
+  catch (e) {
+    console.error('update', e)
+    return c.json({
+      message: `Error unknow ${JSON.stringify(e)}`,
+      error: 'unknow_error',
+    }, 500)
+  }
+  // await pgClient.end()
+  backgroundTask(c, pgClient.end as any)
+  return res
 }

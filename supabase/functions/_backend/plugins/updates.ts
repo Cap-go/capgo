@@ -71,6 +71,7 @@ app.post('/', async (c: Context) => {
       }, 400)
     }
 
+    
     return update(c, body)
   }
   catch (e) {

@@ -1,4 +1,3 @@
-import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
@@ -14,6 +13,7 @@ export type Bindings = {
   APP_LOG: AnalyticsEngineDataPoint
   DEVICE_INFO: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
+  HYPERDRIVE: Hyperdrive
 }
 
 const DEFAULT_LIMIT = 1000
