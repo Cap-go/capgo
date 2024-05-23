@@ -257,6 +257,52 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleClient: Re
       }, 200)
     }
 
+    if (versionInfo.disable_auto_update === 'patch' && !(
+      semver.patch(versionInfo.version_name) > semver.patch(version_name)
+      && semver.major(versionInfo.version_name) === semver.major(version_name)
+      && semver.minor(versionInfo.version_name) === semver.minor(version_name)
+    )) {
+      console.log(id, 'Cannot upgrade patch version', device_id, new Date().toISOString())
+      await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch' }])
+      return c.json({
+        major: true,
+        message: 'Cannot upgrade patch version',
+        error: 'disable_auto_update_to_patch',
+        version: versionInfo.version_name,
+        old: version_name,
+        aaa: `${semver.patch(versionInfo.version_name)}, ${semver.patch(version_name)}`,
+      }, 200)
+    }
+
+    if (versionInfo.disable_auto_update === 'version_number') {
+      const minUpdateVersion = versionInfo.min_update_version
+
+      // The channel is misconfigured
+      if (minUpdateVersion === null) {
+        console.log(id, 'Channel is misconfigured', versionInfo.channel_name, new Date().toISOString())
+        await sendStatsAndDevice(c, device, [{ action: 'channelMisconfigured' }])
+        return c.json({
+          message: `Channel ${versionInfo.channel_name} is misconfigured`,
+          error: 'misconfigured_channel',
+          version: versionInfo.version_name,
+          old: version_name,
+        }, 200)
+      }
+
+      // Check if the minVersion is greater then the current version
+      if (semver.gt(minUpdateVersion, version_name)) {
+        console.log(id, 'Cannot upgrade, metadata > current version', device_id, minUpdateVersion, version_name, new Date().toISOString())
+        await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata' }])
+        return c.json({
+          major: true,
+          message: 'Cannot upgrade version, min update version > current version',
+          error: 'disable_auto_update_to_metadata',
+          version: versionInfo.version_name,
+          old: version_name,
+        }, 200)
+      }
+    }
+
     // Under native version check
     if (versionInfo.disable_auto_update_under_native && semver.lt(versionInfo.version_name, version_build)) {
       console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
