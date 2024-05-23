@@ -195,9 +195,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleClient: Re
 
     const versionInfo = await requestInfosPostgres(platform, app_id, device_id, defaultChannel, drizzleClient)
 
+    // Add no channel found check
     if (!versionInfo) {
-      console.log(id, 'No version data found', app_id, new Date().toISOString())
-      return c.json({ message: 'Couldn\'t find version data', error: 'no_version_data' }, 200)
+      console.log(id, 'No suitable channel or override found', app_id, new Date().toISOString())
+      await sendStatsAndDevice(c, device, [{ action: 'noChannelOrOverride' }])
+      return c.json({
+        message: 'No suitable channel or override found',
+        error: 'no_channel',
+      }, 200)
     }
 
     // Check if there is a device-specific override
