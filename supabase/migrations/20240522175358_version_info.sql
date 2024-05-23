@@ -30,12 +30,13 @@ CREATE TABLE version_info (
 );
 
 -- Create a partial unique index for app_id, channel_id, device_id when device_id is not null
-CREATE UNIQUE INDEX version_info_unique_idx ON version_info (app_id, channel_id, device_id)
-WHERE device_id IS NOT NULL;
+ALTER TABLE version_info ADD CONSTRAINT version_info_unique_idx UNIQUE (app_id, channel_id, device_id);
+
+-- CREATE UNIQUE INDEX version_info_unique_rel_idx ON version_info (app_id, channel_id, device_id);
 
 
 -- Create a unique index for app_id and channel_id
-CREATE UNIQUE INDEX version_info_app_channel_unique_idx ON version_info (app_id, channel_id);
+-- ALTER TABLE version_info ADD CONSTRAINT version_info_app_channel_unique_idx UNIQUE (app_id, channel_id);
 
 -- Create indexes if missing
 CREATE INDEX idx_version_info_app_id ON version_info (app_id);
@@ -220,7 +221,7 @@ BEGIN
       NEW."enableAbTesting" AS enable_ab_testing, NEW.allow_device_self_set, NEW.public, CURRENT_TIMESTAMP
     FROM app_versions av
     WHERE av.app_id = NEW.app_id AND av.id = NEW.version
-    ON CONFLICT ON CONSTRAINT version_info_app_channel_unique_idx
+    ON CONFLICT ON CONSTRAINT version_info_unique_idx
     DO UPDATE SET
       version_id = EXCLUDED.version_id,
       version_name = EXCLUDED.version_name, checksum = EXCLUDED.checksum, session_key = EXCLUDED.session_key,
