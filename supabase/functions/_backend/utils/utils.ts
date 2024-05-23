@@ -34,6 +34,12 @@ export const NON_STRING_VERSION_OS = 'Version OS must be a string'
 export const MISSING_STRING_PLATFORM = 'Platform is required'
 export const NON_STRING_PLATFORM = 'Platform must be a string'
 
+export const INVALID_STRING_PLUGIN_VERSION = 'Plugin version is invalid'
+export const MISSING_STRING_PLUGIN_VERSION = 'plugin_version is required'
+
+// Constants for validation messages
+export const INVALID_STRING_PLATFORM = 'Platform is not supported or invalid'
+
 export function shallowCleanObject(obj: Record<string, unknown>) {
   return Object.entries(obj).reduce((acc, [key, value]) => {
     if (value ?? false)
