@@ -41,7 +41,6 @@ async function requestInfosPostgres(
     orderByClause = [
       // Prioritize default channel
       sql`CASE WHEN version_info.channel_name = ${defaultChannel} THEN 0 ELSE 1 END`,
-      sql`version_info.updated_at DESC`, // Optional: Order by update timestamp if needed
     ]
   }
   else {
