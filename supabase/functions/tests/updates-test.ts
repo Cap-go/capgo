@@ -1,8 +1,8 @@
 // Imports
 import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
-// import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.8.0'
 import { z } from 'https://deno.land/x/zod/mod.ts'
+import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../_backend/utils/utils.ts'
 
 // Constants
 const BASE_URL = 'http://localhost:54321/functions/v1'
@@ -293,4 +293,128 @@ Deno.test('Test version overwrite', async () => {
   await supabase.from('devices_override')
     .delete()
     .eq('device_id', uuid)
+})
+
+Deno.test('Test disallowed public channel update', async () => {
+  await resetAndSeedData()
+
+  const { error } = await supabase.from('channels')
+    .update({ public: false })
+    .eq('id', 22)
+  assertEquals(error, null)
+
+  const baseData = getBaseData()
+  baseData.version_name = '1.1.0'
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 200)
+  const json = await response.json()
+  console.log('Test disallowed public channel update', json)
+  assertEquals(json.error, 'no_channel')
+})
+
+Deno.test('Test disabled progressive deployment', async () => {
+  await resetAndSeedData()
+
+  const { error } = await supabase.from('channels')
+    .update({ enable_progressive_deploy: false })
+    .eq('id', 22)
+  assertEquals(error, null)
+
+  const baseData = getBaseData()
+  baseData.version_name = '1.0.0'
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 200)
+
+  const json = await response.json()
+  console.log('Test disabled progressive deployment', json)
+  assertEquals(json.message, 'No new version available')
+})
+
+Deno.test('Test unsupported platform', async () => {
+  await resetAndSeedData()
+
+  const baseData = getBaseData()
+  baseData.platform = 'unsupported_platform'
+  baseData.version_name = '1.1.0'
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 400)
+
+  const json = await response.json()
+  assertEquals(json.error, `Cannot parse json: ${INVALID_STRING_PLATFORM}`)
+  console.log('Test unsupported platform', json)
+})
+
+Deno.test('Test invalid device_id', async () => {
+  await resetAndSeedData()
+
+  const invalidUUID = 'invalid-uuid'
+
+  const baseData = getBaseData()
+  baseData.device_id = invalidUUID
+  baseData.version_name = '1.1.0'
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 400)
+
+  const json = await response.json()
+  assertEquals(json.error, `Cannot parse json: ${INVALID_STRING_DEVICE_ID}`)
+  console.log('Test invalid device_id', json)
+})
+
+Deno.test('Test invalid plugin_version', async () => {
+  await resetAndSeedData()
+
+  const baseData = getBaseData()
+  baseData.plugin_version = 'invalid_version'
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 400)
+
+  const json = await response.json()
+  assertEquals(json.error, `Cannot parse json: ${INVALID_STRING_PLUGIN_VERSION}`)
+  console.log('Test invalid plugin_version', json)
+})
+
+Deno.test('Test missing fields', async () => {
+  await resetAndSeedData()
+
+  const baseData = {} as any
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 400)
+
+  const json = await response.json()
+  assertEquals(json.error, 'Cannot parse json: App ID is required')
+  console.log('Test missing fields', json)
+})
+
+Deno.test('Test only platform field', async () => {
+  await resetAndSeedData()
+
+  const baseData = { platform: 'android' } as any
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 400)
+
+  const json = await response.json()
+  assertEquals(json.error, 'Cannot parse json: App ID is required')
+  console.log('Test only platform field', json)
+})
+
+Deno.test('Test device_id and app_id combination not found', async () => {
+  await resetAndSeedData()
+
+  const baseData = getBaseData()
+  baseData.device_id = '00000000-0000-0000-1234-000000000000'
+  baseData.app_id = 'non.existent.app'
+
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 200)
+
+  const json = await response.json()
+  assertEquals(json.error, 'app_not_found')
+  console.log('Test device_id and app_id combination not found', json)
 })
