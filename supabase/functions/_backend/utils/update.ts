@@ -1,11 +1,8 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
 import type { Context } from 'hono'
-import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import postgres from 'postgres'
-// import { getRuntimeKey } from 'hono/adapter'
 import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
@@ -13,12 +10,10 @@ import { sendNotifOrg } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
-
 import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
-// import { backgroundTask } from './utils.ts'
-import { backgroundTask, existInEnv, getEnv } from './utils.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
+import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
@@ -43,7 +38,7 @@ async function requestInfosPostgres(
   device_id: string,
   version_name: string,
   defaultChannel: string,
-  drizzleCient: ReturnType<typeof drizzle_postgress>,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
 ) {
   const appVersions = drizzleCient
     .select({
@@ -212,7 +207,7 @@ async function requestInfosPostgres(
 
 async function getAppOwnerPostgres(
   appId: string,
-  drizzleCient: ReturnType<typeof drizzle_postgress>,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
     const appOwner = await drizzleCient
@@ -237,7 +232,7 @@ async function getAppOwnerPostgres(
   }
 }
 
-export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof drizzle_postgress>) {
+export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient>) {
   const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -625,25 +620,11 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   }
 }
 
-function getDrizzlePostgres(c: Context) {
-  // TODO: find why is not always working when we add the IF
-  // if (getRuntimeKey() === 'workerd') {
-  //   return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
-  // }
-  // else
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 1 })
-  }
-  console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 1 })
-}
-
 export async function update(c: Context, body: AppInfos) {
-  const pgClient = getDrizzlePostgres(c)
+  const pgClient = getPgClient(c)
   let res
   try {
-    res = await updateWithPG(c, body, drizzle_postgress(pgClient as any))
+    res = await updateWithPG(c, body, getDrizzleClient(pgClient as any))
   }
   catch (e) {
     console.error('update', e)
@@ -652,7 +633,6 @@ export async function update(c: Context, body: AppInfos) {
       error: 'unknow_error',
     }, 500)
   }
-  // await pgClient.end()
-  backgroundTask(c, () => pgClient.end({ timeout: 1 }))
+  closeClient(c, pgClient)
   return res
 }
