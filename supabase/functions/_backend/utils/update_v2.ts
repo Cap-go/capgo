@@ -66,7 +66,6 @@ async function requestInfosPostgres(
             WHEN ${platform} = 'ios' AND version_info.ios = TRUE THEN 1
             ELSE 2
           END`,
-      sql`version_info.updated_at DESC`, // Optional: Order by update timestamp if needed
     ]
   }
 
@@ -194,6 +193,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleClient: Re
     }
 
     const versionInfo = await requestInfosPostgres(platform, app_id, device_id, defaultChannel, drizzleClient)
+
+    console.log('versionInfo', versionInfo)
 
     // Add no channel found check
     if (!versionInfo) {
@@ -343,15 +344,15 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleClient: Re
 function getDrizzlePostgres(c: Context) {
   // TODO: find why is not always working when we add the IF
   // if (getRuntimeKey() === 'workerd') {
-  //   return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, timeout: 2 })
+  //   return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, idle_timeout: 2 })
   // }
   // else
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
     console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { timeout: 1 })
+    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { idle_timeout: 1 })
   }
   console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { timeout: 1 })
+  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { idle_timeout: 1 })
 }
 
 export async function updateV2(c: Context, body: AppInfos) {

@@ -1979,6 +1979,7 @@ BEGIN
     TRUNCATE TABLE "public"."app_versions" CASCADE;
     TRUNCATE TABLE "public"."app_versions_meta" CASCADE;
     TRUNCATE TABLE "public"."channels" CASCADE;
+    TRUNCATE TABLE "public"."version_info" CASCADE;
 
     -- Insert seed data
     -- (Include all your INSERT statements here)
