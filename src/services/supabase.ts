@@ -1,4 +1,5 @@
 import ky from 'ky'
+import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 
@@ -168,11 +169,12 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
 
   // generate all dates between startDate and endDate
   const dates: string[] = []
-  let currentDate = new Date(startDate)
-  const end = new Date(endDate)
+  // use dayjs to create dates
+  let currentDate = dayjs(startDate)
+  const end = dayjs(endDate)
   while (currentDate <= end) {
     dates.push(currentDate.toISOString().split('T')[0])
-    currentDate = new Date(currentDate.setDate(currentDate.getDate() + 1))
+    currentDate = currentDate.add(1, 'day')
   }
   const data = resAppIds.flatMap((appId) => {
     // create only one entry for each day by appId
@@ -298,11 +300,11 @@ export async function isAdmin(userid?: string): Promise<boolean> {
   return data || false
 }
 
-export async function isCanceled(userid?: string): Promise<boolean> {
-  if (!userid)
+export async function isCanceled(orgId?: string): Promise<boolean> {
+  if (!orgId)
     return false
   const { data, error } = await useSupabase()
-    .rpc('is_canceled', { userid })
+    .rpc('is_canceled_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
