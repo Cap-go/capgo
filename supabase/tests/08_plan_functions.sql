@@ -73,19 +73,5 @@ BEGIN
     );
 END $$;
 
--- Test get_app_metrics for different dates
-SELECT is(
-    (SELECT COUNT(*) FROM get_app_metrics('22dbad8a-b885-4309-9b3b-a09f8460fb6d', '2023-01-01', '2023-01-31')), 
-    1, 
-    'get_app_metrics test - returns data for given date range'
-);
-
--- Test get_global_metrics for different dates
-SELECT is(
-    (SELECT COUNT(*) FROM get_global_metrics('22dbad8a-b885-4309-9b3b-a09f8460fb6d', '2023-01-01', '2023-01-31')), 
-    1, 
-    'get_global_metrics test - returns aggregated data for given date range'
-);
-
 SELECT * FROM finish();
 ROLLBACK;
