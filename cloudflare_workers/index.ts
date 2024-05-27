@@ -3,6 +3,7 @@ import { sentry } from '@hono/sentry'
 
 // Public API
 import { HTTPException } from 'hono/http-exception'
+import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
@@ -114,7 +115,7 @@ app.get('/test_sentry', (c) => {
   throw new Error('Failed!')
 })
 
-app.post('/test_d1', async (c) => {
+app.post('/test_d1', middlewareAPISecret, async (c) => {
   try {
     const body = await c.req.json()
     if (body.request) {
