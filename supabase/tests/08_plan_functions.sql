@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(16);
+SELECT plan(8);
 
 -- Test get_current_plan_max_org
 SELECT results_eq(
