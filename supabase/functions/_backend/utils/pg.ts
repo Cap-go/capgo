@@ -29,4 +29,6 @@ export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) 
   // console.log('Closing client', client)
   if (getRuntimeKey() === 'workerd')
     c.executionCtx.waitUntil(client.end())
+  else
+    client.end()
 }
