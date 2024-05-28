@@ -357,6 +357,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
     return [] as StatRowCF[]
 
   let deviceFilter = ''
+
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
     if (deviceIds.length === 1) {
@@ -369,11 +370,11 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
   }
   let searchFilter = ''
   if (search) {
-    // console.log('search', search)
+    const searchLower = search.toLowerCase()
     if (deviceIds && deviceIds.length)
-      searchFilter = `AND position('${search}' IN action) > 0`
+      searchFilter = `AND position('${searchLower}' IN toLower(action)) > 0`
     else
-      searchFilter = `AND (position('${search}' IN device_id) > 0 OR position('${search}' IN action) > 0)`
+      searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0)`
   }
   const query = `SELECT
   index1 as app_id,
