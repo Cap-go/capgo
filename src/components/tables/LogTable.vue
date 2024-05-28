@@ -101,7 +101,7 @@ async function getData() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
-    console.log('paginatedRange.value', paginatedRange.value, currentPage.value)
+    // console.log('paginatedRange.value', paginatedRange.value, currentPage.value)
     const dataD = await ky
       .post(`${defaultApiHost}/private/stats`, {
         headers: {
@@ -122,7 +122,7 @@ async function getData() {
         console.log('Cannot get devices', err)
         return [] as LogData[]
       })
-    console.log('dataD', dataD)
+    // console.log('dataD', dataD)
     elements.value.push(...dataD as any)
   }
   catch (error) {
