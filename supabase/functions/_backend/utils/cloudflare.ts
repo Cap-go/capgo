@@ -301,9 +301,9 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   if (search) {
     console.log('search', search)
     if (deviceIds && deviceIds.length)
-      searchFilter = `AND custom_id LIKE '${search}')`
+      searchFilter = `AND custom_id LIKE '%${search}%')`
     else
-      searchFilter = `AND (device_id LIKE '${search}' OR custom_id LIKE '${search}')`
+      searchFilter = `AND (device_id LIKE '%${search}%' OR custom_id LIKE '%${search}%')`
   }
   let versionFilter = ''
   if (version_id)

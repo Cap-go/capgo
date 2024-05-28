@@ -133,8 +133,9 @@ async function getData() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
+    const defaultApiHostPreprod = 'https://api-preprod.capgo.app'
     const dataD = await ky
-      .post(`${defaultApiHost}/private/devices`, {
+      .post(`${defaultApiHostPreprod}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt}` || '',
@@ -154,7 +155,7 @@ async function getData() {
         console.log('Cannot get devices', err)
         return [] as DeviceData[]
       })
-    console.log('dataD', dataD)
+    // console.log('dataD', dataD)
 
     const versionPromises = dataD.map((element) => {
       return supabase
@@ -185,7 +186,7 @@ async function getData() {
 }
 
 async function reload() {
-  console.log('reload')
+  // console.log('reload')
   try {
     elements.value.length = 0
     await getData()
