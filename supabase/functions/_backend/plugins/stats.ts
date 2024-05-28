@@ -125,7 +125,7 @@ async function post(c: Context, body: AppStats) {
       //   })
       // }
       // if (action === 'get')
-      //   await updateInClickHouse(c, app_id, 1)
+      //   await updateStoreApp(c, app_id, 1)
 
       return c.json({
         message: 'App not found',

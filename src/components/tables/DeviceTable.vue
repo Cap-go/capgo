@@ -133,9 +133,8 @@ async function getData() {
     if (!currentSession.session)
       return
     const currentJwt = currentSession.session.access_token
-    const defaultApiHostPreprod = 'https://api-preprod.capgo.app'
     const dataD = await ky
-      .post(`${defaultApiHostPreprod}/private/devices`, {
+      .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
           'authorization': `Bearer ${currentJwt}` || '',

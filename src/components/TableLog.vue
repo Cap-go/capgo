@@ -14,6 +14,7 @@ import type { Organization } from '~/stores/organization'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSortDown from '~icons/lucide/chevron-down'
+import IconSearch from '~icons/ic/round-search'
 import IconReload from '~icons/tabler/reload'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
 import IconClock from '~icons/heroicons/clock'
@@ -195,7 +196,6 @@ onMounted(async () => {
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <!-- </div> -->
       <div class="flex h-10 ml-4 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
         <div :class="`flex-auto flex-col cursor-pointer flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
           <div class="flex items-center justify-center">
@@ -296,6 +296,13 @@ onMounted(async () => {
             </VueDatePicker>
           </div>
         </div>
+      </div>
+      <div class="relative w-70 md:w-auto">
+        <label for="table-search" class="sr-only">{{ searchPlaceholder }}</label>
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <IconSearch class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        </div>
+        <input id="table-search" v-model="searchVal" type="text" class="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 md:w-80 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :placeholder="searchPlaceholder">
       </div>
     </div>
     <div class="hidden md:block">

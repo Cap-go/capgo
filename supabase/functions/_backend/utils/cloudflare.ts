@@ -129,7 +129,7 @@ WHERE
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
 GROUP BY app_id, date
-ORDER BY date, app_id;`
+ORDER BY date, app_id`
 
   console.log('readDeviceUsageCF query', query)
   try {
@@ -160,7 +160,7 @@ WHERE
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
   AND app_id = '${app_id}'
 GROUP BY date, app_id
-ORDER BY date, app_id;`
+ORDER BY date, app_id`
 
   console.log('readBandwidthUsageCF query', query)
   try {
@@ -229,7 +229,7 @@ WHERE
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
 GROUP BY date, app_id, version_id
-ORDER BY date;`
+ORDER BY date`
 
   console.log('readStatsVersionCF query', query)
   try {
@@ -323,10 +323,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   updated_at
 FROM devices
 WHERE
-  app_id = '${app_id}'
-  ${deviceFilter}
-  ${searchFilter}
-  ${versionFilter}
+  app_id = '${app_id}' ${deviceFilter} ${searchFilter} ${versionFilter}
 ORDER BY updated_at DESC
 LIMIT ${rangeEnd} OFFSET ${rangeStart}`
 
@@ -372,11 +369,11 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
   }
   let searchFilter = ''
   if (search) {
-    console.log('search', search)
+    // console.log('search', search)
     if (deviceIds && deviceIds.length)
-      searchFilter = `AND startsWith(custom_id, '${search}')`
+      searchFilter = `AND position('${search}' IN action) > 0`
     else
-      searchFilter = `AND (startsWith(device_id, '${search}') OR startsWith(custom_id, '${search}'))`
+      searchFilter = `AND (position('${search}' IN device_id) > 0 OR position('${search}' IN action) > 0)`
   }
   const query = `SELECT
   index1 as app_id,
@@ -386,21 +383,19 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
   timestamp as created_at
 FROM app_log
 WHERE
-  app_id = '${app_id}'
-  ${deviceFilter}
-  ${searchFilter}
+  app_id = '${app_id}' ${deviceFilter} ${searchFilter}
   AND created_at >= toDateTime('${formatDateCF(period_start)}')
   AND created_at < toDateTime('${formatDateCF(period_end)}')
 GROUP BY app_id, created_at, action, device_id, version_id
 ORDER BY created_at, app_id
-LIMIT ${limit};`
+LIMIT ${limit}`
 
   console.log('readStatsCF query', query)
   try {
     return await runQueryToCF<StatRowCF[]>(c, query)
   }
   catch (e) {
-    console.error('Error reading stats list', e)
+    console.error('Error reading stats list', e, JSON.stringify(e))
   }
   return [] as StatRowCF[]
 }
@@ -603,11 +598,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
   const updates = columns.map(column => `${column} = EXCLUDED.${column}`).join(', ')
   const values = columns.map(column => app[column])
 
-  const query = `
-    INSERT INTO store_apps (app_id, ${columns.join(', ')})
-    VALUES (?, ${placeholders})
-    ON CONFLICT(app_id) DO UPDATE SET ${updates};
-  `
+  const query = `INSERT INTO store_apps (app_id, ${columns.join(', ')}) VALUES (?, ${placeholders}) ON CONFLICT(app_id) DO UPDATE SET ${updates}`
 
   try {
     const res = await c.env.DB_DEVICES
@@ -638,7 +629,7 @@ export async function bulkUpdateStoreAppsCF(c: Context, apps: StoreApp[]) {
   return Promise.all(jobs)
 }
 
-export async function updateInClickHouse(c: Context, appId: string, updates: number) {
+export async function updateStoreApp(c: Context, appId: string, updates: number) {
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
 
@@ -649,10 +640,10 @@ export async function updateInClickHouse(c: Context, appId: string, updates: num
       .prepare(query)
       .bind(appId, updates)
       .run()
-    console.log('updateInClickHouse result', res)
+    console.log('updateStoreApp result', res)
   }
   catch (e) {
-    console.error('Error updating in ClickHouse', e)
+    console.error('Error updating StoreApp', e)
   }
 
   return Promise.resolve()
