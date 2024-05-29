@@ -45,7 +45,7 @@ BEGIN
 
   UPDATE app_versions set app_id='com.demoadmin.app' where id=9601;
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 
-  ('com.demo.app', 10, (now() - interval '1 day')::date);
+  ('com.demoadmin.app', 10, (now() - interval '1 day')::date);
 
   INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
   (now(), 'com.demoadmin.app', now(), '3885ee49', convert_gb_to_bytes(0.1), 9601, 10);
