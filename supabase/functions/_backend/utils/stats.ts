@@ -85,13 +85,13 @@ export function readStats(c: Context, app_id: string, start_date: string, end_da
 }
 
 export function countDevices(c: Context, app_id: string) {
-  if (!c.env.DEVICE_LOG)
+  if (!c.env.DB_DEVICES)
     return countDevicesSB(c, app_id)
   return countDevicesCF(c, app_id)
 }
 
 export function readDevices(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
-  if (!c.env.DEVICE_LOG)
+  if (!c.env.DB_DEVICES)
     return readDevicesSB(c, app_id, range_start, range_end, version_id, deviceIds, search)
   return readDevicesCF(c, app_id, range_start, range_end, version_id, deviceIds, search)
 }

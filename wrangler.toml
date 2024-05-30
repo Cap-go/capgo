@@ -22,14 +22,6 @@ dataset = "version_usage"
 binding = "APP_LOG"
 dataset = "app_log"
 
-[[analytics_engine_datasets]]
-binding = "DEVICE_LOG"
-dataset = "device_log"
-
-[[analytics_engine_datasets]]
-binding = "DEVICE_INFO"
-dataset = "device_info"
-
 [[d1_databases]]
 binding = "DB_DEVICES"
 database_name = "capgo_prod_devices"

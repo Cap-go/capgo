@@ -11,7 +11,6 @@ export type Bindings = {
   BANDWIDTH_USAGE: AnalyticsEngineDataPoint
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
-  DEVICE_INFO: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
   HYPERDRIVE: Hyperdrive
 }
