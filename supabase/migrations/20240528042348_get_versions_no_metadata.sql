@@ -5,8 +5,10 @@ BEGIN
   RETURN QUERY
   SELECT app_versions.* FROM app_versions
   LEFT JOIN app_versions_meta ON app_versions_meta.id=app_versions.id
-  where coalesce(app_versions_meta.size, 0) = 0 
-  AND app_versions.deleted=false;
+  where coalesce(app_versions_meta.size, 0) = 0
+  AND app_versions.deleted=false
+  AND app_versions.storage_provider != 'external'
+  AND now() - app_versions.created_at > interval '30 seconds';
 END;
 $$;
 
