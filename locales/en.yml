@@ -311,6 +311,7 @@ name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
 new-name-not-changed: The new name is the same as the old one
 new-name-to-long: The new name is too long. You can only use 32 characters
+new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 'no': 'no'
 no-channel-linked: No channel, click to add

@@ -59,7 +59,8 @@ onMounted(() => {
 
   // watch for changes
   watch(() => displayStore.showDialog, (val) => {
-    displayStore.dialogInputText = ''
+    if (!val)
+      displayStore.dialogInputText = ''
     const closable = !displayStore.dialogOption?.preventAccidentalClose
     if (modalOptions.closable !== closable) {
       modalOptions.closable = closable

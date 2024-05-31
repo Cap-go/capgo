@@ -75,7 +75,7 @@ async function addNewApiKey() {
 
   const { data, error } = await supabase
     .from('apikeys')
-    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType })
+    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType, name: '' })
     .select()
 
   if (error)
@@ -124,11 +124,12 @@ async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
     throw error
 
   toast.success(t('removed-apikey'))
-  keys.value = keys.value?.filter(filterKey => filterKey.key !== app.key)
+  keys.value = keys.value?.filter(filterKey => filterKey.key !== key.key)
 }
 
 async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
   const currentName = key.name
+  displayStore.dialogInputText = currentName
 
   displayStore.dialogOption = {
     header: t('change-api-key-name'),
@@ -155,6 +156,11 @@ async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
 
           if (newName.length > 32) {
             toast.error(t('new-name-to-long'))
+            return
+          }
+
+          if (newName.length < 4) {
+            toast.error(t('new-name-to-short'))
             return
           }
 
