@@ -8,6 +8,7 @@ import {
 } from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
 import VueDatePicker from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import dayjs from 'dayjs'
 import type { MobileColType, TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
