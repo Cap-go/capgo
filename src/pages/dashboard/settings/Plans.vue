@@ -4,7 +4,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { storeToRefs } from 'pinia'
-import test from './particles.json'
+// import test from './particles.json'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
@@ -559,11 +559,11 @@ const hightLights = computed<Stat[]>(() => ([
         <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
       </router-link>
     </div>
-    <vue-particles
+    <!-- <VueParticles
       id="tsparticles"
       class="absolute z-0 w-full h-full"
       :options="test"
-    />
+    /> -->
   </div>
 </template>
 
