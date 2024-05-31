@@ -115,7 +115,7 @@
     "@netlify/functions": "^2.6.0",
     "@revenuecat/purchases-capacitor": "^7.5.8",
     "@sentry/cli": "^2.31.0",
-    "@supabase/supabase-js": "2.42.7",
+    "@supabase/supabase-js": "2.43.4",
     "@tailwindcss/forms": "^0.5.7",
     "@tsparticles/preset-confetti": "^3.0.2",
     "@tsparticles/vue3": "^3.0.1",
