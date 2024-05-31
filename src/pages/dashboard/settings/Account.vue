@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
-import { FormKitMessages, reset } from '@formkit/vue'
+import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
@@ -428,7 +428,7 @@ onMounted(async () => {
             {{ t('you-can-change-your-') }}
           </div>
 
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-x-4 sm:space-y-0">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
               <FormKit
                 type="text"
@@ -457,7 +457,7 @@ onMounted(async () => {
               />
             </div>
           </div>
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:items-stretch sm:space-x-4 sm:space-y-0">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
               <FormKit
                 type="email"

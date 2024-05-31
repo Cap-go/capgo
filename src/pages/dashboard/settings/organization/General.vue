@@ -4,10 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { FunctionsHttpError } from '@supabase/supabase-js'
+import { FormKit } from '@formkit/vue'
 import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { pickPhoto, takePhoto } from '~/services/photos'
+import { iconEmail, iconName } from '~/services/icons'
 
 const { t } = useI18n()
 
@@ -117,7 +119,7 @@ async function saveChanges() {
 
     if (error) {
       if (error instanceof FunctionsHttpError && error.context instanceof Response) {
-        const json = await error.context.json()
+        const json = await error.context.json<{ status: string }>()
         if (json.status && typeof json.status === 'string') {
           if (json.status === 'email_not_unique')
             toast.error(t('org-changes-set-email-not-unique'))
@@ -145,12 +147,9 @@ async function saveChanges() {
     toast.success(t('org-changes-saved'))
 }
 
-function onInputClick(event: MouseEvent) {
-  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
-    toast.error(t('no-permission'))
-    event.preventDefault()
-  }
-}
+const hasOrgPerm = computed(() => {
+  return organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])
+})
 
 const acronym = computed(() => {
   const res = 'N/A'
@@ -164,11 +163,6 @@ const acronym = computed(() => {
   // }
   return res.toUpperCase()
 })
-
-function onInputKeyDown(event: Event) {
-  if (!(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])))
-    event.preventDefault()
-}
 </script>
 
 <template>
@@ -198,12 +192,31 @@ function onInputKeyDown(event: Event) {
         </h2>
         <div>{{ t('modify-org-info') }}</div>
         <div class="mt-3 mb-6">
-          <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-name') }}</label>
-          <input id="base-input" v-model="name " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
+          <FormKit
+            type="text"
+            name="orgName"
+            autocomplete="given-name"
+            :prefix-icon="iconName"
+            :disabled="!hasOrgPerm"
+            :value="name"
+            validation="required:trim"
+            enterkeyhint="next"
+            autofocus
+            :label="t('organization-name')"
+          />
         </div>
         <div class="mt-3 mb-6">
-          <label for="base-input" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">{{ t('organization-email') }}</label>
-          <input id="base-input" v-model="email " :readonly="!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])" type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" @click="(event) => onInputClick(event)" @keydown="(event) => onInputKeyDown(event)">
+          <FormKit
+            type="email"
+            name="email"
+            :prefix-icon="iconEmail"
+            autocomplete="given-name"
+            :disabled="!hasOrgPerm"
+            :value="email"
+            validation="required:trim" enterkeyhint="next"
+            autofocus
+            :label="t('organization-email')"
+          />
         </div>
       </div>
       <footer style="margin-top: auto">

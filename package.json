@@ -163,6 +163,7 @@
     "stripe": "^15.4.0",
     "tsparticles": "^3.3.0",
     "unplugin-auto-import": "^0.17.5",
+    "unplugin-formkit": "^0.3.0",
     "unplugin-vue-macros": "^2.9.1",
     "unplugin-vue-router": "^0.8.6",
     "vite-plugin-vue-devtools": "^7.1.3",

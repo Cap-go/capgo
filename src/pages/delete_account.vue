@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setErrors } from '@formkit/core'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'

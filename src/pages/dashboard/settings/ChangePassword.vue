@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { setErrors } from '@formkit/core'
 import { useI18n } from 'vue-i18n'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { iconPassword } from '~/services/icons'

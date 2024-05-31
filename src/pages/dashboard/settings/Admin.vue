@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
 

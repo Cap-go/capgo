@@ -3,6 +3,7 @@ import { Modal } from 'flowbite'
 import { onMounted, ref, watch } from 'vue'
 import type { ModalInterface, ModalOptions } from 'flowbite'
 import DOMPurify from 'dompurify'
+import { FormKit } from '@formkit/vue'
 import type { ActionSheetOptionButton } from '~/stores/display'
 import { useDisplayStore } from '~/stores/display'
 
@@ -104,8 +105,14 @@ onMounted(() => {
         <div class="p-6 space-y-6">
           <p :class="`text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400 ${displayStore.dialogOption?.textStyle}`" v-html="displayText(displayStore.dialogOption?.message)" />
           <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
-          <div v-if="displayStore.dialogOption?.input" class="flex flex-row max-w-2xl">
-            <input id="dialog-input-field" v-model="displayStore.dialogInputText" autocomplete="off" class="w-full ml-4 bg-white border border-gray-200 rounded dark:border-gray-600 dark:bg-gray-700 text-center" type="text">
+          <div v-if="displayStore.dialogOption?.input" class="w-full">
+            <FormKit
+              type="text"
+              name="text"
+              :value="displayStore.dialogInputText"
+              enterkeyhint="next"
+              validation="required:trim"
+            />
           </div>
         </div>
         <!-- Modal footer -->

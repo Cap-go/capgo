@@ -7,8 +7,6 @@ import { loadFull } from 'tsparticles'
 import { createRouter, createWebHistory } from 'vue-router/auto'
 import { setupLayouts } from 'virtual:generated-layouts'
 import type { Router } from 'vue-router/auto'
-import { defaultConfig, plugin } from '@formkit/vue'
-import { generateClasses } from '@formkit/themes'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import App from './App.vue'
@@ -17,18 +15,12 @@ import App from './App.vue'
 import './styles/style.css'
 
 import { initPlausible } from './services/plausible'
-import formkit from './styles/formkit'
 import { getRemoteConfig } from './services/supabase'
 
 const guestPath = ['/login', '/register', '/delete_account', '/forgot_password', '/resend_email', '/onboarding']
 
 getRemoteConfig()
 const app = createApp(App)
-app.use(plugin, defaultConfig({
-  config: {
-    classes: generateClasses(formkit),
-  },
-}))
 app.use(Particles, {
   init: async (engine) => {
     await loadFull(engine)
