@@ -44,6 +44,7 @@ module.exports = konstaConfig({
   },
   content: [
     './index.html',
+    './formkit.config.ts',
     './src/**/*.{vue,js,ts,jsx,tsx}',
     './node_modules/flowbite/**/*.js',
   ],
