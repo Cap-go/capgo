@@ -10,6 +10,7 @@ import { useDisplayStore } from '~/stores/display'
 import Plus from '~icons/heroicons/plus'
 import Trash from '~icons/heroicons/trash'
 import Pencil from '~icons/heroicons/pencil'
+import ArrowPath from '~icons/heroicons/arrow-path'
 import Clipboard from '~icons/heroicons/clipboard-document'
 
 const { t } = useI18n()
@@ -17,7 +18,8 @@ const displayStore = useDisplayStore()
 const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
-const apps = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const magicVal = ref(0)
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
@@ -25,7 +27,7 @@ async function getKeys(retry = true): Promise<void> {
     .select()
     .eq('user_id', main.user?.id)
   if (data && data.length)
-    apps.value = data
+    keys.value = data
 
   else if (retry && main.user?.id)
     return getKeys(false)
@@ -73,13 +75,13 @@ async function addNewApiKey() {
 
   const { data, error } = await supabase
     .from('apikeys')
-    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType })
+    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType, name: '' })
     .select()
 
   if (error)
     throw error
 
-  apps.value?.push(data[0])
+  keys.value?.push(data[0])
   toast.success(t('add-api-key'))
 }
 
@@ -109,20 +111,83 @@ async function regenrateKey(app: Database['public']['Tables']['apikeys']['Row'])
   toast.success(t('generated-new-apikey'))
 }
 
-async function deleteKey(app: Database['public']['Tables']['apikeys']['Row']) {
+async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
   if (await showDeleteKeyModal())
     return
 
   const { error } = await supabase
     .from('apikeys')
     .delete()
-    .eq('key', app.key)
+    .eq('key', key.key)
 
   if (error)
     throw error
 
   toast.success(t('removed-apikey'))
-  apps.value = apps.value?.filter(filterKey => filterKey.key !== app.key)
+  keys.value = keys.value?.filter(filterKey => filterKey.key !== key.key)
+}
+
+async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
+  const currentName = key.name
+  displayStore.dialogInputText = currentName
+
+  displayStore.dialogOption = {
+    header: t('change-api-key-name'),
+    message: `${t('type-new-name')}`,
+    input: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-lg',
+    buttonCenter: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        handler: async () => {
+          const newName = displayStore.dialogInputText
+          if (currentName === newName) {
+            toast.error(t('new-name-not-changed'))
+            return
+          }
+
+          if (newName.length > 32) {
+            toast.error(t('new-name-to-long'))
+            return
+          }
+
+          if (newName.length < 4) {
+            toast.error(t('new-name-to-short'))
+            return
+          }
+
+          const { error } = await supabase.from('apikeys')
+            .update({ name: newName })
+            .eq('id', key.id)
+
+          if (error) {
+            toast.error(t('cannot-change-name'))
+            console.error(error)
+            return
+          }
+
+          toast.success(t('changed-name'))
+          keys.value = keys.value?.map((k) => {
+            if (key.id === k.id)
+              k.name = newName
+
+            return k
+          })
+          magicVal.value += 1
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 // This returns true if user has canceled the action
@@ -216,15 +281,18 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
     </div>
     <div class="flex flex-col">
       <div class="flex flex-col overflow-hidden overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-        <dl class="divide-y divide-gray-500">
-          <InfoRow v-for="app in apps" :key="app.id" :label="app.mode.toUpperCase()" :value="app.key" :is-link="true">
-            <button class="ml-auto bg-transparent w-7 h-7" @click="regenrateKey(app)">
+        <dl :key="magicVal" class="divide-y divide-gray-500">
+          <InfoRow v-for="key in keys" :key="key.id" :label="key.mode.toUpperCase()" :value="key.name" :is-link="true">
+            <button class="ml-auto bg-transparent w-7 h-7" @click="regenrateKey(key)">
+              <ArrowPath class="mr-4 text-lg" />
+            </button>
+            <button class="ml-auto bg-transparent w-7 h-7" @click="changeName(key)">
               <Pencil class="mr-4 text-lg" />
             </button>
-            <button class="ml-auto bg-transparent w-7 h-7" @click="copyKey(app)">
+            <button class="ml-auto bg-transparent w-7 h-7" @click="copyKey(key)">
               <Clipboard class="mr-4 text-lg" />
             </button>
-            <button class="ml-4 bg-transparent w-7 h-7" @click="deleteKey(app)">
+            <button class="ml-4 bg-transparent w-7 h-7" @click="deleteKey(key)">
               <Trash class="mr-4 text-lg text-red-600" />
             </button>
           </InfoRow>

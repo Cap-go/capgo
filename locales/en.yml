@@ -88,6 +88,7 @@ button-back: Back
 button-browse: Browse
 button-camera: Camera
 button-cancel: Cancel
+button-confirm: Confirm
 button-delete: Delete
 button-deny-invite: Deny
 button-go: GO
@@ -102,6 +103,7 @@ button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cancel: Cancel
+cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
@@ -122,6 +124,8 @@ cannot-view-plans: Cannot view the plans page
 cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
 change: Change
+change-api-key-name: Change the apikey's name
+changed-name: Successfully changed apikey's name
 changed-password-suc: Password changed successfully
 channel: Channel
 channel-ab-testing: Enable AB testing
@@ -305,6 +309,9 @@ my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
+new-name-not-changed: The new name is the same as the old one
+new-name-to-long: The new name is too long. You can only use 32 characters
+new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 'no': 'no'
 no-channel-linked: No channel, click to add
@@ -453,6 +460,7 @@ trial: trial
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
+type-new-name: Please type the new api key name
 undefined: undefined
 undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
