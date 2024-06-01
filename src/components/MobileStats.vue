@@ -9,9 +9,9 @@ import {
 // CategoryScale,
   ArcElement,
   Chart,
+  LinearScale,
   Tooltip,
-// LineElement,
-// LinearScale,
+  // LineElement,
 // PointElement,
 } from 'chart.js'
 import { useSupabase } from '~/services/supabase'
@@ -20,6 +20,7 @@ import type { Database } from '~/types/supabase.types'
 import { urlToAppId } from '~/services/conversion'
 
 Chart.register(
+  LinearScale,
   ArcElement,
   annotationPlugin,
   Tooltip,

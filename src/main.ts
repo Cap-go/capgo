@@ -1,9 +1,6 @@
 // register vue composition api globally
 import { createApp } from 'vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
-// TODO: fix this and use local import only
-// import Particles from '@tsparticles/vue3'
-// import { loadFull } from 'tsparticles'
 
 import { createRouter, createWebHistory } from 'vue-router/auto'
 import { routes } from 'vue-router/auto-routes'
@@ -21,11 +18,6 @@ const guestPath = ['/login', '/register', '/delete_account', '/forgot_password',
 
 getRemoteConfig()
 const app = createApp(App)
-// app.use(Particles, {
-//   init: async (engine) => {
-//     await loadFull(engine)
-//   },
-// })
 CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts

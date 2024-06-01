@@ -118,7 +118,6 @@
     "@supabase/supabase-js": "2.43.4",
     "@tailwindcss/forms": "^0.5.7",
     "@tsparticles/preset-confetti": "^3.0.2",
-    "@tsparticles/vue3": "^3.0.1",
     "@vuepic/vue-datepicker": "^8.7.0",
     "@vueuse/components": "^10.10.0",
     "@vueuse/core": "10.10.0",
