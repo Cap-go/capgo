@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.598.79",
+  "version": "10.598.80",
   "private": true,
   "scripts": {
     "build": "vite build",
