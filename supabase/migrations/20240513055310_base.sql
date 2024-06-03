@@ -2823,22 +2823,13 @@ ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channel_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."daily_bandwidth"
-    ADD CONSTRAINT "daily_bandwidth_app_id_date_key" UNIQUE ("app_id", "date");
-
-ALTER TABLE ONLY "public"."daily_bandwidth"
-    ADD CONSTRAINT "daily_bandwidth_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "daily_bandwidth_pkey" PRIMARY KEY ("app_id", "date");
 
 ALTER TABLE ONLY "public"."daily_mau"
-    ADD CONSTRAINT "daily_mau_app_id_date_key" UNIQUE ("app_id", "date");
-
-ALTER TABLE ONLY "public"."daily_mau"
-    ADD CONSTRAINT "daily_mau_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "daily_mau_pkey" PRIMARY KEY ("app_id", "date");
 
 ALTER TABLE ONLY "public"."daily_storage"
-    ADD CONSTRAINT "daily_storage_app_id_date_key" UNIQUE ("app_id", "date");
-
-ALTER TABLE ONLY "public"."daily_storage"
-    ADD CONSTRAINT "daily_storage_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "daily_storage_pkey" PRIMARY KEY ("app_id", "date");
 
 ALTER TABLE ONLY "public"."daily_version"
     ADD CONSTRAINT "daily_version_pkey" PRIMARY KEY ("date", "app_id", "version_id");
