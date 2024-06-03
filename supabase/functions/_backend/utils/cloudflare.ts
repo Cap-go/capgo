@@ -146,13 +146,27 @@ interface BandwidthUsageCF {
   app_id: string
 }
 
+export async function rawAnalyticsQuery(c: Context, query: string) {
+  if (!c.env.BANDWIDTH_USAGE)
+    return []
+
+  console.log('rawAnalyticsQuery query', query)
+  try {
+    return await runQueryToCF<[]>(c, query)
+  }
+  catch (e) {
+    console.error('Error reading rawAnalyticsQuery', e)
+  }
+  return []
+}
+
 export async function readBandwidthUsageCF(c: Context, app_id: string, period_start: string, period_end: string) {
   if (!c.env.BANDWIDTH_USAGE)
     return [] as BandwidthUsageCF[]
   const query = `SELECT
   toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
   sum(double1) AS bandwidth,
-  blob2 AS app_id
+  index1 AS app_id
 FROM bandwidth_usage
 WHERE
   timestamp >= toDateTime('${formatDateCF(period_start)}')

@@ -4,7 +4,7 @@ import { sentry } from '@hono/sentry'
 // Public API
 import { HTTPException } from 'hono/http-exception'
 import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
-import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
@@ -123,19 +123,19 @@ app.post('/test_d1', middlewareAPISecret, async (c) => {
         .exec(body.request)
 
       const res = await requestD1
-      console.log('trackDevicesCF res', res)
+      console.log('test d1 res', res)
       return c.json({ res })
     }
     else if (body.query && body.bind) {
-      console.log('trackDevicesCF query', body.query)
-      console.log('trackDevicesCF bind', body.bind, body.bind.length)
+      console.log('test d1 query', body.query)
+      console.log('test d1 bind', body.bind, body.bind.length)
       const requestD1 = c.env.DB_DEVICES
         .prepare(body.query)
         .bind(...body.bind)
         .run()
 
       const res = await requestD1
-      console.log('trackDevicesCF res', res)
+      console.log('test d1 res', res)
       return c.json({ res })
     }
     else {
@@ -144,6 +144,25 @@ app.post('/test_d1', middlewareAPISecret, async (c) => {
   }
   catch (e) {
     console.error('Error d1', e)
+    return c.json({ error: 'Error', e: JSON.stringify(e) })
+  }
+})
+
+app.post('/test_analytics', middlewareAPISecret, async (c) => {
+  try {
+    const body = await c.req.json()
+    if (body.request) {
+      const res = await rawAnalyticsQuery(c, body.request)
+
+      console.log('test_analytics res', res)
+      return c.json({ res })
+    }
+    else {
+      return c.json({ error: 'Missing request' })
+    }
+  }
+  catch (e) {
+    console.error('Error test_analytics', e)
     return c.json({ error: 'Error', e: JSON.stringify(e) })
   }
 })
