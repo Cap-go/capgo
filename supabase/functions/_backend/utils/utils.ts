@@ -6,12 +6,12 @@ import type { Database } from './supabase.types.ts'
 export const fetchLimit = 50
 
 // Regex for Zod validation of an app id
-export const reverseDomainRegex = /^[a-z0-9]+(\.[a-z0-9_-]+)+$/i
+export const reverseDomainRegex = /^[a-z0-9]+(\.[\w-]+)+$/i
 
 // Regex for Zod validation of a device id. Examples:
 //    44f128a5-ac7a-4c9a-be4c-224b6bf81b20 (android)
 //    0F673663-459A-44C0-A7F5-613F2A4AF3AB (ios)
-export const deviceIdRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+export const deviceIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Zod validation messages
 export const MISSING_STRING_APP_ID = 'App ID is required'
