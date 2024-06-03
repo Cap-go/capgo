@@ -87,6 +87,33 @@ export function formatDateCF(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
 }
 
+interface AnalyticsApiResponse {
+  data: { [key: string]: string }[]
+  meta: { name: string, type: string }[]
+  rows: number
+  rows_before_limit_at_least: number
+}
+
+function convertDataToJsTypes<T>(apiResponse: AnalyticsApiResponse) {
+  const { meta, data } = apiResponse
+
+  // console.log('meta', meta)
+  const converters = {
+    String: (value: string) => String(value),
+    UInt64: (value: string) => Number(value),
+    DateTime: (value: string) => new Date(value),
+  }
+
+  return data.map((row) => {
+    const convertedRow = {} as any
+    meta.forEach((column) => {
+      const { name, type } = column
+      convertedRow[name] = (converters as any)[type] ? (converters as any)[type](row[name]) : row[name]
+    })
+    return convertedRow as T
+  })
+}
+
 async function runQueryToCF<T>(c: Context, query: string) {
   const CF_ANALYTICS_TOKEN = getEnv(c, 'CF_ANALYTICS_TOKEN')
   const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
@@ -100,13 +127,8 @@ async function runQueryToCF<T>(c: Context, query: string) {
     body: query,
   })
 
-  const res = await response.json<{
-    data: T
-    meta: { name: string, type: string }[]
-    rows: number
-    rows_before_limit_at_least: number
-  }>()
-  return res.data
+  const res = await response.json<AnalyticsApiResponse & { data: T[] }>()
+  return convertDataToJsTypes<T>(res)
 }
 
 interface DeviceUsageCF {
@@ -132,7 +154,7 @@ ORDER BY date, app_id`
 
   console.log('readDeviceUsageCF query', query)
   try {
-    return await runQueryToCF<DeviceUsageCF[]>(c, query)
+    return await runQueryToCF<DeviceUsageCF>(c, query)
   }
   catch (e) {
     console.error('Error reading device usage', e)
@@ -152,7 +174,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
 
   console.log('rawAnalyticsQuery query', query)
   try {
-    return await runQueryToCF<[]>(c, query)
+    return await runQueryToCF<any>(c, query)
   }
   catch (e) {
     console.error('Error reading rawAnalyticsQuery', e)
@@ -177,7 +199,7 @@ ORDER BY date, app_id`
 
   console.log('readBandwidthUsageCF query', query)
   try {
-    return await runQueryToCF<BandwidthUsageCF[]>(c, query)
+    return await runQueryToCF<BandwidthUsageCF>(c, query)
   }
   catch (e) {
     console.error('Error reading bandwidth usage', e)
@@ -246,7 +268,7 @@ ORDER BY date`
 
   console.log('readStatsVersionCF query', query)
   try {
-    return await runQueryToCF<VersionUsageCF[]>(c, query)
+    return await runQueryToCF<VersionUsageCF>(c, query)
   }
   catch (e) {
     console.error('Error reading version usage', e)
@@ -406,7 +428,7 @@ LIMIT ${limit}`
 
   console.log('readStatsCF query', query)
   try {
-    return await runQueryToCF<StatRowCF[]>(c, query)
+    return await runQueryToCF<StatRowCF>(c, query)
   }
   catch (e) {
     console.error('Error reading stats list', e, JSON.stringify(e))
@@ -460,7 +482,7 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
 
   console.log('countUpdatesFromLogsCF query', query)
   try {
-    const readAnalytics = await runQueryToCF<{ count: number }[]>(c, query)
+    const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
     return readAnalytics[0].count
   }
   catch (e) {
@@ -473,7 +495,7 @@ export async function reactActiveAppsCF(c: Context) {
   const query = `SELECT DISTINCT app_id FROM app_log WHERE created_at >= DATE('now', '-1 month') AND created_at < DATE('now') AND action = 'get'`
   console.log('reactActiveAppsCF query', query)
   try {
-    const response = await runQueryToCF<{ app_id: string }[]>(c, query)
+    const response = await runQueryToCF<{ app_id: string }>(c, query)
     return response
   }
   catch (e) {
