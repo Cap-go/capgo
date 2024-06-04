@@ -20,6 +20,7 @@ import { app as on_organization_delete } from '../_backend/triggers/on_organizat
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
 import { app as cron_stats } from '../_backend/triggers/cron_stats.ts'
 import { app as cron_plan } from '../_backend/triggers/cron_plan.ts'
+import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
 
 const functionName = 'triggers'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -49,6 +50,7 @@ appGlobal.route('/stripe_event', stripe_event)
 appGlobal.route('/on_organization_create', on_organization_create)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
+appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 
 Deno.serve(appGlobal.fetch)
