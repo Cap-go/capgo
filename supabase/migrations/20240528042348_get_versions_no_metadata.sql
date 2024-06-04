@@ -26,7 +26,7 @@ BEGIN
     VALUES (
       'TRIGGER',
       json_build_object('version', failed_version)::text,
-      'supabase', -- this is likley not correct but idk what should i put here
+      'cloudflare',
       'cron_clear_versions'
     );
   END LOOP;
