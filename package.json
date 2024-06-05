@@ -109,7 +109,7 @@
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
     "@formkit/themes": "1.6.5",
     "@formkit/vue": "1.6.5",
-    "@hono/hono": "npm:@jsr/hono__hono",
+    "@hono/hono": "npm:@jsr/hono__hono@^4.4.3",
     "@hono/sentry": "^1.1.0",
     "@intlify/unplugin-vue-i18n": "^4.0.0",
     "@logsnag/node": "1.0.1",
