@@ -1,12 +1,12 @@
 {
   "imports": {
     "@hono/sentry": "npm:@hono/sentry@1.1.0",
-    "hono": "https://deno.land/x/hono@v4.4.2/mod.ts",
-    "hono/cors": "https://deno.land/x/hono@v4.4.2/middleware/cors/index.ts",
-    "hono/tiny": "https://deno.land/x/hono@v4.4.2/preset/tiny.ts",
-    "hono/http-exception": "https://deno.land/x/hono@v4.4.2/http-exception.ts",
-    "hono/adapter": "https://deno.land/x/hono@v4.4.2/helper/adapter/index.ts",
-    "hono/utils/buffer": "https://deno.land/x/hono@v4.4.2/utils/buffer.ts",
+    "hono": "https://deno.land/x/hono@v4.3.11/mod.ts",
+    "hono/cors": "https://deno.land/x/hono@v4.3.11/middleware/cors/index.ts",
+    "hono/tiny": "https://deno.land/x/hono@v4.3.11/preset/tiny.ts",
+    "hono/http-exception": "https://deno.land/x/hono@v4.3.11/http-exception.ts",
+    "hono/adapter": "https://deno.land/x/hono@v4.3.11/helper/adapter/index.ts",
+    "hono/utils/buffer": "https://deno.land/x/hono@v4.3.11/utils/buffer.ts",
     "stripe": "npm:stripe@15.8.0",
     "zod": "https://esm.sh/zod@3.23.8?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.11?target=deno",
