@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
 
 function getAllMetrics(c: Context): Promise<string[]> {

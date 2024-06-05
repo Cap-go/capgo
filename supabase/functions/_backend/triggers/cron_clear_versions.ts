@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import { Hono } from '@hono/tiny'
+import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { s3 } from '../utils/s3.ts'

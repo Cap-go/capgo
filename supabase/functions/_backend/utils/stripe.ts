@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
 import { getEnv } from './utils.ts'
 

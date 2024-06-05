@@ -1,6 +1,6 @@
 import { LogSnag } from '@logsnag/node'
 
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
 
 interface LogSnagExt {

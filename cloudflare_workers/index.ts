@@ -1,8 +1,8 @@
-import { Hono } from 'hono/tiny'
+import { Hono } from '@hono/tiny'
 import { sentry } from '@hono/sentry'
 
 // Public API
-import { HTTPException } from 'hono/http-exception'
+import { HTTPException } from '@hono/http-exception'
 import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
 import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'

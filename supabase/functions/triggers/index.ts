@@ -1,4 +1,4 @@
-import { Hono } from 'hono/tiny'
+import { Hono } from '@hono/tiny'
 
 // Triggers API
 import { sentry } from '@hono/sentry'

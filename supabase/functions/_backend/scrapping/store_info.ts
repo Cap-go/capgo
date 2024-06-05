@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import { Hono } from '@hono/tiny'
+import type { Context } from '@hono/hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { countries } from '../utils/gplay_categ.ts'

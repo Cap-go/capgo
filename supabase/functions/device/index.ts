@@ -1,5 +1,5 @@
 import { sentry } from '@hono/sentry'
-import { Hono } from 'hono/tiny'
+import { Hono } from '@hono/tiny'
 import { app } from '../_backend/public/devices.ts'
 
 const functionName = 'device'

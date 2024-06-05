@@ -1,4 +1,4 @@
-import { Hono } from 'hono/tiny'
+import { Hono } from '@hono/tiny'
 import { sentry } from '@hono/sentry'
 
 // Webapps API

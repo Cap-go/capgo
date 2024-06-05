@@ -1,5 +1,5 @@
 import { sentry } from '@hono/sentry'
-import { Hono } from 'hono/tiny'
+import { Hono } from '@hono/tiny'
 
 // Scrapping API
 

@@ -2,6 +2,11 @@
   "imports": {
     "@hono/sentry": "npm:@hono/sentry@1.1.0",
     "@hono/hono": "jsr:@hono/hono@^4.4.3",
+    "@hono/cors": "jsr:@hono/hono@^4.4.3/cors",
+    "@hono/tiny": "jsr:@hono/hono@^4.4.3/tiny",
+    "@hono/http-exception": "jsr:@hono/hono@^4.4.3/http-exception",
+    "@hono/adapter": "jsr:@hono/hono@^4.4.3/adapter",
+    "@hono/utils/buffer": "jsr:@hono/hono@^4.4.3/utils/buffer",
     "stripe": "npm:stripe@15.8.0",
     "zod": "https://esm.sh/zod@3.23.8?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.11?target=deno",

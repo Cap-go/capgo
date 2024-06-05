@@ -1,6 +1,6 @@
 import ky from 'ky'
-import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import { Hono } from '@hono/tiny'
+import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { categories } from '../utils/gplay_categ.ts'
 import { getAppsToProcessCF } from '../utils/cloudflare.ts'

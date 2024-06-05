@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 
 import { createClient } from '@supabase/supabase-js'
 import { createCustomer } from './stripe.ts'

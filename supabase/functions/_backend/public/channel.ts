@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import { Hono } from '@hono/tiny'
+import type { Context } from '@hono/hono'
 import { EMPTY_UUID, hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
