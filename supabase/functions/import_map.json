@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@hono/sentry": "jsr:@hono/sentry@1.1.0",
+    "@hono/sentry": "npm:@hono/sentry@1.1.0",
     "hono": "jsr:@hono/hono@4.4.2",
     "stripe": "npm:stripe@15.8.0",
     "zod": "https://esm.sh/zod@3.23.8?target=deno",
