@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'hono/utils/buffer'
-import type { Context, MiddlewareHandler, Next } from 'hono'
+import type { Context, MiddlewareHandler, Next } from '@hono/hono'
 import { HTTPException } from 'hono/http-exception'
 import { cors } from 'hono/cors'
 import { checkKey, getEnv } from './utils.ts'

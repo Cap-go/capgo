@@ -1,6 +1,6 @@
 import { parseCronExpression } from 'cron-schedule'
 
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import dayjs from 'dayjs'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'

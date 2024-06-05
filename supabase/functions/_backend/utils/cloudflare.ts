@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import ky from 'ky'
 import dayjs from 'dayjs'
 import { getEnv } from './utils.ts'

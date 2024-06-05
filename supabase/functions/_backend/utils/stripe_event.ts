@@ -1,5 +1,5 @@
 import Stripe from 'stripe'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import type { MeteredData } from './stripe.ts'
 import { parsePriceIds } from './stripe.ts'

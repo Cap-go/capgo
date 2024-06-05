@@ -5,7 +5,7 @@ import * as semver from 'semver'
 import { Hono } from 'hono/tiny'
 
 import { z } from 'zod'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { BRES, getBody } from '../utils/hono.ts'
 import { EMPTY_UUID, supabaseAdmin } from '../utils/supabase.ts'
 import type { AppInfos } from '../utils/types.ts'

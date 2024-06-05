@@ -1,6 +1,6 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { isAllowedActionOrg } from './supabase.ts'

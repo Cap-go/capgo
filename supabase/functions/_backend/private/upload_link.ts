@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -128,6 +128,10 @@ function getMultipartServerUrl(c: Context) {
   return new URL(getEnv(c, 'MULTIPART_SERVER'))
 }
 
+interface MultipartLink {
+  uploadId: string
+}
+
 async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
   try {
     const serverUrl = getMultipartServerUrl(c)
@@ -149,7 +153,7 @@ async function createMultipartRequest(c: Context, path: string, orgid: string): 
       },
     })
 
-    const json = await response.json()
+    const json: MultipartLink = await response.json()
     console.log('json', json)
     if (!json || !json.uploadId || typeof json.uploadId !== 'string') {
       console.error(`Cannot get uploadId from resonse: ${JSON.stringify(json)}`)
