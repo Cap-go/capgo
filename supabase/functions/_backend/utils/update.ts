@@ -271,6 +271,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'app_not_found',
       }, 200)
     }
+    await createStatsMau(c, device_id, app_id) // TODO: see if anaylytics got too expensive or not. Then keep it or move it back to same place as createStatsBandwidth
     if (coerce) {
       version_build = coerce.version
     }
@@ -604,7 +605,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    await createStatsMau(c, device_id, app_id)
     await createStatsBandwidth(c, device_id, app_id, fileSize)
     await createStatsVersion(c, version.id, app_id, 'get')
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
