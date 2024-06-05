@@ -1,6 +1,6 @@
-import { sentry } from '@hono/sentry';
+import { sentry } from '@hono/sentry'
 import { handle } from 'https://deno.land/x/hono@v4.0.0/adapter/netlify/mod.ts'
-import { Hono } from '@hono/tiny'
+import { Hono } from 'hono/tiny'
 
 import { app as topApk } from '../../supabase/functions/_backend/scrapping/top_apk.ts'
 import { app as similarApps } from '../../supabase/functions/_backend/scrapping/similar_apps.ts'

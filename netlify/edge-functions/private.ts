@@ -1,6 +1,6 @@
 import { sentry } from '@hono/sentry'
 import { handle } from 'https://deno.land/x/hono@v4.0.0/adapter/netlify/mod.ts'
-import { Hono } from '@hono/tiny'
+import { Hono } from 'hono/tiny'
 
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'

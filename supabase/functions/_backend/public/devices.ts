@@ -1,4 +1,4 @@
-import { Hono } from '@hono/tiny'
+import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { EMPTY_UUID, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'

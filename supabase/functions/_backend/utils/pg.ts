@@ -3,7 +3,7 @@
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import type { Context } from '@hono/hono'
-import { getRuntimeKey } from '@hono/adapter'
+import { getRuntimeKey } from 'hono/adapter'
 import { existInEnv, getEnv } from './utils.ts'
 
 export function getPgClient(c: Context) {

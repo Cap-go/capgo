@@ -1,4 +1,4 @@
-import { Hono } from '@hono/tiny'
+import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'

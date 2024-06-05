@@ -1,4 +1,4 @@
-import { Hono } from '@hono/tiny'
+import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'

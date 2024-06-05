@@ -1,4 +1,4 @@
-import { Hono } from '@hono/tiny'
+import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import * as semver from 'semver'
 import { z } from 'zod'
