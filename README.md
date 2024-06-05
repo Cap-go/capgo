@@ -23,11 +23,10 @@
 
 <br>
 
-<p align='center'>
-<a href="https://capgo.app/">Capgo - Instant updates for capacitor</a>
-</p>
-<h2><a href="https://capgo.app/consulting/">Hire a Capacitor consultant</a></h2>
-
+<div align="center">
+  <h2><a href="https://capgo.app/?ref=plugin"> ➡️ Get Instant updates for your App with Capgo 🚀</a></h2>
+  <h2><a href="https://capgo.app/consulting/?ref=plugin"> Fix your annoying bug now, Hire a Capacitor expert 💪</a></h2>
+</div>
 <br>
 
 ## Features
