@@ -96,7 +96,9 @@ const chartData = computed(() => {
       data: percentageData,
       borderColor: colors[color][400],
       backgroundColor: colors[color][200],
-      fill: false,
+      tension: 0.3,
+      pointRadius: 2,
+      pointBorderWidth: 0,
     }
   })
 
@@ -134,13 +136,15 @@ const chartData = computed(() => {
   }
 })
 
-const chartOptions = computed(() => ({
-  responsive: true,
+const chartOptions = ref({
   maintainAspectRatio: false,
   scales: {
     x: {
       grid: {
         display: false,
+      },
+      ticks: {
+        color: `${isDark.value ? 'white' : 'black'}`,
       },
     },
     y: {
@@ -148,10 +152,22 @@ const chartOptions = computed(() => ({
       max: 100,
       ticks: {
         callback: (value: number) => `${value}%`,
+        color: `${isDark.value ? 'white' : 'black'}`,
       },
     },
   },
-}))
+  plugins: {
+    // annotation: {
+    //   annotations: generateAnnotations.value,
+    // },
+    legend: {
+      display: false,
+    },
+    title: {
+      display: false,
+    },
+  },
+})
 
 watchEffect(async () => {
   if (route.path.includes('/package/')) {
@@ -171,24 +187,6 @@ watchEffect(async () => {
 })
 </script>
 
-<!-- <template>
-  <div
-    class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
-  >
-    <div class="px-5 pt-5">
-      <h2 class="mb-2 text-2xl font-semibold text-slate-800 dark:text-white">
-        {{ t('active_users_by_version') }}
-      </h2>
-    </div>
-
-    <div class="w-full p-6 h-96">
-      <Line v-if="!isLoading" :key="chartData.datasets.length" :data="chartData" :options="chartOptions" />
-      <div v-else class="flex items-center justify-center h-full">
-        <Spinner size="w-40 h-40" />
-      </div>
-    </div>
-  </div>
-</template> -->
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
@@ -213,11 +211,8 @@ watchEffect(async () => {
         </div>
       </div>
     </div>
-    <!-- Chart built with Chart.js 3 -->
-
-    <!-- Change the height attribute to adjust the chart height -->
     <div class="w-full h-full p-6">
-      <Line v-if="!isLoading" :key="chartData.datasets.length" :data="chartData" :options="chartOptions" />
+      <Line v-if="!isLoading" :data="chartData" :options="chartOptions" />
       <div v-else class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
       </div>
