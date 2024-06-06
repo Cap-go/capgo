@@ -29,18 +29,29 @@ const colorKeys = Object.keys(colors)
 const dailyUsage = ref<appUsageByVersion[]>([])
 const versionNames = ref<{ id: string, name: string, created_at: string }[]>([])
 
-const organizationStore = useOrganizationStore()
-const cycleStart = computed(() => new Date(organizationStore.currentOrganization?.subscription_start ?? ''))
-const cycleEnd = computed(() => new Date(organizationStore.currentOrganization?.subscription_end ?? ''))
-
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 async function loadData() {
   isLoading.value = true
 
-  dailyUsage.value = await getDailyVersion(appId.value, cycleStart.value.toISOString(), cycleEnd.value.toISOString())
+  const endDate = new Date()
+  const startDate = new Date(endDate)
+  startDate.setDate(startDate.getDate() - 30)
+
+  dailyUsage.value = await getDailyVersion(appId.value, startDate.toISOString(), endDate.toISOString())
   versionNames.value = await getVersionNames(appId.value, dailyUsage.value.map(d => d.version_id))
   isLoading.value = false
+}
+
+function getLast30Days() {
+  const dates = []
+  const endDate = new Date()
+  for (let i = 30; i > 0; i--) {
+    const date = new Date(endDate)
+    date.setDate(endDate.getDate() - i)
+    dates.push(date.toISOString().slice(0, 10))
+  }
+  return dates
 }
 
 const chartData = computed(() => {
@@ -212,7 +223,7 @@ watchEffect(async () => {
       </div>
     </div>
     <div class="w-full h-full p-6">
-      <Line v-if="!isLoading" :data="chartData" :options="chartOptions" />
+      <Line v-if="!isLoading" :data="{ labels: getLast30Days(), datasets: chartData.datasets }" :options="chartOptions" />
       <div v-else class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
       </div>

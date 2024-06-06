@@ -16,21 +16,21 @@ const refStats = toRef(() => props.stats)
         <p
           v-if="!!s.value"
           id="stats-val"
-          class="font-bold dark:text-white font-pj lg:order-1 lg:mt-3"
+          class="font-bold dark:text-white font-pj lg:order-1 lg:mt-3 group-hover:hidden"
           :class="{ 'text-5xl': !props.mini, 'text-3xl': props.mini }"
         >
           {{ s.value }}
         </p>
-        <div v-else class="lg:order-1 lg:mt-3 flex justify-center">
+        <div v-else class="flex justify-center lg:order-1 lg:mt-3">
           <Spinner size="w-10 h-10 ml-auto mr-auto" />
         </div>
-        <div class="flex flex-column items-center flex-row-reverse justify-center">
-          <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase font-pj lg:order-2 lg:mt-0">
-            {{ s.label }}
+        <div class="flex flex-row-reverse items-center justify-center flex-column">
+          <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase transition-opacity duration-300 font-pj lg:order-2 lg:mt-0">
+            <span class="group-hover:hidden">{{ s.label }}</span>
+            <span class="hidden group-hover:inline">{{ s.hoverLabel || s.label }}</span>
           </h3>
           <InformationInfo v-if="!!s.informationIcon" class="ml-1" @click="s.informationIcon" />
         </div>
-
       </span>
     </a>
   </template>

@@ -80,21 +80,25 @@ async function refreshData() {
 const stats = computed<Stat[]>(() => ([
   {
     label: t('channels'),
+    hoverLabel: 'Click to explore the channel list',
     value: channelsNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/channels`,
   },
   {
     label: t('bundles'),
+    hoverLabel: 'Click to explore the bundle list',
     value: bundlesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/bundles`,
   },
   {
     label: t('devices'),
+    hoverLabel: 'Click to explore the device list',
     value: devicesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/devices`,
   },
   {
     label: t('plan-updates'),
+    hoverLabel: 'Click to explore the logs',
     value: updatesNb.value?.toLocaleString(),
     link: `/app/p/${appIdToUrl(id.value)}/logs`,
   },
