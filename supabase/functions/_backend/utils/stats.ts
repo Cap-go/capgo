@@ -6,7 +6,7 @@ import type { Database } from './supabase.types.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 export interface StatsActions {
-  action: string
+  action: Database['public']['Enums']['stats_action']
   versionId?: number
 }
 
@@ -31,15 +31,10 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
   return trackVersionUsageCF(c, version_id, app_id, action)
 }
 
-export function createStatsLogs(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
   if (!c.env.APP_LOG)
     return trackLogsSB(c, app_id, device_id, action, version_id)
   return trackLogsCF(c, app_id, device_id, action, version_id)
-}
-
-export interface StatsActions {
-  action: string
-  versionId?: number
 }
 
 export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {

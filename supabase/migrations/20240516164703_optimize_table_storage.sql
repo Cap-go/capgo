@@ -54,7 +54,8 @@ CREATE TYPE "public"."stats_action" AS ENUM (
 'download_complete',
 'decrypt_fail',
 'app_moved_to_foreground',
-'app_moved_to_background'
+'app_moved_to_background',
+'uninstall'
 );
 
 DROP TABLE "public"."stats";

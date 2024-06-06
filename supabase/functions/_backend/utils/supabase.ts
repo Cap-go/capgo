@@ -585,7 +585,7 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
     .eq('device_id', device_id)
 }
 
-export function trackLogsSB(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
   return supabaseAdmin(c)
     .from('stats')
     .insert(
