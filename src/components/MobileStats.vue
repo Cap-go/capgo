@@ -24,7 +24,7 @@ const isLoading = ref(true)
 const SKIP_COLOR = 10
 const colorKeys = Object.keys(colors)
 const dailyUsage = ref<appUsageByVersion[]>([])
-const versionNames = ref<{ id: string, name: string }[]>([])
+const versionNames = ref<{ id: string, name: string, created_at: string }[]>([])
 
 const organizationStore = useOrganizationStore()
 const cycleStart = computed(() => new Date(organizationStore.currentOrganization?.subscription_start ?? ''))
@@ -100,10 +100,37 @@ const chartData = computed(() => {
     }
   })
 
+  // Find the maximum accumulated value across all versions and dates
+  const maxAccumulatedValue = Math.max(...datasets.map(dataset => Math.max(...dataset.data)))
+
+  // Normalize the data to represent percentages
+  const normalizedDatasets = datasets.map((dataset) => {
+    const normalizedData = dataset.data.map(value => (value / maxAccumulatedValue) * 100)
+    return {
+      ...dataset,
+      data: normalizedData,
+    }
+  })
+
+  // Find the latest released version based on the created_at field
+  const latestVersion = versionNames.value.reduce((latest, current) => {
+    return new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+  }, versionNames.value[0])
+
+  // Find the dataset corresponding to the latest version
+  const latestVersionDataset = normalizedDatasets.find(dataset => dataset.label === latestVersion?.name)
+
+  // Get the current percentage of the latest version (last data point)
+  const latestVersionPercentage = latestVersionDataset ? latestVersionDataset.data[latestVersionDataset.data.length - 1] : 0
+
   // Return the chart data object
   return {
     labels: dates,
-    datasets,
+    datasets: normalizedDatasets,
+    latestVersion: {
+      name: latestVersion?.name,
+      percentage: latestVersionPercentage.toFixed(2),
+    },
   }
 })
 
@@ -144,7 +171,7 @@ watchEffect(async () => {
 })
 </script>
 
-<template>
+<!-- <template>
   <div
     class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800"
   >
@@ -155,6 +182,41 @@ watchEffect(async () => {
     </div>
 
     <div class="w-full p-6 h-96">
+      <Line v-if="!isLoading" :key="chartData.datasets.length" :data="chartData" :options="chartOptions" />
+      <div v-else class="flex items-center justify-center h-full">
+        <Spinner size="w-40 h-40" />
+      </div>
+    </div>
+  </div>
+</template> -->
+<template>
+  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
+    <div class="px-5 pt-3">
+      <div class="flex flex-row">
+        <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
+          {{ t('active_users_by_version') }}
+        </h2>
+        <div class="font-medium badge badge-primary">
+          beta
+        </div>
+      </div>
+
+      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
+        {{ t('latest_version') }}
+      </div>
+      <div v-if="chartData.latestVersion" class="flex items-start">
+        <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
+          {{ chartData.latestVersion?.name }}
+        </div>
+        <div class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
+          {{ chartData.latestVersion?.percentage }}%
+        </div>
+      </div>
+    </div>
+    <!-- Chart built with Chart.js 3 -->
+
+    <!-- Change the height attribute to adjust the chart height -->
+    <div class="w-full h-full p-6">
       <Line v-if="!isLoading" :key="chartData.datasets.length" :data="chartData" :options="chartOptions" />
       <div v-else class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />

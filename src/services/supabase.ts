@@ -238,10 +238,10 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
   }
 }
 
-export async function getVersionNames(appId: string, versionIds: string[]): Promise<{ id: string, name: string }[]> {
+export async function getVersionNames(appId: string, versionIds: string[]): Promise<{ id: string, name: string, created_at: string }[]> {
   const { data, error: vError } = await useSupabase()
     .from('app_versions')
-    .select('id, name')
+    .select('id, name, created_at')
     .eq('app_id', appId)
     .in('id', versionIds)
 
