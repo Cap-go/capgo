@@ -3,6 +3,9 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Line } from 'vue-chartjs'
+import type {
+  ChartOptions,
+} from 'chart.js'
 import {
   CategoryScale,
   Chart,
@@ -136,7 +139,7 @@ const chartData = computed(() => {
   }
 })
 
-const chartOptions = ref({
+const chartOptions = ref<ChartOptions>({
   maintainAspectRatio: false,
   scales: {
     x: {
@@ -157,9 +160,6 @@ const chartOptions = ref({
     },
   },
   plugins: {
-    // annotation: {
-    //   annotations: generateAnnotations.value,
-    // },
     legend: {
       display: false,
     },

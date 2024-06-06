@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChartData } from 'chart.js'
+import type { ChartData, ChartOptions } from 'chart.js'
 import {
   CategoryScale,
   Chart,
@@ -10,8 +10,9 @@ import {
 } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
-import annotationPlugin from 'chartjs-plugin-annotation'
 import { useI18n } from 'vue-i18n'
+import type { AnnotationOptions } from '../services/chartAnnotations'
+import { inlineAnnotationPlugin } from '../services/chartAnnotations'
 import { isDark } from '../composables/dark'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 
@@ -32,16 +33,11 @@ const cycleStart = new Date(organizationStore.currentOrganization?.subscription_
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 
 Chart.register(
-  // Colors,
-  // BarController,
-  // BarElement,
   Tooltip,
   PointElement,
   CategoryScale,
   LinearScale,
   LineElement,
-  annotationPlugin,
-  // Legend,
 )
 
 const accumulateData = computed(() => {
@@ -144,6 +140,7 @@ function createAnotation(id: string, y: number, title: string, lineColor: string
     font: {
       size: 10,
     },
+    color: '#000',
   }
   return obj
 }
@@ -186,7 +183,7 @@ const chartData = ref<ChartData<'line'>>({
     pointBorderWidth: 0,
   }],
 })
-const chartOptions = ref({
+const chartOptions = ref<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions } }>({
   maintainAspectRatio: false,
   scales: {
     y: {
@@ -202,9 +199,7 @@ const chartOptions = ref({
     ,
   },
   plugins: {
-    annotation: {
-      annotations: generateAnnotations.value,
-    },
+    inlineAnnotationPlugin: generateAnnotations.value,
     legend: {
       display: false,
     },
@@ -216,5 +211,5 @@ const chartOptions = ref({
 </script>
 
 <template>
-  <Line :data="chartData" height="auto" :options="chartOptions" />
+  <Line :data="chartData" height="auto" :options="chartOptions" :plugins="[inlineAnnotationPlugin]" />
 </template>
