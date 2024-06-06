@@ -28,6 +28,7 @@ activation-notification-desc: >-
   Aceito receber notificação quando uma nova versão do aplicativo estiver
   disponível
 activation-validate: Validar
+active_users_by_version: Dispositivo ativo por pacote
 add: Adicionar
 add-another-app: Adicione seu aplicativo
 add-api-key: Adicionada nova chave de API com sucesso

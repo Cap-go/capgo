@@ -26,6 +26,7 @@ activation-legal-desc: I accept Capgo app privacy policy and terms of use
 activation-notification: Notifications
 activation-notification-desc: I accept to receive notification when new app version are available
 activation-validate: Validate
+active_users_by_version: Active device by bundle
 add: Add
 add-another-app: Add your app
 add-api-key: Added new API key successfully

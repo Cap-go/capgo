@@ -144,6 +144,15 @@ export interface appUsageByApp {
   uninstall: number
   fail: number
 }
+
+export interface appUsageByVersion {
+  date: string
+  app_id: string
+  version_id: string
+  install: number
+  uninstall: number
+}
+
 export interface appUsageGlobal {
   date: string
   bandwidth: number
@@ -154,10 +163,12 @@ export interface appUsageGlobal {
   uninstall: number
   fail: number
 }
+
 export interface appUsageGlobalByApp {
   global: appUsageGlobal[]
   byApp: appUsageByApp[]
 }
+
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobalByApp> {
   const resAppIds = await useSupabase()
     .from('apps')
@@ -225,6 +236,36 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     global: reducedData.sort((a, b) => a.date.localeCompare(b.date)),
     byApp: data.sort((a, b) => a.date.localeCompare(b.date)),
   }
+}
+
+export async function getVersionNames(appId: string, versionIds: string[]): Promise<{ id: string, name: string }[]> {
+  const { data, error: vError } = await useSupabase()
+    .from('app_versions')
+    .select('id, name')
+    .eq('app_id', appId)
+    .in('id', versionIds)
+
+  console.log('getVersionNames', data)
+  if (vError)
+    return []
+
+  return data
+}
+
+export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<appUsageByVersion[]> {
+  const { data, error } = await useSupabase()
+    .from('daily_version')
+    .select('date, app_id, version_id, install, uninstall')
+    .eq('app_id', appId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true })
+
+  if (error || !data) {
+    console.error('Error fetching data from daily_version:', error)
+    return []
+  }
+  return data
 }
 
 export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {

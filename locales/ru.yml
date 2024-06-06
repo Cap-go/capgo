@@ -28,6 +28,7 @@ activation-legal-desc: >-
 activation-notification: Уведомления
 activation-notification-desc: Я согласен получать уведомления о появлении новой версии приложения
 activation-validate: Подтвердить
+active_users_by_version: Активное устройство по комплекту
 add: Добавлять
 add-another-app: Добавьте свое приложение
 add-api-key: Новый ключ API успешно добавлен

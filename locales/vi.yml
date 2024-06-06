@@ -28,6 +28,7 @@ activation-legal-desc: >-
 activation-notification: thông báo
 activation-notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
 activation-validate: xác thực
+active_users_by_version: Thiết bị hoạt động theo gói
 add: Thêm vào
 add-another-app: Thêm ứng dụng của bạn
 add-api-key: Đã thêm khóa API mới thành công

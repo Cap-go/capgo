@@ -30,6 +30,7 @@ activation-notification-desc: >-
   Accetto di ricevere una notifica quando sarà disponibile una nuova versione
   dell'app
 activation-validate: Convalidare
+active_users_by_version: Dispositivo attivo per bundle
 add: Aggiungere
 add-another-app: Aggiungi la tua app
 add-api-key: Aggiunta con successo una nuova chiave API

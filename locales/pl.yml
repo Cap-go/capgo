@@ -28,6 +28,7 @@ activation-notification-desc: >-
   Wyrażam zgodę na otrzymywanie powiadomień, gdy pojawi się nowa wersja
   aplikacji
 activation-validate: Uprawomocnić
+active_users_by_version: Aktywne urządzenie według pakietu
 add: Dodać
 add-another-app: Dodaj swoją aplikację
 add-api-key: Pomyślnie dodano nowy klucz API

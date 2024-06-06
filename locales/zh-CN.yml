@@ -26,6 +26,7 @@ activation-legal-desc: 我接受 Capgo 应用隐私政策和使用条款
 activation-notification: 通知
 activation-notification-desc: 我同意在新应用版本可用时收到通知
 activation-validate: 证实
+active_users_by_version: 按捆绑包列出的活动设备
 add: 添加
 add-another-app: 添加您的应用
 add-api-key: 成功添加新的 API 密钥

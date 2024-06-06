@@ -26,6 +26,7 @@ activation-legal-desc: Capgo アプリのプライバシー ポリシーと利�
 activation-notification: 通知
 activation-notification-desc: アプリの新しいバージョンが利用可能になったときに通知を受け取ることに同意します
 activation-validate: 検証
+active_users_by_version: バンドルごとのアクティブなデバイス
 add: 追加
 add-another-app: アプリを追加する
 add-api-key: 新しい API キーが正常に追加されました

@@ -32,6 +32,7 @@ activation-notification-desc: >-
   Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
   verfügbar sind
 activation-validate: Bestätigen
+active_users_by_version: Aktives Gerät nach Bundle
 add: Hinzufügen
 add-another-app: Fügen Sie Ihre Anwendung hinzu
 add-api-key: Neuer API-Schlüssel erfolgreich hinzugefügt

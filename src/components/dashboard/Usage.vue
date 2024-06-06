@@ -155,7 +155,7 @@ if (main.dashboardFetched)
 </script>
 
 <template>
-  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6">
+  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''">
     <!-- TODO: to reactivate when we do the new chart https://github.com/Cap-go/capgo/issues/645 <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''"> -->
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
@@ -187,6 +187,6 @@ if (main.dashboardFetched)
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <!-- <MobileStats v-if="appId" /> -->
+    <MobileStats v-if="appId" />
   </div>
 </template>

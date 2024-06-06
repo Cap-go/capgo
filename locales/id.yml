@@ -26,6 +26,7 @@ activation-legal-desc: Saya menerima kebijakan privasi dan ketentuan penggunaan 
 activation-notification: Notifikasi
 activation-notification-desc: Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru tersedia
 activation-validate: Mengesahkan
+active_users_by_version: Perangkat aktif berdasarkan paket
 add: Menambahkan
 add-another-app: Tambahkan aplikasi Anda
 add-api-key: Berhasil menambahkan kunci API baru

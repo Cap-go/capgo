@@ -26,6 +26,7 @@ activation-legal-desc: Capgo uygulaması gizlilik politikasını ve kullanım ş
 activation-notification: Bildirimler
 activation-notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
 activation-validate: Doğrula
+active_users_by_version: Pakete göre etkin cihaz
 add: Eklemek
 add-another-app: uygulamanızı ekleyin
 add-api-key: Yeni API anahtarı başarıyla eklendi
