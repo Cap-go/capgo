@@ -245,7 +245,6 @@ export async function getVersionNames(appId: string, versionIds: string[]): Prom
     .eq('app_id', appId)
     .in('id', versionIds)
 
-  console.log('getVersionNames', data)
   if (vError)
     return []
 
