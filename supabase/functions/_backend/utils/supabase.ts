@@ -622,16 +622,20 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
   return data || []
 }
 
-export async function readStatsSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
+export async function readStatsSB(c: Context, app_id: string, period_start?: string, period_end?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
   let query = supabase
     .from('stats')
     .select('*')
     .eq('app_id', app_id)
-    .gte('created_at', new Date(period_start).toISOString())
-    .lt('created_at', new Date(period_end).toISOString())
     .limit(limit)
+
+  if (period_start)
+    query = query.gte('created_at', new Date(period_start).toISOString())
+
+  if (period_end)
+    query = query.lt('created_at', new Date(period_end).toISOString())
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)

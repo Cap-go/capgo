@@ -71,7 +71,8 @@ CREATE TYPE "public"."stats_action" AS ENUM (
 'disableDevBuild',
 'disableEmulator',
 'cannotGetBundle',
-'checksum_fail'
+'checksum_fail',
+'NoChannelOrOverride'
 );
 
 DROP TABLE "public"."stats";

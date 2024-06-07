@@ -399,7 +399,7 @@ interface StatRowCF {
   created_at: string
 }
 
-export async function readStatsCF(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
+export async function readStatsCF(c: Context, app_id: string, period_start?: string, period_end?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   if (!c.env.APP_LOG)
     return [] as StatRowCF[]
 
@@ -433,6 +433,8 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
     })
   }
   const orderFilter = orderFilters.length ? `ORDER BY ${orderFilters.join(', ')}` : ''
+  const startFilter = period_start ? `AND created_at >= toDateTime('${formatDateCF(period_start)}')` : ''
+  const endFilter = period_end ? `AND created_at < toDateTime('${formatDateCF(period_end)}')` : ''
   const query = `SELECT
   index1 as app_id,
   blob1 as device_id,
@@ -441,9 +443,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
   timestamp as created_at
 FROM app_log
 WHERE
-  app_id = '${app_id}' ${deviceFilter} ${searchFilter}
-  AND created_at >= toDateTime('${formatDateCF(period_start)}')
-  AND created_at < toDateTime('${formatDateCF(period_end)}')
+  app_id = '${app_id}' ${deviceFilter} ${searchFilter} ${startFilter} ${endFilter}
 GROUP BY app_id, created_at, action, device_id, version_id
 ${orderFilter}
 LIMIT ${limit}`

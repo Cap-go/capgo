@@ -74,10 +74,10 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-export function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string, order?: Order[]) {
+export function readStats(c: Context, app_id: string, start_date?: string, end_date?: string, deviceIds?: string[], search?: string, order?: Order[], limit?: number) {
   if (!c.env.APP_LOG)
-    return readStatsSB(c, app_id, start_date, end_date, deviceIds, search, order)
-  return readStatsCF(c, app_id, start_date, end_date, deviceIds, search, order)
+    return readStatsSB(c, app_id, start_date, end_date, deviceIds, search, order, limit)
+  return readStatsCF(c, app_id, start_date, end_date, deviceIds, search, order, limit)
 }
 
 export function countDevices(c: Context, app_id: string) {
