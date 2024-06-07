@@ -55,7 +55,23 @@ CREATE TYPE "public"."stats_action" AS ENUM (
 'decrypt_fail',
 'app_moved_to_foreground',
 'app_moved_to_background',
-'uninstall'
+'uninstall',
+'needPlanUpgrade',
+'missingBundle',
+'noNew',
+'disablePlatformIos',
+'disablePlatformAndroid',
+'disableAutoUpdateToMajor',
+'cannotUpdateViaPrivateChannel',
+'disableAutoUpdateToMinor',
+'disableAutoUpdateToPatch',
+'channelMisconfigured',
+'disableAutoUpdateMetadata',
+'disableAutoUpdateUnderNative',
+'disableDevBuild',
+'disableEmulator',
+'cannotGetBundle',
+'checksum_fail'
 );
 
 DROP TABLE "public"."stats";
