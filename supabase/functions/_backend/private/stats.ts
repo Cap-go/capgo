@@ -21,7 +21,8 @@ export const app = new Hono()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+// No middleware applied to this route, as we allow both authorization and capgkey for CLI and webapp access
+app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<dataStats>()
     console.log('body', body)
