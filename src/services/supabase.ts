@@ -237,6 +237,31 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     byApp: data.sort((a, b) => a.date.localeCompare(b.date)),
   }
 }
+interface NativePackage {
+  name: string
+  version: string
+}
+
+export async function getCapgoVersion(appId: string, versionId: string | null | undefined): Promise<string> {
+  if (!versionId)
+    return ''
+  const { data, error } = await useSupabase()
+    .from('app_versions')
+    .select('native_packages')
+    .eq('app_id', appId)
+    .eq('name', versionId)
+    .single()
+
+  if (error)
+    return ''
+
+  const nativePackages: NativePackage[] = (data?.native_packages || []) as any as NativePackage[]
+  for (const pkg of nativePackages) {
+    if (pkg && pkg.name === '@capgo/capacitor-updater')
+      return pkg.version.replace('v', '').replace('^', '')
+  }
+  return ''
+}
 
 export async function getVersionNames(appId: string, versionIds: string[]): Promise<{ id: string, name: string, created_at: string }[]> {
   const { data, error: vError } = await useSupabase()

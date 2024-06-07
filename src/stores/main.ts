@@ -85,6 +85,9 @@ export const useMainStore = defineStore('main', () => {
     return dashboardByapp.value.filter(d => d.app_id === appId)
   }
 
+  const getTotalStatsByApp = (appId: string) => {
+    return dashboardByapp.value.filter(d => d.app_id === appId).reduce((acc: number, cur) => acc + cur.get, 0)
+  }
   const getTotalMauByApp = (appId: string) => {
     // dashboardByapp add up all the mau for the appId and return it
     return dashboardByapp.value.filter(d => d.app_id === appId).reduce((acc: number, cur) => acc + cur.mau, 0)
@@ -105,6 +108,7 @@ export const useMainStore = defineStore('main', () => {
     dashboard,
     dashboardByapp,
     getTotalMauByApp,
+    getTotalStatsByApp,
     user,
     path,
     logout,

@@ -69,7 +69,6 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
       .from('app_versions')
       .select()
       .eq('app_id', app.app_id)
-      .eq('user_id', app.user_id)
 
     if (data && data.length) {
       const filesToRemove = (data as Database['public']['Tables']['app_versions']['Row'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
@@ -87,7 +86,6 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
       .from('apps')
       .delete()
       .eq('app_id', app.app_id)
-      .eq('user_id', app.user_id)
     if (vError || dbAppError)
       toast.error(t('cannot-delete-app'))
 
