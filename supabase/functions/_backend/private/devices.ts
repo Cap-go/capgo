@@ -48,7 +48,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     }
     if (body.count)
       return c.json({ count: await countDevices(c, body.appId) })
-    return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search))
+    return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search, body.order))
   }
   catch (e) {
     return c.json({ status: 'Cannot get devices', error: JSON.stringify(e) }, 500)

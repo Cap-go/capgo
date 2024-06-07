@@ -3,6 +3,7 @@ import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesSB, getAppsFromSB, readBandwidthUsageSB, readDeviceUsageSB, readDevicesSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDeviceUsageSB, trackDevicesSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, readBandwidthUsageCF, readDeviceUsageCF, readDevicesCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDeviceUsageCF, trackDevicesCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
 import type { Database } from './supabase.types.ts'
+import type { Order } from './types.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 export interface StatsActions {
@@ -73,10 +74,10 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-export function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string) {
+export function readStats(c: Context, app_id: string, start_date: string, end_date: string, deviceIds?: string[], search?: string, order?: Order[]) {
   if (!c.env.APP_LOG)
-    return readStatsSB(c, app_id, start_date, end_date, deviceIds, search)
-  return readStatsCF(c, app_id, start_date, end_date, deviceIds, search)
+    return readStatsSB(c, app_id, start_date, end_date, deviceIds, search, order)
+  return readStatsCF(c, app_id, start_date, end_date, deviceIds, search, order)
 }
 
 export function countDevices(c: Context, app_id: string) {
@@ -85,10 +86,10 @@ export function countDevices(c: Context, app_id: string) {
   return countDevicesCF(c, app_id)
 }
 
-export function readDevices(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
+export function readDevices(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[]) {
   if (!c.env.DB_DEVICES)
-    return readDevicesSB(c, app_id, range_start, range_end, version_id, deviceIds, search)
-  return readDevicesCF(c, app_id, range_start, range_end, version_id, deviceIds, search)
+    return readDevicesSB(c, app_id, range_start, range_end, version_id, deviceIds, search, order)
+  return readDevicesCF(c, app_id, range_start, range_end, version_id, deviceIds, search, order)
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {

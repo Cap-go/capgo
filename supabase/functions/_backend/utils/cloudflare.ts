@@ -3,6 +3,7 @@ import ky from 'ky'
 import dayjs from 'dayjs'
 import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
+import type { Order } from './types.ts'
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
@@ -311,7 +312,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
   return [] as DeviceRowCF[]
 }
 
-export async function readDevicesCF(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
+export async function readDevicesCF(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[]) {
   if (!c.env.DB_DEVICES)
     return [] as DeviceRowCF[]
 
@@ -344,6 +345,17 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   if (version_id)
     versionFilter = `AND version_id = ${version_id}`
 
+  const orderFilters: string[] = []
+  if (order && order.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
+      }
+    })
+  }
+  const orderFilter = orderFilters.length ? `ORDER BY ${orderFilters.join(', ')}` : ''
+
   const query = `SELECT
   app_id,
   device_id,
@@ -359,7 +371,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
 FROM devices
 WHERE
   app_id = '${app_id}' ${deviceFilter} ${searchFilter} ${versionFilter}
-ORDER BY updated_at DESC
+${orderFilter}
 LIMIT ${rangeEnd} OFFSET ${rangeStart}`
 
   console.log('readDevicesCF query', query)
@@ -387,7 +399,7 @@ interface StatRowCF {
   created_at: string
 }
 
-export async function readStatsCF(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readStatsCF(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   if (!c.env.APP_LOG)
     return [] as StatRowCF[]
 
@@ -411,6 +423,16 @@ export async function readStatsCF(c: Context, app_id: string, period_start: stri
     else
       searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0)`
   }
+  const orderFilters: string[] = []
+  if (order && order.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
+      }
+    })
+  }
+  const orderFilter = orderFilters.length ? `ORDER BY ${orderFilters.join(', ')}` : ''
   const query = `SELECT
   index1 as app_id,
   blob1 as device_id,
@@ -423,7 +445,7 @@ WHERE
   AND created_at >= toDateTime('${formatDateCF(period_start)}')
   AND created_at < toDateTime('${formatDateCF(period_end)}')
 GROUP BY app_id, created_at, action, device_id, version_id
-ORDER BY created_at, app_id
+${orderFilter}
 LIMIT ${limit}`
 
   console.log('readStatsCF query', query)

@@ -46,7 +46,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'You can\'t access this app auth not found', app_id: body.appId }, 400)
     }
 
-    return c.json(await readStats(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.devicesId, body.search))
+    return c.json(await readStats(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.devicesId, body.search, body.order))
   }
   catch (e) {
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)

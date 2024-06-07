@@ -6,6 +6,7 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
+import type { Order } from './types.ts'
 
 export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 const DEFAULT_LIMIT = 1000
@@ -349,24 +350,22 @@ export async function createApiKey(c: Context, userId: string) {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'all',
+          name: 'all',
         },
         {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'upload',
+          name: 'upload',
         },
         {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'read',
+          name: 'read',
         },
       ])
   }
-  return Promise.resolve()
-}
-
-export async function createdefaultOrg(_c: Context, _userId: string, _name = 'Default') {
-  /// We no longer do that in the backend, we have a postgres trigger
   return Promise.resolve()
 }
 
@@ -518,7 +517,7 @@ export function trackVersionUsageSB(
   c: Context,
   versionId: number,
   appId: string,
-  action: string,
+  action: Database['public']['Enums']['version_action'],
 ) {
   return supabaseAdmin(c)
     .from('version_usage')
@@ -623,7 +622,7 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
   return data || []
 }
 
-export async function readStatsSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readStatsSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
   let query = supabase
@@ -632,8 +631,6 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
     .eq('app_id', app_id)
     .gte('created_at', new Date(period_start).toISOString())
     .lt('created_at', new Date(period_end).toISOString())
-    .order('created_at', { ascending: true })
-    .order('app_id', { ascending: true })
     .limit(limit)
 
   if (deviceIds && deviceIds.length) {
@@ -652,6 +649,15 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
       query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
   }
 
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
+      }
+    })
+  }
+
   const { data, error } = await query
 
   if (error) {
@@ -662,7 +668,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
   return data || []
 }
 
-export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string) {
+export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
   console.log('readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search)
@@ -670,8 +676,8 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
     .from('devices')
     .select('*')
     .eq('app_id', app_id)
-    .order('updated_at', { ascending: false })
     .range(range_start, range_end)
+    .limit(limit)
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
@@ -687,6 +693,14 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
       query = query.ilike('custom_id', `${search}%`)
     else
       query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
+  }
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
+      }
+    })
   }
   if (version_id)
     query = query.eq('version_id', version_id)

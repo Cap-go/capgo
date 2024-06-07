@@ -25,7 +25,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     console.log('record', record)
     await Promise.all([
       createApiKey(c, record.id),
-      createdefaultOrg(c, record.id, record.first_name || ''),
       addContact(c, record.email, {
         first_name: record.first_name || '',
         last_name: record.last_name || '',
