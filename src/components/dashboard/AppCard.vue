@@ -54,16 +54,12 @@ async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
     return
 
   try {
-    const { data: _data, error: _error } = await supabase
-      .storage
-      .getBucket(`images/${app.user_id}`)
-    if (_data && _data.id) {
-      const { error: errorIcon } = await supabase.storage
-        .from(`images/${app.user_id}`)
-        .remove([app.app_id])
-      if (errorIcon)
-        toast.error(t('cannot-delete-app-icon'))
-    }
+    const org = organizationStore.getOrgByAppId(props.app.app_id)
+    const { error: errorIcon } = await supabase.storage
+      .from(`images`)
+      .remove([`org/${org?.gid}/${app.app_id}/icon`])
+    if (errorIcon)
+      toast.error(t('cannot-delete-app-icon'))
 
     const { data, error: vError } = await supabase
       .from('app_versions')
