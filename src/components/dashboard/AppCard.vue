@@ -133,6 +133,12 @@ const perm = computed(() => {
     return t('unknown')
   }
 })
+const isSuperAdmin = computed(() => {
+  // TODO: check if that is smart to not let admins delete apps
+  if (!perm.value)
+    return false
+  return organizationStore.hasPermisisonsInRole(perm.value as any, ['super_admin'])
+})
 
 watchEffect(async () => {
   if (route.path.endsWith('/app/home'))
@@ -177,7 +183,7 @@ watchEffect(async () => {
         {{ perm }}
       </div>
     </td>
-    <td class="w-1/5 p-2" @click.stop="deleteApp(app)">
+    <td v-if="isSuperAdmin" class="w-1/5 p-2" @click.stop="deleteApp(app)">
       <div class="text-center">
         <IconTrash v-if="!channel && deleteButton" class="mr-4 text-lg text-red-600" />
       </div>
