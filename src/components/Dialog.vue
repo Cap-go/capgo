@@ -38,6 +38,11 @@ function displayText(text?: string) {
   const sanitize = DOMPurify.sanitize(text.replace(/\n/g, '<br/>'))
   return sanitize
 }
+
+function submit(form: { text: string }) {
+  displayStore.dialogInputText = form.text
+}
+
 onMounted(() => {
   const modalOptions: ModalOptions = {
     placement: 'center',
@@ -106,13 +111,15 @@ onMounted(() => {
           <p :class="`text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400 ${displayStore.dialogOption?.textStyle}`" v-html="displayText(displayStore.dialogOption?.message)" />
           <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
           <div v-if="displayStore.dialogOption?.input" class="w-full">
-            <FormKit
-              type="text"
-              name="text"
-              :value="displayStore.dialogInputText"
-              enterkeyhint="next"
-              validation="required:trim"
-            />
+            <FormKit id="dialog-input" type="form" :actions="false" @submit="submit">
+              <FormKit
+                type="text"
+                name="text"
+                :value="displayStore.dialogInputText"
+                enterkeyhint="next"
+                validation="required:trim"
+              />
+            </FormKit>
           </div>
         </div>
         <!-- Modal footer -->
