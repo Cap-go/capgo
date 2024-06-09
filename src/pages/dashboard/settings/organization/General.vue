@@ -24,12 +24,12 @@ onMounted(async () => {
 })
 
 const { currentOrganization } = storeToRefs(organizationStore)
-const name = ref(currentOrganization.value?.name ?? '')
+const orgName = ref(currentOrganization.value?.name ?? '')
 const email = ref(currentOrganization.value?.management_email ?? '')
 
 watch(currentOrganization, (newOrg) => {
   if (newOrg) {
-    name.value = newOrg.name
+    orgName.value = newOrg.name
     email.value = newOrg.management_email
   }
 })
@@ -69,7 +69,7 @@ async function presentActionSheet() {
   }
 }
 
-async function saveChanges() {
+async function saveChanges(form: { orgName: string, email: string }) {
   if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
     return
@@ -85,14 +85,14 @@ async function saveChanges() {
   const orgCopy = Object.assign({}, currentOrganization.value)
 
   // Optimistic update
-  currentOrganization.value.name = name.value
-  currentOrganization.value.management_email = email.value
+  currentOrganization.value.name = form.orgName
+  currentOrganization.value.management_email = form.email
   isLoading.value = true
 
   // Update name only
   const { error } = await supabase
     .from('orgs')
-    .update({ name: name.value })
+    .update({ name: form.orgName })
     .eq('id', gid)
 
   if (error) {
@@ -106,13 +106,13 @@ async function saveChanges() {
   }
 
   let hasErrored = false
-  if (orgCopy.management_email !== email.value) {
+  if (orgCopy.management_email !== form.email) {
     // The management emial has changed, call the edge function
     console.log('Edge fn')
 
     const { error } = await supabase.functions.invoke('private/set_org_email', {
       body: {
-        emial: email.value,
+        emial: form.email,
         org_id: orgCopy.gid,
       },
     })
@@ -168,7 +168,7 @@ const acronym = computed(() => {
 <template>
   <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0" style="min-height: 100%;">
     <!-- TODO Classes are not working -->
-    <FormKit id="update-account" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;">
+    <FormKit id="update-org" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;" @submit="saveChanges">
       <div>
         <section>
           <div class="flex items-center">
@@ -198,7 +198,7 @@ const acronym = computed(() => {
             autocomplete="given-name"
             :prefix-icon="iconName"
             :disabled="!hasOrgPerm"
-            :value="name"
+            :value="orgName"
             validation="required:trim"
             enterkeyhint="next"
             autofocus
@@ -231,7 +231,6 @@ const acronym = computed(() => {
               type="submit"
               color="secondary"
               shape="round"
-              @click.prevent="saveChanges()"
             >
               <span v-if="!isLoading" class="rounded-4xl">
                 {{ t('save-changes') }}

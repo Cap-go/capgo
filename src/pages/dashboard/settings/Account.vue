@@ -451,7 +451,7 @@ onMounted(async () => {
                 :prefix-icon="iconName"
                 :disabled="isLoading"
                 enterkeyhint="next"
-                :value="main.user?.last_name"
+                :value="main.user?.last_name || ''"
                 validation="required:trim"
                 :label="t('last-name')"
               />
