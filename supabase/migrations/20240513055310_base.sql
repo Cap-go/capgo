@@ -2022,7 +2022,8 @@ BEGIN
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"user_min_right", null, null),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"user_min_right", null, null),
-    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"user_min_right", null, null);
+    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"user_min_right", null, null),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'upload'::"user_min_right", null, null);
 
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
     (901, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', now()),
@@ -2032,8 +2033,8 @@ BEGIN
     (912, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', now()),
     (913, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', now()),
     (916, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', now()),
-    (914, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now()),
-    (915, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now());
+    (915, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now()),
+    (917, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now());
 
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
@@ -3874,46 +3875,46 @@ Requires:
   - pg_tle: https://github.com/aws/pg_tle
   - pgsql-http: https://github.com/pramsey/pgsql-http
 */
-create extension if not exists http with schema extensions;
-create extension if not exists pg_tle;
-drop extension if exists "supabase-dbdev";
-select pgtle.uninstall_extension_if_exists('supabase-dbdev');
-select
-    pgtle.install_extension(
-        'supabase-dbdev',
-        resp.contents ->> 'version',
-        'PostgreSQL package manager',
-        resp.contents ->> 'sql'
-    )
-from http(
-    (
-        'GET',
-        'https://api.database.dev/rest/v1/'
-        || 'package_versions?select=sql,version'
-        || '&package_name=eq.supabase-dbdev'
-        || '&order=version.desc'
-        || '&limit=1',
-        array[
-            (
-                'apiKey',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJp'
-                || 'c3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyY'
-                || 'ndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzI'
-                || 'sImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJ'
-                || 'rzM0AQKsu_5k134s'
-            )::http_header
-        ],
-        null,
-        null
-    )
-) x,
-lateral (
-    select
-        ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
-) resp(contents);
-create extension "supabase-dbdev";
-select dbdev.install('supabase-dbdev');
-drop extension if exists "supabase-dbdev";
-create extension "supabase-dbdev";
+-- create extension if not exists http with schema extensions;
+-- create extension if not exists pg_tle;
+-- drop extension if exists "supabase-dbdev";
+-- select pgtle.uninstall_extension_if_exists('supabase-dbdev');
+-- select
+--     pgtle.install_extension(
+--         'supabase-dbdev',
+--         resp.contents ->> 'version',
+--         'PostgreSQL package manager',
+--         resp.contents ->> 'sql'
+--     )
+-- from http(
+--     (
+--         'GET',
+--         'https://api.database.dev/rest/v1/'
+--         || 'package_versions?select=sql,version'
+--         || '&package_name=eq.supabase-dbdev'
+--         || '&order=version.desc'
+--         || '&limit=1',
+--         array[
+--             (
+--                 'apiKey',
+--                 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJp'
+--                 || 'c3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyY'
+--                 || 'ndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzI'
+--                 || 'sImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJ'
+--                 || 'rzM0AQKsu_5k134s'
+--             )::http_header
+--         ],
+--         null,
+--         null
+--     )
+-- ) x,
+-- lateral (
+--     select
+--         ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
+-- ) resp(contents);
+-- create extension "supabase-dbdev";
+-- select dbdev.install('supabase-dbdev');
+-- drop extension if exists "supabase-dbdev";
+-- create extension "supabase-dbdev";
 
-select dbdev.install('basejump-supabase_test_helpers');
+-- select dbdev.install('basejump-supabase_test_helpers');
