@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import ky from 'ky'
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 
 import { getEnv } from './utils.ts'
@@ -26,6 +26,22 @@ function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
   console.log('initS3', params)
 
   return new S3Client(params)
+}
+
+async function setCRC32Checksum(c: Context, fileId: string, checksum: string) {
+  const client = initS3(c)
+  const path = `${getEnv(c, 'S3_BUCKET')}/${fileId}`
+  const command = new CopyObjectCommand({
+    Bucket: getEnv(c, 'S3_BUCKET'),
+    Key: fileId,
+    CopySource: path,
+    MetadataDirective: 'REPLACE',
+    Metadata: {
+      'x-amz-meta-crc32': checksum,
+    },
+  })
+  console.log('setCRC32Checksum', path, checksum)
+  await client.send(command)
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
@@ -95,4 +111,5 @@ export const s3 = {
   checkIfExist,
   getSignedUrl,
   getUploadUrl,
+  setCRC32Checksum,
 }

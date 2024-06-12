@@ -11,7 +11,7 @@ import { createStatsMeta } from '../utils/stats.ts'
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const record = body.record
 
-  if (!record.bucket_id && !record.r2_path) {
+  if (!record.r2_path) {
     console.log('no bucket_id')
     return c.json(BRES)
   }
@@ -30,17 +30,19 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const v2Path = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
   const existV2 = v2Path ? await s3.checkIfExist(c, v2Path) : false
 
-  if (existV2 && record.storage_provider === 'r2') {
+  if (v2Path && existV2 && record.storage_provider === 'r2') {
     // pdate size and checksum
     console.log('V2', record.bucket_id, record.r2_path)
-    const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
+    // set checksum in s3
+    await s3.setCRC32Checksum(c, v2Path, record.checksum ?? '')
+    const { size } = await s3.getSizeChecksum(c, v2Path ?? '')
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
         .from('app_versions_meta')
         .update({
           size,
-          checksum: checksum ?? '',
+          checksum: record.checksum ?? '',
         })
         .eq('id', record.id)
       if (errorUpdate)
