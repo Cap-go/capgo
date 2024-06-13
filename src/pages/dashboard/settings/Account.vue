@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import copy from 'copy-text-to-clipboard'
+import dayjs from 'dayjs'
 import { useMainStore } from '~/stores/main'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -53,6 +54,22 @@ async function deleteAccount() {
               .single()
             if (!user)
               return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+
+            if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
+              const { error: banErr } = await supabase
+                .from('users')
+                .update({ ban_time: dayjs().add(5, 'minutes').toDate().toISOString() })
+                .eq('id', user.id)
+
+              if (banErr) {
+                console.error('Cannot set ban duration', banErr)
+                return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+              }
+
+              await main.logout()
+              router.replace('/login')
+              return
+            }
 
             if (user.customer_id) {
               await supabaseClient

@@ -7,6 +7,8 @@ import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import type { Factor } from '@supabase/supabase-js'
+import dayjs from 'dayjs'
+import { Capacitor } from '@capacitor/core'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
 import { iconEmail, iconPassword, mfaIcon } from '~/services/icons'
@@ -41,43 +43,62 @@ async function submit(form: { email: string, password: string, code: string }) {
       console.error('error', error)
       setErrors('login-account', [error.message], {})
       toast.error(t('invalid-auth'))
+      return
     }
-    else {
-      const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
-      if (error) {
-        setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot getm MFA factors', error)
+
+    if (form.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
+      const { data: userPreData, error: userPreError } = await supabase.from('users').select('ban_time').eq('email', form.email).single()
+      if (!userPreData && userPreError) {
+        isLoading.value = false
+        console.error('error', error)
+        setErrors('login-account', [userPreError.message], {})
+        toast.error(t('failed-to-get-user'))
         return
       }
 
-      const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
-      if (unverified && unverified.length > 0) {
-        console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
-        const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
-
-        responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
-      }
-
-      const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
-      const hasMfa = !!mfaFactor
-
-      if (hasMfa) {
-        mfaLoginFactor.value = mfaFactor
-        const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
-        if (errorChallenge) {
-          isLoading.value = false
-          setErrors('login-account', ['See browser console'], {})
-          console.error('Cannot challange mfa', errorChallenge)
-          return
-        }
-
-        mfaChallangeId.value = challenge.id
-        stauts.value = '2fa'
+      if (!!userPreData.ban_time && dayjs().isBefore(userPreData.ban_time)) {
         isLoading.value = false
+        console.error('error', error)
+        setErrors('login-account', ['Invalid login credentials'], {})
+        toast.error(t('failed-to-get-user'))
+        return
       }
-      else {
-        await nextLogin()
+    }
+
+    const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
+    if (mfaError) {
+      setErrors('login-account', ['See browser console'], {})
+      console.error('Cannot getm MFA factors', error)
+      return
+    }
+
+    const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
+    if (unverified && unverified.length > 0) {
+      console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
+      const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
+
+      responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
+    }
+
+    const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+    const hasMfa = !!mfaFactor
+
+    if (hasMfa) {
+      mfaLoginFactor.value = mfaFactor
+      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
+      if (errorChallenge) {
+        isLoading.value = false
+        setErrors('login-account', ['See browser console'], {})
+        console.error('Cannot challange mfa', errorChallenge)
+        return
       }
+
+      mfaChallangeId.value = challenge.id
+      stauts.value = '2fa'
+      isLoading.value = false
+    }
+    else {
+      await nextLogin()
     }
   }
   else {
