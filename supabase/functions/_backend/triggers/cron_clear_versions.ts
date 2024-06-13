@@ -37,11 +37,14 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     const v2Path = version.bucket_id ? `apps/${version.user_id}/${version.app_id}/versions/${version.bucket_id}` : version.r2_path
     console.log('v2Path', v2Path)
+    let notFound = false
     try {
       const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
       if (!size || !checksum) {
         console.log(`No checksum or size for ${v2Path}, ${size}, ${checksum}`)
-        return c.json({ error: 'no_checksum_or_size', status: `No checksum or size for ${v2Path}, ${size}, ${checksum}` }, 500)
+        // throw error to trigger the deletion
+        notFound = true
+        throw new Error('no_checksum_or_size')
       }
 
       console.log(`Upsert app_versions_meta (version id: ${version.id}) to: ${size}, ${checksum}`)
@@ -65,8 +68,27 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       if (error)
         return errorOut(c, `Cannot check channel count for ${version.id} because of error: ${error}`)
 
-      if ((count ?? 0) > 0)
-        return errorOut(c, `cannot delete failed version ${version.id}, linked in some channels (${data.map(d => d.id).join(', ')})`)
+      if ((count ?? 0) > 0) {
+        if (notFound) {
+          // set channel to unknow version where version is currently set
+          // find id of unknow version
+          const { data: unknowVersion, error: errorUnknowVersion } = await supabase.from('app_versions')
+            .select('id')
+            .eq('app_id', version.app_id)
+            .eq('name', 'unknown')
+            .single()
+          if (errorUnknowVersion)
+            return errorOut(c, `Cannot find unknow version for app_id ${version.app_id} because of error: ${errorUnknowVersion}`)
+          if (!unknowVersion)
+            return errorOut(c, `Cannot find unknow version for app_id ${version.app_id} because of no unknow version found`)
+          await supabase.from('channels')
+            .update({ version: unknowVersion.id, secondVersion: null })
+            .or(`version.eq.${version.id},secondVersion.eq.${version.id}`)
+        }
+        else {
+          return errorOut(c, `cannot delete failed version ${version.id}, linked in some channels (${data.map(d => d.id).join(', ')})`)
+        }
+      }
 
       const { error: error1 } = await supabase.from('app_versions')
         .delete()
