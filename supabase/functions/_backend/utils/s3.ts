@@ -77,6 +77,7 @@ async function checkIfExist(c: Context, fileId: string) {
     return true
   }
   catch (error) {
+    console.log('checkIfExist', error)
     return false
   }
 }
@@ -97,12 +98,18 @@ async function getSizeChecksum(c: Context, fileId: string) {
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
   })
-  const url = await getSignedUrlSDK(client, command)
-  const response = await ky.head(url)
-  const contentLength = response.headers.get('content-length')
-  const checksum = response.headers.get('x-amz-meta-crc32')
-  const size = contentLength ? Number.parseInt(contentLength, 10) : 0
-  return { size, checksum }
+  try {
+    const url = await getSignedUrlSDK(client, command)
+    const response = await ky.head(url)
+    const contentLength = response.headers.get('content-length')
+    const checksum = response.headers.get('x-amz-meta-crc32')
+    const size = contentLength ? Number.parseInt(contentLength, 10) : 0
+    return { size, checksum }
+  }
+  catch (error) {
+    console.log('getSizeChecksum', error)
+    return { size: 0, checksum: null }
+  }
 }
 
 export const s3 = {

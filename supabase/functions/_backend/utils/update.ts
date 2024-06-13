@@ -587,12 +587,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
     }
     let signedURL = version.external_url || ''
-    let fileSize = 0
     if ((version.bucket_id || version.r2_path) && !version.external_url) {
       const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
       if (res) {
-        fileSize = res.size
         signedURL = res.url
+        // only count the size of the bundle if it's not external
+        await createStatsBandwidth(c, device_id, app_id, res.size)
       }
     }
     //  check signedURL and if it's url
@@ -605,7 +605,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    await createStatsBandwidth(c, device_id, app_id, fileSize)
     await createStatsVersion(c, version.id, app_id, 'get')
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())

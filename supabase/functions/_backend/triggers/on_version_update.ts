@@ -12,7 +12,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const record = body.record
 
   if (!record.r2_path) {
-    console.log('no bucket_id')
+    console.log('no r2_path')
     return c.json(BRES)
   }
   if (!record.app_id) {
@@ -47,8 +47,13 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
         .eq('id', record.id)
       if (errorUpdate)
         console.log('errorUpdate', errorUpdate)
-      await createStatsMeta(c, record.app_id, record.id, size)
+      const { error } = await createStatsMeta(c, record.app_id, record.id, size)
+      if (error)
+        console.log('error createStatsMeta', error)
     }
+  }
+  else {
+    console.log('no v2 path')
   }
   return c.json(BRES)
 }
