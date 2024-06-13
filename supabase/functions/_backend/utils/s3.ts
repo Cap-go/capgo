@@ -77,6 +77,7 @@ async function checkIfExist(c: Context, fileId: string) {
     return true
   }
   catch (error) {
+    console.log('checkIfExist', error)
     return false
   }
 }

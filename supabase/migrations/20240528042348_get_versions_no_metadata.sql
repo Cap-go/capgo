@@ -26,7 +26,7 @@ BEGIN
     VALUES (
       'TRIGGER',
       json_build_object('version', failed_version)::text,
-      'cloudflare',
+      '',
       'cron_clear_versions'
     );
   END LOOP;

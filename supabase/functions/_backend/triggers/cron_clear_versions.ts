@@ -16,13 +16,29 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     // unsafe parse the body
     const body = await c.req.json<{ version: Database['public']['Tables']['app_versions']['Row'] }>()
+    console.log('body cron_clear_versions', body)
 
     // Let's start with the metadata
     const supabase = supabaseAdmin(c)
 
     const version = body.version
+    if (version.user_id === null) {
+      // find the user_id from the app_id
+      const { data: app, error: errorApp } = await supabaseAdmin(c)
+        .from('apps')
+        .select('user_id')
+        .eq('app_id', version.app_id)
+        .single()
+      if (errorApp)
+        return errorOut(c, `Cannot find user_id for app_id ${version.app_id} because of error: ${errorApp}`)
+      if (!app)
+        return errorOut(c, `Cannot find user_id for app_id ${version.app_id} because of no app found`)
+      version.user_id = app.user_id
+    }
     const v2Path = version.bucket_id ? `apps/${version.user_id}/${version.app_id}/versions/${version.bucket_id}` : version.r2_path
+    console.log('v2Path', v2Path)
     const existV2 = v2Path ? await s3.checkIfExist(c, v2Path) : false
+    console.log('existV2', existV2)
 
     if (!existV2) {
       // Ensure that the version is not linked anywhere

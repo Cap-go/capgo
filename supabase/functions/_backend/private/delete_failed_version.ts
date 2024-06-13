@@ -54,7 +54,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .eq('name', body.name)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
-      .eq('user_id', apikey.user_id)
       .eq('deleted', false)
       .single()
     if (errorVersion || version.external_url || !version.r2_path) {
@@ -79,10 +78,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .from('app_versions')
       .delete()
       .eq('id', version.id)
-      .eq('app_id', body.app_id)
-      .eq('user_id', apikey.user_id)
-      .eq('storage_provider', 'r2-direct')
-      .eq('deleted', false)
       .single()
     if (errorDelete) {
       console.log('errorDelete', errorDelete)
@@ -97,6 +92,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       icon: '💀',
     })
 
+    console.log('delete version', version.id)
     return c.json({ status: 'Version deleted' })
   }
   catch (e) {
