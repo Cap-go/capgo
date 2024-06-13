@@ -40,26 +40,29 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     let notFound = false
     try {
       const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
-      if (!size || !checksum) {
-        console.log(`No checksum or size for ${v2Path}, ${size}, ${checksum}`)
+      if (!size) {
+        console.log(`No size for ${v2Path}, ${size}`)
         // throw error to trigger the deletion
         notFound = true
-        throw new Error('no_checksum_or_size')
+        throw new Error('no_size')
+      }
+      if (!checksum) {
+        console.log(`No checksum for ${v2Path}, ${checksum}`)
       }
 
-      console.log(`Upsert app_versions_meta (version id: ${version.id}) to: ${size}, ${checksum}`)
+      console.log(`Upsert app_versions_meta (version id: ${version.id}) to: ${size}`)
 
       await supabase.from('app_versions_meta')
         .upsert({
           id: version.id,
           app_id: version.app_id,
-          checksum,
+          checksum: checksum ?? '',
           size,
           owner_org: version.owner_org,
         })
     }
     catch (errorSize) {
-      console.error('errorSize', v2Path, errorSize)
+      console.error('errorSize', notFound, v2Path, errorSize)
       // Ensure that the version is not linked anywhere
       const { count, error, data } = await supabase.from('channels')
         .select('id', { count: 'exact' })
@@ -97,47 +100,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       if (error1)
         errorOut(c, `Cannot delete version ${version.id} because of the error: ${error1}`)
     }
-    // const existV2 = v2Path ? await s3.checkIfExist(c, encodeURI(v2Path)) : false
-    // console.log('existV2', existV2)
-
-    // if (!existV2) {
-    //   // Ensure that the version is not linked anywhere
-    //   const { count, error, data } = await supabase.from('channels')
-    //     .select('id', { count: 'exact' })
-    //     .or(`version.eq.${version.id},secondVersion.eq.${version.id}`)
-
-    //   if (error)
-    //     return errorOut(c, `Cannot check channel count for ${version.id} because of error: ${error}`)
-
-    //   if ((count ?? 0) > 0)
-    //     return errorOut(c, `cannot delete failed version ${version.id}, linked in some channels (${data.map(d => d.id).join(', ')})`)
-
-    //   const { error: error1 } = await supabase.from('app_versions')
-    //     .delete()
-    //     .eq('id', version.id)
-
-    //   if (error1)
-    //     errorOut(c, `Cannot delete version ${version.id} because of the error: ${error1}`)
-    // }
-    // else {
-    //   const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
-    //   if (!size || !checksum) {
-    //     console.log(`No checksum or size for ${v2Path}, ${size}, ${checksum}`)
-    //     return c.json({ error: 'no_checksum_or_size', status: `No checksum or size for ${v2Path}, ${size}, ${checksum}` }, 500)
-    //   }
-
-    //   console.log(`Upsert app_versions_meta (version id: ${version.id}) to: ${size}, ${checksum}`)
-
-    //   await supabase.from('app_versions_meta')
-    //     .upsert({
-    //       id: version.id,
-    //       app_id: version.app_id,
-    //       checksum,
-    //       size,
-    //       owner_org: version.owner_org,
-    //     })
-    // }
-
     return c.json(BRES)
   }
   catch (e) {
