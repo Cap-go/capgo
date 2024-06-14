@@ -72,7 +72,9 @@ CREATE TYPE "public"."stats_action" AS ENUM (
 'disableEmulator',
 'cannotGetBundle',
 'checksum_fail',
-'NoChannelOrOverride'
+'NoChannelOrOverride',
+'setChannel',
+'getChannel'
 );
 
 DROP TABLE "public"."stats";
