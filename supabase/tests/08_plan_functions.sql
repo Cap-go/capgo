@@ -2,7 +2,7 @@
 BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(6);
+SELECT plan(8);
 
 -- Test get_current_plan_max_org
 SELECT results_eq(
@@ -29,49 +29,28 @@ SELECT is(get_current_plan_name_org('11111111-1111-1111-1111-111111111111'), NUL
 SELECT is(is_good_plan_v5_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'), true, 'is_good_plan_v5_org test - plan is good');
 
 -- Test find_best_plan_v3
--- Define variables to hold plan details
-DO $$
-DECLARE
-    selected_plan_id uuid := '526e11d8-3c51-4581-ac92-4770c602f47c'; -- ID for Solo plan
-    selected_plan_mau bigint;
-    selected_plan_bandwidth double precision;
-    selected_plan_storage double precision;
-BEGIN
-    -- Retrieve a suitable plan from the database by ID
-    SELECT mau, bandwidth, storage INTO selected_plan_mau, selected_plan_bandwidth, selected_plan_storage
-    FROM plans 
-    WHERE id = selected_plan_id
-    LIMIT 1;
-    
-    -- Perform the test using the retrieved plan values
-    PERFORM is(
-        find_best_plan_v3(selected_plan_mau, selected_plan_bandwidth, selected_plan_storage), 
-        'Solo', 
-        'find_best_plan_v3 test - fits Solo plan'
-    );
-END $$;
 
--- Define variables to hold details for another plan
-DO $$
-DECLARE
-    selected_plan_id_2 uuid := 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'; -- ID for Team plan
-    selected_plan_mau_2 bigint;
-    selected_plan_bandwidth_2 double precision;
-    selected_plan_storage_2 double precision;
-BEGIN
-    -- Retrieve another suitable plan from the database by ID
-    SELECT mau, bandwidth, storage INTO selected_plan_mau_2, selected_plan_bandwidth_2, selected_plan_storage_2
-    FROM plans 
-    WHERE id = selected_plan_id_2
-    LIMIT 1;
-    
-    -- Perform the test using the retrieved plan values
-    PERFORM is(
-        find_best_plan_v3(selected_plan_mau_2, selected_plan_bandwidth_2, selected_plan_storage_2), 
-        'Team', 
-        'find_best_plan_v3 test - fits Team plan'
-    );
-END $$;
+-- Retrieve Solo plan details and perform the test
+SELECT is(
+    find_best_plan_v3(
+        (SELECT mau FROM plans WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'), 
+        (SELECT bandwidth FROM plans WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'), 
+        (SELECT storage FROM plans WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c')
+    ), 
+    'Solo', 
+    'find_best_plan_v3 test - fits Solo plan'
+);
+
+-- Retrieve Team plan details and perform the test
+SELECT is(
+    find_best_plan_v3(
+        (SELECT mau FROM plans WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'), 
+        (SELECT bandwidth FROM plans WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'), 
+        (SELECT storage FROM plans WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77')
+    ), 
+    'Team', 
+    'find_best_plan_v3 test - fits Team plan'
+);
 
 SELECT * FROM finish();
 ROLLBACK;
