@@ -15,6 +15,9 @@ import { app as deleted_failed_version } from '../_backend/private/delete_failed
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
+import { app as latency } from '../_backend/private/latency.ts'
+import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
+import { app as latency_postres } from '../_backend/private/latency_postres.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -40,5 +43,8 @@ appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/upload_link', upload_link)
 appGlobal.route('/delete_failed_version', deleted_failed_version)
 appGlobal.route('/set_org_email', set_org_email)
+appGlobal.route('/latency', latency)
+appGlobal.route('/latency_drizzle', latency_drizzle)
+appGlobal.route('/latency_postres', latency_postres)
 
 Deno.serve(appGlobal.fetch)

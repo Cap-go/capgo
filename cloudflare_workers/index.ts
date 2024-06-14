@@ -3,8 +3,9 @@ import { sentry } from '@hono/sentry'
 
 // Public API
 import { HTTPException } from 'hono/http-exception'
-import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
-import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
+// import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
+// import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
@@ -28,6 +29,9 @@ import { app as upload_link } from '../supabase/functions/_backend/private/uploa
 import { app as deleted_failed_version } from '../supabase/functions/_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../supabase/functions/_backend/private/devices.ts'
 import { app as stats_priv } from '../supabase/functions/_backend/private/stats.ts'
+import { app as latency } from '../supabase/functions/_backend/private/latency.ts'
+import { app as latency_postres } from '../supabase/functions/_backend/private/latency_postres.ts'
+import { app as latency_drizzle } from '../supabase/functions/_backend/private/latency_drizzle.ts'
 
 // Triggers API
 import { app as clear_app_cache } from '../supabase/functions/_backend/triggers/clear_app_cache.ts'
@@ -86,6 +90,9 @@ appFront.route('/stripe_checkout', stripe_checkout)
 appFront.route('/stripe_portal', stripe_portal)
 appFront.route('/upload_link', upload_link)
 appFront.route('/delete_failed_version', deleted_failed_version)
+appFront.route('/latency', latency)
+appFront.route('/latency_drizzle', latency_drizzle)
+appFront.route('/latency_postres', latency_postres)
 
 // Triggers
 
@@ -117,57 +124,57 @@ app.get('/test_sentry', (c) => {
   throw new Error('Failed!')
 })
 
-app.post('/test_d1', middlewareAPISecret, async (c) => {
-  try {
-    const body = await c.req.json()
-    if (body.request) {
-      const requestD1 = c.env.DB_DEVICES
-        .exec(body.request)
+// app.post('/test_d1', middlewareAPISecret, async (c) => {
+//   try {
+//     const body = await c.req.json()
+//     if (body.request) {
+//       const requestD1 = c.env.DB_DEVICES
+//         .exec(body.request)
 
-      const res = await requestD1
-      console.log('test d1 res', res)
-      return c.json({ res })
-    }
-    else if (body.query && body.bind) {
-      console.log('test d1 query', body.query)
-      console.log('test d1 bind', body.bind, body.bind.length)
-      const requestD1 = c.env.DB_DEVICES
-        .prepare(body.query)
-        .bind(...body.bind)
-        .run()
+//       const res = await requestD1
+//       console.log('test d1 res', res)
+//       return c.json({ res })
+//     }
+//     else if (body.query && body.bind) {
+//       console.log('test d1 query', body.query)
+//       console.log('test d1 bind', body.bind, body.bind.length)
+//       const requestD1 = c.env.DB_DEVICES
+//         .prepare(body.query)
+//         .bind(...body.bind)
+//         .run()
 
-      const res = await requestD1
-      console.log('test d1 res', res)
-      return c.json({ res })
-    }
-    else {
-      return c.json({ error: 'Missing request' })
-    }
-  }
-  catch (e) {
-    console.error('Error d1', e)
-    return c.json({ error: 'Error', e: JSON.stringify(e) })
-  }
-})
+//       const res = await requestD1
+//       console.log('test d1 res', res)
+//       return c.json({ res })
+//     }
+//     else {
+//       return c.json({ error: 'Missing request' })
+//     }
+//   }
+//   catch (e) {
+//     console.error('Error d1', e)
+//     return c.json({ error: 'Error', e: JSON.stringify(e) })
+//   }
+// })
 
-app.post('/test_analytics', middlewareAPISecret, async (c) => {
-  try {
-    const body = await c.req.json()
-    if (body.request) {
-      const res = await rawAnalyticsQuery(c, body.request)
+// app.post('/test_analytics', middlewareAPISecret, async (c) => {
+//   try {
+//     const body = await c.req.json()
+//     if (body.request) {
+//       const res = await rawAnalyticsQuery(c, body.request)
 
-      console.log('test_analytics res', res)
-      return c.json({ res })
-    }
-    else {
-      return c.json({ error: 'Missing request' })
-    }
-  }
-  catch (e) {
-    console.error('Error test_analytics', e)
-    return c.json({ error: 'Error', e: JSON.stringify(e) })
-  }
-})
+//       console.log('test_analytics res', res)
+//       return c.json({ res })
+//     }
+//     else {
+//       return c.json({ error: 'Missing request' })
+//     }
+//   }
+//   catch (e) {
+//     console.error('Error test_analytics', e)
+//     return c.json({ error: 'Error', e: JSON.stringify(e) })
+//   }
+// })
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
