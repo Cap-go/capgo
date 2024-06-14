@@ -524,7 +524,7 @@ BEGIN
     )
     SELECT
         a.app_id,
-        d.date::date,
+        ds.date::date,
         COALESCE(dm.mau, 0) AS mau,
         COALESCE(dst.storage, 0) AS storage,
         COALESCE(db.bandwidth, 0) AS bandwidth,
