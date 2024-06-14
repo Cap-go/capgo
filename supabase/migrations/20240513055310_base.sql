@@ -519,32 +519,37 @@ CREATE OR REPLACE FUNCTION "public"."get_app_metrics"("org_id" "uuid", "start_da
     AS $$
 BEGIN
     RETURN QUERY
+    WITH DateSeries AS (
+        SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"
+    )
     SELECT
         a.app_id,
         d.date::date,
         COALESCE(dm.mau, 0) AS mau,
-        COALESCE(ds.storage, 0) AS storage,
+        COALESCE(dst.storage, 0) AS storage,
         COALESCE(db.bandwidth, 0) AS bandwidth,
         COALESCE(SUM(dv.get)::bigint, 0) AS get,
         COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
         COALESCE(SUM(dv.install)::bigint, 0) AS install,
         COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
-    FROM
+    FROM 
         apps a
-    CROSS JOIN
-        generate_series(start_date, end_date + '1 day'::interval, '1 day'::interval) AS d(date)
-    LEFT JOIN
-        daily_mau dm ON a.app_id = dm.app_id AND d.date::date = dm.date
-    LEFT JOIN
-        daily_storage ds ON a.app_id = ds.app_id AND d.date::date = ds.date
-    LEFT JOIN
-        daily_bandwidth db ON a.app_id = db.app_id AND d.date::date = db.date
-    LEFT JOIN
-        daily_version dv ON a.app_id = dv.app_id AND d.date::date = dv.date
-    WHERE
-        a.owner_org = org_id
-    GROUP BY
-        a.app_id, d.date, dm.mau, ds.storage, db.bandwidth;
+    CROSS JOIN 
+        DateSeries ds
+    LEFT JOIN 
+        daily_mau dm ON a.app_id = dm.app_id AND ds.date = dm.date
+    LEFT JOIN 
+        daily_storage dst ON a.app_id = dst.app_id AND ds.date = dst.date
+    LEFT JOIN 
+        daily_bandwidth db ON a.app_id = db.app_id AND ds.date = db.date
+    LEFT JOIN 
+        daily_version dv ON a.app_id = dv.app_id AND ds.date = dv.date
+    WHERE 
+        a.owner_org = org_id 
+    GROUP BY 
+        a.app_id, ds.date, dm.mau, dst.storage, db.bandwidth
+    ORDER BY
+        a.app_id, ds.date; 
 END;
 $$;
 
