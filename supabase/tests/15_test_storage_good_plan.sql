@@ -10,9 +10,6 @@ CREATE OR REPLACE FUNCTION my_tests(
 DECLARE
   plan RECORD;
   usage RECORD;
-  total_metrics RECORD;
-  mau_count bigint;
-  bandwidth_count bigint;
 BEGIN
   -- Remove all storage info for everyone
   TRUNCATE TABLE "public"."daily_mau" CASCADE;
