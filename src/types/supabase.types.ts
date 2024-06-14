@@ -1988,6 +1988,8 @@ export type Database = {
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
+        | "setChannel"
+        | "getChannel"
       stripe_status:
         | "created"
         | "succeeded"
