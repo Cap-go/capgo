@@ -532,7 +532,7 @@ BEGIN
     FROM
         apps a
     CROSS JOIN
-        generate_series(start_date, end_date, '1 day'::interval) AS d(date)
+        generate_series(start_date, end_date + '1 day'::interval, '1 day'::interval) AS d(date)
     LEFT JOIN
         daily_mau dm ON a.app_id = dm.app_id AND d.date::date = dm.date
     LEFT JOIN
