@@ -21,33 +21,8 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
-        run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
+        run: ENV=local supabase start
       - run: supabase test db
-      - uses: JarvusInnovations/background-action@v1
-        name: Bootstrap Edge server
-        with:
-          run: supabase functions serve --env-file=supabase/.env.backend.test &
-          wait-on: |
-            http-get://127.0.0.1:54321/functions/v1/ok
-          # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
-          # See wait-on section below for all resource types and prefixes
-
-          tail: stderr,stdout  # true = stderr,stdout
-          # This will allow you to monitor the progress live
-
-          log-output-resume: stderr,stdout 
-          # Eliminates previously output stderr log entries from post-run output
-
-          wait-for: 1m
-
-          log-output: stderr,stdout # same as true
-
-          log-output-if: true
-          # failure = exit-early or timeout
-
-          working-directory: .
-          # sets the working directory (cwd) for the shell running commands
-      # - run: supabase functions serve // TODO: wait for https://github.com/supabase/cli/issues/2267 to be resolved
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
