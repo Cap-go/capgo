@@ -9,6 +9,7 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
+    implementation project(':capacitor-community-in-app-review')
     implementation project(':capacitor-community-keep-awake')
     implementation project(':capacitor-action-sheet')
     implementation project(':capacitor-app')
@@ -44,7 +45,6 @@ dependencies {
     implementation project(':capgo-native-audio')
     implementation project(':capgo-native-market')
     implementation project(':revenuecat-purchases-capacitor')
-    implementation project(':capacitor-rate-app')
     implementation project(':capacitor-secure-storage-plugin')
 
 }

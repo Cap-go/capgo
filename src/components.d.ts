@@ -16,7 +16,6 @@ declare module 'vue' {
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']
-    ChannelCard: typeof import('./components/package/ChannelCard.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
     Dashboard: typeof import('./components/dashboard/Dashboard.vue')['default']
     DeviceCard: typeof import('./components/package/DeviceCard.vue')['default']
@@ -48,7 +47,6 @@ declare module 'vue' {
     TopApps: typeof import('./components/dashboard/TopApps.vue')['default']
     Usage: typeof import('./components/dashboard/Usage.vue')['default']
     UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
-    VersionCard: typeof import('./components/package/VersionCard.vue')['default']
     VueParticles: typeof import('./components/VueParticles.vue')['default']
     WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
   }
