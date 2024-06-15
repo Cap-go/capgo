@@ -357,6 +357,7 @@ open-channel: kanalı aç
 open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
 open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
+open-your-portal: Portalınızı açın
 org-changes-saved: Kuruluş başarıyla güncellendi
 org-changes-set-email-not-unique: Yönetim e-postası benzersiz değil, lütfen farklı bir e-posta seçin
 org-changes-set-email-other-error: Yönetim e-postası ayarlanamıyor, lütfen desteğe başvurun
@@ -465,6 +466,7 @@ status-complete: tamamlamak
 status-failed: arızalı
 storage-usage: 'Depolama kullanımı:'
 stored-externally: harici olarak depolanır
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe faturalandırma portalı yeni bir sekmede açılacak
 submit: Göndermek
 support: Destek
 switch-to-all-device: Tüm cihazlara geç

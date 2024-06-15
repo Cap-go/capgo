@@ -361,6 +361,7 @@ open-channel: Открытый канал
 open-settings: Нажмите, чтобы открыть настройки
 open-sidebar: Открыть боковую панель
 open-this-link-to-le: Откройте эту ссылку, чтобы узнать, как протестировать обновление
+open-your-portal: Откройте свой портал
 org-changes-saved: Организация успешно обновлена
 org-changes-set-email-not-unique: Адрес электронной почты руководства не уникален, выберите другой.
 org-changes-set-email-other-error: >-
@@ -469,6 +470,7 @@ status-complete: полный
 status-failed: неуспешный
 storage-usage: 'Использование хранилища:'
 stored-externally: хранится снаружи
+stripe-billing-portal-will-be-opened-in-a-new-tab: Платежный портал Stripe откроется в новой вкладке
 submit: Представлять на рассмотрение
 support: Поддерживать
 switch-to-all-device: Переключиться на все устройства

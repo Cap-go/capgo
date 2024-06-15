@@ -219,6 +219,7 @@ force-version-change: Skip progressive deploy
 forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
+free-trial: Free trial
 from: From
 from-device: from device
 general-information: General Informations
@@ -338,6 +339,7 @@ open-channel: Open channel
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
+open-your-portal: Open your portal
 org-changes-saved: Organization updated successfully
 org-changes-set-email-not-unique: The management email is not unique, please select a different one
 org-changes-set-email-other-error: Cannot set the management email, please contant support
@@ -440,6 +442,7 @@ status-complete: complete
 status-failed: failed
 storage-usage: 'Storage usage: '
 stored-externally: stored externally
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe billing portal will be opened in a new tab
 submit: Submit
 support: Support
 switch-to-all-device: Switch to all devices
@@ -458,7 +461,6 @@ to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
 top-apps-v2: Apps
-free-trial: Free trial
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in

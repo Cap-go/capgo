@@ -351,6 +351,7 @@ open-channel: チャンネルを開く
 open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
 open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
+open-your-portal: ポータルを開く
 org-changes-saved: 組織が正常に更新されました
 org-changes-set-email-not-unique: 管理用メールアドレスは一意ではありません。別のメールアドレスを選択してください
 org-changes-set-email-other-error: 管理用メールアドレスを設定できません。サポートにお問い合わせください。
@@ -455,6 +456,7 @@ status-complete: 完了
 status-failed: 失敗した
 storage-usage: 'ストレージ使用量:'
 stored-externally: 外部保存
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 請求ポータルが新しいタブで開きます
 submit: 送信
 support: サポート
 switch-to-all-device: すべてのデバイスに切り替える

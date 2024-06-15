@@ -361,6 +361,7 @@ open-channel: mở kênh
 open-settings: Nhấp để mở cài đặt
 open-sidebar: Mở thanh bên
 open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn
+open-your-portal: Mở cổng thông tin của bạn
 org-changes-saved: Tổ chức được cập nhật thành công
 org-changes-set-email-not-unique: Email quản lý không phải là duy nhất, vui lòng chọn email khác
 org-changes-set-email-other-error: Không cài đặt được email quản lý, vui lòng tiếp tục hỗ trợ
@@ -465,6 +466,7 @@ status-complete: hoàn thành
 status-failed: thất bại
 storage-usage: 'Sử dụng lưu trữ:'
 stored-externally: được lưu trữ bên ngoài
+stripe-billing-portal-will-be-opened-in-a-new-tab: Cổng thanh toán sọc sẽ được mở trong tab mới
 submit: Nộp
 support: Ủng hộ
 switch-to-all-device: Chuyển sang tất cả các thiết bị

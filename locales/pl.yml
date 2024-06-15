@@ -361,6 +361,7 @@ open-channel: Otwórz kanał
 open-settings: Kliknij, aby otworzyć ustawienia
 open-sidebar: Otwórz pasek boczny
 open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację
+open-your-portal: Otwórz swój portal
 org-changes-saved: Organizacja została pomyślnie zaktualizowana
 org-changes-set-email-not-unique: Adres e-mail do zarządzania nie jest unikalny. Wybierz inny
 org-changes-set-email-other-error: >-
@@ -471,6 +472,7 @@ status-complete: kompletny
 status-failed: przegrany
 storage-usage: 'Wykorzystanie pamięci:'
 stored-externally: przechowywane na zewnątrz
+stripe-billing-portal-will-be-opened-in-a-new-tab: Portal rozliczeniowy Stripe otworzy się w nowej karcie
 submit: Składać
 support: Wsparcie
 switch-to-all-device: Przełącz na wszystkie urządzenia

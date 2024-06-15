@@ -351,6 +351,7 @@ open-channel: 채널 열기
 open-settings: 클릭하여 설정 열기
 open-sidebar: 사이드바 열기
 open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.
+open-your-portal: 포털을 열어보세요
 org-changes-saved: 조직이 업데이트되었습니다.
 org-changes-set-email-not-unique: 관리 이메일이 고유하지 않습니다. 다른 이메일을 선택하세요.
 org-changes-set-email-other-error: 관리 이메일을 설정할 수 없습니다. 지속적인 지원을 부탁드립니다.
@@ -455,6 +456,7 @@ status-complete: 완벽한
 status-failed: 실패한
 storage-usage: '스토리지 사용량:'
 stored-externally: 외부에 저장
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 청구 포털이 새 탭에서 열립니다.
 submit: 제출하다
 support: 지원하다
 switch-to-all-device: 모든 기기로 전환

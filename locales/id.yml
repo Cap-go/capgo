@@ -362,6 +362,7 @@ open-channel: Buka saluran
 open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
+open-your-portal: Buka portal Anda
 org-changes-saved: Organisasi berhasil diperbarui
 org-changes-set-email-not-unique: Email manajemen tidak unik, silakan pilih email lain
 org-changes-set-email-other-error: Tidak dapat mengatur email manajemen, silakan hubungi dukungan
@@ -468,6 +469,7 @@ status-complete: menyelesaikan
 status-failed: gagal
 storage-usage: 'Penggunaan penyimpanan:'
 stored-externally: disimpan secara eksternal
+stripe-billing-portal-will-be-opened-in-a-new-tab: Portal penagihan Stripe akan dibuka di tab baru
 submit: Kirim
 support: Mendukung
 switch-to-all-device: Beralih ke semua perangkat

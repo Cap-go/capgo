@@ -351,6 +351,7 @@ open-channel: 打开通道
 open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新
+open-your-portal: 打开您的门户
 org-changes-saved: 组织更新成功
 org-changes-set-email-not-unique: 管理邮箱不唯一，请选择其他邮箱
 org-changes-set-email-other-error: 无法设置管理邮箱，请联系支持
@@ -455,6 +456,7 @@ status-complete: 完全的
 status-failed: 失败的
 storage-usage: 存储使用情况：
 stored-externally: 外部存储
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 计费门户将在新选项卡中打开
 submit: 提交
 support: 支持
 switch-to-all-device: 切换到所有设备
