@@ -41,9 +41,7 @@ export const useDisplayStore = defineStore('display', () => {
   const NavTitle = ref<string>('')
   const defaultBack = ref<string>('')
   const messageToast = ref<string[]>([])
-  const messageLoader = ref<string>('')
   const durationToast = ref<number>(2000)
-  const showLoader = ref<boolean>(false)
   const lastButtonRole = ref<string>('')
   const dialogInputText = ref('')
   const onDialogDismiss = (): Promise<boolean> => {
@@ -79,12 +77,10 @@ export const useDisplayStore = defineStore('display', () => {
     dialogCanceled,
     dialogOption,
     toastOption,
-    messageLoader,
     messageToast,
     durationToast,
     showDialog,
     showActionSheet,
-    showLoader,
     lastButtonRole,
     NavTitle,
     defaultBack,

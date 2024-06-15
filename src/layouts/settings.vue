@@ -92,7 +92,7 @@ watchEffect(() => {
       label: 'billing',
       icon: shallowRef(IconBilling) as any,
       key: '/billing',
-      onClick: () => openPortal(organizationStore.currentOrganization?.gid),
+      onClick: () => openPortal(organizationStore.currentOrganization?.gid || '', t),
     })
   }
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {

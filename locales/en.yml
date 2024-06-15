@@ -458,7 +458,7 @@ to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
 top-apps-v2: Apps
-trial: trial
+free-trial: Free trial
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in

@@ -93,6 +93,7 @@ button-back: Назад
 button-browse: Просматривать
 button-camera: Камера
 button-cancel: Отмена
+button-confirm: Подтверждать
 button-delete: Удалить
 button-deny-invite: Отрицать
 button-go: ИДТИ
@@ -107,6 +108,7 @@ button-toggle_dark: Переключить темный режим
 button-toggle_langs: Изменить языки
 by-clicking-on-them: нажав на них.
 cancel: Отмена
+cannot-change-name: Невозможно изменить имя, проверьте консоль браузера.
 cannot-change-permission: Невозможно изменить разрешения, проверьте консоль браузера
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
@@ -127,6 +129,8 @@ cannot-view-plans: Невозможно просмотреть страницу 
 cannot-view-usage: Невозможно просмотреть страницу использования
 cannots-sign-off: Невозможно войти в систему
 change: Изменять
+change-api-key-name: Измените имя апикея
+changed-name: Имя апикея успешно изменено.
 changed-password-suc: Пароль успешно изменен
 channel: Канал
 channel-ab-testing: Включить AB-тестирование
@@ -228,6 +232,7 @@ force-version-change: Пропустить прогрессивное разве
 forgot: Забыл
 forgot-check-email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
 forgot-success: Пароль успешно обновлен
+free-trial: Бесплатная пробная версия
 from: С сайта
 from-device: с устройства
 general-information: Общая информация
@@ -325,6 +330,13 @@ name: Имя
 need-more-contact-us: |-
   Нужно больше ? 
   Свяжитесь с нами для индивидуального плана
+new-name-not-changed: Новое имя такое же, как старое
+new-name-to-long: |-
+  Новое имя слишком длинное. 
+  Вы можете использовать только 32 символа
+new-name-to-short: |-
+  Имя апикея слишком короткое. 
+  Оно должно содержать не менее 4 символов.
 next: Следующий
 'no': нет
 no-channel-linked: Нет канала, нажмите, чтобы добавить
@@ -475,11 +487,11 @@ to-live-reload: жить перезагрузить.
 to-open-encrypted-bu: 'Чтобы открыть зашифрованный пакет, используйте команду:'
 top-apps: Мои приложения
 top-apps-v2: Программы
-trial: пробный
 trial-left: дней осталось
 trial-plan-expired: Пробная версия истекла
 trial-plan-expires-in: Испытание заканчивается через
 type: ''
+type-new-name: Введите новое имя ключа API.
 undefined: неопределенный
 undefined-fail: Не определено (обновления не будут выполнены)
 uninstall: Удалено

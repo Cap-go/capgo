@@ -89,6 +89,7 @@ button-back: 뒤쪽에
 button-browse: 검색
 button-camera: 카메라
 button-cancel: 취소
+button-confirm: 확인하다
 button-delete: 삭제
 button-deny-invite: 부인하다
 button-go: 가다
@@ -103,6 +104,7 @@ button-toggle_dark: 다크 모드 전환
 button-toggle_langs: 언어 변경
 by-clicking-on-them: 그들을 클릭하여.
 cancel: 취소
+cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
@@ -123,6 +125,8 @@ cannot-view-plans: 계획 페이지를 볼 수 없습니다
 cannot-view-usage: 사용량 페이지를 볼 수 없습니다
 cannots-sign-off: 로그할 수 없습니다.
 change: 변화
+change-api-key-name: apikey 이름 변경
+changed-name: apikey 이름이 변경되었습니다.
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel: 채널
 channel-ab-testing: AB 테스트 활성화
@@ -222,6 +226,7 @@ force-version-change: 점진적 배포 건너뛰기
 forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
+free-trial: 무료 시험판
 from: From
 from-device: 장치에서
 general-information: 일반 정보
@@ -317,6 +322,13 @@ name: 이름
 need-more-contact-us: |-
   더 필요하십니까? 
   맞춤형 계획을 위해 저희에게 연락하십시오
+new-name-not-changed: 새 이름은 기존 이름과 동일합니다.
+new-name-to-long: |-
+  새 이름이 너무 깁니다. 
+  32자까지만 사용할 수 있습니다.
+new-name-to-short: |-
+  apikey 이름이 너무 짧습니다. 
+  길이는 4자 이상이어야 합니다.
 next: 다음
 'no': 아니요
 no-channel-linked: 채널이 없습니다. 추가하려면 클릭하세요.
@@ -461,11 +473,11 @@ to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps: 나의 앱들
 top-apps-v2: 앱
-trial: 재판
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: '평가판 종료:'
 type: ''
+type-new-name: 새 API 키 이름을 입력하세요.
 undefined: 한정되지 않은
 undefined-fail: 정의되지 않음(업데이트가 실패함)
 uninstall: 제거됨

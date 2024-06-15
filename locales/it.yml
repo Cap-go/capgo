@@ -93,6 +93,7 @@ button-back: Indietro
 button-browse: Navigare
 button-camera: Telecamera
 button-cancel: Annulla
+button-confirm: Confermare
 button-delete: Eliminare
 button-deny-invite: Negare
 button-go: ANDARE
@@ -107,6 +108,7 @@ button-toggle_dark: Attiva/disattiva la modalità oscura
 button-toggle_langs: Cambia lingua
 by-clicking-on-them: cliccandoci sopra.
 cancel: Annulla
+cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
@@ -127,6 +129,8 @@ cannot-view-plans: Impossibile visualizzare la pagina dei piani
 cannot-view-usage: Impossibile visualizzare la pagina di utilizzo
 cannots-sign-off: Impossibile accedere
 change: Modifica
+change-api-key-name: Cambia il nome dell'apikey
+changed-name: Nome di apikey modificato con successo
 changed-password-suc: password cambiata con successo
 channel: Canale
 channel-ab-testing: Abilita test AB
@@ -232,6 +236,7 @@ force-version-change: Salta la distribuzione progressiva
 forgot: Dimenticato
 forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
 forgot-success: Password aggiornata con successo
+free-trial: Prova gratuita
 from: Da
 from-device: dal dispositivo
 general-information: Informazioni generali
@@ -329,6 +334,13 @@ name: Nome
 need-more-contact-us: |-
   Bisogno di piu ? 
   Contattaci per un piano su misura
+new-name-not-changed: Il nuovo nome è lo stesso di quello vecchio
+new-name-to-long: |-
+  Il nuovo nome è troppo lungo. 
+  Puoi utilizzare solo 32 caratteri
+new-name-to-short: |-
+  Il nome apikey è troppo corto. 
+  Deve contenere almeno 4 caratteri
 next: Prossimo
 'no': 'NO'
 no-channel-linked: Nessun canale, fai clic per aggiungere
@@ -481,11 +493,11 @@ to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
 top-apps: Le mie applicazioni
 top-apps-v2: App
-trial: prova
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
 type: ''
+type-new-name: Digita il nuovo nome della chiave API
 undefined: non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato

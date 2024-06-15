@@ -9,3 +9,12 @@ export async function hideLoader() {
       SplashScreen.hide()
   }
 }
+
+export async function showLoader() {
+  const appLoader = document.querySelector('#app-loader')
+  if (appLoader) {
+    appLoader.setAttribute('style', 'visibility: visible;')
+    if (Capacitor.isNativePlatform())
+      SplashScreen.show()
+  }
+}

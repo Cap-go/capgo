@@ -235,6 +235,20 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
   toast.success(t('permission-changed'))
   members.value = await organizationStore.getMembers()
 }
+function acronym(email: string) {
+  let res = 'NA'
+  const prefix = email.split('@')[0]
+  // search for a dot and if there is more than 2 chars, if yes use the first 2 chars of each word
+  if (prefix.length > 2 && prefix.includes('.')) {
+    const first_name = prefix.split('.')[0]
+    const last_name = prefix.split('.')[1]
+    res = first_name[0] + last_name[0]
+  }
+  else if (prefix) {
+    res = prefix[0] + prefix[1]
+  }
+  return res.toUpperCase()
+}
 </script>
 
 <template>
@@ -248,17 +262,17 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
         {{ t('add-member') }}
       </button>
     </div>
-    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-full md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+    <div class="flex flex-col overflow-y-auto md:mx-auto md:mt-5 md:w-full ">
       <dl id="members-div" class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
-          <div id="member-card" class="flex justify-between mt-2 mb-2 ml-2">
+          <div id="member-card" class="flex justify-between my-2 ml-2 md:my-6">
             <div class="flex">
               <img
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
                 width="80" height="80" alt="profile_photo"
               >
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
-                <p>{{ 'N/A' }}</p>
+                <p>{{ acronym(member.email) }}</p>
               </div>
             </div>
             <div id="user-email" class="mt-auto mb-auto text-center ml-1/3 mr-1/3">
