@@ -363,6 +363,7 @@ open-channel: Canal ouvert
 open-settings: Cliquez pour ouvrir les paramètres
 open-sidebar: Ouvrir la barre latérale
 open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jour
+open-your-portal: Ouvrez votre portail
 org-changes-saved: Organisation mise à jour avec succès
 org-changes-set-email-not-unique: L'e-mail de gestion n'est pas unique, veuillez en sélectionner un autre
 org-changes-set-email-other-error: Impossible de définir l'e-mail de gestion, veuillez contacter l'assistance
@@ -473,6 +474,7 @@ status-complete: complet
 status-failed: échoué
 storage-usage: "Utilisation du stockage\_:"
 stored-externally: stocké en externe
+stripe-billing-portal-will-be-opened-in-a-new-tab: Le portail de facturation Stripe sera ouvert dans un nouvel onglet
 submit: Soumettre
 support: Support
 switch-to-all-device: Passer à tous les appareils

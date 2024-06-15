@@ -371,6 +371,7 @@ open-channel: Canal abierto
 open-settings: Haga clic para abrir la configuración
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abre este enlace para saber cómo probar tu actualización
+open-your-portal: Abre tu portal
 org-changes-saved: Organización actualizada con éxito
 org-changes-set-email-not-unique: El correo electrónico de administración no es único, seleccione uno diferente
 org-changes-set-email-other-error: >-
@@ -483,6 +484,7 @@ status-complete: completo
 status-failed: fallido
 storage-usage: 'Uso de almacenamiento:'
 stored-externally: almacenado externamente
+stripe-billing-portal-will-be-opened-in-a-new-tab: El portal de facturación de Stripe se abrirá en una nueva pestaña
 submit: Entregar
 support: Apoyo
 switch-to-all-device: Cambiar a todos los dispositivos

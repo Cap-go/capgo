@@ -5,7 +5,6 @@ import { toast } from 'vue-sonner'
 import { downloadUrl } from './supabase'
 import { hideLoader, showLoader } from './loader'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
 import { i18n } from '~/modules/i18n'
 
 export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {

@@ -373,6 +373,7 @@ open-channel: Offener Kanal
 open-settings: Klicken Sie hier, um die Einstellungen zu öffnen
 open-sidebar: Seitenleiste öffnen
 open-this-link-to-le: Öffnen Sie diesen Link, um zu erfahren, wie Sie Ihr Update testen können
+open-your-portal: Öffnen Sie Ihr Portal
 org-changes-saved: Organisation erfolgreich aktualisiert
 org-changes-set-email-not-unique: >-
   Die Verwaltungs-E-Mail-Adresse ist nicht eindeutig. Bitte wählen Sie eine
@@ -489,6 +490,7 @@ status-complete: vollständig
 status-failed: fehlgeschlagen
 storage-usage: 'Speichernutzung:'
 stored-externally: extern gespeichert
+stripe-billing-portal-will-be-opened-in-a-new-tab: Das Stripe-Abrechnungsportal wird in einem neuen Tab geöffnet
 submit: Einreichen
 support: Unterstützung
 switch-to-all-device: Wechseln Sie zu allen Geräten

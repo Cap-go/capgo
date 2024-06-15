@@ -42,8 +42,8 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   })
 
   displayStore.dialogOption = {
-    header: 'Open your portal',
-    message: 'Stripe billing portal will be opened in a new tab',
+    header: t('open-your-portal'),
+    message: t('stripe-billing-portal-will-be-opened-in-a-new-tab'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -66,7 +66,7 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   return displayStore.onDialogDismiss()
 }
 
-export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string, t: ComposerTranslation) {
+export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
 //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
