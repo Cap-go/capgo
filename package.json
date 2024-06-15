@@ -108,6 +108,7 @@
     "@capgo/native-audio": "^6.3.2",
     "@capgo/native-market": "^6.0.1",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
+    "@formkit/i18n": "^1.6.5",
     "@formkit/themes": "1.6.5",
     "@formkit/vue": "1.6.5",
     "@hono/hono": "npm:@jsr/hono__hono@^4.4.3",

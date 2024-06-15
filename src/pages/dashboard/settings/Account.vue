@@ -6,17 +6,18 @@ import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
-import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import copy from 'copy-text-to-clipboard'
 import dayjs from 'dayjs'
+import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
-import { availableLocales, i18n, languages, loadLanguageAsync } from '~/modules/i18n'
+import { availableLocales, i18n, languages } from '~/modules/i18n'
 import { iconEmail, iconName } from '~/services/icons'
 import { pickPhoto, takePhoto } from '~/services/photos'
+import { changeLanguage, getEmoji } from '~/services/i18n'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -28,8 +29,6 @@ const isLoading = ref(false)
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
-// const errorMessage = ref('')
-
 async function deleteAccount() {
   displayStore.showActionSheet = true
   displayStore.actionSheetOption = {
@@ -156,24 +155,6 @@ async function presentActionSheet() {
       },
     ],
   }
-}
-function getEmoji(country: string) {
-  // convert country code to emoji flag
-  let countryCode = country
-  switch (country) {
-    case 'en':
-      countryCode = 'US'
-      break
-    case 'ko':
-      countryCode = 'KR'
-      break
-    case 'ja':
-      countryCode = 'JP'
-      break
-    default:
-      break
-  }
-  return countryCodeToFlagEmoji(countryCode)
 }
 
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
@@ -419,7 +400,7 @@ onMounted(async () => {
             <!-- Dropdown menu -->
             <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
               <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
-                <li v-for="locale in availableLocales" :key="locale" @click="loadLanguageAsync(locale)">
+                <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
                   <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
                 </li>
               </ul>
