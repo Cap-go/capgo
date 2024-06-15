@@ -89,6 +89,7 @@ button-back: 后退
 button-browse: 浏览
 button-camera: 相机
 button-cancel: 取消
+button-confirm: 确认
 button-delete: 删除
 button-deny-invite: 否定
 button-go: 去
@@ -103,6 +104,7 @@ button-toggle_dark: 切换深色模式
 button-toggle_langs: 更改语言
 by-clicking-on-them: 通过点击它们。
 cancel: 取消
+cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
@@ -123,6 +125,8 @@ cannot-view-plans: 无法查看计划页面
 cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
 change: 改变
+change-api-key-name: 更改 apikey 的名称
+changed-name: 已成功更改 apikey 名称
 changed-password-suc: 密码修改成功
 channel: 渠道
 channel-ab-testing: 启用AB测试
@@ -222,6 +226,7 @@ force-version-change: 跳过渐进式部署
 forgot: 忘记
 forgot-check-email: 检查您的电子邮件以获取重置密码的链接
 forgot-success: 密码更新成功
+free-trial: 免费试用
 from: 从
 from-device: 从设备
 general-information: 一般信息
@@ -317,6 +322,13 @@ name: 姓名
 need-more-contact-us: |-
   需要更多 ？
   联系我们获取量身定制的计划
+new-name-not-changed: 新名称与旧名称相同
+new-name-to-long: |-
+  新名字太长了。
+  您只能使用 32 个字符
+new-name-to-short: |-
+  apikey 名称太短。
+  长度必须至少为 4 个字符
 next: 下一个
 'no': 不
 no-channel-linked: 暂无频道，点击添加
@@ -461,11 +473,11 @@ to-live-reload: 住重新加载。
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps: 我的应用
 top-apps-v2: 应用
-trial: 审判
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
 type: ''
+type-new-name: 请输入新的 api 密钥名称
 undefined: 不明确的
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载

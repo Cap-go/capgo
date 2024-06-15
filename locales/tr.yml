@@ -89,6 +89,7 @@ button-back: Geri
 button-browse: Araştır
 button-camera: Kamera
 button-cancel: İptal etmek
+button-confirm: Onaylamak
 button-delete: Silmek
 button-deny-invite: Reddetmek
 button-go: GİTMEK
@@ -103,6 +104,7 @@ button-toggle_dark: Karanlık modu değiştir
 button-toggle_langs: Dilleri değiştir
 by-clicking-on-them: üzerlerine tıklayarak.
 cancel: İptal etmek
+cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
@@ -123,6 +125,8 @@ cannot-view-plans: Planlar sayfası görüntülenemiyor
 cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
 change: Değiştirmek
+change-api-key-name: Apikey'in adını değiştirin
+changed-name: Apikey'in adı başarıyla değiştirildi
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
 channel-ab-testing: AB testini etkinleştir
@@ -226,6 +230,7 @@ force-version-change: Aşamalı dağıtımı atla
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
+free-trial: Ücretsiz deneme
 from: Kimden
 from-device: cihazdan
 general-information: Genel Bilgiler
@@ -323,6 +328,13 @@ name: İsim
 need-more-contact-us: |-
   Daha fazlasına ihtiyaç var ? 
   Size özel plan için bize ulaşın
+new-name-not-changed: Yeni isim eskisiyle aynı
+new-name-to-long: |-
+  Yeni isim çok uzun. 
+  Yalnızca 32 karakter kullanabilirsiniz
+new-name-to-short: |-
+  Apikey adı çok kısa. 
+  En az 4 karakter uzunluğunda olmalı
 next: Sonraki
 'no': HAYIR
 no-channel-linked: Kanal yok, eklemek için tıklayın
@@ -390,6 +402,7 @@ plans-super-only: >-
   Yalnızca süper yöneticilerin planları ve faturalandırmayı görüntülemesine izin
   verilir
 platform: platformu
+please-ask-the-user-to-create-account-first: Lütfen önce kullanıcıdan hesap oluşturmasını isteyin
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
@@ -470,11 +483,11 @@ to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
 top-apps-v2: Uygulamalar
-trial: duruşma
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
 type: ''
+type-new-name: Lütfen yeni API anahtarı adını yazın
 undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı

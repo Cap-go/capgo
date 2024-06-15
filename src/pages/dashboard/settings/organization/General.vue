@@ -170,7 +170,11 @@ const acronym = computed(() => {
     <!-- TODO Classes are not working -->
     <FormKit id="update-org" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;" @submit="saveChanges">
       <div>
-        <section>
+        <h2 class="mt-2 mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('general-information') }}
+        </h2>
+        <div>{{ t('modify-org-info') }}</div>
+        <section class="mt-4">
           <div class="flex items-center">
             <div class="mr-4">
               <img
@@ -182,15 +186,11 @@ const acronym = computed(() => {
                 <p>{{ acronym }}</p>
               </div>
             </div>
-            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="presentActionSheet">
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
               {{ t('change') }}
             </button>
           </div>
         </section>
-        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-          {{ t('general-information') }}
-        </h2>
-        <div>{{ t('modify-org-info') }}</div>
         <div class="mt-3 mb-6">
           <FormKit
             type="text"
@@ -222,9 +222,6 @@ const acronym = computed(() => {
       <footer style="margin-top: auto">
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button type="button" class="text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700 dark:border-gray-700">
-              {{ t('cancel') }}
-            </button>
             <button
               id="save-changes"
               class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"

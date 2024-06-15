@@ -74,7 +74,7 @@ onUnmounted(() => {
     >
       <div v-show="dropdownOpen" class="absolute top-full z-30 mt-1 min-w-44 origin-top-right overflow-hidden border border-slate-200 rounded bg-gray-100 py-1.5 shadow-lg" :class="props.align === 'right' ? 'right-0' : 'left-0'">
         <div class="mb-1 border-b border-slate-200 px-3 pb-2 pt-0.5">
-          <div class="font-medium text-slate-800 mb-1 mt-1">
+          <div class="mt-1 mb-1 font-medium text-slate-800">
             {{ `${main.user?.first_name} ${main.user?.last_name}` }}
           </div>
         </div>

@@ -169,7 +169,8 @@ async function createNewOrg() {
   <div :class="`${!show ? 'invisible' : ''}`">
     <button
       id="organization-picker" data-dropdown-toggle="dropdown-org"
-      :class="`text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 ${!currentOrganization ? 'invisible' : ''}`"
+      class="text-gray-700 dark:text-white  border hover:bg-gray-100 dark:hover:bg-gray-600 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center"
+      :class="{ invisible: !currentOrganization }"
       type="button"
     >
       {{ currentOrganization?.name }}

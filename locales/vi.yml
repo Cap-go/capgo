@@ -93,6 +93,7 @@ button-back: Mặt sau
 button-browse: duyệt
 button-camera: Máy ảnh
 button-cancel: Hủy bỏ
+button-confirm: Xác nhận
 button-delete: Xóa bỏ
 button-deny-invite: Từ chối
 button-go: ĐI
@@ -107,6 +108,7 @@ button-toggle_dark: Chuyển đổi chế độ tối
 button-toggle_langs: Thay đổi ngôn ngữ
 by-clicking-on-them: bằng cách nhấp vào chúng.
 cancel: Hủy bỏ
+cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
@@ -127,6 +129,8 @@ cannot-view-plans: Không thể xem trang kế hoạch
 cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
 change: Thay đổi
+change-api-key-name: Thay đổi tên của apikey
+changed-name: Đã đổi tên apikey thành công
 changed-password-suc: Đã đổi mật khẩu thành công
 channel: Kênh
 channel-ab-testing: Bật thử nghiệm AB
@@ -228,6 +232,7 @@ force-version-change: Bỏ qua triển khai lũy tiến
 forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công
+free-trial: Dùng thử miễn phí
 from: Từ
 from-device: từ thiết bị
 general-information: Thông tin chung
@@ -325,6 +330,13 @@ name: Tên
 need-more-contact-us: |-
   Cần thêm? 
   Liên hệ với chúng tôi để có kế hoạch phù hợp
+new-name-not-changed: Tên mới vẫn giống tên cũ
+new-name-to-long: |-
+  Tên mới dài quá. 
+  Bạn chỉ có thể sử dụng 32 ký tự
+new-name-to-short: |-
+  Tên apikey quá ngắn. 
+  Nó phải dài ít nhất 4 ký tự
 next: Kế tiếp
 'no': KHÔNG
 no-channel-linked: Không có kênh, nhấp để thêm
@@ -471,11 +483,11 @@ to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
 top-apps-v2: Ứng dụng
-trial: sự thử nghiệm
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
 type: ''
+type-new-name: Vui lòng nhập tên khóa api mới
 undefined: không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt

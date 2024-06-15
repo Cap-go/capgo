@@ -95,6 +95,7 @@ button-back: Atrás
 button-browse: Navegar
 button-camera: Cámara
 button-cancel: Cancelar
+button-confirm: Confirmar
 button-delete: Borrar
 button-deny-invite: Denegar
 button-go: IR
@@ -109,6 +110,7 @@ button-toggle_dark: Alternar modo oscuro
 button-toggle_langs: Cambiar idiomas
 by-clicking-on-them: haciendo clic en ellos.
 cancel: Cancelar
+cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
@@ -131,6 +133,8 @@ cannot-view-plans: No puedo ver la página de planes
 cannot-view-usage: No se puede ver la página de uso
 cannots-sign-off: No se puede iniciar sesión
 change: Cambiar
+change-api-key-name: Cambiar el nombre del apikey
+changed-name: Cambió exitosamente el nombre de apikey
 changed-password-suc: Contraseña cambiada con éxito
 channel: Canal
 channel-ab-testing: Habilitar pruebas AB
@@ -238,6 +242,7 @@ forgot-check-email: >-
   Revise su correo electrónico para obtener el enlace para restablecer su
   contraseña
 forgot-success: Contraseña actualizada exitosamente
+free-trial: Prueba gratis
 from: Desde
 from-device: desde el dispositivo
 general-information: Información general
@@ -335,6 +340,13 @@ name: Nombre
 need-more-contact-us: |-
   Necesitar más ? 
   Contáctenos para un plan a medida
+new-name-not-changed: El nuevo nombre es el mismo que el antiguo.
+new-name-to-long: |-
+  El nuevo nombre es demasiado largo. 
+  Sólo puedes usar 32 caracteres.
+new-name-to-short: |-
+  El nombre apikey es demasiado corto. 
+  Debe tener al menos 4 caracteres.
 next: Próximo
 'no': 'No'
 no-channel-linked: No hay canal, haga clic para agregar
@@ -489,11 +501,11 @@ to-live-reload: vivir recargar.
 to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps: Mis aplicaciones
 top-apps-v2: Aplicaciones
-trial: ensayo
 trial-left: Días restantes
 trial-plan-expired: Prueba caducada
 trial-plan-expires-in: El juicio termina en
 type: ''
+type-new-name: Por favor escriba el nuevo nombre de la clave API
 undefined: indefinido
 undefined-fail: Indefinido (las actualizaciones fallarán)
 uninstall: desinstalado

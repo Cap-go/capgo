@@ -89,6 +89,7 @@ button-back: Kembali
 button-browse: Jelajahi
 button-camera: Kamera
 button-cancel: Membatalkan
+button-confirm: Mengonfirmasi
 button-delete: Menghapus
 button-deny-invite: Membantah
 button-go: PERGI
@@ -103,6 +104,7 @@ button-toggle_dark: Alihkan mode gelap
 button-toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
 cancel: Membatalkan
+cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
@@ -123,6 +125,8 @@ cannot-view-plans: Tidak dapat melihat halaman rencana
 cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
 change: Mengubah
+change-api-key-name: Ubah nama apikey
+changed-name: Berhasil mengubah nama apikey
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
 channel-ab-testing: Aktifkan pengujian AB
@@ -151,7 +155,6 @@ confirm-password: Konfirmasi sandi
 confirm-public-desc: >-
   Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
   semua pengguna Anda.
-
 
   Saluran default lainnya tidak akan menjadi default lagi.
 copied-to-clipboard: Disalin ke papan klip
@@ -230,6 +233,7 @@ forgot-check-email: >-
   Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
   Anda
 forgot-success: Kata sandi berhasil diperbarui
+free-trial: Uji coba gratis
 from: Dari
 from-device: dari perangkat
 general-information: Informasi Umum
@@ -310,7 +314,7 @@ min-update-version: Versi pembaruan minimal
 minor: Minor
 misconfigured: Salah dikonfigurasi
 misconfigured-channels: |-
-  Beberapa saluran salah dikonfigurasi. 
+  Beberapa saluran salah dikonfigurasi.
   Pembaruan akan gagal untuk saluran tersebut!
 mo: bulan
 modify-org-info: Anda dapat mengubah informasi organisasi di sini.
@@ -325,8 +329,15 @@ my-account: Akun saya
 my-notifications: Notifikasi Saya
 name: Nama
 need-more-contact-us: |-
-  Butuh lebih banyak? 
+  Butuh lebih banyak?
   Hubungi kami untuk rencana yang disesuaikan
+new-name-not-changed: Nama barunya sama dengan nama lama
+new-name-to-long: |-
+  Nama barunya terlalu panjang. 
+  Anda hanya dapat menggunakan 32 karakter
+new-name-to-short: |-
+  Nama apikey terlalu pendek. 
+  Panjangnya minimal harus 4 karakter
 next: Berikutnya
 'no': TIDAK
 no-channel-linked: Tidak ada saluran, klik untuk menambahkan
@@ -447,7 +458,7 @@ sign-out: Keluar
 size: Ukuran
 size-not-found: Tidak ditemukan
 something-went-wrong-try-again-later: |-
-  Ada yang salah! 
+  Ada yang salah!
   Coba lagi nanti.
 special-api-access: Akses API khusus
 specialError: Harus mengandung karakter khusus
@@ -475,11 +486,11 @@ to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 top-apps-v2: Aplikasi
-trial: uji coba
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
 type: ''
+type-new-name: Silakan ketik nama kunci api baru
 undefined: belum diartikan
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
