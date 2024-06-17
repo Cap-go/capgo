@@ -261,6 +261,25 @@ async function showAddNewKeyModal() {
 }
 
 async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
+  if (app.mode === 'upload') {
+    displayStore.dialogOption = {
+      header: t('warning'),
+      message: `${t('upload-key-tmp-disabled')}`,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('confirm-copy'),
+          id: 'confirm-copy',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss())
+      return
+  }
   copy(app.key)
   console.log('displayStore.messageToast', displayStore.messageToast)
   toast.success(t('key-copied'))
