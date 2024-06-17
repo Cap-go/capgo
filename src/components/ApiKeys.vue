@@ -275,7 +275,7 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
       <h1 class="ml-2 text-2xl font-bold text-slate-800 md:text-3xl dark:text-white">
         {{ t('api-keys') }}
       </h1>
-      <button type="button" class="ml-auto mr-2 text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
+      <button type="button" class="ml-auto mr-2 text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="addNewApiKey">
         <Plus />
         <p class="hidden ml-2 md:block">
           {{ t('api-key') }}
