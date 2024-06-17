@@ -14,8 +14,10 @@ import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconVersion from '~icons/radix-icons/update'
+import iconEmail from '~icons/oui/email?raw'
+import iconName from '~icons/ph/user?raw'
+import iconFlag from '~icons/ph/flag?raw'
 import { availableLocales, i18n, languages } from '~/modules/i18n'
-import { iconEmail, iconName } from '~/services/icons'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { changeLanguage, getEmoji } from '~/services/i18n'
 
@@ -439,7 +441,7 @@ onMounted(async () => {
               <FormKit
                 type="text"
                 name="country"
-                prefix-icon="flag"
+                :prefix-icon="iconFlag"
                 :disabled="isLoading"
                 :value="main.user?.country || ''"
                 enterkeyhint="send"

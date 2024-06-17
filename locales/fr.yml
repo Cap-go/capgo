@@ -62,8 +62,10 @@ allow-develoment-bui: Autoriser la compilation de développement
 allow-device-to-self: Autoriser les appareils à s'auto-associer
 allow-emulator: Autoriser les émulateurs
 already-account: Avez-vous déjà un compte?
+api-doc: Documentation API
 api-key: Clé API
 api-keys: Clés API
+api-keys-are-used-for-cli-and-public-api: Les clés API sont utilisées pour la CLI et l'API publique
 api-keys-key-copied: Clés API copiées
 app: Application
 app-deleted: Application supprimée
@@ -152,6 +154,7 @@ channels: Canaux
 check-email: Veuillez vérifier votre e-mail et vérifier
 check-on-web: Vérifier sur le site Web
 checksum: checksum
+cli-doc: Document CLI
 commands: commandes
 confirm-email: confirmez votre email
 confirm-email-sent: >-

@@ -60,8 +60,10 @@ allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
 allow-emulator: Разрешить эмуляторы
 already-account: У вас уже есть аккаунт?
+api-doc: API-документ
 api-key: ключ API
 api-keys: Ключи API
+api-keys-are-used-for-cli-and-public-api: Ключи API используются для CLI и общедоступного API.
 api-keys-key-copied: Ключи API
 app: Приложение
 app-deleted: Приложение удалено
@@ -150,6 +152,7 @@ channels: каналы
 check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
 check-on-web: Проверить на сайте
 checksum: Контрольная сумма
+cli-doc: Документация CLI
 commands: команды
 confirm-email: Подтвердите ваш адрес электронной почты
 confirm-email-sent: >-

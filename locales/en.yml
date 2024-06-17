@@ -56,8 +56,10 @@ allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
 already-account: You already have an account?
+api-doc: API doc
 api-key: API key
 api-keys: API Keys
+api-keys-are-used-for-cli-and-public-api: API keys are used for CLI and public API
 api-keys-key-copied: API Keys
 app: App
 app-deleted: App deleted
@@ -146,6 +148,7 @@ channels: Channels
 check-email: Please check your email and verify
 check-on-web: Check on website
 checksum: Checksum
+cli-doc: CLI doc
 commands: commands
 confirm-email: Confirm your email
 confirm-email-sent: A confirmation email was sent click to link to confirm your email
@@ -299,6 +302,8 @@ min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured
 misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
+missing-email: Missing email
+missing-name: Missing name
 mo: mo
 modify-org-info: You can modify the organization's informations here.
 module-heading: Modules

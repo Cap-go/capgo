@@ -56,8 +56,10 @@ allow-develoment-bui: Geliştirme derlemesine izin ver
 allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
 allow-emulator: Öykünücülere İzin Ver
 already-account: Zaten bir hesabınız var mı?
+api-doc: API belgesi
 api-key: API anahtarı
 api-keys: API Anahtarları
+api-keys-are-used-for-cli-and-public-api: API anahtarları CLI ve genel API için kullanılır
 api-keys-key-copied: API Anahtarları
 app: Uygulama
 app-deleted: Uygulama silindi
@@ -146,6 +148,7 @@ channels: Kanallar
 check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
 check-on-web: Web sitesinde kontrol edin
 checksum: sağlama toplamı
+cli-doc: CLI belgesi
 commands: komutlar
 confirm-email: e-postanızı onaylayın
 confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.

@@ -56,8 +56,10 @@ allow-develoment-bui: 允许开发构建
 allow-device-to-self: 允许设备自关联
 allow-emulator: 允许模拟器
 already-account: 你已经有一个账户了吗？
+api-doc: API文档
 api-key: API密钥
 api-keys: API 密钥
+api-keys-are-used-for-cli-and-public-api: API 密钥用于 CLI 和公共 API
 api-keys-key-copied: API 密钥
 app: 应用程序
 app-deleted: 应用已删除
@@ -146,6 +148,7 @@ channels: 频道
 check-email: 请检查您的电子邮件并验证
 check-on-web: 在网站上查看
 checksum: 校验和
+cli-doc: CLI文档
 commands: 命令
 confirm-email: 确认您的电子邮件
 confirm-email-sent: 已发送确认邮件，请点击链接确认您的电子邮件。

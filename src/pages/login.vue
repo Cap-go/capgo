@@ -12,7 +12,9 @@ import { Capacitor } from '@capacitor/core'
 import { initDropdowns } from 'flowbite'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
-import { iconEmail, iconPassword, mfaIcon } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
+import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { changeLanguage, getEmoji } from '~/services/i18n'
 import { availableLocales, i18n, languages } from '~/modules/i18n'
 
@@ -252,11 +254,11 @@ onMounted(checkLogin)
 
       <div v-if="stauts === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
-          <div class="px-4 py-6 sm:px-8 sm:py-7">
+          <div class="px-4 py-6 text-gray-500 sm:px-8 sm:py-7">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
-                  type="email" name="email" :disabled="isLoading" enterkeyhint="next" input-class="!text-black"
+                  type="email" name="email" :disabled="isLoading" enterkeyhint="next"
                   :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                   validation="required:trim"
                 />
@@ -271,7 +273,7 @@ onMounted(checkLogin)
                     </router-link>
                   </div>
                   <FormKit
-                    id="passwordInput" type="password" input-class="!text-black" :placeholder="t('password')"
+                    id="passwordInput" type="password" :placeholder="t('password')"
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
@@ -342,8 +344,8 @@ onMounted(checkLogin)
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <FormKit id="login-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
-              <div class="space-y-5">
+            <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
+              <div class="space-y-5 text-gray-500">
                 <FormKit
                   type="text" name="code" :disabled="isLoading" input-class="!text-black"
                   :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"

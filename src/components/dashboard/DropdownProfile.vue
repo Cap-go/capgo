@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { Dropdown, initDropdowns } from 'flowbite'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
@@ -7,12 +8,6 @@ import { useMainStore } from '~/stores/main'
 import { openMessenger } from '~/services/chatwoot'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
-const props = defineProps({
-  align: {
-    type: String,
-    default: 'left',
-  },
-})
 const { t } = useI18n()
 
 const router = useRouter()
@@ -29,89 +24,62 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 
-const dropdownOpen = ref(false)
-
-// close if the esc key is pressed
-function keyHandler(keyCode: any) {
-  if (!dropdownOpen.value || keyCode !== 27)
-    return
-  dropdownOpen.value = false
-}
-
+let dropdown: Dropdown
 onMounted(() => {
-  document.addEventListener('keydown', keyHandler)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', keyHandler)
+  initDropdowns()
+  dropdown = new Dropdown(
+    document.getElementById('dropdown-profile'),
+    document.getElementById('profile-picker'),
+  )
 })
 </script>
 
 <template>
-  <div class="relative inline-flex">
+  <div>
     <button
-      class="inline-flex items-center justify-center group"
-      aria-haspopup="true"
-      :aria-expanded="dropdownOpen"
-      @click.prevent="dropdownOpen = !dropdownOpen"
+      id="profile-picker" data-dropdown-toggle="dropdown-profile"
+      class="inline-flex items-center px-2 py-1 text-sm font-medium text-center text-gray-700 border rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 focus:ring-4 focus:outline-none focus:ring-blue-300"
+      type="button"
     >
       <img v-if="main.user?.image_url" class="w-8 h-8 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
       <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-full dark:border-white">
         <p>{{ acronym }}</p>
       </div>
-      <div class="items-center hidden truncate md:flex">
-        <span class="ml-2 text-sm font-medium truncate dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
+      <div class="flex items-center truncate">
+        <span class="hidden ml-2 text-sm font-medium truncate md:block dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
         <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
       </div>
     </button>
-    <transition
-      enter-active-class="transition duration-200 ease-out transform"
-      enter-from-class="-translate-y-2 opacity-0"
-      enter-to-class="translate-y-0 opacity-100"
-      leave-active-class="transition duration-200 ease-out"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-show="dropdownOpen" class="absolute top-full z-30 mt-1 min-w-44 origin-top-right overflow-hidden border border-slate-200 rounded bg-gray-100 py-1.5 shadow-lg" :class="props.align === 'right' ? 'right-0' : 'left-0'">
-        <div class="mb-1 border-b border-slate-200 px-3 pb-2 pt-0.5">
-          <div class="mt-1 mb-1 font-medium text-slate-800">
-            {{ `${main.user?.first_name} ${main.user?.last_name}` }}
-          </div>
+    <div id="dropdown-profile" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
+      <div class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+        <div>{{ `${main.user?.first_name} ${main.user?.last_name}` }}</div>
+        <div class="font-medium truncate">
+          {{ main.user?.email }}
         </div>
-        <ul
-          class="space-y-2"
-          @focusin="dropdownOpen = true"
-          @focusout="dropdownOpen = false"
-        >
-          <li>
-            <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/dashboard/settings/account" @click="dropdownOpen = false">
-              {{ t('settings') }}
-            </router-link>
-          </li>
-          <li v-if="isMobile">
-            <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/app/modules" @click="dropdownOpen = false">
-              {{ t('module-heading') }}
-            </router-link>
-          </li>
-          <li v-if="isMobile">
-            <router-link class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" to="/app/modules_test" @click="dropdownOpen = false">
-              {{ t('module-heading') }} {{ t('tests') }}
-            </router-link>
-          </li>
-          <hr>
-          <li>
-            <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="openMessenger">
-              {{ t('support') }}
-            </button>
-          </li>
-          <hr>
-          <li>
-            <button class="flex items-center px-3 py-1 text-sm font-medium text-blue-500 hover:text-blue-600" @click="main.logout().then(() => router.replace('/login'))">
-              {{ t('sign-out') }}
-            </button>
-          </li>
-        </ul>
       </div>
-    </transition>
+      <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownInformationButton">
+        <li>
+          <router-link to="/dashboard/settings/account" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+            {{ t('settings') }}
+          </router-link>
+        </li>
+        <li v-if="isMobile">
+          <router-link to="/app/modules_test" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+            {{ t('module-heading') }}
+          </router-link>
+        </li>
+        <li v-if="isMobile">
+          <router-link to="/app/modules" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+            {{ t('module-heading') }} {{ t('tests') }}
+          </router-link>
+        </li>
+        <li>
+          <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="openMessenger">{{ t('support') }}</a>
+        </li>
+      </ul>
+      <div class="py-2">
+        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white" @click="main.logout().then(() => router.replace('/login'))">{{ t('sign-out') }}</a>
+      </div>
+    </div>
   </div>
 </template>

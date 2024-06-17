@@ -56,8 +56,10 @@ allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 allow-emulator: Izinkan Emulator
 already-account: Anda sudah memiliki akun?
+api-doc: dokumen API
 api-key: Kunci API
 api-keys: Kunci API
+api-keys-are-used-for-cli-and-public-api: Kunci API digunakan untuk CLI dan API publik
 api-keys-key-copied: Kunci API
 app: Aplikasi
 app-deleted: Aplikasi dihapus
@@ -146,6 +148,7 @@ channels: Saluran
 check-email: Silakan periksa email Anda dan verifikasi
 check-on-web: Periksa di situs web
 checksum: Checksum
+cli-doc: dokumen CLI
 commands: perintah
 confirm-email: Konfirmasi email Anda
 confirm-email-sent: >-

@@ -10,12 +10,13 @@ import { useI18n } from 'vue-i18n'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import dayjs from 'dayjs'
+import { FormKit } from '@formkit/vue'
 import type { MobileColType, TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSortDown from '~icons/lucide/chevron-down'
-import IconSearch from '~icons/ic/round-search'
+import IconSearch from '~icons/ic/round-search?raw'
 import IconReload from '~icons/tabler/reload'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
 import IconClock from '~icons/heroicons/clock'
@@ -107,7 +108,7 @@ if (props.filters) {
 
 watch(preciseDates, () => {
   console.log('preciseDates', preciseDates.value)
-  emit('rangeChange', preciseDates.value)
+  emit('reload')
 })
 
 watch(searchVal, debounce(() => {
@@ -161,7 +162,6 @@ async function setTime(time: Minutes) {
       new Date(),
     ]
   }
-  // TODO: Closing is done in clickLeft
 }
 
 function formatValue(previewValue: Date[] | undefined) {
@@ -188,42 +188,42 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative pb-4 overflow-x-auto md:pb-0">
+  <div class="pb-4 overflow-x-auto md:pb-0 min-h-[500px]">
     <div class="flex items-start justify-between pb-4 md:items-center">
-      <div class="flex h-10 mb-2 md:mb-0">
-        <button class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
+      <div class="flex h-10 md:mb-0">
+        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 ml-4 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
-        <div :class="`flex-auto flex-col cursor-pointer flex items-center justify-center w-28 ${!showTimeDropdown ? 'hover:bg-gray-700 hover:text-white' : ''} rounded-l-lg ${currentSelected === 'general' ? 'bg-gray-100 text-gray-800' : ''}`" @click="clickLeft">
+      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
+        <div class="flex flex-col items-center justify-center flex-auto px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'hover:bg-gray-700 hover:text-white': !showTimeDropdown, 'general': currentSelected, 'bg-gray-100 text-gray-800': !currentSelected }" @click="clickLeft">
           <div class="flex items-center justify-center">
             <IconClock class="mr-1" />
-            <span>{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
+            <span class="hidden md:block">{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
           </div>
           <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
             <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
-              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(1)">
+              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 1, 'hover:bg-gray-700': currentGeneralTime !== 1 }" @click="setTime(1)">
                 {{ t('last-minute') }}
               </div>
-              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(3)">
+              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 3, 'hover:bg-gray-700': currentGeneralTime !== 3 }" @click="setTime(3)">
                 {{ t('last-3-minutes') }}
               </div>
-              <div class="w-full py-3 text-center hover:bg-gray-700" @click="setTime(15)">
+              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 15, 'hover:bg-gray-700': currentGeneralTime !== 15 }" @click="setTime(15)">
                 {{ t('last-15-minutes') }}
               </div>
             </div>
           </div>
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-600" />
-        <div :class="`flex-auto cursor-pointer flex items-center justify-center w-28 hover:bg-gray-700 rounded-r-lg ${currentSelected === 'precise' ? 'bg-gray-100 text-gray-800 hover:text-white' : ''}`" @click="clickRight">
+        <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-800 hover:text-white': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
               v-model="preciseDates"
-              :min-date="dayjs(thisOrganization?.subscription_start ?? 0).toDate()"
-              :max-date="new Date()"
+              :min-date="dayjs().subtract(30, 'day').toDate()"
+              :max-date="dayjs().toDate()"
               :start-time="startTime"
               prevent-min-max-navigation
               dark
@@ -231,9 +231,9 @@ onMounted(async () => {
               @update:model-value="clickRight"
             >
               <template #trigger>
-                <div class="flex flex-row items-center justify-center h-10 w-28">
+                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-6">
                   <IconCalendar class="mr-1" />
-                  <p>
+                  <p class="hidden md:block">
                     {{ t('custom') }}
                   </p>
                 </div>
@@ -298,12 +298,13 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div class="relative w-70 md:w-auto">
-        <label for="table-search" class="sr-only">{{ searchPlaceholder }}</label>
-        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-          <IconSearch class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-        </div>
-        <input id="table-search" v-model="searchVal" type="text" class="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 md:w-80 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400" :placeholder="searchPlaceholder">
+      <div class="flex h-10 w-70 md:w-auto">
+        <FormKit
+          v-model="searchVal"
+          :placeholder="searchPlaceholder"
+          :prefix-icon="IconSearch" :disabled="isLoading"
+          enterkeyhint="send"
+        />
       </div>
     </div>
     <div class="hidden md:block">
@@ -322,7 +323,7 @@ onMounted(async () => {
             </th>
           </tr>
         </thead>
-        <tbody v-if="!isLoading">
+        <tbody v-if="!isLoading && elementList.length !== 0">
           <tr
             v-for="(elem, i) in elementList" :key="i"
             :class="{ 'cursor-pointer': rowClick }"
@@ -341,7 +342,7 @@ onMounted(async () => {
           </tr>
         </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" class="max-w-sm animate-pulse">
+          <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse': isLoading }">
             <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-6 py-4">
               <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
@@ -351,7 +352,11 @@ onMounted(async () => {
     </div>
     <kList class="block !my-0 md:hidden">
       <kListItem
-        v-for="(elem, i) in elementList" :key="i"
+        v-for="(elem, i) in elementList"
+        :key="i"
+        content-class="block"
+        inner-class="block"
+        title-wrap-class="block"
         :title="displayValueKey(elem, findMobileCol('title'))"
         :footer="displayValueKey(elem, findMobileCol('footer'))"
         :header="displayValueKey(elem, findMobileCol('header'))"

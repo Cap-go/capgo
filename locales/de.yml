@@ -64,8 +64,10 @@ allow-develoment-bui: Entwicklungsbuild zulassen
 allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
 allow-emulator: Emulatoren zulassen
 already-account: Sie haben schon ein Konto?
+api-doc: API-Dokument
 api-key: API-Schlüssel
 api-keys: API-Schlüssel
+api-keys-are-used-for-cli-and-public-api: API-Schlüssel werden für CLI und öffentliche API verwendet
 api-keys-key-copied: API-Schlüssel
 app: App
 app-deleted: Anwendung gelöscht
@@ -154,6 +156,7 @@ channels: Kanäle
 check-email: Bitte überprüfen Sie Ihre E-Mail und bestätigen Sie
 check-on-web: Überprüfen Sie auf der Website
 checksum: Prüfsumme
+cli-doc: CLI-Dokument
 commands: Befehle
 confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-

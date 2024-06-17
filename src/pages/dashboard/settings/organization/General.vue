@@ -9,7 +9,8 @@ import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { iconEmail, iconName } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconName from '~icons/ph/user?raw'
 
 const { t } = useI18n()
 
@@ -166,7 +167,7 @@ const acronym = computed(() => {
 </script>
 
 <template>
-  <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0" style="min-height: 100%;">
+  <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0">
     <!-- TODO Classes are not working -->
     <FormKit id="update-org" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;" @submit="saveChanges">
       <div>

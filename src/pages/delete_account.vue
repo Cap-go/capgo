@@ -7,7 +7,8 @@ import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
-import { iconEmail, iconPassword } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
 import { useDisplayStore } from '~/stores/display'
 
 const supabase = useSupabase()

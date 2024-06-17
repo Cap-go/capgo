@@ -56,8 +56,10 @@ allow-develoment-bui: 개발 빌드 허용
 allow-device-to-self: 장치가 자체 연결하도록 허용
 allow-emulator: 에뮬레이터 허용
 already-account: 이미 계정이 있으신가요?
+api-doc: API 문서
 api-key: API 키
 api-keys: API 키
+api-keys-are-used-for-cli-and-public-api: API 키는 CLI 및 공개 API에 사용됩니다.
 api-keys-key-copied: API 키
 app: 앱
 app-deleted: 앱 삭제됨
@@ -146,6 +148,7 @@ channels: 채널
 check-email: 이메일을 확인하고 확인하십시오
 check-on-web: 웹사이트에서 확인
 checksum: 체크섬
+cli-doc: CLI 문서
 commands: 명령
 confirm-email: 이메일 확인
 confirm-email-sent: 확인 이메일이 전송되었습니다. 이메일을 확인하려면 링크를 클릭하세요.

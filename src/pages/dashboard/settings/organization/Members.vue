@@ -105,13 +105,10 @@ async function showInviteModal() {
         text: t('button-invite'),
         id: 'confirm-button',
         handler: async () => {
-          const input = document.getElementById('dialog-input-field') as HTMLInputElement | undefined
-          email = input?.value
+          email = displayStore.dialogInputText
 
-          if (!email || !input)
-            return
-
-          input.value = ''
+          if (!email)
+            toast.error(t('missing-email'))
 
           if (!validateEmail(email)) {
             toast.error(t('invalid-email'))
@@ -249,6 +246,12 @@ function acronym(email: string) {
   }
   return res.toUpperCase()
 }
+function canEdit(member: ExtendedOrganizationMember) {
+  return (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.created_by)
+}
+function canDelete(member: ExtendedOrganizationMember) {
+  return (member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by
+}
 </script>
 
 <template>
@@ -257,16 +260,18 @@ function acronym(email: string) {
       <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
         {{ t('members') }}
       </h2>
-      <button type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
+      <button type="button" class="text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
         <Plus />
-        {{ t('add-member') }}
+        <p class="hidden ml-2 md:block">
+          {{ t('add-member') }}
+        </p>
       </button>
     </div>
     <div class="flex flex-col overflow-y-auto md:mx-auto md:mt-5 md:w-full ">
       <dl id="members-div" class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
           <div id="member-card" class="flex justify-between my-2 ml-2 md:my-6">
-            <div class="flex">
+            <div class="hidden md:flex">
               <img
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
                 width="80" height="80" alt="profile_photo"
@@ -279,10 +284,10 @@ function acronym(email: string) {
               {{ `${member.email} (${member.role.replaceAll('_', ' ')})` }}
             </div>
             <div class="mt-auto mb-auto mr-4">
-              <button id="wrench-button" :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
+              <button id="wrench-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canEdit(member), invisible: !canEdit(member) }" @click="changeMemberPermission(member)">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button id="trash-button" :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">
+              <button id="trash-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canDelete(member), invisible: !canDelete(member) }" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>

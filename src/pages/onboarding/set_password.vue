@@ -6,7 +6,7 @@ import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
-import { iconPassword } from '~/services/icons'
+import iconPassword from '~icons/ph/key?raw'
 
 const isLoading = ref(false)
 const supabase = useSupabase()

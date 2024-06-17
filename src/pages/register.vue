@@ -7,7 +7,9 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { initDropdowns } from 'flowbite'
 import { useSupabase } from '~/services/supabase'
-import { iconEmail, iconName, iconPassword } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconName from '~icons/ph/user?raw'
+import iconPassword from '~icons/ph/key?raw'
 import { reflioLoader } from '~/services/reflio'
 import { changeLanguage, getEmoji } from '~/services/i18n'
 import { availableLocales, i18n, languages } from '~/modules/i18n'
@@ -89,7 +91,7 @@ onMounted(async () => {
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages />
-              <div class="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+              <div class="space-y-2 text-gray-500 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <FormKit
                   type="text"
                   name="first_name"

@@ -60,8 +60,10 @@ allow-develoment-bui: Cho phép xây dựng phát triển
 allow-device-to-self: Cho phép các thiết bị tự liên kết
 allow-emulator: Cho phép giả lập
 already-account: Bạn đã có tài khoản?
+api-doc: tài liệu API
 api-key: Mã API
 api-keys: Khóa API
+api-keys-are-used-for-cli-and-public-api: Khóa API được sử dụng cho CLI và API công khai
 api-keys-key-copied: Khóa API
 app: Ứng dụng
 app-deleted: Đã xóa ứng dụng
@@ -150,6 +152,7 @@ channels: Kênh truyền hình
 check-email: Vui lòng kiểm tra email của bạn và xác minh
 check-on-web: Kiểm tra trên trang web
 checksum: tổng kiểm tra
+cli-doc: tài liệu CLI
 commands: mệnh lệnh
 confirm-email: Xác nhận email của bạn
 confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn

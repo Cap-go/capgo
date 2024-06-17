@@ -273,13 +273,27 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
     <div class="mb-6 flex flex-row w-[66.666667%] ml-auto mr-auto">
       <!-- Title -->
       <h1 class="ml-2 text-2xl font-bold text-slate-800 md:text-3xl dark:text-white">
-        CLI {{ t('api-keys') }}
+        {{ t('api-keys') }}
       </h1>
-      <button class="ml-auto mr-2 " @click="addNewApiKey()">
-        <Plus class="text-green-500" />
+      <button type="button" class="ml-auto mr-2 text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
+        <Plus />
+        <p class="hidden ml-2 md:block">
+          {{ t('api-key') }}
+        </p>
       </button>
     </div>
     <div class="flex flex-col">
+      <p class="mx-3 mb-2 md:mx-auto">
+        {{ t('api-keys-are-used-for-cli-and-public-api') }}
+      </p>
+      <div class="mx-3 mb-2 md:mx-auto">
+        <a class="text-blue-500 underline" href="https://capgo.app/docs/tooling/cli/" target="_blank">
+          {{ t('cli-doc') }}
+        </a>
+        <a class="ml-1 text-blue-500 underline" href="https://capgo.app/docs/tooling/api/" target="_blank">
+          {{ t('api-doc') }}
+        </a>
+      </div>
       <div class="flex flex-col overflow-hidden overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl :key="magicVal" class="divide-y divide-gray-500">
           <InfoRow v-for="key in keys" :key="key.id" :label="key.mode.toUpperCase()" :value="key.name" :is-link="true">

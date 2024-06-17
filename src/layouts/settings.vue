@@ -16,10 +16,6 @@ import { useOrganizationStore } from '~/stores/organization'
 import { openPortal } from '~/services/stripe'
 import { isSpoofed } from '~/services/supabase'
 
-// import ky from 'ky'
-// import MdiInvoiceListOutline from '~icons/mdi/invoice-list-outline';
-// import { toast } from 'vue-sonner'
-
 const { t } = useI18n()
 const main = useMainStore()
 const displayStore = useDisplayStore()

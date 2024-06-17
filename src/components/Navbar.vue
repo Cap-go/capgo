@@ -40,7 +40,7 @@ const { t } = useI18n()
 
 <template>
   <header class="border-b border-slate-200 bg-white/90 backdrop-blur-xl dark:bg-gray-900/90">
-    <div class="px-4 lg:px-8 sm:px-6">
+    <div class="px-2 lg:px-8 sm:px-6">
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex">
@@ -69,10 +69,10 @@ const { t } = useI18n()
         </div>
         <!-- Header: Right side -->
         <div class="flex items-center space-x-3">
-          <div class=" mr-2">
+          <div class="flex md:mr-2">
             <dropdown-organization />
+            <UserMenu align="right" class="ml-2" />
           </div>
-          <UserMenu align="right" />
         </div>
       </div>
     </div>
