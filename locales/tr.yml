@@ -316,6 +316,8 @@ misconfigured: Yanlış yapılandırılmış
 misconfigured-channels: |-
   Bazı kanallar yanlış yapılandırılmış. 
   Bu kanallar için güncellemeler başarısız olacaktır!
+missing-email: Eksik e-posta
+missing-name: Eksik ad
 mo: Ay
 modify-org-info: Kuruluşun bilgilerini buradan değiştirebilirsiniz.
 module-heading: Modüller

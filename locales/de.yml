@@ -330,6 +330,8 @@ misconfigured: Falsch konfiguriert
 misconfigured-channels: |-
   Einige Kanäle sind falsch konfiguriert. 
   Updates werden für diese Kanäle fehlschlagen!
+missing-email: Fehlende E-Mail
+missing-name: Fehlender Name
 mo: Mon
 modify-org-info: Sie können die Informationen der Organisation hier ändern.
 module-heading: Module

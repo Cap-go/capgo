@@ -322,6 +322,8 @@ misconfigured: Non configurato correttamente
 misconfigured-channels: |-
   Alcuni canali sono configurati in modo errato. 
   Gli aggiornamenti falliranno per quei canali!
+missing-email: E-mail mancante
+missing-name: Nome mancante
 mo: mo
 modify-org-info: Puoi modificare le informazioni dell'organizzazione qui.
 module-heading: Moduli

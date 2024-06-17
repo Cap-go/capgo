@@ -319,6 +319,8 @@ misconfigured: Salah dikonfigurasi
 misconfigured-channels: |-
   Beberapa saluran salah dikonfigurasi.
   Pembaruan akan gagal untuk saluran tersebut!
+missing-email: Email tidak ada
+missing-name: Nama tidak ada
 mo: bulan
 modify-org-info: Anda dapat mengubah informasi organisasi di sini.
 module-heading: Modul

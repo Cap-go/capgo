@@ -318,6 +318,8 @@ misconfigured: Bị định cấu hình sai
 misconfigured-channels: |-
   Một số kênh bị định cấu hình sai. 
   Cập nhật sẽ không thành công đối với các kênh đó!
+missing-email: Thiếu email
+missing-name: Thiếu tên
 mo: Th
 modify-org-info: Bạn có thể sửa đổi thông tin của tổ chức tại đây.
 module-heading: mô-đun

@@ -328,6 +328,8 @@ misconfigured: Mal configurado
 misconfigured-channels: |-
   Algunos canales están mal configurados. 
   ¡Las actualizaciones fallarán para esos canales!
+missing-email: correo electrónico faltante
+missing-name: Nombre faltante
 mo: mes
 modify-org-info: Puedes modificar los datos de la organización aquí.
 module-heading: Módulos

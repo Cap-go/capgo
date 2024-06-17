@@ -310,6 +310,8 @@ misconfigured: 配置错误
 misconfigured-channels: |-
   某些通道配置错误。
   这些频道的更新将失败！
+missing-email: 缺少电子邮件
+missing-name: 缺少名字
 mo: 月
 modify-org-info: 您可以在此处修改组织的信息。
 module-heading: 模块
