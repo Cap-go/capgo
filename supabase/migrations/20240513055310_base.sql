@@ -1275,8 +1275,8 @@ CREATE OR REPLACE FUNCTION "public"."guard_r2_path"() RETURNS "trigger"
     RETURN NEW;
   END IF;
 
-  IF NEW."r2_path" is distinct from (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, encode(NEW.app_id::bytea, 'base64'), NEW.id)) THEN
-    RAISE EXCEPTION 'The expected r2_path is %', (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, encode(NEW.app_id::bytea, 'base64'), NEW.id));
+  IF NEW."r2_path" is distinct from (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id, NEW.id)) THEN
+    RAISE EXCEPTION 'The expected r2_path is %', (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id), NEW.id));
   END IF;
 
    RETURN NEW;
