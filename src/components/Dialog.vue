@@ -93,7 +93,7 @@ onMounted(() => {
     aria-hidden="true"
     class="fixed left-0 right-0 top-0 z-50 hidden h-[calc(100%-1rem)] w-full overflow-x-hidden overflow-y-auto p-4 md:inset-0 md:h-full"
   >
-    <div id="popout" class="relative w-full h-auto" :class="{ 'max-w-2xl': !displayStore.dialogOption?.size }">
+    <div id="popout" class="relative w-full h-auto" :class="displayStore.dialogOption?.size ?? 'max-w-2xl'">
       <!-- Modal content -->
       <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
         <!-- Modal header -->
