@@ -110,6 +110,7 @@ by-clicking-on-them: clicando sobre eles.
 cancel: Cancelar
 cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
+cannot-create-org: Não é possível criar uma organização. Verifique os registros do navegador!
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-app-version: Não é possível excluir a versão do aplicativo
@@ -167,6 +168,7 @@ copy-command: Copiar comando
 copy-your: Copie o seu
 country: País
 create-a-free-accoun: Criar uma conta gratuita
+create-new-org: Criar uma nova organização
 created-at: Criado em
 current-billing-cycle: Ciclo de faturamento atual
 custom: Personalizado
@@ -224,6 +226,7 @@ error: Erro
 external-storage: Armazenamento externo
 fail: Falha na instalação
 failed: Fracassado
+failed-to-get-user: Falha ao carregar o usuário
 fast-backward: Retrocesso rápido
 fast-forward: Avanço rápido
 filters: Filtros
@@ -316,6 +319,8 @@ misconfigured: Mal configurado
 misconfigured-channels: |-
   Alguns canais estão configurados incorretamente. 
   As atualizações falharão para esses canais!
+missing-email: E-mail ausente
+missing-name: Nome ausente
 mo: m
 modify-org-info: Você pode modificar as informações da organização aqui.
 module-heading: Módulos
@@ -368,7 +373,9 @@ org-changes-set-email-not-unique: O e-mail de gerenciamento não é único. Sele
 org-changes-set-email-other-error: >-
   Não é possível definir o e-mail de gerenciamento. Entre em contato com o
   suporte
+org-created-successfully: Organização criada com sucesso!
 org-invited-user: Usuário convidado para a organização com sucesso
+org-with-this-name-exists: Você já criou uma organização com este nome!
 organization-email: E-mail de gerenciamento da organização
 organization-name: Nome da organização
 organization-settings: Configurações da organização
@@ -497,6 +504,7 @@ trial-plan-expired: Versao de teste expirada
 trial-plan-expires-in: O teste termina em
 type: ''
 type-new-name: Digite o novo nome da chave de API
+type-new-org-name: Digite o novo nome da organização
 undefined: indefinido
 undefined-fail: Indefinido (as atualizações falharão)
 uninstall: Desinstalado

@@ -114,6 +114,7 @@ by-clicking-on-them: en cliquant dessus.
 cancel: Annuler
 cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
+cannot-create-org: "Impossible de créer une organisation, veuillez vérifier les journaux du navigateur\_!"
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-app-version: Impossible de supprimer la version de l'application
@@ -173,6 +174,7 @@ copy-command: Copier la commande
 copy-your: Copiez votre
 country: Pays
 create-a-free-accoun: Créer un compte gratuit
+create-new-org: Créer une nouvelle organisation
 created-at: Créé à
 current-billing-cycle: Cycle de facturation en cours
 custom: Coutume
@@ -232,6 +234,7 @@ error: Erreur
 external-storage: Stockage externe
 fail: Échec de l'installation
 failed: Échoué
+failed-to-get-user: Échec du chargement de l'utilisateur
 fast-backward: Retour rapide
 fast-forward: Avance rapide
 filters: Filtres
@@ -372,7 +375,9 @@ open-your-portal: Ouvrez votre portail
 org-changes-saved: Organisation mise à jour avec succès
 org-changes-set-email-not-unique: L'e-mail de gestion n'est pas unique, veuillez en sélectionner un autre
 org-changes-set-email-other-error: Impossible de définir l'e-mail de gestion, veuillez contacter l'assistance
+org-created-successfully: "Organisation créée avec succès\_!"
 org-invited-user: L'utilisateur a été invité avec succès dans l'organisation
+org-with-this-name-exists: "Vous avez déjà créé une organisation portant ce nom\_!"
 organization-email: E-mail de gestion de l'organisation
 organization-name: nom de l'organisation
 organization-settings: Paramètres de l'organisation
@@ -503,6 +508,7 @@ trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
 type: ''
 type-new-name: Veuillez saisir le nouveau nom de la clé API
+type-new-org-name: Veuillez saisir le nouveau nom de l'organisation
 undefined: indéfini
 undefined-fail: Non défini (les mises à jour échoueront)
 uninstall: Désinstaller

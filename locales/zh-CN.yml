@@ -108,6 +108,7 @@ by-clicking-on-them: 通过点击它们。
 cancel: 取消
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
+cannot-create-org: 无法创建组织，请检查浏览器日志！
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-app-version: 无法删除应用版本
@@ -163,6 +164,7 @@ copy-command: 复制指令
 copy-your: 复制你的
 country: 国家
 create-a-free-accoun: 创建一个免费帐户
+create-new-org: 创建一个新组织
 created-at: 创建于
 current-billing-cycle: 当前账单周期
 custom: 风俗
@@ -220,6 +222,7 @@ error: 错误
 external-storage: 外置储存
 fail: 安装失败
 failed: 失败的
+failed-to-get-user: 加载用户失败
 fast-backward: 快退
 fast-forward: 快进
 filters: 过滤器
@@ -360,7 +363,9 @@ open-your-portal: 打开您的门户
 org-changes-saved: 组织更新成功
 org-changes-set-email-not-unique: 管理邮箱不唯一，请选择其他邮箱
 org-changes-set-email-other-error: 无法设置管理邮箱，请联系支持
+org-created-successfully: 组织创建成功！
 org-invited-user: 已成功邀请用户加入组织
+org-with-this-name-exists: 您已经使用此名称创建了一个组织！
 organization-email: 组织的管理电子邮件
 organization-name: 机构名称
 organization-settings: 组织设置
@@ -485,6 +490,7 @@ trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
 type: ''
 type-new-name: 请输入新的 api 密钥名称
+type-new-org-name: 请输入组织的新名称
 undefined: 不明确的
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载
