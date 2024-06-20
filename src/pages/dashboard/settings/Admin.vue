@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
+import iconPassword from '~icons/ph/key?raw'
 
 const route = useRoute()
 const isLoading = ref(false)
@@ -118,11 +119,10 @@ function reset() {
 
           <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">UUID</label>
               <FormKit
                 type="text"
                 name="uuid"
-                prefix-icon="password"
+                :prefix-icon="iconPassword"
                 :disabled="isLoading"
                 enterkeyhint="send"
                 autofocus

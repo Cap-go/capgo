@@ -7,7 +7,8 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { iconEmail, iconPassword } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
 
 const { t } = useI18n()
 const router = useRouter()

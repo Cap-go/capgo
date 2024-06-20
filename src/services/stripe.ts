@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { toast } from 'vue-sonner'
+import type { ComposerTranslation } from 'vue-i18n'
 import { useSupabase } from './supabase'
 import { useDisplayStore } from '~/stores/display'
 
@@ -25,34 +26,44 @@ export function openBlank(link: string) {
   else
     window.open(link, '_blank')
 }
-export async function openPortal(orgId: string) {
-//   console.log('openPortal')
+export async function openPortal(orgId: string, t: ComposerTranslation) {
+  let url = ''
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
     return
-  displayStore.messageLoader = 'Please wait...'
-  displayStore.showLoader = true
-  try {
-    const resp = await supabase.functions.invoke('private/stripe_portal', {
-      body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
-    })
-    console.error('stripe_portal', resp)
-    displayStore.showLoader = false
-    if (!resp.error && resp.data && resp.data.url) {
-      console.error('resp.data.url', resp.data.url)
-      openBlank(resp.data.url)
+
+  const prem = supabase.functions.invoke('private/stripe_portal', {
+    body: JSON.stringify({ callbackUrl: window.location.href, orgId }),
+  }).then(({ data }) => {
+    if (data?.url) {
+      url = data.url
     }
-    else {
-      toast.error('Cannot open your portal')
-    }
+  })
+
+  displayStore.dialogOption = {
+    header: t('open-your-portal'),
+    message: t('stripe-billing-portal-will-be-opened-in-a-new-tab'),
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        handler: async () => {
+          await prem
+          if (url)
+            openBlank(url)
+          else
+            toast.error('Cannot open your portal')
+        },
+      },
+    ],
   }
-  catch (error) {
-    console.error('Error unknow', error)
-    displayStore.showLoader = false
-    toast.error('Cannot get your portal')
-  }
-  return null
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
@@ -61,9 +72,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   const session = await supabase.auth.getSession()
   if (!session)
     return
-  displayStore.messageLoader = 'Please wait...'
   try {
-    displayStore.showLoader = true
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
         priceId,
@@ -73,13 +82,11 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         orgId,
       }),
     })
-    displayStore.showLoader = false
     if (!resp.error && resp.data && resp.data.url)
       openBlank(resp.data.url)
   }
   catch (error) {
     console.error(error)
-    displayStore.showLoader = false
     toast.error('Cannot get your checkout')
   }
 }

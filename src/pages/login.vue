@@ -9,9 +9,14 @@ import { toast } from 'vue-sonner'
 import type { Factor } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
+import { initDropdowns } from 'flowbite'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { hideLoader } from '~/services/loader'
-import { iconEmail, iconPassword, mfaIcon } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
+import mfaIcon from '~icons/simple-icons/2fas?raw'
+import { changeLanguage, getEmoji } from '~/services/i18n'
+import { availableLocales, i18n, languages } from '~/modules/i18n'
 
 const route = useRoute()
 const supabase = useSupabase()
@@ -120,6 +125,7 @@ async function submit(form: { email: string, password: string, code: string }) {
 }
 
 async function checkLogin() {
+  initDropdowns()
   isLoading.value = true
   const resUser = await supabase.auth.getUser()
   const user = resUser?.data.user
@@ -248,11 +254,11 @@ onMounted(checkLogin)
 
       <div v-if="stauts === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
-          <div class="px-4 py-6 sm:px-8 sm:py-7">
+          <div class="px-4 py-6 text-gray-500 sm:px-8 sm:py-7">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
-                  type="email" name="email" :disabled="isLoading" enterkeyhint="next" input-class="!text-black"
+                  type="email" name="email" :disabled="isLoading" enterkeyhint="next"
                   :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                   validation="required:trim"
                 />
@@ -267,7 +273,7 @@ onMounted(checkLogin)
                     </router-link>
                   </div>
                   <FormKit
-                    id="passwordInput" type="password" input-class="!text-black" :placeholder="t('password')"
+                    id="passwordInput" type="password" :placeholder="t('password')"
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
@@ -319,12 +325,27 @@ onMounted(checkLogin)
             </FormKit>
           </div>
         </div>
+        <section class="flex flex-col mt-6 md:flex-row md:items-center items-left">
+          <div class="mx-auto">
+            <button id="dropdownDefaultButton" data-dropdown-toggle="dropdown" class="text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center border dark:focus:ring-blue-800" type="button">
+              {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <!-- Dropdown menu -->
+            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
+              <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+                <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
+                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
       </div>
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <FormKit id="login-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
-              <div class="space-y-5">
+            <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
+              <div class="space-y-5 text-gray-500">
                 <FormKit
                   type="text" name="code" :disabled="isLoading" input-class="!text-black"
                   :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"

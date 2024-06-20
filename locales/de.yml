@@ -64,8 +64,10 @@ allow-develoment-bui: Entwicklungsbuild zulassen
 allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
 allow-emulator: Emulatoren zulassen
 already-account: Sie haben schon ein Konto?
+api-doc: API-Dokument
 api-key: API-Schlüssel
 api-keys: API-Schlüssel
+api-keys-are-used-for-cli-and-public-api: API-Schlüssel werden für CLI und öffentliche API verwendet
 api-keys-key-copied: API-Schlüssel
 app: App
 app-deleted: Anwendung gelöscht
@@ -97,6 +99,7 @@ button-back: Zurück
 button-browse: Durchsuche
 button-camera: Kamera
 button-cancel: Stornieren
+button-confirm: Bestätigen
 button-delete: Löschen
 button-deny-invite: Leugnen
 button-go: GEHEN
@@ -111,6 +114,7 @@ button-toggle_dark: Dunkelmodus umschalten
 button-toggle_langs: Sprachen ändern
 by-clicking-on-them: indem Sie darauf klicken.
 cancel: Stornieren
+cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-icon: App-Symbol kann nicht gelöscht werden
@@ -131,6 +135,8 @@ cannot-view-plans: Die Seite mit den Plänen kann nicht angezeigt werden
 cannot-view-usage: Die Nutzungsseite kann nicht angezeigt werden
 cannots-sign-off: Protokollierung nicht möglich
 change: Ändern
+change-api-key-name: Ändern Sie den Namen des Apikeys
+changed-name: Der Name von apikey wurde erfolgreich geändert
 changed-password-suc: das Passwort wurde erfolgreich geändert
 channel: Kanal
 channel-ab-testing: Aktivieren Sie AB-Tests
@@ -150,6 +156,7 @@ channels: Kanäle
 check-email: Bitte überprüfen Sie Ihre E-Mail und bestätigen Sie
 check-on-web: Überprüfen Sie auf der Website
 checksum: Prüfsumme
+cli-doc: CLI-Dokument
 commands: Befehle
 confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-
@@ -238,6 +245,7 @@ forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
   erhalten
 forgot-success: Passwort erfolgreich aktualisiert
+free-trial: Kostenlose Testphase
 from: von
 from-device: vom Gerät
 general-information: Allgemeine Informationen
@@ -322,6 +330,8 @@ misconfigured: Falsch konfiguriert
 misconfigured-channels: |-
   Einige Kanäle sind falsch konfiguriert. 
   Updates werden für diese Kanäle fehlschlagen!
+missing-email: Fehlende E-Mail
+missing-name: Fehlender Name
 mo: Mon
 modify-org-info: Sie können die Informationen der Organisation hier ändern.
 module-heading: Module
@@ -337,6 +347,13 @@ name: Name
 need-more-contact-us: |-
   Brauche mehr ? 
   Kontaktieren Sie uns für einen maßgeschneiderten Plan
+new-name-not-changed: Der neue Name ist derselbe wie der alte
+new-name-to-long: |-
+  Der neue Name ist zu lang. 
+  Sie können nur 32 Zeichen verwenden
+new-name-to-short: |-
+  Der apikey-Name ist zu kurz. 
+  Es muss mindestens 4 Zeichen lang sein
 next: Nächste
 'no': NEIN
 no-channel-linked: Kein Kanal, zum Hinzufügen klicken
@@ -361,6 +378,7 @@ open-channel: Offener Kanal
 open-settings: Klicken Sie hier, um die Einstellungen zu öffnen
 open-sidebar: Seitenleiste öffnen
 open-this-link-to-le: Öffnen Sie diesen Link, um zu erfahren, wie Sie Ihr Update testen können
+open-your-portal: Öffnen Sie Ihr Portal
 org-changes-saved: Organisation erfolgreich aktualisiert
 org-changes-set-email-not-unique: >-
   Die Verwaltungs-E-Mail-Adresse ist nicht eindeutig. Bitte wählen Sie eine
@@ -477,6 +495,7 @@ status-complete: vollständig
 status-failed: fehlgeschlagen
 storage-usage: 'Speichernutzung:'
 stored-externally: extern gespeichert
+stripe-billing-portal-will-be-opened-in-a-new-tab: Das Stripe-Abrechnungsportal wird in einem neuen Tab geöffnet
 submit: Einreichen
 support: Unterstützung
 switch-to-all-device: Wechseln Sie zu allen Geräten
@@ -495,11 +514,11 @@ to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
 top-apps-v2: Apps
-trial: Versuch
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
 type: ''
+type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
 undefined: nicht definiert
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert

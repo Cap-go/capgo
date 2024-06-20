@@ -112,7 +112,7 @@ export function updateOrCreateChannel(c: Context, update: Database['public']['Ta
   }
   return supabaseAdmin(c)
     .from('channels')
-    .upsert(update)
+    .upsert(update, { onConflict: 'app_id, name' })
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)

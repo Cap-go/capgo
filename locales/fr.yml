@@ -62,8 +62,10 @@ allow-develoment-bui: Autoriser la compilation de développement
 allow-device-to-self: Autoriser les appareils à s'auto-associer
 allow-emulator: Autoriser les émulateurs
 already-account: Avez-vous déjà un compte?
+api-doc: Documentation API
 api-key: Clé API
 api-keys: Clés API
+api-keys-are-used-for-cli-and-public-api: Les clés API sont utilisées pour la CLI et l'API publique
 api-keys-key-copied: Clés API copiées
 app: Application
 app-deleted: Application supprimée
@@ -95,6 +97,7 @@ button-back: Retour
 button-browse: Parcourir
 button-camera: Caméra
 button-cancel: Annuler
+button-confirm: Confirmer
 button-delete: Supprimer
 button-deny-invite: Refuser
 button-go: ALLER
@@ -109,6 +112,7 @@ button-toggle_dark: Basculer en mode sombre
 button-toggle_langs: Changer de langue
 by-clicking-on-them: en cliquant dessus.
 cancel: Annuler
+cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
@@ -129,6 +133,8 @@ cannot-view-plans: Impossible d'afficher la page des forfaits
 cannot-view-usage: Impossible d'afficher la page d'utilisation
 cannots-sign-off: Impossible de se connecter
 change: Changement
+change-api-key-name: Changer le nom de l'apikey
+changed-name: Le nom d'Apikey a été modifié avec succès
 changed-password-suc: Le mot de passe a été changé avec succès
 channel: Canaux
 channel-ab-testing: Activer les tests AB
@@ -148,6 +154,7 @@ channels: Canaux
 check-email: Veuillez vérifier votre e-mail et vérifier
 check-on-web: Vérifier sur le site Web
 checksum: checksum
+cli-doc: Document CLI
 commands: commandes
 confirm-email: confirmez votre email
 confirm-email-sent: >-
@@ -236,6 +243,7 @@ forgot-check-email: >-
   Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
   passe
 forgot-success: Mot de passe mis à jour avec succès
+free-trial: Essai gratuit
 from: Du
 from-device: depuis l'appareil
 general-information: Informations générales
@@ -316,6 +324,8 @@ min-update-version: Version de mise à jour minimale
 minor: Mineure
 misconfigured: Mal configuré
 misconfigured-channels: "Certaines chaînes sont mal configurées. \nLes mises à jour échoueront pour ces chaînes\_!"
+missing-email: E-mail manquant
+missing-name: Nom manquant
 mo: mo
 modify-org-info: Vous pouvez modifier les informations de l'organisation ici.
 module-heading: Modules
@@ -331,6 +341,9 @@ name: Nom
 need-more-contact-us: |-
   Besoin de plus ? 
   Contactez-nous pour un plan sur mesure
+new-name-not-changed: Le nouveau nom est le même que l'ancien
+new-name-to-long: "Le nouveau nom est trop long. \nVous ne pouvez utiliser que 32\_caractères"
+new-name-to-short: "Le nom de l'apikey est trop court. \nIl doit contenir au moins 4\_caractères"
 next: Suivant
 'no': Non
 no-channel-linked: Pas de canal, cliquez pour ajouter
@@ -355,6 +368,7 @@ open-channel: Canal ouvert
 open-settings: Cliquez pour ouvrir les paramètres
 open-sidebar: Ouvrir la barre latérale
 open-this-link-to-le: Ouvrez ce lien pour savoir comment tester votre mise à jour
+open-your-portal: Ouvrez votre portail
 org-changes-saved: Organisation mise à jour avec succès
 org-changes-set-email-not-unique: L'e-mail de gestion n'est pas unique, veuillez en sélectionner un autre
 org-changes-set-email-other-error: Impossible de définir l'e-mail de gestion, veuillez contacter l'assistance
@@ -465,6 +479,7 @@ status-complete: complet
 status-failed: échoué
 storage-usage: "Utilisation du stockage\_:"
 stored-externally: stocké en externe
+stripe-billing-portal-will-be-opened-in-a-new-tab: Le portail de facturation Stripe sera ouvert dans un nouvel onglet
 submit: Soumettre
 support: Support
 switch-to-all-device: Passer à tous les appareils
@@ -483,11 +498,11 @@ to-live-reload: pour recharger en direct.
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps: Mes applications
 top-apps-v2: applications
-trial: procès
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
 type: ''
+type-new-name: Veuillez saisir le nouveau nom de la clé API
 undefined: indéfini
 undefined-fail: Non défini (les mises à jour échoueront)
 uninstall: Désinstaller

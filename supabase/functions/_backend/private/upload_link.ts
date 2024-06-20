@@ -62,7 +62,8 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     }
 
     // const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
-    const filePath = `orgs/${app.owner_org}/apps/${btoa(app.app_id)}/${version.id}.zip`
+    // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/ee.forgr.capacitor_go/11.zip
+    const filePath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}.zip`
     console.log(filePath)
     // check if app version exist
 
@@ -104,8 +105,6 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       response = { url }
     }
 
-    // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/Y29tLmRlbW8uYXBw/11.zip
-    // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/Y29tLmRlbW8uYXBw/11.zip
     const { error: changeError } = await supabaseAdmin(c)
       .from('app_versions')
       .update({ r2_path: filePath })

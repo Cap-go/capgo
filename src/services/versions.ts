@@ -3,17 +3,14 @@ import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
 import { toast } from 'vue-sonner'
 import { downloadUrl } from './supabase'
+import { hideLoader, showLoader } from './loader'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
 import { i18n } from '~/modules/i18n'
-
-const displayStore = useDisplayStore()
 
 export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {
   const { t } = i18n.global
 
-  displayStore.messageLoader = 'Opening version...'
-  displayStore.showLoader = true
+  showLoader()
   let signedURL
   if (app.bucket_id || app.r2_path)
     signedURL = await downloadUrl(app.storage_provider, app.user_id ?? '', app.app_id, app.id)
@@ -43,16 +40,16 @@ export async function openVersion(app: Database['public']['Tables']['app_version
       console.error('Error', error)
       toast.error(t('cannot-set-this-vers'))
     }
-    displayStore.showLoader = false
+    hideLoader()
   }
   else {
     if (!signedURL) {
       toast.error(t('cannot-get-the-test-'))
-      displayStore.showLoader = false
+      hideLoader()
     }
     else {
       window.location.assign(signedURL)
-      displayStore.showLoader = false
+      hideLoader()
     }
   }
 }

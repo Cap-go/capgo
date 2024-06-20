@@ -14,7 +14,7 @@ SELECT is(coalesce(
 		(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
 	)::uuid, '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'test if authenticate_as works');
 
-SELECT is((SELECT id FROM orgs LIMIT 1), '34a8c55d-2d0f-4652-a43f-684c7a9403ac', 'test get supabase_uid - org created by test_admin');
+SELECT is((SELECT id FROM orgs LIMIT 1), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'test get supabase_uid - org created by test_admin');
 SELECT tests.clear_authentication();
 
 -- Test 1: Check if the function returns 'NO_INVITE' when there's no invite

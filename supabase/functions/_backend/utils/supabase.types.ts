@@ -1053,6 +1053,7 @@ export type Database = {
       }
       users: {
         Row: {
+          ban_time: string | null
           billing_email: string | null
           country: string | null
           created_at: string | null
@@ -1068,6 +1069,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ban_time?: string | null
           billing_email?: string | null
           country?: string | null
           created_at?: string | null
@@ -1083,6 +1085,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ban_time?: string | null
           billing_email?: string | null
           country?: string | null
           created_at?: string | null
@@ -1985,6 +1988,8 @@ export type Database = {
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
+        | "setChannel"
+        | "getChannel"
       stripe_status:
         | "created"
         | "succeeded"

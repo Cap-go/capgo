@@ -56,8 +56,10 @@ allow-develoment-bui: Allow develoment build
 allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
 already-account: You already have an account?
+api-doc: API doc
 api-key: API key
 api-keys: API Keys
+api-keys-are-used-for-cli-and-public-api: API keys are used for CLI and public API
 api-keys-key-copied: API Keys
 app: App
 app-deleted: App deleted
@@ -147,6 +149,7 @@ channels: Channels
 check-email: Please check your email and verify
 check-on-web: Check on website
 checksum: Checksum
+cli-doc: CLI doc
 commands: commands
 confirm-email: Confirm your email
 confirm-email-sent: A confirmation email was sent click to link to confirm your email
@@ -222,6 +225,7 @@ force-version-change: Skip progressive deploy
 forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
+free-trial: Free trial
 from: From
 from-device: from device
 general-information: General Informations
@@ -301,6 +305,8 @@ min-update-version: Minimal update version
 minor: Minor
 misconfigured: Misconfigured
 misconfigured-channels: Some channels are misconfigured. Updates will fail for those channels!
+missing-email: Missing email
+missing-name: Missing name
 mo: mo
 modify-org-info: You can modify the organization's informations here.
 module-heading: Modules
@@ -341,6 +347,7 @@ open-channel: Open channel
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
+open-your-portal: Open your portal
 org-changes-saved: Organization updated successfully
 org-changes-set-email-not-unique: The management email is not unique, please select a different one
 org-changes-set-email-other-error: Cannot set the management email, please contant support
@@ -445,6 +452,7 @@ status-complete: complete
 status-failed: failed
 storage-usage: 'Storage usage: '
 stored-externally: stored externally
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe billing portal will be opened in a new tab
 submit: Submit
 support: Support
 switch-to-all-device: Switch to all devices
@@ -463,7 +471,6 @@ to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps: My Apps
 top-apps-v2: Apps
-trial: trial
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in

@@ -5,9 +5,14 @@ import { useI18n } from 'vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
+import { initDropdowns } from 'flowbite'
 import { useSupabase } from '~/services/supabase'
-import { iconEmail, iconName, iconPassword } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconName from '~icons/ph/user?raw'
+import iconPassword from '~icons/ph/key?raw'
 import { reflioLoader } from '~/services/reflio'
+import { changeLanguage, getEmoji } from '~/services/i18n'
+import { availableLocales, i18n, languages } from '~/modules/i18n'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -65,6 +70,9 @@ async function submit(form: { first_name: string, last_name: string, password: s
   }
   router.push(`/onboarding/confirm_email?email=${encodeURI(form.email)}`)
 }
+onMounted(async () => {
+  initDropdowns()
+})
 </script>
 
 <template>
@@ -83,7 +91,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages />
-              <div class="space-y-2 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+              <div class="space-y-2 text-gray-500 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <FormKit
                   type="text"
                   name="first_name"
@@ -171,6 +179,21 @@ async function submit(form: { first_name: string, last_name: string, password: s
             </FormKit>
           </div>
         </div>
+        <section class="flex flex-col mt-6 md:flex-row md:items-center items-left">
+          <div class="mx-auto">
+            <button id="dropdownDefaultButton" data-dropdown-toggle="dropdown" class="text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center border dark:focus:ring-blue-800" type="button">
+              {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <!-- Dropdown menu -->
+            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
+              <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+                <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
+                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </section>

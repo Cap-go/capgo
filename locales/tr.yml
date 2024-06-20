@@ -56,8 +56,10 @@ allow-develoment-bui: Geliştirme derlemesine izin ver
 allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
 allow-emulator: Öykünücülere İzin Ver
 already-account: Zaten bir hesabınız var mı?
+api-doc: API belgesi
 api-key: API anahtarı
 api-keys: API Anahtarları
+api-keys-are-used-for-cli-and-public-api: API anahtarları CLI ve genel API için kullanılır
 api-keys-key-copied: API Anahtarları
 app: Uygulama
 app-deleted: Uygulama silindi
@@ -89,6 +91,7 @@ button-back: Geri
 button-browse: Araştır
 button-camera: Kamera
 button-cancel: İptal etmek
+button-confirm: Onaylamak
 button-delete: Silmek
 button-deny-invite: Reddetmek
 button-go: GİTMEK
@@ -103,6 +106,7 @@ button-toggle_dark: Karanlık modu değiştir
 button-toggle_langs: Dilleri değiştir
 by-clicking-on-them: üzerlerine tıklayarak.
 cancel: İptal etmek
+cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
@@ -123,6 +127,8 @@ cannot-view-plans: Planlar sayfası görüntülenemiyor
 cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
 change: Değiştirmek
+change-api-key-name: Apikey'in adını değiştirin
+changed-name: Apikey'in adı başarıyla değiştirildi
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
 channel-ab-testing: AB testini etkinleştir
@@ -142,6 +148,7 @@ channels: Kanallar
 check-email: Lütfen e-postanızı kontrol edin ve doğrulayın
 check-on-web: Web sitesinde kontrol edin
 checksum: sağlama toplamı
+cli-doc: CLI belgesi
 commands: komutlar
 confirm-email: e-postanızı onaylayın
 confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
@@ -226,6 +233,7 @@ force-version-change: Aşamalı dağıtımı atla
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
+free-trial: Ücretsiz deneme
 from: Kimden
 from-device: cihazdan
 general-information: Genel Bilgiler
@@ -308,6 +316,8 @@ misconfigured: Yanlış yapılandırılmış
 misconfigured-channels: |-
   Bazı kanallar yanlış yapılandırılmış. 
   Bu kanallar için güncellemeler başarısız olacaktır!
+missing-email: Eksik e-posta
+missing-name: Eksik ad
 mo: Ay
 modify-org-info: Kuruluşun bilgilerini buradan değiştirebilirsiniz.
 module-heading: Modüller
@@ -323,6 +333,13 @@ name: İsim
 need-more-contact-us: |-
   Daha fazlasına ihtiyaç var ? 
   Size özel plan için bize ulaşın
+new-name-not-changed: Yeni isim eskisiyle aynı
+new-name-to-long: |-
+  Yeni isim çok uzun. 
+  Yalnızca 32 karakter kullanabilirsiniz
+new-name-to-short: |-
+  Apikey adı çok kısa. 
+  En az 4 karakter uzunluğunda olmalı
 next: Sonraki
 'no': HAYIR
 no-channel-linked: Kanal yok, eklemek için tıklayın
@@ -345,6 +362,7 @@ open-channel: kanalı aç
 open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
 open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
+open-your-portal: Portalınızı açın
 org-changes-saved: Kuruluş başarıyla güncellendi
 org-changes-set-email-not-unique: Yönetim e-postası benzersiz değil, lütfen farklı bir e-posta seçin
 org-changes-set-email-other-error: Yönetim e-postası ayarlanamıyor, lütfen desteğe başvurun
@@ -390,6 +408,7 @@ plans-super-only: >-
   Yalnızca süper yöneticilerin planları ve faturalandırmayı görüntülemesine izin
   verilir
 platform: platformu
+please-ask-the-user-to-create-account-first: Lütfen önce kullanıcıdan hesap oluşturmasını isteyin
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
@@ -452,6 +471,7 @@ status-complete: tamamlamak
 status-failed: arızalı
 storage-usage: 'Depolama kullanımı:'
 stored-externally: harici olarak depolanır
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe faturalandırma portalı yeni bir sekmede açılacak
 submit: Göndermek
 support: Destek
 switch-to-all-device: Tüm cihazlara geç
@@ -470,11 +490,11 @@ to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps: Benim uygulamalarım
 top-apps-v2: Uygulamalar
-trial: duruşma
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
 type: ''
+type-new-name: Lütfen yeni API anahtarı adını yazın
 undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı

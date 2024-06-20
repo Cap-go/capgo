@@ -14,7 +14,9 @@ PODS:
     - Capacitor
   - CapacitorClipboard (6.0.0):
     - Capacitor
-  - CapacitorCommunityKeepAwake (4.0.0):
+  - CapacitorCommunityInAppReview (6.0.0):
+    - Capacitor
+  - CapacitorCommunityKeepAwake (5.0.0):
     - Capacitor
   - CapacitorCordova (6.0.0)
   - CapacitorDevice (6.0.0):
@@ -37,11 +39,9 @@ PODS:
     - Capacitor
   - CapacitorPushNotifications (6.0.0):
     - Capacitor
-  - CapacitorRateApp (4.0.3):
-    - Capacitor
   - CapacitorScreenReader (6.0.0):
     - Capacitor
-  - CapacitorSecureStoragePlugin (0.9.0):
+  - CapacitorSecureStoragePlugin (0.10.0):
     - Capacitor
     - SwiftKeychainWrapper
   - CapacitorShare (6.0.0):
@@ -67,7 +67,7 @@ PODS:
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorScreenRecorder (6.0.0):
+  - CapgoCapacitorScreenRecorder (8.1.3):
     - Capacitor
   - CapgoCapacitorUpdater (6.0.2):
     - Alamofire
@@ -83,12 +83,12 @@ PODS:
   - Crisp (2.5.1):
     - Crisp/Crisp (= 2.5.1)
   - Crisp/Crisp (2.5.1)
-  - PurchasesHybridCommon (10.4.1):
-    - RevenueCat (= 4.40.1)
-  - RevenueCat (4.40.1)
-  - RevenuecatPurchasesCapacitor (7.5.8):
+  - PurchasesHybridCommon (10.6.1):
+    - RevenueCat (= 4.41.2)
+  - RevenueCat (4.41.2)
+  - RevenuecatPurchasesCapacitor (8.0.0-beta.2):
     - Capacitor
-    - PurchasesHybridCommon (= 10.4.1)
+    - PurchasesHybridCommon (= 10.6.1)
   - SSZipArchive (2.4.3)
   - SwiftKeychainWrapper (4.0.1)
   - Version (0.8.0)
@@ -101,6 +101,7 @@ DEPENDENCIES:
   - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorClipboard (from `../../node_modules/@capacitor/clipboard`)"
+  - "CapacitorCommunityInAppReview (from `../../node_modules/@capacitor-community/in-app-review`)"
   - "CapacitorCommunityKeepAwake (from `../../node_modules/@capacitor-community/keep-awake`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorDevice (from `../../node_modules/@capacitor/device`)"
@@ -113,7 +114,6 @@ DEPENDENCIES:
   - "CapacitorNetwork (from `../../node_modules/@capacitor/network`)"
   - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
-  - CapacitorRateApp (from `../../node_modules/capacitor-rate-app`)
   - "CapacitorScreenReader (from `../../node_modules/@capacitor/screen-reader`)"
   - CapacitorSecureStoragePlugin (from `../../node_modules/capacitor-secure-storage-plugin`)
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
@@ -159,6 +159,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/camera"
   CapacitorClipboard:
     :path: "../../node_modules/@capacitor/clipboard"
+  CapacitorCommunityInAppReview:
+    :path: "../../node_modules/@capacitor-community/in-app-review"
   CapacitorCommunityKeepAwake:
     :path: "../../node_modules/@capacitor-community/keep-awake"
   CapacitorCordova:
@@ -183,8 +185,6 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/preferences"
   CapacitorPushNotifications:
     :path: "../../node_modules/@capacitor/push-notifications"
-  CapacitorRateApp:
-    :path: "../../node_modules/capacitor-rate-app"
   CapacitorScreenReader:
     :path: "../../node_modules/@capacitor/screen-reader"
   CapacitorSecureStoragePlugin:
@@ -233,7 +233,8 @@ SPEC CHECKSUMS:
   CapacitorBrowser: 7e1e2cdbb3e372f09f0bad0c4c21a6d187b679ad
   CapacitorCamera: b61f125d92a0ef75d7becb7956fed7dd13187ee0
   CapacitorClipboard: 80282f684154124b9019ebf401235b70b0cf4994
-  CapacitorCommunityKeepAwake: f3442e3e9b666dd0162522fbd053da1fe81ede20
+  CapacitorCommunityInAppReview: c69a9392f39a10f28092d823cfa979637f4fa079
+  CapacitorCommunityKeepAwake: c820e5394a74ab73635107f0544378b026562243
   CapacitorCordova: 8c4bfdf69368512e85b1d8b724dd7546abeb30af
   CapacitorDevice: f8fd88f9edd1261c55a109f32015b09bbbfdc4a0
   CapacitorDialog: 64aa82840ee5e9c066f9e1a49c1e186afd3f24d2
@@ -245,9 +246,8 @@ SPEC CHECKSUMS:
   CapacitorNetwork: f15a94c16a33cba7c47a17814cb6bcfe3ea34ded
   CapacitorPreferences: c9b839a80baa72e4ed4bdb117618e1950d3046b5
   CapacitorPushNotifications: e18636e8a96f1d70b4c669e21c730e995bf5e5c9
-  CapacitorRateApp: 896df7ec6a237fea72d1955e0cb26394654b00db
   CapacitorScreenReader: 039da921b443a37ecf4f3f1b39a8a6869a3f58ce
-  CapacitorSecureStoragePlugin: e91d7df060f2495a1acff9583641a6953e3aacba
+  CapacitorSecureStoragePlugin: ced6025438fbbdbfb9fffec4398e748572fc147b
   CapacitorShare: a771200d3b924a5d7ad9d9fecbac517e4c0aa74f
   CapacitorSplashScreen: 5431ab8d19c1c6e95777d53bfaa7a36a6c3d94c7
   CapacitorStatusBar: 2e4369f99166125435641b1908d05f561eaba6f6
@@ -259,19 +259,19 @@ SPEC CHECKSUMS:
   CapgoCapacitorFlash: a570db525cf7d42477e650615b32e933858937f8
   CapgoCapacitorMute: 4581f843a3b79eaa1106d1ef1ee18a093b7c9907
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
-  CapgoCapacitorScreenRecorder: a2481ed4a91333ef354e5e8d564f86d6d161250d
+  CapgoCapacitorScreenRecorder: 3b37f481bf3f9523d817a7de138e6ce69410996f
   CapgoCapacitorUpdater: 129bc6135042cec74592ae55ae7f891824f2251f
   CapgoInappbrowser: 1d3f1891b49bc9646f8405c6498b6b271f58d67e
   CapgoNativeAudio: cb169369d3e836b4e490c288818d932d314cfc3b
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
   Crisp: 4d8b0776bdd124db206075cb683a90cff1390864
-  PurchasesHybridCommon: 596ac8a54be4e03cc1398b012bd9cdf134111b70
-  RevenueCat: 9f6b84da3f00953b2eeaaa6fc4710c1d280a5710
-  RevenuecatPurchasesCapacitor: a3d7cb84b43121c6fb0a22a114213495a77af671
+  PurchasesHybridCommon: 465af21945a10dda051b725933a1fd7b7c2d2a07
+  RevenueCat: 0250867579677899de94f96ad9be342be865560f
+  RevenuecatPurchasesCapacitor: 415aee183fbe2b9688a60b2424a0489f98daacc8
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: b154eabe778fb0de211d4427917b553b7df01ae6
+PODFILE CHECKSUM: 37a97bf6083aae73e13d61d5c09d9d23bda6b0ad
 
 COCOAPODS: 1.15.2

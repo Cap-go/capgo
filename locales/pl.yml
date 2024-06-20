@@ -58,8 +58,10 @@ allow-develoment-bui: Zezwalaj na kompilację deweloperską
 allow-device-to-self: Zezwól urządzeniom na samopowiązanie
 allow-emulator: Zezwalaj na emulatory
 already-account: Posiadasz już konto?
+api-doc: Dokument API
 api-key: Klucz API
 api-keys: Klucze API
+api-keys-are-used-for-cli-and-public-api: Klucze API są używane w interfejsie CLI i publicznym interfejsie API
 api-keys-key-copied: Klucze API
 app: Aplikacja
 app-deleted: Usunięto aplikację
@@ -91,6 +93,7 @@ button-back: Z powrotem
 button-browse: Przeglądać
 button-camera: Kamera
 button-cancel: Anulować
+button-confirm: Potwierdzać
 button-delete: Usuwać
 button-deny-invite: Zaprzeczyć
 button-go: IŚĆ
@@ -105,6 +108,7 @@ button-toggle_dark: Przełącz tryb ciemny
 button-toggle_langs: Zmień języki
 by-clicking-on-them: klikając na nie.
 cancel: Anulować
+cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
@@ -125,6 +129,8 @@ cannot-view-plans: Nie można wyświetlić strony planów
 cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
 change: Zmiana
+change-api-key-name: Zmień nazwę apikey
+changed-name: Pomyślnie zmieniono nazwę apikey
 changed-password-suc: Hasło zostało zmienione pomyślnie
 channel: Kanał
 channel-ab-testing: Włącz testowanie AB
@@ -144,6 +150,7 @@ channels: Kanały
 check-email: Sprawdź swój e-mail i zweryfikuj
 check-on-web: Sprawdź na stronie internetowej
 checksum: Suma kontrolna
+cli-doc: Dokument CLI
 commands: polecenia
 confirm-email: Potwierdź swój email
 confirm-email-sent: >-
@@ -228,6 +235,7 @@ force-version-change: Pomiń wdrażanie stopniowe
 forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione
+free-trial: Bezpłatny okres próbny
 from: od
 from-device: z urządzenia
 general-information: Ogólne informacje
@@ -310,6 +318,8 @@ misconfigured: Źle skonfigurowany
 misconfigured-channels: |-
   Niektóre kanały są źle skonfigurowane. 
   Aktualizacje tych kanałów nie powiodą się!
+missing-email: Brak e-maila
+missing-name: Brak imienia
 mo: mo
 modify-org-info: Tutaj możesz modyfikować dane organizacji.
 module-heading: Moduły
@@ -325,6 +335,13 @@ name: Nazwa
 need-more-contact-us: |-
   Potrzeba więcej ? 
   Skontaktuj się z nami, aby uzyskać dostosowany plan
+new-name-not-changed: Nowa nazwa jest taka sama jak stara
+new-name-to-long: |-
+  Nowa nazwa jest za długa. 
+  Możesz użyć tylko 32 znaków
+new-name-to-short: |-
+  Nazwa apikey jest za krótka. 
+  Musi mieć co najmniej 4 znaki
 next: Następny
 'no': NIE
 no-channel-linked: Brak kanału, kliknij, aby dodać
@@ -349,6 +366,7 @@ open-channel: Otwórz kanał
 open-settings: Kliknij, aby otworzyć ustawienia
 open-sidebar: Otwórz pasek boczny
 open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację
+open-your-portal: Otwórz swój portal
 org-changes-saved: Organizacja została pomyślnie zaktualizowana
 org-changes-set-email-not-unique: Adres e-mail do zarządzania nie jest unikalny. Wybierz inny
 org-changes-set-email-other-error: >-
@@ -459,6 +477,7 @@ status-complete: kompletny
 status-failed: przegrany
 storage-usage: 'Wykorzystanie pamięci:'
 stored-externally: przechowywane na zewnątrz
+stripe-billing-portal-will-be-opened-in-a-new-tab: Portal rozliczeniowy Stripe otworzy się w nowej karcie
 submit: Składać
 support: Wsparcie
 switch-to-all-device: Przełącz na wszystkie urządzenia
@@ -477,11 +496,11 @@ to-live-reload: przeładować na żywo.
 to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
 top-apps: Moje aplikacje
 top-apps-v2: Aplikacje
-trial: test
 trial-left: Pozostałe dni
 trial-plan-expired: Wersja czasowa wygasła
 trial-plan-expires-in: Próba kończy się za
 type: ''
+type-new-name: Wpisz nową nazwę klucza API
 undefined: nieokreślony
 undefined-fail: Niezdefiniowany (aktualizacje nie powiodą się)
 uninstall: Odinstalowano

@@ -56,8 +56,10 @@ allow-develoment-bui: 允许开发构建
 allow-device-to-self: 允许设备自关联
 allow-emulator: 允许模拟器
 already-account: 你已经有一个账户了吗？
+api-doc: API文档
 api-key: API密钥
 api-keys: API 密钥
+api-keys-are-used-for-cli-and-public-api: API 密钥用于 CLI 和公共 API
 api-keys-key-copied: API 密钥
 app: 应用程序
 app-deleted: 应用已删除
@@ -89,6 +91,7 @@ button-back: 后退
 button-browse: 浏览
 button-camera: 相机
 button-cancel: 取消
+button-confirm: 确认
 button-delete: 删除
 button-deny-invite: 否定
 button-go: 去
@@ -103,6 +106,7 @@ button-toggle_dark: 切换深色模式
 button-toggle_langs: 更改语言
 by-clicking-on-them: 通过点击它们。
 cancel: 取消
+cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
@@ -123,6 +127,8 @@ cannot-view-plans: 无法查看计划页面
 cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
 change: 改变
+change-api-key-name: 更改 apikey 的名称
+changed-name: 已成功更改 apikey 名称
 changed-password-suc: 密码修改成功
 channel: 渠道
 channel-ab-testing: 启用AB测试
@@ -142,6 +148,7 @@ channels: 频道
 check-email: 请检查您的电子邮件并验证
 check-on-web: 在网站上查看
 checksum: 校验和
+cli-doc: CLI文档
 commands: 命令
 confirm-email: 确认您的电子邮件
 confirm-email-sent: 已发送确认邮件，请点击链接确认您的电子邮件。
@@ -222,6 +229,7 @@ force-version-change: 跳过渐进式部署
 forgot: 忘记
 forgot-check-email: 检查您的电子邮件以获取重置密码的链接
 forgot-success: 密码更新成功
+free-trial: 免费试用
 from: 从
 from-device: 从设备
 general-information: 一般信息
@@ -302,6 +310,8 @@ misconfigured: 配置错误
 misconfigured-channels: |-
   某些通道配置错误。
   这些频道的更新将失败！
+missing-email: 缺少电子邮件
+missing-name: 缺少名字
 mo: 月
 modify-org-info: 您可以在此处修改组织的信息。
 module-heading: 模块
@@ -317,6 +327,13 @@ name: 姓名
 need-more-contact-us: |-
   需要更多 ？
   联系我们获取量身定制的计划
+new-name-not-changed: 新名称与旧名称相同
+new-name-to-long: |-
+  新名字太长了。
+  您只能使用 32 个字符
+new-name-to-short: |-
+  apikey 名称太短。
+  长度必须至少为 4 个字符
 next: 下一个
 'no': 不
 no-channel-linked: 暂无频道，点击添加
@@ -339,6 +356,7 @@ open-channel: 打开通道
 open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新
+open-your-portal: 打开您的门户
 org-changes-saved: 组织更新成功
 org-changes-set-email-not-unique: 管理邮箱不唯一，请选择其他邮箱
 org-changes-set-email-other-error: 无法设置管理邮箱，请联系支持
@@ -443,6 +461,7 @@ status-complete: 完全的
 status-failed: 失败的
 storage-usage: 存储使用情况：
 stored-externally: 外部存储
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 计费门户将在新选项卡中打开
 submit: 提交
 support: 支持
 switch-to-all-device: 切换到所有设备
@@ -461,11 +480,11 @@ to-live-reload: 住重新加载。
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps: 我的应用
 top-apps-v2: 应用
-trial: 审判
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
 type: ''
+type-new-name: 请输入新的 api 密钥名称
 undefined: 不明确的
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载

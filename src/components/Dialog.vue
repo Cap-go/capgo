@@ -93,12 +93,12 @@ onMounted(() => {
     aria-hidden="true"
     class="fixed left-0 right-0 top-0 z-50 hidden h-[calc(100%-1rem)] w-full overflow-x-hidden overflow-y-auto p-4 md:inset-0 md:h-full"
   >
-    <div id="popout" :class="`relative w-full h-full ${displayStore.dialogOption?.size ?? 'max-w-2xl'} md:h-auto`">
+    <div id="popout" class="relative w-full h-auto" :class="displayStore.dialogOption?.size ?? 'max-w-2xl'">
       <!-- Modal content -->
       <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
         <!-- Modal header -->
         <div class="flex items-start justify-between p-4 border-b rounded-t dark:border-gray-600">
-          <h3 :class="`text-xl font-semibold text-gray-900 dark:text-white ${displayStore.dialogOption?.headerStyle}`">
+          <h3 class="text-xl font-semibold text-gray-900 dark:text-white" :class="displayStore.dialogOption?.headerStyle">
             {{ displayStore.dialogOption?.header }}
           </h3>
           <button type="button" class="ml-auto inline-flex items-center rounded-lg bg-transparent p-1.5 text-sm text-gray-400 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-gray-600 dark:hover:text-white" @click="close({ role: 'cancel' } as ActionSheetOptionButton)">
@@ -108,7 +108,7 @@ onMounted(() => {
         </div>
         <!-- Modal body -->
         <div class="p-6 space-y-6">
-          <p :class="`text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400 ${displayStore.dialogOption?.textStyle}`" v-html="displayText(displayStore.dialogOption?.message)" />
+          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" :class="displayStore.dialogOption?.textStyle" v-html="displayText(displayStore.dialogOption?.message)" />
           <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
           <div v-if="displayStore.dialogOption?.input" class="w-full">
             <FormKit id="dialog-input" type="form" :actions="false" @submit="submit">

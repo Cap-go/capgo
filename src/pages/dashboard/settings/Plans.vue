@@ -273,7 +273,7 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 const hightLights = computed<Stat[]>(() => ([
   {
     label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value) ? t('Current') : t('failed'),
-    value: !isTrial.value ? currentPlan.value?.name : t('trial'),
+    value: currentPlan.value?.name,
   },
   {
     label: t('usage'),
@@ -373,7 +373,7 @@ const hightLights = computed<Stat[]>(() => ([
                 {{ p.name }}
               </h2>
               <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="px-2 ml-auto bg-blue-600 rounded-full">
-                {{ t('trial') }}
+                {{ t('free-trial') }}
               </h2>
             </div>
             <p class="mt-4 text-sm text-gray-500 dark:text-gray-100">

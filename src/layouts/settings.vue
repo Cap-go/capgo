@@ -16,10 +16,6 @@ import { useOrganizationStore } from '~/stores/organization'
 import { openPortal } from '~/services/stripe'
 import { isSpoofed } from '~/services/supabase'
 
-// import ky from 'ky'
-// import MdiInvoiceListOutline from '~icons/mdi/invoice-list-outline';
-// import { toast } from 'vue-sonner'
-
 const { t } = useI18n()
 const main = useMainStore()
 const displayStore = useDisplayStore()
@@ -92,7 +88,7 @@ watchEffect(() => {
       label: 'billing',
       icon: shallowRef(IconBilling) as any,
       key: '/billing',
-      onClick: () => openPortal(organizationStore.currentOrganization?.gid),
+      onClick: () => openPortal(organizationStore.currentOrganization?.gid || '', t),
     })
   }
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {

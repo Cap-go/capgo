@@ -60,8 +60,10 @@ allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
 allow-emulator: Разрешить эмуляторы
 already-account: У вас уже есть аккаунт?
+api-doc: API-документ
 api-key: ключ API
 api-keys: Ключи API
+api-keys-are-used-for-cli-and-public-api: Ключи API используются для CLI и общедоступного API.
 api-keys-key-copied: Ключи API
 app: Приложение
 app-deleted: Приложение удалено
@@ -93,6 +95,7 @@ button-back: Назад
 button-browse: Просматривать
 button-camera: Камера
 button-cancel: Отмена
+button-confirm: Подтверждать
 button-delete: Удалить
 button-deny-invite: Отрицать
 button-go: ИДТИ
@@ -107,6 +110,7 @@ button-toggle_dark: Переключить темный режим
 button-toggle_langs: Изменить языки
 by-clicking-on-them: нажав на них.
 cancel: Отмена
+cannot-change-name: Невозможно изменить имя, проверьте консоль браузера.
 cannot-change-permission: Невозможно изменить разрешения, проверьте консоль браузера
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
@@ -127,6 +131,8 @@ cannot-view-plans: Невозможно просмотреть страницу 
 cannot-view-usage: Невозможно просмотреть страницу использования
 cannots-sign-off: Невозможно войти в систему
 change: Изменять
+change-api-key-name: Измените имя апикея
+changed-name: Имя апикея успешно изменено.
 changed-password-suc: Пароль успешно изменен
 channel: Канал
 channel-ab-testing: Включить AB-тестирование
@@ -146,6 +152,7 @@ channels: каналы
 check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
 check-on-web: Проверить на сайте
 checksum: Контрольная сумма
+cli-doc: Документация CLI
 commands: команды
 confirm-email: Подтвердите ваш адрес электронной почты
 confirm-email-sent: >-
@@ -228,6 +235,7 @@ force-version-change: Пропустить прогрессивное разве
 forgot: Забыл
 forgot-check-email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
 forgot-success: Пароль успешно обновлен
+free-trial: Бесплатная пробная версия
 from: С сайта
 from-device: с устройства
 general-information: Общая информация
@@ -310,6 +318,8 @@ misconfigured: Неправильно настроен
 misconfigured-channels: |-
   Некоторые каналы настроены неправильно. 
   Для этих каналов обновления не будут установлены!
+missing-email: Отсутствует адрес электронной почты
+missing-name: Отсутствует имя
 mo: мес.
 modify-org-info: Здесь вы можете изменить информацию об организации.
 module-heading: Модули
@@ -325,6 +335,13 @@ name: Имя
 need-more-contact-us: |-
   Нужно больше ? 
   Свяжитесь с нами для индивидуального плана
+new-name-not-changed: Новое имя такое же, как старое
+new-name-to-long: |-
+  Новое имя слишком длинное. 
+  Вы можете использовать только 32 символа
+new-name-to-short: |-
+  Имя апикея слишком короткое. 
+  Оно должно содержать не менее 4 символов.
 next: Следующий
 'no': нет
 no-channel-linked: Нет канала, нажмите, чтобы добавить
@@ -349,6 +366,7 @@ open-channel: Открытый канал
 open-settings: Нажмите, чтобы открыть настройки
 open-sidebar: Открыть боковую панель
 open-this-link-to-le: Откройте эту ссылку, чтобы узнать, как протестировать обновление
+open-your-portal: Откройте свой портал
 org-changes-saved: Организация успешно обновлена
 org-changes-set-email-not-unique: Адрес электронной почты руководства не уникален, выберите другой.
 org-changes-set-email-other-error: >-
@@ -457,6 +475,7 @@ status-complete: полный
 status-failed: неуспешный
 storage-usage: 'Использование хранилища:'
 stored-externally: хранится снаружи
+stripe-billing-portal-will-be-opened-in-a-new-tab: Платежный портал Stripe откроется в новой вкладке
 submit: Представлять на рассмотрение
 support: Поддерживать
 switch-to-all-device: Переключиться на все устройства
@@ -475,11 +494,11 @@ to-live-reload: жить перезагрузить.
 to-open-encrypted-bu: 'Чтобы открыть зашифрованный пакет, используйте команду:'
 top-apps: Мои приложения
 top-apps-v2: Программы
-trial: пробный
 trial-left: дней осталось
 trial-plan-expired: Пробная версия истекла
 trial-plan-expires-in: Испытание заканчивается через
 type: ''
+type-new-name: Введите новое имя ключа API.
 undefined: неопределенный
 undefined-fail: Не определено (обновления не будут выполнены)
 uninstall: Удалено

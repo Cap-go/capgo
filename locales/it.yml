@@ -60,8 +60,10 @@ allow-develoment-bui: Consenti build di sviluppo
 allow-device-to-self: Consenti ai dispositivi di associarsi automaticamente
 allow-emulator: Consenti emulatori
 already-account: Hai già un account?
+api-doc: Documento API
 api-key: Chiave dell'API
 api-keys: Chiavi API
+api-keys-are-used-for-cli-and-public-api: Le chiavi API vengono utilizzate per la CLI e l'API pubblica
 api-keys-key-copied: Chiavi API
 app: App
 app-deleted: Applicazione eliminata
@@ -93,6 +95,7 @@ button-back: Indietro
 button-browse: Navigare
 button-camera: Telecamera
 button-cancel: Annulla
+button-confirm: Confermare
 button-delete: Eliminare
 button-deny-invite: Negare
 button-go: ANDARE
@@ -107,6 +110,7 @@ button-toggle_dark: Attiva/disattiva la modalità oscura
 button-toggle_langs: Cambia lingua
 by-clicking-on-them: cliccandoci sopra.
 cancel: Annulla
+cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
@@ -127,6 +131,8 @@ cannot-view-plans: Impossibile visualizzare la pagina dei piani
 cannot-view-usage: Impossibile visualizzare la pagina di utilizzo
 cannots-sign-off: Impossibile accedere
 change: Modifica
+change-api-key-name: Cambia il nome dell'apikey
+changed-name: Nome di apikey modificato con successo
 changed-password-suc: password cambiata con successo
 channel: Canale
 channel-ab-testing: Abilita test AB
@@ -146,6 +152,7 @@ channels: Canali
 check-email: Controlla la tua email e verifica
 check-on-web: Controlla sul sito web
 checksum: Somma di controllo
+cli-doc: Documento CLI
 commands: comandi
 confirm-email: conferma la tua email
 confirm-email-sent: >-
@@ -232,6 +239,7 @@ force-version-change: Salta la distribuzione progressiva
 forgot: Dimenticato
 forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
 forgot-success: Password aggiornata con successo
+free-trial: Prova gratuita
 from: Da
 from-device: dal dispositivo
 general-information: Informazioni generali
@@ -314,6 +322,8 @@ misconfigured: Non configurato correttamente
 misconfigured-channels: |-
   Alcuni canali sono configurati in modo errato. 
   Gli aggiornamenti falliranno per quei canali!
+missing-email: E-mail mancante
+missing-name: Nome mancante
 mo: mo
 modify-org-info: Puoi modificare le informazioni dell'organizzazione qui.
 module-heading: Moduli
@@ -329,6 +339,13 @@ name: Nome
 need-more-contact-us: |-
   Bisogno di piu ? 
   Contattaci per un piano su misura
+new-name-not-changed: Il nuovo nome è lo stesso di quello vecchio
+new-name-to-long: |-
+  Il nuovo nome è troppo lungo. 
+  Puoi utilizzare solo 32 caratteri
+new-name-to-short: |-
+  Il nome apikey è troppo corto. 
+  Deve contenere almeno 4 caratteri
 next: Prossimo
 'no': 'NO'
 no-channel-linked: Nessun canale, fai clic per aggiungere
@@ -353,6 +370,7 @@ open-channel: Canale aperto
 open-settings: Fare clic per aprire le impostazioni
 open-sidebar: Apri la barra laterale
 open-this-link-to-le: Apri questo link per scoprire come testare il tuo aggiornamento
+open-your-portal: Apri il tuo portale
 org-changes-saved: Organizzazione aggiornata correttamente
 org-changes-set-email-not-unique: L'e-mail di gestione non è univoca, selezionane una diversa
 org-changes-set-email-other-error: Impossibile impostare l'e-mail di gestione, contattare l'assistenza
@@ -463,6 +481,7 @@ status-complete: completare
 status-failed: fallito
 storage-usage: 'Utilizzo dello spazio di archiviazione:'
 stored-externally: memorizzati esternamente
+stripe-billing-portal-will-be-opened-in-a-new-tab: Il portale di fatturazione Stripe verrà aperto in una nuova scheda
 submit: Invia
 support: Supporto
 switch-to-all-device: Passa a tutti i dispositivi
@@ -481,11 +500,11 @@ to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
 top-apps: Le mie applicazioni
 top-apps-v2: App
-trial: prova
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
 type: ''
+type-new-name: Digita il nuovo nome della chiave API
 undefined: non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato

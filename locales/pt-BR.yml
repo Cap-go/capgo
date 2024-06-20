@@ -58,8 +58,10 @@ allow-develoment-bui: Permitir compilação de desenvolvimento
 allow-device-to-self: Permitir que os dispositivos se associem automaticamente
 allow-emulator: Permitir emuladores
 already-account: Você já tem uma conta?
+api-doc: Documento da API
 api-key: Chave API
 api-keys: Chaves de API
+api-keys-are-used-for-cli-and-public-api: As chaves de API são usadas para CLI e API pública
 api-keys-key-copied: Chaves de API
 app: Aplicativo
 app-deleted: Aplicativo deletado
@@ -91,6 +93,7 @@ button-back: Voltar
 button-browse: Navegar
 button-camera: Câmera
 button-cancel: Cancelar
+button-confirm: confirme
 button-delete: Excluir
 button-deny-invite: Negar
 button-go: IR
@@ -105,6 +108,7 @@ button-toggle_dark: Alternar modo escuro
 button-toggle_langs: Alterar idiomas
 by-clicking-on-them: clicando sobre eles.
 cancel: Cancelar
+cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
@@ -125,6 +129,8 @@ cannot-view-plans: Não é possível visualizar a página de planos
 cannot-view-usage: Não é possível visualizar a página de uso
 cannots-sign-off: Não é possível registrar
 change: Mudar
+change-api-key-name: Alterar o nome do apikey
+changed-name: Nome do apikey alterado com sucesso
 changed-password-suc: Senha alterada com sucesso
 channel: Canal
 channel-ab-testing: Habilitar teste AB
@@ -144,6 +150,7 @@ channels: Canais
 check-email: Verifique seu e-mail e confirme
 check-on-web: Verifique no site
 checksum: soma de verificação
+cli-doc: Documento CLI
 commands: comandos
 confirm-email: confirme seu email
 confirm-email-sent: Um email de confirmação foi enviado, clique no link para confirmar seu email.
@@ -226,6 +233,7 @@ force-version-change: Pular implantação progressiva
 forgot: Esquecido
 forgot-check-email: Verifique seu e-mail para obter o link para redefinir sua senha
 forgot-success: Senha atualizada com sucesso
+free-trial: Teste grátis
 from: De
 from-device: do dispositivo
 general-information: Informações gerais
@@ -323,6 +331,13 @@ name: Nome
 need-more-contact-us: |-
   Preciso de mais ? 
   Contacte-nos para um plano à medida
+new-name-not-changed: O novo nome é igual ao antigo
+new-name-to-long: |-
+  O novo nome é muito longo. 
+  Você só pode usar 32 caracteres
+new-name-to-short: |-
+  O nome apikey é muito curto. 
+  Deve ter pelo menos 4 caracteres
 next: Próximo
 'no': não
 no-channel-linked: Nenhum canal, clique para adicionar
@@ -347,6 +362,7 @@ open-channel: canal aberto
 open-settings: Clique para abrir as configurações
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abra este link para saber como testar sua atualização
+open-your-portal: Abra seu portal
 org-changes-saved: Organização atualizada com sucesso
 org-changes-set-email-not-unique: O e-mail de gerenciamento não é único. Selecione outro.
 org-changes-set-email-other-error: >-
@@ -457,6 +473,7 @@ status-complete: completo
 status-failed: fracassado
 storage-usage: 'Uso de armazenamento:'
 stored-externally: armazenado externamente
+stripe-billing-portal-will-be-opened-in-a-new-tab: O portal de faturamento Stripe será aberto em uma nova guia
 submit: Enviar
 support: Apoiar
 switch-to-all-device: Alternar para todos os dispositivos
@@ -475,11 +492,11 @@ to-live-reload: para recarregar ao vivo.
 to-open-encrypted-bu: 'Para abrir o pacote criptografado, use o comando:'
 top-apps: Meus aplicativos
 top-apps-v2: Aplicativos
-trial: julgamento
 trial-left: dias restantes
 trial-plan-expired: Versao de teste expirada
 trial-plan-expires-in: O teste termina em
 type: ''
+type-new-name: Digite o novo nome da chave de API
 undefined: indefinido
 undefined-fail: Indefinido (as atualizações falharão)
 uninstall: Desinstalado

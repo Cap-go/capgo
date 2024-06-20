@@ -39,7 +39,7 @@ interface Step {
 const simpleStep: Step[] = [
   {
     title: t('init-capgo-in-your-a'),
-    command: 'bunx --yes @capgo/cli@latest init [APIKEY]',
+    command: 'npx @capgo/cli@latest init [APIKEY]',
     subtitle: '',
     link: '',
   },

@@ -56,8 +56,10 @@ allow-develoment-bui: 開発ビルドを許可
 allow-device-to-self: デバイスの自己関連付けを許可する
 allow-emulator: エミュレータを許可
 already-account: すでにアカウントをお持ちですか？
+api-doc: APIドキュメント
 api-key: API キー
 api-keys: API キー
+api-keys-are-used-for-cli-and-public-api: API キーは CLI とパブリック API に使用されます
 api-keys-key-copied: API キー
 app: アプリ
 app-deleted: アプリを削除しました
@@ -89,6 +91,7 @@ button-back: 戻る
 button-browse: ブラウズ
 button-camera: カメラ
 button-cancel: キャンセル
+button-confirm: 確認する
 button-delete: 消去
 button-deny-invite: 拒否
 button-go: 行く
@@ -103,6 +106,7 @@ button-toggle_dark: ダークモードの切り替え
 button-toggle_langs: 言語を変更
 by-clicking-on-them: それらをクリックして。
 cancel: キャンセル
+cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
@@ -123,6 +127,8 @@ cannot-view-plans: プランページが表示されない
 cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
 change: 変化
+change-api-key-name: apikey の名前を変更する
+changed-name: apikey の名前が正常に変更されました
 changed-password-suc: パスワードは正常に変更されました
 channel: チャネル
 channel-ab-testing: AB テストを有効にする
@@ -142,6 +148,7 @@ channels: チャネル
 check-email: メールを確認して確認してください
 check-on-web: ウェブサイトでチェック
 checksum: チェックサム
+cli-doc: CLIドキュメント
 commands: コマンド
 confirm-email: メールを確認する
 confirm-email-sent: 確認メールが送信されました。リンクをクリックしてメールアドレスを確認してください。
@@ -222,6 +229,7 @@ force-version-change: プログレッシブ展開をスキップする
 forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました
+free-trial: 無料トライアル
 from: 請求元
 from-device: デバイスから
 general-information: 一般情報
@@ -317,6 +325,13 @@ name: 名前
 need-more-contact-us: |-
   もっといります ？
   オーダーメイドプランはお問い合わせください
+new-name-not-changed: 新しい名前は古い名前と同じです
+new-name-to-long: |-
+  新しい名前は長すぎます。 
+  32 文字のみ使用できます
+new-name-to-short: |-
+  apikey 名が短すぎます。
+  少なくとも 4 文字の長さである必要があります
 next: 次
 'no': いいえ
 no-channel-linked: チャンネルがありません。クリックして追加してください
@@ -339,6 +354,7 @@ open-channel: チャンネルを開く
 open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
 open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
+open-your-portal: ポータルを開く
 org-changes-saved: 組織が正常に更新されました
 org-changes-set-email-not-unique: 管理用メールアドレスは一意ではありません。別のメールアドレスを選択してください
 org-changes-set-email-other-error: 管理用メールアドレスを設定できません。サポートにお問い合わせください。
@@ -443,6 +459,7 @@ status-complete: 完了
 status-failed: 失敗した
 storage-usage: 'ストレージ使用量:'
 stored-externally: 外部保存
+stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 請求ポータルが新しいタブで開きます
 submit: 送信
 support: サポート
 switch-to-all-device: すべてのデバイスに切り替える
@@ -461,11 +478,11 @@ to-live-reload: リロードを生きます。
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps: 私のアプリ
 top-apps-v2: アプリ
-trial: トライアル
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
 type: ''
+type-new-name: 新しい API キー名を入力してください
 undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
