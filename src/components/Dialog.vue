@@ -113,11 +113,15 @@ onMounted(() => {
           <div v-if="displayStore.dialogOption?.input" class="w-full">
             <FormKit id="dialog-input" type="form" :actions="false" @submit="submit">
               <FormKit
+                v-model="displayStore.dialogInputText"
                 type="text"
                 name="text"
-                :value="displayStore.dialogInputText"
                 enterkeyhint="next"
                 validation="required:trim"
+                :classes="{
+                  input: 'txt-cent',
+                  message: 'txt-cent',
+                }"
               />
             </FormKit>
           </div>
