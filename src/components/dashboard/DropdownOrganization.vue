@@ -9,7 +9,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
-import PlusCircle from '~icons/heroicons/plus-circle'
+import Plus from '~icons/heroicons/plus'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
 const router = useRouter()
@@ -185,7 +185,7 @@ async function createNewOrg() {
       <ul class="py-2 text-sm text-gray-700 divide-y divide-gray-100 dark:divide-gray-600 dark:bg-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
         <li v-for="org in organizationStore.organizations" :key="org.gid">
           <a
-            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white text-center"
+            class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
             @click="onOrganizationClick(org)"
           >
             {{ org.name }}
@@ -196,7 +196,7 @@ async function createNewOrg() {
           <a
             class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
             @click="createNewOrg"
-          ><PlusCircle class=" mx-auto" />
+          ><Plus class="mx-auto " />
           </a>
         </li>
       </ul>
