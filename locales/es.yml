@@ -114,6 +114,7 @@ by-clicking-on-them: haciendo clic en ellos.
 cancel: Cancelar
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
+cannot-create-org: No se puede crear una organización; verifique los registros del navegador.
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
 cannot-delete-app-version: No se puede eliminar la versión de la aplicación
@@ -175,6 +176,7 @@ copy-command: Copiar comando
 copy-your: copia tu
 country: País
 create-a-free-accoun: Crea una cuenta nueva
+create-new-org: Crear una nueva organización
 created-at: Creado en
 current-billing-cycle: Ciclo de facturación actual
 custom: Costumbre
@@ -234,6 +236,7 @@ error: Error
 external-storage: Almacenamiento externo
 fail: Instalación fallida
 failed: Fallido
+failed-to-get-user: No se pudo cargar el usuario
 fast-backward: Retroceso rápido
 fast-forward: Avance rápido
 filters: filtros
@@ -382,7 +385,9 @@ org-changes-set-email-not-unique: El correo electrónico de administración no e
 org-changes-set-email-other-error: >-
   No se puede configurar el correo electrónico de administración, comuníquese
   con el soporte
+org-created-successfully: ¡Organización creada exitosamente!
 org-invited-user: Usuario invitado exitosamente a la organización
+org-with-this-name-exists: ¡Ya has creado una organización con este nombre!
 organization-email: Correo electrónico de gestión de la organización.
 organization-name: Nombre de la Organización
 organization-settings: Configuración de la organización
@@ -513,6 +518,7 @@ trial-plan-expired: Prueba caducada
 trial-plan-expires-in: El juicio termina en
 type: ''
 type-new-name: Por favor escriba el nuevo nombre de la clave API
+type-new-org-name: Por favor escriba el nuevo nombre de la organización.
 undefined: indefinido
 undefined-fail: Indefinido (las actualizaciones fallarán)
 uninstall: desinstalado

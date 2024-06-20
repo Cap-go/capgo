@@ -112,6 +112,7 @@ by-clicking-on-them: cliccandoci sopra.
 cancel: Annulla
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
+cannot-create-org: Impossibile creare un'organizzazione, controlla i log del browser!
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
 cannot-delete-app-version: Impossibile eliminare la versione dell'app
@@ -171,6 +172,7 @@ copy-command: Comando Copia
 copy-your: Copia il tuo
 country: Paese
 create-a-free-accoun: Crea un account gratis
+create-new-org: Crea una nuova organizzazione
 created-at: Creato a
 current-billing-cycle: Ciclo di fatturazione corrente
 custom: Costume
@@ -230,6 +232,7 @@ error: Errore
 external-storage: Archiviazione esterna
 fail: Installazione non riuscita
 failed: Fallito
+failed-to-get-user: Impossibile caricare l'utente
 fast-backward: Indietro veloce
 fast-forward: Avanti veloce
 filters: Filtri
@@ -374,7 +377,9 @@ open-your-portal: Apri il tuo portale
 org-changes-saved: Organizzazione aggiornata correttamente
 org-changes-set-email-not-unique: L'e-mail di gestione non è univoca, selezionane una diversa
 org-changes-set-email-other-error: Impossibile impostare l'e-mail di gestione, contattare l'assistenza
+org-created-successfully: Organizzazione creata con successo!
 org-invited-user: Utente invitato all'organizzazione correttamente
+org-with-this-name-exists: Hai già creato un'organizzazione con questo nome!
 organization-email: E-mail di gestione dell'organizzazione
 organization-name: Nome dell'organizzazione
 organization-settings: Impostazioni dell'organizzazione
@@ -505,6 +510,7 @@ trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
 type: ''
 type-new-name: Digita il nuovo nome della chiave API
+type-new-org-name: Digita il nuovo nome per l'organizzazione
 undefined: non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato

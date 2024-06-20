@@ -108,6 +108,7 @@ by-clicking-on-them: dengan mengkliknya.
 cancel: Membatalkan
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
+cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
@@ -166,6 +167,7 @@ copy-command: Salin perintah
 copy-your: Salin Anda
 country: Negara
 create-a-free-accoun: Buat Akun gratis
+create-new-org: Buat organisasi baru
 created-at: Dibuat di
 current-billing-cycle: Siklus Penagihan Saat Ini
 custom: Kebiasaan
@@ -225,6 +227,7 @@ error: Kesalahan
 external-storage: Penyimpanan luar
 fail: Instal gagal
 failed: Gagal
+failed-to-get-user: Gagal memuat pengguna
 fast-backward: Mundur Cepat
 fast-forward: Maju Cepat
 filters: Filter
@@ -371,7 +374,9 @@ open-your-portal: Buka portal Anda
 org-changes-saved: Organisasi berhasil diperbarui
 org-changes-set-email-not-unique: Email manajemen tidak unik, silakan pilih email lain
 org-changes-set-email-other-error: Tidak dapat mengatur email manajemen, silakan hubungi dukungan
+org-created-successfully: Organisasi berhasil dibuat!
 org-invited-user: Berhasil mengundang pengguna ke org
+org-with-this-name-exists: Anda telah membuat organisasi dengan nama ini!
 organization-email: Email manajemen organisasi
 organization-name: Nama Organisasi
 organization-settings: Pengaturan organisasi
@@ -498,6 +503,7 @@ trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
 type: ''
 type-new-name: Silakan ketik nama kunci api baru
+type-new-org-name: Silakan ketikkan nama baru untuk organisasi tersebut
 undefined: belum diartikan
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal

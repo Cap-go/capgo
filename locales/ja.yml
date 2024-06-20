@@ -108,6 +108,7 @@ by-clicking-on-them: それらをクリックして。
 cancel: キャンセル
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
+cannot-create-org: 組織を作成できません。ブラウザのログを確認してください。
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
@@ -163,6 +164,7 @@ copy-command: コピー コマンド
 copy-your: あなたのコピー
 country: 国
 create-a-free-accoun: 無料アカウントを作成
+create-new-org: 新しい組織を作成する
 created-at: で作成
 current-billing-cycle: 現在の請求サイクル
 custom: カスタム
@@ -220,6 +222,7 @@ error: エラー
 external-storage: 外部記憶装置
 fail: インストールに失敗しました
 failed: 失敗した
+failed-to-get-user: ユーザーのロードに失敗しました
 fast-backward: 早戻し
 fast-forward: 早送り
 filters: フィルター
@@ -310,6 +313,8 @@ misconfigured: 設定が間違っています
 misconfigured-channels: |-
   一部のチャネルが正しく設定されていません。
   これらのチャンネルの更新は失敗します。
+missing-email: メールが見つからない
+missing-name: 名前がありません
 mo: 月
 modify-org-info: ここで組織の情報を変更できます。
 module-heading: モジュール
@@ -358,7 +363,9 @@ open-your-portal: ポータルを開く
 org-changes-saved: 組織が正常に更新されました
 org-changes-set-email-not-unique: 管理用メールアドレスは一意ではありません。別のメールアドレスを選択してください
 org-changes-set-email-other-error: 管理用メールアドレスを設定できません。サポートにお問い合わせください。
+org-created-successfully: 組織が正常に作成されました。
 org-invited-user: ユーザーを組織に正常に招待しました
+org-with-this-name-exists: この名前の組織はすでに作成されています。
 organization-email: 組織の管理メール
 organization-name: 組織名
 organization-settings: 組織の設定
@@ -483,6 +490,7 @@ trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
 type: ''
 type-new-name: 新しい API キー名を入力してください
+type-new-org-name: 組織の新しい名前を入力してください
 undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み

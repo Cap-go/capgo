@@ -108,6 +108,7 @@ by-clicking-on-them: by clicking on them.
 cancel: Cancel
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
+cannot-create-org: Cannot create an organization, please check the browser logs!
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
@@ -162,6 +163,7 @@ copy-command: Copy command
 copy-your: Copy your
 country: Country
 create-a-free-accoun: Create a free account
+create-new-org: Create a new organization
 created-at: Created at
 current-billing-cycle: Current Billing Cycle
 custom: Custom
@@ -213,6 +215,7 @@ error: Error
 external-storage: External storage
 fail: Install failed
 failed: Failed
+failed-to-get-user: Failed to load the user
 fast-backward: Fast Backward
 fast-forward: Fast Forward
 filters: Filters
@@ -348,7 +351,9 @@ open-your-portal: Open your portal
 org-changes-saved: Organization updated successfully
 org-changes-set-email-not-unique: The management email is not unique, please select a different one
 org-changes-set-email-other-error: Cannot set the management email, please contant support
+org-created-successfully: Org created successfully!
 org-invited-user: Successfully invited user to org
+org-with-this-name-exists: You have already created an organization with this name!
 organization-email: Organization's management email
 organization-name: Organization Name
 organization-settings: Organization settings
@@ -470,6 +475,7 @@ trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
 type-new-name: Please type the new api key name
+type-new-org-name: Please type the new name for the organization
 undefined: undefined
 undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled

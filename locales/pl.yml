@@ -110,6 +110,7 @@ by-clicking-on-them: klikając na nie.
 cancel: Anulować
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
+cannot-create-org: Nie można utworzyć organizacji. Sprawdź logi przeglądarki!
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
@@ -169,6 +170,7 @@ copy-command: Kopiuj polecenie
 copy-your: Skopiuj swój
 country: Kraj
 create-a-free-accoun: Utwórz bezpłatne konto
+create-new-org: Utwórz nową organizację
 created-at: Utworzono o godz
 current-billing-cycle: Obecny cykl płatniczy
 custom: Zwyczaj
@@ -226,6 +228,7 @@ error: Błąd
 external-storage: Dysk zewnętrzny
 fail: Instalacja nie powiodła się
 failed: Przegrany
+failed-to-get-user: Nie udało się załadować użytkownika
 fast-backward: Szybkie przewijanie do tyłu
 fast-forward: Szybkie przewijanie do przodu
 filters: Filtry
@@ -372,7 +375,9 @@ org-changes-set-email-not-unique: Adres e-mail do zarządzania nie jest unikalny
 org-changes-set-email-other-error: >-
   Nie można ustawić adresu e-mail zarządzania. Skontaktuj się z pomocą
   techniczną
+org-created-successfully: Organizacja została utworzona pomyślnie!
 org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
+org-with-this-name-exists: Utworzyłeś już organizację o tej nazwie!
 organization-email: Adres e-mail zarządu organizacji
 organization-name: Nazwa organizacji
 organization-settings: Ustawienia organizacji
@@ -501,6 +506,7 @@ trial-plan-expired: Wersja czasowa wygasła
 trial-plan-expires-in: Próba kończy się za
 type: ''
 type-new-name: Wpisz nową nazwę klucza API
+type-new-org-name: Wpisz nową nazwę organizacji
 undefined: nieokreślony
 undefined-fail: Niezdefiniowany (aktualizacje nie powiodą się)
 uninstall: Odinstalowano

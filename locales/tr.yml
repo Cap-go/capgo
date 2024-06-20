@@ -108,6 +108,7 @@ by-clicking-on-them: üzerlerine tıklayarak.
 cancel: İptal etmek
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
+cannot-create-org: Organizasyon oluşturulamıyor, lütfen tarayıcı kayıtlarını kontrol edin!
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-app-version: Uygulama sürümü silinemiyor
@@ -165,6 +166,7 @@ copy-command: Komutu kopyala
 copy-your: kopyala
 country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
+create-new-org: Yeni bir kuruluş oluşturun
 created-at: oluşturuldu
 current-billing-cycle: Güncel Fatura Döngüsü
 custom: Gelenek
@@ -224,6 +226,7 @@ error: Hata
 external-storage: Harici depolama
 fail: Yükleme başarısız
 failed: Arızalı
+failed-to-get-user: Kullanıcı yüklenemedi
 fast-backward: Hızlı Geriye Dön
 fast-forward: İleri sar
 filters: Filtreler
@@ -366,7 +369,9 @@ open-your-portal: Portalınızı açın
 org-changes-saved: Kuruluş başarıyla güncellendi
 org-changes-set-email-not-unique: Yönetim e-postası benzersiz değil, lütfen farklı bir e-posta seçin
 org-changes-set-email-other-error: Yönetim e-postası ayarlanamıyor, lütfen desteğe başvurun
+org-created-successfully: Kuruluş başarıyla oluşturuldu!
 org-invited-user: Kullanıcı başarıyla kuruluşa davet edildi
+org-with-this-name-exists: Bu adda zaten bir kuruluş oluşturdunuz!
 organization-email: Kuruluşun yönetim e-postası
 organization-name: Kuruluş Adı
 organization-settings: Organizasyon ayarları
@@ -495,6 +500,7 @@ trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
 type: ''
 type-new-name: Lütfen yeni API anahtarı adını yazın
+type-new-org-name: Lütfen kuruluşun yeni adını yazın
 undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
