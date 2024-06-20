@@ -181,8 +181,8 @@ async function createNewOrg() {
         <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
       </div>
     </button>
-    <div id="dropdown-org" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
-      <ul class="py-2 text-sm text-gray-700 divide-y dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+    <div id="dropdown-org" class="z-10 hidden bg-white rounded-lg shadow w-44">
+      <ul class="py-2 text-sm text-gray-700 divide-y divide-gray-100 dark:divide-gray-600 dark:bg-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
         <li v-for="org in organizationStore.organizations" :key="org.gid">
           <a
             class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white text-center"
@@ -191,7 +191,7 @@ async function createNewOrg() {
             {{ org.name }}
           </a>
         </li>
-        <div class=" w-full h-[1px] bg-gray-200" />
+        <!-- <div class=" w-full h-[1px] bg-gray-200" /> -->
         <li>
           <a
             class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"

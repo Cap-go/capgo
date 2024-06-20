@@ -3109,7 +3109,7 @@ ALTER TABLE ONLY "public"."users"
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-CREATE POLICY "Allow all for auth (admin+)" ON "public"."channels" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
+-- CREATE POLICY "Allow all for auth (admin+)" ON "public"."channels" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
 CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions" TO "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
