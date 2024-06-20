@@ -2019,10 +2019,12 @@ BEGIN
     ('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), 'f', 'f', 'f', NULL, NULL);
     ALTER TABLE users ENABLE TRIGGER generate_org_on_user_create;
 
+    ALTER TABLE orgs DISABLE TRIGGER generate_org_user_on_org_create;
     INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name", "management_email", "customer_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', now(), now(), '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A'),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), now(), '', 'Demo org', 'test@capgo.app', 'cus_Q38uE91NP8Ufqc'),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q');
+    ALTER TABLE orgs ENABLE TRIGGER generate_org_user_on_org_create;
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"user_min_right", null, null),
