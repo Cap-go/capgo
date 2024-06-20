@@ -26,6 +26,7 @@ async function getKeys(retry = true): Promise<void> {
     .from('apikeys')
     .select()
     .eq('user_id', main.user?.id)
+    .neq('mode', 'upload')
   if (data && data.length)
     keys.value = data
 
@@ -242,10 +243,10 @@ async function showAddNewKeyModal() {
         text: t('key-read'),
         id: 'read-button',
       },
-      {
-        text: t('key-upload'),
-        id: 'upload-button',
-      },
+      // {
+      //   text: t('key-upload'),
+      //   id: 'upload-button',
+      // },
       {
         text: t('write-key'),
         id: 'write-button',
@@ -283,17 +284,6 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
       </button>
     </div>
     <div class="flex flex-col">
-      <p class="mx-3 mb-2 md:mx-auto">
-        {{ t('api-keys-are-used-for-cli-and-public-api') }}
-      </p>
-      <div class="mx-3 mb-2 md:mx-auto">
-        <a class="text-blue-500 underline" href="https://capgo.app/docs/tooling/cli/" target="_blank">
-          {{ t('cli-doc') }}
-        </a>
-        <a class="ml-1 text-blue-500 underline" href="https://capgo.app/docs/tooling/api/" target="_blank">
-          {{ t('api-doc') }}
-        </a>
-      </div>
       <div class="flex flex-col overflow-hidden overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl :key="magicVal" class="divide-y divide-gray-500">
           <InfoRow v-for="key in keys" :key="key.id" :label="key.mode.toUpperCase()" :value="key.name" :is-link="true">
@@ -311,6 +301,17 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
             </button>
           </InfoRow>
         </dl>
+      </div>
+      <p class="mx-3 mt-6 md:mx-auto">
+        {{ t('api-keys-are-used-for-cli-and-public-api') }}
+      </p>
+      <div class="mx-3 mb-2 md:mx-auto">
+        <a class="text-blue-500 underline" href="https://capgo.app/docs/tooling/cli/" target="_blank">
+          {{ t('cli-doc') }}
+        </a>
+        <a class="ml-1 text-blue-500 underline" href="https://capgo.app/docs/tooling/api/" target="_blank">
+          {{ t('api-doc') }}
+        </a>
       </div>
     </div>
   </div>
