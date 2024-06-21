@@ -116,9 +116,12 @@ onMounted(() => {
                 v-model="displayStore.dialogInputText"
                 type="text"
                 name="text"
-                :value="displayStore.dialogInputText"
                 enterkeyhint="next"
                 validation="required:trim"
+                :classes="{
+                  input: 'txt-center',
+                  message: 'txt-center',
+                }"
               />
             </FormKit>
           </div>

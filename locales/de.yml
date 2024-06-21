@@ -116,6 +116,9 @@ by-clicking-on-them: indem Sie darauf klicken.
 cancel: Stornieren
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
+cannot-create-org: >-
+  Es kann keine Organisation erstellt werden. Bitte überprüfen Sie die
+  Browserprotokolle!
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-icon: App-Symbol kann nicht gelöscht werden
 cannot-delete-app-version: App-Version kann nicht gelöscht werden
@@ -175,6 +178,7 @@ copy-command: Befehl kopieren
 copy-your: Kopieren Sie Ihre
 country: Land
 create-a-free-accoun: Erstelle einen kostenlosen Account
+create-new-org: Erstellen Sie eine neue Organisation
 created-at: Hergestellt in
 current-billing-cycle: Aktueller Abrechnungszyklus
 custom: Brauch
@@ -234,6 +238,7 @@ error: Fehler
 external-storage: Externer Speicher
 fail: Installation fehlgeschlagen
 failed: Fehlgeschlagen
+failed-to-get-user: Der Benutzer konnte nicht geladen werden
 fast-backward: Schneller Rücklauf
 fast-forward: Schneller Vorlauf
 filters: Filter
@@ -386,7 +391,9 @@ org-changes-set-email-not-unique: >-
 org-changes-set-email-other-error: >-
   Die Verwaltungs-E-Mail-Adresse kann nicht festgelegt werden. Bitte wenden Sie
   sich an den Support
+org-created-successfully: Organisation erfolgreich erstellt!
 org-invited-user: Benutzer wurde erfolgreich zur Organisation eingeladen
+org-with-this-name-exists: Sie haben bereits eine Organisation mit diesem Namen erstellt!
 organization-email: Management-E-Mail der Organisation
 organization-name: Name der Organisation
 organization-settings: Organisationseinstellungen
@@ -519,6 +526,7 @@ trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
 type: ''
 type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
+type-new-org-name: Bitte geben Sie den neuen Namen für die Organisation ein
 undefined: nicht definiert
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert

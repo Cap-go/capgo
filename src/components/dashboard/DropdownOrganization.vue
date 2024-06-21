@@ -9,6 +9,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import Plus from '~icons/heroicons/plus'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
 const router = useRouter()
@@ -115,6 +116,51 @@ function onOrganizationClick(org: Organization) {
   if (dropdown)
     dropdown.hide()
 }
+
+async function createNewOrg() {
+  console.log('new org!')
+
+  displayStore.dialogOption = {
+    header: t('create-new-org'),
+    message: `${t('type-new-org-name')}`,
+    input: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-lg',
+    buttonCenter: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        handler: async () => {
+          console.log('new org', displayStore.dialogInputText)
+
+          const { error } = await supabase.from('orgs')
+            .insert({
+              name: displayStore.dialogInputText,
+              created_by: main.auth?.id ?? '',
+              management_email: main.auth?.email ?? '',
+            })
+
+          if (error) {
+            console.error('Error when creating org', error)
+            toast.error(error.code === '23505' ? t('org-with-this-name-exists') : t('cannot-create-org'))
+            return
+          }
+
+          toast.success(t('org-created-successfully'))
+          await organizationStore.fetchOrganizations()
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
 </script>
 
 <template>
@@ -135,14 +181,22 @@ function onOrganizationClick(org: Organization) {
         <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
       </div>
     </button>
-    <div id="dropdown-org" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
-      <ul class="py-2 text-sm text-gray-700 divide-y dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+    <div id="dropdown-org" class="z-10 hidden bg-white rounded-lg shadow w-44">
+      <ul class="py-2 text-sm text-gray-700 divide-y divide-gray-100 dark:divide-gray-600 dark:bg-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
         <li v-for="org in organizationStore.organizations" :key="org.gid">
           <a
-            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+            class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
             @click="onOrganizationClick(org)"
           >
             {{ org.name }}
+          </a>
+        </li>
+        <!-- <div class=" w-full h-[1px] bg-gray-200" /> -->
+        <li>
+          <a
+            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+            @click="createNewOrg"
+          ><Plus class="mx-auto " />
           </a>
         </li>
       </ul>

@@ -247,10 +247,10 @@ function acronym(email: string) {
   return res.toUpperCase()
 }
 function canEdit(member: ExtendedOrganizationMember) {
-  return (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.created_by)
+  return (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
 }
 function canDelete(member: ExtendedOrganizationMember) {
-  return (member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by
+  return (member.uid === main.user?.id || currentOrganization?.value?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.value?.created_by
 }
 </script>
 
