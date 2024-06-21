@@ -4,8 +4,9 @@
   "version": "10.600.7",
   "private": true,
   "scripts": {
+    "test": "vitest",
     "build": "vite build",
-    "test": "playwright test",
+    "test-front": "playwright test",
     "preview": "vite preview",
     "preview-https": "serve dist",
     "mobile": "vite build --mode mobile && cap copy",
