@@ -109,6 +109,7 @@ cancel: 取消
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
 cannot-create-org: 无法创建组织，请检查浏览器日志！
+cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-app-version: 无法删除应用版本
@@ -178,6 +179,7 @@ defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete-account: 删除帐户
 delete-account-0: 删除帐户
+delete-org: 删除组织
 delete-your-account: 删除您的帐户
 deleted: 删除
 dependencies:
@@ -364,6 +366,7 @@ org-changes-saved: 组织更新成功
 org-changes-set-email-not-unique: 管理邮箱不唯一，请选择其他邮箱
 org-changes-set-email-other-error: 无法设置管理邮箱，请联系支持
 org-created-successfully: 组织创建成功！
+org-deleted: 组织删除成功
 org-invited-user: 已成功邀请用户加入组织
 org-with-this-name-exists: 您已经使用此名称创建了一个组织！
 organization-email: 组织的管理电子邮件
@@ -405,6 +408,7 @@ plans-super-only: 仅允许超级管理员查看计划和账单
 platform: 平台
 please-ask-the-user-to-create-account-first: 请先要求用户创建帐户
 please-choose-your-p: 请选择您的喜好
+please-confirm-org-del: 请输入“%1”组织的名称来确认您要删除该组织
 please-upgrade: 请升级您的计划以添加更多用户
 plugin-version: 插件版本
 prediction: 预言
@@ -529,6 +533,9 @@ warning: 警告！
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
 write-key: 写
+wrong-name-org-del: |-
+  您尚未输入组织名称。
+  您应该输入：%1
 yearly: 每年
 'yes': 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。

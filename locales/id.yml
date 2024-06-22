@@ -109,6 +109,7 @@ cancel: Membatalkan
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
 cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!
+cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
@@ -181,6 +182,7 @@ defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
 delete-account-0: Hapus akun
+delete-org: Hapus organisasi
 delete-your-account: Hapus akun anda
 deleted: dihapus
 dependencies:
@@ -375,6 +377,7 @@ org-changes-saved: Organisasi berhasil diperbarui
 org-changes-set-email-not-unique: Email manajemen tidak unik, silakan pilih email lain
 org-changes-set-email-other-error: Tidak dapat mengatur email manajemen, silakan hubungi dukungan
 org-created-successfully: Organisasi berhasil dibuat!
+org-deleted: Organisasi berhasil dihapus
 org-invited-user: Berhasil mengundang pengguna ke org
 org-with-this-name-exists: Anda telah membuat organisasi dengan nama ini!
 organization-email: Email manajemen organisasi
@@ -416,6 +419,9 @@ plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan
 platform: Platform
 please-ask-the-user-to-create-account-first: Silakan minta pengguna untuk membuat akun terlebih dahulu
 please-choose-your-p: Silakan pilih preferensi Anda
+please-confirm-org-del: >-
+  Harap konfirmasikan bahwa Anda ingin menghapus "%1" organisasi dengan
+  mengetikkan namanya
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
 prediction: Ramalan
@@ -544,6 +550,9 @@ warning: Peringatan!
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 write-key: Menulis
+wrong-name-org-del: |-
+  Anda belum mengetikkan nama organisasi. 
+  Anda seharusnya mengetik: %1
 yearly: Tahunan
 'yes': Ya
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
