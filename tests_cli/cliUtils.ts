@@ -73,6 +73,8 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   const command = [
     'npx',
     '@capgo/cli',
+    // 'node',
+    // '../../CLI/dist/index.js',
     ...params,
     '--ignore-metadata-check',
     '--apikey',
@@ -80,10 +82,12 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   ].join(' ')
 
   try {
-    const output = execSync(command, { cwd: appPath!, encoding: 'utf-8' })
-    if (logOutput) {
-      console.log(`CLI output:\n\n${output}`)
-    }
+    const output = execSync(command, {
+      cwd: appPath!,
+      encoding: 'utf-8',
+      stdio: logOutput ? 'inherit' : 'pipe',
+    })
+
     return output
   }
   catch (error) {
