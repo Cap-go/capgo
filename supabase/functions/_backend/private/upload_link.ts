@@ -79,10 +79,10 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
 
     let response: any
     if (body.version && body.version === 1) {
-      console.log('mul!')
+      console.log(`Multipart upload for ${JSON.stringify(body)}`)
       const uploadId = await createMultipartRequest(c, filePath, app.owner_org)
 
-      response = { uploadId, key: filePath, url: getMultipartServerUrl(c) }
+      response = { uploadId, key: filePath, url: getMultipartServerUrl(c, true) }
     }
     else {
       const url = await s3.getUploadUrl(c, filePath)
@@ -123,8 +123,9 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
   }
 })
 
-function getMultipartServerUrl(c: Context) {
-  return new URL(getEnv(c, 'MULTIPART_SERVER'))
+function getMultipartServerUrl(c: Context, external = false) {
+  const raw = !external ? getEnv(c, 'MULTIPART_SERVER') : getEnv(c, 'MULTIPART_SERVER').replace('host.docker.internal', '127.0.0.1')
+  return new URL(raw)
 }
 
 interface MultipartLink {
@@ -134,7 +135,7 @@ interface MultipartLink {
 async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
   try {
     const serverUrl = getMultipartServerUrl(c)
-    const serverSecret = getEnv(c, 'MULTIPART_SECRET')
+    const serverSecret = getEnv(c, 'MAGIC_MULTIPART_SECRET')
 
     const body = {
       key: path,
