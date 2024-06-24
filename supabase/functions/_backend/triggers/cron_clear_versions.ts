@@ -39,13 +39,24 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     console.log('v2Path', v2Path)
     let notFound = false
     try {
-      const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
+      const size = await s3.getSize(c, v2Path ?? '')
       if (!size) {
         console.log(`No size for ${v2Path}, ${size}`)
         // throw error to trigger the deletion
         notFound = true
         throw new Error('no_size')
       }
+      // get checksum from table app_versions
+      const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c)
+        .from('app_versions')
+        .select('checksum')
+        .eq('id', version.id)
+        .single()
+      if (errorAppVersion)
+        return errorOut(c, `Cannot find checksum for app_versions id ${version.id} because of error: ${errorAppVersion}`)
+      if (!appVersion)
+        return errorOut(c, `Cannot find checksum for app_versions id ${version.id} because of no app_versions found`)
+      const checksum = appVersion.checksum
       if (!checksum) {
         console.log(`No checksum for ${v2Path}, ${checksum}`)
       }
