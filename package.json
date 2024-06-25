@@ -36,6 +36,7 @@
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
+    "lint-sql": "sqlfluff fix --dialect postgres",
     "deploy:cf_serverless": "wrangler deploy",
     "types": "bun ./scripts/getTypes.mjs",
     "dev-types": "BRANCH=development bun ./scripts/getTypes.mjs",

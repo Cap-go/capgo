@@ -30,8 +30,10 @@ SELECT results_eq(
 
 -- Test get_metered_usage
 SELECT tests.authenticate_as('test_admin');
-SELECT is((get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')).mau >= 0, true, 'get_metered_usage test - non-negative mau');
-SELECT is((get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')).bandwidth >= 0, true, 'get_metered_usage test - non-negative bandwidth');
+SELECT
+    is((get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')).mau >= 0, true, 'get_metered_usage test - non-negative mau');
+SELECT
+    is((get_metered_usage('22dbad8a-b885-4309-9b3b-a09f8460fb6d')).bandwidth >= 0, true, 'get_metered_usage test - non-negative bandwidth');
 SELECT tests.clear_authentication();
 
 SELECT * FROM finish();

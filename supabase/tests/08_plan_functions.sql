@@ -26,29 +26,53 @@ SELECT is(get_current_plan_name_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'), 'So
 SELECT is(get_current_plan_name_org('11111111-1111-1111-1111-111111111111'), NULL, 'get_current_plan_name_org test - org does not exist');
 
 -- Test is_good_plan_v5_org
-SELECT is(is_good_plan_v5_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'), true, 'is_good_plan_v5_org test - plan is good');
+SELECT is(is_good_plan_v5_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'), TRUE, 'is_good_plan_v5_org test - plan is good');
 
 -- Test find_best_plan_v3
 
 -- Retrieve Solo plan details and perform the test
 SELECT is(
     find_best_plan_v3(
-        (SELECT mau FROM plans WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'), 
-        (SELECT bandwidth FROM plans WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'), 
-        (SELECT storage FROM plans WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c')
-    ), 
-    'Solo', 
+        (
+            SELECT mau
+            FROM plans
+            WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'
+        ),
+        (
+            SELECT bandwidth
+            FROM plans
+            WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'
+        ),
+        (
+            SELECT storage
+            FROM plans
+            WHERE id = '526e11d8-3c51-4581-ac92-4770c602f47c'
+        )
+    ),
+    'Solo',
     'find_best_plan_v3 test - fits Solo plan'
 );
 
 -- Retrieve Team plan details and perform the test
 SELECT is(
     find_best_plan_v3(
-        (SELECT mau FROM plans WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'), 
-        (SELECT bandwidth FROM plans WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'), 
-        (SELECT storage FROM plans WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77')
-    ), 
-    'Team', 
+        (
+            SELECT mau
+            FROM plans
+            WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'
+        ),
+        (
+            SELECT bandwidth
+            FROM plans
+            WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'
+        ),
+        (
+            SELECT storage
+            FROM plans
+            WHERE id = 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77'
+        )
+    ),
+    'Team',
     'find_best_plan_v3 test - fits Team plan'
 );
 
