@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.600.10",
+  "version": "10.600.17",
   "private": true,
   "scripts": {
     "test": "vitest",
@@ -36,6 +36,7 @@
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
+    "lint-sql": "sqlfluff fix --dialect postgres",
     "deploy:cf_serverless": "wrangler deploy",
     "types": "bun ./scripts/getTypes.mjs",
     "dev-types": "BRANCH=development bun ./scripts/getTypes.mjs",
@@ -59,6 +60,7 @@
     "deploy:netlify_env:preprod": "bunx netlify env:import -r internal/cloudflare/.env.preprod",
     "size": "bunx vite-bundle-visualizer",
     "minio:start": "cd ./tests_backend/gh_actions && sh ./minio.sh && cd ../..",
+    "minio:trace": "cd ./tests_backend/gh_actions && sh ./minio-trace.sh",
     "minio:seed": "cd ./tests_backend/gh_actions && sh ./minio-seed.sh && cd ../..",
     "minio:delete": "docker stop minio1 && docker rm minio1 && rm -rf /tmp/minio-data",
     "clickhouse:start": "cd ./tests_backend/gh_actions && sh ./clickhouse.sh && cd ../..",

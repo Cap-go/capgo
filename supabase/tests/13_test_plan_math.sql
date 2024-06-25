@@ -65,7 +65,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-select my_tests();
+SELECT my_tests();
 
 SELECT * FROM finish();
 ROLLBACK;

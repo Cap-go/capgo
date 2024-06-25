@@ -75,7 +75,7 @@ Deno.test('Test new version available', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('Test new version available', json)
+  // console.log('Test new version available', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.0.0')
 })
@@ -109,7 +109,7 @@ Deno.test('Test with new device', async () => {
   const response2 = await postUpdate(getBaseData())
   assertEquals(response2.status, 200)
   const json = await response2.json()
-  console.log('Test with new device', json)
+  // console.log('Test with new device', json)
   assertEquals(json, { message: 'No new version available' })
 })
 
@@ -250,7 +250,7 @@ Deno.test('Test channel overwrite', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('Test channel overwrite', json)
+  // console.log('Test channel overwrite', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.361.0')
 
@@ -286,7 +286,7 @@ Deno.test('Test version overwrite', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('Test version overwrite', json)
+  // console.log('Test version overwrite', json)
   updateNewScheme.parse(json)
   assertEquals(json.version, '1.359.0')
 
@@ -309,7 +309,7 @@ Deno.test('Test disallowed public channel update', async () => {
   const response = await postUpdate(baseData)
   assertEquals(response.status, 200)
   const json = await response.json()
-  console.log('Test disallowed public channel update', json)
+  // console.log('Test disallowed public channel update', json)
   assertEquals(json.error, 'no_channel')
 })
 
@@ -328,7 +328,7 @@ Deno.test('Test disabled progressive deployment', async () => {
   assertEquals(response.status, 200)
 
   const json = await response.json()
-  console.log('Test disabled progressive deployment', json)
+  // console.log('Test disabled progressive deployment', json)
   assertEquals(json.message, 'No new version available')
 })
 
@@ -344,7 +344,7 @@ Deno.test('Test unsupported platform', async () => {
 
   const json = await response.json()
   assertEquals(json.error, `Cannot parse json: ${INVALID_STRING_PLATFORM}`)
-  console.log('Test unsupported platform', json)
+  // console.log('Test unsupported platform', json)
 })
 
 Deno.test('Test invalid device_id', async () => {
@@ -361,7 +361,7 @@ Deno.test('Test invalid device_id', async () => {
 
   const json = await response.json()
   assertEquals(json.error, `Cannot parse json: ${INVALID_STRING_DEVICE_ID}`)
-  console.log('Test invalid device_id', json)
+  // console.log('Test invalid device_id', json)
 })
 
 Deno.test('Test invalid plugin_version', async () => {
@@ -375,7 +375,7 @@ Deno.test('Test invalid plugin_version', async () => {
 
   const json = await response.json()
   assertEquals(json.error, `Cannot parse json: ${INVALID_STRING_PLUGIN_VERSION}`)
-  console.log('Test invalid plugin_version', json)
+  // console.log('Test invalid plugin_version', json)
 })
 
 Deno.test('Test missing fields', async () => {
@@ -388,7 +388,7 @@ Deno.test('Test missing fields', async () => {
 
   const json = await response.json()
   assertEquals(json.error, 'Cannot parse json: App ID is required')
-  console.log('Test missing fields', json)
+  // console.log('Test missing fields', json)
 })
 
 Deno.test('Test only platform field', async () => {
@@ -401,7 +401,7 @@ Deno.test('Test only platform field', async () => {
 
   const json = await response.json()
   assertEquals(json.error, 'Cannot parse json: App ID is required')
-  console.log('Test only platform field', json)
+  // console.log('Test only platform field', json)
 })
 
 Deno.test('Test device_id and app_id combination not found', async () => {
@@ -416,5 +416,5 @@ Deno.test('Test device_id and app_id combination not found', async () => {
 
   const json = await response.json()
   assertEquals(json.error, 'app_not_found')
-  console.log('Test device_id and app_id combination not found', json)
+  // console.log('Test device_id and app_id combination not found', json)
 })
