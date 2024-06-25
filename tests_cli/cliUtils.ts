@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import path from 'node:path'
 import process from 'node:process'
+import type { ExecSyncOptions } from 'node:child_process'
 import rimraf from 'rimraf'
 
 let appPath: string | null = null
@@ -53,6 +54,20 @@ export async function prepareCli(backendBaseUrl: URL) {
   mkdirSync(path.join(tempFileFolder, 'dist'), { recursive: true })
   writeFileSync(path.join(tempFileFolder, 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(path.join(tempFileFolder, 'dist', 'index.html'), '')
+  // write package.json
+  writeFileSync(path.join(tempFileFolder, 'package.json'), JSON.stringify({
+    name: 'test-cli-app',
+    version: '1.0.0',
+    description: 'An Amazing Test App',
+    dependencies: {
+      '@capacitor/android': '^4.5.0',
+    },
+    devDependencies: {
+      '@capacitor/cli': '^5.4.1',
+      'typescript': '^5.2.2',
+    },
+    author: '',
+  }, null, 2))
 
   appPath = tempFileFolder
 
@@ -73,25 +88,36 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   const command = [
     'npx',
     '@capgo/cli',
-    // 'node',
-    // '../../CLI/dist/index.js',
     ...params,
     '--ignore-metadata-check',
     '--apikey',
     overwriteApiKey ?? defaultApiKey,
   ].join(' ')
 
+  const options: ExecSyncOptions = {
+    cwd: appPath!,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, FORCE_COLOR: '1' },
+  }
+
   try {
-    const output = execSync(command, {
-      cwd: appPath!,
-      encoding: 'utf-8',
-      stdio: logOutput ? 'inherit' : 'pipe',
-    })
+    const output = execSync(command, options)
+
+    if (logOutput) {
+      console.log(output)
+    }
 
     return output
   }
   catch (error) {
-    console.error('CLI execution failed', error)
-    throw error
+    const errorOutput = error.stderr ? error.stderr.toString() : error.message
+    console.error('CLI execution failed', errorOutput)
+
+    if (logOutput) {
+      console.log(errorOutput)
+    }
+
+    return errorOutput
   }
 }
