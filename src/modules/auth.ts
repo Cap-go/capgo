@@ -5,7 +5,6 @@ import { useSupabase } from '~/services/supabase'
 import { setUser } from '~/services/chatwoot'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
-import { initStunning } from '~/services/stunning'
 
 async function guard(next: any, to: string, from: string) {
   const supabase = useSupabase()
