@@ -53,7 +53,8 @@ async function guard(next: any, to: string, from: string) {
       main.plans = pls
     })
 
-    initStunning(main.user?.customer_id)
+    // TODO: fix stunning to work with orgs custiner id
+    // initStunning(main.user?.customer_id)
     isAdmin(main.auth?.id).then((res) => {
       main.isAdmin = res
     })
