@@ -109,6 +109,7 @@ cancel: キャンセル
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
 cannot-create-org: 組織を作成できません。ブラウザのログを確認してください。
+cannot-del-org: 組織を削除できません。ブラウザのログを確認してください。
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-app-version: アプリのバージョンを削除できません
@@ -178,6 +179,7 @@ defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
 delete-account-0: アカウントを削除する
+delete-org: 組織の削除
 delete-your-account: アカウントを削除する
 deleted: 削除された
 dependencies:
@@ -364,6 +366,7 @@ org-changes-saved: 組織が正常に更新されました
 org-changes-set-email-not-unique: 管理用メールアドレスは一意ではありません。別のメールアドレスを選択してください
 org-changes-set-email-other-error: 管理用メールアドレスを設定できません。サポートにお問い合わせください。
 org-created-successfully: 組織が正常に作成されました。
+org-deleted: 組織は正常に削除されました
 org-invited-user: ユーザーを組織に正常に招待しました
 org-with-this-name-exists: この名前の組織はすでに作成されています。
 organization-email: 組織の管理メール
@@ -405,6 +408,7 @@ plans-super-only: スーパー管理者のみがプランと請求を表示で�
 platform: プラットホーム
 please-ask-the-user-to-create-account-first: 最初にユーザーにアカウントを作成するように依頼してください
 please-choose-your-p: お好みを選択してください
+please-confirm-org-del: 「%1」組織の名前を入力して、削除することを確認してください
 please-upgrade: プランをアップグレードしてユーザーを追加してください
 plugin-version: プラグインのバージョン
 prediction: 予測
@@ -529,6 +533,9 @@ warning: 警告！
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
 write-key: 書く
+wrong-name-org-del: |-
+  組織名が入力されていません。
+  次のように入力する必要がありました: %1
 yearly: 毎年
 'yes': はい
 you-can-change-your-: ここで個人情報を変更できます。

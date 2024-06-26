@@ -115,6 +115,7 @@ cancel: Cancelar
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
 cannot-create-org: No se puede crear una organización; verifique los registros del navegador.
+cannot-del-org: No se puede eliminar la organización; consulte el registro del navegador.
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
 cannot-delete-app-version: No se puede eliminar la versión de la aplicación
@@ -190,6 +191,7 @@ defined-as-private: definido como normal
 defined-as-public: definido como predeterminado
 delete-account: Borrar cuenta
 delete-account-0: Borrar cuenta
+delete-org: Eliminar organización
 delete-your-account: Elimina tu cuenta
 deleted: eliminado
 dependencies:
@@ -386,6 +388,7 @@ org-changes-set-email-other-error: >-
   No se puede configurar el correo electrónico de administración, comuníquese
   con el soporte
 org-created-successfully: ¡Organización creada exitosamente!
+org-deleted: Organización eliminada correctamente
 org-invited-user: Usuario invitado exitosamente a la organización
 org-with-this-name-exists: ¡Ya has creado una organización con este nombre!
 organization-email: Correo electrónico de gestión de la organización.
@@ -431,6 +434,7 @@ plans-super-only: Solo los superadministradores pueden ver los planes y la factu
 platform: Plataforma
 please-ask-the-user-to-create-account-first: Solicite al usuario que primero cree una cuenta.
 please-choose-your-p: Por favor elige tus preferencias
+please-confirm-org-del: Confirme que desea eliminar la organización "%1" escribiendo su nombre.
 please-upgrade: Actualice su plan para agregar más usuarios
 plugin-version: Versión del complemento
 prediction: Predicción
@@ -559,6 +563,9 @@ warning: ¡Advertencia!
 welcome-to: Bienvenido a
 welcome-to-your-capg: Bienvenido a tu panel de control de Capgo
 write-key: Escribir
+wrong-name-org-del: |-
+  No ha escrito el nombre de la organización. 
+  Se suponía que debías escribir: %1
 yearly: Anual
 'yes': Sí
 you-can-change-your-: Puede cambiar su información personal aquí.

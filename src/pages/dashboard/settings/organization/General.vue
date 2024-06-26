@@ -164,6 +164,55 @@ const acronym = computed(() => {
   // }
   return res.toUpperCase()
 })
+
+function canDeleteOrg() {
+  return currentOrganization.value?.role === 'super_admin'
+    && organizationStore.organizations.length > 1
+}
+
+async function deleteOrganization() {
+  displayStore.dialogOption = {
+    header: t('delete-org'),
+    message: `${t('please-confirm-org-del')}`.replace('%1', currentOrganization.value?.name ?? ''),
+    input: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-lg',
+    buttonCenter: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        handler: async () => {
+          const typed = displayStore.dialogInputText
+          if (typed !== (currentOrganization.value?.name ?? '')) {
+            toast.error(t('wrong-name-org-del').replace('%1', currentOrganization.value?.name ?? ''))
+            return
+          }
+
+          const { error } = await supabase.from('orgs')
+            .delete()
+            .eq('id', currentOrganization.value?.gid ?? 0)
+
+          if (error) {
+            toast.error(t('cannot-del-org'))
+            console.error('org del err', error)
+            return
+          }
+
+          toast.success(t('org-deleted'))
+          await organizationStore.fetchOrganizations()
+        },
+      },
+    ],
+  }
+
+  displayStore.showDialog = true
+}
 </script>
 
 <template>
@@ -223,6 +272,21 @@ const acronym = computed(() => {
       <footer style="margin-top: auto">
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
+            <button
+              class="p-2 text-white border border-red-400 rounded-lg btn hover:bg-red-600 mr-4 mb-2"
+              color="secondary"
+              shape="round"
+              type="button"
+              :class="{
+                invisible: !canDeleteOrg(),
+              }"
+              @click="() => deleteOrganization()"
+            >
+              <span v-if="!isLoading" class="rounded-4xl">
+                {{ t('delete-org') }}
+              </span>
+              <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+            </button>
             <button
               id="save-changes"
               class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"

@@ -111,6 +111,7 @@ cancel: Cancelar
 cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
 cannot-create-org: Não é possível criar uma organização. Verifique os registros do navegador!
+cannot-del-org: Não é possível excluir a organização. Verifique o registro do navegador
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-app-version: Não é possível excluir a versão do aplicativo
@@ -182,6 +183,7 @@ defined-as-private: definido como normal
 defined-as-public: definido como padrão
 delete-account: Deletar conta
 delete-account-0: Deletar conta
+delete-org: Excluir organização
 delete-your-account: Deletar sua conta
 deleted: excluído
 dependencies:
@@ -374,6 +376,7 @@ org-changes-set-email-other-error: >-
   Não é possível definir o e-mail de gerenciamento. Entre em contato com o
   suporte
 org-created-successfully: Organização criada com sucesso!
+org-deleted: Organização excluída com sucesso
 org-invited-user: Usuário convidado para a organização com sucesso
 org-with-this-name-exists: Você já criou uma organização com este nome!
 organization-email: E-mail de gerenciamento da organização
@@ -417,6 +420,7 @@ plans-super-only: Somente superadministradores têm permissão para visualizar p
 platform: Plataforma
 please-ask-the-user-to-create-account-first: Por favor, peça ao usuário para criar uma conta primeiro
 please-choose-your-p: Escolha suas preferências
+please-confirm-org-del: Por favor confirme que deseja excluir a organização "%1" digitando seu nome
 please-upgrade: Atualize seu plano para adicionar mais usuários
 plugin-version: Versão do plug-in
 prediction: Predição
@@ -543,6 +547,9 @@ warning: Aviso!
 welcome-to: Bem-vindo ao
 welcome-to-your-capg: Bem-vindo ao seu painel Capgo
 write-key: Escrever
+wrong-name-org-del: |-
+  Você não digitou o nome da organização. 
+  Você deveria ter digitado:% 1
 yearly: Anual
 'yes': sim
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.

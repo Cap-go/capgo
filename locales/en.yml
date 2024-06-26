@@ -110,6 +110,7 @@ cancel: Cancel
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
 cannot-create-org: Cannot create an organization, please check the browser logs!
+cannot-del-org: Cannot delete the organization, please check the browser log
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-app-version: Cannot delete app version
@@ -179,6 +180,7 @@ defined-as-private: defined as normal
 defined-as-public: defined as default
 delete-account: Delete Account
 delete-account-0: Delete account
+delete-org: Delete organization
 delete-your-account: Delete your account
 deleted: deleted
 detailed-usage-plan: Detailed usage
@@ -356,6 +358,7 @@ org-changes-saved: Organization updated successfully
 org-changes-set-email-not-unique: The management email is not unique, please select a different one
 org-changes-set-email-other-error: Cannot set the management email, please contant support
 org-created-successfully: Org created successfully!
+org-deleted: Org deleted successfully
 org-invited-user: Successfully invited user to org
 org-with-this-name-exists: You have already created an organization with this name!
 organization-email: Organization's management email
@@ -399,6 +402,7 @@ platform: Platform
 please-ask-the-user-to-create-account-first: Please ask the user to create account first
 please-choose-your-p: Please choose your preferences
 please-type-new-app-name: Please type the new app name
+please-confirm-org-del: Please confirm that you want to delete "%1" org by typing it's name
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
@@ -521,6 +525,7 @@ warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 write-key: Write
+wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
 'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.

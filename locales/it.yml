@@ -113,6 +113,7 @@ cancel: Annulla
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
 cannot-create-org: Impossibile creare un'organizzazione, controlla i log del browser!
+cannot-del-org: Impossibile eliminare l'organizzazione, controlla il registro del browser
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
 cannot-delete-app-version: Impossibile eliminare la versione dell'app
@@ -186,6 +187,7 @@ defined-as-private: definita normale
 defined-as-public: definito come predefinito
 delete-account: Eliminare l'account
 delete-account-0: Eliminare l'account
+delete-org: Elimina organizzazione
 delete-your-account: cancella il tuo account
 deleted: cancellato
 dependencies:
@@ -378,6 +380,7 @@ org-changes-saved: Organizzazione aggiornata correttamente
 org-changes-set-email-not-unique: L'e-mail di gestione non è univoca, selezionane una diversa
 org-changes-set-email-other-error: Impossibile impostare l'e-mail di gestione, contattare l'assistenza
 org-created-successfully: Organizzazione creata con successo!
+org-deleted: Organizzazione eliminata correttamente
 org-invited-user: Utente invitato all'organizzazione correttamente
 org-with-this-name-exists: Hai già creato un'organizzazione con questo nome!
 organization-email: E-mail di gestione dell'organizzazione
@@ -421,6 +424,7 @@ plans-super-only: Solo i super amministratori possono visualizzare i piani e la 
 platform: piattaforma
 please-ask-the-user-to-create-account-first: Chiedi prima all'utente di creare un account
 please-choose-your-p: Scegli le tue preferenze
+please-confirm-org-del: Conferma di voler eliminare l'organizzazione "%1" digitandone il nome
 please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
 prediction: Predizione
@@ -549,6 +553,9 @@ warning: Avvertimento!
 welcome-to: Benvenuto a
 welcome-to-your-capg: Benvenuto nella dashboard di Capgo
 write-key: Scrivere
+wrong-name-org-del: |-
+  Non hai digitato il nome dell'organizzazione. 
+  Avresti dovuto digitare: %1
 yearly: Annuale
 'yes': SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
