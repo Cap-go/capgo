@@ -109,6 +109,7 @@ cancel: 취소
 cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-create-org: 조직을 생성할 수 없습니다. 브라우저 로그를 확인하세요!
+cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확인하세요.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다.
@@ -178,6 +179,7 @@ defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete-account: 계정 삭제
 delete-account-0: 계정 삭제
+delete-org: 조직 삭제
 delete-your-account: 계정 삭제
 deleted: 삭제
 dependencies:
@@ -364,6 +366,7 @@ org-changes-saved: 조직이 업데이트되었습니다.
 org-changes-set-email-not-unique: 관리 이메일이 고유하지 않습니다. 다른 이메일을 선택하세요.
 org-changes-set-email-other-error: 관리 이메일을 설정할 수 없습니다. 지속적인 지원을 부탁드립니다.
 org-created-successfully: 조직이 성공적으로 생성되었습니다!
+org-deleted: 조직이 삭제되었습니다.
 org-invited-user: 사용자를 조직에 초대했습니다.
 org-with-this-name-exists: 이미 이 이름을 가진 조직을 만드셨습니다!
 organization-email: 조직의 관리 이메일
@@ -405,6 +408,7 @@ plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니�
 platform: 플랫폼
 please-ask-the-user-to-create-account-first: 먼저 사용자에게 계정을 생성하도록 요청하세요.
 please-choose-your-p: 기본 설정을 선택하십시오
+please-confirm-org-del: 이름을 입력하여 "%1" 조직을 삭제할 것인지 확인하십시오.
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
 prediction: 예측
@@ -529,6 +533,9 @@ warning: 경고!
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
 write-key: 쓰다
+wrong-name-org-del: |-
+  조직 이름을 입력하지 않았습니다. 
+  다음을 입력해야 했습니다: %1
 yearly: 매년
 'yes': 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.

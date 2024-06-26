@@ -113,6 +113,7 @@ cancel: Отмена
 cannot-change-name: Невозможно изменить имя, проверьте консоль браузера.
 cannot-change-permission: Невозможно изменить разрешения, проверьте консоль браузера
 cannot-create-org: Невозможно создать организацию, проверьте журналы браузера!
+cannot-del-org: Невозможно удалить организацию, проверьте журнал браузера
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-app-version: Не могу удалить версию приложения
@@ -184,6 +185,7 @@ defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
 delete-account-0: Удалить аккаунт
+delete-org: Удалить организацию
 delete-your-account: Удалить свой аккаунт
 deleted: удален
 dependencies:
@@ -376,6 +378,7 @@ org-changes-set-email-other-error: >-
   Невозможно установить адрес электронной почты управления, обратитесь в службу
   поддержки.
 org-created-successfully: Организация успешно создана!
+org-deleted: Организация успешно удалена
 org-invited-user: Пользователь успешно приглашен в организацию.
 org-with-this-name-exists: Вы уже создали организацию с таким названием!
 organization-email: Электронная почта руководства организации
@@ -417,6 +420,7 @@ plans-super-only: Только суперадминистраторы могут
 platform: Платформа
 please-ask-the-user-to-create-account-first: Пожалуйста, попросите пользователя сначала создать учетную запись
 please-choose-your-p: Пожалуйста, выберите ваши предпочтения
+please-confirm-org-del: Подтвердите, что вы хотите удалить организацию «%1», введя ее имя.
 please-upgrade: Обновите свой план, чтобы добавить больше пользователей
 plugin-version: Версия плагина
 prediction: Прогноз
@@ -547,6 +551,9 @@ warning: Предупреждение!
 welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
 write-key: Писать
+wrong-name-org-del: |-
+  Вы не ввели название организации. 
+  Вы должны были ввести: %1
 yearly: Ежегодно
 'yes': да
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.
