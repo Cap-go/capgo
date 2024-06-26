@@ -1,6 +1,6 @@
 // Imports
-import { assert, assertEquals } from 'https://deno.land/std@0.192.0/testing/asserts.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.8.0'
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/testing/asserts.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.44.0'
 import { z } from 'https://deno.land/x/zod/mod.ts'
 import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../_backend/utils/utils.ts'
 
