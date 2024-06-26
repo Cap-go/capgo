@@ -31,3 +31,12 @@ jobs:
       - name: "Start minio"
         run: npm run minio:start && npm run minio:seed
       - run: deno test --allow-all supabase/functions/tests/* --env=supabase/.env.test --import-map=supabase/functions/import_map.json
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: CLI test
+        run: bun run test
+   
