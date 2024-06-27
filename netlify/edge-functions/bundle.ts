@@ -1,5 +1,5 @@
 import { sentry } from '@hono/sentry';
-import { handle } from 'https://deno.land/x/hono@v4.0.0/adapter/netlify/mod.ts'
+import { handle } from 'https://deno.land/x/hono@v4.4.3/adapter/netlify/mod.ts'
 import { app } from '../../supabase/functions/_backend/public/bundles.ts'
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_NETLIFY')

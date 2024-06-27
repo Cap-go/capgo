@@ -112,6 +112,7 @@ by-clicking-on-them: bằng cách nhấp vào chúng.
 cancel: Hủy bỏ
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
+cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký trình duyệt
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
@@ -180,6 +181,7 @@ defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete-account: Xóa tài khoản
 delete-account-0: Xóa tài khoản
+delete-org: Xóa tổ chức
 delete-your-account: Xóa tài khoản của bạn
 deleted: đã xóa
 dependencies:
@@ -370,6 +372,7 @@ open-your-portal: Mở cổng thông tin của bạn
 org-changes-saved: Tổ chức được cập nhật thành công
 org-changes-set-email-not-unique: Email quản lý không phải là duy nhất, vui lòng chọn email khác
 org-changes-set-email-other-error: Không cài đặt được email quản lý, vui lòng tiếp tục hỗ trợ
+org-deleted: Đã xóa tổ chức thành công
 org-invited-user: Đã mời thành công người dùng vào tổ chức
 organization-email: Email quản lý của tổ chức
 organization-name: tên tổ chức
@@ -410,6 +413,9 @@ plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem g�
 platform: Nền tảng
 please-ask-the-user-to-create-account-first: Vui lòng yêu cầu người dùng tạo tài khoản trước
 please-choose-your-p: Vui lòng chọn sở thích của bạn
+please-confirm-org-del: >-
+  Vui lòng xác nhận rằng bạn muốn xóa tổ chức "%1" bằng cách nhập tên của tổ
+  chức đó
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
 prediction: Sự dự đoán
@@ -535,6 +541,9 @@ warning: Cảnh báo!
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Bảng điều khiển Capgo của bạn
 write-key: Viết
+wrong-name-org-del: |-
+  Bạn chưa gõ tên tổ chức. 
+  Bạn phải gõ: %1
 yearly: hàng năm
 'yes': Đúng
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.

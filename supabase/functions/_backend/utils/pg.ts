@@ -17,7 +17,7 @@ export function getPgClient(c: Context) {
     return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { prepare: false, timeout: 2 })
   }
   console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'))
+  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { prepare: false, timeout: 2 })
 }
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {

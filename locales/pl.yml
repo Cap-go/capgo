@@ -111,6 +111,7 @@ cancel: Anulować
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
 cannot-create-org: Nie można utworzyć organizacji. Sprawdź logi przeglądarki!
+cannot-del-org: Nie można usunąć organizacji. Sprawdź dziennik przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-app-version: Nie można usunąć wersji aplikacji
@@ -184,6 +185,7 @@ defined-as-private: określone jako normalne
 defined-as-public: zdefiniowane jako domyślne
 delete-account: Usuń konto
 delete-account-0: Usuń konto
+delete-org: Usuń organizację
 delete-your-account: Usuń swoje konto
 deleted: usunięte
 dependencies:
@@ -376,6 +378,7 @@ org-changes-set-email-other-error: >-
   Nie można ustawić adresu e-mail zarządzania. Skontaktuj się z pomocą
   techniczną
 org-created-successfully: Organizacja została utworzona pomyślnie!
+org-deleted: Organizacja została pomyślnie usunięta
 org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
 org-with-this-name-exists: Utworzyłeś już organizację o tej nazwie!
 organization-email: Adres e-mail zarządu organizacji
@@ -419,6 +422,7 @@ plans-super-only: Tylko superadministratorzy mogą przeglądać plany i rozlicze
 platform: Platforma
 please-ask-the-user-to-create-account-first: Najpierw poproś użytkownika o utworzenie konta
 please-choose-your-p: Wybierz swoje preferencje
+please-confirm-org-del: Potwierdź, że chcesz usunąć organizację „%1”, wpisując jej nazwę
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 plugin-version: Wersja wtyczki
 prediction: Prognoza
@@ -547,6 +551,9 @@ warning: Ostrzeżenie!
 welcome-to: Witamy w
 welcome-to-your-capg: Witamy na pulpicie nawigacyjnym Capgo
 write-key: Pisać
+wrong-name-org-del: |-
+  Nie wpisałeś nazwy organizacji. 
+  Miałeś wpisać: %1
 yearly: Rocznie
 'yes': Tak
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.

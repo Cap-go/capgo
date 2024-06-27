@@ -3856,22 +3856,6 @@ CREATE POLICY "All user to manage they own folder 1ffg0oo_2" ON "storage"."objec
 
 CREATE POLICY "All user to manage they own folder 1ffg0oo_3" ON "storage"."objects" FOR SELECT USING ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
 
-CREATE POLICY "Allow apikey manage they folder 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow apikey to manage they folder  1sbjm_3" ON "storage"."objects" FOR DELETE TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow apikey to manage they folder 1sbjm_1" ON "storage"."objects" FOR INSERT TO "anon" WITH CHECK ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow apikey to select 1sbjm_0" ON "storage"."objects" FOR SELECT TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow user or shared to manage they folder 1sbjm_0" ON "storage"."objects" FOR SELECT TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
-CREATE POLICY "Allow user to delete they folder 1sbjm_0" ON "storage"."objects" FOR DELETE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
-CREATE POLICY "Allow user to update version 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
-CREATE POLICY "Alow user to insert in they folder 1sbjm_0" ON "storage"."objects" FOR INSERT TO "authenticated" WITH CHECK ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
 CREATE POLICY "Disable act bucket for users" ON "storage"."buckets" USING (false) WITH CHECK (false);
 
 

@@ -1,9 +1,8 @@
 import type { Context } from '@hono/hono'
 import ky from 'ky'
 import type { CompletedPart } from '@aws-sdk/client-s3'
-import { CompleteMultipartUploadCommand, CopyObjectCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
+import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
-
 import { getEnv } from './utils.ts'
 
 function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
@@ -27,22 +26,6 @@ function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
   console.log('initS3', params)
 
   return new S3Client(params)
-}
-
-async function setCRC32Checksum(c: Context, fileId: string, checksum: string) {
-  const client = initS3(c)
-  const path = `${getEnv(c, 'S3_BUCKET')}/${fileId}`
-  const command = new CopyObjectCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-    CopySource: path,
-    MetadataDirective: 'REPLACE',
-    Metadata: {
-      'x-amz-meta-crc32': checksum,
-    },
-  })
-  console.log('setCRC32Checksum', path, checksum)
-  await client.send(command)
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
@@ -115,7 +98,7 @@ async function checkIfExist(c: Context, fileId: string) {
     return true
   }
   catch (error) {
-    console.log('checkIfExist', error)
+    console.log('checkIfExist', fileId, error)
     return false
   }
 }
@@ -130,7 +113,7 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   return url
 }
 
-async function getSizeChecksum(c: Context, fileId: string) {
+async function getSize(c: Context, fileId: string) {
   const client = initS3(c)
   const command = new HeadObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
@@ -140,21 +123,19 @@ async function getSizeChecksum(c: Context, fileId: string) {
     const url = await getSignedUrlSDK(client, command)
     const response = await ky.head(url)
     const contentLength = response.headers.get('content-length')
-    const checksum = response.headers.get('x-amz-meta-crc32')
     const size = contentLength ? Number.parseInt(contentLength, 10) : 0
-    return { size, checksum }
+    return size
   }
   catch (error) {
-    console.log('getSizeChecksum', error)
-    return { size: 0, checksum: null }
+    console.log('getSize', error)
+    return 0
   }
 }
 
 export const s3 = {
-  getSizeChecksum,
+  getSize,
   deleteObject,
   checkIfExist,
   getSignedUrl,
   getUploadUrl,
-  setCRC32Checksum,
 }
