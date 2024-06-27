@@ -5,6 +5,7 @@ import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { initMultipartUpload } from './multipart.ts'
 
 interface dataUpload {
   name?: string
@@ -79,10 +80,10 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
 
     let response: any
     if (body.version && body.version === 1) {
-      console.log('mul!')
+      console.log(`Multipart upload for ${JSON.stringify(body)}`)
       const uploadId = await createMultipartRequest(c, filePath, app.owner_org)
 
-      response = { uploadId, key: filePath, url: getMultipartServerUrl(c) }
+      response = { uploadId, key: filePath, url: getMultipartServerUrl(c, true) }
     }
     else {
       const url = await s3.getUploadUrl(c, filePath)
@@ -123,55 +124,29 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
   }
 })
 
-function getMultipartServerUrl(c: Context) {
-  return new URL(getEnv(c, 'MULTIPART_SERVER'))
-}
-
-interface MultipartLink {
-  uploadId: string
+function getMultipartServerUrl(c: Context, external = false) {
+  const raw = !external ? getEnv(c, 'MULTIPART_SERVER') : getEnv(c, 'MULTIPART_SERVER').replace('host.docker.internal', '127.0.0.1')
+  return new URL(raw)
 }
 
 async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
-  try {
-    const serverUrl = getMultipartServerUrl(c)
-    const serverSecret = getEnv(c, 'MULTIPART_SECRET')
+  const multipart = await initMultipartUpload(c, path)
+  if (multipart.error)
+    return null
 
-    const body = {
-      key: path,
-      action: 'mpu-create',
-    }
-
-    const encodedBody = btoa(JSON.stringify(body))
-    serverUrl.searchParams.set('body', encodedBody)
-    console.log('body', encodedBody)
-
-    const response = await fetch(serverUrl, {
-      method: 'POST',
-      headers: {
-        MAGIC_MULTIPART_SECRET: serverSecret,
-      },
-    })
-
-    const json: MultipartLink = await response.json()
-    console.log('json', json)
-    if (!json || !json.uploadId || typeof json.uploadId !== 'string') {
-      console.error(`Cannot get uploadId from resonse: ${JSON.stringify(json)}`)
-      return null
-    }
-
-    const LogSnag = logsnag(c)
-    await LogSnag.track({
-      channel: 'upload-get-link',
-      event: 'Upload via multipart',
-      icon: '🏗️',
-      user_id: orgid,
-      notify: false,
-    })
-
-    return json.uploadId
-  }
-  catch (e) {
-    console.error(`Cannot generate multipart. Error: ${e}`)
+  if (!multipart.uploadId) {
+    console.error('No upload id (?) for multipart')
     return null
   }
+
+  const LogSnag = logsnag(c)
+  await LogSnag.track({
+    channel: 'upload-get-link',
+    event: 'Upload via multipart',
+    icon: '🏗️',
+    user_id: orgid,
+    notify: false,
+  })
+
+  return multipart.uploadId
 }

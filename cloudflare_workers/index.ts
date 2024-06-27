@@ -32,6 +32,7 @@ import { app as stats_priv } from '../supabase/functions/_backend/private/stats.
 import { app as latency } from '../supabase/functions/_backend/private/latency.ts'
 import { app as latency_postres } from '../supabase/functions/_backend/private/latency_postres.ts'
 import { app as latency_drizzle } from '../supabase/functions/_backend/private/latency_drizzle.ts'
+import { app as multipart } from '../supabase/functions/_backend/private/multipart.ts'
 
 // Triggers API
 import { app as clear_app_cache } from '../supabase/functions/_backend/triggers/clear_app_cache.ts'
@@ -93,6 +94,7 @@ appFront.route('/delete_failed_version', deleted_failed_version)
 appFront.route('/latency', latency)
 appFront.route('/latency_drizzle', latency_drizzle)
 appFront.route('/latency_postres', latency_postres)
+appFront.route('/multipart', multipart)
 
 // Triggers
 

@@ -18,6 +18,7 @@ import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../_backend/private/latency_postres.ts'
+import { app as multipart } from '../_backend/private/multipart.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -46,5 +47,6 @@ appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
+appGlobal.route('/multipart', multipart)
 
 Deno.serve(appGlobal.fetch)
