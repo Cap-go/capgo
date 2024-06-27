@@ -1,6 +1,3 @@
-import { isEqual } from 'lodash'
-import fetch from 'node-fetch'
-
 // ... other imports and types ...
 
 export const updateAndroidBaseData = {
@@ -25,7 +22,8 @@ export async function responseOk(response: Response, requestName: string): Promi
 }
 
 export async function sendUpdate(baseUrl: URL, data: typeof updateAndroidBaseData): Promise<Response> {
-  return await fetch(new URL('updates', baseUrl), {
+  const url = new URL(`${baseUrl.href}/updates`, baseUrl)
+  return await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

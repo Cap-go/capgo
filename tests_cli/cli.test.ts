@@ -1,7 +1,8 @@
+import { Buffer } from 'node:buffer'
 import { beforeAll, describe, expect, it } from 'vitest'
-// import AdmZip from 'adm-zip'
+import AdmZip from 'adm-zip'
 import { createClient } from '@supabase/supabase-js'
-// import { getUpdateBaseData, responseOk, sendUpdate } from './utils'
+import { getUpdateBaseData, responseOk, sendUpdate } from './utils'
 import { prepareCli, runCli } from './cliUtils'
 import type { Database } from '~/types/supabase.types'
 
@@ -23,46 +24,49 @@ function resetAndSeedData() {
   return supabase.rpc('reset_and_seed_data')
 }
 
-describe('cLI Tests', () => {
+describe('tests CLI', () => {
   beforeAll(async () => {
     await prepareCli(BASE_URL)
   })
 
   it('should upload bundle successfully', async () => {
-    resetAndSeedData()
+    await resetAndSeedData()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], true)
     expect(output).toContain('Bundle Uploaded')
   })
 
-  // it('should download and verify uploaded bundle', async () => {
-  //   const baseData = getUpdateBaseData()
-  //   const response = await sendUpdate(BASE_URL, baseData)
-  //   await responseOk(response, 'Update new bundle')
+  it('should download and verify uploaded bundle', async () => {
+    const baseData = getUpdateBaseData()
+    const response = await sendUpdate(BASE_URL, baseData)
+    await responseOk(response, 'Update new bundle')
 
-  //   const responseJson = await response.json()
-  //   expect(responseJson.url).toBeDefined()
-  //   expect(responseJson.version).toBe(semver)
+    const responseJson = await response.json<{ url: string, version: string }>()
+    expect(responseJson.url).toBeDefined()
+    expect(responseJson.version).toBe(semver)
 
-  //   const downloadResponse = await fetch(responseJson.url)
-  //   await responseOk(downloadResponse, 'Download new bundle')
-  //   const arrayBuffer = await downloadResponse.arrayBuffer()
+    const downloadResponse = await fetch(responseJson.url)
+    await responseOk(downloadResponse, 'Download new bundle')
+    const arrayBuffer = await downloadResponse.arrayBuffer()
 
-  //   const zip = new AdmZip(Buffer.from(arrayBuffer))
-  //   const zipEntries = zip.getEntries()
+    const zip = new AdmZip(Buffer.from(arrayBuffer))
+    const zipEntries = zip.getEntries()
 
-  //   expect(zipEntries.length).toBe(2)
+    expect(zipEntries.length).toBe(2)
 
-  //   const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
-  //   expect(indexJsEntry).toBeDefined()
+    const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
+    expect(indexJsEntry).toBeDefined()
 
-  //   const indexJsContent = indexJsEntry!.getData().toString('utf8')
-  //   expect(indexJsContent).toBe('console.log(\'Hello world!!!\');\nnotifyAppReady();\n')
-  // })
+    const indexJsContent = indexJsEntry!.getData().toString('utf8')
+    expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
+  })
 
   it('should test selectable disallow upload', async () => {
     const supabase = createSupabase()
     increaseSemver()
     await supabase.from('channels').update({ disableAutoUpdate: 'version_number' }).eq('id', 22)
+    // test if is set correctly
+    const { data: channel } = await supabase.from('channels').select('*').eq('id', 22).single()
+    expect(channel?.disableAutoUpdate).toBe('version_number')
 
     try {
       const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
@@ -77,40 +81,10 @@ describe('cLI Tests', () => {
     }
   })
 
-  it('should test compatibility table', async () => {
-    resetAndSeedData()
-    // Setup dependencies
-    // ... (code to update package.json with @capacitor/android dependency)
-
-    const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-      const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
-      const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
-      expect(androidPackage).toBeDefined()
-
-      const columns = androidPackage!.split('│').slice(2, -1)
-      expect(columns.length).toBe(4)
-      expect(columns[0]).toContain(column1)
-      expect(columns[1]).toContain(column2)
-      expect(columns[2]).toContain(column3)
-      expect(columns[3]).toContain(column4)
-    }
-
-    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
-
-    increaseSemver()
-    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
-
-    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
-
-    // Remove dependency and check again
-    // ... (code to update package.json removing @capacitor/android)
-
-    await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
-  })
-
   it('should test auto min version flag', async () => {
     const uploadWithAutoFlagWithAssert = async (expected: string) => {
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-metadata-check'])
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+      console.log(output)
       const minUpdateVersion = output.split('\n').find(l => l.includes('Auto set min-update-version'))
       expect(minUpdateVersion).toBeDefined()
       expect(minUpdateVersion).toContain(expected)
@@ -129,7 +103,8 @@ describe('cLI Tests', () => {
       .update({ minUpdateVersion: null })
       .eq('name', semver)
 
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-metadata-check'])
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
     expect(output).toContain('skipping auto setting compatibility')
 
     await supabase
@@ -182,5 +157,36 @@ describe('cLI Tests', () => {
         .eq('key', testApiKey)
         .eq('user_id', testUserId)
     }
+  })
+
+  it('should test compatibility table', async () => {
+    await resetAndSeedData()
+    // Setup dependencies
+    // ... (code to update package.json with @capacitor/android dependency)
+
+    const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
+      const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
+      const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
+      expect(androidPackage).toBeDefined()
+
+      const columns = androidPackage!.split('│').slice(2, -1)
+      expect(columns.length).toBe(4)
+      expect(columns[0]).toContain(column1)
+      expect(columns[1]).toContain(column2)
+      expect(columns[2]).toContain(column3)
+      expect(columns[3]).toContain(column4)
+    }
+
+    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
+
+    increaseSemver()
+    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
+
+    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
+
+    // Remove dependency and check again
+    // ... (code to update package.json removing @capacitor/android)
+
+    await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
   })
 })

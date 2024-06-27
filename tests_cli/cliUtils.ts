@@ -18,9 +18,9 @@ function generateDefaultJsonCliConfig(baseUrl: URL) {
     plugins: {
       CapacitorUpdater: {
         autoUpdate: true,
-        statsUrl: new URL('stats', baseUrl).toString(),
-        channelUrl: new URL('channel_self', baseUrl).toString(),
-        updateUrl: new URL('updates', baseUrl).toString(),
+        statsUrl: new URL(`${baseUrl.href}/stats`, baseUrl).toString(),
+        channelUrl: new URL(`${baseUrl.href}/channel_self`, baseUrl).toString(),
+        updateUrl: new URL(`${baseUrl.href}/updates`, baseUrl).toString(),
         localS3: true,
         localHost: 'http://localhost:5173',
         localWebHost: 'http://localhost:5173',
@@ -88,8 +88,9 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   const command = [
     'npx',
     '@capgo/cli',
+    // 'node',
+    // '../../CLI/dist/index.js',
     ...params,
-    '--ignore-metadata-check',
     '--apikey',
     overwriteApiKey ?? defaultApiKey,
   ].join(' ')
@@ -111,7 +112,7 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
     return output
   }
   catch (error) {
-    const errorOutput = error.stderr ? error.stderr.toString() : error.message
+    const errorOutput = error.stdout ?? JSON.stringify(error)
     console.error('CLI execution failed', errorOutput)
 
     if (logOutput) {
