@@ -70,7 +70,6 @@ describe('tests CLI', () => {
 
     try {
       const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
-      console.log('output1', output1)
       expect(output1).toContain('to provide a min-update-version')
 
       const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--min-update-version', 'invalid', '--ignore-metadata-check'])
