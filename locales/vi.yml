@@ -112,6 +112,7 @@ by-clicking-on-them: bằng cách nhấp vào chúng.
 cancel: Hủy bỏ
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
+cannot-create-org: Không thể tạo tổ chức, vui lòng kiểm tra nhật ký trình duyệt!
 cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký trình duyệt
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
@@ -168,6 +169,7 @@ copy-command: Sao chép lệnh
 copy-your: Sao chép của bạn
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
+create-new-org: Tạo một tổ chức mới
 created-at: tạo tại
 current-billing-cycle: Chu kỳ thanh toán hiện tại
 custom: Phong tục
@@ -228,6 +230,7 @@ error: Lỗi
 external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
 failed: Thất bại
+failed-to-get-user: Không tải được người dùng
 fast-backward: Lùi nhanh
 fast-forward: Nhanh về phía trước
 filters: bộ lọc
@@ -372,8 +375,10 @@ open-your-portal: Mở cổng thông tin của bạn
 org-changes-saved: Tổ chức được cập nhật thành công
 org-changes-set-email-not-unique: Email quản lý không phải là duy nhất, vui lòng chọn email khác
 org-changes-set-email-other-error: Không cài đặt được email quản lý, vui lòng tiếp tục hỗ trợ
+org-created-successfully: Tổ chức đã được tạo thành công!
 org-deleted: Đã xóa tổ chức thành công
 org-invited-user: Đã mời thành công người dùng vào tổ chức
+org-with-this-name-exists: Bạn đã tạo một tổ chức có tên này!
 organization-email: Email quản lý của tổ chức
 organization-name: tên tổ chức
 organization-settings: Cài đặt tổ chức
@@ -501,6 +506,7 @@ trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
 type: ''
 type-new-name: Vui lòng nhập tên khóa api mới
+type-new-org-name: Vui lòng nhập tên mới cho tổ chức
 undefined: không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt
