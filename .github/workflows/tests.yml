@@ -29,8 +29,13 @@ jobs:
         if: ${{ !contains(github.ref, '-alpha.') }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+      - name: 🍜 Prepare Supabase ALPHA
+        run: supabase link --project-ref aucsybvnhavogdmzwtcw
+        if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
-        run: ENV=local supabase start
+        run: supabase start
       - run: supabase test db
       - uses: denoland/setup-deno@v1
         with:

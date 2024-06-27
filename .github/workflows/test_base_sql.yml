@@ -24,5 +24,10 @@ jobs:
       - name: 🍜 Prepare Supabase PROD
         run: supabase link --project-ref xvwzpoazmxkqosrdewyv
         if: ${{ !contains(github.ref, '-alpha.') }}
+      - name: 🍜 Prepare Supabase ALPHA
+        run: supabase link --project-ref aucsybvnhavogdmzwtcw
+        if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
         run: ENV=local supabase start -x studio,imgproxy,inbucket,logflare --ignore-health-check
