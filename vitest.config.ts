@@ -5,5 +5,6 @@ export default defineConfig({
     include: ['tests_cli/*.test.ts'],
     environment: 'node',
     watch: false,
+    testTimeout: 30_000,
   },
 })

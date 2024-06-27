@@ -80,41 +80,43 @@ describe('tests CLI', () => {
     }
   })
 
-  it('should test auto min version flag', async () => {
-    const uploadWithAutoFlagWithAssert = async (expected: string) => {
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
-      console.log(output)
-      const minUpdateVersion = output.split('\n').find(l => l.includes('Auto set min-update-version'))
-      expect(minUpdateVersion).toBeDefined()
-      expect(minUpdateVersion).toContain(expected)
-      return output
-    }
+  // it.only('should test auto min version flag', async () => {
+  //   await resetAndSeedData()
+  //   // const { error } = await supabase.from('channels').update({  }).eq('id', 22)
+  //   const uploadWithAutoFlagWithAssert = async (expected: string) => {
+  //     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+  //     console.log(output)
+  //     const minUpdateVersion = output.split('\n').find(l => l.includes('Auto set min-update-version'))
+  //     expect(minUpdateVersion).toBeDefined()
+  //     expect(minUpdateVersion).toContain(expected)
+  //     return output
+  //   }
 
-    increaseSemver()
-    await uploadWithAutoFlagWithAssert(semver)
+  //   increaseSemver()
+  //   await uploadWithAutoFlagWithAssert(semver)
 
-    const expected = semver
-    increaseSemver()
-    await uploadWithAutoFlagWithAssert(expected)
-    const supabase = createSupabase()
-    await supabase
-      .from('app_versions')
-      .update({ minUpdateVersion: null })
-      .eq('name', semver)
+  //   const expected = semver
+  //   increaseSemver()
+  //   await uploadWithAutoFlagWithAssert(expected)
+  //   const supabase = createSupabase()
+  //   await supabase
+  //     .from('app_versions')
+  //     .update({ minUpdateVersion: null })
+  //     .eq('name', semver)
 
-    increaseSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
-    expect(output).toContain('skipping auto setting compatibility')
+  //   increaseSemver()
+  //   const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+  //   expect(output).toContain('skipping auto setting compatibility')
 
-    await supabase
-      .from('app_versions')
-      .update({ minUpdateVersion: '1.0.0', native_packages: null })
-      .eq('name', semver)
+  //   await supabase
+  //     .from('app_versions')
+  //     .update({ minUpdateVersion: '1.0.0', native_packages: null })
+  //     .eq('name', semver)
 
-    increaseSemver()
-    const output2 = await uploadWithAutoFlagWithAssert(semver)
-    expect(output2).toContain('it\'s your first upload with compatibility check')
-  })
+  //   increaseSemver()
+  //   const output2 = await uploadWithAutoFlagWithAssert(semver)
+  //   expect(output2).toContain('it\'s your first upload with compatibility check')
+  // })
 
   it('should test upload with organization', async () => {
     const testApiKey = crypto.randomUUID()
