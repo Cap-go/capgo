@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.601.14",
+  "version": "10.601.15",
   "private": true,
   "scripts": {
     "test": "vitest --bail=1",
