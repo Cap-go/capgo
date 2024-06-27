@@ -1,13 +1,11 @@
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
-import { timingSafeEqual } from 'hono/utils/buffer'
 import { z } from 'zod'
-import { getEnv } from '../utils/utils.ts'
 import { compleateMultipartUpload, createMultipartUpload, multipartUploadPart } from '../utils/s3.ts'
 
 export const app = new Hono()
 
-const actionZod = z.enum(['mpu-create', 'mpu-complete'])
+const actionZod = z.enum(['mpu-complete'])
 const baseZodObj = z.object({
   action: actionZod,
   key: z.string(),
@@ -48,25 +46,7 @@ app.post('/', async (c: Context) => {
     return c.json({ error: 'Invalid body', zod_error: parsedAction.error }, 400)
   }
 
-  if (parsedAction.data.action === 'mpu-create') {
-    const multipartSecretProvided = c.req.header('MAGIC_MULTIPART_SECRET') ?? ''
-    const multipartRealSecret = getEnv(c, 'MAGIC_MULTIPART_SECRET')
-    if (!await timingSafeEqual(multipartRealSecret, multipartSecretProvided)) {
-      return c.json({ error: 'Invalid secret - cannot authenticate' }, 401)
-    }
-
-    try {
-      const res = await createMultipartUpload(c, parsedAction.data.key)
-      return c.json({
-        uploadId: res.UploadId,
-      })
-    }
-    catch (err) {
-      console.log('Cannot create multipart upload', err)
-      return c.json({ error: 'Cannot create multipart upload' }, 500)
-    }
-  }
-  else if (parsedAction.data.action === 'mpu-complete') {
+  if (parsedAction.data.action === 'mpu-complete') {
     const parsedUploadId = uploadObjZod.safeParse(body)
     if (!parsedUploadId.success) {
       console.error('Invalid upload ID', parsedUploadId.error)
@@ -144,3 +124,16 @@ app.put('/', async (c: Context) => {
     return c.json({ error: 'Cannot upload multipart part' }, 500)
   }
 })
+
+export async function initMultipartUpload(c: Context, key: string) {
+  try {
+    const res = await createMultipartUpload(c, key)
+    return {
+      uploadId: res.UploadId,
+    }
+  }
+  catch (err) {
+    console.log('Cannot create multipart upload', err)
+    return { error: 'Cannot create multipart upload' }
+  }
+}
