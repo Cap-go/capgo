@@ -188,7 +188,7 @@
     "@iconify-json/ion": "1.1.18",
     "@iconify-json/ls": "1.1.8",
     "@iconify/json": "^2.2.222",
-    "@playwright/test": "1.44.1",
+    "@playwright/test": "1.45.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tailwindcss/typography": "^0.5.13",
