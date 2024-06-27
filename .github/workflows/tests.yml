@@ -15,11 +15,18 @@ jobs:
       - name: "Checkout capgo"
         uses: actions/checkout@v4
       - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: 1.176.10
-        uses: supabase/setup-cli@v1
-      - name: 🍜 Prepare Supabase ALPHA
-        run: supabase link --project-ref aucsybvnhavogdmzwtcw
+      - name: Set env PROD
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS }}" >> $GITHUB_ENV
+      - name: Set env ALPHA
+        if: ${{ contains(github.ref, '-alpha.') }}
+        run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV      
+      - name: 🍜 Prepare Supabase PROD
+        run: supabase link --project-ref xvwzpoazmxkqosrdewyv
+        if: ${{ !contains(github.ref, '-alpha.') }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
@@ -39,4 +46,4 @@ jobs:
         run: bun install
       - name: CLI test
         run: bun run test
-   
+
