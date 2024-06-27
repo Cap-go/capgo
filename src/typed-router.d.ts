@@ -29,6 +29,7 @@ declare module 'vue-router/auto-routes' {
     '/app/p/[p]/d/[device]': RouteRecordInfo<'/app/p/[p]/d/[device]', '/app/p/:p/d/:device', { p: ParamValue<true>, device: ParamValue<true> }, { p: ParamValue<false>, device: ParamValue<false> }>,
     '/app/p/[p]/devices': RouteRecordInfo<'/app/p/[p]/devices', '/app/p/:p/devices', { p: ParamValue<true> }, { p: ParamValue<false> }>,
     '/app/p/[p]/logs': RouteRecordInfo<'/app/p/[p]/logs', '/app/p/:p/logs', { p: ParamValue<true> }, { p: ParamValue<false> }>,
+    '/app/p/[p]/settings': RouteRecordInfo<'/app/p/[p]/settings', '/app/p/:p/settings', { p: ParamValue<true> }, { p: ParamValue<false> }>,
     '/app/package/[package]': RouteRecordInfo<'/app/package/[package]', '/app/package/:package', { package: ParamValue<true> }, { package: ParamValue<false> }>,
     '/dashboard/ApiKeys': RouteRecordInfo<'/dashboard/ApiKeys', '/dashboard/ApiKeys', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/Account': RouteRecordInfo<'/dashboard/settings/Account', '/dashboard/settings/Account', Record<never, never>, Record<never, never>>,

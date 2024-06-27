@@ -65,6 +65,7 @@ app: App
 app-deleted: App deleted
 app-id: 'App id:'
 app-id-example: App ID example
+app-logo-deleted: App picture deleted successfully
 app-not-found: App not found
 app-perm: App permission
 app-preview: App preview
@@ -107,6 +108,7 @@ button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cancel: Cancel
+canceled-photo-selection: You canceled the picture selection
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
 cannot-create-org: Cannot create an organization, please check the browser logs!
@@ -179,6 +181,7 @@ days: days
 defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
+delete: Delete
 delete-account: Delete Account
 delete-account-0: Delete account
 delete-org: Delete organization
@@ -332,6 +335,7 @@ new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 'no': 'no'
+no-app-icon: This app does not have any app icon
 no-channel-linked: No channel, click to add
 no-channel-linked-no-perm: No channel
 no-data: No Data
@@ -377,6 +381,8 @@ patch: Patch
 percent-fail: Fail percentage
 permission-changed: Successfully changed user permission
 personal-information: Personal Informations
+picture-delete-fail: Cannot delete app picture, please check console log
+picture-uploaded: Picture uploaded successfully
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
 plan-buy: Buy
@@ -492,6 +498,7 @@ undefined: undefined
 undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
 unknown: unknown
+unknown-mime: Unknown mime type, please check browser console
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel
@@ -501,6 +508,7 @@ updated-at: Updated at
 updated-min-version: Updated minimal version
 upgrade: Upgrade
 upgrade-now: Upgrade now
+upload-img-error: Cannot upload picture, please check console
 upperCaseError: Should contain uppercase letters
 url: URL
 usage: Usage
@@ -525,6 +533,8 @@ versions: Versions
 warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
+what-to-do-with-photo: Edit picture
+what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly

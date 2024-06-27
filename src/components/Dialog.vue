@@ -119,8 +119,8 @@ onMounted(() => {
                 enterkeyhint="next"
                 validation="required:trim"
                 :classes="{
-                  input: 'txt-center',
-                  message: 'txt-center',
+                  input: 'text-center',
+                  message: 'text-center',
                 }"
               />
             </FormKit>
