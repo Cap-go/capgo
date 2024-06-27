@@ -129,10 +129,6 @@ function getMultipartServerUrl(c: Context, external = false) {
   return new URL(raw)
 }
 
-interface MultipartLink {
-  uploadId: string
-}
-
 async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
   const multipart = await initMultipartUpload(c, path)
   if (multipart.error)
