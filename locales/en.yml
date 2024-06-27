@@ -132,6 +132,7 @@ cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
 change: Change
 change-api-key-name: Change the apikey's name
+changed-app-name: Successfully changed app name
 changed-name: Successfully changed apikey's name
 changed-password-suc: Password changed successfully
 channel: Channel
@@ -401,8 +402,8 @@ plans-super-only: Only super admins are allowed to view plans and billing
 platform: Platform
 please-ask-the-user-to-create-account-first: Please ask the user to create account first
 please-choose-your-p: Please choose your preferences
-please-type-new-app-name: Please type the new app name
 please-confirm-org-del: Please confirm that you want to delete "%1" org by typing it's name
+please-type-new-app-name: Please type the new app name
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction

@@ -57,10 +57,28 @@ async function editName() {
         role: 'cancel',
       },
       {
-        text: t('verify'),
+        text: t('change'),
         id: 'verify',
         preventClose: true,
-        handler: async () => {},
+        handler: async () => {
+          const newName = displayStore.dialogInputText
+          if (newName === (appRef.value?.name ?? '')) {
+            toast.error(t('new-name-not-changed'))
+            return false
+          }
+
+          const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', appId.value)
+          if (error) {
+            toast.error(t('cannot-change-name'))
+            console.error(error)
+          }
+
+          if (appRef.value?.name)
+            appRef.value.name = newName
+
+          displayStore.showDialog = false
+          toast.success(t('changed-app-name'))
+        },
       },
     ],
   }
