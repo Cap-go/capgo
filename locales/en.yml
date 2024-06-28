@@ -106,6 +106,7 @@ button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cancel: Cancel
+canceled-delete: Canceled bundle deletion, cannot delete a linked bundle
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
 cannot-create-org: Cannot create an organization, please check the browser logs!
@@ -118,6 +119,9 @@ cannot-delete-channel: Cannot delete channel
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
 cannot-download: Cannot download bundle
+cannot-find-unknown-version: >-
+  Cannot find unknown version, please contact capgo support and check browser
+  logs
 cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
 cannot-save-custom-i: Cannot save custom ID
@@ -135,6 +139,9 @@ changed-password-suc: Password changed successfully
 channel: Channel
 channel-ab-testing: Enable AB testing
 channel-ab-testing-percentage: Percentage of users recving secondary version
+channel-bundle-linked: >-
+  This bundle is linked to one or more channels. (%) Would you like to unlink it
+  from those channels?
 channel-create: Create channel
 channel-deleted: Channel deleted
 channel-forced-devices: Forced devices
@@ -487,6 +494,7 @@ unknown: unknown
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel
+unlink-error: Unlink error, please check console
 unlink-version: Unlink version
 update: Update
 updated-at: Updated at
@@ -514,6 +522,7 @@ version-builtin: Version builtin
 version-linked: Version link
 version-linking: Link to bundle
 versions: Versions
+want-to-unlink: Do you want to unlink?
 warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
