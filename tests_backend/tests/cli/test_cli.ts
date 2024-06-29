@@ -135,7 +135,7 @@ async function prepareCli(backendBaseUrl: URL, supabase: SupabaseType) {
 
   // We set the channel update scheme to major
   // id 22 = production
-  const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+  const { error } = await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('id', 22)
 
   assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
 }

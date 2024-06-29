@@ -25,7 +25,7 @@ import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
-  secondVersion: Database['public']['Tables']['app_versions']['Row']
+  second_version: Database['public']['Tables']['app_versions']['Row']
 }
 const router = useRouter()
 const displayStore = useDisplayStore()
@@ -82,10 +82,10 @@ function openBundle() {
 function openSecondBundle() {
   if (!channel.value)
     return
-  if (channel.value.secondVersion.name === 'unknown')
+  if (channel.value.second_version.name === 'unknown')
     return
   console.log('openBundle', channel.value.version.id)
-  router.push(`/app/p/${route.params.p}/bundle/${channel.value.secondVersion.id}`)
+  router.push(`/app/p/${route.params.p}/bundle/${channel.value.second_version.id}`)
 }
 
 async function getDeviceIds() {
@@ -123,25 +123,25 @@ async function getChannel() {
             app_id,
             bucket_id,
             created_at,
-            minUpdateVersion
+            min_update_version
           ),
           created_at,
           app_id,
           allow_emulator,
           allow_dev,
           allow_device_self_set,
-          disableAutoUpdateUnderNative,
-          disableAutoUpdate,
+          disable_auto_update_under_native,
+          disable_auto_update,
           ios,
           android,
           updated_at,
-          enableAbTesting,
+          enable_ab_testing,
           enable_progressive_deploy,
-          secondaryVersionPercentage,
-          secondVersion (
+          secondary_version_percentage,
+          second_version (
             name,
             id,
-            minUpdateVersion
+            min_update_version
           )
         `)
       .eq('id', id.value)
@@ -152,7 +152,7 @@ async function getChannel() {
     }
 
     channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
-    secondaryVersionPercentage.value = (data.secondaryVersionPercentage * 100) | 0
+    secondaryVersionPercentage.value = (data.secondary_version_percentage * 100) | 0
   }
   catch (error) {
     console.error(error)
@@ -346,7 +346,7 @@ async function enableAbTesting() {
   if (!channel.value)
     return
 
-  const val = !channel.value.enableAbTesting
+  const val = !channel.value.enable_ab_testing
 
   if (val && channel.value.enable_progressive_deploy) {
     toast.error(t('ab-testing-progressive-deploy-conflict'))
@@ -355,14 +355,14 @@ async function enableAbTesting() {
 
   const { error } = await supabase
     .from('channels')
-    .update({ enableAbTesting: val, secondVersion: val ? channel.value.version.id : undefined })
+    .update({ enable_ab_testing: val, second_version: val ? channel.value.version.id : undefined })
     .eq('id', id.value)
 
   if (error) {
     console.error(error)
   }
   else {
-    channel.value.enableAbTesting = val
+    channel.value.enable_ab_testing = val
     toast.success(val ? t('enabled-ab-testing') : t('disable-ab-testing'))
   }
 
@@ -379,14 +379,14 @@ async function enableProgressiveDeploy() {
 
   const val = !channel.value.enable_progressive_deploy
 
-  if (val && channel.value.enableAbTesting) {
+  if (val && channel.value.enable_ab_testing) {
     toast.error(t('ab-testing-progressive-deploy-conflict'))
     return
   }
 
   const { error } = await supabase
     .from('channels')
-    .update({ enable_progressive_deploy: val, secondVersion: val ? channel.value.version.id : undefined })
+    .update({ enable_progressive_deploy: val, second_version: val ? channel.value.version.id : undefined })
     .eq('id', id.value)
 
   if (error) {
@@ -407,7 +407,7 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
   }
   const { error } = await supabase
     .from('channels')
-    .update({ secondaryVersionPercentage: percentage / 100 })
+    .update({ secondary_version_percentage: percentage / 100 })
     .eq('id', id.value)
 
   if (error)
@@ -449,28 +449,28 @@ async function onChangeAutoUpdate(event: Event) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     event.preventDefault()
-    if (channel?.value?.disableAutoUpdate)
-      (event.target as HTMLSelectElement).value = channel.value.disableAutoUpdate
+    if (channel?.value?.disable_auto_update)
+      (event.target as HTMLSelectElement).value = channel.value.disable_auto_update
 
     return false
   }
   const value = (event.target as HTMLSelectElement).value as Database['public']['Enums']['disable_update']
 
   if (value === 'version_number') {
-    if (!channel.value?.version.minUpdateVersion)
+    if (!channel.value?.version.min_update_version)
       toast.error(t('metadata-min-ver-not-set'))
   }
 
   const { error } = await supabase
     .from('channels')
-    .update({ disableAutoUpdate: value })
+    .update({ disableAudisable_auto_updatetoUpdate: value })
     .eq('id', id.value)
 
   if (error)
     console.error(error)
 
-  if (channel.value?.disableAutoUpdate)
-    channel.value.disableAutoUpdate = value
+  if (channel.value?.disable_auto_update)
+    channel.value.disable_auto_update = value
 }
 </script>
 
@@ -482,25 +482,25 @@ async function onChangeAutoUpdate(event: Event) {
         <dl class="divide-y divide-gray-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
-          <template v-if="!channel.enableAbTesting && !channel.enable_progressive_deploy">
+          <template v-if="!channel.enable_ab_testing && !channel.enable_progressive_deploy">
             <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle()" />
-            <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="t('min-update-version')" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
+            <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')" :value="channel.version.min_update_version ?? t('undefined-fail')" />
           </template>
-          <template v-else-if="channel.enableAbTesting && !channel.enable_progressive_deploy">
+          <template v-else-if="channel.enable_ab_testing && !channel.enable_progressive_deploy">
             <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle()" />
-            <InfoRow :label="`${t('bundle-number')} B`" :value="channel.secondVersion.name" :is-link="true" @click="openSecondBundle" />
-            <template v-if="channel.disableAutoUpdate === 'version_number'">
-              <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
-              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.secondVersion.minUpdateVersion ?? t('undefined-fail')" />
+            <InfoRow :label="`${t('bundle-number')} B`" :value="channel.second_version.name" :is-link="true" @click="openSecondBundle" />
+            <template v-if="channel.disable_auto_update === 'version_number'">
+              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.min_update_version ?? t('undefined-fail')" />
+              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.second_version.min_update_version ?? t('undefined-fail')" />
             </template>
           </template>
           <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle()" />
-            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.secondVersion.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
-            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : (channel.secondaryVersionPercentage !== 0 ? `${((channel.secondaryVersionPercentage * 100) | 0)}%` : t('status-failed'))" />
-            <template v-if="channel.disableAutoUpdate === 'version_number'">
-              <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
-              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.secondVersion.minUpdateVersion ?? t('undefined-fail')" />
+            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondary_version_percentage !== 1) ? channel.version.name : channel.second_version.name" :is-link="true" @click="openBundle()" />
+            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondary_version_percentage !== 1) ? channel.second_version.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
+            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondary_version_percentage === 1) ? t('status-complete') : (channel.secondary_version_percentage !== 0 ? `${((channel.secondary_version_percentage * 100) | 0)}%` : t('status-failed'))" />
+            <template v-if="channel.disable_auto_update === 'version_number'">
+              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.min_update_version ?? t('undefined-fail')" />
+              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.second_version.min_update_version ?? t('undefined-fail')" />
             </template>
           </template>
           <!-- Created At -->
@@ -553,14 +553,14 @@ async function onChangeAutoUpdate(event: Event) {
                   id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
-                  :checked="channel?.disableAutoUpdateUnderNative"
-                  @change="saveChannelChange('disableAutoUpdateUnderNative', !channel?.disableAutoUpdateUnderNative)"
+                  :checked="channel?.disable_auto_update_under_native"
+                  @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update_under_native)"
                 />
               </template>
             </k-list-item>
             <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
               <template #after>
-                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
+                <select id="selectableDisallow" :value="channel.disable_auto_update" class="text-[#fdfdfd] bg-[#4b5462] rounded-lg border-4 border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
                   <option value="major">
                     {{ t('major') }}
                   </option>
@@ -618,7 +618,7 @@ async function onChangeAutoUpdate(event: Event) {
                   id="ktoggle"
                   class="-my-1 k-color-success"
                   component="div"
-                  :checked="channel?.enableAbTesting"
+                  :checked="channel?.enable_ab_testing"
                   @change="enableAbTesting()"
                 />
               </template>

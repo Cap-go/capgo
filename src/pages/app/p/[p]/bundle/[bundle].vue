@@ -82,13 +82,13 @@ async function getChannels() {
   // search if the bundle is used in a channel
   channels.value.forEach((chan) => {
     const v: number = chan.version as any
-    if (version.value && (v === version.value.id || version.value.id === chan.secondVersion)) {
+    if (version.value && (v === version.value.id || version.value.id === chan.second_version)) {
       bundleChannels.value.push(chan)
-      secondaryChannel.value = (version.value.id === chan.secondVersion)
+      secondaryChannel.value = (version.value.id === chan.second_version)
     }
   })
 
-  showBundleMetadataInput.value = !!bundleChannels.value.find(c => c.disableAutoUpdate === 'version_number')
+  showBundleMetadataInput.value = !!bundleChannels.value.find(c => c.disable_auto_update === 'version_number')
 }
 
 async function openChannelLink() {
@@ -131,7 +131,7 @@ async function setSecondChannel(channel: Database['public']['Tables']['channels'
   return supabase
     .from('channels')
     .update({
-      secondVersion: id,
+      second_version: id,
     })
     .eq('id', channel.id)
 }
@@ -140,9 +140,9 @@ async function setChannelProgressive(channel: Database['public']['Tables']['chan
   return supabase
     .from('channels')
     .update({
-      secondVersion: id,
-      version: channel.secondVersion ?? undefined,
-      secondaryVersionPercentage: 0.1,
+      second_version: id,
+      version: channel.second_version ?? undefined,
+      secondary_version_percentage: 0.1,
     })
     .eq('id', channel.id)
 }
@@ -151,9 +151,9 @@ async function setChannelSkipProgressive(channel: Database['public']['Tables']['
   return supabase
     .from('channels')
     .update({
-      secondVersion: id,
+      second_version: id,
       version: id,
-      secondaryVersionPercentage: 1,
+      secondary_version_percentage: 1,
     })
     .eq('id', channel.id)
 }
@@ -173,7 +173,7 @@ async function ASChannelChooser() {
       return
 
     const aSelected = version?.value?.id === (chan.version as any)
-    const bSelected = version?.value?.id === (chan.secondVersion as any)
+    const bSelected = version?.value?.id === (chan.second_version as any)
 
     if (aSelected && ab === 'b') {
       const id = await getUnknowBundleId()
@@ -219,14 +219,14 @@ async function ASChannelChooser() {
 
   for (const chan of channels.value) {
     const v: number = chan.version as any
-    if (!chan.enableAbTesting && !chan.enable_progressive_deploy) {
+    if (!chan.enable_ab_testing && !chan.enable_progressive_deploy) {
       buttons.push({
         text: chan.name,
         selected: version.value.id === v,
         handler: async () => { await normalHandler(chan) },
       })
     }
-    else if (chan.enableAbTesting && !chan.enable_progressive_deploy) {
+    else if (chan.enable_ab_testing && !chan.enable_progressive_deploy) {
       buttons.push({
         text: `${chan.name}-A`,
         selected: version.value.id === v,
@@ -237,7 +237,7 @@ async function ASChannelChooser() {
       })
       buttons.push({
         text: `${chan.name}-B`,
-        selected: version.value.id === chan.secondVersion,
+        selected: version.value.id === chan.second_version,
         handler: async () => {
           await commonAbHandler(channel.value, 'b')
           await secondHandler(chan)
@@ -247,7 +247,7 @@ async function ASChannelChooser() {
     else {
       buttons.push({
         text: `${chan.name}`,
-        selected: version.value.id === chan.secondVersion,
+        selected: version.value.id === chan.second_version,
         handler: async () => {
           const newButtons = []
           newButtons.push({
@@ -509,7 +509,7 @@ async function saveCustomId(input: string) {
     const { error: errorNull } = await supabase
       .from('app_versions')
       .update({
-        minUpdateVersion: null,
+        min_update_version: null,
       })
       .eq('id', id.value)
 
@@ -530,7 +530,7 @@ async function saveCustomId(input: string) {
   const { error } = await supabase
     .from('app_versions')
     .update({
-      minUpdateVersion: input,
+      min_update_version: input,
     })
     .eq('id', id.value)
 
@@ -583,7 +583,7 @@ function preventInputChangePerm(event: Event) {
             <!-- Min update version -->
             <InfoRow
               v-if="showBundleMetadataInput" id="metadata-bundle"
-              :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''"
+              :label="t('min-update-version')" editable :value="version.min_update_version ?? ''"
               :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])"
               @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
             />
@@ -603,26 +603,26 @@ function preventInputChangePerm(event: Event) {
               <template #start>
                 <span v-for="chn in bundleChannels" id="open-channel" :key="chn.id">
                   <span
-                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.secondVersion === version.id) : false"
+                    v-if="(chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? (chn!.second_version === version.id) : false"
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
                     @click="openChannel(chn, true)"
                   >
-                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion
+                    {{ (chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? ((chn!.second_version
                       === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
                   </span>
                   <span
-                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? (chn!.version === version.id) : false"
+                    v-if="(chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? (chn!.version === version.id) : false"
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
                     @click="openChannel(chn, false)"
                   >
                     {{ `${chn!.name}-A` }}
                   </span>
                   <span
-                    v-if="(chn!.enableAbTesting || chn!.enable_progressive_deploy) ? false : true"
+                    v-if="(chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? false : true"
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
                     @click="openChannel(chn, false)"
                   >
-                    {{ (chn!.enableAbTesting || chn!.enable_progressive_deploy) ? ((chn!.secondVersion === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
+                    {{ (chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? ((chn!.second_version === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
                   </span>
                 </span>
               </template>
