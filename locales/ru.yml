@@ -68,6 +68,9 @@ api-keys-key-copied: Ключи API
 app: Приложение
 app-deleted: Приложение удалено
 app-id-example: Пример идентификатора приложения
+app-info: Информация о приложении
+app-info-desc: Здесь вы можете изменить информацию о своем приложении.
+app-name: Имя приложения
 app-not-found: Приложение не найдено
 app-perm: Разрешение приложения
 app-preview: Предварительный просмотр приложения
@@ -185,6 +188,7 @@ defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete-account: Удалить аккаунт
 delete-account-0: Удалить аккаунт
+delete-app: Удалить приложение
 delete-org: Удалить организацию
 delete-your-account: Удалить свой аккаунт
 deleted: удален

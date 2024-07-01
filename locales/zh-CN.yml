@@ -64,6 +64,9 @@ api-keys-key-copied: API 密钥
 app: 应用程序
 app-deleted: 应用已删除
 app-id-example: 应用 ID 示例
+app-info: 应用信息
+app-info-desc: 您可以在此处更改您的应用程序信息
+app-name: 应用名称
 app-not-found: 找不到应用
 app-perm: 应用程序权限
 app-preview: 应用预览
@@ -179,6 +182,7 @@ defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete-account: 删除帐户
 delete-account-0: 删除帐户
+delete-app: 删除应用程序
 delete-org: 删除组织
 delete-your-account: 删除您的帐户
 deleted: 删除

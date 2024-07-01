@@ -68,6 +68,9 @@ api-keys-key-copied: Khóa API
 app: Ứng dụng
 app-deleted: Đã xóa ứng dụng
 app-id-example: Ví dụ về ID ứng dụng
+app-info: Thông tin ứng dụng
+app-info-desc: Bạn có thể thay đổi thông tin ứng dụng của mình tại đây
+app-name: Tên ứng dụng
 app-not-found: Không tìm thấy ứng dụng
 app-perm: Quyền ứng dụng
 app-preview: Xem trước ứng dụng
@@ -183,6 +186,7 @@ defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete-account: Xóa tài khoản
 delete-account-0: Xóa tài khoản
+delete-app: Xóa ứng dụng
 delete-org: Xóa tổ chức
 delete-your-account: Xóa tài khoản của bạn
 deleted: đã xóa

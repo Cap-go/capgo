@@ -64,6 +64,9 @@ api-keys-key-copied: Kunci API
 app: Aplikasi
 app-deleted: Aplikasi dihapus
 app-id-example: Contoh ID aplikasi
+app-info: Informasi aplikasi
+app-info-desc: Di sini Anda dapat mengubah informasi aplikasi Anda
+app-name: Nama aplikasi
 app-not-found: Aplikasi tidak ditemukan
 app-perm: Izin aplikasi
 app-preview: Pratinjau aplikasi
@@ -182,6 +185,7 @@ defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete-account: Hapus akun
 delete-account-0: Hapus akun
+delete-app: Hapus aplikasi
 delete-org: Hapus organisasi
 delete-your-account: Hapus akun anda
 deleted: dihapus

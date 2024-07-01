@@ -2,12 +2,17 @@
 import { toast } from 'vue-sonner'
 import { Camera } from '@capacitor/camera'
 import mime from 'mime'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { useSupabase } from '~/services/supabase'
 import { urlToAppId } from '~/services/conversion'
 import type { Database } from '~/types/supabase.types'
+import iconName from '~icons/ph/user?raw'
 import type { OrganizationRole } from '~/stores/organization'
 
+const isLoading = ref(false)
+const isFirstLoading = ref(true)
 const route = useRoute()
+const router = useRouter()
 const supabase = useSupabase()
 const appId = ref('')
 const appRef = ref<Database['public']['Tables']['apps']['Row'] & { owner_org: Database['public']['Tables']['orgs']['Row'] } | null>(null)
@@ -16,10 +21,13 @@ const displayStore = useDisplayStore()
 const role = ref<OrganizationRole | null>(null)
 const organizationStore = useOrganizationStore()
 
-watchEffect(async () => {
-  if (route.path.includes('/p/')) {
+onMounted(async () => {
+  if (route.path.includes('/p/') && route.path.endsWith('/settings')) {
+    displayStore.NavTitle = t('settings')
+    displayStore.defaultBack = `/app/package/${route.params.p}`
     appId.value = (route.params as any).p as string
     appId.value = urlToAppId(appId.value)
+    isLoading.value = true
 
     const [{ error, data }] = await Promise.all([
       supabase
@@ -34,8 +42,11 @@ watchEffect(async () => {
       return
     }
 
+    await organizationStore.awaitInitialLoad()
     role.value = organizationStore.getCurrentRoleForApp(appId.value)
     appRef.value = data as any
+    isLoading.value = false
+    isFirstLoading.value = false
   }
 })
 
@@ -49,61 +60,95 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 
-async function editName() {
-  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-
+async function didCancel(name: string) {
   displayStore.dialogOption = {
-    header: t('type-new-app-name'),
-    message: `${t('please-type-new-app-name')}`,
-    input: true,
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-sm',
-    buttonCenter: true,
-    preventAccidentalClose: true,
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('change'),
-        id: 'verify',
-        preventClose: true,
-        handler: async () => {
-          const newName = displayStore.dialogInputText
-          if (newName === (appRef.value?.name ?? '')) {
-            toast.error(t('new-name-not-changed'))
-            return false
-          }
-
-          if (newName.length > 32) {
-            toast.error(t('new-name-to-long'))
-            return
-          }
-
-          const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', appId.value)
-          if (error) {
-            toast.error(t('cannot-change-name'))
-            console.error(error)
-          }
-
-          if (appRef.value?.name)
-            appRef.value.name = newName
-
-          displayStore.showDialog = false
-          toast.success(t('changed-app-name'))
-        },
+        text: t('button-delete'),
+        id: 'confirm-button',
       },
     ],
   }
-
-  displayStore.dialogInputText = appRef?.value?.name ?? ''
   displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
+
+async function deleteApp() {
+  if (await didCancel(t('app')))
+    return
+
+  try {
+    const org = organizationStore.getOrgByAppId(appId.value)
+    const { error: errorIcon } = await supabase.storage
+      .from(`images`)
+      .remove([`org/${org?.gid}/${appId.value}/icon`])
+    if (errorIcon)
+      toast.error(t('cannot-delete-app-icon'))
+
+    const { error: dbAppError } = await supabase
+      .from('apps')
+      .delete()
+      .eq('app_id', appId.value)
+    if (dbAppError)
+      toast.error(t('cannot-delete-app'))
+
+    else
+      toast.success(t('app-deleted'))
+
+    // return to home
+    router.push('/app/home')
+  }
+  catch (error) {
+    toast.error(t('cannot-delete-app'))
+  }
+}
+async function submit(form: { app_name: string }) {
+  isLoading.value = true
+  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
+    toast.error(t('no-permission'))
+    isLoading.value = false
+    return
+  }
+  const newName = form.app_name
+  if (newName === (appRef.value?.name ?? '')) {
+    toast.error(t('new-name-not-changed'))
+    isLoading.value = false
+    return
+  }
+
+  if (newName.length > 32) {
+    toast.error(t('new-name-to-long'))
+    isLoading.value = false
+    return
+  }
+
+  const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', appId.value)
+  if (error) {
+    toast.error(t('cannot-change-name'))
+    console.error(error)
+    isLoading.value = false
+    return
+  }
+
+  if (appRef.value?.name)
+    appRef.value.name = newName
+
+  toast.success(t('changed-app-name'))
+  isLoading.value = false
+}
+
+const isSuperAdmin = computed(() => {
+  // TODO: check if that is smart to not let admins delete apps
+  if (!role.value)
+    return false
+  return organizationStore.hasPermisisonsInRole(role.value as any, ['super_admin'])
+})
 
 async function editPhoto() {
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
@@ -229,31 +274,76 @@ async function editPhoto() {
 </script>
 
 <template>
-  <div v-if="!displayStore.showDialog" class="flex justify-center flex-col items-center pb-80">
-    <div class="flex justify-center flex-col items-center border-3 border-gray-700 p-5 rounded-xl">
-      <p class="text-6xl">
-        {{ appRef?.name }}
-      </p>
-      <img v-if="appRef?.icon_url" :src="appRef.icon_url" :alt="`App icon ${appRef.name}`" class="mt-8 rounded shrink-0 mx-auto" width="64" height="64">
-      <div v-else class="mt-8 flex items-center justify-center w-16 h-16 border border-black rounded-lg dark:border-white mx-auto">
-        <p class="text-xl">
-          {{ acronym }}
-        </p>
+  <div class="h-full pb-8 max-h-fit grow md:pb-0">
+    <FormKit id="update-app" type="form" :actions="false" @submit="submit">
+      <!-- Panel body -->
+      <div class="p-6 space-y-6">
+        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('app-info') }}
+        </h2>
+        <div class="text-sm dark:text-gray-100">
+          {{ t('app-info-desc') }}
+        </div>
+        <!-- Picture -->
+        <section>
+          <div class="flex items-center">
+            <div class="mr-4">
+              <img
+                v-if="appRef?.icon_url" class="object-cover w-20 h-20 rounded" :src="appRef?.icon_url"
+                width="80" height="80" alt="User upload"
+              >
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded dark:border-white">
+                <p>{{ acronym }}</p>
+              </div>
+            </div>
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="editPhoto">
+              {{ t('change') }}
+            </button>
+          </div>
+        </section>
+
+        <!-- Personal Info -->
+        <section v-if="!isFirstLoading && !isLoading">
+          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
+            <div class="sm:w-1/2">
+              <FormKit
+                type="text"
+                name="app_name"
+                :prefix-icon="iconName"
+                :value="appRef?.name || ''"
+                :label="t('app-name')"
+              />
+            </div>
+          </div>
+          <FormKitMessages />
+        </section>
       </div>
-      <p class="mt-8 mx-auto">
-        {{ t('app-id') }} {{ appRef?.app_id }}
-      </p>
-      <p class="mt-2 mx-auto">
-        {{ t('owner-org') }} {{ appRef?.owner_org.name }}
-      </p>
-      <div class="flex flex-row mt-8 ">
-        <button class="mr-2 px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="editName">
-          {{ t('edit-name') }}
-        </button>
-        <button class="ml-2 px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="editPhoto">
-          {{ t('edit-pic') }}
-        </button>
-      </div>
-    </div>
+      <!-- Panel footer -->
+      <footer>
+        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+          <div class="flex self-end">
+            <button v-if="isSuperAdmin" class="p-2 text-white border border-red-400 rounded-lg btn hover:bg-red-600" @click="deleteApp()">
+              {{ t('delete-app') }}
+            </button>
+            <button
+              class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+              type="submit"
+              color="secondary"
+              shape="round"
+            >
+              <span v-if="!isLoading" class="rounded-4xl">
+                {{ t('update') }}
+              </span>
+              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+            </button>
+          </div>
+        </div>
+      </footer>
+    </FormKit>
   </div>
 </template>
+
+<route lang="yaml">
+  meta:
+    layout: app_settings
+      </route>

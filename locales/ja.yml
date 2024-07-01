@@ -64,6 +64,9 @@ api-keys-key-copied: API キー
 app: アプリ
 app-deleted: アプリを削除しました
 app-id-example: アプリ ID の例
+app-info: アプリ情報
+app-info-desc: ここでアプリ情報を変更できます
+app-name: アプリ名
 app-not-found: アプリが見つかりません
 app-perm: アプリの許可
 app-preview: アプリのプレビュー
@@ -179,6 +182,7 @@ defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete-account: アカウントを削除する
 delete-account-0: アカウントを削除する
+delete-app: アプリを削除する
 delete-org: 組織の削除
 delete-your-account: アカウントを削除する
 deleted: 削除された
