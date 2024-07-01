@@ -63,7 +63,9 @@ api-keys-are-used-for-cli-and-public-api: API keys are used for CLI and public A
 api-keys-key-copied: API Keys
 app: App
 app-deleted: App deleted
+app-id: 'App id:'
 app-id-example: App ID example
+app-logo-deleted: App picture deleted successfully
 app-not-found: App not found
 app-perm: App permission
 app-preview: App preview
@@ -106,6 +108,7 @@ button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cancel: Cancel
+canceled-photo-selection: You canceled the picture selection
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
 cannot-create-org: Cannot create an organization, please check the browser logs!
@@ -120,6 +123,7 @@ cannot-delete-owner: Cannot delete owner from the organization
 cannot-download: Cannot download bundle
 cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
+cannot-load-app-settings: Cannot load app settings
 cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
 cannot-share: Cannot share user id, check browser console
@@ -130,6 +134,7 @@ cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
 change: Change
 change-api-key-name: Change the apikey's name
+changed-app-name: Successfully changed app name
 changed-name: Successfully changed apikey's name
 changed-password-suc: Password changed successfully
 channel: Channel
@@ -176,6 +181,7 @@ days: days
 defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
+delete: Delete
 delete-account: Delete Account
 delete-account-0: Delete account
 delete-org: Delete organization
@@ -203,6 +209,8 @@ discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
 dont-have-an-account: Don’t have an account?
 download: Download
+edit-name: Edit name
+edit-pic: Edit picture
 email: Email
 email-address: Email address
 email-does-not-exist: This user does not exist
@@ -327,6 +335,7 @@ new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 'no': 'no'
+no-app-icon: This app does not have any app icon
 no-channel-linked: No channel, click to add
 no-channel-linked-no-perm: No channel
 no-data: No Data
@@ -361,6 +370,7 @@ organization-email: Organization's management email
 organization-name: Organization Name
 organization-settings: Organization settings
 os-version: OS version
+owner-org: 'Owner org:'
 pages: Pages
 password: Password
 password-confirmatio: Password confirmation
@@ -371,6 +381,8 @@ patch: Patch
 percent-fail: Fail percentage
 permission-changed: Successfully changed user permission
 personal-information: Personal Informations
+picture-delete-fail: Cannot delete app picture, please check console log
+picture-uploaded: Picture uploaded successfully
 plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
 plan-buy: Buy
@@ -397,6 +409,7 @@ platform: Platform
 please-ask-the-user-to-create-account-first: Please ask the user to create account first
 please-choose-your-p: Please choose your preferences
 please-confirm-org-del: Please confirm that you want to delete "%1" org by typing it's name
+please-type-new-app-name: Please type the new app name
 please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
@@ -478,12 +491,14 @@ top-apps-v2: Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
 trial-plan-expires-in: Trial ends in
+type-new-app-name: New app name
 type-new-name: Please type the new api key name
 type-new-org-name: Please type the new name for the organization
 undefined: undefined
 undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
 unknown: unknown
+unknown-mime: Unknown mime type, please check browser console
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel
@@ -493,6 +508,7 @@ updated-at: Updated at
 updated-min-version: Updated minimal version
 upgrade: Upgrade
 upgrade-now: Upgrade now
+upload-img-error: Cannot upload picture, please check console
 upperCaseError: Should contain uppercase letters
 url: URL
 usage: Usage
@@ -517,6 +533,8 @@ versions: Versions
 warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
+what-to-do-with-photo: Edit picture
+what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly

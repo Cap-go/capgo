@@ -7,6 +7,7 @@ import {
 } from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash'
+import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -47,6 +48,10 @@ async function didCancel(name: string) {
   }
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
+}
+
+function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
+  router.push(`/app/p/${appIdToUrl(app.app_id)}/settings`)
 }
 
 async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
@@ -183,9 +188,14 @@ watchEffect(async () => {
         {{ perm }}
       </div>
     </td>
-    <td v-if="isSuperAdmin" class="w-1/5 p-2" @click.stop="deleteApp(app)">
-      <div class="text-center">
+    <td class="w-1/5 p-2 flex flex-row">
+      <div v-if="isSuperAdmin" class="text-center" @click.stop="deleteApp(app)">
         <IconTrash v-if="!channel && deleteButton" class="mr-4 text-lg text-red-600" />
+      </div>
+      <div
+        class="text-center mr-4" @click.stop="openSettngs(app)"
+      >
+        <IconSettings class=" text-lg" />
       </div>
     </td>
   </tr>
