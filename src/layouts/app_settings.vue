@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, watchEffect } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDisplayStore } from '~/stores/display'
 import IconAcount from '~icons/mdi/user'
