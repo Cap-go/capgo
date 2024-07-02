@@ -71,9 +71,11 @@ api-keys-are-used-for-cli-and-public-api: API-Schlüssel werden für CLI und öf
 api-keys-key-copied: API-Schlüssel
 app: App
 app-deleted: Anwendung gelöscht
+app-id: 'App-ID:'
 app-id-example: App-ID-Beispiel
 app-info: App-Informationen
 app-info-desc: Hier können Sie Ihre App-Informationen ändern
+app-logo-deleted: App-Bild erfolgreich gelöscht
 app-name: App Name
 app-not-found: Anwendung nicht gefunden
 app-perm: App-Berechtigung
@@ -117,6 +119,10 @@ button-toggle_dark: Dunkelmodus umschalten
 button-toggle_langs: Sprachen ändern
 by-clicking-on-them: indem Sie darauf klicken.
 cancel: Stornieren
+canceled-delete: >-
+  Das Löschen des Bundles wurde abgebrochen. Ein verknüpftes Bundle kann nicht
+  gelöscht werden
+canceled-photo-selection: Sie haben die Bildauswahl abgebrochen
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
 cannot-create-org: >-
@@ -133,8 +139,12 @@ cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
 cannot-download: Paket kann nicht heruntergeladen werden
+cannot-find-unknown-version: >-
+  Unbekannte Version kann nicht gefunden werden. Bitte wenden Sie sich an den
+  Capgo-Support und überprüfen Sie die Browserprotokolle
 cannot-get-the-test-: Die Testversion kann nicht abgerufen werden
 cannot-invite-owner: Eigentümer kann nicht zur Organisation eingeladen werden
+cannot-load-app-settings: App-Einstellungen können nicht geladen werden
 cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
 cannot-set-this-vers: Diese Version kann nicht eingestellt werden
 cannot-share: Benutzer-ID kann nicht geteilt werden. Überprüfen Sie die Browserkonsole
@@ -145,11 +155,15 @@ cannot-view-usage: Die Nutzungsseite kann nicht angezeigt werden
 cannots-sign-off: Protokollierung nicht möglich
 change: Ändern
 change-api-key-name: Ändern Sie den Namen des Apikeys
+changed-app-name: App-Name erfolgreich geändert
 changed-name: Der Name von apikey wurde erfolgreich geändert
 changed-password-suc: das Passwort wurde erfolgreich geändert
 channel: Kanal
 channel-ab-testing: Aktivieren Sie AB-Tests
 channel-ab-testing-percentage: Prozentsatz der Benutzer, die die Sekundärversion erhalten
+channel-bundle-linked: |-
+  Dieses Bundle ist mit einem oder mehreren Kanälen verknüpft. 
+  (%) Möchten Sie die Verknüpfung mit diesen Kanälen aufheben?
 channel-create: Kanal erstellen
 channel-deleted: Kanal gelöscht
 channel-forced-devices: Erzwungene Geräte
@@ -196,6 +210,7 @@ days: Tage
 defined-as: Definiert als
 defined-as-private: als normal definiert
 defined-as-public: als Standard definiert
+delete: Löschen
 delete-account: Konto löschen
 delete-account-0: Konto löschen
 delete-app: App löschen
@@ -230,6 +245,8 @@ discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
 download: Herunterladen
+edit-name: Namen bearbeiten
+edit-pic: Bild bearbeiten
 email: Email
 email-address: E-Mail-Addresse
 email-does-not-exist: Dieser Benutzer existiert nicht
@@ -369,6 +386,7 @@ new-name-to-short: |-
   Es muss mindestens 4 Zeichen lang sein
 next: Nächste
 'no': NEIN
+no-app-icon: Diese App hat kein App-Symbol
 no-channel-linked: Kein Kanal, zum Hinzufügen klicken
 no-channel-linked-no-perm: Kein Kanal
 no-data: Keine Daten
@@ -407,6 +425,7 @@ organization-email: Management-E-Mail der Organisation
 organization-name: Name der Organisation
 organization-settings: Organisationseinstellungen
 os-version: OS Version
+owner-org: 'Eigentümerorganisation:'
 pages: Seiten
 password: Passwort
 password-confirmatio: Passwort Bestätigung
@@ -419,6 +438,10 @@ patch: Patch
 percent-fail: Fehlerprozentsatz
 permission-changed: Benutzerberechtigung erfolgreich geändert
 personal-information: Persönliche Informationen
+picture-delete-fail: >-
+  Das App-Bild kann nicht gelöscht werden. Bitte überprüfen Sie das
+  Konsolenprotokoll
+picture-uploaded: Bild erfolgreich hochgeladen
 plan-abtest: A / B-Tests
 plan-bandwidth: GB Bandbreite
 plan-buy: Besorgen
@@ -451,6 +474,7 @@ please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
 please-confirm-org-del: >-
   Bitte bestätigen Sie, dass Sie die Organisation „%1“ löschen möchten, indem
   Sie ihren Namen eingeben
+please-type-new-app-name: Bitte geben Sie den neuen App-Namen ein
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 plugin-version: Plugin-Version
 prediction: Vorhersage
@@ -537,21 +561,25 @@ trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
 type: ''
+type-new-app-name: Neuer App-Name
 type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
 type-new-org-name: Bitte geben Sie den neuen Namen für die Organisation ein
 undefined: nicht definiert
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert
 unknown: Unbekannt
+unknown-mime: Unbekannter Mime-Typ, bitte überprüfen Sie die Browserkonsole
 unlimited-updates: Unbegrenzte Updates
 unlink-bundle: Bündel aufheben
 unlink-channel: Verknüpfung des Kanals aufheben
+unlink-error: Fehler beim Aufheben der Verknüpfung. Bitte überprüfen Sie die Konsole
 unlink-version: Verknüpfung aufheben
 update: Aktualisieren
 updated-at: Aktualisiert am
 updated-min-version: Aktualisierte Minimalversion
 upgrade: Aktualisierung
 upgrade-now: Jetzt upgraden
+upload-img-error: Bild kann nicht hochgeladen werden. Bitte überprüfen Sie die Konsole
 upperCaseError: Sollte Großbuchstaben enthalten
 url: URL
 usage: Verwendung
@@ -575,9 +603,12 @@ version-builtin: Version eingebaut
 version-linked: Versionslink
 version-linking: Link zum Bündel
 versions: Versionen
+want-to-unlink: Möchten Sie die Verknüpfung aufheben?
 warning: Warnung!
 welcome-to: Willkommen zu
 welcome-to-your-capg: Willkommen auf Ihrem Capgo-Dashboard
+what-to-do-with-photo: Bild bearbeiten
+what-to-do-with-photo-dec: Was möchten Sie mit dem App-Foto machen?
 write-key: Schreiben
 wrong-name-org-del: |-
   Sie haben den Namen der Organisation nicht eingegeben. 

@@ -122,18 +122,72 @@ async function deleteOne(one: typeof element) {
     return
   }
 
-  if (one.deleted || await didCancel(t('version')))
-    return
   try {
+    // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
       .select()
       .eq('app_id', one.app_id)
       .eq('version', one.id)
+
+    let unlink = [] as Database['public']['Tables']['channels']['Row'][]
     if ((channelFound && channelFound.length) || errorChannel) {
-      toast.error(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-channel')}`)
-      return
+      displayStore.dialogOption = {
+        header: t('want-to-unlink'),
+        message: t('channel-bundle-linked').replace('%', channelFound?.map(ch => ch.name).join(', ') ?? ''),
+        buttons: [
+          {
+            text: t('yes'),
+            role: 'yes',
+            id: 'yes',
+            handler: () => {
+              if (channelFound)
+                unlink = channelFound
+            },
+          },
+          {
+            text: t('no'),
+            id: 'cancel',
+            role: 'cancel',
+          },
+        ],
+      }
+      displayStore.showDialog = true
+      if (await displayStore.onDialogDismiss()) {
+        toast.error(t('canceled-delete'))
+        return
+      }
     }
+
+    if (one.deleted || await didCancel(t('version')))
+      return
+
+    if (unlink.length > 0) {
+      const { data: unknownVersion, error: unknownError } = await supabase
+        .from('app_versions')
+        .select()
+        .eq('app_id', one.app_id)
+        .eq('name', 'unknown')
+        .single()
+
+      if (unknownError) {
+        toast.error(t('cannot-find-unknown-version'))
+        console.error('Cannot find unknown', JSON.stringify(unknownError))
+        return
+      }
+
+      const { error: updateError } = await supabase
+        .from('channels')
+        .update({ version: unknownVersion.id })
+        .in('id', unlink.map(c => c.id))
+
+      if (updateError) {
+        toast.error(t('unlink-error'))
+        console.error('unlink error (updateError)', updateError)
+        return
+      }
+    }
+
     const { data: deviceFound, error: errorDevice } = await supabase
       .from('devices_override')
       .select()

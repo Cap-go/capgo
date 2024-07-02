@@ -111,6 +111,7 @@ button-toggle_dark: Toggle dark mode
 button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
 cancel: Cancel
+canceled-delete: Canceled bundle deletion, cannot delete a linked bundle
 canceled-photo-selection: You canceled the picture selection
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
@@ -124,6 +125,9 @@ cannot-delete-channel: Cannot delete channel
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
 cannot-download: Cannot download bundle
+cannot-find-unknown-version: >-
+  Cannot find unknown version, please contact capgo support and check browser
+  logs
 cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
 cannot-load-app-settings: Cannot load app settings
@@ -143,6 +147,9 @@ changed-password-suc: Password changed successfully
 channel: Channel
 channel-ab-testing: Enable AB testing
 channel-ab-testing-percentage: Percentage of users recving secondary version
+channel-bundle-linked: >-
+  This bundle is linked to one or more channels. (%) Would you like to unlink it
+  from those channels?
 channel-create: Create channel
 channel-deleted: Channel deleted
 channel-forced-devices: Forced devices
@@ -164,7 +171,7 @@ confirm-email: Confirm your email
 confirm-email-sent: A confirmation email was sent click to link to confirm your email
 confirm-password: Confirm password
 confirm-public-desc: |-
-  Making this channel default will make it send updates to all yours users. 
+  Making this channel default will make it send updates to all yours users.
   Others default channels will not be default anymore.
 copied-to-clipboard: Copied to clipboard
 copy-account-id: copy account id
@@ -338,7 +345,7 @@ new-name-not-changed: The new name is the same as the old one
 new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
-'no': 'no'
+no: no
 no-app-icon: This app does not have any app icon
 no-channel-linked: No channel, click to add
 no-channel-linked-no-perm: No channel
@@ -506,6 +513,7 @@ unknown-mime: Unknown mime type, please check browser console
 unlimited-updates: Unlimited updates
 unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel
+unlink-error: Unlink error, please check console
 unlink-version: Unlink version
 update: Update
 updated-at: Updated at
@@ -534,6 +542,7 @@ version-builtin: Version builtin
 version-linked: Version link
 version-linking: Link to bundle
 versions: Versions
+want-to-unlink: Do you want to unlink?
 warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
@@ -542,7 +551,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-'yes': 'yes'
+yes: yes
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-api-key: 'Your API key:'
