@@ -76,6 +76,7 @@ async function loadAppInfo() {
 async function refreshData() {
   isLoading.value = true
   try {
+    await main.awaitInitialLoad()
     await loadAppInfo()
   }
   catch (error) {

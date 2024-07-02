@@ -33,6 +33,7 @@ export const useMainStore = defineStore('main', () => {
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
   const dashboardFetched = ref<boolean>(false)
+  const _initialLoadPromise = ref(Promise.withResolvers())
 
   const totalDownload = ref<number>(0)
 
@@ -70,15 +71,22 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
-    const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
-    dashboard.value = dashboardRes.global
-    dashboardByapp.value = dashboardRes.byApp
-    totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
-    totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
-    totalStorage.value = await getTotalStorage()
-    totalStats.value = getTotalStats()
-    bestPlan.value = await findBestPlan(totalStats.value)
-    dashboardFetched.value = true
+    try {
+      const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
+      dashboard.value = dashboardRes.global
+      dashboardByapp.value = dashboardRes.byApp
+      totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
+      totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
+      totalStorage.value = await getTotalStorage()
+      totalStats.value = getTotalStats()
+      bestPlan.value = await findBestPlan(totalStats.value)
+      dashboardFetched.value = true
+      _initialLoadPromise.value.resolve()
+    }
+    catch (error) {
+      _initialLoadPromise.value.reject(error)
+      throw error
+    }
   }
 
   const filterDashboard = (appId: string) => {
@@ -91,6 +99,10 @@ export const useMainStore = defineStore('main', () => {
   const getTotalMauByApp = (appId: string) => {
     // dashboardByapp add up all the mau for the appId and return it
     return dashboardByapp.value.filter(d => d.app_id === appId).reduce((acc: number, cur) => acc + cur.mau, 0)
+  }
+
+  const awaitInitialLoad = () => {
+    return _initialLoadPromise.value.promise
   }
 
   return {
@@ -106,6 +118,7 @@ export const useMainStore = defineStore('main', () => {
     updateDashboard,
     filterDashboard,
     dashboard,
+    awaitInitialLoad,
     dashboardByapp,
     getTotalMauByApp,
     getTotalStatsByApp,
