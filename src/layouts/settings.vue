@@ -20,7 +20,7 @@ const { t } = useI18n()
 const main = useMainStore()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
-const ActiveTab = ref('')
+const ActiveTab = ref('/dashboard/settings/account')
 
 const tabs = ref<Tab[]>([
   {

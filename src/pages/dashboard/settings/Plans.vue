@@ -311,13 +311,6 @@ const hightLights = computed<Stat[]>(() => ([
         <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
           {{ t('plan-desc') }}<br>
         </p>
-        <div class="flex flex-row ml-auto mr-auto">
-          <p class="mt-2 text-lg text-gray-700 sm:text-center dark:text-white w-fit">
-            {{ t('plan-page-warn').replace('%ORG_NAME%', currentOrganization?.name ?? '') }}
-            <a class="text-blue-600" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
-            <br>
-          </p>
-        </div>
       </div>
       <section class="px-8 pt-4 sm:px-0">
         <BlurBg :mini="true">
@@ -372,7 +365,7 @@ const hightLights = computed<Stat[]>(() => ([
               <h2 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
                 {{ p.name }}
               </h2>
-              <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="px-2 ml-auto bg-blue-600 rounded-full">
+              <h2 v-if="isTrial && currentPlanSuggest?.name === p.name" class="px-2 ml-auto text-white bg-blue-600 rounded-full dark:text-white">
                 {{ t('free-trial') }}
               </h2>
             </div>
@@ -421,6 +414,13 @@ const hightLights = computed<Stat[]>(() => ([
             </ul>
           </div>
         </div>
+      </div>
+      <div v-if="!isMobile" class="mt-4 text-center">
+        <p class="mt-2 text-lg text-gray-700 sm:text-center dark:text-white">
+          {{ t('plan-page-warn').replace('%ORG_NAME%', currentOrganization?.name ?? '') }}
+          <a class="text-blue-600" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
+          <br>
+        </p>
       </div>
       <section v-if="!isMobile" class="py-12 lg:py-20 sm:py-16">
         <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">

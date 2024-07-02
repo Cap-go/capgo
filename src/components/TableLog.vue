@@ -11,6 +11,7 @@ import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import dayjs from 'dayjs'
 import { FormKit } from '@formkit/vue'
+import { useDark } from '@vueuse/core'
 import type { MobileColType, TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import IconSort from '~icons/lucide/chevrons-up-down'
@@ -53,6 +54,7 @@ const emit = defineEmits([
   'rangeChange',
 ])
 const { t } = useI18n()
+const isDark = useDark()
 const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
 const showTimeDropdown = ref(false)
@@ -197,28 +199,28 @@ onMounted(async () => {
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
-        <div class="flex flex-col items-center justify-center flex-auto px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'hover:bg-gray-700 hover:text-white': !showTimeDropdown, 'general': currentSelected, 'bg-gray-100 text-gray-800': !currentSelected }" @click="clickLeft">
+      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-100 rounded-lg dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
+        <div class="flex flex-col items-center justify-center flex-auto px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'hover:bg-gray-300 dark:hover:bg-gray-700 hover:text-white': !showTimeDropdown, 'general': currentSelected, 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'general' }" @click="clickLeft">
           <div class="flex items-center justify-center">
             <IconClock class="mr-1" />
             <span class="hidden md:block">{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
           </div>
-          <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
+          <div v-if="showTimeDropdown" class="absolute z-50 block w-32 text-gray-500 bg-white pointer-events-none dark:text-white dark:bg-gray-800">
             <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 1, 'hover:bg-gray-700': currentGeneralTime !== 1 }" @click="setTime(1)">
+              <div class="w-full py-3 text-center" :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1, 'bg-gray-100 dark:hover:bg-gray-700': currentGeneralTime !== 1 }" @click="setTime(1)">
                 {{ t('last-minute') }}
               </div>
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 3, 'hover:bg-gray-700': currentGeneralTime !== 3 }" @click="setTime(3)">
+              <div class="w-full py-3 text-center" :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 3, 'bg-gray-100 dark:hover:bg-gray-700': currentGeneralTime !== 3 }" @click="setTime(3)">
                 {{ t('last-3-minutes') }}
               </div>
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 15, 'hover:bg-gray-700': currentGeneralTime !== 15 }" @click="setTime(15)">
+              <div class="w-full py-3 text-center" :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 15, 'bg-gray-100 dark:hover:bg-gray-700': currentGeneralTime !== 15 }" @click="setTime(15)">
                 {{ t('last-15-minutes') }}
               </div>
             </div>
           </div>
         </div>
-        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-600" />
-        <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-800 hover:text-white': currentSelected === 'precise' }" @click="clickRight">
+        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
+        <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
               v-model="preciseDates"
@@ -226,7 +228,7 @@ onMounted(async () => {
               :max-date="dayjs().toDate()"
               :start-time="startTime"
               prevent-min-max-navigation
-              dark
+              :dark="isDark"
               range
               @update:model-value="clickRight"
             >
@@ -241,7 +243,7 @@ onMounted(async () => {
               <template #action-preview />
               <template #top-extra="{ value }">
                 <div class="flex items-center justify-center">
-                  <div class="flex items-center space-x-2 bg-[#444] px-3 py-2 rounded-full">
+                  <div class="flex items-center space-x-2 text-black dark:text-white bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="24"
@@ -252,12 +254,12 @@ onMounted(async () => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5 text-white"
+                      class="w-5 h-5 text-black dark:text-white"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="font-mono text-white">{{ formatValue(value as any).start }}</span>
+                    <span class="font-mono text-black dark:text-white">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -269,12 +271,12 @@ onMounted(async () => {
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-5 h-5 mx-4 text-white"
+                    class="w-5 h-5 mx-4 text-black dark:text-white"
                   >
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
                   </svg>
-                  <div class="flex items-center space-x-2 bg-[#444] px-3 py-2 rounded-full">
+                  <div class="flex items-center space-x-2 bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="24"
@@ -285,12 +287,12 @@ onMounted(async () => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5 text-white"
+                      class="w-5 h-5 text-black dark:text-white"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="font-mono text-white">{{ formatValue(value as any).end }}</span>
+                    <span class="font-mono text-black dark:text-white">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
               </template>
@@ -370,7 +372,7 @@ onMounted(async () => {
     </kList>
     <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent" aria-label="Table navigation">
       <button
-        class="flex items-center justify-center h-10 px-4 py-2 space-x-2 text-sm font-medium text-white transition-colors border border-gray-300 rounded-md dark:border-gray-700 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary/90"
+        class="flex items-center justify-center h-10 px-4 py-2 space-x-2 text-sm font-medium transition-colors border border-gray-300 rounded-md dark:text-white dark:border-gray-700 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary/10 dark:hover:bg-primary/90"
         @click="fastBackward"
       >
         <IconFastBackward />
