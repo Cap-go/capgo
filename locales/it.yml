@@ -67,9 +67,11 @@ api-keys-are-used-for-cli-and-public-api: Le chiavi API vengono utilizzate per l
 api-keys-key-copied: Chiavi API
 app: App
 app-deleted: Applicazione eliminata
+app-id: 'ID dell''applicazione:'
 app-id-example: Esempio di ID app
 app-info: Informazioni sull'app
 app-info-desc: Puoi modificare qui le informazioni sulla tua app
+app-logo-deleted: Immagine dell'app eliminata correttamente
 app-name: Nome dell'applicazione
 app-not-found: App non trovata
 app-perm: Autorizzazione dell'app
@@ -113,6 +115,10 @@ button-toggle_dark: Attiva/disattiva la modalità oscura
 button-toggle_langs: Cambia lingua
 by-clicking-on-them: cliccandoci sopra.
 cancel: Annulla
+canceled-delete: >-
+  Eliminazione del pacchetto annullata, impossibile eliminare un pacchetto
+  collegato
+canceled-photo-selection: Hai annullato la selezione dell'immagine
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
 cannot-create-org: Impossibile creare un'organizzazione, controlla i log del browser!
@@ -125,8 +131,12 @@ cannot-delete-channel: Impossibile eliminare il canale
 cannot-delete-member: Impossibile eliminare il membro, controlla la console del browser
 cannot-delete-owner: Impossibile eliminare il proprietario dall'organizzazione
 cannot-download: Impossibile scaricare il pacchetto
+cannot-find-unknown-version: >-
+  Impossibile trovare la versione sconosciuta, contattare l'assistenza capgo e
+  controllare i registri del browser
 cannot-get-the-test-: Impossibile ottenere la versione di prova
 cannot-invite-owner: Impossibile invitare il proprietario nell'organizzazione
+cannot-load-app-settings: Impossibile caricare le impostazioni dell'app
 cannot-save-custom-i: Impossibile salvare l'ID personalizzato
 cannot-set-this-vers: Impossibile impostare questa versione
 cannot-share: Impossibile condividere l'ID utente, controlla la console del browser
@@ -137,11 +147,15 @@ cannot-view-usage: Impossibile visualizzare la pagina di utilizzo
 cannots-sign-off: Impossibile accedere
 change: Modifica
 change-api-key-name: Cambia il nome dell'apikey
+changed-app-name: Nome dell'app modificato correttamente
 changed-name: Nome di apikey modificato con successo
 changed-password-suc: password cambiata con successo
 channel: Canale
 channel-ab-testing: Abilita test AB
 channel-ab-testing-percentage: Percentuale di utenti che hanno ricevuto la versione secondaria
+channel-bundle-linked: |-
+  Questo pacchetto è collegato a uno o più canali. 
+  (%) Desideri scollegarlo da questi canali?
 channel-create: Crea canale
 channel-deleted: Canale eliminato
 channel-forced-devices: Dispositivi forzati
@@ -188,6 +202,7 @@ days: giorni
 defined-as: Definito come
 defined-as-private: definita normale
 defined-as-public: definito come predefinito
+delete: Eliminare
 delete-account: Eliminare l'account
 delete-account-0: Eliminare l'account
 delete-app: Elimina l'app
@@ -222,6 +237,8 @@ discover-your-dashbo: Scopri la tua dashboard!
 documentation: Documentazione
 dont-have-an-account: Non hai un account?
 download: Scaricamento
+edit-name: Modifica nome
+edit-pic: Modifica immagine
 email: E-mail
 email-address: Indirizzo e-mail
 email-does-not-exist: Questo utente non esiste
@@ -357,6 +374,7 @@ new-name-to-short: |-
   Deve contenere almeno 4 caratteri
 next: Prossimo
 'no': 'NO'
+no-app-icon: Questa app non ha alcuna icona dell'app
 no-channel-linked: Nessun canale, fai clic per aggiungere
 no-channel-linked-no-perm: Nessun canale
 no-data: Nessun dato
@@ -391,6 +409,7 @@ organization-email: E-mail di gestione dell'organizzazione
 organization-name: Nome dell'organizzazione
 organization-settings: Impostazioni dell'organizzazione
 os-version: Versione del sistema operativo
+owner-org: 'Organizzazione proprietaria:'
 pages: Pagine
 password: Parola d'ordine
 password-confirmatio: conferma password
@@ -403,6 +422,8 @@ patch: Toppa
 percent-fail: Percentuale di fallimento
 permission-changed: Autorizzazione utente modificata correttamente
 personal-information: Informazioni personali
+picture-delete-fail: Impossibile eliminare l'immagine dell'app, controlla il registro della console
+picture-uploaded: Immagine caricata correttamente
 plan-abtest: Test A/B
 plan-bandwidth: Larghezza di banda GB
 plan-buy: Acquistare
@@ -429,6 +450,7 @@ platform: piattaforma
 please-ask-the-user-to-create-account-first: Chiedi prima all'utente di creare un account
 please-choose-your-p: Scegli le tue preferenze
 please-confirm-org-del: Conferma di voler eliminare l'organizzazione "%1" digitandone il nome
+please-type-new-app-name: Digita il nome della nuova app
 please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
 prediction: Predizione
@@ -517,21 +539,25 @@ trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
 trial-plan-expires-in: Il processo finisce tra
 type: ''
+type-new-app-name: Nuovo nome dell'app
 type-new-name: Digita il nuovo nome della chiave API
 type-new-org-name: Digita il nuovo nome per l'organizzazione
 undefined: non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato
 unknown: sconosciuto
+unknown-mime: Tipo MIME sconosciuto, controlla la console del browser
 unlimited-updates: Aggiornamenti illimitati
 unlink-bundle: Scollega gruppo
 unlink-channel: Scollega canale
+unlink-error: Errore di scollegamento, controlla la console
 unlink-version: Scollega versione
 update: Aggiornamento
 updated-at: Aggiornato a
 updated-min-version: Versione minima aggiornata
 upgrade: Aggiornamento
 upgrade-now: Aggiorna ora
+upload-img-error: Impossibile caricare l'immagine, controlla la console
 upperCaseError: Deve contenere lettere maiuscole
 url: URL
 usage: Utilizzo
@@ -553,9 +579,12 @@ version-builtin: Versione incorporata
 version-linked: Collegamento versione
 version-linking: Collegamento al pacchetto
 versions: Versioni
+want-to-unlink: Vuoi scollegarti?
 warning: Avvertimento!
 welcome-to: Benvenuto a
 welcome-to-your-capg: Benvenuto nella dashboard di Capgo
+what-to-do-with-photo: Modifica immagine
+what-to-do-with-photo-dec: Cosa vorresti fare con la foto dell'app?
 write-key: Scrivere
 wrong-name-org-del: |-
   Non hai digitato il nome dell'organizzazione. 
