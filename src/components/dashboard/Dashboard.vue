@@ -15,7 +15,6 @@ const props = defineProps<{
   apps: Database['public']['Tables']['apps']['Row'][]
   sharedApps: Database['public']['Tables']['apps']['Row'][]
 }>()
-const emit = defineEmits(['reloadShared'])
 const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()

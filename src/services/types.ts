@@ -25,9 +25,9 @@ type MergeNonUnionObjects<T, U> = Expand<
     [K in OptionalMergeKeys<T, U>]?: K extends keyof T
       ? K extends keyof U
         ? Expand<Merge<
-                    Exclude<T[K], undefined>,
-                    Exclude<U[K], undefined>
-                >>
+          Exclude<T[K], undefined>,
+          Exclude<U[K], undefined>
+        >>
         : T[K]
       : K extends keyof U
         ? U[K]
