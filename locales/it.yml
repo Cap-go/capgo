@@ -68,6 +68,9 @@ api-keys-key-copied: Chiavi API
 app: App
 app-deleted: Applicazione eliminata
 app-id-example: Esempio di ID app
+app-info: Informazioni sull'app
+app-info-desc: Puoi modificare qui le informazioni sulla tua app
+app-name: Nome dell'applicazione
 app-not-found: App non trovata
 app-perm: Autorizzazione dell'app
 app-preview: Anteprima dell'app
@@ -187,6 +190,7 @@ defined-as-private: definita normale
 defined-as-public: definito come predefinito
 delete-account: Eliminare l'account
 delete-account-0: Eliminare l'account
+delete-app: Elimina l'app
 delete-org: Elimina organizzazione
 delete-your-account: cancella il tuo account
 deleted: cancellato

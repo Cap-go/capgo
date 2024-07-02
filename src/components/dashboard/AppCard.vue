@@ -5,12 +5,9 @@ import { useI18n } from 'vue-i18n'
 import {
   kListItem,
 } from 'konsta/vue'
-import { toast } from 'vue-sonner'
-import IconTrash from '~icons/heroicons/trash'
+import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
 import { appIdToUrl } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 
@@ -19,80 +16,16 @@ const props = defineProps<{
   channel: string
   deleteButton: boolean
 }>()
-const emit = defineEmits(['reload'])
-const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const route = useRoute()
 const router = useRouter()
-const supabase = useSupabase()
 const mauNb = ref(0)
 const main = useMainStore()
 const isLoading = ref(true)
 const { t } = useI18n()
 
-async function didCancel(name: string) {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-delete'),
-        id: 'confirm-button',
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
-}
-
-async function deleteApp(app: Database['public']['Tables']['apps']['Row']) {
-  if (await didCancel(t('app')))
-    return
-
-  try {
-    const org = organizationStore.getOrgByAppId(props.app.app_id)
-    const { error: errorIcon } = await supabase.storage
-      .from(`images`)
-      .remove([`org/${org?.gid}/${app.app_id}/icon`])
-    if (errorIcon)
-      toast.error(t('cannot-delete-app-icon'))
-
-    const { data, error: vError } = await supabase
-      .from('app_versions')
-      .select()
-      .eq('app_id', app.app_id)
-
-    if (data && data.length) {
-      const filesToRemove = (data as Database['public']['Tables']['app_versions']['Row'][]).map(x => `${app.user_id}/${app.app_id}/versions/${x.bucket_id}`)
-      const { error: delError } = await supabase
-        .storage
-        .from('apps')
-        .remove(filesToRemove)
-      if (delError) {
-        toast.error(t('cannot-delete-app-version'))
-        return
-      }
-    }
-
-    const { error: dbAppError } = await supabase
-      .from('apps')
-      .delete()
-      .eq('app_id', app.app_id)
-    if (vError || dbAppError)
-      toast.error(t('cannot-delete-app'))
-
-    else
-      toast.success(t('app-deleted'))
-
-    await emit('reload')
-  }
-  catch (error) {
-    toast.error(t('cannot-delete-app'))
-  }
+function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
+  router.push(`/app/p/${appIdToUrl(app.app_id)}/settings`)
 }
 
 async function loadData() {
@@ -132,12 +65,6 @@ const perm = computed(() => {
   else {
     return t('unknown')
   }
-})
-const isSuperAdmin = computed(() => {
-  // TODO: check if that is smart to not let admins delete apps
-  if (!perm.value)
-    return false
-  return organizationStore.hasPermisisonsInRole(perm.value as any, ['super_admin'])
 })
 
 watchEffect(async () => {
@@ -183,9 +110,11 @@ watchEffect(async () => {
         {{ perm }}
       </div>
     </td>
-    <td v-if="isSuperAdmin" class="w-1/5 p-2" @click.stop="deleteApp(app)">
-      <div class="text-center">
-        <IconTrash v-if="!channel && deleteButton" class="mr-4 text-lg text-red-600" />
+    <td class="flex flex-row w-1/5 p-2">
+      <div
+        class="mr-4 text-center" @click.stop="openSettngs(app)"
+      >
+        <IconSettings class="text-lg " />
       </div>
     </td>
   </tr>
@@ -200,7 +129,7 @@ watchEffect(async () => {
       <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
     </template>
     <template #after>
-      <IconTrash class="text-lg text-red-600" @click.stop="deleteApp(app)" />
+      <IconSettings class="text-lg" @click.stop="openSettngs(app)" />
     </template>
   </k-list-item>
 </template>

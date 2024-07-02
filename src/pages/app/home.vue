@@ -63,7 +63,7 @@ watchEffect(async () => {
 
 <template>
   <div>
-    <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" @reload-app="getMyApps()" />
+    <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
     <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
     <div v-else class="flex flex-col items-center justify-center h-full">
       <Spinner size="w-40 h-40" />

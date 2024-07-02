@@ -15,7 +15,7 @@ const props = defineProps<{
   apps: Database['public']['Tables']['apps']['Row'][]
   sharedApps: Database['public']['Tables']['apps']['Row'][]
 }>()
-const emit = defineEmits(['reloadApp', 'reloadShared'])
+const emit = defineEmits(['reloadShared'])
 const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
@@ -46,7 +46,7 @@ watchEffect(async () => {
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->
         <!-- Table (Top Channels) -->
-        <TopApps :apps="props.apps" :header="t('top-apps-v2')" :delete-button="true" @reload="emit('reloadApp')" />
+        <TopApps :apps="props.apps" :header="t('top-apps-v2')" :delete-button="true" />
       </div>
     </div>
     <k-fab v-if="!stepsOpen && !isMobile" class="fixed z-20 right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">

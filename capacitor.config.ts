@@ -14,7 +14,7 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP',
     },
     CapacitorUpdater: {
-      updateUrl: 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/updates_debug',
+      // updateUrl: 'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/updates_debug',
       // localS3: true,
       // localHost: 'http://localhost:5173',
       // localWebHost: 'http://localhost:5173',
