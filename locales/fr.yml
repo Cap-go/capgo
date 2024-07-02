@@ -69,9 +69,11 @@ api-keys-are-used-for-cli-and-public-api: Les clés API sont utilisées pour la 
 api-keys-key-copied: Clés API copiées
 app: Application
 app-deleted: Application supprimée
+app-id: "Identifiant de l'application\_:"
 app-id-example: Exemple d'ID d'application
 app-info: Informations sur l'application
 app-info-desc: Vous pouvez modifier ici les informations de votre application
+app-logo-deleted: Image de l'application supprimée avec succès
 app-name: Nom de l'application
 app-not-found: Application introuvable
 app-perm: Autorisation de l'application
@@ -115,6 +117,8 @@ button-toggle_dark: Basculer en mode sombre
 button-toggle_langs: Changer de langue
 by-clicking-on-them: en cliquant dessus.
 cancel: Annuler
+canceled-delete: Suppression du bundle annulée, impossible de supprimer un bundle lié
+canceled-photo-selection: Vous avez annulé la sélection d'image
 cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
 cannot-create-org: "Impossible de créer une organisation, veuillez vérifier les journaux du navigateur\_!"
@@ -129,8 +133,12 @@ cannot-delete-channel: Impossible de supprimer le canal
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
 cannot-download: Impossible de télécharger le pack
+cannot-find-unknown-version: >-
+  Impossible de trouver la version inconnue, veuillez contacter le support capgo
+  et vérifier les journaux du navigateur
 cannot-get-the-test-: Impossible d'obtenir la version de test
 cannot-invite-owner: Impossible d'inviter le propriétaire dans l'organisation
+cannot-load-app-settings: Impossible de charger les paramètres de l'application
 cannot-save-custom-i: Impossible d'enregistrer l'ID personnalisé
 cannot-set-this-vers: Impossible de définir cette version
 cannot-share: Impossible de partager l'ID utilisateur, vérifiez la console du navigateur
@@ -141,11 +149,13 @@ cannot-view-usage: Impossible d'afficher la page d'utilisation
 cannots-sign-off: Impossible de se connecter
 change: Changement
 change-api-key-name: Changer le nom de l'apikey
+changed-app-name: Le nom de l'application a bien été modifié
 changed-name: Le nom d'Apikey a été modifié avec succès
 changed-password-suc: Le mot de passe a été changé avec succès
 channel: Canaux
 channel-ab-testing: Activer les tests AB
 channel-ab-testing-percentage: Pourcentage d'utilisateurs recevant la version secondaire
+channel-bundle-linked: "Ce forfait est lié à une ou plusieurs chaînes. \n(%) Souhaitez-vous le dissocier de ces chaînes\_?"
 channel-create: Créer un canal
 channel-deleted: Canal supprimé
 channel-forced-devices: Appareils forcés
@@ -192,6 +202,7 @@ days: jours
 defined-as: Défini comme
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
+delete: Supprimer
 delete-account: Supprimer le compte
 delete-account-0: Supprimer le compte
 delete-app: Supprimer l'application
@@ -226,6 +237,8 @@ discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: Documentation
 dont-have-an-account: "Vous n'avez pas de compte\_?"
 download: Télécharger
+edit-name: Modifier le nom
+edit-pic: Modifier l'image
 email: E-mail
 email-address: Adresse e-mail
 email-does-not-exist: Cet utilisateur n'existe pas
@@ -357,6 +370,7 @@ new-name-to-long: "Le nouveau nom est trop long. \nVous ne pouvez utiliser que 3
 new-name-to-short: "Le nom de l'apikey est trop court. \nIl doit contenir au moins 4\_caractères"
 next: Suivant
 'no': Non
+no-app-icon: Cette application n'a pas d'icône d'application
 no-channel-linked: Pas de canal, cliquez pour ajouter
 no-channel-linked-no-perm: Aucune chaîne
 no-data: Pas de données
@@ -391,6 +405,7 @@ organization-email: E-mail de gestion de l'organisation
 organization-name: nom de l'organisation
 organization-settings: Paramètres de l'organisation
 os-version: Version du système d'exploitation
+owner-org: "Organisation propriétaire\_:"
 pages: pages
 password: Mot de passe
 password-confirmatio: Confirmation mot de passe
@@ -403,6 +418,10 @@ patch: Correctif
 percent-fail: Pourcentage d'échec
 permission-changed: L'autorisation de l'utilisateur a été modifiée avec succès
 personal-information: Informations personnelles
+picture-delete-fail: >-
+  Impossible de supprimer l'image de l'application, veuillez vérifier le journal
+  de la console
+picture-uploaded: Photo téléchargée avec succès
 plan-abtest: Test A/B
 plan-bandwidth: Bande passante Go
 plan-buy: Acheter
@@ -435,6 +454,7 @@ please-choose-your-p: Veuillez choisir vos préférences
 please-confirm-org-del: >-
   Veuillez confirmer que vous souhaitez supprimer l'organisation « %1 » en
   saisissant son nom
+please-type-new-app-name: Veuillez saisir le nouveau nom de l'application
 please-upgrade: Veuillez mettre à jour votre plan pour ajouter plus d'utilisateurs
 plugin-version: Version du plug-in
 prediction: Prédiction
@@ -519,21 +539,25 @@ trial-left: Jours restants
 trial-plan-expired: Essai expiré
 trial-plan-expires-in: La période d'essai se termine dans
 type: ''
+type-new-app-name: Nouveau nom de l'application
 type-new-name: Veuillez saisir le nouveau nom de la clé API
 type-new-org-name: Veuillez saisir le nouveau nom de l'organisation
 undefined: indéfini
 undefined-fail: Non défini (les mises à jour échoueront)
 uninstall: Désinstaller
 unknown: inconnu
+unknown-mime: Type MIME inconnu, veuillez vérifier la console du navigateur
 unlimited-updates: Mises à jour illimitées
 unlink-bundle: Dissocier le groupe
 unlink-channel: Dissocier le canal
+unlink-error: Erreur de dissociation, veuillez vérifier la console
 unlink-version: Dissocier la version
 update: Mise à jour
 updated-at: Mis à jour à
 updated-min-version: Version minimale mise à jour
 upgrade: Améliorer
 upgrade-now: Mettre à jour maintenant
+upload-img-error: Impossible de télécharger l'image, veuillez vérifier la console
 upperCaseError: Doit contenir des lettres majuscules
 url: URL
 usage: Usage
@@ -555,9 +579,12 @@ version-builtin: Version intégrée
 version-linked: Lien vers la version
 version-linking: Lien vers le forfait
 versions: Versions
+want-to-unlink: "Voulez-vous dissocier\_?"
 warning: Avertissement!
 welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
+what-to-do-with-photo: Modifier l'image
+what-to-do-with-photo-dec: "Que souhaiteriez-vous faire avec la photo de l'application\_?"
 write-key: Écrire
 wrong-name-org-del: "Vous n'avez pas saisi le nom de l'organisation. \nVous étiez censé taper\_: %1"
 yearly: Annuel

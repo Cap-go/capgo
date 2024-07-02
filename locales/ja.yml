@@ -63,9 +63,11 @@ api-keys-are-used-for-cli-and-public-api: API キーは CLI とパブリック A
 api-keys-key-copied: API キー
 app: アプリ
 app-deleted: アプリを削除しました
+app-id: 'アプリID:'
 app-id-example: アプリ ID の例
 app-info: アプリ情報
 app-info-desc: ここでアプリ情報を変更できます
+app-logo-deleted: アプリの画像が正常に削除されました
 app-name: アプリ名
 app-not-found: アプリが見つかりません
 app-perm: アプリの許可
@@ -109,6 +111,8 @@ button-toggle_dark: ダークモードの切り替え
 button-toggle_langs: 言語を変更
 by-clicking-on-them: それらをクリックして。
 cancel: キャンセル
+canceled-delete: バンドルの削除がキャンセルされました。リンクされたバンドルは削除できません
+canceled-photo-selection: 画像の選択をキャンセルしました
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
 cannot-create-org: 組織を作成できません。ブラウザのログを確認してください。
@@ -121,8 +125,10 @@ cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
 cannot-download: バンドルをダウンロードできない
+cannot-find-unknown-version: 不明なバージョンが見つかりません。capgo サポートに連絡し、ブラウザのログを確認してください。
 cannot-get-the-test-: テスト版を入手できません
 cannot-invite-owner: 所有者を組織に招待できません
+cannot-load-app-settings: アプリ設定を読み込めません
 cannot-save-custom-i: カスタム ID を保存できません
 cannot-set-this-vers: このバージョンは設定できません
 cannot-share: ユーザー ID を共有できません。ブラウザ コンソールを確認してください
@@ -133,11 +139,15 @@ cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
 change: 変化
 change-api-key-name: apikey の名前を変更する
+changed-app-name: アプリ名が正常に変更されました
 changed-name: apikey の名前が正常に変更されました
 changed-password-suc: パスワードは正常に変更されました
 channel: チャネル
 channel-ab-testing: AB テストを有効にする
 channel-ab-testing-percentage: セカンダリ バージョンを受信して​​いるユーザーの割合
+channel-bundle-linked: |-
+  このバンドルは 1 つ以上のチャネルにリンクされています。 
+  (%) これらのチャンネルからのリンクを解除しますか?
 channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
 channel-forced-devices: 強制デバイス
@@ -180,6 +190,7 @@ days: 日々
 defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
+delete: 消去
 delete-account: アカウントを削除する
 delete-account-0: アカウントを削除する
 delete-app: アプリを削除する
@@ -214,6 +225,8 @@ discover-your-dashbo: あなたのダッシュボードを見つけてくださ�
 documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
 download: ダウンロード
+edit-name: 名前の編集
+edit-pic: 画像を編集する
 email: Eメール
 email-address: 電子メールアドレス
 email-does-not-exist: このユーザーは存在しません
@@ -345,6 +358,7 @@ new-name-to-short: |-
   少なくとも 4 文字の長さである必要があります
 next: 次
 'no': いいえ
+no-app-icon: このアプリにはアプリアイコンがありません
 no-channel-linked: チャンネルがありません。クリックして追加してください
 no-channel-linked-no-perm: チャンネルがありません
 no-data: データなし
@@ -377,6 +391,7 @@ organization-email: 組織の管理メール
 organization-name: 組織名
 organization-settings: 組織の設定
 os-version: OSバージョン
+owner-org: '所有者の組織:'
 pages: ページ
 password: パスワード
 password-confirmatio: パスワードの確認
@@ -387,6 +402,8 @@ patch: パッチ
 percent-fail: 失敗率
 permission-changed: ユーザー権限が正常に変更されました
 personal-information: 個人情報
+picture-delete-fail: アプリの画像を削除できません。コンソールのログを確認してください。
+picture-uploaded: 画像が正常にアップロードされました
 plan-abtest: A / Bテスト
 plan-bandwidth: GB帯域幅
 plan-buy: 買う
@@ -413,6 +430,7 @@ platform: プラットホーム
 please-ask-the-user-to-create-account-first: 最初にユーザーにアカウントを作成するように依頼してください
 please-choose-your-p: お好みを選択してください
 please-confirm-org-del: 「%1」組織の名前を入力して、削除することを確認してください
+please-type-new-app-name: 新しいアプリ名を入力してください
 please-upgrade: プランをアップグレードしてユーザーを追加してください
 plugin-version: プラグインのバージョン
 prediction: 予測
@@ -497,21 +515,25 @@ trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 trial-plan-expires-in: トライアル終了まで
 type: ''
+type-new-app-name: 新しいアプリ名
 type-new-name: 新しい API キー名を入力してください
 type-new-org-name: 組織の新しい名前を入力してください
 undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
 unknown: 未知
+unknown-mime: 不明な MIME タイプです。ブラウザ コンソールを確認してください。
 unlimited-updates: 無制限のアップデート
 unlink-bundle: バンドルのリンクを解除
 unlink-channel: チャンネルのリンクを解除
+unlink-error: リンク解除エラー。コンソールを確認してください
 unlink-version: バージョンのリンクを解除
 update: アップデート
 updated-at: に更新
 updated-min-version: 最小バージョンを更新しました
 upgrade: アップグレード
 upgrade-now: 今すぐアップグレード
+upload-img-error: 画像をアップロードできません。コンソールを確認してください
 upperCaseError: 大文字を含める必要があります
 url: URL
 usage: 使用法
@@ -533,9 +555,12 @@ version-builtin: バージョン組み込み
 version-linked: バージョンリンク
 version-linking: バンドルへのリンク
 versions: バージョン
+want-to-unlink: リンクを解除しますか?
 warning: 警告！
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
+what-to-do-with-photo: 画像を編集する
+what-to-do-with-photo-dec: アプリの写真で何をしたいですか?
 write-key: 書く
 wrong-name-org-del: |-
   組織名が入力されていません。
