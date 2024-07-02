@@ -2,6 +2,7 @@ import ky from 'ky'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
+import { coerce as semverCoerce } from 'semver'
 
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
@@ -257,8 +258,9 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
 
   const nativePackages: NativePackage[] = (data?.native_packages || []) as any as NativePackage[]
   for (const pkg of nativePackages) {
-    if (pkg && pkg.name === '@capgo/capacitor-updater')
-      return pkg.version.replace('v', '').replace('^', '')
+    if (pkg && pkg.name === '@capgo/capacitor-updater') {
+      return semverCoerce(pkg.version)?.version ?? ''
+    }
   }
   return ''
 }
