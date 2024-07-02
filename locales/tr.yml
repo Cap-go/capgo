@@ -64,6 +64,9 @@ api-keys-key-copied: API Anahtarları
 app: Uygulama
 app-deleted: Uygulama silindi
 app-id-example: Uygulama kimliği örneği
+app-info: Uygulama bilgileri
+app-info-desc: Uygulama bilgilerinizi buradan değiştirebilirsiniz
+app-name: Uygulama ismi
 app-not-found: Uygulama bulunamadı
 app-perm: Uygulama izni
 app-preview: Uygulama önizlemesi
@@ -181,6 +184,7 @@ defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete-account: Hesabı sil
 delete-account-0: Hesabı sil
+delete-app: Uygulamayı sil
 delete-org: Kuruluşu sil
 delete-your-account: Hesabını sil
 deleted: silindi

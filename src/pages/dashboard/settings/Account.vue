@@ -367,35 +367,35 @@ onMounted(async () => {
 
 <template>
   <div class="h-full pb-8 max-h-fit grow md:pb-0">
-    <!-- Panel body -->
-    <div class="p-6 space-y-6">
-      <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-        {{ t('personal-information') }}
-      </h2>
-      <div class="text-sm dark:text-gray-100">
-        {{ t('you-can-change-your-') }}
-      </div>
-      <!-- Picture -->
-      <section>
-        <div class="flex items-center">
-          <div class="mr-4">
-            <img
-              v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
-              width="80" height="80" alt="User upload"
-            >
-            <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
-              <p>{{ acronym }}</p>
-            </div>
-          </div>
-          <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
-            {{ t('change') }}
-          </button>
+    <FormKit id="update-account" type="form" :actions="false" @submit="submit">
+      <!-- Panel body -->
+      <div class="p-6 space-y-6">
+        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('personal-information') }}
+        </h2>
+        <div class="text-sm dark:text-gray-100">
+          {{ t('you-can-change-your-') }}
         </div>
-      </section>
+        <!-- Picture -->
+        <section>
+          <div class="flex items-center">
+            <div class="mr-4">
+              <img
+                v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
+                width="80" height="80" alt="User upload"
+              >
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
+                <p>{{ acronym }}</p>
+              </div>
+            </div>
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+              {{ t('change') }}
+            </button>
+          </div>
+        </section>
 
-      <!-- Personal Info -->
-      <section>
-        <FormKit id="update-account" type="form" :actions="false" @submit="submit">
+        <!-- Personal Info -->
+        <section>
           <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
               <FormKit
@@ -451,85 +451,85 @@ onMounted(async () => {
             </div>
           </div>
           <FormKitMessages />
-        </FormKit>
-      </section>
-      <h3 class="mt-2 mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-        {{ t('settings') }}
-      </h3>
-      <!-- Language Info -->
-      <section class="flex flex-col md:flex-row md:items-center items-left">
-        <p class="text-slate-800 dark:text-white">
-          {{ t('language') }}:
-        </p>
-        <div class="md:ml-6">
-          <button
-            id="dropdownDefaultButton" data-dropdown-toggle="dropdown"
-            class="inline-flex px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
+        </section>
+        <h3 class="mt-2 mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('settings') }}
+        </h3>
+        <!-- Language Info -->
+        <section class="flex flex-col md:flex-row md:items-center items-left">
+          <p class="text-slate-800 dark:text-white">
+            {{ t('language') }}:
+          </p>
+          <div class="md:ml-6">
+            <button
+              id="dropdownDefaultButton" data-dropdown-toggle="dropdown"
+              class="inline-flex px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
 
-            type="button"
-          >
-            {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-          </button>
-          <!-- Dropdown menu -->
-          <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
-            <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
-              <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
-                <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
-              </li>
-            </ul>
+              type="button"
+            >
+              {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <!-- Dropdown menu -->
+            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
+              <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+                <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
+                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="flex flex-col md:flex-row md:items-center items-left">
+          <p class="text-slate-800 dark:text-white">
+            {{ t('2fa') }}:
+          </p>
+          <div class="md:ml-6">
+            <button
+              class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
+              :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
+              @click="handleMfa"
+            >
+              {{ !mfaEnabled ? t('enable') : t('disable') }}
+            </button>
+          </div>
+        </section>
+        <div class="flex flex-col md:flex-row md:items-center items-left">
+          <p class="text-slate-800 dark:text-white">
+            {{ t('account-id') }}:
+          </p>
+          <div class="md:ml-6">
+            <button class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
+              {{ t('copy-account-id') }}
+            </button>
           </div>
         </div>
-      </section>
-
-      <section class="flex flex-col md:flex-row md:items-center items-left">
-        <p class="text-slate-800 dark:text-white">
-          {{ t('2fa') }}:
-        </p>
-        <div class="md:ml-6">
-          <button
-            class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
-            :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
-            @click="handleMfa"
-          >
-            {{ !mfaEnabled ? t('enable') : t('disable') }}
-          </button>
-        </div>
-      </section>
-      <div class="flex flex-col md:flex-row md:items-center items-left">
-        <p class="text-slate-800 dark:text-white">
-          {{ t('account-id') }}:
-        </p>
-        <div class="md:ml-6">
-          <button class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
-            {{ t('copy-account-id') }}
-          </button>
+        <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
+          <IconVersion /> <span class="pl-2"> {{ version }}</span>
         </div>
       </div>
-      <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
-        <IconVersion /> <span class="pl-2"> {{ version }}</span>
-      </div>
-    </div>
-    <!-- Panel footer -->
-    <footer>
-      <div class="flex flex-col px-6 py-5 border-t border-slate-200">
-        <div class="flex self-end">
-          <button class="p-2 text-white border border-red-400 rounded-lg btn hover:bg-red-600" @click="deleteAccount()">
-            {{ t('delete-account') }}
-          </button>
-          <button
-            class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
-            type="submit"
-            color="secondary"
-            shape="round"
-          >
-            <span v-if="!isLoading" class="rounded-4xl">
-              {{ t('update') }}
-            </span>
-            <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-          </button>
+      <!-- Panel footer -->
+      <footer>
+        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+          <div class="flex self-end">
+            <button class="p-2 text-white border border-red-400 rounded-lg btn hover:bg-red-600" @click="deleteAccount()">
+              {{ t('delete-account') }}
+            </button>
+            <button
+              class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+              type="submit"
+              color="secondary"
+              shape="round"
+            >
+              <span v-if="!isLoading" class="rounded-4xl">
+                {{ t('update') }}
+              </span>
+              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+            </button>
+          </div>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </FormKit>
   </div>
 </template>
 
