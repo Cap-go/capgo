@@ -159,14 +159,6 @@ jobs:
         with:
           fileName: "serviceAccount.json"
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/android/.gradle/*
-            ~/android/gradle/wrapper/*
-          key: ${{ runner.os }}-gradle-${{ hashFiles('android/.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.0'
