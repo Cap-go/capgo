@@ -63,7 +63,12 @@ api-keys-are-used-for-cli-and-public-api: API 키는 CLI 및 공개 API에 사�
 api-keys-key-copied: API 키
 app: 앱
 app-deleted: 앱 삭제됨
+app-id: '앱 ID:'
 app-id-example: 앱 ID 예시
+app-info: 앱 정보
+app-info-desc: 여기에서 앱 정보를 변경할 수 있습니다.
+app-logo-deleted: 앱 사진이 삭제되었습니다.
+app-name: 앱 이름
 app-not-found: 앱을 찾을 수 없음
 app-perm: 앱 권한
 app-preview: 앱 미리보기
@@ -106,6 +111,8 @@ button-toggle_dark: 다크 모드 전환
 button-toggle_langs: 언어 변경
 by-clicking-on-them: 그들을 클릭하여.
 cancel: 취소
+canceled-delete: 번들 삭제가 취소되었습니다. 연결된 번들을 삭제할 수 없습니다.
+canceled-photo-selection: 사진 선택을 취소했습니다.
 cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-create-org: 조직을 생성할 수 없습니다. 브라우저 로그를 확인하세요!
@@ -118,8 +125,10 @@ cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
 cannot-download: 번들을 다운로드할 수 없습니다.
+cannot-find-unknown-version: 알 수 없는 버전을 찾을 수 없습니다. capgo 지원팀에 문의하여 브라우저 로그를 확인하세요.
 cannot-get-the-test-: 테스트 버전을 받을 수 없습니다
 cannot-invite-owner: 소유자를 조직에 초대할 수 없습니다.
+cannot-load-app-settings: 앱 설정을 로드할 수 없습니다.
 cannot-save-custom-i: 맞춤 ID를 저장할 수 없습니다.
 cannot-set-this-vers: 이 버전을 설정할 수 없습니다.
 cannot-share: 사용자 ID를 공유할 수 없습니다. 브라우저 콘솔을 확인하세요.
@@ -130,11 +139,15 @@ cannot-view-usage: 사용량 페이지를 볼 수 없습니다
 cannots-sign-off: 로그할 수 없습니다.
 change: 변화
 change-api-key-name: apikey 이름 변경
+changed-app-name: 앱 이름이 변경되었습니다.
 changed-name: apikey 이름이 변경되었습니다.
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
 channel: 채널
 channel-ab-testing: AB 테스트 활성화
 channel-ab-testing-percentage: 보조 버전을 수신하는 사용자 비율
+channel-bundle-linked: |-
+  이 번들은 하나 이상의 채널에 연결되어 있습니다. 
+  (%) 해당 채널에서 연결을 해제하시겠습니까?
 channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-forced-devices: 강제 장치
@@ -177,8 +190,10 @@ days: 날
 defined-as: 로써 정의 된
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
+delete: 삭제
 delete-account: 계정 삭제
 delete-account-0: 계정 삭제
+delete-app: 앱 삭제
 delete-org: 조직 삭제
 delete-your-account: 계정 삭제
 deleted: 삭제
@@ -210,6 +225,8 @@ discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
 download: 다운로드
+edit-name: 이름 수정
+edit-pic: 사진 편집
 email: 이메일
 email-address: 이메일 주소
 email-does-not-exist: 이 사용자는 존재하지 않습니다.
@@ -341,6 +358,7 @@ new-name-to-short: |-
   길이는 4자 이상이어야 합니다.
 next: 다음
 'no': 아니요
+no-app-icon: 이 앱에는 앱 아이콘이 없습니다.
 no-channel-linked: 채널이 없습니다. 추가하려면 클릭하세요.
 no-channel-linked-no-perm: 채널 없음
 no-data: 데이터 없음
@@ -373,6 +391,7 @@ organization-email: 조직의 관리 이메일
 organization-name: 조직 이름
 organization-settings: 조직 설정
 os-version: OS 버전
+owner-org: '소유자 조직:'
 pages: 페이지
 password: 비밀번호
 password-confirmatio: 비밀번호 확인
@@ -383,6 +402,8 @@ patch: 반점
 percent-fail: 실패율
 permission-changed: 사용자 권한을 성공적으로 변경했습니다.
 personal-information: 개인 정보
+picture-delete-fail: 앱 사진을 삭제할 수 없습니다. 콘솔 로그를 확인하세요.
+picture-uploaded: 사진이 성공적으로 업로드되었습니다.
 plan-abtest: A/B 테스트
 plan-bandwidth: GB 대역폭
 plan-buy: 구입하다
@@ -409,6 +430,7 @@ platform: 플랫폼
 please-ask-the-user-to-create-account-first: 먼저 사용자에게 계정을 생성하도록 요청하세요.
 please-choose-your-p: 기본 설정을 선택하십시오
 please-confirm-org-del: 이름을 입력하여 "%1" 조직을 삭제할 것인지 확인하십시오.
+please-type-new-app-name: 새 앱 이름을 입력하세요.
 please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
 prediction: 예측
@@ -493,21 +515,25 @@ trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
 trial-plan-expires-in: '평가판 종료:'
 type: ''
+type-new-app-name: 새 앱 이름
 type-new-name: 새 API 키 이름을 입력하세요.
 type-new-org-name: 조직의 새 이름을 입력하세요.
 undefined: 한정되지 않은
 undefined-fail: 정의되지 않음(업데이트가 실패함)
 uninstall: 제거됨
 unknown: 알려지지 않은
+unknown-mime: 알 수 없는 MIME 유형입니다. 브라우저 콘솔을 확인하세요.
 unlimited-updates: 무제한 업데이트
 unlink-bundle: 번들 연결 해제
 unlink-channel: 채널 연결 해제
+unlink-error: 연결 해제 오류가 발생했습니다. 콘솔을 확인하세요.
 unlink-version: 버전 연결 해제
 update: 업데이트
 updated-at: 업데이트 시간
 updated-min-version: 업데이트된 최소 버전
 upgrade: 업그레이드
 upgrade-now: 지금 업그레이드
+upload-img-error: 사진을 업로드할 수 없습니다. 콘솔을 확인하세요.
 upperCaseError: 대문자를 포함해야 함
 url: URL
 usage: 용법
@@ -529,9 +555,12 @@ version-builtin: 버전 내장
 version-linked: 버전 링크
 version-linking: 번들 링크
 versions: 버전
+want-to-unlink: 연결을 해제하시겠습니까?
 warning: 경고!
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
+what-to-do-with-photo: 사진 편집
+what-to-do-with-photo-dec: 앱 사진으로 무엇을 하고 싶으신가요?
 write-key: 쓰다
 wrong-name-org-del: |-
   조직 이름을 입력하지 않았습니다. 

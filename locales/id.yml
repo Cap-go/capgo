@@ -63,7 +63,12 @@ api-keys-are-used-for-cli-and-public-api: Kunci API digunakan untuk CLI dan API 
 api-keys-key-copied: Kunci API
 app: Aplikasi
 app-deleted: Aplikasi dihapus
+app-id: 'Id aplikasi:'
 app-id-example: Contoh ID aplikasi
+app-info: Informasi aplikasi
+app-info-desc: Di sini Anda dapat mengubah informasi aplikasi Anda
+app-logo-deleted: Gambar aplikasi berhasil dihapus
+app-name: Nama aplikasi
 app-not-found: Aplikasi tidak ditemukan
 app-perm: Izin aplikasi
 app-preview: Pratinjau aplikasi
@@ -106,6 +111,8 @@ button-toggle_dark: Alihkan mode gelap
 button-toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
 cancel: Membatalkan
+canceled-delete: Penghapusan paket dibatalkan, tidak dapat menghapus paket tertaut
+canceled-photo-selection: Anda membatalkan pemilihan gambar
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
 cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!
@@ -118,8 +125,12 @@ cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
 cannot-download: Tidak dapat mengunduh bundel
+cannot-find-unknown-version: >-
+  Tidak dapat menemukan versi yang tidak dikenal, silakan hubungi dukungan capgo
+  dan periksa log browser
 cannot-get-the-test-: Tidak bisa mendapatkan versi uji
 cannot-invite-owner: Tidak dapat mengundang pemilik ke organisasi
+cannot-load-app-settings: Tidak dapat memuat pengaturan aplikasi
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 cannot-set-this-vers: Tidak dapat menyetel versi ini
 cannot-share: Tidak dapat membagikan id pengguna, periksa konsol browser
@@ -130,11 +141,15 @@ cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
 change: Mengubah
 change-api-key-name: Ubah nama apikey
+changed-app-name: Berhasil mengubah nama aplikasi
 changed-name: Berhasil mengubah nama apikey
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
 channel-ab-testing: Aktifkan pengujian AB
 channel-ab-testing-percentage: Persentase pengguna yang menerima versi sekunder
+channel-bundle-linked: |-
+  Paket ini tertaut ke satu atau beberapa saluran. 
+  (%) Apakah Anda ingin membatalkan tautannya dari saluran tersebut?
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-forced-devices: Perangkat Terpaksa
@@ -180,8 +195,10 @@ days: hari
 defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
+delete: Menghapus
 delete-account: Hapus akun
 delete-account-0: Hapus akun
+delete-app: Hapus aplikasi
 delete-org: Hapus organisasi
 delete-your-account: Hapus akun anda
 deleted: dihapus
@@ -213,6 +230,8 @@ discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
 dont-have-an-account: Belum punya akun?
 download: Unduh
+edit-name: Sunting nama
+edit-pic: Sunting gambar
 email: Surel
 email-address: Alamat email
 email-does-not-exist: Pengguna ini tidak ada
@@ -350,6 +369,7 @@ new-name-to-short: |-
   Panjangnya minimal harus 4 karakter
 next: Berikutnya
 'no': TIDAK
+no-app-icon: Aplikasi ini tidak memiliki ikon aplikasi apa pun
 no-channel-linked: Tidak ada saluran, klik untuk menambahkan
 no-channel-linked-no-perm: Tidak ada saluran
 no-data: Tidak ada data
@@ -384,6 +404,7 @@ organization-email: Email manajemen organisasi
 organization-name: Nama Organisasi
 organization-settings: Pengaturan organisasi
 os-version: versi OS
+owner-org: 'Organisasi pemilik:'
 pages: Halaman
 password: Kata sandi
 password-confirmatio: konfirmasi kata kunci
@@ -394,6 +415,8 @@ patch: Tambalan
 percent-fail: Persentase gagal
 permission-changed: Berhasil mengubah izin pengguna
 personal-information: Informasi pribadi
+picture-delete-fail: Tidak dapat menghapus gambar aplikasi, silakan periksa log konsol
+picture-uploaded: Gambar berhasil diunggah
 plan-abtest: Pengujian A/B
 plan-bandwidth: Bandwidth GB
 plan-buy: Membeli
@@ -422,6 +445,7 @@ please-choose-your-p: Silakan pilih preferensi Anda
 please-confirm-org-del: >-
   Harap konfirmasikan bahwa Anda ingin menghapus "%1" organisasi dengan
   mengetikkan namanya
+please-type-new-app-name: Silakan ketik nama aplikasi baru
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
 prediction: Ramalan
@@ -508,21 +532,25 @@ trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
 type: ''
+type-new-app-name: Nama aplikasi baru
 type-new-name: Silakan ketik nama kunci api baru
 type-new-org-name: Silakan ketikkan nama baru untuk organisasi tersebut
 undefined: belum diartikan
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
 unknown: tidak dikenal
+unknown-mime: Jenis pantomim tidak dikenal, silakan periksa konsol browser
 unlimited-updates: Pembaruan tanpa batas
 unlink-bundle: Putuskan tautan bundel
 unlink-channel: Batalkan tautan saluran
+unlink-error: Kesalahan pembatalan tautan, silakan periksa konsol
 unlink-version: Batalkan tautan versi
 update: Memperbarui
 updated-at: Diperbarui pada
 updated-min-version: Versi minimal yang diperbarui
 upgrade: Meningkatkan
 upgrade-now: Tingkatkan sekarang
+upload-img-error: Tidak dapat mengunggah gambar, silakan periksa konsol
 upperCaseError: Harus berisi huruf besar
 url: URL
 usage: Penggunaan
@@ -546,9 +574,12 @@ version-builtin: Versi bawaan
 version-linked: Tautan versi
 version-linking: Tautan ke bundel
 versions: Versi
+want-to-unlink: Apakah Anda ingin membatalkan tautan?
 warning: Peringatan!
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
+what-to-do-with-photo: Sunting gambar
+what-to-do-with-photo-dec: Apa yang ingin Anda lakukan dengan foto aplikasi?
 write-key: Menulis
 wrong-name-org-del: |-
   Anda belum mengetikkan nama organisasi. 

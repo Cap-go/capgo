@@ -69,7 +69,7 @@ PODS:
     - Capacitor
   - CapgoCapacitorScreenRecorder (8.1.19):
     - Capacitor
-  - CapgoCapacitorUpdater (6.0.33):
+  - CapgoCapacitorUpdater (6.0.36):
     - Alamofire
     - Capacitor
     - SSZipArchive
@@ -260,7 +260,7 @@ SPEC CHECKSUMS:
   CapgoCapacitorMute: 4581f843a3b79eaa1106d1ef1ee18a093b7c9907
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
   CapgoCapacitorScreenRecorder: 69e46b6a00ea27cab52dd4087d082aeda193bf93
-  CapgoCapacitorUpdater: b204c813679cda2ff9c0c217068f201fdddb41ff
+  CapgoCapacitorUpdater: ca5c8f767c753ed12427db15bcae60972e3f8767
   CapgoInappbrowser: d1ff4bb69de1686de259b777858f2801ff390c75
   CapgoNativeAudio: 71b7ad4171b4439834bcfd5b7e3b63e9abb13545
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059

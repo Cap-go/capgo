@@ -63,7 +63,12 @@ api-keys-are-used-for-cli-and-public-api: API anahtarları CLI ve genel API içi
 api-keys-key-copied: API Anahtarları
 app: Uygulama
 app-deleted: Uygulama silindi
+app-id: 'Uygulama kimliği:'
 app-id-example: Uygulama kimliği örneği
+app-info: Uygulama bilgileri
+app-info-desc: Uygulama bilgilerinizi buradan değiştirebilirsiniz
+app-logo-deleted: Uygulama resmi başarıyla silindi
+app-name: Uygulama ismi
 app-not-found: Uygulama bulunamadı
 app-perm: Uygulama izni
 app-preview: Uygulama önizlemesi
@@ -106,6 +111,8 @@ button-toggle_dark: Karanlık modu değiştir
 button-toggle_langs: Dilleri değiştir
 by-clicking-on-them: üzerlerine tıklayarak.
 cancel: İptal etmek
+canceled-delete: Paket silme işlemi iptal edildi, bağlantılı paket silinemiyor
+canceled-photo-selection: Resim seçimini iptal ettiniz
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
 cannot-create-org: Organizasyon oluşturulamıyor, lütfen tarayıcı kayıtlarını kontrol edin!
@@ -118,8 +125,12 @@ cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
 cannot-download: Paket indirilemiyor
+cannot-find-unknown-version: >-
+  Bilinmeyen sürüm bulunamıyor, lütfen Capgo desteğiyle iletişime geçin ve
+  tarayıcı günlüklerini kontrol edin
 cannot-get-the-test-: Test sürümü alınamıyor
 cannot-invite-owner: Sahibi kuruluşa davet edilemiyor
+cannot-load-app-settings: Uygulama ayarları yüklenemiyor
 cannot-save-custom-i: Özel kimlik kaydedilemiyor
 cannot-set-this-vers: Bu sürüm ayarlanamıyor
 cannot-share: Kullanıcı kimliği paylaşılamıyor, tarayıcı konsolunu kontrol edin
@@ -130,11 +141,15 @@ cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
 change: Değiştirmek
 change-api-key-name: Apikey'in adını değiştirin
+changed-app-name: Uygulama adı başarıyla değiştirildi
 changed-name: Apikey'in adı başarıyla değiştirildi
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
 channel-ab-testing: AB testini etkinleştir
 channel-ab-testing-percentage: İkincil sürümü alan kullanıcıların yüzdesi
+channel-bundle-linked: |-
+  Bu paket bir veya daha fazla kanala bağlı. 
+  (%) Bu kanallardan bağlantısını kaldırmak ister misiniz?
 channel-create: Kanal oluştur
 channel-deleted: kanal silindi
 channel-forced-devices: Zorla cihazlar
@@ -179,8 +194,10 @@ days: günler
 defined-as: olarak tanımlandı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
+delete: Silmek
 delete-account: Hesabı sil
 delete-account-0: Hesabı sil
+delete-app: Uygulamayı sil
 delete-org: Kuruluşu sil
 delete-your-account: Hesabını sil
 deleted: silindi
@@ -212,6 +229,8 @@ discover-your-dashbo: Kontrol panelinizi keşfedin!
 documentation: Belgeler
 dont-have-an-account: Hesabınız yok mu?
 download: İndirmek
+edit-name: Adı düzenle
+edit-pic: Resmi düzenle
 email: E-posta
 email-address: E-posta adresi
 email-does-not-exist: Böyle bir kullanıcı yoktur
@@ -347,6 +366,7 @@ new-name-to-short: |-
   En az 4 karakter uzunluğunda olmalı
 next: Sonraki
 'no': HAYIR
+no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-channel-linked: Kanal yok, eklemek için tıklayın
 no-channel-linked-no-perm: Kanal yok
 no-data: Veri yok
@@ -379,6 +399,7 @@ organization-email: Kuruluşun yönetim e-postası
 organization-name: Kuruluş Adı
 organization-settings: Organizasyon ayarları
 os-version: OS sürümü
+owner-org: 'Sahip kuruluşu:'
 pages: Sayfalar
 password: Şifre
 password-confirmatio: Şifre onayı
@@ -389,6 +410,8 @@ patch: Yama
 percent-fail: Başarısız yüzde
 permission-changed: Kullanıcı izni başarıyla değiştirildi
 personal-information: Kişisel bilgiler
+picture-delete-fail: Uygulama resmi silinemiyor, lütfen konsol günlüğünü kontrol edin
+picture-uploaded: Resim başarıyla yüklendi
 plan-abtest: A / B testi
 plan-bandwidth: GB Bant Genişliği
 plan-buy: Satın almak
@@ -419,6 +442,7 @@ platform: platformu
 please-ask-the-user-to-create-account-first: Lütfen önce kullanıcıdan hesap oluşturmasını isteyin
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-confirm-org-del: Lütfen adını yazarak "%1" kuruluşunu silmek istediğinizi onaylayın.
+please-type-new-app-name: Lütfen yeni uygulama adını yazın
 please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
 prediction: Tahmin
@@ -503,21 +527,25 @@ trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 trial-plan-expires-in: deneme bitiyor
 type: ''
+type-new-app-name: Yeni uygulama adı
 type-new-name: Lütfen yeni API anahtarı adını yazın
 type-new-org-name: Lütfen kuruluşun yeni adını yazın
 undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
 unknown: Bilinmeyen
+unknown-mime: Bilinmeyen mime türü, lütfen tarayıcı konsolunu kontrol edin
 unlimited-updates: Sınırsız güncelleme
 unlink-bundle: Paketin bağlantısını kaldır
 unlink-channel: Kanalın bağlantısını kaldır
+unlink-error: Bağlantıyı kaldırma hatası, lütfen konsolu kontrol edin
 unlink-version: Sürümün bağlantısını kaldır
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
 updated-min-version: Minimum sürüm güncellendi
 upgrade: Güncelleme
 upgrade-now: Hemen Yükselt
+upload-img-error: Resim yüklenemiyor, lütfen konsolu kontrol edin
 upperCaseError: Büyük harfler içermelidir
 url: URL
 usage: Kullanım
@@ -539,9 +567,12 @@ version-builtin: Sürüm yerleşik
 version-linked: Sürüm bağlantısı
 version-linking: Paket bağlantısı
 versions: Versiyonlar
+want-to-unlink: Bağlantıyı kaldırmak istiyor musunuz?
 warning: Uyarı!
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
+what-to-do-with-photo: Resmi düzenle
+what-to-do-with-photo-dec: Uygulama fotoğrafıyla ne yapmak istersiniz?
 write-key: Yazmak
 wrong-name-org-del: |-
   Kuruluşun adını yazmadınız. 

@@ -63,7 +63,12 @@ api-keys-are-used-for-cli-and-public-api: API 密钥用于 CLI 和公共 API
 api-keys-key-copied: API 密钥
 app: 应用程序
 app-deleted: 应用已删除
+app-id: 应用程序 ID：
 app-id-example: 应用 ID 示例
+app-info: 应用信息
+app-info-desc: 您可以在此处更改您的应用程序信息
+app-logo-deleted: 应用图片删除成功
+app-name: 应用名称
 app-not-found: 找不到应用
 app-perm: 应用程序权限
 app-preview: 应用预览
@@ -106,6 +111,8 @@ button-toggle_dark: 切换深色模式
 button-toggle_langs: 更改语言
 by-clicking-on-them: 通过点击它们。
 cancel: 取消
+canceled-delete: 已取消捆绑包删除，无法删除链接的捆绑包
+canceled-photo-selection: 您取消了图片选择
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
 cannot-create-org: 无法创建组织，请检查浏览器日志！
@@ -118,8 +125,10 @@ cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
 cannot-download: 无法下载捆绑包
+cannot-find-unknown-version: 找不到未知版本，请联系 capgo 支持并检查浏览器日志
 cannot-get-the-test-: 无法获取测试版
 cannot-invite-owner: 无法邀请所有者加入组织
+cannot-load-app-settings: 无法加载应用程序设置
 cannot-save-custom-i: 无法保存自定义 ID
 cannot-set-this-vers: 无法设置此版本
 cannot-share: 无法共享用户 ID，请检查浏览器控制台
@@ -130,11 +139,15 @@ cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
 change: 改变
 change-api-key-name: 更改 apikey 的名称
+changed-app-name: 更改应用名称成功
 changed-name: 已成功更改 apikey 名称
 changed-password-suc: 密码修改成功
 channel: 渠道
 channel-ab-testing: 启用AB测试
 channel-ab-testing-percentage: 接收辅助版本的用户百分比
+channel-bundle-linked: |-
+  该捆绑包链接到一个或多个频道。 
+  (%) 您想取消它与这些频道的链接吗？
 channel-create: 创建频道
 channel-deleted: 频道已删除
 channel-forced-devices: 强制设备
@@ -177,8 +190,10 @@ days: 天
 defined-as: 定义为
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认
+delete: 删除
 delete-account: 删除帐户
 delete-account-0: 删除帐户
+delete-app: 删除应用程序
 delete-org: 删除组织
 delete-your-account: 删除您的帐户
 deleted: 删除
@@ -210,6 +225,8 @@ discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
 dont-have-an-account: 没有帐户？
 download: 下载
+edit-name: 编辑姓名
+edit-pic: 编辑图片
 email: 电子邮件
 email-address: 电子邮件地址
 email-does-not-exist: 该用户不存在
@@ -341,6 +358,7 @@ new-name-to-short: |-
   长度必须至少为 4 个字符
 next: 下一个
 'no': 不
+no-app-icon: 此应用程序没有任何应用程序图标
 no-channel-linked: 暂无频道，点击添加
 no-channel-linked-no-perm: 无频道
 no-data: 没有数据
@@ -373,6 +391,7 @@ organization-email: 组织的管理电子邮件
 organization-name: 机构名称
 organization-settings: 组织设置
 os-version: 操作系统版本
+owner-org: 所有者组织：
 pages: 页数
 password: 密码
 password-confirmatio: 确认密码
@@ -383,6 +402,8 @@ patch: 修补
 percent-fail: 失败百分比
 permission-changed: 成功更改用户权限
 personal-information: 个人信息
+picture-delete-fail: 无法删除应用图片，请检查控制台日志
+picture-uploaded: 图片上传成功
 plan-abtest: A / B测试
 plan-bandwidth: 国标带宽
 plan-buy: 买
@@ -409,6 +430,7 @@ platform: 平台
 please-ask-the-user-to-create-account-first: 请先要求用户创建帐户
 please-choose-your-p: 请选择您的喜好
 please-confirm-org-del: 请输入“%1”组织的名称来确认您要删除该组织
+please-type-new-app-name: 请输入新的应用程序名称
 please-upgrade: 请升级您的计划以添加更多用户
 plugin-version: 插件版本
 prediction: 预言
@@ -493,21 +515,25 @@ trial-left: 剩余天数
 trial-plan-expired: 试用期满
 trial-plan-expires-in: 审判结束于
 type: ''
+type-new-app-name: 新应用程序名称
 type-new-name: 请输入新的 api 密钥名称
 type-new-org-name: 请输入组织的新名称
 undefined: 不明确的
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载
 unknown: 未知
+unknown-mime: 未知的 mime 类型，请检查浏览器控制台
 unlimited-updates: 无限更新
 unlink-bundle: 取消链接包
 unlink-channel: 取消链接频道
+unlink-error: 取消链接错误，请检查控制台
 unlink-version: 取消链接版本
 update: 更新
 updated-at: 更新于
 updated-min-version: 更新了最小版本
 upgrade: 升级
 upgrade-now: 现在升级
+upload-img-error: 无法上传图片，请检查控制台
 upperCaseError: 应包含大写字母
 url: 网址
 usage: 用法
@@ -529,9 +555,12 @@ version-builtin: 版本内置
 version-linked: 版本链接
 version-linking: 捆绑包链接
 versions: 版本
+want-to-unlink: 您想取消链接吗？
 warning: 警告！
 welcome-to: 欢迎来到
 welcome-to-your-capg: 欢迎来到您的 Capgo 仪表板
+what-to-do-with-photo: 编辑图片
+what-to-do-with-photo-dec: 您想对应用程序照片做什么？
 write-key: 写
 wrong-name-org-del: |-
   您尚未输入组织名称。

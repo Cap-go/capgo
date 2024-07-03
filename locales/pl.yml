@@ -65,7 +65,12 @@ api-keys-are-used-for-cli-and-public-api: Klucze API są używane w interfejsie 
 api-keys-key-copied: Klucze API
 app: Aplikacja
 app-deleted: Usunięto aplikację
+app-id: 'Identyfikator aplikacji:'
 app-id-example: Przykład identyfikatora aplikacji
+app-info: Informacje o aplikacji
+app-info-desc: Tutaj możesz zmienić informacje o swojej aplikacji
+app-logo-deleted: Obraz aplikacji został pomyślnie usunięty
+app-name: Nazwa aplikacji
 app-not-found: Nie znaleziono aplikacji
 app-perm: Zezwolenie na aplikację
 app-preview: Podgląd aplikacji
@@ -108,6 +113,8 @@ button-toggle_dark: Przełącz tryb ciemny
 button-toggle_langs: Zmień języki
 by-clicking-on-them: klikając na nie.
 cancel: Anulować
+canceled-delete: Anulowano usunięcie pakietu. Nie można usunąć połączonego pakietu
+canceled-photo-selection: Anulowałeś wybór zdjęć
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
 cannot-create-org: Nie można utworzyć organizacji. Sprawdź logi przeglądarki!
@@ -120,8 +127,12 @@ cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
 cannot-download: Nie można pobrać pakietu
+cannot-find-unknown-version: >-
+  Nie można znaleźć nieznanej wersji. Skontaktuj się z pomocą techniczną Capgo i
+  sprawdź logi przeglądarki
 cannot-get-the-test-: Nie można pobrać wersji testowej
 cannot-invite-owner: Nie można zaprosić właściciela do organizacji
+cannot-load-app-settings: Nie można załadować ustawień aplikacji
 cannot-save-custom-i: Nie można zapisać niestandardowego identyfikatora
 cannot-set-this-vers: Nie można ustawić tej wersji
 cannot-share: Nie można udostępnić identyfikatora użytkownika. Sprawdź konsolę przeglądarki
@@ -132,11 +143,15 @@ cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
 change: Zmiana
 change-api-key-name: Zmień nazwę apikey
+changed-app-name: Pomyślnie zmieniono nazwę aplikacji
 changed-name: Pomyślnie zmieniono nazwę apikey
 changed-password-suc: Hasło zostało zmienione pomyślnie
 channel: Kanał
 channel-ab-testing: Włącz testowanie AB
 channel-ab-testing-percentage: Procent użytkowników którzy otrzymają drugą wersję
+channel-bundle-linked: |-
+  Ten pakiet jest powiązany z jednym lub większą liczbą kanałów. 
+  (%) Czy chcesz odłączyć go od tych kanałów?
 channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
 channel-forced-devices: Wymuszone urządzenia
@@ -183,8 +198,10 @@ days: dni
 defined-as: Zdefiniowana jako
 defined-as-private: określone jako normalne
 defined-as-public: zdefiniowane jako domyślne
+delete: Usuwać
 delete-account: Usuń konto
 delete-account-0: Usuń konto
+delete-app: Usuń aplikację
 delete-org: Usuń organizację
 delete-your-account: Usuń swoje konto
 deleted: usunięte
@@ -216,6 +233,8 @@ discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: Dokumentacja
 dont-have-an-account: Nie masz konta?
 download: Pobierać
+edit-name: Edytuj imię
+edit-pic: Edytuj zdjęcie
 email: E-mail
 email-address: Adres e-mail
 email-does-not-exist: Ten użytkownik nie istnieje
@@ -349,6 +368,7 @@ new-name-to-short: |-
   Musi mieć co najmniej 4 znaki
 next: Następny
 'no': NIE
+no-app-icon: Ta aplikacja nie ma żadnej ikony aplikacji
 no-channel-linked: Brak kanału, kliknij, aby dodać
 no-channel-linked-no-perm: Brak kanału
 no-data: Brak danych
@@ -385,6 +405,7 @@ organization-email: Adres e-mail zarządu organizacji
 organization-name: Nazwa organizacji
 organization-settings: Ustawienia organizacji
 os-version: Wersja systemu operacyjnego
+owner-org: 'Właściciel organizacji:'
 pages: Strony
 password: Hasło
 password-confirmatio: Potwierdzenie hasła
@@ -395,6 +416,8 @@ patch: Skrawek
 percent-fail: Procent niepowodzeń
 permission-changed: Pomyślnie zmieniono uprawnienia użytkownika
 personal-information: Informacje osobiste
+picture-delete-fail: Nie można usunąć obrazu aplikacji. Sprawdź dziennik konsoli
+picture-uploaded: Zdjęcie zostało pomyślnie przesłane
 plan-abtest: Testy A/B
 plan-bandwidth: GB Przepustowość
 plan-buy: Kupić
@@ -423,6 +446,7 @@ platform: Platforma
 please-ask-the-user-to-create-account-first: Najpierw poproś użytkownika o utworzenie konta
 please-choose-your-p: Wybierz swoje preferencje
 please-confirm-org-del: Potwierdź, że chcesz usunąć organizację „%1”, wpisując jej nazwę
+please-type-new-app-name: Wpisz nową nazwę aplikacji
 please-upgrade: Zaktualizuj swój plan, aby dodać więcej użytkowników
 plugin-version: Wersja wtyczki
 prediction: Prognoza
@@ -509,21 +533,25 @@ trial-left: Pozostałe dni
 trial-plan-expired: Wersja czasowa wygasła
 trial-plan-expires-in: Próba kończy się za
 type: ''
+type-new-app-name: Nowa nazwa aplikacji
 type-new-name: Wpisz nową nazwę klucza API
 type-new-org-name: Wpisz nową nazwę organizacji
 undefined: nieokreślony
 undefined-fail: Niezdefiniowany (aktualizacje nie powiodą się)
 uninstall: Odinstalowano
 unknown: nieznany
+unknown-mime: Nieznany typ MIME, sprawdź konsolę przeglądarki
 unlimited-updates: Nieograniczone aktualizacje
 unlink-bundle: Odłącz pakiet
 unlink-channel: Odłącz kanał
+unlink-error: Błąd rozłączenia. Sprawdź konsolę
 unlink-version: Odłącz wersję
 update: Aktualizacja
 updated-at: Zaktualizowano o godz
 updated-min-version: Zaktualizowana wersja minimalna
 upgrade: Aktualizacja
 upgrade-now: Ulepsz teraz
+upload-img-error: Nie można przesłać zdjęcia. Sprawdź w konsoli
 upperCaseError: Powinien zawierać wielkie litery
 url: Adres URL
 usage: Stosowanie
@@ -547,9 +575,12 @@ version-builtin: Wersja wbudowana
 version-linked: Link do wersji
 version-linking: Link do pakietu
 versions: Wersje
+want-to-unlink: Czy chcesz odłączyć?
 warning: Ostrzeżenie!
 welcome-to: Witamy w
 welcome-to-your-capg: Witamy na pulpicie nawigacyjnym Capgo
+what-to-do-with-photo: Edytuj zdjęcie
+what-to-do-with-photo-dec: Co chcesz zrobić ze zdjęciem w aplikacji?
 write-key: Pisać
 wrong-name-org-del: |-
   Nie wpisałeś nazwy organizacji. 
