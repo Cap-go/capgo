@@ -1,5 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import { hash } from 'bun'
 import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -12,6 +13,10 @@ interface dataUpload {
   app_id: string
   bucket_id?: string
   version?: number
+  manifest?: {
+    file: string
+    hash: string
+  }[]
 }
 
 export const app = new Hono()
@@ -54,12 +59,36 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .select('id')
       .eq(body.name ? 'name' : 'bucket_id', body.name ? body.name : body.bucket_id ?? '')
       .eq('app_id', body.app_id)
-      .eq('storage_provider', 'r2-direct')
+      .eq('storage_provider', body.version !== 2 ? 'r2-direct' : 'r2-direct-partial')
       .eq('user_id', apikey.user_id)
       .single()
     if (errorVersion) {
       console.log('errorVersion', errorVersion)
       return c.json({ status: 'Error App or Version not found' }, 500)
+    }
+
+    if (body.version === 2 && body.manifest) {
+      const uploadObjects = await Promise.all(body.manifest.map(async (manifestObj) => {
+        const finalPath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}/${manifestObj.file}`
+        return {
+          path: manifestObj.file,
+          hash: manifestObj.hash,
+          finalPath,
+          uploadLink: await s3.getUploadUrl(c, finalPath),
+        }
+      }))
+
+      const { error: changeError } = await supabaseAdmin(c)
+        .from('app_versions')
+        .update({ r2_path: `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}/` })
+        .eq('id', version.id)
+
+      if (changeError) {
+        console.error('Cannot update supabase', changeError)
+        return c.json({ status: 'Error unknow' }, 500)
+      }
+
+      return c.json(uploadObjects)
     }
 
     // const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
