@@ -16,7 +16,7 @@ RENAME COLUMN "secondVersion" TO second_version;
 ALTER TABLE channels 
 RENAME COLUMN "disableAutoUpdate" TO disable_auto_update;
 
-CREATE PROCEDURE "public"."update_channels_progressive_deploy"()
+CREATE OR REPLACE PROCEDURE "public"."update_channels_progressive_deploy"()
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
