@@ -59,7 +59,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .select('id')
       .eq(body.name ? 'name' : 'bucket_id', body.name ? body.name : body.bucket_id ?? '')
       .eq('app_id', body.app_id)
-      .eq('storage_provider', body.version !== 2 ? 'r2-direct' : 'r2-direct-partial')
+      .eq('storage_provider', 'r2-direct')
       .eq('user_id', apikey.user_id)
       .single()
     if (errorVersion) {
@@ -77,16 +77,6 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
           uploadLink: await s3.getUploadUrl(c, finalPath),
         }
       }))
-
-      const { error: changeError } = await supabaseAdmin(c)
-        .from('app_versions')
-        .update({ r2_path: `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}/` })
-        .eq('id', version.id)
-
-      if (changeError) {
-        console.error('Cannot update supabase', changeError)
-        return c.json({ status: 'Error unknow' }, 500)
-      }
 
       return c.json(uploadObjects)
     }
