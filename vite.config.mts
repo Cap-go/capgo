@@ -18,6 +18,7 @@ import Components from 'unplugin-vue-components/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import formkit from 'unplugin-formkit/vite'
 import { branch, getRightKey } from './scripts/utils.mjs'
 import pack from './package.json'
 
@@ -36,12 +37,17 @@ readdirSync('./locales/')
   })
 
 export default defineConfig({
+  define: {
+    __VUE_OPTIONS_API__: 'true',
+  },
   resolve: {
     alias: {
       '~/': `${path.resolve(__dirname, 'src')}/`,
     },
   },
   plugins: [
+    formkit({}),
+
     VueMacros({
       plugins: {
         vue: Vue({
@@ -100,7 +106,7 @@ export default defineConfig({
         '@vueuse/core',
         VueRouterAutoImports,
         {
-        // add any other imports you were relying on
+          // add any other imports you were relying on
           'vue-router/auto': ['useLink'],
         },
       ],

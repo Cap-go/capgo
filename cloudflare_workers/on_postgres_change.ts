@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import type { D1Database } from '@cloudflare/workers-types'
 import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono'
 

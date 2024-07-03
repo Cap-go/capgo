@@ -3,12 +3,9 @@ import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import {
-  kDialog,
-  kDialogButton,
-  kFab,
-} from 'konsta/vue'
+import { kFab } from 'konsta/vue'
 import { toast } from 'vue-sonner'
+import { storeToRefs } from 'pinia'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
@@ -40,7 +37,6 @@ interface Channel {
   misconfigured: boolean | undefined
 }
 const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
-const addChannelModal = ref(false)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
@@ -54,12 +50,12 @@ const search = ref('')
 const elements = ref<(typeof element)[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const newChannel = ref<string>()
 const versionId = ref<number>()
 const filters = ref()
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
+const { currentOrganization } = storeToRefs(organizationStore)
 
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -91,17 +87,17 @@ function findUnknownVersion() {
     .then(({ data }) => data?.id)
 }
 
-async function addChannel() {
-  if (!newChannel.value || !versionId.value || !main.user)
+async function addChannel(name: string) {
+  if (!name || !versionId.value || !main.user)
     return
   try {
-    console.log('addChannel', newChannel.value, versionId.value, main.user)
+    console.log('addChannel', name, versionId.value, main.user)
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }
     const { data: dataChannel } = await supabase
       .from('channels')
       .insert([
         {
-          name: newChannel.value,
+          name,
           app_id: props.appId,
           version: versionId.value,
           owner_org: EMPTY_UUID,
@@ -111,8 +107,6 @@ async function addChannel() {
     if (!dataChannel)
       return
     elements.value.push(dataChannel[0] as any)
-    newChannel.value = ''
-    addChannelModal.value = false
   }
   catch (error) {
     console.error(error)
@@ -278,13 +272,35 @@ async function reload() {
     console.error(error)
   }
 }
-
-async function openAddChannel() {
-  if (organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['admin', 'super_admin']))
-    addChannelModal.value = true
-
-  else
+async function showAddModal() {
+  if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
+    return
+  }
+
+  displayStore.dialogOption = {
+    header: t('channel-create'),
+    input: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        handler: async () => {
+          const newName = displayStore.dialogInputText
+          console.log('newName', newName)
+          if (!newName)
+            toast.error(t('missing-name'))
+          await addChannel(newName)
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  await displayStore.onDialogDismiss()
 }
 
 async function openOne(one: typeof element) {
@@ -309,27 +325,10 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <k-fab id="create_channel" class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="openAddChannel">
+    <k-fab id="create_channel" class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
       <template #icon>
         <component :is="IconPlus" />
       </template>
     </k-fab>
-    <k-dialog
-      :opened="addChannelModal"
-      @backdropclick="() => (addChannelModal = false)"
-    >
-      <template #title>
-        {{ t('channel-create') }}
-      </template>
-      <input id="kdialog-input" v-model="newChannel" type="text" placeholder="Production" class="w-full p-1 text-lg text-gray-900 rounded-lg">
-      <template #buttons>
-        <k-dialog-button id="kdialog-cancel" class="text-red-800" @click="() => (addChannelModal = false)">
-          {{ t('button-cancel') }}
-        </k-dialog-button>
-        <k-dialog-button @click="addChannel()">
-          {{ t('add') }}
-        </k-dialog-button>
-      </template>
-    </k-dialog>
   </div>
 </template>

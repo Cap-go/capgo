@@ -15,6 +15,7 @@ export type Database = {
           id: number
           key: string
           mode: Database["public"]["Enums"]["key_mode"]
+          name: string
           updated_at: string | null
           user_id: string
         }
@@ -23,6 +24,7 @@ export type Database = {
           id?: number
           key: string
           mode: Database["public"]["Enums"]["key_mode"]
+          name: string
           updated_at?: string | null
           user_id: string
         }
@@ -31,6 +33,7 @@ export type Database = {
           id?: number
           key?: string
           mode?: Database["public"]["Enums"]["key_mode"]
+          name?: string
           updated_at?: string | null
           user_id?: string
         }
@@ -411,129 +414,6 @@ export type Database = {
           },
         ]
       }
-      clickhouse_app_usage_parm: {
-        Row: {
-          _app_list: string | null
-          _end_date: string | null
-          _start_date: string | null
-          app_id: string | null
-          bandwidth: number | null
-          date: string | null
-          fail: number | null
-          get: number | null
-          install: number | null
-          mau: number | null
-          storage_added: number | null
-          storage_deleted: number | null
-          uninstall: number | null
-        }
-        Insert: {
-          _app_list?: string | null
-          _end_date?: string | null
-          _start_date?: string | null
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Update: {
-          _app_list?: string | null
-          _end_date?: string | null
-          _start_date?: string | null
-          app_id?: string | null
-          bandwidth?: number | null
-          date?: string | null
-          fail?: number | null
-          get?: number | null
-          install?: number | null
-          mau?: number | null
-          storage_added?: number | null
-          storage_deleted?: number | null
-          uninstall?: number | null
-        }
-        Relationships: []
-      }
-      clickhouse_devices: {
-        Row: {
-          app_id: string | null
-          created_at: string | null
-          custom_id: string | null
-          device_id: string | null
-          is_emulator: boolean | null
-          is_prod: boolean | null
-          os_version: string | null
-          platform: string | null
-          plugin_version: string | null
-          updated_at: string | null
-          version: number | null
-          version_build: string | null
-        }
-        Insert: {
-          app_id?: string | null
-          created_at?: string | null
-          custom_id?: string | null
-          device_id?: string | null
-          is_emulator?: boolean | null
-          is_prod?: boolean | null
-          os_version?: string | null
-          platform?: string | null
-          plugin_version?: string | null
-          updated_at?: string | null
-          version?: number | null
-          version_build?: string | null
-        }
-        Update: {
-          app_id?: string | null
-          created_at?: string | null
-          custom_id?: string | null
-          device_id?: string | null
-          is_emulator?: boolean | null
-          is_prod?: boolean | null
-          os_version?: string | null
-          platform?: string | null
-          plugin_version?: string | null
-          updated_at?: string | null
-          version?: number | null
-          version_build?: string | null
-        }
-        Relationships: []
-      }
-      clickhouse_logs: {
-        Row: {
-          action: string | null
-          app_id: string | null
-          created_at: string | null
-          device_id: string | null
-          platform: string | null
-          version: number | null
-          version_build: string | null
-        }
-        Insert: {
-          action?: string | null
-          app_id?: string | null
-          created_at?: string | null
-          device_id?: string | null
-          platform?: string | null
-          version?: number | null
-          version_build?: string | null
-        }
-        Update: {
-          action?: string | null
-          app_id?: string | null
-          created_at?: string | null
-          device_id?: string | null
-          platform?: string | null
-          version?: number | null
-          version_build?: string | null
-        }
-        Relationships: []
-      }
       daily_bandwidth: {
         Row: {
           app_id: string
@@ -674,7 +554,7 @@ export type Database = {
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
-          platform: Database["public"]["Enums"]["platform_os"] | null
+          platform: Database["public"]["Enums"]["platform_os"]
           plugin_version: string
           updated_at: string
           version: number
@@ -687,7 +567,7 @@ export type Database = {
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
-          platform?: Database["public"]["Enums"]["platform_os"] | null
+          platform: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at: string
           version: number
@@ -700,7 +580,7 @@ export type Database = {
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
-          platform?: Database["public"]["Enums"]["platform_os"] | null
+          platform?: Database["public"]["Enums"]["platform_os"]
           plugin_version?: string
           updated_at?: string
           version?: number
@@ -1069,21 +949,21 @@ export type Database = {
       }
       stats: {
         Row: {
-          action: string
+          action: Database["public"]["Enums"]["stats_action"]
           app_id: string
           created_at: string
           device_id: string
           version: number
         }
         Insert: {
-          action: string
+          action: Database["public"]["Enums"]["stats_action"]
           app_id: string
           created_at: string
           device_id: string
           version: number
         }
         Update: {
-          action?: string
+          action?: Database["public"]["Enums"]["stats_action"]
           app_id?: string
           created_at?: string
           device_id?: string
@@ -1173,6 +1053,7 @@ export type Database = {
       }
       users: {
         Row: {
+          ban_time: string | null
           billing_email: string | null
           country: string | null
           created_at: string | null
@@ -1188,6 +1069,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ban_time?: string | null
           billing_email?: string | null
           country?: string | null
           created_at?: string | null
@@ -1203,6 +1085,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ban_time?: string | null
           billing_email?: string | null
           country?: string | null
           created_at?: string | null
@@ -1257,19 +1140,19 @@ export type Database = {
       }
       version_usage: {
         Row: {
-          action: string
+          action: Database["public"]["Enums"]["version_action"]
           app_id: string
           timestamp: string
           version_id: number
         }
         Insert: {
-          action: string
+          action: Database["public"]["Enums"]["version_action"]
           app_id: string
           timestamp?: string
           version_id: number
         }
         Update: {
-          action?: string
+          action?: Database["public"]["Enums"]["version_action"]
           app_id?: string
           timestamp?: string
           version_id?: number
@@ -1599,6 +1482,13 @@ export type Database = {
           role: Database["public"]["Enums"]["user_min_right"]
         }[]
       }
+      get_org_owner_id: {
+        Args: {
+          apikey: string
+          app_id: string
+        }
+        Returns: string
+      }
       get_org_perm_for_apikey: {
         Args: {
           apikey: string
@@ -1708,16 +1598,6 @@ export type Database = {
               uninstall: number
             }[]
           }
-      get_total_stats_v5_org: {
-        Args: {
-          orgid: string
-        }
-        Returns: {
-          mau: number
-          bandwidth: number
-          storage: number
-        }[]
-      }
       get_total_storage_size:
         | {
             Args: {
@@ -1763,6 +1643,27 @@ export type Database = {
           app_id: string
         }
         Returns: string
+      }
+      get_versions_with_no_metadata: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          app_id: string
+          bucket_id: string | null
+          checksum: string | null
+          created_at: string | null
+          deleted: boolean
+          external_url: string | null
+          id: number
+          minUpdateVersion: string | null
+          name: string
+          native_packages: Json[] | null
+          owner_org: string
+          r2_path: string | null
+          session_key: string | null
+          storage_provider: string
+          updated_at: string | null
+          user_id: string | null
+        }[]
       }
       get_weekly_stats: {
         Args: {
@@ -1940,6 +1841,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number[]
       }
+      process_failed_uploads: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_free_trial_expired: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -2039,6 +1944,52 @@ export type Database = {
       pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       queue_job_status: "inserted" | "requested" | "failed"
+      stats_action:
+        | "delete"
+        | "reset"
+        | "set"
+        | "get"
+        | "set_fail"
+        | "update_fail"
+        | "download_fail"
+        | "windows_path_fail"
+        | "canonical_path_fail"
+        | "directory_path_fail"
+        | "unzip_fail"
+        | "low_mem_fail"
+        | "download_10"
+        | "download_20"
+        | "download_30"
+        | "download_40"
+        | "download_50"
+        | "download_60"
+        | "download_70"
+        | "download_80"
+        | "download_90"
+        | "download_complete"
+        | "decrypt_fail"
+        | "app_moved_to_foreground"
+        | "app_moved_to_background"
+        | "uninstall"
+        | "needPlanUpgrade"
+        | "missingBundle"
+        | "noNew"
+        | "disablePlatformIos"
+        | "disablePlatformAndroid"
+        | "disableAutoUpdateToMajor"
+        | "cannotUpdateViaPrivateChannel"
+        | "disableAutoUpdateToMinor"
+        | "disableAutoUpdateToPatch"
+        | "channelMisconfigured"
+        | "disableAutoUpdateMetadata"
+        | "disableAutoUpdateUnderNative"
+        | "disableDevBuild"
+        | "disableEmulator"
+        | "cannotGetBundle"
+        | "checksum_fail"
+        | "NoChannelOrOverride"
+        | "setChannel"
+        | "getChannel"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2059,6 +2010,7 @@ export type Database = {
         | "admin"
         | "super_admin"
       user_role: "read" | "upload" | "write" | "admin"
+      version_action: "get" | "fail" | "install" | "uninstall"
     }
     CompositeTypes: {
       match_plan: {

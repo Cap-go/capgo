@@ -1,10 +1,9 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { createStatsMeta } from '../utils/stats.ts'
 
 export const app = new Hono()
 
@@ -38,32 +37,12 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (errorUpdate)
       console.log('errorUpdate', errorUpdate)
 
-    if (!record.bucket_id && !record.r2_path) {
-      console.log('No bucket_id')
-      const { error: dbError } = await supabaseAdmin(c)
-        .from('app_versions_meta')
-        .insert({
-          id: record.id,
-          app_id: record.app_id,
-          owner_org: record.owner_org,
-          checksum: '',
-          size: 0,
-        })
-      if (dbError)
-        console.error('Cannot create app version meta', dbError)
-      return c.json(BRES)
-    }
-
-    // Invalidate cache
     if (!record.app_id) {
       return c.json({
         status: 'error app_id',
         error: 'Np app id included the request',
       }, 500)
     }
-
-    const checksum = ''
-    const size = 0
 
     // create app version meta
     const { error: dbError } = await supabaseAdmin(c)
@@ -72,10 +51,9 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         id: record.id,
         app_id: record.app_id,
         owner_org: record.owner_org,
-        checksum,
-        size,
+        checksum: '',
+        size: 0,
       })
-    await createStatsMeta(c, record.app_id, record.id, size)
     if (dbError)
       console.error('Cannot create app version meta', dbError)
     return c.json(BRES) // skip delete s3 and increment size in new upload

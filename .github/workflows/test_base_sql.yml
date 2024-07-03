@@ -6,16 +6,29 @@ on:
 jobs:
   test_base_sql:
     runs-on: ubuntu-latest	
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     name: "Test if base.sql is valid"
     steps:
       - name: "Checkout capgo"
         uses: actions/checkout@v4
       - name: Install Supabase CLI
         with:
-          version: 1.167.4
+          version: 1.176.10
         uses: supabase/setup-cli@v1
+      - name: Set env PROD
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS }}" >> $GITHUB_ENV
+      - name: Set env ALPHA
+        if: ${{ contains(github.ref, '-alpha.') }}
+        run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV      
+      - name: 🍜 Prepare Supabase PROD
+        run: supabase link --project-ref xvwzpoazmxkqosrdewyv
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: 🍜 Prepare Supabase ALPHA
         run: supabase link --project-ref aucsybvnhavogdmzwtcw
+        if: ${{ contains(github.ref, '-alpha.') }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start

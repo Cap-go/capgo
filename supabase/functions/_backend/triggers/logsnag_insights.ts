@@ -1,11 +1,12 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import ky from 'ky'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { countAllApps, countAllUpdates, reactActiveApps } from '../utils/clickhouse.ts'
+import { countAllApps, countAllUpdates } from '../utils/stats.ts'
+import { reactActiveAppsCF } from '../utils/cloudflare.ts'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -63,17 +64,17 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
-    actives: reactActiveApps(c).then(async (res) => {
+    actives: reactActiveAppsCF(c).then(async (res) => {
       try {
-        const app_ids = res.data.map(app => app.app_id)
+        const app_ids = res.map(app => app.app_id)
         console.log('app_ids', app_ids)
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
-        return { apps: res.rows, users: res2.data || 0 }
+        return { apps: res.length, users: res2.data || 0 }
       }
       catch (e) {
         console.error('count_active_users error', e)
       }
-      return { apps: res.rows, users: 0 }
+      return { apps: res.length, users: 0 }
     }),
   }
 }

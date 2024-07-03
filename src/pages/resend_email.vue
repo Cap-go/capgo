@@ -3,11 +3,11 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setErrors } from '@formkit/core'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { iconEmail } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
 
 const { t } = useI18n()
 const supabase = useSupabase()

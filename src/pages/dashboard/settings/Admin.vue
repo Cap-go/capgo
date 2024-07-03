@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
+import iconPassword from '~icons/ph/key?raw'
 
 const route = useRoute()
 const isLoading = ref(false)
@@ -118,11 +119,10 @@ function reset() {
 
           <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
             <div class="sm:w-1/2">
-              <label class="block mb-1 text-sm font-medium dark:text-white" for="name">UUID</label>
               <FormKit
                 type="text"
                 name="uuid"
-                prefix-icon="password"
+                :prefix-icon="iconPassword"
                 :disabled="isLoading"
                 enterkeyhint="send"
                 autofocus
@@ -139,25 +139,25 @@ function reset() {
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
             <button
-              class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"
-              type="submit"
-              color="secondary"
-              shape="round"
-            >
-              <span v-if="!isLoading" class="rounded-4xl">
-                Spoof
-              </span>
-              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-            </button>
-            <button
               v-if="oldId"
-              class="p-2 ml-3 text-white bg-red-500 rounded btn hover:bg-red-600"
+              class="p-2 ml-3 text-black bg-white border-2 border-red-500 rounded btn hover:bg-red-600"
               color="secondary"
               shape="round"
               @click="reset()"
             >
               <span v-if="!isLoading" class="rounded-4xl">
                 Reset
+              </span>
+              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+            </button>
+            <button
+              class="p-2 ml-3 text-black bg-white border-2 border-blue-500 rounded btn hover:bg-blue-600"
+              type="submit"
+              color="secondary"
+              shape="round"
+            >
+              <span v-if="!isLoading" class="rounded-4xl">
+                Spoof
               </span>
               <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
             </button>

@@ -1,7 +1,8 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
+  getTotalStats,
   isGoodPlanOrg,
   isOnboardedOrg,
   isOnboardingNeeded,
@@ -43,23 +44,6 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
   }
 
   return data || 'Team'
-}
-
-export async function getTotalStats(c: Context, userId: string): Promise<Database['public']['Functions']['get_total_stats_v5']['Returns'][0]> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_total_stats_v5', { userid: userId })
-    .single()
-
-  if (error) {
-    console.error('error.message', error.message)
-    throw new Error(error.message)
-  }
-
-  return data || {
-    mau: 0,
-    storage: 0,
-    bandwidth: 0,
-  }
 }
 
 export async function getMeterdUsage(c: Context, userId: string): Promise<Database['public']['Functions']['get_max_plan']['Returns'][0]> {
@@ -142,7 +126,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       const get_total_stats = await getTotalStats(c, orgId)
       const current_plan = await getCurrentPlanNameOrg(c, orgId)
       if (get_total_stats) {
-        const best_plan = await findBestPlan(c, get_total_stats)
+        const best_plan = await findBestPlan(c, { mau: get_total_stats.mau, storage: get_total_stats.storage, bandwidth: get_total_stats.bandwidth })
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
         await setMetered(c, org.customer_id!, orgId)
         // if (best_plan === 'Free' && current_plan === 'Free') {

@@ -2,8 +2,10 @@ import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
 
 // Public API
-import type { Bindings } from 'supabase/functions/_backend/utils/cloudflare.ts'
 import { HTTPException } from 'hono/http-exception'
+// import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
+// import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
@@ -19,7 +21,6 @@ import { app as plans } from '../supabase/functions/_backend/private/plans.ts'
 import { app as storeTop } from '../supabase/functions/_backend/private/store_top.ts'
 import { app as publicStats } from '../supabase/functions/_backend/private/public_stats.ts'
 import { app as config } from '../supabase/functions/_backend/private/config.ts'
-import { app as dashboard } from '../supabase/functions/_backend/private/dashboard.ts'
 import { app as download_link } from '../supabase/functions/_backend/private/download_link.ts'
 import { app as log_as } from '../supabase/functions/_backend/private/log_as.ts'
 import { app as stripe_checkout } from '../supabase/functions/_backend/private/stripe_checkout.ts'
@@ -28,12 +29,17 @@ import { app as upload_link } from '../supabase/functions/_backend/private/uploa
 import { app as deleted_failed_version } from '../supabase/functions/_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../supabase/functions/_backend/private/devices.ts'
 import { app as stats_priv } from '../supabase/functions/_backend/private/stats.ts'
+import { app as latency } from '../supabase/functions/_backend/private/latency.ts'
+import { app as latency_postres } from '../supabase/functions/_backend/private/latency_postres.ts'
+import { app as latency_drizzle } from '../supabase/functions/_backend/private/latency_drizzle.ts'
+import { app as multipart } from '../supabase/functions/_backend/private/multipart.ts'
 
 // Triggers API
 import { app as clear_app_cache } from '../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../supabase/functions/_backend/triggers/clear_device_cache.ts'
 import { app as cron_email } from '../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_scrapper } from '../supabase/functions/_backend/triggers/cron_scrapper.ts'
+import { app as cron_clear_versions } from '../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as logsnag_insights } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../supabase/functions/_backend/triggers/on_channel_update.ts'
 import { app as on_user_create } from '../supabase/functions/_backend/triggers/on_user_create.ts'
@@ -43,7 +49,6 @@ import { app as on_version_create } from '../supabase/functions/_backend/trigger
 import { app as on_version_update } from '../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as get_total_stats } from '../supabase/functions/_backend/triggers/get_total_stats.ts'
 import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as cron_plan } from '../supabase/functions/_backend/triggers/cron_plan.ts'
 import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
@@ -78,7 +83,6 @@ appFront.route('/plans', plans)
 appFront.route('/store_top', storeTop)
 appFront.route('/website_stats', publicStats)
 appFront.route('/config', config)
-appFront.route('/dashboard', dashboard)
 appFront.route('/devices', devices_priv)
 appFront.route('/download_link', download_link)
 appFront.route('/log_as', log_as)
@@ -87,6 +91,10 @@ appFront.route('/stripe_checkout', stripe_checkout)
 appFront.route('/stripe_portal', stripe_portal)
 appFront.route('/upload_link', upload_link)
 appFront.route('/delete_failed_version', deleted_failed_version)
+appFront.route('/latency', latency)
+appFront.route('/latency_drizzle', latency_drizzle)
+appFront.route('/latency_postres', latency_postres)
+appFront.route('/multipart', multipart)
 
 // Triggers
 
@@ -94,6 +102,7 @@ appTriggers.route('/clear_app_cache', clear_app_cache)
 appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_scrapper', cron_scrapper)
+appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/on_channel_update', on_channel_update)
 appTriggers.route('/on_user_create', on_user_create)
@@ -103,7 +112,6 @@ appTriggers.route('/on_version_create', on_version_create)
 appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/stripe_event', stripe_event)
-appTriggers.route('/get_total_stats', get_total_stats)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)
 appTriggers.route('/cron_plan', cron_plan)
@@ -117,6 +125,58 @@ app.get('/test_sentry', (c) => {
 
   throw new Error('Failed!')
 })
+
+// app.post('/test_d1', middlewareAPISecret, async (c) => {
+//   try {
+//     const body = await c.req.json()
+//     if (body.request) {
+//       const requestD1 = c.env.DB_DEVICES
+//         .exec(body.request)
+
+//       const res = await requestD1
+//       console.log('test d1 res', res)
+//       return c.json({ res })
+//     }
+//     else if (body.query && body.bind) {
+//       console.log('test d1 query', body.query)
+//       console.log('test d1 bind', body.bind, body.bind.length)
+//       const requestD1 = c.env.DB_DEVICES
+//         .prepare(body.query)
+//         .bind(...body.bind)
+//         .run()
+
+//       const res = await requestD1
+//       console.log('test d1 res', res)
+//       return c.json({ res })
+//     }
+//     else {
+//       return c.json({ error: 'Missing request' })
+//     }
+//   }
+//   catch (e) {
+//     console.error('Error d1', e)
+//     return c.json({ error: 'Error', e: JSON.stringify(e) })
+//   }
+// })
+
+// app.post('/test_analytics', middlewareAPISecret, async (c) => {
+//   try {
+//     const body = await c.req.json()
+//     if (body.request) {
+//       const res = await rawAnalyticsQuery(c, body.request)
+
+//       console.log('test_analytics res', res)
+//       return c.json({ res })
+//     }
+//     else {
+//       return c.json({ error: 'Missing request' })
+//     }
+//   }
+//   catch (e) {
+//     console.error('Error test_analytics', e)
+//     return c.json({ error: 'Error', e: JSON.stringify(e) })
+//   }
+// })
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)

@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -27,23 +27,25 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       return c.json({ status: 'Error User not found' }, 500)
     }
 
-    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+    if (!(await hasAppRight(c, body.app_id, userId, 'read'))) {
+      console.log('not has app right', userId, body.app_id)
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    }
 
     const { error: errorApp } = await supabaseAdmin(c)
       .from('apps')
       .select('app_id, owner_org')
       .eq('app_id', body.app_id)
-
-      // .eq('user_id', userId)
       .single()
     if (errorApp) {
       console.log('errorApp', errorApp)
       return c.json({ status: 'Error App not found' }, 500)
     }
 
-    if (!body.app_id || !body.name)
+    if (!body.app_id || !body.name) {
+      console.log('Error app_id or bundle name missing', body)
       return c.json({ status: 'Error app_id or bundle name missing' }, 500)
+    }
 
     // console.log(body.name ?? body.bucket_id?.split('.')[0] ?? '')
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
@@ -52,7 +54,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .eq('name', body.name)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
-      .eq('user_id', apikey.user_id)
       .eq('deleted', false)
       .single()
     if (errorVersion || version.external_url || !version.r2_path) {
@@ -60,7 +61,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
-    console.log(version.r2_path)
+    console.log('r2_path', version.r2_path)
     // check if app version exist
 
     console.log('s3.checkIfExist', version.r2_path)
@@ -77,10 +78,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .from('app_versions')
       .delete()
       .eq('id', version.id)
-      .eq('app_id', body.app_id)
-      .eq('user_id', apikey.user_id)
-      .eq('storage_provider', 'r2-direct')
-      .eq('deleted', false)
       .single()
     if (errorDelete) {
       console.log('errorDelete', errorDelete)
@@ -95,6 +92,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       icon: '💀',
     })
 
+    console.log('delete version', version.id)
     return c.json({ status: 'Version deleted' })
   }
   catch (e) {

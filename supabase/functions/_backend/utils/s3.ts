@@ -1,8 +1,8 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import ky from 'ky'
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import type { CompletedPart } from '@aws-sdk/client-s3'
+import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
-
 import { getEnv } from './utils.ts'
 
 function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
@@ -49,6 +49,43 @@ async function deleteObject(c: Context, fileId: string) {
   return true
 }
 
+export function createMultipartUpload(c: Context, key: string) {
+  const client = initS3(c)
+  const command = new CreateMultipartUploadCommand({
+    Bucket: getEnv(c, 'S3_BUCKET'),
+    Key: key,
+  })
+
+  return client.send(command)
+}
+
+export function compleateMultipartUpload(c: Context, key: string, uploadId: string, parts: CompletedPart[]) {
+  const client = initS3(c)
+  const command = new CompleteMultipartUploadCommand({
+    Bucket: getEnv(c, 'S3_BUCKET'),
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: { Parts: parts },
+  })
+
+  return client.send(command)
+}
+
+export function multipartUploadPart(c: Context, key: string, uploadId: string, partNumber: number, contentLength: number, chunk: Uint8Array) {
+  const client = initS3(c)
+
+  const command = new UploadPartCommand({
+    Bucket: getEnv(c, 'S3_BUCKET'),
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+    Body: chunk,
+    ContentLength: contentLength,
+  })
+
+  return client.send(command)
+}
+
 async function checkIfExist(c: Context, fileId: string) {
   const client = initS3(c)
   try {
@@ -61,6 +98,7 @@ async function checkIfExist(c: Context, fileId: string) {
     return true
   }
   catch (error) {
+    console.log('checkIfExist', fileId, error)
     return false
   }
 }
@@ -75,22 +113,27 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   return url
 }
 
-async function getSizeChecksum(c: Context, fileId: string) {
+async function getSize(c: Context, fileId: string) {
   const client = initS3(c)
   const command = new HeadObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,
   })
-  const url = await getSignedUrlSDK(client, command)
-  const response = await ky.head(url)
-  const contentLength = response.headers.get('content-length')
-  const checksum = response.headers.get('x-amz-meta-crc32')
-  const size = contentLength ? Number.parseInt(contentLength, 10) : 0
-  return { size, checksum }
+  try {
+    const url = await getSignedUrlSDK(client, command)
+    const response = await ky.head(url)
+    const contentLength = response.headers.get('content-length')
+    const size = contentLength ? Number.parseInt(contentLength, 10) : 0
+    return size
+  }
+  catch (error) {
+    console.log('getSize', error)
+    return 0
+  }
 }
 
 export const s3 = {
-  getSizeChecksum,
+  getSize,
   deleteObject,
   checkIfExist,
   getSignedUrl,

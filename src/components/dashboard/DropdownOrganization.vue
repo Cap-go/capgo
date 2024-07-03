@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { Dropdown, initDropdowns } from 'flowbite'
 import { storeToRefs } from 'pinia'
-import { onMounted, ref, watchEffect } from 'vue'
+import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { useRoute } from 'vue-router'
 import type { Organization } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
 import { useDisplayStore } from '~/stores/display'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import Plus from '~icons/heroicons/plus'
+import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
-const route = useRoute()
-const show = ref(false)
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
@@ -21,10 +21,6 @@ const supabase = useSupabase()
 const main = useMainStore()
 
 let dropdown: Dropdown
-
-watchEffect(async () => {
-  show.value = (route.path.includes('settings') || route.path.includes('home'))
-})
 
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
@@ -113,34 +109,95 @@ function onOrganizationClick(org: Organization) {
   }
 
   organizationStore.setCurrentOrganization(org.gid)
+  // if current path is not home, redirect to the org home page
+  if (router.currentRoute.value.path !== '/app/home')
+    router.push(`/app/home`)
 
   if (dropdown)
     dropdown.hide()
 }
+
+async function createNewOrg() {
+  console.log('new org!')
+
+  displayStore.dialogOption = {
+    header: t('create-new-org'),
+    message: `${t('type-new-org-name')}`,
+    input: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-lg',
+    buttonCenter: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        handler: async () => {
+          console.log('new org', displayStore.dialogInputText)
+
+          const { error } = await supabase.from('orgs')
+            .insert({
+              name: displayStore.dialogInputText,
+              created_by: main.auth?.id ?? '',
+              management_email: main.auth?.email ?? '',
+            })
+
+          if (error) {
+            console.error('Error when creating org', error)
+            toast.error(error.code === '23505' ? t('org-with-this-name-exists') : t('cannot-create-org'))
+            return
+          }
+
+          toast.success(t('org-created-successfully'))
+          await organizationStore.fetchOrganizations()
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
 </script>
 
 <template>
-  <div :class="`${!show ? 'invisible' : ''}`">
+  <div>
     <button
       id="organization-picker" data-dropdown-toggle="dropdown-org"
-      :class="`text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 ${!currentOrganization ? 'invisible' : ''}`"
+      class="inline-flex items-center px-2 py-2 text-sm font-medium text-center text-gray-700 border rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 focus:ring-4 focus:outline-none focus:ring-blue-300 md:px-5"
+      :class="{ invisible: !currentOrganization }"
       type="button"
     >
-      {{ currentOrganization?.name }}
-      <svg
-        class="w-2.5 h-2.5 ml-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-        viewBox="0 0 10 6"
-      >
-        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
-      </svg>
+      <div class="hidden md:block">
+        {{ currentOrganization?.name }}
+      </div>
+      <div class="block md:hidden">
+        {{ currentOrganization?.name.substring(0, 3) }}..
+      </div>
+      <div class="flex items-center truncate">
+        <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
+      </div>
     </button>
-    <div id="dropdown-org" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
-      <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
+    <div id="dropdown-org" class="z-10 hidden bg-white rounded-lg shadow w-44">
+      <ul class="py-2 text-sm text-gray-700 divide-y divide-gray-100 dark:divide-gray-600 dark:bg-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
         <li v-for="org in organizationStore.organizations" :key="org.gid">
           <a
-            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+            class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
             @click="onOrganizationClick(org)"
-          >{{ org.name }}</a>
+          >
+            {{ org.name }}
+          </a>
+        </li>
+        <!-- <div class=" w-full h-[1px] bg-gray-200" /> -->
+        <li>
+          <a
+            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+            @click="createNewOrg"
+          ><Plus class="mx-auto " />
+          </a>
         </li>
       </ul>
     </div>

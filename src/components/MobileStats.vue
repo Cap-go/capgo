@@ -1,130 +1,175 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Doughnut } from 'vue-chartjs'
-import type { ChartData, ChartOptions } from 'chart.js'
-import annotationPlugin from 'chartjs-plugin-annotation'
-import {
-// CategoryScale,
-  ArcElement,
-  Chart,
-  Tooltip,
-// LineElement,
-// LinearScale,
-// PointElement,
+import { useI18n } from 'vue-i18n'
+import { Line } from 'vue-chartjs'
+import type {
+  ChartOptions,
 } from 'chart.js'
-import { useSupabase } from '~/services/supabase'
-import Spinner from '~/components/Spinner.vue'
-import type { Database } from '~/types/supabase.types'
-import { urlToAppId } from '~/services/conversion'
-
-Chart.register(
-  ArcElement,
-  annotationPlugin,
+import {
+  CategoryScale,
+  Chart,
+  LineElement,
+  LinearScale,
+  PointElement,
   Tooltip,
-  {
-    id: 'emptyDoughnut',
-    afterDraw(chart, args, options) {
-      const { datasets } = chart.data
-      const { color, width, radiusDecrease } = options
-      let hasData = false
-
-      for (let i = 0; i < datasets.length; i += 1) {
-        const dataset = datasets[i]
-        hasData = hasData || dataset.data.length > 0
-      }
-
-      if (!hasData) {
-        const { chartArea: { left, top, right, bottom }, ctx } = chart
-        const centerX = (left + right) / 2
-        const centerY = (top + bottom) / 2
-        const r = Math.min(right - left, bottom - top) / 2
-
-        ctx.beginPath()
-        ctx.lineWidth = width || 2
-        ctx.strokeStyle = color || 'rgba(255, 128, 0, 0.5)'
-        ctx.arc(centerX, centerY, (r - radiusDecrease || 0), 0, 2 * Math.PI)
-        ctx.stroke()
-      }
-    },
-  },
-  // Colors,
-  // BarController,
-  // BarElement,
-  // PointElement,
-  // CategoryScale,
-  // LinearScale,
-  // LineElement,
-  // Legend,
-)
-
-interface Version {
-  id: {
-    name: string
-  }
-}
+} from 'chart.js'
+import colors from 'tailwindcss/colors'
+import type { appUsageByVersion } from '~/services/supabase'
+import { getDailyVersion, getVersionNames } from '~/services/supabase'
+import { urlToAppId } from '~/services/conversion'
 
 const { t } = useI18n()
 const route = useRoute()
-const supabase = useSupabase()
-const id = ref('')
-const isLoading = ref(true)
-const bundles = ref<(Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]>([])
-const dataDevValues = ref([] as number[])
-const dataDevLabels = ref([] as string[])
 
-function buildGraph() {
-  const vals = bundles.value.reduce((past, d) => {
-    if (d.devices)
-      past[d.id.name] = d.devices || 0
-    return past
-  }, { } as any)
-  dataDevValues.value = Object.values(vals)
-  dataDevLabels.value = Object.keys(vals)
-}
+const appId = ref('')
+const isLoading = ref(true)
+const SKIP_COLOR = 10
+const colorKeys = Object.keys(colors)
+const dailyUsage = ref<appUsageByVersion[]>([])
+const versionNames = ref<{ id: string, name: string, created_at: string }[]>([])
+
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 async function loadData() {
-  const dateLimit = new Date()
-  dateLimit.setMonth(dateLimit.getMonth() - 1)
-  try {
-    const { data: dataVersions } = await supabase
-      .from('app_versions_meta')
-      .select(`
-        id (
-            name
-        ),
-        devices,
-        created_at,
-        updated_at
-      `)
-      .eq('app_id', id.value)
-      .order('created_at', { ascending: false })
-      .gte('created_at', dateLimit.toISOString())
-    bundles.value = (dataVersions || bundles.value) as (Database['public']['Tables']['app_versions_meta']['Row'] & Version)[]
-    buildGraph()
-  }
-  catch (error) {
-    console.error(error)
-  }
+  isLoading.value = true
+
+  const endDate = new Date()
+  const startDate = new Date(endDate)
+  startDate.setDate(startDate.getDate() - 30)
+
+  dailyUsage.value = await getDailyVersion(appId.value, startDate.toISOString(), endDate.toISOString())
+  versionNames.value = await getVersionNames(appId.value, dailyUsage.value.map(d => d.version_id))
+  isLoading.value = false
 }
 
-const chartData = computed<ChartData<'doughnut'>>(() => ({
-  labels: dataDevLabels.value,
-  datasets: [
-    {
-      data: dataDevValues.value,
-      backgroundColor: [
-        '#77CEFF',
-        '#0079AF',
-        '#123E6B',
-        '#97B0C4',
-        '#A5C8ED',
-      ],
+function getLast30Days() {
+  const dates = []
+  const endDate = new Date()
+  for (let i = 30; i > 0; i--) {
+    const date = new Date(endDate)
+    date.setDate(endDate.getDate() - i)
+    dates.push(date.toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+const chartData = computed(() => {
+  // Get unique version IDs and dates from the dailyUsage data
+  const versions = [...new Set(dailyUsage.value.map(d => d.version_id))]
+  const dates = [...new Set(dailyUsage.value.map(d => d.date))]
+
+  // Create an object to store the accumulated data for each version by date
+  const accumulatedDataByVersionAndDate: { [date: string]: { [version: number]: number } } = {}
+
+  // Calculate the accumulated data for each version by date
+  dailyUsage.value.forEach((usage) => {
+    const { date, version_id, install, uninstall } = usage
+    if (!accumulatedDataByVersionAndDate[date]) {
+      accumulatedDataByVersionAndDate[date] = {}
+    }
+    const lastTotal = accumulatedDataByVersionAndDate[date][version_id] || 0
+    const currentTotal = lastTotal + (install ?? 0) - (uninstall ?? 0)
+    accumulatedDataByVersionAndDate[date][version_id] = currentTotal
+  })
+
+  // Calculate the total accumulated value for each date
+  const totalAccumulatedByDate: { [date: string]: number } = {}
+  dates.forEach((date) => {
+    const totalAccumulated = Object.values(accumulatedDataByVersionAndDate[date] || {}).reduce(
+      (sum, value) => sum + value,
+      0,
+    )
+    totalAccumulatedByDate[date] = totalAccumulated
+  })
+
+  // Filter out versions with 0 active users on every day
+  const activeVersions = versions.filter((version) => {
+    return dates.some((date) => {
+      // version is more than 0 and version name is not 'builtin'
+      return accumulatedDataByVersionAndDate[date]?.[version] > 0 && versionNames.value.find(v => v.id === version)?.name !== 'builtin'
+    })
+  })
+
+  // Create a dataset for each active version
+  const datasets = activeVersions.map((version, i) => {
+    // Calculate the percentage of the maximum total accumulated value for each date
+    const percentageData = dates.map((date) => {
+      const versionAccumulated = accumulatedDataByVersionAndDate[date]?.[version] || 0
+      const totalAccumulated = totalAccumulatedByDate[date] || 0
+      return totalAccumulated > 0 ? (versionAccumulated / totalAccumulated) * 100 : 0
+    })
+
+    // Get a color from the colorKeys array based on the version index
+    const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
+
+    const versionName = versionNames.value.find(v => v.id === version)?.name || version
+    // Return the dataset object for the current version
+    return {
+      label: versionName,
+      data: percentageData,
+      borderColor: colors[color][400],
+      backgroundColor: colors[color][200],
+      tension: 0.3,
+      pointRadius: 2,
+      pointBorderWidth: 0,
+    }
+  })
+
+  // Find the maximum accumulated value across all versions and dates
+  const maxAccumulatedValue = Math.max(...datasets.map(dataset => Math.max(...dataset.data)))
+
+  // Normalize the data to represent percentages
+  const normalizedDatasets = datasets.map((dataset) => {
+    const normalizedData = dataset.data.map(value => (value / maxAccumulatedValue) * 100)
+    return {
+      ...dataset,
+      data: normalizedData,
+    }
+  })
+
+  // Find the latest released version based on the created_at field
+  const latestVersion = versionNames.value.reduce((latest, current) => {
+    return new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+  }, versionNames.value[0])
+
+  // Find the dataset corresponding to the latest version
+  const latestVersionDataset = normalizedDatasets.find(dataset => dataset.label === latestVersion?.name)
+
+  // Get the current percentage of the latest version (last data point)
+  const latestVersionPercentage = latestVersionDataset ? latestVersionDataset.data[latestVersionDataset.data.length - 1] : 0
+
+  // Return the chart data object
+  return {
+    labels: dates,
+    datasets: normalizedDatasets,
+    latestVersion: {
+      name: latestVersion?.name,
+      percentage: latestVersionPercentage.toFixed(2),
     },
-  ],
-}))
-const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
+  }
+})
+
+const chartOptions = ref<ChartOptions>({
+  maintainAspectRatio: false,
+  scales: {
+    x: {
+      grid: {
+        display: false,
+      },
+      ticks: {
+        color: `${isDark.value ? 'white' : 'black'}`,
+      },
+    },
+    y: {
+      min: 0,
+      max: 100,
+      ticks: {
+        callback: (value: number) => `${value}%`,
+        color: `${isDark.value ? 'white' : 'black'}`,
+      },
+    },
+  },
   plugins: {
     legend: {
       display: false,
@@ -132,18 +177,13 @@ const chartOptions = computed<ChartOptions<'doughnut'>>(() => ({
     title: {
       display: false,
     },
-    emptyDoughnut: {
-      color: 'rgba(255, 255, 255, 0.5)',
-      width: 2,
-      radiusDecrease: 20,
-    },
   },
-}))
+})
 
 watchEffect(async () => {
   if (route.path.includes('/package/')) {
-    id.value = route.params.package as string
-    id.value = urlToAppId(id.value)
+    appId.value = route.params.package as string
+    appId.value = urlToAppId(appId.value)
     try {
       await loadData()
       isLoading.value = false
@@ -159,27 +199,33 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex flex-col items-center justify-center bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800" :class="{ 'h-[460px]': dataDevValues.length }">
-    <Spinner size="w-40 h-40" />
-  </div>
-  <div v-else class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800">
-    <div class="px-5 pt-5">
-      <h2 class="mb-2 text-2xl font-semibold text-slate-800 dark:text-white">
-        {{ t('bundles') }}
-      </h2>
-      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
-        {{ t('usage-title') }}
+  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
+    <div class="px-5 pt-3">
+      <div class="flex flex-row">
+        <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
+          {{ t('active_users_by_version') }}
+        </h2>
+        <div class="font-medium badge badge-primary">
+          beta
+        </div>
       </div>
-      <div class="flex items-start">
-        <div id="bundles-total" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
-          {{ bundles.length.toLocaleString() }}
+
+      <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
+        {{ t('latest_version') }}
+      </div>
+      <div v-if="chartData.latestVersion" class="flex items-start">
+        <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
+          {{ chartData.latestVersion?.name }}
+        </div>
+        <div class="rounded-full bg-emerald-500 px-1.5 text-sm font-semibold text-white">
+          {{ chartData.latestVersion?.percentage }}%
         </div>
       </div>
     </div>
-    <div class="w-full h-full p-6 px-16">
-      <Doughnut v-if="dataDevValues.length" :data="chartData" :options="chartOptions" />
-      <div v-else class="flex flex-col items-center justify-center h-full">
-        {{ t('no-data') }}
+    <div class="w-full h-full p-6">
+      <Line v-if="!isLoading" :data="{ labels: getLast30Days(), datasets: chartData.datasets }" :options="chartOptions" />
+      <div v-else class="flex items-center justify-center h-full">
+        <Spinner size="w-40 h-40" />
       </div>
     </div>
   </div>

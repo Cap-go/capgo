@@ -32,6 +32,7 @@ activation-notification-desc: >-
   Ich akzeptiere, Benachrichtigungen zu erhalten, wenn neue App-Versionen
   verfügbar sind
 activation-validate: Bestätigen
+active_users_by_version: Aktives Gerät nach Bundle
 add: Hinzufügen
 add-another-app: Fügen Sie Ihre Anwendung hinzu
 add-api-key: Neuer API-Schlüssel erfolgreich hinzugefügt
@@ -63,12 +64,19 @@ allow-develoment-bui: Entwicklungsbuild zulassen
 allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
 allow-emulator: Emulatoren zulassen
 already-account: Sie haben schon ein Konto?
+api-doc: API-Dokument
 api-key: API-Schlüssel
 api-keys: API-Schlüssel
+api-keys-are-used-for-cli-and-public-api: API-Schlüssel werden für CLI und öffentliche API verwendet
 api-keys-key-copied: API-Schlüssel
 app: App
 app-deleted: Anwendung gelöscht
+app-id: 'App-ID:'
 app-id-example: App-ID-Beispiel
+app-info: App-Informationen
+app-info-desc: Hier können Sie Ihre App-Informationen ändern
+app-logo-deleted: App-Bild erfolgreich gelöscht
+app-name: App Name
 app-not-found: Anwendung nicht gefunden
 app-perm: App-Berechtigung
 app-preview: App-Vorschau
@@ -96,6 +104,7 @@ button-back: Zurück
 button-browse: Durchsuche
 button-camera: Kamera
 button-cancel: Stornieren
+button-confirm: Bestätigen
 button-delete: Löschen
 button-deny-invite: Leugnen
 button-go: GEHEN
@@ -110,7 +119,18 @@ button-toggle_dark: Dunkelmodus umschalten
 button-toggle_langs: Sprachen ändern
 by-clicking-on-them: indem Sie darauf klicken.
 cancel: Stornieren
+canceled-delete: >-
+  Das Löschen des Bundles wurde abgebrochen. Ein verknüpftes Bundle kann nicht
+  gelöscht werden
+canceled-photo-selection: Sie haben die Bildauswahl abgebrochen
+cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
+cannot-create-org: >-
+  Es kann keine Organisation erstellt werden. Bitte überprüfen Sie die
+  Browserprotokolle!
+cannot-del-org: >-
+  Die Organisation kann nicht gelöscht werden. Bitte überprüfen Sie das
+  Browserprotokoll
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-icon: App-Symbol kann nicht gelöscht werden
 cannot-delete-app-version: App-Version kann nicht gelöscht werden
@@ -119,8 +139,12 @@ cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
 cannot-download: Paket kann nicht heruntergeladen werden
+cannot-find-unknown-version: >-
+  Unbekannte Version kann nicht gefunden werden. Bitte wenden Sie sich an den
+  Capgo-Support und überprüfen Sie die Browserprotokolle
 cannot-get-the-test-: Die Testversion kann nicht abgerufen werden
 cannot-invite-owner: Eigentümer kann nicht zur Organisation eingeladen werden
+cannot-load-app-settings: App-Einstellungen können nicht geladen werden
 cannot-save-custom-i: Benutzerdefinierte ID kann nicht gespeichert werden
 cannot-set-this-vers: Diese Version kann nicht eingestellt werden
 cannot-share: Benutzer-ID kann nicht geteilt werden. Überprüfen Sie die Browserkonsole
@@ -130,10 +154,16 @@ cannot-view-plans: Die Seite mit den Plänen kann nicht angezeigt werden
 cannot-view-usage: Die Nutzungsseite kann nicht angezeigt werden
 cannots-sign-off: Protokollierung nicht möglich
 change: Ändern
+change-api-key-name: Ändern Sie den Namen des Apikeys
+changed-app-name: App-Name erfolgreich geändert
+changed-name: Der Name von apikey wurde erfolgreich geändert
 changed-password-suc: das Passwort wurde erfolgreich geändert
 channel: Kanal
 channel-ab-testing: Aktivieren Sie AB-Tests
 channel-ab-testing-percentage: Prozentsatz der Benutzer, die die Sekundärversion erhalten
+channel-bundle-linked: |-
+  Dieses Bundle ist mit einem oder mehreren Kanälen verknüpft. 
+  (%) Möchten Sie die Verknüpfung mit diesen Kanälen aufheben?
 channel-create: Kanal erstellen
 channel-deleted: Kanal gelöscht
 channel-forced-devices: Erzwungene Geräte
@@ -149,6 +179,7 @@ channels: Kanäle
 check-email: Bitte überprüfen Sie Ihre E-Mail und bestätigen Sie
 check-on-web: Überprüfen Sie auf der Website
 checksum: Prüfsumme
+cli-doc: CLI-Dokument
 commands: Befehle
 confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-
@@ -167,8 +198,10 @@ copy-command: Befehl kopieren
 copy-your: Kopieren Sie Ihre
 country: Land
 create-a-free-accoun: Erstelle einen kostenlosen Account
+create-new-org: Erstellen Sie eine neue Organisation
 created-at: Hergestellt in
 current-billing-cycle: Aktueller Abrechnungszyklus
+custom: Brauch
 custom-domain: Benutzerdefinierten Domain
 custom-id: Benutzerdefinierte ID
 custom-id-saved: Benutzerdefinierte ID gespeichert
@@ -177,8 +210,11 @@ days: Tage
 defined-as: Definiert als
 defined-as-private: als normal definiert
 defined-as-public: als Standard definiert
+delete: Löschen
 delete-account: Konto löschen
 delete-account-0: Konto löschen
+delete-app: App löschen
+delete-org: Organisation löschen
 delete-your-account: Lösche deinen Account
 deleted: gelöscht
 dependencies:
@@ -209,6 +245,8 @@ discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
 download: Herunterladen
+edit-name: Namen bearbeiten
+edit-pic: Bild bearbeiten
 email: Email
 email-address: E-Mail-Addresse
 email-does-not-exist: Dieser Benutzer existiert nicht
@@ -225,6 +263,7 @@ error: Fehler
 external-storage: Externer Speicher
 fail: Installation fehlgeschlagen
 failed: Fehlgeschlagen
+failed-to-get-user: Der Benutzer konnte nicht geladen werden
 fast-backward: Schneller Rücklauf
 fast-forward: Schneller Vorlauf
 filters: Filter
@@ -236,6 +275,7 @@ forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
   erhalten
 forgot-success: Passwort erfolgreich aktualisiert
+free-trial: Kostenlose Testphase
 from: von
 from-device: vom Gerät
 general-information: Allgemeine Informationen
@@ -269,10 +309,17 @@ key-super-admin: Höchster Vorgesetzter
 key-upload: Hochladen
 key-write: Schreiben
 language: Sprache
+last-15-minutes: Letzte 15 Minuten
+last-24-hour: Letzte 24 Stunden
+last-3-hour: Letzte 3 Stunden
+last-3-minutes: Letzte 3 Minuten
+last-hour: Letzte Stunde
+last-minute: Letzte Minute
 last-name: Familienname, Nachname
 last-update: Letztes Update
 last-upload: Letzter Upload
 last-version: Letzte Version
+latest_version: Neuestes Paket
 launch-bundle: Bündel starten
 leaving: Verlassen
 limit-reached: Limit erreicht
@@ -313,6 +360,8 @@ misconfigured: Falsch konfiguriert
 misconfigured-channels: |-
   Einige Kanäle sind falsch konfiguriert. 
   Updates werden für diese Kanäle fehlschlagen!
+missing-email: Fehlende E-Mail
+missing-name: Fehlender Name
 mo: Mon
 modify-org-info: Sie können die Informationen der Organisation hier ändern.
 module-heading: Module
@@ -328,8 +377,16 @@ name: Name
 need-more-contact-us: |-
   Brauche mehr ? 
   Kontaktieren Sie uns für einen maßgeschneiderten Plan
+new-name-not-changed: Der neue Name ist derselbe wie der alte
+new-name-to-long: |-
+  Der neue Name ist zu lang. 
+  Sie können nur 32 Zeichen verwenden
+new-name-to-short: |-
+  Der apikey-Name ist zu kurz. 
+  Es muss mindestens 4 Zeichen lang sein
 next: Nächste
 'no': NEIN
+no-app-icon: Diese App hat kein App-Symbol
 no-channel-linked: Kein Kanal, zum Hinzufügen klicken
 no-channel-linked-no-perm: Kein Kanal
 no-data: Keine Daten
@@ -352,6 +409,7 @@ open-channel: Offener Kanal
 open-settings: Klicken Sie hier, um die Einstellungen zu öffnen
 open-sidebar: Seitenleiste öffnen
 open-this-link-to-le: Öffnen Sie diesen Link, um zu erfahren, wie Sie Ihr Update testen können
+open-your-portal: Öffnen Sie Ihr Portal
 org-changes-saved: Organisation erfolgreich aktualisiert
 org-changes-set-email-not-unique: >-
   Die Verwaltungs-E-Mail-Adresse ist nicht eindeutig. Bitte wählen Sie eine
@@ -359,11 +417,15 @@ org-changes-set-email-not-unique: >-
 org-changes-set-email-other-error: >-
   Die Verwaltungs-E-Mail-Adresse kann nicht festgelegt werden. Bitte wenden Sie
   sich an den Support
+org-created-successfully: Organisation erfolgreich erstellt!
+org-deleted: Organisation erfolgreich gelöscht
 org-invited-user: Benutzer wurde erfolgreich zur Organisation eingeladen
+org-with-this-name-exists: Sie haben bereits eine Organisation mit diesem Namen erstellt!
 organization-email: Management-E-Mail der Organisation
 organization-name: Name der Organisation
 organization-settings: Organisationseinstellungen
 os-version: OS Version
+owner-org: 'Eigentümerorganisation:'
 pages: Seiten
 password: Passwort
 password-confirmatio: Passwort Bestätigung
@@ -376,6 +438,10 @@ patch: Patch
 percent-fail: Fehlerprozentsatz
 permission-changed: Benutzerberechtigung erfolgreich geändert
 personal-information: Persönliche Informationen
+picture-delete-fail: >-
+  Das App-Bild kann nicht gelöscht werden. Bitte überprüfen Sie das
+  Konsolenprotokoll
+picture-uploaded: Bild erfolgreich hochgeladen
 plan-abtest: A / B-Tests
 plan-bandwidth: GB Bandbreite
 plan-buy: Besorgen
@@ -405,6 +471,10 @@ plans-super-only: Nur Superadministratoren dürfen Pläne und Abrechnungen einse
 platform: Plattform
 please-ask-the-user-to-create-account-first: Bitten Sie den Benutzer, zuerst ein Konto zu erstellen
 please-choose-your-p: Bitte wählen Sie Ihre Präferenzen
+please-confirm-org-del: >-
+  Bitte bestätigen Sie, dass Sie die Organisation „%1“ löschen möchten, indem
+  Sie ihren Namen eingeben
+please-type-new-app-name: Bitte geben Sie den neuen App-Namen ein
 please-upgrade: Bitte aktualisieren Sie Ihren Plan, um weitere Benutzer hinzuzufügen
 plugin-version: Plugin-Version
 prediction: Vorhersage
@@ -468,6 +538,7 @@ status-complete: vollständig
 status-failed: fehlgeschlagen
 storage-usage: 'Speichernutzung:'
 stored-externally: extern gespeichert
+stripe-billing-portal-will-be-opened-in-a-new-tab: Das Stripe-Abrechnungsportal wird in einem neuen Tab geöffnet
 submit: Einreichen
 support: Unterstützung
 switch-to-all-device: Wechseln Sie zu allen Geräten
@@ -486,24 +557,29 @@ to-live-reload: zu leben nachladen.
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps: Meine Applikationen
 top-apps-v2: Apps
-trial: Versuch
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 trial-plan-expires-in: Der Prozess endet in
 type: ''
+type-new-app-name: Neuer App-Name
+type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
+type-new-org-name: Bitte geben Sie den neuen Namen für die Organisation ein
 undefined: nicht definiert
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert
 unknown: Unbekannt
+unknown-mime: Unbekannter Mime-Typ, bitte überprüfen Sie die Browserkonsole
 unlimited-updates: Unbegrenzte Updates
 unlink-bundle: Bündel aufheben
 unlink-channel: Verknüpfung des Kanals aufheben
+unlink-error: Fehler beim Aufheben der Verknüpfung. Bitte überprüfen Sie die Konsole
 unlink-version: Verknüpfung aufheben
 update: Aktualisieren
 updated-at: Aktualisiert am
 updated-min-version: Aktualisierte Minimalversion
 upgrade: Aktualisierung
 upgrade-now: Jetzt upgraden
+upload-img-error: Bild kann nicht hochgeladen werden. Bitte überprüfen Sie die Konsole
 upperCaseError: Sollte Großbuchstaben enthalten
 url: URL
 usage: Verwendung
@@ -527,10 +603,16 @@ version-builtin: Version eingebaut
 version-linked: Versionslink
 version-linking: Link zum Bündel
 versions: Versionen
+want-to-unlink: Möchten Sie die Verknüpfung aufheben?
 warning: Warnung!
 welcome-to: Willkommen zu
 welcome-to-your-capg: Willkommen auf Ihrem Capgo-Dashboard
+what-to-do-with-photo: Bild bearbeiten
+what-to-do-with-photo-dec: Was möchten Sie mit dem App-Foto machen?
 write-key: Schreiben
+wrong-name-org-del: |-
+  Sie haben den Namen der Organisation nicht eingegeben. 
+  Sie sollten Folgendes eingeben: %1
 yearly: Jährlich
 'yes': Ja
 you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.

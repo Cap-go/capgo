@@ -3,11 +3,12 @@ import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
-import { FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
-import { iconEmail, iconPassword } from '~/services/icons'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
 
 const { t } = useI18n()
 const router = useRouter()

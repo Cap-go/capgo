@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
@@ -41,16 +41,9 @@ export async function getBundleUrl(
 
   try {
     const signedUrl = await s3.getSignedUrl(c, path, EXPIRATION_SECONDS)
-    // TODO: fix when cloudflare fix the api rate issue.
-    // const [signedUrl, { size: fileSize }] = await Promise.all([
-    //   s3.getSignedUrl(c, path, EXPIRATION_SECONDS),
-    //   s3.getSizeChecksum(c, path),
-    // ])
-    // console.log('getBundleUrl', signedUrl, fileSize)
     console.log('getBundleUrl', signedUrl, bundleMeta?.size)
 
     url = signedUrl
-    // size = fileSize ?? 0
     size = bundleMeta?.size ?? 0
 
     return { url, size }

@@ -1,20 +1,14 @@
 <script setup lang="ts">
-// import { applyPureReactInVue } from 'veaury'
 import { Toaster } from 'vue-sonner'
 
-// const ToasterVue = applyPureReactInVue(Toaster,
-//   {
-//     useInjectPropsFromWrapper(reactProps) {
-//       return {
-//         ...reactProps,
-//         richColors: true,
-//         closeButton: true,
-//         position: 'top-right',
-//       }
-//     },
-//   })
+const toastOptions = {
+  class: 'safe-areas',
+}
 </script>
 
 <template>
-  <Toaster rich-colors close-button position="top-right" />
+  <Toaster
+    rich-colors close-button position="top-right"
+    :toast-options="toastOptions"
+  />
 </template>

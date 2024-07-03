@@ -53,9 +53,6 @@ const lastDayEvolution = computed(() => {
         <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="font-medium badge badge-primary">
-          beta
-        </div>
       </div>
 
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">

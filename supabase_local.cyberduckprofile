@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>Protocol</key>
+        <string>s3</string>
+        <key>Vendor</key>
+        <string>Supabase Storage S3</string>
+        <key>Scheme</key>
+        <string>http</string>
+        <key>Description</key>
+        <string>Supabase Storage (S3)</string>
+        <key>Default Hostname</key>
+        <string>127.0.0.1</string>
+        <key>Default Port</key>
+        <string>54321</string>
+        <key>Region</key>
+        <string>local</string>
+        <key>Properties</key>
+        <array>
+            <string>s3.storage.class.options=STANDARD</string>
+            <string>s3.bucket.virtualhost.disable=true</string>
+        </array>
+        <key>Context</key>
+        <string>/storage/v1/s3</string>
+        <key>Help</key>
+        <string>https://supabase.com/docs/guides/storage</string>
+    </dict>
+</plist>

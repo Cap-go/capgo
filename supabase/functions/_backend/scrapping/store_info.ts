@@ -1,9 +1,9 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { bulkUpdateStoreApps, getStoreAppById, saveStoreInfo } from '../utils/clickhouse.ts'
 import { countries } from '../utils/gplay_categ.ts'
+import { bulkUpdateStoreAppsCF, getStoreAppByIdCF, saveStoreInfoCF } from '../utils/cloudflare.ts'
 
 export const app = new Hono()
 
@@ -60,15 +60,14 @@ async function findLang(appId: string) {
 async function getInfo(c: Context, appId: string) {
   try {
     // console.log('getInfo', appId)
-    const data = await getStoreAppById(c, appId)
+    const data = await getStoreAppByIdCF(c, appId)
 
     const res = (!data || !data.lang) ? await findLang(appId) : await getAppInfo(appId, data.lang)
     if (!res) {
       console.error('no lang found', appId)
-      await saveStoreInfo(c, {
+      await saveStoreInfoCF(c, {
         app_id: appId,
         to_get_info: false,
-        error_get_info: 'no lang found',
       })
       return []
     }
@@ -77,10 +76,9 @@ async function getInfo(c: Context, appId: string) {
   }
   catch (e) {
     console.log('error getAppInfo', e)
-    await saveStoreInfo(c, {
+    await saveStoreInfoCF(c, {
       app_id: appId,
       to_get_info: false,
-      error_get_framework: JSON.stringify(e),
     })
   }
   return []
@@ -104,7 +102,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     const toSave = await Promise.all(all)
     const flattenToSave = toSave.flat()
-    await bulkUpdateStoreApps(c, flattenToSave)
+    await bulkUpdateStoreAppsCF(c, flattenToSave)
     return c.json(BRES)
   }
   catch (e) {

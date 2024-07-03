@@ -1,9 +1,9 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import gplay from 'google-play-scraper'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { bulkUpdateStoreApps } from '../utils/clickhouse.ts'
 import { countries } from '../utils/gplay_categ.ts'
+import { bulkUpdateStoreAppsCF } from '../utils/cloudflare.ts'
 
 export const app = new Hono()
 
@@ -85,7 +85,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     const toSave = await Promise.all(all)
     const flattenToSave = toSave.flat()
-    await bulkUpdateStoreApps(c, flattenToSave)
+    await bulkUpdateStoreAppsCF(c, flattenToSave)
     return c.json(BRES)
   }
   catch (e) {

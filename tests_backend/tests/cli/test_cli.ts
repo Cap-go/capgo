@@ -101,8 +101,8 @@ export function getTest(): RunnableTest {
       {
         name: 'Test upload with organization (upload)',
         test: testUploadWithOrganization,
-        timesToExecute: 1
-      }
+        timesToExecute: 1,
+      },
     ],
   }
 }
@@ -350,9 +350,8 @@ async function testAutoMinVersionFlag(_backendBaseUrl: URL, supabase: SupabaseTy
   const uploadCliOutput2 = await uploadWithAutoFlagWithAssert(semver)
 
   assert(uploadCliOutput2.includes(
-    'it\'s your first upload with compatibility check'),
-    `CLI output does not include \"it\'s your first upload with compatibility check\". CLI output:\n${uploadCliOutput2}`,
-  )
+    'it\'s your first upload with compatibility check',
+  ), `CLI output does not include \"it\'s your first upload with compatibility check\". CLI output:\n${uploadCliOutput2}`)
 }
 
 async function testFrontend(backendBaseUrl: URL, _supabase: SupabaseType) {
@@ -385,12 +384,13 @@ async function testUploadWithOrganization(_backendBaseUrl: URL, supabase: Supaba
 
       assert(insertTempUserError === null, `Insert temp organization user error is not null. Error: ${insertTempUserError}`)
 
-      try{
+      try {
         increaseSemver()
 
         const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], false, testApiKey)
         assert(output.includes('Bundle Uploaded'), `The upload propably failed. Output:\n${output}`)
-      } finally {
+      }
+      finally {
         const { error: deleteTempUserError } = await supabase.from('org_users')
           .delete()
           .eq('user_id', testUserId)
@@ -399,11 +399,13 @@ async function testUploadWithOrganization(_backendBaseUrl: URL, supabase: Supaba
 
         assert(deleteTempUserError === null, `Delete temp user error is not null ${deleteTempUserError}`)
       }
-    } finally {
+    }
+    finally {
       const { error: insertOrgUsers } = await supabase.from('org_users').insert(orgMembers!)
       assert(insertOrgUsers === null, `Insert org users error not null: ${insertOrgUsers}`)
     }
-  } finally {
+  }
+  finally {
     const { error: deleteApiKeyError } = await supabase.from('apikeys')
       .delete()
       .eq('key', testApiKey)

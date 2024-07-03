@@ -28,6 +28,7 @@ activation-notification-desc: >-
   Aceito receber notificação quando uma nova versão do aplicativo estiver
   disponível
 activation-validate: Validar
+active_users_by_version: Dispositivo ativo por pacote
 add: Adicionar
 add-another-app: Adicione seu aplicativo
 add-api-key: Adicionada nova chave de API com sucesso
@@ -57,12 +58,19 @@ allow-develoment-bui: Permitir compilação de desenvolvimento
 allow-device-to-self: Permitir que os dispositivos se associem automaticamente
 allow-emulator: Permitir emuladores
 already-account: Você já tem uma conta?
+api-doc: Documento da API
 api-key: Chave API
 api-keys: Chaves de API
+api-keys-are-used-for-cli-and-public-api: As chaves de API são usadas para CLI e API pública
 api-keys-key-copied: Chaves de API
 app: Aplicativo
 app-deleted: Aplicativo deletado
+app-id: 'ID do aplicativo:'
 app-id-example: Exemplo de código de aplicativo
+app-info: Informações do aplicativo
+app-info-desc: Você pode alterar aqui as informações do seu aplicativo
+app-logo-deleted: Imagem do aplicativo excluída com sucesso
+app-name: Nome do aplicativo
 app-not-found: Aplicativo não encontrado
 app-perm: Permissão do aplicativo
 app-preview: Visualização do aplicativo
@@ -90,6 +98,7 @@ button-back: Voltar
 button-browse: Navegar
 button-camera: Câmera
 button-cancel: Cancelar
+button-confirm: confirme
 button-delete: Excluir
 button-deny-invite: Negar
 button-go: IR
@@ -104,7 +113,12 @@ button-toggle_dark: Alternar modo escuro
 button-toggle_langs: Alterar idiomas
 by-clicking-on-them: clicando sobre eles.
 cancel: Cancelar
+canceled-delete: Exclusão de pacote cancelada, não é possível excluir um pacote vinculado
+canceled-photo-selection: Você cancelou a seleção de fotos
+cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
+cannot-create-org: Não é possível criar uma organização. Verifique os registros do navegador!
+cannot-del-org: Não é possível excluir a organização. Verifique o registro do navegador
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-app-version: Não é possível excluir a versão do aplicativo
@@ -113,8 +127,12 @@ cannot-delete-channel: Não é possível excluir o canal
 cannot-delete-member: Não é possível excluir o membro. Verifique o console do navegador
 cannot-delete-owner: Não é possível excluir o proprietário da organização
 cannot-download: Não é possível baixar o pacote
+cannot-find-unknown-version: >-
+  Não é possível encontrar a versão desconhecida, entre em contato com o suporte
+  capgo e verifique os registros do navegador
 cannot-get-the-test-: Não consigo obter a versão de teste
 cannot-invite-owner: Não é possível convidar o proprietário para a organização
+cannot-load-app-settings: Não é possível carregar as configurações do aplicativo
 cannot-save-custom-i: Não é possível salvar o ID personalizado
 cannot-set-this-vers: Não é possível definir esta versão
 cannot-share: Não é possível compartilhar o ID do usuário, verifique o console do navegador
@@ -124,10 +142,16 @@ cannot-view-plans: Não é possível visualizar a página de planos
 cannot-view-usage: Não é possível visualizar a página de uso
 cannots-sign-off: Não é possível registrar
 change: Mudar
+change-api-key-name: Alterar o nome do apikey
+changed-app-name: Nome do aplicativo alterado com sucesso
+changed-name: Nome do apikey alterado com sucesso
 changed-password-suc: Senha alterada com sucesso
 channel: Canal
 channel-ab-testing: Habilitar teste AB
 channel-ab-testing-percentage: Porcentagem de usuários que recebem a versão secundária
+channel-bundle-linked: |-
+  Este pacote está vinculado a um ou mais canais. 
+  (%) Gostaria de desvinculá-lo desses canais?
 channel-create: Criar canal
 channel-deleted: Canal deletado
 channel-forced-devices: Dispositivos forçados
@@ -143,6 +167,7 @@ channels: Canais
 check-email: Verifique seu e-mail e confirme
 check-on-web: Verifique no site
 checksum: soma de verificação
+cli-doc: Documento CLI
 commands: comandos
 confirm-email: confirme seu email
 confirm-email-sent: Um email de confirmação foi enviado, clique no link para confirmar seu email.
@@ -159,8 +184,10 @@ copy-command: Copiar comando
 copy-your: Copie o seu
 country: País
 create-a-free-accoun: Criar uma conta gratuita
+create-new-org: Criar uma nova organização
 created-at: Criado em
 current-billing-cycle: Ciclo de faturamento atual
+custom: Personalizado
 custom-domain: Domínio personalizado
 custom-id: ID personalizado
 custom-id-saved: ID personalizado salvo
@@ -169,8 +196,11 @@ days: dias
 defined-as: Definido como
 defined-as-private: definido como normal
 defined-as-public: definido como padrão
+delete: Excluir
 delete-account: Deletar conta
 delete-account-0: Deletar conta
+delete-app: Excluir aplicativo
+delete-org: Excluir organização
 delete-your-account: Deletar sua conta
 deleted: excluído
 dependencies:
@@ -201,6 +231,8 @@ discover-your-dashbo: Descubra o seu painel!
 documentation: Documentação
 dont-have-an-account: Não tem uma conta?
 download: Download
+edit-name: Editar nome
+edit-pic: Editar imagem
 email: E-mail
 email-address: Endereço de email
 email-does-not-exist: Esse usuário não existe
@@ -215,6 +247,7 @@ error: Erro
 external-storage: Armazenamento externo
 fail: Falha na instalação
 failed: Fracassado
+failed-to-get-user: Falha ao carregar o usuário
 fast-backward: Retrocesso rápido
 fast-forward: Avanço rápido
 filters: Filtros
@@ -224,6 +257,7 @@ force-version-change: Pular implantação progressiva
 forgot: Esquecido
 forgot-check-email: Verifique seu e-mail para obter o link para redefinir sua senha
 forgot-success: Senha atualizada com sucesso
+free-trial: Teste grátis
 from: De
 from-device: do dispositivo
 general-information: Informações gerais
@@ -257,10 +291,17 @@ key-super-admin: Superadministrador
 key-upload: Carregar
 key-write: Escrever
 language: Linguagem
+last-15-minutes: Últimos 15 minutos
+last-24-hour: Últimas 24 horas
+last-3-hour: Últimas 3 horas
+last-3-minutes: Últimos 3 minutos
+last-hour: Última hora
+last-minute: Último minuto
 last-name: Sobrenome
 last-update: Última atualização
 last-upload: último upload
 last-version: Última versão
+latest_version: Pacote mais recente
 launch-bundle: Lançar pacote
 leaving: Saindo
 limit-reached: Limite alcançado
@@ -299,6 +340,8 @@ misconfigured: Mal configurado
 misconfigured-channels: |-
   Alguns canais estão configurados incorretamente. 
   As atualizações falharão para esses canais!
+missing-email: E-mail ausente
+missing-name: Nome ausente
 mo: m
 modify-org-info: Você pode modificar as informações da organização aqui.
 module-heading: Módulos
@@ -314,8 +357,16 @@ name: Nome
 need-more-contact-us: |-
   Preciso de mais ? 
   Contacte-nos para um plano à medida
+new-name-not-changed: O novo nome é igual ao antigo
+new-name-to-long: |-
+  O novo nome é muito longo. 
+  Você só pode usar 32 caracteres
+new-name-to-short: |-
+  O nome apikey é muito curto. 
+  Deve ter pelo menos 4 caracteres
 next: Próximo
 'no': não
+no-app-icon: Este aplicativo não possui nenhum ícone de aplicativo
 no-channel-linked: Nenhum canal, clique para adicionar
 no-channel-linked-no-perm: Nenhum canal
 no-data: Sem dados
@@ -338,16 +389,21 @@ open-channel: canal aberto
 open-settings: Clique para abrir as configurações
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abra este link para saber como testar sua atualização
+open-your-portal: Abra seu portal
 org-changes-saved: Organização atualizada com sucesso
 org-changes-set-email-not-unique: O e-mail de gerenciamento não é único. Selecione outro.
 org-changes-set-email-other-error: >-
   Não é possível definir o e-mail de gerenciamento. Entre em contato com o
   suporte
+org-created-successfully: Organização criada com sucesso!
+org-deleted: Organização excluída com sucesso
 org-invited-user: Usuário convidado para a organização com sucesso
+org-with-this-name-exists: Você já criou uma organização com este nome!
 organization-email: E-mail de gerenciamento da organização
 organization-name: Nome da organização
 organization-settings: Configurações da organização
 os-version: versão do sistema operacional
+owner-org: 'Organização proprietária:'
 pages: Páginas
 password: Senha
 password-confirmatio: ConfirmaÇão Da Senha
@@ -358,6 +414,8 @@ patch: Correção
 percent-fail: Porcentagem de reprovação
 permission-changed: Permissão do usuário alterada com sucesso
 personal-information: Informações pessoais
+picture-delete-fail: Não é possível excluir a imagem do aplicativo. Verifique o log do console
+picture-uploaded: Imagem enviada com sucesso
 plan-abtest: teste A/B
 plan-bandwidth: GB de largura de banda
 plan-buy: Comprar
@@ -385,6 +443,8 @@ plans-super-only: Somente superadministradores têm permissão para visualizar p
 platform: Plataforma
 please-ask-the-user-to-create-account-first: Por favor, peça ao usuário para criar uma conta primeiro
 please-choose-your-p: Escolha suas preferências
+please-confirm-org-del: Por favor confirme que deseja excluir a organização "%1" digitando seu nome
+please-type-new-app-name: Digite o novo nome do aplicativo
 please-upgrade: Atualize seu plano para adicionar mais usuários
 plugin-version: Versão do plug-in
 prediction: Predição
@@ -448,6 +508,7 @@ status-complete: completo
 status-failed: fracassado
 storage-usage: 'Uso de armazenamento:'
 stored-externally: armazenado externamente
+stripe-billing-portal-will-be-opened-in-a-new-tab: O portal de faturamento Stripe será aberto em uma nova guia
 submit: Enviar
 support: Apoiar
 switch-to-all-device: Alternar para todos os dispositivos
@@ -466,24 +527,29 @@ to-live-reload: para recarregar ao vivo.
 to-open-encrypted-bu: 'Para abrir o pacote criptografado, use o comando:'
 top-apps: Meus aplicativos
 top-apps-v2: Aplicativos
-trial: julgamento
 trial-left: dias restantes
 trial-plan-expired: Versao de teste expirada
 trial-plan-expires-in: O teste termina em
 type: ''
+type-new-app-name: Novo nome do aplicativo
+type-new-name: Digite o novo nome da chave de API
+type-new-org-name: Digite o novo nome da organização
 undefined: indefinido
 undefined-fail: Indefinido (as atualizações falharão)
 uninstall: Desinstalado
 unknown: desconhecido
+unknown-mime: Tipo mime desconhecido, verifique o console do navegador
 unlimited-updates: Atualizações ilimitadas
 unlink-bundle: Desvincular pacote
 unlink-channel: Desvincular canal
+unlink-error: Erro ao desvincular, verifique o console
 unlink-version: Desvincular versão
 update: Atualizar
 updated-at: Atualizado em
 updated-min-version: Versão mínima atualizada
 upgrade: Atualizar
 upgrade-now: Atualize agora
+upload-img-error: Não é possível fazer upload da imagem, verifique o console
 upperCaseError: Deve conter letras maiúsculas
 url: URL
 usage: Uso
@@ -505,10 +571,16 @@ version-builtin: Versão integrada
 version-linked: Link da versão
 version-linking: Link para o pacote
 versions: Versões
+want-to-unlink: Você quer desvincular?
 warning: Aviso!
 welcome-to: Bem-vindo ao
 welcome-to-your-capg: Bem-vindo ao seu painel Capgo
+what-to-do-with-photo: Editar imagem
+what-to-do-with-photo-dec: O que você gostaria de fazer com a foto do aplicativo?
 write-key: Escrever
+wrong-name-org-del: |-
+  Você não digitou o nome da organização. 
+  Você deveria ter digitado:% 1
 yearly: Anual
 'yes': sim
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.

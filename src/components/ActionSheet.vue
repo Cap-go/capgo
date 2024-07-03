@@ -27,7 +27,7 @@ function close(item: ActionSheetOptionButton | undefined) {
     :opened="displayStore.showActionSheet"
     @backdropclick="close(undefined)"
   >
-    <div id="action-sheet" :class="`max-h-screen overflow-y-auto ${!displayStore.showActionSheet ? 'hidden' : ''}`">
+    <div id="action-sheet" class="max-h-screen overflow-y-auto" :class="{ hidden: !displayStore.showActionSheet }">
       <k-actions-group>
         <k-actions-label v-if="displayStore.actionSheetOption?.header">
           {{ displayStore.actionSheetOption.header }}

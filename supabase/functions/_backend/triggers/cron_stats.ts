@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { middlewareAPISecret, useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
@@ -47,25 +47,25 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const storage = await readStatsStorage(c, body.appId, startDate, endDate)
     const versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
 
-    console.log('mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0))
-    console.log('bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0))
-    console.log('storage', storage.length, storage.reduce((acc, curr) => acc + curr.storage, 0))
+    console.log('mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0), JSON.stringify(mau))
+    console.log('bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), JSON.stringify(bandwidth))
+    console.log('storage', storage.length, storage.reduce((acc, curr) => acc + curr.storage, 0), JSON.stringify(storage))
     console.log('versionUsage', versionUsage.length, versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0))
 
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
       supabase.from('daily_mau')
         .upsert(mau)
-        .eq('app_id', body.appId),
+        .eq('app_id', body.appId).throwOnError(),
       supabase.from('daily_bandwidth')
         .upsert(bandwidth)
-        .eq('app_id', body.appId),
+        .eq('app_id', body.appId).throwOnError(),
       supabase.from('daily_storage')
         .upsert(storage)
-        .eq('app_id', body.appId),
+        .eq('app_id', body.appId).throwOnError(),
       supabase.from('daily_version')
         .upsert(versionUsage)
-        .eq('app_id', body.appId),
+        .eq('app_id', body.appId).throwOnError(),
     ])
 
     console.log('stats saved')

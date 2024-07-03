@@ -2,10 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import ky from 'ky'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
@@ -90,6 +91,37 @@ async function getDevicesID() {
   return [...channelDev, ...overrideDev]
 }
 
+interface DeviceData {
+  app_id: string
+  device_id: string
+  version: number
+  created_at: string
+}
+
+async function countDevices() {
+  const { data: currentSession } = await supabase.auth.getSession()!
+  if (!currentSession.session)
+    return 0
+  const currentJwt = currentSession.session.access_token
+  const dataD = await ky
+    .post(`${defaultApiHost}/private/devices`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${currentJwt}` || '',
+      },
+      body: JSON.stringify({
+        count: true,
+        appId: props.appId,
+      }),
+    })
+    .then(res => res.json<{ count: number }>())
+    .catch((err) => {
+      console.log('Cannot get devices', err)
+      return { count: 0 }
+    })
+  return dataD.count
+}
+
 async function getData() {
   isLoading.value = true
   try {
@@ -97,23 +129,34 @@ async function getData() {
     if (filters.value.Override)
       ids = await getDevicesID()
 
-    const req = await supabase.functions.invoke('private/devices', {
-      body: {
-        // appId: string, versionId?: string, deviceIds?: string[], search?: string, order?: Order[], rangeStart?: number, rangeEnd?: number
-        appId: props.appId,
-        versionId: props.versionId,
-        devicesId: ids.length ? ids : undefined,
-        search: search.value ? search.value : undefined,
-        order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
-        rangeStart: currentVersionsNumber.value,
-        rangeEnd: currentVersionsNumber.value + offset - 1,
-      },
-    })
-    const { data, count } = (await req).data
-    if (!data)
+    const { data: currentSession } = await supabase.auth.getSession()!
+    if (!currentSession.session)
       return
+    const currentJwt = currentSession.session.access_token
+    const dataD = await ky
+      .post(`${defaultApiHost}/private/devices`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${currentJwt}` || '',
+        },
+        body: JSON.stringify({
+          appId: props.appId,
+          versionId: props.versionId,
+          devicesId: ids.length ? ids : undefined,
+          search: search.value ? search.value : undefined,
+          order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+          rangeStart: currentVersionsNumber.value,
+          rangeEnd: currentVersionsNumber.value + offset - 1,
+        }),
+      })
+      .then(res => res.json<DeviceData[]>())
+      .catch((err) => {
+        console.log('Cannot get devices', err)
+        return [] as DeviceData[]
+      })
+    // console.log('dataD', dataD)
 
-    const versionPromises = data.map((element) => {
+    const versionPromises = dataD.map((element) => {
       return supabase
         .from('app_versions')
         .select('name')
@@ -122,7 +165,7 @@ async function getData() {
     })
 
     // Cast so that we can set version from the other request
-    const finalData = data as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
+    const finalData = dataD as any as Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }[]
 
     // This is faster then awaiting in a big loop
     const versionData = await Promise.all(versionPromises)
@@ -134,7 +177,6 @@ async function getData() {
     })
 
     elements.value.push(...finalData as any)
-    total.value = count || 0
   }
   catch (error) {
     console.error(error)
@@ -143,7 +185,7 @@ async function getData() {
 }
 
 async function reload() {
-  console.log('reload')
+  // console.log('reload')
   try {
     elements.value.length = 0
     await getData()
@@ -157,6 +199,7 @@ async function refreshData() {
   try {
     currentPage.value = 1
     elements.value.length = 0
+    total.value = await countDevices()
     await getData()
   }
   catch (error) {

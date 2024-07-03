@@ -28,6 +28,7 @@ activation-legal-desc: >-
 activation-notification: thông báo
 activation-notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
 activation-validate: xác thực
+active_users_by_version: Thiết bị hoạt động theo gói
 add: Thêm vào
 add-another-app: Thêm ứng dụng của bạn
 add-api-key: Đã thêm khóa API mới thành công
@@ -59,12 +60,19 @@ allow-develoment-bui: Cho phép xây dựng phát triển
 allow-device-to-self: Cho phép các thiết bị tự liên kết
 allow-emulator: Cho phép giả lập
 already-account: Bạn đã có tài khoản?
+api-doc: tài liệu API
 api-key: Mã API
 api-keys: Khóa API
+api-keys-are-used-for-cli-and-public-api: Khóa API được sử dụng cho CLI và API công khai
 api-keys-key-copied: Khóa API
 app: Ứng dụng
 app-deleted: Đã xóa ứng dụng
+app-id: 'Id ứng dụng:'
 app-id-example: Ví dụ về ID ứng dụng
+app-info: Thông tin ứng dụng
+app-info-desc: Bạn có thể thay đổi thông tin ứng dụng của mình tại đây
+app-logo-deleted: Đã xóa ảnh ứng dụng thành công
+app-name: Tên ứng dụng
 app-not-found: Không tìm thấy ứng dụng
 app-perm: Quyền ứng dụng
 app-preview: Xem trước ứng dụng
@@ -92,6 +100,7 @@ button-back: Mặt sau
 button-browse: duyệt
 button-camera: Máy ảnh
 button-cancel: Hủy bỏ
+button-confirm: Xác nhận
 button-delete: Xóa bỏ
 button-deny-invite: Từ chối
 button-go: ĐI
@@ -106,7 +115,12 @@ button-toggle_dark: Chuyển đổi chế độ tối
 button-toggle_langs: Thay đổi ngôn ngữ
 by-clicking-on-them: bằng cách nhấp vào chúng.
 cancel: Hủy bỏ
+canceled-delete: Đã hủy xóa gói, không thể xóa gói được liên kết
+canceled-photo-selection: Bạn đã hủy việc chọn ảnh
+cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
+cannot-create-org: Không thể tạo tổ chức, vui lòng kiểm tra nhật ký trình duyệt!
+cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký trình duyệt
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
@@ -115,8 +129,12 @@ cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
 cannot-download: Không thể tải xuống gói
+cannot-find-unknown-version: >-
+  Không thể tìm thấy phiên bản không xác định, vui lòng liên hệ với bộ phận hỗ
+  trợ của capgo và kiểm tra nhật ký trình duyệt
 cannot-get-the-test-: Không thể tải phiên bản thử nghiệm
 cannot-invite-owner: Không thể mời chủ sở hữu vào tổ chức
+cannot-load-app-settings: Không thể tải cài đặt ứng dụng
 cannot-save-custom-i: Không thể lưu ID tùy chỉnh
 cannot-set-this-vers: Không thể đặt phiên bản này
 cannot-share: Không thể chia sẻ id người dùng, hãy kiểm tra bảng điều khiển trình duyệt
@@ -126,10 +144,16 @@ cannot-view-plans: Không thể xem trang kế hoạch
 cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
 change: Thay đổi
+change-api-key-name: Thay đổi tên của apikey
+changed-app-name: Đã đổi tên ứng dụng thành công
+changed-name: Đã đổi tên apikey thành công
 changed-password-suc: Đã đổi mật khẩu thành công
 channel: Kênh
 channel-ab-testing: Bật thử nghiệm AB
 channel-ab-testing-percentage: Tỷ lệ người dùng yêu thích phiên bản phụ
+channel-bundle-linked: |-
+  Gói này được liên kết với một hoặc nhiều kênh. 
+  (%) Bạn có muốn hủy liên kết khỏi các kênh đó không?
 channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
 channel-forced-devices: Thiết bị bắt buộc
@@ -145,6 +169,7 @@ channels: Kênh truyền hình
 check-email: Vui lòng kiểm tra email của bạn và xác minh
 check-on-web: Kiểm tra trên trang web
 checksum: tổng kiểm tra
+cli-doc: tài liệu CLI
 commands: mệnh lệnh
 confirm-email: Xác nhận email của bạn
 confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
@@ -159,8 +184,10 @@ copy-command: Sao chép lệnh
 copy-your: Sao chép của bạn
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
+create-new-org: Tạo một tổ chức mới
 created-at: tạo tại
 current-billing-cycle: Chu kỳ thanh toán hiện tại
+custom: Phong tục
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
 custom-id-saved: Đã lưu ID tùy chỉnh
@@ -169,8 +196,11 @@ days: ngày
 defined-as: Định nghĩa là
 defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
+delete: Xóa bỏ
 delete-account: Xóa tài khoản
 delete-account-0: Xóa tài khoản
+delete-app: Xóa ứng dụng
+delete-org: Xóa tổ chức
 delete-your-account: Xóa tài khoản của bạn
 deleted: đã xóa
 dependencies:
@@ -201,6 +231,8 @@ discover-your-dashbo: Khám phá bảng điều khiển của bạn!
 documentation: Tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
 download: Tải xuống
+edit-name: Chỉnh sửa tên
+edit-pic: Chỉnh sửa hình ảnh
 email: E-mail
 email-address: Địa chỉ email
 email-does-not-exist: Người dùng này không tòn tại
@@ -217,6 +249,7 @@ error: Lỗi
 external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
 failed: Thất bại
+failed-to-get-user: Không tải được người dùng
 fast-backward: Lùi nhanh
 fast-forward: Nhanh về phía trước
 filters: bộ lọc
@@ -226,6 +259,7 @@ force-version-change: Bỏ qua triển khai lũy tiến
 forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công
+free-trial: Dùng thử miễn phí
 from: Từ
 from-device: từ thiết bị
 general-information: Thông tin chung
@@ -259,10 +293,17 @@ key-super-admin: Quản trị viên cấp cao
 key-upload: Tải lên
 key-write: Viết
 language: Ngôn ngữ
+last-15-minutes: 15 phút cuối
+last-24-hour: 24 giờ qua
+last-3-hour: 3 giờ qua
+last-3-minutes: 3 phút cuối
+last-hour: Giờ cuối cùng
+last-minute: Phút trước
 last-name: Họ
 last-update: Cập nhật cuối cùng
 last-upload: Tải lên lần cuối
 last-version: Phiên bản cuối cùng
+latest_version: Gói mới nhất
 launch-bundle: Khởi chạy gói
 leaving: Rời đi
 limit-reached: Đạt tới giới hạn
@@ -301,6 +342,8 @@ misconfigured: Bị định cấu hình sai
 misconfigured-channels: |-
   Một số kênh bị định cấu hình sai. 
   Cập nhật sẽ không thành công đối với các kênh đó!
+missing-email: Thiếu email
+missing-name: Thiếu tên
 mo: Th
 modify-org-info: Bạn có thể sửa đổi thông tin của tổ chức tại đây.
 module-heading: mô-đun
@@ -316,8 +359,16 @@ name: Tên
 need-more-contact-us: |-
   Cần thêm? 
   Liên hệ với chúng tôi để có kế hoạch phù hợp
+new-name-not-changed: Tên mới vẫn giống tên cũ
+new-name-to-long: |-
+  Tên mới dài quá. 
+  Bạn chỉ có thể sử dụng 32 ký tự
+new-name-to-short: |-
+  Tên apikey quá ngắn. 
+  Nó phải dài ít nhất 4 ký tự
 next: Kế tiếp
 'no': KHÔNG
+no-app-icon: Ứng dụng này không có bất kỳ biểu tượng ứng dụng nào
 no-channel-linked: Không có kênh, nhấp để thêm
 no-channel-linked-no-perm: Không có kênh
 no-data: Không có dữ liệu
@@ -340,14 +391,19 @@ open-channel: mở kênh
 open-settings: Nhấp để mở cài đặt
 open-sidebar: Mở thanh bên
 open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn
+open-your-portal: Mở cổng thông tin của bạn
 org-changes-saved: Tổ chức được cập nhật thành công
 org-changes-set-email-not-unique: Email quản lý không phải là duy nhất, vui lòng chọn email khác
 org-changes-set-email-other-error: Không cài đặt được email quản lý, vui lòng tiếp tục hỗ trợ
+org-created-successfully: Tổ chức đã được tạo thành công!
+org-deleted: Đã xóa tổ chức thành công
 org-invited-user: Đã mời thành công người dùng vào tổ chức
+org-with-this-name-exists: Bạn đã tạo một tổ chức có tên này!
 organization-email: Email quản lý của tổ chức
 organization-name: tên tổ chức
 organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
+owner-org: 'Tổ chức chủ sở hữu:'
 pages: trang
 password: Mật khẩu
 password-confirmatio: xác nhận mật khẩu
@@ -358,6 +414,8 @@ patch: Vá
 percent-fail: tỷ lệ thất bại
 permission-changed: Đã thay đổi thành công quyền của người dùng
 personal-information: Thông tin cá nhân
+picture-delete-fail: Không thể xóa ảnh ứng dụng, vui lòng kiểm tra nhật ký bảng điều khiển
+picture-uploaded: Hình ảnh được tải lên thành công
 plan-abtest: Thử nghiệm A/B
 plan-bandwidth: Băng thông GB
 plan-buy: Mua
@@ -383,6 +441,10 @@ plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem g�
 platform: Nền tảng
 please-ask-the-user-to-create-account-first: Vui lòng yêu cầu người dùng tạo tài khoản trước
 please-choose-your-p: Vui lòng chọn sở thích của bạn
+please-confirm-org-del: >-
+  Vui lòng xác nhận rằng bạn muốn xóa tổ chức "%1" bằng cách nhập tên của tổ
+  chức đó
+please-type-new-app-name: Vui lòng nhập tên ứng dụng mới
 please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
 prediction: Sự dự đoán
@@ -444,6 +506,7 @@ status-complete: hoàn thành
 status-failed: thất bại
 storage-usage: 'Sử dụng lưu trữ:'
 stored-externally: được lưu trữ bên ngoài
+stripe-billing-portal-will-be-opened-in-a-new-tab: Cổng thanh toán sọc sẽ được mở trong tab mới
 submit: Nộp
 support: Ủng hộ
 switch-to-all-device: Chuyển sang tất cả các thiết bị
@@ -462,24 +525,29 @@ to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps: Những ứng dụng của tôi
 top-apps-v2: Ứng dụng
-trial: sự thử nghiệm
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 trial-plan-expires-in: Thử nghiệm kết thúc sau
 type: ''
+type-new-app-name: Tên ứng dụng mới
+type-new-name: Vui lòng nhập tên khóa api mới
+type-new-org-name: Vui lòng nhập tên mới cho tổ chức
 undefined: không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt
 unknown: không xác định
+unknown-mime: Loại mime không xác định, vui lòng kiểm tra bảng điều khiển trình duyệt
 unlimited-updates: cập nhật không giới hạn
 unlink-bundle: Hủy liên kết gói
 unlink-channel: Hủy liên kết kênh
+unlink-error: Lỗi hủy liên kết, vui lòng kiểm tra bảng điều khiển
 unlink-version: Hủy liên kết phiên bản
 update: Cập nhật
 updated-at: Cập nhật tại
 updated-min-version: Đã cập nhật phiên bản tối thiểu
 upgrade: Nâng cấp
 upgrade-now: Nâng cấp ngay bây giờ
+upload-img-error: Không thể tải ảnh lên, vui lòng kiểm tra bảng điều khiển
 upperCaseError: Nên chứa chữ in hoa
 url: URL
 usage: Cách sử dụng
@@ -503,10 +571,16 @@ version-builtin: Phiên bản dựng sẵn
 version-linked: liên kết phiên bản
 version-linking: Liên kết đến gói
 versions: phiên bản
+want-to-unlink: Bạn có muốn hủy liên kết không?
 warning: Cảnh báo!
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Bảng điều khiển Capgo của bạn
+what-to-do-with-photo: Chỉnh sửa hình ảnh
+what-to-do-with-photo-dec: Bạn muốn làm gì với ảnh ứng dụng?
 write-key: Viết
+wrong-name-org-del: |-
+  Bạn chưa gõ tên tổ chức. 
+  Bạn phải gõ: %1
 yearly: hàng năm
 'yes': Đúng
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.

@@ -68,3 +68,5 @@ internal/cloudflare/.preprod.env
 internal/cloudflare/.prod.env
 internal/cloudflare/.env.preprod
 internal/cloudflare/.env.prod
+scripts/local_cf_backend/spawn
+temp_cli_test

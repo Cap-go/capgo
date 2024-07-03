@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -11,8 +11,8 @@ import { createStatsMeta } from '../utils/stats.ts'
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const record = body.record
 
-  if (!record.bucket_id && !record.r2_path) {
-    console.log('no bucket_id')
+  if (!record.r2_path) {
+    console.log('no r2_path')
     return c.json(BRES)
   }
   if (!record.app_id) {
@@ -30,23 +30,29 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const v2Path = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
   const existV2 = v2Path ? await s3.checkIfExist(c, v2Path) : false
 
-  if (existV2 && record.storage_provider === 'r2') {
+  if (v2Path && existV2 && record.storage_provider === 'r2') {
     // pdate size and checksum
     console.log('V2', record.bucket_id, record.r2_path)
-    const { size, checksum } = await s3.getSizeChecksum(c, v2Path ?? '')
+    // set checksum in s3
+    const size = await s3.getSize(c, v2Path ?? '')
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
         .from('app_versions_meta')
         .update({
           size,
-          checksum: checksum ?? '',
+          checksum: record.checksum ?? '',
         })
         .eq('id', record.id)
       if (errorUpdate)
         console.log('errorUpdate', errorUpdate)
-      await createStatsMeta(c, record.app_id, record.id, size)
+      const { error } = await createStatsMeta(c, record.app_id, record.id, size)
+      if (error)
+        console.log('error createStatsMeta', error)
     }
+  }
+  else {
+    console.log('no v2 path')
   }
   return c.json(BRES)
 }

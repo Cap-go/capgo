@@ -28,6 +28,7 @@ activation-legal-desc: >-
 activation-notification: Уведомления
 activation-notification-desc: Я согласен получать уведомления о появлении новой версии приложения
 activation-validate: Подтвердить
+active_users_by_version: Активное устройство по комплекту
 add: Добавлять
 add-another-app: Добавьте свое приложение
 add-api-key: Новый ключ API успешно добавлен
@@ -59,12 +60,19 @@ allow-develoment-bui: Разрешить сборку разработки
 allow-device-to-self: Разрешить устройствам самостоятельно связываться
 allow-emulator: Разрешить эмуляторы
 already-account: У вас уже есть аккаунт?
+api-doc: API-документ
 api-key: ключ API
 api-keys: Ключи API
+api-keys-are-used-for-cli-and-public-api: Ключи API используются для CLI и общедоступного API.
 api-keys-key-copied: Ключи API
 app: Приложение
 app-deleted: Приложение удалено
+app-id: 'Идентификатор приложения:'
 app-id-example: Пример идентификатора приложения
+app-info: Информация о приложении
+app-info-desc: Здесь вы можете изменить информацию о своем приложении.
+app-logo-deleted: Изображение приложения успешно удалено
+app-name: Имя приложения
 app-not-found: Приложение не найдено
 app-perm: Разрешение приложения
 app-preview: Предварительный просмотр приложения
@@ -92,6 +100,7 @@ button-back: Назад
 button-browse: Просматривать
 button-camera: Камера
 button-cancel: Отмена
+button-confirm: Подтверждать
 button-delete: Удалить
 button-deny-invite: Отрицать
 button-go: ИДТИ
@@ -106,7 +115,12 @@ button-toggle_dark: Переключить темный режим
 button-toggle_langs: Изменить языки
 by-clicking-on-them: нажав на них.
 cancel: Отмена
+canceled-delete: Удаление пакета отменено, невозможно удалить связанный пакет.
+canceled-photo-selection: Вы отменили выбор изображения
+cannot-change-name: Невозможно изменить имя, проверьте консоль браузера.
 cannot-change-permission: Невозможно изменить разрешения, проверьте консоль браузера
+cannot-create-org: Невозможно создать организацию, проверьте журналы браузера!
+cannot-del-org: Невозможно удалить организацию, проверьте журнал браузера
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-app-version: Не могу удалить версию приложения
@@ -115,8 +129,12 @@ cannot-delete-channel: Не могу удалить канал
 cannot-delete-member: Невозможно удалить участника, проверьте консоль браузера
 cannot-delete-owner: Невозможно удалить владельца из организации
 cannot-download: Не могу скачать пакет
+cannot-find-unknown-version: >-
+  Невозможно найти неизвестную версию, обратитесь в службу поддержки Capgo и
+  проверьте журналы браузера.
 cannot-get-the-test-: Не могу получить тестовую версию
 cannot-invite-owner: Невозможно пригласить владельца в организацию
+cannot-load-app-settings: Не могу загрузить настройки приложения
 cannot-save-custom-i: Не удается сохранить пользовательский идентификатор
 cannot-set-this-vers: Не могу установить эту версию
 cannot-share: Невозможно поделиться идентификатором пользователя, проверьте консоль браузера
@@ -126,10 +144,16 @@ cannot-view-plans: Невозможно просмотреть страницу 
 cannot-view-usage: Невозможно просмотреть страницу использования
 cannots-sign-off: Невозможно войти в систему
 change: Изменять
+change-api-key-name: Измените имя апикея
+changed-app-name: Название приложения успешно изменено.
+changed-name: Имя апикея успешно изменено.
 changed-password-suc: Пароль успешно изменен
 channel: Канал
 channel-ab-testing: Включить AB-тестирование
 channel-ab-testing-percentage: Процент пользователей, получивших дополнительную версию
+channel-bundle-linked: |-
+  Этот пакет связан с одним или несколькими каналами. 
+  (%) Хотите отсоединить его от этих каналов?
 channel-create: Создать канал
 channel-deleted: Канал удален
 channel-forced-devices: Принудительные устройства
@@ -145,6 +169,7 @@ channels: каналы
 check-email: Пожалуйста, проверьте свою электронную почту и подтвердите
 check-on-web: Проверить на сайте
 checksum: Контрольная сумма
+cli-doc: Документация CLI
 commands: команды
 confirm-email: Подтвердите ваш адрес электронной почты
 confirm-email-sent: >-
@@ -161,8 +186,10 @@ copy-command: Копировать команду
 copy-your: Скопируйте свой
 country: Страна
 create-a-free-accoun: Создать бесплатный аккаунт
+create-new-org: Создать новую организацию
 created-at: Создан в
 current-billing-cycle: Текущий цикл выставления счетов
+custom: Обычай
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
 custom-id-saved: Пользовательский идентификатор сохранен
@@ -171,8 +198,11 @@ days: дни
 defined-as: Определяется как
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
+delete: Удалить
 delete-account: Удалить аккаунт
 delete-account-0: Удалить аккаунт
+delete-app: Удалить приложение
+delete-org: Удалить организацию
 delete-your-account: Удалить свой аккаунт
 deleted: удален
 dependencies:
@@ -203,6 +233,8 @@ discover-your-dashbo: Откройте для себя панель инстру
 documentation: Документация
 dont-have-an-account: У вас нет аккаунта?
 download: Скачать
+edit-name: Редактировать имя
+edit-pic: Редактировать изображение
 email: Электронная почта
 email-address: Адрес электронной почты
 email-does-not-exist: Этот пользователь не существует
@@ -217,6 +249,7 @@ error: Ошибка
 external-storage: Внешнее хранилище
 fail: Установка не удалась
 failed: Неуспешный
+failed-to-get-user: Не удалось загрузить пользователя
 fast-backward: Быстро назад
 fast-forward: Перемотка вперед
 filters: Фильтры
@@ -226,6 +259,7 @@ force-version-change: Пропустить прогрессивное разве
 forgot: Забыл
 forgot-check-email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
 forgot-success: Пароль успешно обновлен
+free-trial: Бесплатная пробная версия
 from: С сайта
 from-device: с устройства
 general-information: Общая информация
@@ -259,10 +293,17 @@ key-super-admin: Суперадминистратор
 key-upload: Загрузить
 key-write: Писать
 language: Язык
+last-15-minutes: Последние 15 минут
+last-24-hour: Последние 24 часа
+last-3-hour: Последние 3 часа
+last-3-minutes: Последние 3 минуты
+last-hour: Последний час
+last-minute: Последняя минута
 last-name: Фамилия
 last-update: Последнее обновление
 last-upload: Последняя загрузка
 last-version: Последняя версия
+latest_version: Последний пакет
 launch-bundle: Пакет запуска
 leaving: Уход
 limit-reached: Достигнут предел
@@ -301,6 +342,8 @@ misconfigured: Неправильно настроен
 misconfigured-channels: |-
   Некоторые каналы настроены неправильно. 
   Для этих каналов обновления не будут установлены!
+missing-email: Отсутствует адрес электронной почты
+missing-name: Отсутствует имя
 mo: мес.
 modify-org-info: Здесь вы можете изменить информацию об организации.
 module-heading: Модули
@@ -316,8 +359,16 @@ name: Имя
 need-more-contact-us: |-
   Нужно больше ? 
   Свяжитесь с нами для индивидуального плана
+new-name-not-changed: Новое имя такое же, как старое
+new-name-to-long: |-
+  Новое имя слишком длинное. 
+  Вы можете использовать только 32 символа
+new-name-to-short: |-
+  Имя апикея слишком короткое. 
+  Оно должно содержать не менее 4 символов.
 next: Следующий
 'no': нет
+no-app-icon: В этом приложении нет значка приложения
 no-channel-linked: Нет канала, нажмите, чтобы добавить
 no-channel-linked-no-perm: Нет канала
 no-data: Нет данных
@@ -340,16 +391,21 @@ open-channel: Открытый канал
 open-settings: Нажмите, чтобы открыть настройки
 open-sidebar: Открыть боковую панель
 open-this-link-to-le: Откройте эту ссылку, чтобы узнать, как протестировать обновление
+open-your-portal: Откройте свой портал
 org-changes-saved: Организация успешно обновлена
 org-changes-set-email-not-unique: Адрес электронной почты руководства не уникален, выберите другой.
 org-changes-set-email-other-error: >-
   Невозможно установить адрес электронной почты управления, обратитесь в службу
   поддержки.
+org-created-successfully: Организация успешно создана!
+org-deleted: Организация успешно удалена
 org-invited-user: Пользователь успешно приглашен в организацию.
+org-with-this-name-exists: Вы уже создали организацию с таким названием!
 organization-email: Электронная почта руководства организации
 organization-name: Название организации
 organization-settings: Настройки организации
 os-version: версия ОС
+owner-org: 'Владелец: организация:'
 pages: Страницы
 password: Пароль
 password-confirmatio: Подтверждение пароля
@@ -360,6 +416,8 @@ patch: Пластырь
 percent-fail: Процент неудач
 permission-changed: Разрешение пользователя успешно изменено.
 personal-information: Личные сведения
+picture-delete-fail: Невозможно удалить изображение приложения, проверьте журнал консоли.
+picture-uploaded: Изображение успешно загружено
 plan-abtest: А/Б тестирование
 plan-bandwidth: Пропускная способность в ГБ
 plan-buy: Купить
@@ -385,6 +443,8 @@ plans-super-only: Только суперадминистраторы могут
 platform: Платформа
 please-ask-the-user-to-create-account-first: Пожалуйста, попросите пользователя сначала создать учетную запись
 please-choose-your-p: Пожалуйста, выберите ваши предпочтения
+please-confirm-org-del: Подтвердите, что вы хотите удалить организацию «%1», введя ее имя.
+please-type-new-app-name: Пожалуйста, введите новое название приложения
 please-upgrade: Обновите свой план, чтобы добавить больше пользователей
 plugin-version: Версия плагина
 prediction: Прогноз
@@ -448,6 +508,7 @@ status-complete: полный
 status-failed: неуспешный
 storage-usage: 'Использование хранилища:'
 stored-externally: хранится снаружи
+stripe-billing-portal-will-be-opened-in-a-new-tab: Платежный портал Stripe откроется в новой вкладке
 submit: Представлять на рассмотрение
 support: Поддерживать
 switch-to-all-device: Переключиться на все устройства
@@ -466,24 +527,29 @@ to-live-reload: жить перезагрузить.
 to-open-encrypted-bu: 'Чтобы открыть зашифрованный пакет, используйте команду:'
 top-apps: Мои приложения
 top-apps-v2: Программы
-trial: пробный
 trial-left: дней осталось
 trial-plan-expired: Пробная версия истекла
 trial-plan-expires-in: Испытание заканчивается через
 type: ''
+type-new-app-name: Новое название приложения
+type-new-name: Введите новое имя ключа API.
+type-new-org-name: Пожалуйста, введите новое название организации
 undefined: неопределенный
 undefined-fail: Не определено (обновления не будут выполнены)
 uninstall: Удалено
 unknown: неизвестный
+unknown-mime: Неизвестный тип mime, проверьте консоль браузера
 unlimited-updates: Неограниченные обновления
 unlink-bundle: Отключить группу
 unlink-channel: Отключить канал
+unlink-error: Ошибка отключения, проверьте консоль
 unlink-version: Отключить версию
 update: Обновлять
 updated-at: Обновлено в
 updated-min-version: Обновлена ​​минимальная версия
 upgrade: Обновление
 upgrade-now: Обнови сейчас
+upload-img-error: Невозможно загрузить изображение, проверьте консоль
 upperCaseError: Должен содержать заглавные буквы
 url: URL-адрес
 usage: Применение
@@ -509,10 +575,16 @@ version-builtin: Встроенная версия
 version-linked: Ссылка на версию
 version-linking: Ссылка на комплект
 versions: Версии
+want-to-unlink: Вы хотите отменить связь?
 warning: Предупреждение!
 welcome-to: Добро пожаловать в
 welcome-to-your-capg: Добро пожаловать на панель инструментов Capgo
+what-to-do-with-photo: Редактировать изображение
+what-to-do-with-photo-dec: Что бы вы хотели сделать с фотографией приложения?
 write-key: Писать
+wrong-name-org-del: |-
+  Вы не ввели название организации. 
+  Вы должны были ввести: %1
 yearly: Ежегодно
 'yes': да
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.

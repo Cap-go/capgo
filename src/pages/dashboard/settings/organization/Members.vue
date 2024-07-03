@@ -38,7 +38,7 @@ function validateEmail(email: string) {
   return String(email)
     .toLowerCase()
     .match(
-      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\])|(([a-z\-0-9]+\.)+[a-z]{2,}))$/i,
     )
 }
 
@@ -105,13 +105,10 @@ async function showInviteModal() {
         text: t('button-invite'),
         id: 'confirm-button',
         handler: async () => {
-          const input = document.getElementById('dialog-input-field') as HTMLInputElement | undefined
-          email = input?.value
+          email = displayStore.dialogInputText
 
-          if (!email || !input)
-            return
-
-          input.value = ''
+          if (!email)
+            toast.error(t('missing-email'))
 
           if (!validateEmail(email)) {
             toast.error(t('invalid-email'))
@@ -235,6 +232,26 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
   toast.success(t('permission-changed'))
   members.value = await organizationStore.getMembers()
 }
+function acronym(email: string) {
+  let res = 'NA'
+  const prefix = email.split('@')[0]
+  // search for a dot and if there is more than 2 chars, if yes use the first 2 chars of each word
+  if (prefix.length > 2 && prefix.includes('.')) {
+    const first_name = prefix.split('.')[0]
+    const last_name = prefix.split('.')[1]
+    res = first_name[0] + last_name[0]
+  }
+  else if (prefix) {
+    res = prefix[0] + prefix[1]
+  }
+  return res.toUpperCase()
+}
+function canEdit(member: ExtendedOrganizationMember) {
+  return (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
+}
+function canDelete(member: ExtendedOrganizationMember) {
+  return (member.uid === main.user?.id || currentOrganization?.value?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.value?.created_by
+}
 </script>
 
 <template>
@@ -243,32 +260,34 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
       <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
         {{ t('members') }}
       </h2>
-      <button type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
+      <button type="button" class="text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
         <Plus />
-        {{ t('add-member') }}
+        <p class="hidden ml-2 md:block">
+          {{ t('add-member') }}
+        </p>
       </button>
     </div>
-    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-full md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+    <div class="flex flex-col overflow-y-auto md:mx-auto md:mt-5 md:w-full ">
       <dl id="members-div" class="divide-y divide-gray-500">
         <div v-for="member in members" :key="member.id">
-          <div id="member-card" class="flex justify-between mt-2 mb-2 ml-2">
-            <div class="flex">
+          <div id="member-card" class="flex justify-between my-2 ml-2 md:my-6">
+            <div class="hidden md:flex">
               <img
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
                 width="80" height="80" alt="profile_photo"
               >
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
-                <p>{{ 'N/A' }}</p>
+                <p>{{ acronym(member.email) }}</p>
               </div>
             </div>
             <div id="user-email" class="mt-auto mb-auto text-center ml-1/3 mr-1/3">
               {{ `${member.email} (${member.role.replaceAll('_', ' ')})` }}
             </div>
             <div class="mt-auto mb-auto mr-4">
-              <button id="wrench-button" :class="`w-7 h-7 bg-transparent ml-4 ${(organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="changeMemberPermission(member)">
+              <button id="wrench-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canEdit(member), invisible: !canEdit(member) }" @click="changeMemberPermission(member)">
                 <Wrench class="mr-4 text-lg text-[#397cea]" />
               </button>
-              <button id="trash-button" :class="`w-7 h-7 bg-transparent ml-4 ${((member.uid === main.user?.id || currentOrganization?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.created_by) ? 'visible' : 'invisible'}`" @click="deleteMember(member)">
+              <button id="trash-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canDelete(member), invisible: !canDelete(member) }" @click="deleteMember(member)">
                 <Trash class="mr-4 text-lg text-red-600" />
               </button>
             </div>

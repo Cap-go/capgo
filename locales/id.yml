@@ -26,6 +26,7 @@ activation-legal-desc: Saya menerima kebijakan privasi dan ketentuan penggunaan 
 activation-notification: Notifikasi
 activation-notification-desc: Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru tersedia
 activation-validate: Mengesahkan
+active_users_by_version: Perangkat aktif berdasarkan paket
 add: Menambahkan
 add-another-app: Tambahkan aplikasi Anda
 add-api-key: Berhasil menambahkan kunci API baru
@@ -55,12 +56,19 @@ allow-develoment-bui: Izinkan pembangunan pembangunan
 allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 allow-emulator: Izinkan Emulator
 already-account: Anda sudah memiliki akun?
+api-doc: dokumen API
 api-key: Kunci API
 api-keys: Kunci API
+api-keys-are-used-for-cli-and-public-api: Kunci API digunakan untuk CLI dan API publik
 api-keys-key-copied: Kunci API
 app: Aplikasi
 app-deleted: Aplikasi dihapus
+app-id: 'Id aplikasi:'
 app-id-example: Contoh ID aplikasi
+app-info: Informasi aplikasi
+app-info-desc: Di sini Anda dapat mengubah informasi aplikasi Anda
+app-logo-deleted: Gambar aplikasi berhasil dihapus
+app-name: Nama aplikasi
 app-not-found: Aplikasi tidak ditemukan
 app-perm: Izin aplikasi
 app-preview: Pratinjau aplikasi
@@ -88,6 +96,7 @@ button-back: Kembali
 button-browse: Jelajahi
 button-camera: Kamera
 button-cancel: Membatalkan
+button-confirm: Mengonfirmasi
 button-delete: Menghapus
 button-deny-invite: Membantah
 button-go: PERGI
@@ -102,7 +111,12 @@ button-toggle_dark: Alihkan mode gelap
 button-toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
 cancel: Membatalkan
+canceled-delete: Penghapusan paket dibatalkan, tidak dapat menghapus paket tertaut
+canceled-photo-selection: Anda membatalkan pemilihan gambar
+cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
+cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!
+cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
@@ -111,8 +125,12 @@ cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
 cannot-download: Tidak dapat mengunduh bundel
+cannot-find-unknown-version: >-
+  Tidak dapat menemukan versi yang tidak dikenal, silakan hubungi dukungan capgo
+  dan periksa log browser
 cannot-get-the-test-: Tidak bisa mendapatkan versi uji
 cannot-invite-owner: Tidak dapat mengundang pemilik ke organisasi
+cannot-load-app-settings: Tidak dapat memuat pengaturan aplikasi
 cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 cannot-set-this-vers: Tidak dapat menyetel versi ini
 cannot-share: Tidak dapat membagikan id pengguna, periksa konsol browser
@@ -122,10 +140,16 @@ cannot-view-plans: Tidak dapat melihat halaman rencana
 cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
 change: Mengubah
+change-api-key-name: Ubah nama apikey
+changed-app-name: Berhasil mengubah nama aplikasi
+changed-name: Berhasil mengubah nama apikey
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
 channel-ab-testing: Aktifkan pengujian AB
 channel-ab-testing-percentage: Persentase pengguna yang menerima versi sekunder
+channel-bundle-linked: |-
+  Paket ini tertaut ke satu atau beberapa saluran. 
+  (%) Apakah Anda ingin membatalkan tautannya dari saluran tersebut?
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-forced-devices: Perangkat Terpaksa
@@ -141,6 +165,7 @@ channels: Saluran
 check-email: Silakan periksa email Anda dan verifikasi
 check-on-web: Periksa di situs web
 checksum: Checksum
+cli-doc: dokumen CLI
 commands: perintah
 confirm-email: Konfirmasi email Anda
 confirm-email-sent: >-
@@ -151,7 +176,6 @@ confirm-public-desc: >-
   Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
   semua pengguna Anda.
 
-
   Saluran default lainnya tidak akan menjadi default lagi.
 copied-to-clipboard: Disalin ke papan klip
 copy-account-id: salin id akun
@@ -159,8 +183,10 @@ copy-command: Salin perintah
 copy-your: Salin Anda
 country: Negara
 create-a-free-accoun: Buat Akun gratis
+create-new-org: Buat organisasi baru
 created-at: Dibuat di
 current-billing-cycle: Siklus Penagihan Saat Ini
+custom: Kebiasaan
 custom-domain: Domain khusus
 custom-id: ID khusus
 custom-id-saved: ID khusus disimpan
@@ -169,8 +195,11 @@ days: hari
 defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
+delete: Menghapus
 delete-account: Hapus akun
 delete-account-0: Hapus akun
+delete-app: Hapus aplikasi
+delete-org: Hapus organisasi
 delete-your-account: Hapus akun anda
 deleted: dihapus
 dependencies:
@@ -201,6 +230,8 @@ discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
 dont-have-an-account: Belum punya akun?
 download: Unduh
+edit-name: Sunting nama
+edit-pic: Sunting gambar
 email: Surel
 email-address: Alamat email
 email-does-not-exist: Pengguna ini tidak ada
@@ -217,6 +248,7 @@ error: Kesalahan
 external-storage: Penyimpanan luar
 fail: Instal gagal
 failed: Gagal
+failed-to-get-user: Gagal memuat pengguna
 fast-backward: Mundur Cepat
 fast-forward: Maju Cepat
 filters: Filter
@@ -228,6 +260,7 @@ forgot-check-email: >-
   Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
   Anda
 forgot-success: Kata sandi berhasil diperbarui
+free-trial: Uji coba gratis
 from: Dari
 from-device: dari perangkat
 general-information: Informasi Umum
@@ -261,10 +294,17 @@ key-super-admin: Admin super
 key-upload: Mengunggah
 key-write: Menulis
 language: Bahasa
+last-15-minutes: 15 menit terakhir
+last-24-hour: 24 jam terakhir
+last-3-hour: 3 jam terakhir
+last-3-minutes: 3 menit terakhir
+last-hour: Jam terakhir
+last-minute: Menit terakhir
 last-name: nama keluarga
 last-update: Pembaharuan Terakhir
 last-upload: Unggahan terakhir
 last-version: Versi terakhir
+latest_version: Paket terbaru
 launch-bundle: Luncurkan bundel
 leaving: Meninggalkan
 limit-reached: Batas tercapai
@@ -301,8 +341,10 @@ min-update-version: Versi pembaruan minimal
 minor: Minor
 misconfigured: Salah dikonfigurasi
 misconfigured-channels: |-
-  Beberapa saluran salah dikonfigurasi. 
+  Beberapa saluran salah dikonfigurasi.
   Pembaruan akan gagal untuk saluran tersebut!
+missing-email: Email tidak ada
+missing-name: Nama tidak ada
 mo: bulan
 modify-org-info: Anda dapat mengubah informasi organisasi di sini.
 module-heading: Modul
@@ -316,10 +358,18 @@ my-account: Akun saya
 my-notifications: Notifikasi Saya
 name: Nama
 need-more-contact-us: |-
-  Butuh lebih banyak? 
+  Butuh lebih banyak?
   Hubungi kami untuk rencana yang disesuaikan
+new-name-not-changed: Nama barunya sama dengan nama lama
+new-name-to-long: |-
+  Nama barunya terlalu panjang. 
+  Anda hanya dapat menggunakan 32 karakter
+new-name-to-short: |-
+  Nama apikey terlalu pendek. 
+  Panjangnya minimal harus 4 karakter
 next: Berikutnya
 'no': TIDAK
+no-app-icon: Aplikasi ini tidak memiliki ikon aplikasi apa pun
 no-channel-linked: Tidak ada saluran, klik untuk menambahkan
 no-channel-linked-no-perm: Tidak ada saluran
 no-data: Tidak ada data
@@ -342,14 +392,19 @@ open-channel: Buka saluran
 open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
+open-your-portal: Buka portal Anda
 org-changes-saved: Organisasi berhasil diperbarui
 org-changes-set-email-not-unique: Email manajemen tidak unik, silakan pilih email lain
 org-changes-set-email-other-error: Tidak dapat mengatur email manajemen, silakan hubungi dukungan
+org-created-successfully: Organisasi berhasil dibuat!
+org-deleted: Organisasi berhasil dihapus
 org-invited-user: Berhasil mengundang pengguna ke org
+org-with-this-name-exists: Anda telah membuat organisasi dengan nama ini!
 organization-email: Email manajemen organisasi
 organization-name: Nama Organisasi
 organization-settings: Pengaturan organisasi
 os-version: versi OS
+owner-org: 'Organisasi pemilik:'
 pages: Halaman
 password: Kata sandi
 password-confirmatio: konfirmasi kata kunci
@@ -360,6 +415,8 @@ patch: Tambalan
 percent-fail: Persentase gagal
 permission-changed: Berhasil mengubah izin pengguna
 personal-information: Informasi pribadi
+picture-delete-fail: Tidak dapat menghapus gambar aplikasi, silakan periksa log konsol
+picture-uploaded: Gambar berhasil diunggah
 plan-abtest: Pengujian A/B
 plan-bandwidth: Bandwidth GB
 plan-buy: Membeli
@@ -385,6 +442,10 @@ plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan
 platform: Platform
 please-ask-the-user-to-create-account-first: Silakan minta pengguna untuk membuat akun terlebih dahulu
 please-choose-your-p: Silakan pilih preferensi Anda
+please-confirm-org-del: >-
+  Harap konfirmasikan bahwa Anda ingin menghapus "%1" organisasi dengan
+  mengetikkan namanya
+please-type-new-app-name: Silakan ketik nama aplikasi baru
 please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
 prediction: Ramalan
@@ -438,7 +499,7 @@ sign-out: Keluar
 size: Ukuran
 size-not-found: Tidak ditemukan
 something-went-wrong-try-again-later: |-
-  Ada yang salah! 
+  Ada yang salah!
   Coba lagi nanti.
 special-api-access: Akses API khusus
 specialError: Harus mengandung karakter khusus
@@ -448,6 +509,7 @@ status-complete: menyelesaikan
 status-failed: gagal
 storage-usage: 'Penggunaan penyimpanan:'
 stored-externally: disimpan secara eksternal
+stripe-billing-portal-will-be-opened-in-a-new-tab: Portal penagihan Stripe akan dibuka di tab baru
 submit: Kirim
 support: Mendukung
 switch-to-all-device: Beralih ke semua perangkat
@@ -466,24 +528,29 @@ to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps: Aplikasi saya
 top-apps-v2: Aplikasi
-trial: uji coba
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 trial-plan-expires-in: Uji coba berakhir
 type: ''
+type-new-app-name: Nama aplikasi baru
+type-new-name: Silakan ketik nama kunci api baru
+type-new-org-name: Silakan ketikkan nama baru untuk organisasi tersebut
 undefined: belum diartikan
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
 unknown: tidak dikenal
+unknown-mime: Jenis pantomim tidak dikenal, silakan periksa konsol browser
 unlimited-updates: Pembaruan tanpa batas
 unlink-bundle: Putuskan tautan bundel
 unlink-channel: Batalkan tautan saluran
+unlink-error: Kesalahan pembatalan tautan, silakan periksa konsol
 unlink-version: Batalkan tautan versi
 update: Memperbarui
 updated-at: Diperbarui pada
 updated-min-version: Versi minimal yang diperbarui
 upgrade: Meningkatkan
 upgrade-now: Tingkatkan sekarang
+upload-img-error: Tidak dapat mengunggah gambar, silakan periksa konsol
 upperCaseError: Harus berisi huruf besar
 url: URL
 usage: Penggunaan
@@ -507,10 +574,16 @@ version-builtin: Versi bawaan
 version-linked: Tautan versi
 version-linking: Tautan ke bundel
 versions: Versi
+want-to-unlink: Apakah Anda ingin membatalkan tautan?
 warning: Peringatan!
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
+what-to-do-with-photo: Sunting gambar
+what-to-do-with-photo-dec: Apa yang ingin Anda lakukan dengan foto aplikasi?
 write-key: Menulis
+wrong-name-org-del: |-
+  Anda belum mengetikkan nama organisasi. 
+  Anda seharusnya mengetik: %1
 yearly: Tahunan
 'yes': Ya
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.

@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 
 import { createClient } from '@supabase/supabase-js'
 import { createCustomer } from './stripe.ts'
@@ -6,6 +6,7 @@ import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
+import type { Order } from './types.ts'
 
 export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 const DEFAULT_LIMIT = 1000
@@ -77,7 +78,7 @@ export function updateOrCreateVersion(c: Context, update: Database['public']['Ta
     .eq('name', update.name)
 }
 
-export async function getAppsFromSupabase(c: Context): Promise<string[]> {
+export async function getAppsFromSB(c: Context): Promise<string[]> {
   const limit = 1000
   let page = 0
   let apps: string[] = []
@@ -111,7 +112,7 @@ export function updateOrCreateChannel(c: Context, update: Database['public']['Ta
   }
   return supabaseAdmin(c)
     .from('channels')
-    .upsert(update)
+    .upsert(update, { onConflict: 'app_id, name' })
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)
@@ -168,6 +169,36 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   }
 
   return userRight.data
+}
+
+interface PlanTotal {
+  mau: number
+  bandwidth: number
+  storage: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
+export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTotal> {
+  if (!orgId) {
+    return {
+      mau: 0,
+      bandwidth: 0,
+      storage: 0,
+      get: 0,
+      fail: 0,
+      install: 0,
+      uninstall: 0,
+    }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_total_metrics', { org_id: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
 }
 
 interface PlanUsage {
@@ -302,68 +333,6 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
   return false
 }
 
-export async function getSDashboard(c: Context, auth: string, orgIdQuery: string, startDate: string, endDate: string, appId?: string) {
-  console.log(`getSDashboard orgId ${orgIdQuery} appId ${appId} startDate ${startDate}, endDate ${endDate}`)
-
-  let client = supabaseClient(c, auth)
-  if (!auth)
-    client = supabaseAdmin(c)
-
-  if (appId) {
-    const reqOwner = await client
-      .rpc('has_app_right', { appid: appId, right: 'read' })
-      .then(res => res.data || false)
-    if (!reqOwner)
-      return Promise.reject(new Error('not allowed'))
-  }
-
-  client = supabaseAdmin(c)
-
-  // console.log('tableName', tableName)
-  let req = client
-    .from('clickhouse_app_usage_parm')
-    .select()
-
-  if (appId) {
-    req = req.eq('_app_list', JSON.stringify([appId]))
-  }
-  else {
-    const userId = (await supabaseClient(c, auth).auth.getUser()).data.user?.id
-    if (!userId)
-      return []
-    // get all user apps id
-    let appIdsReq = supabaseClient(c, auth)
-      .from('apps')
-      .select('app_id')
-      // .eq('user_id', userId)
-
-    if (orgIdQuery)
-      appIdsReq = appIdsReq.eq('owner_org', orgIdQuery)
-
-    const appIds = await appIdsReq.then(res => res.data?.map(app => app.app_id) || [])
-
-    console.log('appIds', appIds)
-    req = req.eq('_app_list', JSON.stringify(appIds))
-  }
-
-  if (startDate) {
-    console.log('startDate', startDate)
-    // convert date string startDate to YYYY-MM-DD
-    const startDateStr = new Date(startDate).toISOString().split('T')[0]
-    req = req.eq('_start_date', startDateStr)
-  }
-  if (endDate) {
-    console.log('endDate', endDate)
-    // convert date string endDate to YYYY-MM-DD
-    const endDateStr = new Date(endDate).toISOString().split('T')[0]
-    req = req.eq('_end_date', endDateStr)
-  }
-
-  const res = await req
-  console.log('res', res)
-  return res.data || []
-}
-
 export async function createApiKey(c: Context, userId: string) {
   // check if user has apikeys
   const total = await supabaseAdmin(c)
@@ -381,24 +350,22 @@ export async function createApiKey(c: Context, userId: string) {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'all',
+          name: 'all',
         },
         {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'upload',
+          name: 'upload',
         },
         {
           user_id: userId,
           key: crypto.randomUUID(),
           mode: 'read',
+          name: 'read',
         },
       ])
   }
-  return Promise.resolve()
-}
-
-export async function createdefaultOrg(_c: Context, _userId: string, _name = 'Default') {
-  /// We no longer do that in the backend, we have a postgres trigger
   return Promise.resolve()
 }
 
@@ -550,7 +517,7 @@ export function trackVersionUsageSB(
   c: Context,
   versionId: number,
   appId: string,
-  action: string,
+  action: Database['public']['Enums']['version_action'],
 ) {
   return supabaseAdmin(c)
     .from('version_usage')
@@ -617,7 +584,7 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
     .eq('device_id', device_id)
 }
 
-export function trackLogsSB(c: Context, app_id: string, device_id: string, action: string, version_id: number) {
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
   return supabaseAdmin(c)
     .from('stats')
     .insert(
@@ -655,18 +622,20 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
   return data || []
 }
 
-export async function readStatsSB(c: Context, app_id: string, period_start: string, period_end: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readStatsSB(c: Context, app_id: string, period_start?: string, period_end?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
   let query = supabase
     .from('stats')
     .select('*')
     .eq('app_id', app_id)
-    .gte('created_at', new Date(period_start).toISOString())
-    .lt('created_at', new Date(period_end).toISOString())
-    .order('created_at', { ascending: true })
-    .order('app_id', { ascending: true })
     .limit(limit)
+
+  if (period_start)
+    query = query.gte('created_at', new Date(period_start).toISOString())
+
+  if (period_end)
+    query = query.lt('created_at', new Date(period_end).toISOString())
 
   if (deviceIds && deviceIds.length) {
     console.log('deviceIds', deviceIds)
@@ -684,6 +653,15 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
       query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
   }
 
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
+      }
+    })
+  }
+
   const { data, error } = await query
 
   if (error) {
@@ -694,17 +672,15 @@ export async function readStatsSB(c: Context, app_id: string, period_start: stri
   return data || []
 }
 
-export async function readDevicesSB(c: Context, app_id: string, period_start: string, period_end: string, version_id?: string, deviceIds?: string[], search?: string, limit = DEFAULT_LIMIT) {
+export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
-  console.log('readDevicesSB', app_id, period_start, period_end, version_id, deviceIds, search)
+  console.log('readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search)
   let query = supabase
     .from('devices')
     .select('*')
     .eq('app_id', app_id)
-    .gte('updated_at', new Date(period_start).toISOString())
-    .lt('updated_at', new Date(period_end).toISOString())
-    .order('updated_at', { ascending: false })
+    .range(range_start, range_end)
     .limit(limit)
 
   if (deviceIds && deviceIds.length) {
@@ -722,6 +698,14 @@ export async function readDevicesSB(c: Context, app_id: string, period_start: st
     else
       query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
   }
+  if (order?.length) {
+    order.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        console.log('order', col.key, col.sortable)
+        query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
+      }
+    })
+  }
   if (version_id)
     query = query.eq('version_id', version_id)
 
@@ -734,6 +718,15 @@ export async function readDevicesSB(c: Context, app_id: string, period_start: st
 
   return data || []
 }
+
+export async function countDevicesSB(c: Context, app_id: string) {
+  const { count } = await supabaseAdmin(c)
+    .from('devices')
+    .select('device_id', { count: 'exact', head: true })
+    .eq('app_id', app_id)
+  return count || 0
+}
+
 const DEFAUL_PLAN_NAME = 'Solo'
 
 export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise<string> {

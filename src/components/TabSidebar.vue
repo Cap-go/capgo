@@ -42,7 +42,7 @@ watch(props, (p) => {
     <!-- Content -->
     <div class="h-full mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800">
       <div class="flex flex-col h-full md:flex-row md:-mr-px">
-        <div class="hidden px-3 py-6 overflow-x-scroll border-b no-scrollbar min-w-60 flex-nowrap border-slate-200 md:block md:flex md:overflow-auto md:border-b-0 md:border-r md:space-y-3">
+        <div class="hidden px-3 py-6 overflow-x-scroll border-b no-scrollbar min-w-60 flex-nowrap border-slate-200 md:flex md:overflow-auto md:border-b-0 md:border-r md:space-y-3">
           <!-- Group 1 -->
           <div>
             <ul class="flex mr-3 flex-nowrap md:mr-0 md:block">

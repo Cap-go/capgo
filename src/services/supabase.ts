@@ -1,6 +1,8 @@
 import ky from 'ky'
+import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
+import { coerce as semverCoerce } from 'semver'
 
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
@@ -143,6 +145,15 @@ export interface appUsageByApp {
   uninstall: number
   fail: number
 }
+
+export interface appUsageByVersion {
+  date: string
+  app_id: string
+  version_id: string
+  install: number
+  uninstall: number
+}
+
 export interface appUsageGlobal {
   date: string
   bandwidth: number
@@ -153,10 +164,12 @@ export interface appUsageGlobal {
   uninstall: number
   fail: number
 }
+
 export interface appUsageGlobalByApp {
   global: appUsageGlobal[]
   byApp: appUsageByApp[]
 }
+
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobalByApp> {
   const resAppIds = await useSupabase()
     .from('apps')
@@ -168,11 +181,12 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
 
   // generate all dates between startDate and endDate
   const dates: string[] = []
-  let currentDate = new Date(startDate)
-  const end = new Date(endDate)
+  // use dayjs to create dates
+  let currentDate = dayjs(startDate)
+  const end = dayjs(endDate)
   while (currentDate <= end) {
     dates.push(currentDate.toISOString().split('T')[0])
-    currentDate = new Date(currentDate.setDate(currentDate.getDate() + 1))
+    currentDate = currentDate.add(1, 'day')
   }
   const data = resAppIds.flatMap((appId) => {
     // create only one entry for each day by appId
@@ -223,6 +237,61 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     global: reducedData.sort((a, b) => a.date.localeCompare(b.date)),
     byApp: data.sort((a, b) => a.date.localeCompare(b.date)),
   }
+}
+interface NativePackage {
+  name: string
+  version: string
+}
+
+export async function getCapgoVersion(appId: string, versionId: string | null | undefined): Promise<string> {
+  if (!versionId)
+    return ''
+  const { data, error } = await useSupabase()
+    .from('app_versions')
+    .select('native_packages')
+    .eq('app_id', appId)
+    .eq('name', versionId)
+    .single()
+
+  if (error)
+    return ''
+
+  const nativePackages: NativePackage[] = (data?.native_packages || []) as any as NativePackage[]
+  for (const pkg of nativePackages) {
+    if (pkg && pkg.name === '@capgo/capacitor-updater') {
+      return semverCoerce(pkg.version)?.version ?? ''
+    }
+  }
+  return ''
+}
+
+export async function getVersionNames(appId: string, versionIds: string[]): Promise<{ id: string, name: string, created_at: string }[]> {
+  const { data, error: vError } = await useSupabase()
+    .from('app_versions')
+    .select('id, name, created_at')
+    .eq('app_id', appId)
+    .in('id', versionIds)
+
+  if (vError)
+    return []
+
+  return data
+}
+
+export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<appUsageByVersion[]> {
+  const { data, error } = await useSupabase()
+    .from('daily_version')
+    .select('date, app_id, version_id, install, uninstall')
+    .eq('app_id', appId)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true })
+
+  if (error || !data) {
+    console.error('Error fetching data from daily_version:', error)
+    return []
+  }
+  return data
 }
 
 export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {
@@ -298,11 +367,11 @@ export async function isAdmin(userid?: string): Promise<boolean> {
   return data || false
 }
 
-export async function isCanceled(userid?: string): Promise<boolean> {
-  if (!userid)
+export async function isCanceled(orgId?: string): Promise<boolean> {
+  if (!orgId)
     return false
   const { data, error } = await useSupabase()
-    .rpc('is_canceled', { userid })
+    .rpc('is_canceled_org', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
@@ -354,28 +423,6 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
   if (error)
     throw new Error(error.message)
   return data
-}
-
-export async function getTotalStats(orgId?: string): Promise<Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0]> {
-  if (!orgId) {
-    return {
-      mau: 0,
-      bandwidth: 0,
-      storage: 0,
-    }
-  }
-  const { data, error } = await useSupabase()
-    .rpc('get_total_stats_v5_org', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-  // console.log('getTotalStats', data, error)
-
-  return data as any as Database['public']['Functions']['get_total_stats_v5_org']['Returns'][0] || {
-    mau: 0,
-    bandwidth: 0,
-    storage: 0,
-  }
 }
 
 const DEFAUL_PLAN_NAME = 'Solo'

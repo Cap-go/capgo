@@ -1,5 +1,5 @@
 import ky from 'ky'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { getEnv, shallowCleanObject } from './utils.ts'
 
 export interface Segments {

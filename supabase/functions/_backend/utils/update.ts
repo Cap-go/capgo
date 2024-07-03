@@ -1,10 +1,8 @@
 import cryptoRandomString from 'crypto-random-string'
 import * as semver from 'semver'
-import type { Context } from 'hono'
-import { drizzle as drizzle_postgress } from 'drizzle-orm/postgres-js'
+import type { Context } from '@hono/hono'
 import { and, eq, or, sql } from 'drizzle-orm'
-import { alias as alias_postgres } from 'drizzle-orm/pg-core'
-import postgres from 'postgres'
+import { alias } from 'drizzle-orm/pg-core'
 import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
@@ -12,14 +10,10 @@ import { sendNotifOrg } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
-
-import * as schema_postgres from './postgress_schema.ts'
-import type { DeviceWithoutCreatedAt } from './clickhouse.ts'
-import { getEnv } from './utils.ts'
-import { sendStatsAndDevice } from './clickhouse.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion } from './stats.ts'
-
-// import { saveStoreInfo, sendStatsAndDevice } from './clickhouse.ts'
+import * as schema from './postgress_schema.ts'
+import type { DeviceWithoutCreatedAt } from './stats.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
+import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
@@ -38,24 +32,13 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   return res
 }
 
-function getDrizzlePostgres(c: Context) {
-  const supaUrl = getEnv(c, 'CUSTOM_SUPABASE_DB_URL') ? getEnv(c, 'CUSTOM_SUPABASE_DB_URL') : getEnv(c, 'SUPABASE_DB_URL')
-  // const supaUrl = c.env.HYPERDRIVE ? c.env.HYPERDRIVE.connectionString : getEnv(c, 'CUSTOM_SUPABASE_DB_URL')!
-  console.log('getDrizzlePostgres', supaUrl)
-
-  const pgClient = postgres(supaUrl)
-  return { alias: alias_postgres, schema: schema_postgres, drizzleCient: drizzle_postgress(pgClient as any), pgClient }
-}
-
 async function requestInfosPostgres(
   platform: string,
   app_id: string,
   device_id: string,
   version_name: string,
   defaultChannel: string,
-  alias: typeof alias_postgres,
-  drizzleCient: ReturnType<typeof drizzle_postgress>,
-  schema: typeof schema_postgres,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
 ) {
   const appVersions = drizzleCient
     .select({
@@ -139,6 +122,8 @@ async function requestInfosPostgres(
         secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
         enableAbTesting: schema.channels.enableAbTesting,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        public: schema.channels.public,
       },
     },
     )
@@ -146,20 +131,8 @@ async function requestInfosPostgres(
     .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-
-  let channelDevice
-  if (defaultChannel) {
-    channelDevice = channelDeviceReq
-      .where(and(
-        eq(schema.channel_devices.app_id, app_id),
-        eq(schema.channels.name, defaultChannel),
-      ))
-  }
-  else {
-    channelDevice = channelDeviceReq
-      .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
-  }
-  channelDevice = channelDevice
+    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
+  const channelDevice = channelDeviceReq
     .limit(1)
     .then(data => data.at(0))
 
@@ -206,16 +179,24 @@ async function requestInfosPostgres(
         secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
         enableAbTesting: schema.channels.enableAbTesting,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        public: schema.channels.public,
       },
     })
     .from(schema.channels)
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
     .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
-    .where(and(
-      eq(schema.channels.public, true),
-      eq(schema.channels.app_id, app_id),
-      eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
-    ))
+    .where(!defaultChannel
+      ? and(
+        eq(schema.channels.public, true),
+        eq(schema.channels.app_id, app_id),
+        eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
+      )
+      : and (
+        eq(schema.channels.app_id, app_id),
+        eq(schema.channels.name, defaultChannel),
+      ),
+    )
     .limit(1)
     .then(data => data.at(0))
 
@@ -226,9 +207,7 @@ async function requestInfosPostgres(
 
 async function getAppOwnerPostgres(
   appId: string,
-  alias: typeof alias_postgres,
-  drizzleCient: ReturnType<typeof drizzle_postgress>,
-  schema: typeof schema_postgres,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
     const appOwner = await drizzleCient
@@ -253,9 +232,7 @@ async function getAppOwnerPostgres(
   }
 }
 
-export async function update(c: Context, body: AppInfos) {
-  const { alias, schema, drizzleCient, pgClient } = getDrizzlePostgres(c)
-
+export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient>) {
   const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
   try {
@@ -277,11 +254,11 @@ export async function update(c: Context, body: AppInfos) {
     } = body
     // if version_build is not semver, then make it semver
     const coerce = semver.coerce(version_build, { includePrerelease: true })
-    const appOwner = await getAppOwnerPostgres(app_id, alias, drizzleCient, schema)
+    const appOwner = await getAppOwnerPostgres(app_id, drizzleCient)
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
-      //   await saveStoreInfo(c, {
+      //   await saveStoreInfoCF(c, {
       //     app_id,
       //     onprem: true,
       //     capacitor: true,
@@ -294,6 +271,7 @@ export async function update(c: Context, body: AppInfos) {
         error: 'app_not_found',
       }, 200)
     }
+    await createStatsMau(c, device_id, app_id) // TODO: see if anaylytics got too expensive or not. Then keep it or move it back to same place as createStatsBandwidth
     if (coerce) {
       version_build = coerce.version
     }
@@ -361,7 +339,8 @@ export async function update(c: Context, body: AppInfos) {
       updated_at: new Date().toISOString(),
     }
 
-    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, alias, drizzleCient, schema)
+    const requestedInto = await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient)
+
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
 
@@ -506,6 +485,15 @@ export async function update(c: Context, body: AppInfos) {
         }, 200)
       }
 
+      if (!channelData.channels.allow_device_self_set && !channelData.channels.public) {
+        console.log(id, 'Cannot update via a private channel', device_id, new Date().toISOString())
+        await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel' }])
+        return c.json({
+          message: 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self associate" set to true',
+          error: 'cannot_update_via_private_channel',
+        }, 200)
+      }
+
       if (channelData.channels.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id, new Date().toISOString())
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
@@ -599,12 +587,12 @@ export async function update(c: Context, body: AppInfos) {
       }
     }
     let signedURL = version.external_url || ''
-    let fileSize = 0
     if ((version.bucket_id || version.r2_path) && !version.external_url) {
       const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
       if (res) {
-        fileSize = res.size
         signedURL = res.url
+        // only count the size of the bundle if it's not external
+        await createStatsBandwidth(c, device_id, app_id, res.size)
       }
     }
     //  check signedURL and if it's url
@@ -617,8 +605,6 @@ export async function update(c: Context, body: AppInfos) {
       }, 200)
     }
     // console.log(id, 'save stats', device_id)
-    await createStatsMau(c, device_id, app_id)
-    await createStatsBandwidth(c, device_id, app_id, fileSize)
     await createStatsVersion(c, version.id, app_id, 'get')
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
@@ -631,7 +617,21 @@ export async function update(c: Context, body: AppInfos) {
       error: 'unknow_error',
     }, 500)
   }
-  finally {
-    await pgClient.end()
+}
+
+export async function update(c: Context, body: AppInfos) {
+  const pgClient = getPgClient(c)
+  let res
+  try {
+    res = await updateWithPG(c, body, getDrizzleClient(pgClient as any))
   }
+  catch (e) {
+    console.error('update', e)
+    return c.json({
+      message: `Error unknow ${JSON.stringify(e)}`,
+      error: 'unknow_error',
+    }, 500)
+  }
+  closeClient(c, pgClient)
+  return res
 }

@@ -519,32 +519,37 @@ CREATE OR REPLACE FUNCTION "public"."get_app_metrics"("org_id" "uuid", "start_da
     AS $$
 BEGIN
     RETURN QUERY
+    WITH DateSeries AS (
+        SELECT generate_series(start_date, end_date, '1 day'::interval)::date AS "date"
+    )
     SELECT
         a.app_id,
-        d.date::date,
+        ds.date::date,
         COALESCE(dm.mau, 0) AS mau,
-        COALESCE(ds.storage, 0) AS storage,
+        COALESCE(dst.storage, 0) AS storage,
         COALESCE(db.bandwidth, 0) AS bandwidth,
         COALESCE(SUM(dv.get)::bigint, 0) AS get,
         COALESCE(SUM(dv.fail)::bigint, 0) AS fail,
         COALESCE(SUM(dv.install)::bigint, 0) AS install,
         COALESCE(SUM(dv.uninstall)::bigint, 0) AS uninstall
-    FROM
+    FROM 
         apps a
-    CROSS JOIN
-        generate_series(start_date, end_date, '1 day'::interval) AS d(date)
-    LEFT JOIN
-        daily_mau dm ON a.app_id = dm.app_id AND d.date::date = dm.date
-    LEFT JOIN
-        daily_storage ds ON a.app_id = ds.app_id AND d.date::date = ds.date
-    LEFT JOIN
-        daily_bandwidth db ON a.app_id = db.app_id AND d.date::date = db.date
-    LEFT JOIN
-        daily_version dv ON a.app_id = dv.app_id AND d.date::date = dv.date
-    WHERE
-        a.owner_org = org_id
-    GROUP BY
-        a.app_id, d.date, dm.mau, ds.storage, db.bandwidth;
+    CROSS JOIN 
+        DateSeries ds
+    LEFT JOIN 
+        daily_mau dm ON a.app_id = dm.app_id AND ds.date = dm.date
+    LEFT JOIN 
+        daily_storage dst ON a.app_id = dst.app_id AND ds.date = dst.date
+    LEFT JOIN 
+        daily_bandwidth db ON a.app_id = db.app_id AND ds.date = db.date
+    LEFT JOIN 
+        daily_version dv ON a.app_id = dv.app_id AND ds.date = dv.date
+    WHERE 
+        a.owner_org = org_id 
+    GROUP BY 
+        a.app_id, ds.date, dm.mau, dst.storage, db.bandwidth
+    ORDER BY
+        a.app_id, ds.date; 
 END;
 $$;
 
@@ -627,13 +632,15 @@ $$;
 
 ALTER FUNCTION "public"."get_customer_counts"() OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_cycle_info_org"("orgid" "uuid") RETURNS TABLE("subscription_anchor_start" timestamp with time zone, "subscription_anchor_end" timestamp with time zone)
-    LANGUAGE "plpgsql"
-    AS $$
+CREATE OR REPLACE FUNCTION "public"."get_cycle_info_org"("orgid" "uuid")
+RETURNS TABLE (
+    subscription_anchor_start timestamp with time zone,
+    subscription_anchor_end timestamp with time zone
+) AS $$
 DECLARE
     customer_id_var text;
     stripe_info_row stripe_info%ROWTYPE;
-    anchor_day int;
+    anchor_day INTERVAL;
     start_date timestamp with time zone;
     end_date timestamp with time zone;
 BEGIN
@@ -642,14 +649,14 @@ BEGIN
     -- Get the stripe_info using the customer_id
     SELECT * INTO stripe_info_row FROM stripe_info WHERE customer_id = customer_id_var;
 
-    -- Extract the day of the month from subscription_anchor_start, default to 1 if null
-    anchor_day := COALESCE(EXTRACT(DAY FROM stripe_info_row.subscription_anchor_start), 1);
+    -- Extract the day of the month from subscription_anchor_start as an INTERVAL, default to '0 DAYS' if null
+    anchor_day := COALESCE(stripe_info_row.subscription_anchor_start - date_trunc('MONTH', stripe_info_row.subscription_anchor_start), '0 DAYS'::INTERVAL);
 
     -- Determine the start date based on the anchor day and current date
-    IF anchor_day > EXTRACT(DAY FROM now()) THEN
-        start_date := date_trunc('MONTH', now() - INTERVAL '1 MONTH') + (anchor_day - 1) * INTERVAL '0 DAY';
+    IF anchor_day > now() - date_trunc('MONTH', now()) THEN
+        start_date := date_trunc('MONTH', now() - INTERVAL '1 MONTH') + anchor_day;
     ELSE
-        start_date := date_trunc('MONTH', now()) + (anchor_day - 1) * INTERVAL '1 DAY';
+        start_date := date_trunc('MONTH', now()) + anchor_day;
     END IF;
 
     -- Calculate the end date
@@ -658,7 +665,7 @@ BEGIN
     RETURN QUERY
     SELECT start_date, end_date;
 END;
-$$;
+$$ LANGUAGE plpgsql;
 
 ALTER FUNCTION "public"."get_cycle_info_org"("orgid" "uuid") OWNER TO "postgres";
 
@@ -1268,8 +1275,8 @@ CREATE OR REPLACE FUNCTION "public"."guard_r2_path"() RETURNS "trigger"
     RETURN NEW;
   END IF;
 
-  IF NEW."r2_path" is distinct from (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, encode(NEW.app_id::bytea, 'base64'), NEW.id)) THEN
-    RAISE EXCEPTION 'The expected r2_path is %', (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, encode(NEW.app_id::bytea, 'base64'), NEW.id));
+  IF NEW."r2_path" is distinct from (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id, NEW.id)) THEN
+    RAISE EXCEPTION 'The expected r2_path is %', (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id), NEW.id);
   END IF;
 
    RETURN NEW;
@@ -1990,10 +1997,10 @@ BEGIN
     ('00000000-0000-0000-0000-000000000000', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'authenticated', 'authenticated', 'test2@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsytt', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_user2"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
     INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
-    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3, 250, 5000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
-    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 499, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12, 3000, 40000, 'Best for scalling enterprises', 0.5, 0.9, 0.0006, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
+    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 5000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
+    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 499, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 40000, 'Best for scalling enterprises', 0.5, 0.9, 0.0006, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
     (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 500, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
-    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6, 500, 10000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
+    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 10000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('apps', 'apps', NULL, now(), now(), 'f'),
@@ -2012,15 +2019,18 @@ BEGIN
     ('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), 'f', 'f', 'f', NULL, NULL);
     ALTER TABLE users ENABLE TRIGGER generate_org_on_user_create;
 
+    ALTER TABLE orgs DISABLE TRIGGER generate_org_user_on_org_create;
     INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name", "management_email", "customer_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', now(), now(), '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A'),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), now(), '', 'Demo org', 'test@capgo.app', 'cus_Q38uE91NP8Ufqc'),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q');
+    ALTER TABLE orgs ENABLE TRIGGER generate_org_user_on_org_create;
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"user_min_right", null, null),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"user_min_right", null, null),
-    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"user_min_right", null, null);
+    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"user_min_right", null, null),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'upload'::"user_min_right", null, null);
 
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
     (901, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', now()),
@@ -2030,8 +2040,8 @@ BEGIN
     (912, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', now()),
     (913, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', now()),
     (916, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', now()),
-    (914, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now()),
-    (915, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now());
+    (915, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now()),
+    (917, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now());
 
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
@@ -2821,22 +2831,13 @@ ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channel_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."daily_bandwidth"
-    ADD CONSTRAINT "daily_bandwidth_app_id_date_key" UNIQUE ("app_id", "date");
-
-ALTER TABLE ONLY "public"."daily_bandwidth"
-    ADD CONSTRAINT "daily_bandwidth_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "daily_bandwidth_pkey" PRIMARY KEY ("app_id", "date");
 
 ALTER TABLE ONLY "public"."daily_mau"
-    ADD CONSTRAINT "daily_mau_app_id_date_key" UNIQUE ("app_id", "date");
-
-ALTER TABLE ONLY "public"."daily_mau"
-    ADD CONSTRAINT "daily_mau_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "daily_mau_pkey" PRIMARY KEY ("app_id", "date");
 
 ALTER TABLE ONLY "public"."daily_storage"
-    ADD CONSTRAINT "daily_storage_app_id_date_key" UNIQUE ("app_id", "date");
-
-ALTER TABLE ONLY "public"."daily_storage"
-    ADD CONSTRAINT "daily_storage_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "daily_storage_pkey" PRIMARY KEY ("app_id", "date");
 
 ALTER TABLE ONLY "public"."daily_version"
     ADD CONSTRAINT "daily_version_pkey" PRIMARY KEY ("date", "app_id", "version_id");
@@ -3108,7 +3109,7 @@ ALTER TABLE ONLY "public"."users"
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
-CREATE POLICY "Allow all for auth (admin+)" ON "public"."channels" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
+-- CREATE POLICY "Allow all for auth (admin+)" ON "public"."channels" TO "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
 CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions" TO "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
@@ -3854,22 +3855,6 @@ CREATE POLICY "All user to manage they own folder 1ffg0oo_1" ON "storage"."objec
 CREATE POLICY "All user to manage they own folder 1ffg0oo_2" ON "storage"."objects" FOR INSERT WITH CHECK ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
 
 CREATE POLICY "All user to manage they own folder 1ffg0oo_3" ON "storage"."objects" FOR SELECT USING ((("bucket_id" = 'images'::"text") AND ((((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0]) OR ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying)))));
-
-CREATE POLICY "Allow apikey manage they folder 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow apikey to manage they folder  1sbjm_3" ON "storage"."objects" FOR DELETE TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow apikey to manage they folder 1sbjm_1" ON "storage"."objects" FOR INSERT TO "anon" WITH CHECK ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{upload,write,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow apikey to select 1sbjm_0" ON "storage"."objects" FOR SELECT TO "anon" USING ((("bucket_id" = 'apps'::"text") AND ((("public"."get_user_id"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text")))::"text" = ("storage"."foldername"("name"))[0]) AND "public"."is_allowed_capgkey"((("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text"), '{read,all}'::"public"."key_mode"[], (("storage"."foldername"("name"))[1])::character varying))));
-
-CREATE POLICY "Allow user or shared to manage they folder 1sbjm_0" ON "storage"."objects" FOR SELECT TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
-CREATE POLICY "Allow user to delete they folder 1sbjm_0" ON "storage"."objects" FOR DELETE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
-CREATE POLICY "Allow user to update version 1sbjm_0" ON "storage"."objects" FOR UPDATE TO "authenticated" USING ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
-
-CREATE POLICY "Alow user to insert in they folder 1sbjm_0" ON "storage"."objects" FOR INSERT TO "authenticated" WITH CHECK ((("bucket_id" = 'apps'::"text") AND (((select auth.uid()))::"text" = ("storage"."foldername"("name"))[0])));
 
 CREATE POLICY "Disable act bucket for users" ON "storage"."buckets" USING (false) WITH CHECK (false);
 

@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { z } from 'zod'
 import * as semver from 'semver'
 import {
@@ -26,11 +26,8 @@ import { sendNotifOrg } from '../utils/notifications.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
-import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/clickhouse.ts'
-import { sendStatsAndDevice } from '../utils/clickhouse.ts'
-import { createStatsVersion } from '../utils/stats.ts'
-
-// import { saveStoreInfo, sendStatsAndDevice, updateInClickHouse } from '../utils/clickhouse.ts'
+import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
+import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 
 const failActions = [
   'set_fail',
@@ -120,7 +117,7 @@ async function post(c: Context, body: AppStats) {
     if (!appOwner) {
       // TODO: transfer to clickhouse
       // if (app_id) {
-      //   await saveStoreInfo(c, {
+      //   await saveStoreInfoCF(c, {
       //     app_id,
       //     onprem: true,
       //     capacitor: true,
@@ -128,7 +125,7 @@ async function post(c: Context, body: AppStats) {
       //   })
       // }
       // if (action === 'get')
-      //   await updateInClickHouse(c, app_id, 1)
+      //   await updateStoreApp(c, app_id, 1)
 
       return c.json({
         message: 'App not found',

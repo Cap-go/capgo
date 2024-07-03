@@ -1,9 +1,9 @@
 import ky from 'ky'
 import { Hono } from 'hono/tiny'
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { categories } from '../utils/gplay_categ.ts'
-import { getAppsToProcess } from '../utils/clickhouse.ts'
+import { getAppsToProcessCF } from '../utils/cloudflare.ts'
 
 const toGetFramwork = 500
 const toGetInfo = 500
@@ -20,11 +20,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         apisecret: API_SECRET,
       },
     }
-    const appsToGetFramework = await getAppsToProcess(c, 'to_get_framework', toGetFramwork)
+    const appsToGetFramework = await getAppsToProcessCF(c, 'to_get_framework', toGetFramwork)
 
-    const appsToGetInfo = await getAppsToProcess(c, 'to_get_info', toGetInfo)
+    const appsToGetInfo = await getAppsToProcessCF(c, 'to_get_info', toGetInfo)
 
-    const appsToGetSimilar = await getAppsToProcess(c, 'to_get_similar', toGetSimilar)
+    const appsToGetSimilar = await getAppsToProcessCF(c, 'to_get_similar', toGetSimilar)
 
     const all = []
     const pageSize = 10
