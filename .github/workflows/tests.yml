@@ -35,7 +35,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
-        run: supabase start
+        run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
       - run: supabase test db
       - uses: denoland/setup-deno@v1
         with:
