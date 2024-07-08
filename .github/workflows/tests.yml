@@ -25,7 +25,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.176.10
+          version: 1.178.2
       - name: Set env PROD
         if: ${{ !contains(github.ref, '-alpha.') }}
         run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS }}" >> $GITHUB_ENV
