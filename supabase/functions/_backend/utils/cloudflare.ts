@@ -383,7 +383,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     console.log('readDevicesCF exec await')
     const res = await readD1
     console.log('readDevicesCF res', res)
-    return res.results
+    return res.results as DeviceRowCF[]
   }
   catch (e) {
     console.error('Error reading device list', e)
@@ -470,7 +470,9 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
       .prepare(query)
       .all()
     const res = await readD1
-    return res
+    if (res.error || !res.results || !res.success)
+      console.error('getAppsFromCF error', res.error)
+    return res.results as { app_id: string }[]
   }
   catch (e) {
     console.error('Error reading app list', e)
@@ -500,7 +502,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 
 export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
   // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
-  const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE action = 'get'`
+  const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
 
   console.log('countUpdatesFromLogsCF query', query)
   try {
@@ -513,9 +515,10 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
   return 0
 }
 
-export async function reactActiveAppsCF(c: Context) {
-  const query = `SELECT DISTINCT app_id FROM app_log WHERE created_at >= DATE('now', '-1 month') AND created_at < DATE('now') AND action = 'get'`
-  console.log('reactActiveAppsCF query', query)
+export async function readActiveAppsCF(c: Context) {
+  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const query = `SELECT count(DISTINCT index1) FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get'`
+  console.log('readActiveAppsCF query', query)
   try {
     const response = await runQueryToCF<{ app_id: string }>(c, query)
     return response
@@ -537,7 +540,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
       .prepare(query)
       .all()
     const res = await readD1
-    return res as StoreApp[]
+    return res.results as StoreApp[]
   }
   catch (e) {
     console.error('Error getting apps to process', e)
@@ -582,7 +585,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
       .prepare(query)
       .all()
     const res = await readD1
-    return res as StoreApp[]
+    return res.results as StoreApp[]
   }
   catch (e) {
     console.error('Error getting top apps', e)

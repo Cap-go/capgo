@@ -6,7 +6,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates } from '../utils/stats.ts'
-import { reactActiveAppsCF } from '../utils/cloudflare.ts'
+import { readActiveAppsCF } from '../utils/cloudflare.ts'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -24,7 +24,11 @@ interface GlobalStats {
 }
 
 async function getGithubStars(): Promise<number> {
-  const json = await ky.get('https://api.github.com/repos/Cap-go/capacitor-updater').json<{ stargazers_count: number }>()
+  const json = await ky.get('https://api.github.com/repos/Cap-go/capacitor-updater', {
+    headers: {
+      'User-Agent': 'capgo-app', // GitHub API rate limit
+    },
+  }).json<{ stargazers_count: number }>()
   return json.stargazers_count
 }
 
@@ -64,7 +68,7 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
-    actives: reactActiveAppsCF(c).then(async (res) => {
+    actives: readActiveAppsCF(c).then(async (res) => {
       try {
         const app_ids = res.map(app => app.app_id)
         console.log('app_ids', app_ids)
@@ -220,6 +224,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
+    console.error('insights error', e)
     return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
   }
 })
