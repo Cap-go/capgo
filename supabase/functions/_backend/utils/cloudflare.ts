@@ -517,11 +517,14 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
 
 export async function readActiveAppsCF(c: Context) {
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const query = `SELECT count(DISTINCT index1) FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get'`
+  const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get'`
   console.log('readActiveAppsCF query', query)
   try {
     const response = await runQueryToCF<{ app_id: string }>(c, query)
-    return response
+    const app_ids = response.map(app => app.app_id)
+    // deduplicate them
+    const unique = Array.from(new Set(app_ids))
+    return unique
   }
   catch (e) {
     console.error('Error counting active apps', e)

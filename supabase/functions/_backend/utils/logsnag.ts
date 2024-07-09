@@ -1,11 +1,8 @@
 import { LogSnag } from '@logsnag/node'
+import ky from 'ky'
 
 import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
-
-interface LogSnagExt {
-  insights: (data: { title: string, value: string | boolean | number, icon: string }[]) => Promise<void>
-}
 
 function logsnag(c: Context) {
   const ls = getEnv(c, 'LOGSNAG_TOKEN')
@@ -20,17 +17,39 @@ function logsnag(c: Context) {
           track: (_obj: any) => Promise.resolve(true),
           increment: () => Promise.resolve(true),
         },
-        insights: () => Promise.resolve(true),
-      };
-  (ls as LogSnagExt & LogSnag).insights = async (data: { title: string, value: string | boolean | number, icon: string }[]) => {
-    const all = []
-    console.log('logsnag', data)
-    for (const d of data)
-      all.push(ls.insight.track(d))
-    await Promise.all(all)
-  }
-  return ls as LogSnagExt & LogSnag
+      }
+  return ls as LogSnag
 }
 
-// const logsnag = { publish: lsg.publish, insight, ...lsg }
-export { logsnag }
+function logsnagInsights(c: Context, data: { title: string, value: string | boolean | number, icon: string }[]) {
+  console.log('logsnagInsights', data)
+  const ls = getEnv(c, 'LOGSNAG_TOKEN')
+  const project = getEnv(c, 'LOGSNAG_PROJECT')
+  if (!ls || !project)
+    return Promise.resolve(false)
+  // loop on all insights and send a request for each then return the promise all
+  const all = []
+  for (const d of data) {
+    const payload = {
+      title: d.title,
+      value: d.value,
+      icon: d.icon,
+      project,
+    }
+    all.push(ky.post('https://api.logsnag.com/v1/insight', {
+      json: payload,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ls}`,
+      },
+    }).then(res => res.json())
+      .catch((e) => {
+        console.error('logsnagInsights error', e, payload)
+        return false
+      }),
+    )
+  }
+  return Promise.all(all)
+}
+
+export { logsnag, logsnagInsights }

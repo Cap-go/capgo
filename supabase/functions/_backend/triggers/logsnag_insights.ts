@@ -4,7 +4,7 @@ import ky from 'ky'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { logsnag } from '../utils/logsnag.ts'
+import { logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates } from '../utils/stats.ts'
 import { readActiveAppsCF } from '../utils/cloudflare.ts'
 
@@ -68,17 +68,15 @@ function getStats(c: Context): GlobalStats {
 
       return total
     }),
-    actives: readActiveAppsCF(c).then(async (res) => {
+    actives: readActiveAppsCF(c).then(async (app_ids) => {
       try {
-        const app_ids = res.map(app => app.app_id)
-        console.log('app_ids', app_ids)
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
-        return { apps: res.length, users: res2.data || 0 }
+        return { apps: app_ids.length, users: res2.data || 0 }
       }
       catch (e) {
         console.error('count_active_users error', e)
       }
-      return { apps: res.length, users: 0 }
+      return { apps: app_ids.length, users: 0 }
     }),
   }
 }
@@ -87,7 +85,6 @@ export const app = new Hono()
 
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
-    const LogSnag = logsnag(c)
     const res = getStats(c)
     const [
       apps,
@@ -137,7 +134,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       .upsert(newData)
     if (error)
       console.error('insert global_stats error', error)
-    await LogSnag.insights([
+    await logsnagInsights(c, [
       {
         title: 'Apps',
         value: apps,
@@ -221,10 +218,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     ]).catch((e) => {
       console.error('insights error', e)
     })
+    console.log('Sent to logsnag done')
     return c.json(BRES)
   }
   catch (e) {
-    console.error('insights error', e)
+    console.error('general insights error', e)
     return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
   }
 })
