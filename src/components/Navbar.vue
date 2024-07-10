@@ -68,7 +68,7 @@ const { t } = useI18n()
           </div>
         </div>
         <!-- Header: Right side -->
-        <div class="flex items-center space-x-3">
+        <div v-if="main.user" class="flex items-center space-x-3">
           <div class="flex md:mr-2">
             <dropdown-organization />
             <UserMenu align="right" class="ml-2" />

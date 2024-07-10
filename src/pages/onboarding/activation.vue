@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { useSupabase } from '~/services/supabase'
-import TitleHead from '~/components/TitleHead.vue'
+import Navbar from '~/components/Navbar.vue'
+import { useDisplayStore } from '~/stores/display'
 
 const supabase = useSupabase()
 const form = reactive({
@@ -18,8 +19,11 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 
 const router = useRouter()
+const displayStore = useDisplayStore()
 
 const { t } = useI18n()
+displayStore.defaultBack = '/login'
+displayStore.NavTitle = t('activation-heading')
 
 async function submit() {
   if (isLoading.value)
@@ -48,7 +52,7 @@ async function submit() {
 
 <template>
   <div>
-    <TitleHead :big="true" :title="t('activation-heading')" />
+    <Navbar />
     <section class="flex w-full h-full py-10 my-auto overflow-y-auto lg:py-16 sm:py-8">
       <div class="px-4 mx-auto my-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="max-w-2xl mx-auto text-center">
