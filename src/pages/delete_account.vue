@@ -20,8 +20,7 @@ const router = useRouter()
 const version = import.meta.env.VITE_APP_VERSION
 
 async function deleteAccount() {
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('are-u-sure'),
     buttons: [
       {
@@ -81,6 +80,8 @@ async function deleteAccount() {
       },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function submit(form: { email: string, password: string }) {

@@ -213,7 +213,7 @@ async function makeDefault(val = true) {
       ? t('make-default-android')
       : t('channel-make-now')
 
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('are-u-sure'),
     message: val ? t('confirm-public-desc') : t('making-this-channel-'),
     buttons: [
@@ -280,7 +280,8 @@ async function makeDefault(val = true) {
       },
     ],
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function getUnknownVersion(): Promise<number> {
@@ -312,12 +313,12 @@ async function openPannel() {
     toast.error(t('no-permission'))
     return
   }
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
+    header: t('version-linking'),
     buttons: [
       {
         text: t('unlink-bundle'),
         handler: async () => {
-          displayStore.showActionSheet = false
           const id = await getUnknownVersion()
           if (!id)
             return
@@ -333,7 +334,8 @@ async function openPannel() {
       },
     ],
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function enableAbTesting() {

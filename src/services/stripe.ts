@@ -1,23 +1,33 @@
 import { Capacitor } from '@capacitor/core'
 import { toast } from 'vue-sonner'
 import type { ComposerTranslation } from 'vue-i18n'
+import { useI18n } from 'vue-i18n'
 import { useSupabase } from './supabase'
 import { useDisplayStore } from '~/stores/display'
 
 const displayStore = useDisplayStore()
 
 async function presentActionSheetOpen(url: string) {
-  displayStore.actionSheetOption = {
+  const { t } = useI18n()
+
+  displayStore.dialogOption = {
+    header: t('open-in-new-tab'),
     buttons: [
       {
-        text: 'Continue',
-        handler: () => {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('continue'),
+        id: 'continue-button',
+        handler: async () => {
           window.open(url, '_blank')
         },
       },
     ],
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 export function openBlank(link: string) {
   console.log('openBlank', link)

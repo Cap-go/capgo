@@ -141,6 +141,7 @@ cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
 change: Change
 change-api-key-name: Change the apikey's name
+change-your-picture: Change your picture
 changed-app-name: Successfully changed app name
 changed-name: Successfully changed apikey's name
 changed-password-suc: Password changed successfully
@@ -173,6 +174,7 @@ confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users.
   Others default channels will not be default anymore.
+continue: Continue
 copied-to-clipboard: Copied to clipboard
 copy-account-id: copy account id
 copy-command: Copy command
@@ -220,6 +222,7 @@ discover-your-dashbo: Discover your dashboard !
 documentation: Documentation
 dont-have-an-account: Don’t have an account?
 download: Download
+download-0: Download
 edit-name: Edit name
 edit-pic: Edit picture
 email: Email
@@ -345,7 +348,7 @@ new-name-not-changed: The new name is the same as the old one
 new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
-no: no
+'no': 'no'
 no-app-icon: This app does not have any app icon
 no-channel-linked: No channel, click to add
 no-channel-linked-no-perm: No channel
@@ -366,6 +369,7 @@ old-onboarding-mode: old onboarding
 one-day-left: One day left
 open: Open
 open-channel: Open channel
+open-in-new-tab: Open in new tab
 open-settings: Click to open settings
 open-sidebar: Open sidebar
 open-this-link-to-le: Open this link to learn how to test your update
@@ -551,7 +555,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-yes: yes
+'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
 your-api-key: 'Your API key:'

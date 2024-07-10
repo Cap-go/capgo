@@ -316,11 +316,12 @@ async function updateOverride() {
       // console.log('Cancel clicked')
     },
   })
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('version-linking'),
     buttons,
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 async function upsertDevChannel(device: string, channel: Database['public']['Tables']['channels']['Row']) {
   if (!main?.user?.id)
@@ -368,7 +369,6 @@ async function updateChannel() {
     buttons.push({
       text: t('open-channel'),
       handler: async () => {
-        displayStore.showActionSheet = false
         device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${channelDevice.value?.channel_id}`)
       },
     })
@@ -404,11 +404,12 @@ async function updateChannel() {
       // console.log('Cancel clicked')
     },
   })
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('channel-linking'),
     buttons,
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 watchEffect(async () => {

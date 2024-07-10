@@ -293,11 +293,12 @@ async function ASChannelChooser() {
             },
           })
 
-          displayStore.actionSheetOption = {
+          displayStore.dialogOption = {
             header: t('progressive-deploy-option'),
             buttons: newButtons,
           }
-          displayStore.showActionSheet = true
+          displayStore.showDialog = true
+          return displayStore.onDialogDismiss()
         },
       })
     }
@@ -309,11 +310,12 @@ async function ASChannelChooser() {
       // console.log('Cancel clicked')
     },
   })
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('channel-linking'),
     buttons,
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function openChannel(selChannel: Database['public']['Tables']['channels']['Row'], canHaveSecondVersion: boolean) {
@@ -323,7 +325,8 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
   if (!channel.value)
     return ASChannelChooser()
 
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
+    header: t('channel-linking'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -336,32 +339,29 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
   }
 
   // Push set-bundle if role > read
-  if (displayStore.actionSheetOption.buttons && role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
-    displayStore.actionSheetOption.buttons.splice(0, 0, {
+  if (displayStore.dialogOption.buttons && role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
+    displayStore.dialogOption.buttons.splice(0, 0, {
       text: t('set-bundle'),
       handler: () => {
-        displayStore.showActionSheet = false
         ASChannelChooser()
       },
     })
   }
 
-  const baseIndex = (displayStore.actionSheetOption?.buttons?.length ?? 0) - 1
+  const baseIndex = (displayStore.dialogOption?.buttons?.length ?? 0) - 1
 
   // push in button at index 1 if channel is set
-  if (channel.value && displayStore.actionSheetOption.buttons) {
-    displayStore.actionSheetOption.buttons.splice(baseIndex, 0, {
+  if (channel.value && displayStore.dialogOption.buttons) {
+    displayStore.dialogOption.buttons.splice(baseIndex, 0, {
       text: t('open-channel'),
       handler: () => {
-        displayStore.showActionSheet = false
         openChannelLink()
       },
     })
     if (role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
-      displayStore.actionSheetOption.buttons.splice(baseIndex + 1, 0, {
+      displayStore.dialogOption.buttons.splice(baseIndex + 1, 0, {
         text: t('unlink-channel'),
         handler: async () => {
-          displayStore.showActionSheet = false
           try {
             if (!channel.value)
               return
@@ -383,17 +383,18 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
       })
     }
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 async function openDownload() {
   if (!version.value || !main.auth)
     return
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
+    header: t('download'),
     buttons: [
       {
         text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
         handler: async () => {
-          displayStore.showActionSheet = false
           if (!version.value)
             return
           if (version.value.session_key) {
@@ -418,7 +419,6 @@ async function openDownload() {
       {
         text: t('set-bundle'),
         handler: () => {
-          displayStore.showActionSheet = false
           ASChannelChooser()
         },
       },
@@ -431,7 +431,8 @@ async function openDownload() {
       },
     ],
   }
-  displayStore.showActionSheet = true
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function getVersion() {

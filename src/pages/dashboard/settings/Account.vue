@@ -32,8 +32,7 @@ const isLoading = ref(false)
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
 async function deleteAccount() {
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('are-u-sure'),
     buttons: [
       {
@@ -111,6 +110,8 @@ async function deleteAccount() {
       },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function copyAccountId() {
@@ -130,21 +131,18 @@ const acronym = computed(() => {
 })
 
 async function presentActionSheet() {
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
-    header: '',
+  displayStore.dialogOption = {
+    header: t('change-your-picture'),
     buttons: [
       {
         text: t('button-camera'),
         handler: () => {
-          displayStore.showActionSheet = false
           takePhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
       {
         text: t('button-browse'),
         handler: () => {
-          displayStore.showActionSheet = false
           pickPhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
@@ -157,6 +155,8 @@ async function presentActionSheet() {
       },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
