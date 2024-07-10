@@ -43,6 +43,7 @@ function openTab(tab: Tab) {
     tab.onClick(tab.key)
   else
     router.push(tab.key)
+  emit('closeSidebar')
 }
 const tabs = ref<Tab[]>([
   {

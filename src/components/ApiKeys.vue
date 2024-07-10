@@ -12,6 +12,7 @@ import Trash from '~icons/heroicons/trash'
 import Pencil from '~icons/heroicons/pencil'
 import ArrowPath from '~icons/heroicons/arrow-path'
 import Clipboard from '~icons/heroicons/clipboard-document'
+import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -266,25 +267,14 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
   console.log('displayStore.messageToast', displayStore.messageToast)
   toast.success(t('key-copied'))
 }
+displayStore.NavTitle = t('api-keys')
+displayStore.defaultBack = '/app/home'
 </script>
 
 <template>
   <div class="w-full h-full px-4 py-8 mx-auto max-w-9xl lg:px-8 sm:px-6">
-    <!-- Page header -->
-    <div class="mb-6 flex flex-row w-[66.666667%] ml-auto mr-auto">
-      <!-- Title -->
-      <h1 class="ml-2 text-2xl font-bold text-slate-800 md:text-3xl dark:text-white">
-        {{ t('api-keys') }}
-      </h1>
-      <button type="button" class="ml-auto mr-2 text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="addNewApiKey">
-        <Plus />
-        <p class="hidden ml-2 md:block">
-          {{ t('api-key') }}
-        </p>
-      </button>
-    </div>
     <div class="flex flex-col">
-      <div class="flex flex-col overflow-hidden overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
         <dl :key="magicVal" class="divide-y divide-gray-500">
           <InfoRow v-for="key in keys" :key="key.id" :label="key.mode.toUpperCase()" :value="key.name" :is-link="true">
             <button class="ml-auto bg-transparent w-7 h-7" @click="regenrateKey(key)">
@@ -314,5 +304,8 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
         </a>
       </div>
     </div>
+    <button class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
+      <plusOutline />
+    </button>
   </div>
 </template>
