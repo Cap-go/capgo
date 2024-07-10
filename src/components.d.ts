@@ -24,6 +24,7 @@ declare module 'vue' {
     Dialog: typeof import('./components/Dialog.vue')['default']
     DropdownOrganization: typeof import('./components/dashboard/DropdownOrganization.vue')['default']
     DropdownProfile: typeof import('./components/dashboard/DropdownProfile.vue')['default']
+    Fab: typeof import('./components/tailwind-capacitor/fab.vue')['default']
     IIonCopyOutline: typeof import('~icons/ion/copy-outline')['default']
     InfoRow: typeof import('./components/package/InfoRow.vue')['default']
     LineChartStats: typeof import('./components/LineChartStats.vue')['default']

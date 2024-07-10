@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { kBlockTitle, kList, kListItem } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
@@ -9,6 +8,7 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
 import { toast } from 'vue-sonner'
+import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
@@ -164,11 +164,15 @@ displayStore.defaultBack = '/app/home'
 
 <template>
   <div>
-    <k-block-title>{{ t('available-in-the-san') }}</k-block-title>
-    <k-list strong-ios outline-ios>
-      <k-list-item
-        v-for="(module, index) in modules" :key="index" link :footer="`with ${JSON.stringify(module.option)}`" :title="`${module.name}@${module.method}`" @click="runMethod(module)"
-      />
-    </k-list>
+    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <dl class="divide-y divide-gray-500">
+        <InfoRow :label="t('available-in-the-san')" />
+        <InfoRow v-for="(module, index) in modules" :key="index" :value="`with ${JSON.stringify(module.option)}`" :label="`${module.name}@${module.method}`" :is-link="true" @click="runMethod(module)">
+          <button class="ml-auto bg-transparent w-7 h-7">
+            <IconNext />
+          </button>
+        </InfoRow>
+      </dl>
+    </div>
   </div>
 </template>

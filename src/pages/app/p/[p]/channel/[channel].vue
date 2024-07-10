@@ -3,10 +3,7 @@ import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  kList,
-  kListItem,
   kRange,
-  kToggle,
 } from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import debounce from 'lodash.debounce'
@@ -16,6 +13,7 @@ import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
 import { useDisplayStore } from '~/stores/display'
 import IconSettings from '~icons/heroicons/cog-6-tooth'
+import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import type { Tab } from '~/components/comp_def'
@@ -445,6 +443,25 @@ function guardChangeAutoUpdate(event: Event) {
   }
 }
 
+const getVersion = computed(() => {
+  if (channel.value?.secondaryVersionPercentage !== 1) {
+    let label = t('status-failed')
+    if (channel.value?.secondaryVersionPercentage && channel.value?.secondaryVersionPercentage !== 0) {
+      label = `${channel.value?.secondaryVersionPercentage * 100}%`
+    }
+    return {
+      name: channel.value?.version.name ?? '',
+      label,
+    }
+  }
+  else {
+    return {
+      name: channel.value?.secondVersion.name,
+      label: t('status-complete'),
+    }
+  }
+})
+
 async function onChangeAutoUpdate(event: Event) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
@@ -495,9 +512,9 @@ async function onChangeAutoUpdate(event: Event) {
             </template>
           </template>
           <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.version.name : channel.secondVersion.name" :is-link="true" @click="openBundle()" />
-            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondaryVersionPercentage !== 1) ? channel.secondVersion.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
-            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondaryVersionPercentage === 1) ? t('status-complete') : (channel.secondaryVersionPercentage !== 0 ? `${((channel.secondaryVersionPercentage * 100) | 0)}%` : t('status-failed'))" />
+            <InfoRow :label="`${t('main-bundle-number')}`" :value="getVersion.name" :is-link="true" @click="openBundle()" />
+            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="getVersion.name" :is-link="true" @click="openSecondBundle" />
+            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="getVersion.label" />
             <template v-if="channel.disableAutoUpdate === 'version_number'">
               <InfoRow v-if="channel.disableAutoUpdate === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.minUpdateVersion ?? t('undefined-fail')" />
               <InfoRow :label="`${t('min-update-version')} B`" :value="channel.secondVersion.minUpdateVersion ?? t('undefined-fail')" />
@@ -513,142 +530,103 @@ async function onChangeAutoUpdate(event: Event) {
     <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y divide-gray-500">
-          <k-list id="klist" class="w-full mt-5 list-none border-t border-gray-200">
-            <k-list-item label :title="t('channel-is-public')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle-def"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.public"
-                  @change="() => (makeDefault(!channel?.public))"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label title="iOS" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.ios"
-                  @change="saveChannelChange('ios', !channel?.ios)"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label title="Android" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.android"
-                  @change="saveChannelChange('android', !channel?.android)"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('disable-auto-downgra')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.disableAutoUpdateUnderNative"
-                  @change="saveChannelChange('disableAutoUpdateUnderNative', !channel?.disableAutoUpdateUnderNative)"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('disableAutoUpdateToMajor')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
-                  <option value="major">
-                    {{ t('major') }}
-                  </option>
-                  <option value="minor">
-                    {{ t('minor') }}
-                  </option>
-                  <option value="patch">
-                    {{ t('patch') }}
-                  </option>
-                  <option value="version_number">
-                    {{ t('metadata') }}
-                  </option>
-                  <option value="none">
-                    {{ t('none') }}
-                  </option>
-                </select>
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('allow-develoment-bui')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.allow_dev"
-                  @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('allow-emulator')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.allow_emulator"
-                  @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('allow-device-to-self')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.allow_device_self_set"
-                  @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('channel-ab-testing')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.enableAbTesting"
-                  @change="enableAbTesting()"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="t('channel-progressive-deploy')" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-toggle
-                  id="ktoggle"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :checked="channel?.enable_progressive_deploy"
-                  @change="enableProgressiveDeploy()"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item label :title="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`" class="text-lg text-gray-700 dark:text-gray-200">
-              <template #after>
-                <k-range
-                  id="second-percentage-slider"
-                  :value="secondaryVersionPercentage"
-                  class="-my-1 k-color-success"
-                  component="div"
-                  :step="5"
-                  @input="(e: any) => (setSecondaryVersionPercentage(parseInt(e.target.value, 10)))"
-                  @mousedown="onMouseDownSecondaryVersionSlider"
-                />
-              </template>
-            </k-list-item>
-            <k-list-item id="unlink-bundle" label :title="t('unlink-bundle')" class="text-lg text-red-500" link @click="openPannel" />
-          </k-list>
+          <!-- <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
+            </InfoRow> -->
+          <InfoRow :label="t('channel-is-public')">
+            <Toggle
+              :value="channel?.public"
+              @change="() => (makeDefault(!channel?.public))"
+            />
+          </InfoRow>
+          <InfoRow label="iOS">
+            <Toggle
+              :value="channel?.ios"
+              @change="saveChannelChange('ios', !channel?.ios)"
+            />
+          </InfoRow>
+          <InfoRow label="Android">
+            <Toggle
+              :value="channel?.android"
+              @change="saveChannelChange('android', !channel?.ios)"
+            />
+          </InfoRow>
+          <InfoRow :label="t('disable-auto-downgra')">
+            <Toggle
+              :value="channel?.disableAutoUpdateUnderNative"
+              @change="saveChannelChange('disableAutoUpdateUnderNative', !channel?.disableAutoUpdateUnderNative)"
+            />
+          </InfoRow>
+          <InfoRow :label="t('disableAutoUpdateToMajor')">
+            <select id="selectableDisallow" :value="channel.disableAutoUpdate" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
+              <option value="major">
+                {{ t('major') }}
+              </option>
+              <option value="minor">
+                {{ t('minor') }}
+              </option>
+              <option value="patch">
+                {{ t('patch') }}
+              </option>
+              <option value="version_number">
+                {{ t('metadata') }}
+              </option>
+              <option value="none">
+                {{ t('none') }}
+              </option>
+            </select>
+          </InfoRow>
+          <InfoRow :label="t('allow-develoment-bui')">
+            <Toggle
+              :value="channel?.allow_dev"
+              @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
+            />
+          </InfoRow>
+          <InfoRow :label="t('allow-develoment-bui')">
+            <Toggle
+              :value="channel?.allow_dev"
+              @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
+            />
+          </InfoRow>
+          <InfoRow :label="t('allow-emulator')">
+            <Toggle
+              :value="channel?.allow_emulator"
+              @change="saveChannelChange('allow_emulator', !channel?.allow_emulator)"
+            />
+          </InfoRow>
+          <InfoRow :label="t('allow-device-to-self')">
+            <Toggle
+              :value="channel?.allow_device_self_set"
+              @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
+            />
+          </InfoRow>
+          <InfoRow :label="t('channel-ab-testing')">
+            <Toggle
+              :value="channel?.enableAbTesting"
+              @change="enableAbTesting()"
+            />
+          </InfoRow>
+          <InfoRow :label="t('channel-progressive-deploy')">
+            <Toggle
+              :value="channel?.enable_progressive_deploy"
+              @change="enableProgressiveDeploy()"
+            />
+          </InfoRow>
+          <InfoRow :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
+            <k-range
+              id="second-percentage-slider"
+              :value="secondaryVersionPercentage"
+              class="-my-1 k-color-success"
+              component="div"
+              :step="5"
+              @input="(e: any) => (setSecondaryVersionPercentage(parseInt(e.target.value, 10)))"
+              @mousedown="onMouseDownSecondaryVersionSlider"
+            />
+          </InfoRow>
+          <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
+            <button class="ml-auto bg-transparent w-7 h-7">
+              <IconNext />
+            </button>
+          </InfoRow>
         </dl>
       </div>
     </div>
