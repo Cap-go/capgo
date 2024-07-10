@@ -2,9 +2,6 @@
 import { ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  kRange,
-} from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import debounce from 'lodash.debounce'
 import { useSupabase } from '~/services/supabase'
@@ -414,14 +411,6 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
     console.error(error)
 }, 500, { leading: true, trailing: true, maxWait: 500 })
 
-const debouncedInformAboutProgressiveDeployPercentageSet = debounce(() => {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  toast.error(t('progressive-deploy-set-percentage'))
-}, 500, { leading: true, trailing: true, maxWait: 500 })
-
 async function setSecondaryVersionPercentage(percentage: number) {
   if (channel.value?.enable_progressive_deploy)
     return
@@ -430,10 +419,13 @@ async function setSecondaryVersionPercentage(percentage: number) {
   await debouncedSetSecondaryVersionPercentage(percentage)
 }
 
-function onMouseDownSecondaryVersionSlider(event: MouseEvent) {
+function onMouseDownSecondaryVersionSlider() {
+  console.log('onMouseDownSecondaryVersionSlider', secondaryVersionPercentage.value)
   if (channel.value?.enable_progressive_deploy || !(role.value && organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin']))) {
-    debouncedInformAboutProgressiveDeployPercentageSet()
-    event.preventDefault()
+    setSecondaryVersionPercentage(secondaryVersionPercentage.value)
+  }
+  else {
+    toast.error(t('progressive-deploy-set-percentage'))
   }
 }
 
@@ -614,15 +606,12 @@ async function onChangeAutoUpdate(event: Event) {
             />
           </InfoRow>
           <InfoRow :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
-            <k-range
-              id="second-percentage-slider"
-              :value="secondaryVersionPercentage"
-              class="-my-1 k-color-success"
-              component="div"
-              :step="5"
-              @input="(e: any) => (setSecondaryVersionPercentage(parseInt(e.target.value, 10)))"
-              @mousedown="onMouseDownSecondaryVersionSlider"
-            />
+            <div>
+              <input v-model="secondaryVersionPercentage" type="range" min="0" max="100" class="range range-info" step="10" @mouseup="onMouseDownSecondaryVersionSlider">
+              <div class="w-full px-2 text-xs text-center">
+                <span>{{ secondaryVersionPercentage }}%</span>
+              </div>
+            </div>
           </InfoRow>
           <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
             <button class="ml-auto bg-transparent w-7 h-7">

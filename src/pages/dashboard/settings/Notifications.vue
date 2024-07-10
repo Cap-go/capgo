@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { kListItem, kToggle } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'

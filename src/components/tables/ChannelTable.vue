@@ -3,7 +3,6 @@ import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { kFab } from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import { storeToRefs } from 'pinia'
 import type { TableColumn } from '../comp_def'
@@ -11,7 +10,7 @@ import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { EMPTY_UUID, useSupabase } from '~/services/supabase'
 import IconTrash from '~icons/heroicons/trash?raw'
-import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
+import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { appIdToUrl } from '~/services/conversion'
@@ -228,34 +227,34 @@ columns.value = [
   {
     label: t('name'),
     key: 'name',
-    mobile: 'title',
+    mobile: true,
     sortable: true,
     head: true,
   },
   {
     label: t('last-upload'),
     key: 'updated_at',
-    mobile: 'header',
+    mobile: false,
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
   },
   {
     label: t('last-version'),
     key: 'version',
-    mobile: 'footer',
+    mobile: true,
     sortable: true,
     displayFunction: (elem: typeof element) => elem.version.name,
   },
   {
     label: t('misconfigured'),
+    mobile: false,
     key: 'misconfigured',
-    mobile: 'footer',
     displayFunction: (elem: typeof element) => elem.misconfigured ? t('yes') : t('no'),
   },
   {
     label: t('action'),
     key: 'action',
-    mobile: 'after',
+    mobile: true,
     icon: IconTrash,
     class: 'text-red-500',
     onClick: deleteOne,
@@ -325,10 +324,8 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <k-fab id="create_channel" class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
-      <template #icon>
-        <component :is="IconPlus" />
-      </template>
-    </k-fab>
+    <button id="create_channel" class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
+      <IconPlus />
+    </button>
   </div>
 </template>

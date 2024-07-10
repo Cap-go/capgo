@@ -2,15 +2,12 @@
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
-import {
-  kFab,
-} from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/chatwoot'
-import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
+import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 
 const props = defineProps<{
   onboarding: boolean
@@ -238,9 +235,7 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <k-fab v-if="!onboarding" class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
-    <template #icon>
-      <component :is="arrowBack" />
-    </template>
-  </k-fab>
+  <button v-if="!onboarding" class="fixed z-20 bg-gray-800 btn btn-lg btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
+    <arrowBack />
+  </button>
 </template>

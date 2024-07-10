@@ -219,20 +219,20 @@ columns.value = [
   {
     label: t('name'),
     key: 'name',
-    mobile: 'title',
+    mobile: true,
     sortable: true,
     head: true,
   },
   {
     label: t('created-at'),
     key: 'created_at',
-    mobile: 'header',
+    mobile: true,
     sortable: 'desc',
     displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
   },
   {
     label: t('size'),
-    mobile: 'footer',
+    mobile: false,
     key: 'size',
     sortable: true,
     displayFunction: (elem: typeof element) => {
@@ -249,7 +249,7 @@ columns.value = [
   {
     label: t('action'),
     key: 'action',
-    mobile: 'after',
+    mobile: true,
     icon: IconTrash,
     class: 'text-red-500',
     onClick: deleteOne,

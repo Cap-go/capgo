@@ -272,10 +272,10 @@ module.exports = {
   },
   plugins: [
     require('@tailwindcss/typography'),
+    require('tailwind-capacitor').safeAreas,
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/container-queries'),
     require('daisyui'),
-    require('../tailwind-capacitor').safeAreas,
     // require('flowbite/plugin'), // TODO: understand why this is not working
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {

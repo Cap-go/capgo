@@ -2,13 +2,9 @@
 import debounce from 'lodash.debounce'
 import { computed, onMounted, ref, watch } from 'vue'
 import { initDropdowns } from 'flowbite'
-import {
-  kList,
-  kListItem,
-} from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
 import { FormKit } from '@formkit/vue'
-import type { MobileColType, TableColumn } from './comp_def'
+import type { TableColumn } from './comp_def'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
@@ -116,10 +112,6 @@ const displayElemRange = computed(() => {
   return `${begin}-${end}`
 })
 
-function findMobileCol(name: MobileColType) {
-  return props.columns ? props.columns.find(col => col.mobile === name) : undefined
-}
-
 function canNext() {
   return props.currentPage < Math.ceil(props.total / offset.value)
 }
@@ -208,11 +200,11 @@ onMounted(() => {
         />
       </div>
     </div>
-    <div class="hidden md:block">
+    <div class="block">
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -232,11 +224,11 @@ onMounted(() => {
             @click="emit('rowClick', elem)"
           >
             <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="col.class" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
-              <td v-else class="px-6 py-4">
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4">
                 {{ displayValueKey(elem, col) }}
               </td>
             </template>
@@ -251,7 +243,7 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
-    <kList class="block !my-0 md:hidden">
+    <!-- <kList class="block !my-0 md:hidden">
       <kListItem
         v-for="(elem, i) in elementList" :key="i"
         :title="displayValueKey(elem, findMobileCol('title'))"
@@ -264,7 +256,7 @@ onMounted(() => {
           <span v-else>{{ displayValueKey(elem, findMobileCol('after')) }}</span>
         </template>
       </kListItem>
-    </kList>
+    </kList> -->
     <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">{{ t('showing') }}</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">
