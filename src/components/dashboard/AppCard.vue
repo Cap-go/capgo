@@ -2,9 +2,6 @@
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import {
-  kListItem,
-} from 'konsta/vue'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { formatDate } from '~/services/date'
 import type { Database } from '~/types/supabase.types'
@@ -75,11 +72,17 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="hidden text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
+  <tr class="text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
+    <td class="table-cell w-1/5 p-2 md:hidden">
+      <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
+      <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3">
+        <p>{{ acronym }}</p>
+      </div>
+    </td>
     <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
-        <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3">
+        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="hidden mr-2 rounded md:block shrink-0 sm:mr-3" width="36" height="36">
+        <div v-else class="items-center justify-center hidden w-8 h-8 border border-black rounded-lg md:flex dark:border-white sm:mr-3">
           <p>{{ acronym }}</p>
         </div>
         <div class="max-w-max">
@@ -92,12 +95,12 @@ watchEffect(async () => {
         {{ props.app.last_version }}
       </div>
     </td>
-    <td class="w-1/5 p-2">
+    <td class="hidden w-1/5 p-2 md:table-cell">
       <div class="text-center">
         {{ formatDate(props.app.updated_at || "") }}
       </div>
     </td>
-    <td class="w-1/5 p-2">
+    <td class="hidden w-1/5 p-2 md:table-cell">
       <div v-if="!isLoading && !props.channel" class="text-center">
         {{ mauNb }}
       </div>
@@ -105,31 +108,17 @@ watchEffect(async () => {
         {{ props.channel }}
       </div>
     </td>
-    <td class="w-1/5 p-2">
+    <td class="hidden w-1/5 p-2 md:table-cell">
       <div class="text-center">
         {{ perm }}
       </div>
     </td>
-    <td class="flex flex-row w-1/5 p-2">
-      <div
-        class="mr-4 text-center" @click.stop="openSettngs(app)"
+    <td class="w-1/5 p-2">
+      <button
+        class="flex items-center mx-auto truncate" @click.stop="openSettngs(app)"
       >
-        <IconSettings class="text-lg " />
-      </div>
+        <IconSettings class="text-lg" />
+      </button>
     </td>
   </tr>
-  <!-- Mobile -->
-  <k-list-item
-    class="md:hidden"
-    :title="props.app.name || ''"
-    :subtitle="formatDate(props.app.updated_at || '')"
-    @click="openPackage(app.app_id)"
-  >
-    <template #media>
-      <img :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
-    </template>
-    <template #after>
-      <IconSettings class="text-lg" @click.stop="openSettngs(app)" />
-    </template>
-  </k-list-item>
 </template>

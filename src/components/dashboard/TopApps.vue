@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { kList } from 'konsta/vue'
 import AppCard from './AppCard.vue'
 import type { Database } from '~/types/supabase.types'
 
@@ -21,11 +20,14 @@ const { t } = useI18n()
     </header>
     <div class="">
       <!-- Table -->
-      <div class="hidden p-3 overflow-x-auto md:block">
+      <div class="p-3 overflow-x-auto">
         <table id="top_apps" class="w-full table-auto" aria-label="Table with your apps">
           <!-- Table header -->
           <thead class="text-xs uppercase rounded-sm bg-slate-50 text-slate-400 dark:bg-gray-800 dark:text-white">
             <tr>
+              <th class="table-cell w-1/5 p-2 md:hidden">
+                <div class="font-semibold text-left" />
+              </th>
               <th class="w-1/5 p-2">
                 <div class="font-semibold text-left">
                   {{ t('name') }}
@@ -36,22 +38,24 @@ const { t } = useI18n()
                   {{ t('last-version') }}
                 </div>
               </th>
-              <th class="w-1/5 p-2">
+              <th class="hidden w-1/5 p-2 md:table-cell">
                 <div class="font-semibold text-center">
                   {{ t('last-upload') }}
                 </div>
               </th>
-              <th class="w-1/5 p-2">
+              <th class="hidden w-1/5 p-2 md:table-cell">
                 <div class="font-semibold text-center">
                   {{ t('mau') }}
                 </div>
               </th>
-              <th class="w-1/5 p-2">
+              <th class="hidden w-1/5 p-2 md:table-cell">
                 <div class="font-semibold text-center">
                   {{ t('app-perm') }}
                 </div>
               </th>
-              <th class="w-1/5 p-2" />
+              <th class="table-cell w-1/5 p-2 md:hidden">
+                <div class="font-semibold text-left" />
+              </th>
             </tr>
           </thead>
           <!-- Table body -->
@@ -61,9 +65,6 @@ const { t } = useI18n()
           </tbody>
         </table>
       </div>
-      <k-list class="w-full my-0 md:hidden">
-        <AppCard v-for="(app, i) in props.apps" :key="app.app_id + i" :delete-button="deleteButton" :app="app" channel="" />
-      </k-list>
     </div>
   </div>
 </template>
