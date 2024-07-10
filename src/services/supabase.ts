@@ -149,9 +149,9 @@ export interface appUsageByApp {
 export interface appUsageByVersion {
   date: string
   app_id: string
-  version_id: string
-  install: number
-  uninstall: number
+  version_id: number
+  install: number | null
+  uninstall: number | null
 }
 
 export interface appUsageGlobal {
@@ -265,7 +265,13 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
   return ''
 }
 
-export async function getVersionNames(appId: string, versionIds: string[]): Promise<{ id: string, name: string, created_at: string }[]> {
+export interface VersionName {
+  id: number
+  name: string
+  created_at: string | null
+}
+
+export async function getVersionNames(appId: string, versionIds: string[]): Promise<VersionName[]> {
   const { data, error: vError } = await useSupabase()
     .from('app_versions')
     .select('id, name, created_at')
