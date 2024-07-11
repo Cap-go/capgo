@@ -48,11 +48,16 @@ const emit = defineEmits([
   'sortClick',
   'rangeChange',
 ])
+const dropdown = ref<HTMLElement | null>(null)
+function closeDropdown() {
+  if (dropdown.value) {
+    dropdown.value.removeAttribute('open')
+  }
+}
 const { t } = useI18n()
 const isDark = useDark()
 const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
-const showTimeDropdown = ref(false)
 type Minutes = 1 | 3 | 15
 const currentGeneralTime = ref<Minutes>(1)
 const preciseDates = ref<[Date, Date]>()
@@ -126,16 +131,12 @@ async function fastBackward() {
   emit('reload')
 }
 
-async function clickLeft() {
-  currentSelected.value = 'general'
-  showTimeDropdown.value = !showTimeDropdown.value
-}
-
 async function clickRight() {
   currentSelected.value = 'precise'
 }
 
 async function setTime(time: Minutes) {
+  currentSelected.value = 'general'
   currentGeneralTime.value = time
   if (time === 1) {
     preciseDates.value = [
@@ -155,6 +156,7 @@ async function setTime(time: Minutes) {
       new Date(),
     ]
   }
+  closeDropdown()
 }
 
 function formatValue(previewValue: Date[] | undefined) {
@@ -190,24 +192,16 @@ onMounted(async () => {
         </button>
       </div>
       <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-100 rounded-lg dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
-        <div class="flex flex-col items-center justify-center flex-auto px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'hover:bg-gray-300 dark:hover:bg-gray-700 hover:text-white': !showTimeDropdown, 'general': currentSelected, 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'general' }" @click="clickLeft">
-          <div class="flex items-center justify-center">
+        <div ref="dropdown" class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="flex flex-row items-center justify-center flex-auto h-10 px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'general': currentSelected, 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'general' }">
             <IconClock class="mr-1" />
             <span class="hidden md:block">{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
           </div>
-          <div v-if="showTimeDropdown" class="absolute z-50 block w-32 text-gray-500 bg-white pointer-events-none dark:text-white dark:bg-gray-800">
-            <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1, 'bg-gray-100 dark:hover:bg-gray-700': currentGeneralTime !== 1 }" @click="setTime(1)">
-                {{ t('last-minute') }}
-              </div>
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 3, 'bg-gray-100 dark:hover:bg-gray-700': currentGeneralTime !== 3 }" @click="setTime(3)">
-                {{ t('last-3-minutes') }}
-              </div>
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 15, 'bg-gray-100 dark:hover:bg-gray-700': currentGeneralTime !== 15 }" @click="setTime(15)">
-                {{ t('last-15-minutes') }}
-              </div>
-            </div>
-          </div>
+          <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow">
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-minutes') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 15 }" @click="setTime(15)">{{ t('last-15-minutes') }}</a></li>
+          </ul>
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
         <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
@@ -220,6 +214,9 @@ onMounted(async () => {
               prevent-min-max-navigation
               :dark="isDark"
               range
+              :ui="{
+                menu: 'custom-timepicker-button',
+              }"
               @update:model-value="clickRight"
             >
               <template #trigger>
@@ -230,7 +227,6 @@ onMounted(async () => {
                   </p>
                 </div>
               </template>
-              <template #action-preview />
               <template #top-extra="{ value }">
                 <div class="flex items-center justify-center">
                   <div class="flex items-center space-x-2 text-black dark:text-white bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
@@ -296,6 +292,10 @@ onMounted(async () => {
           :placeholder="searchPlaceholder"
           :prefix-icon="IconSearch" :disabled="isLoading"
           enterkeyhint="send"
+          :classes="{
+            outer: '!mb-0 md:w-96',
+            inner: '!rounded-full',
+          }"
         />
       </div>
     </div>
@@ -353,3 +353,13 @@ onMounted(async () => {
     </nav>
   </div>
 </template>
+
+<style>
+.custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
+  @apply btn btn-outline  btn-sm;
+}
+.custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
+  @apply btn btn-primary  btn-sm;
+
+}
+</style>

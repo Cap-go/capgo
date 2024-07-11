@@ -218,7 +218,7 @@ watchEffect(async () => {
               <div class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
                 <span class="text-sm">{{ s.subtitle }}</span>
-                <div class="p-3 rounded-lg" :class="{ 'bg-black': s.command }">
+                <div class="p-3 rounded-lg" :class="{ 'dark:bg-black bg-gray-100': s.command }">
                   <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />

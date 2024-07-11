@@ -158,8 +158,8 @@ async function createNewOrg() {
 
 <template>
   <div>
-    <details v-show="currentOrganization" ref="dropdown" class="dropdown">
-      <summary class="m-1 btn btn-outline text-slate-800 dark:text-white">
+    <details v-show="currentOrganization" ref="dropdown" class="dropdown dropdown-end">
+      <summary class="m-1 btn btn-outline btn-sm text-slate-800 dark:text-white">
         <div class="hidden md:block">
           {{ currentOrganization?.name }}
         </div>
@@ -170,7 +170,7 @@ async function createNewOrg() {
           <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
         </div>
       </summary>
-      <ul class="menu dropdown-content dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow" @click="closeDropdown()">
+      <ul class="dropdown-content dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow" @click="closeDropdown()">
         <li v-for="org in organizationStore.organizations" :key="org.gid">
           <a
             class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
