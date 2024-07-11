@@ -11,7 +11,6 @@ import type { Database } from '~/types/supabase.types'
 let supaClient: SupabaseClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
-export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 
 interface CapgoConfig {
   supaHost: string

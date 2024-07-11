@@ -311,22 +311,22 @@ async function openPannel() {
     return
   }
   displayStore.dialogOption = {
-    header: t('version-linking'),
+    header: t('unlink-bundle'),
     buttons: [
-      {
-        text: t('unlink-bundle'),
-        handler: async () => {
-          const id = await getUnknownVersion()
-          if (!id)
-            return
-          saveChannelChange('version', id)
-        },
-      },
       {
         text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
           // console.log('Cancel clicked')
+        },
+      },
+      {
+        text: t('confirm'),
+        handler: async () => {
+          const id = await getUnknownVersion()
+          if (!id)
+            return
+          saveChannelChange('version', id)
         },
       },
     ],

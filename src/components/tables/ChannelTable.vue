@@ -8,7 +8,7 @@ import { storeToRefs } from 'pinia'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
-import { EMPTY_UUID, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import IconTrash from '~icons/heroicons/trash?raw'
 import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
 import { useDisplayStore } from '~/stores/display'
@@ -92,6 +92,7 @@ async function addChannel(name: string) {
     return
   try {
     console.log('addChannel', name, versionId.value, main.user)
+    const currentGid = organizationStore.currentOrganization?.gid
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }
     const { data: dataChannel } = await supabase
       .from('channels')
@@ -100,7 +101,7 @@ async function addChannel(name: string) {
           name,
           app_id: props.appId,
           version: versionId.value,
-          owner_org: EMPTY_UUID,
+          owner_org: currentGid,
         },
       ])
       .select()

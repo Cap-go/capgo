@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import type { Context } from '@hono/hono'
 import { BRES, getBody } from '../utils/hono.ts'
-import { EMPTY_UUID, supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -212,7 +212,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           device_id,
           channel_id: dataChannel.id,
           app_id,
-          owner_org: EMPTY_UUID,
+          owner_org: dataChannel.owner_org,
         })
       if (dbErrorDev) {
         console.error('Cannot do channel override', { dbErrorDev })

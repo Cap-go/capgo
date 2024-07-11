@@ -6,7 +6,7 @@ import { gt } from 'semver'
 import { toast } from 'vue-sonner'
 import ky from 'ky'
 import { formatDate } from '~/services/date'
-import { EMPTY_UUID, defaultApiHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
 import { useDisplayStore } from '~/stores/display'
@@ -152,6 +152,7 @@ async function getDeviceOverride() {
     const { data: dataVersion } = await supabase
       .from('app_versions')
       .select(`
+          id,
           name
       `)
       .eq('id', data!.version)
@@ -236,15 +237,17 @@ async function loadData() {
   isLoading.value = false
 }
 
-async function upsertDevVersion(device: string, v: Database['public']['Tables']['app_versions']['Row']) {
+async function upsertDevVersion(device: string, versionId: number) {
+  const currentGid = organizationStore.currentOrganization?.gid
   return supabase
     .from('devices_override')
     .upsert({
       device_id: device,
-      version: v.id,
+      version: versionId,
       app_id: packageId.value,
-      owner_org: EMPTY_UUID,
+      owner_org: currentGid,
     })
+    .throwOnError()
 }
 async function didCancel(name: string) {
   displayStore.dialogOption = {
@@ -275,72 +278,63 @@ async function delDevVersion(device: string) {
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
-async function updateOverride() {
+async function updateOverride(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  console.log('updateOverride', value)
   const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
     toast.error(t('no-permission'))
     return
   }
+  console.log('updateOverride 1')
 
-  const buttons = []
-  if (deviceOverride.value) {
-    buttons.push({
-      text: t('button-remove'),
-      handler: async () => {
-        if (device.value?.device_id)
-          await delDevVersion(device.value?.device_id)
-        toast.success(t('unlink-version'))
-        await loadData()
-      },
-    })
+  if (deviceOverride.value && value === 'none') {
+    if (device.value?.device_id)
+      await delDevVersion(device.value?.device_id)
+    toast.success(t('unlink-version'))
+    await loadData()
   }
-  for (const version of versions.value) {
-    buttons.push({
-      text: version.name,
-      handler: async () => {
-        if (!device.value?.device_id)
-          return
-        isLoading.value = true
-        try {
-          await upsertDevVersion(device.value?.device_id, version)
+  else if (value !== 'none') {
+    if (!device.value?.device_id) {
+      toast.error(t('version-link-fail'))
+      return
+    }
+    try {
+      upsertDevVersion(device.value?.device_id, Number(value))
+        .then(async () => {
           toast.success(t('version-linked'))
-          await loadData()
-        }
-        catch (error) {
+          return loadData()
+        }).catch(async (error) => {
           console.error(error)
           toast.error(t('channel-link-fail'))
-        }
-        isLoading.value = false
-      },
-    })
+        })
+    }
+    catch (error) {
+      console.error(error)
+      toast.error(t('channel-link-fail'))
+    }
   }
-  buttons.push({
-    text: t('button-cancel'),
-    role: 'cancel',
-    handler: () => {
-      // console.log('Cancel clicked')
-    },
-  })
-  displayStore.dialogOption = {
-    header: t('version-linking'),
-    buttons,
+  else {
+    toast.error(t('channel-link-fail'))
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
 }
-async function upsertDevChannel(device: string, channel: Database['public']['Tables']['channels']['Row']) {
+
+async function upsertDevChannel(device: string, channelId: number) {
+  const currentGid = organizationStore.currentOrganization?.gid
   if (!main?.user?.id)
     return
   return supabase
     .from('channel_devices')
     .upsert({
       device_id: device,
-      channel_id: channel.id,
+      channel_id: channelId,
       app_id: packageId.value,
-      owner_org: EMPTY_UUID,
+      owner_org: currentGid,
     })
+    .throwOnError()
 }
+
 async function delDevChannel(device: string) {
   if (await didCancel(t('channel')))
     return
@@ -351,73 +345,47 @@ async function delDevChannel(device: string) {
     .eq('app_id', packageId.value)
 }
 
-async function updateChannel() {
-  const buttons = []
+async function updateChannel(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  console.log('updateChannel', value)
   const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
-  if (!hasPerm && !channelDevice.value) {
+  if (!hasPerm) {
     toast.error(t('no-permission'))
     return
   }
 
-  if (channelDevice.value) {
-    if (hasPerm) {
-      buttons.push({
-        text: t('button-remove'),
-        handler: async () => {
-          if (device.value?.device_id)
-            await delDevChannel(device.value?.device_id)
-          toast.success(t('unlink-channel'))
-          await loadData()
-        },
-      })
+  if (channelDevice.value && value === 'none') {
+    if (device.value?.device_id)
+      await delDevChannel(device.value?.device_id)
+    toast.success(t('unlink-channel'))
+    await loadData()
+  }
+  else if (value !== 'none') {
+    if (!device.value?.device_id) {
+      toast.error(t('channel-link-fail'))
+      return
     }
 
-    buttons.push({
-      text: t('open-channel'),
-      handler: async () => {
-        if (device.value?.device_id)
-          router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${channelDevice.value?.channel_id}`)
-      },
-    })
-  }
-
-  if (hasPerm) {
-    for (const channel of channels.value) {
-      buttons.push({
-        text: channel.name,
-        handler: async () => {
-          if (!device.value?.device_id)
-            return
-          isLoading.value = true
-          try {
-            await upsertDevChannel(device.value?.device_id, channel)
-            toast.success(t('channel-linked'))
-            await loadData()
-          }
-          catch (error) {
-            console.error(error)
-            toast.error(t('channel-link-fail'))
-          }
-          isLoading.value = false
-        },
-      })
+    try {
+      await upsertDevChannel(device.value?.device_id, Number(value))
+        .then(async () => {
+          toast.success(t('channel-linked'))
+          return loadData()
+        })
+        .catch(async (error) => {
+          console.error(error)
+          toast.error(t('channel-link-fail'))
+        })
+    }
+    catch (error) {
+      console.error(error)
+      toast.error(t('channel-link-fail'))
     }
   }
-
-  buttons.push({
-    text: t('button-cancel'),
-    role: 'cancel',
-    handler: () => {
-      // console.log('Cancel clicked')
-    },
-  })
-  displayStore.dialogOption = {
-    header: t('channel-linking'),
-    buttons,
+  else {
+    toast.error(t('channel-link-fail'))
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
 }
 
 watchEffect(async () => {
@@ -430,6 +398,21 @@ watchEffect(async () => {
     displayStore.defaultBack = `/app/package/${route.params.p}/devices`
   }
 })
+function guardUpdate(event: Event) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return false
+  }
+}
+function openVersion() {
+  if (packageId.value && deviceOverride.value?.version?.id)
+    router.push(`/app/p/${appIdToUrl(packageId.value)}/bundle/${deviceOverride.value.version.id}`)
+}
+function openChannel() {
+  if (packageId.value && channelDevice.value?.id)
+    router.push(`/app/p/${appIdToUrl(packageId.value)}/channel/${channelDevice.value.id}`)
+}
 </script>
 
 <template>
@@ -440,7 +423,6 @@ watchEffect(async () => {
         <dl :key="reloadCount" class="divide-y divide-gray-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
           <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
-          <InfoRow v-if="device.created_at" :label="t('created-at')" :value="formatDate(device.created_at)" />
           <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
           <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
           <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
@@ -449,8 +431,27 @@ watchEffect(async () => {
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow id="update-version" :label="t('force-version')" :value="deviceOverride?.version?.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) ? 'no-version-linked' : 'no-version-linked-no-perm')" :is-link="true" @click="updateOverride()" />
-          <InfoRow id="update-channel" :label="t('channel-link')" :value="channelDevice?.channel_id.name || t(organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) ? 'no-channel-linked' : 'no-channel-linked-no-perm')" :is-link="true" @click="updateChannel()" />
+          <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click.self="openVersion()">
+            <select id="selectableDisallow" :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="(event) => updateOverride(event)">
+              <option value="none">
+                {{ t('none') }}
+              </option>
+              <option v-for="vs in versions" :key="vs.id" :value="vs.id">
+                {{ vs.name }}
+              </option>
+            </select>
+          </InfoRow>
+          <!-- TODO: fix channel override -->
+          <InfoRow :is-link="true" class="hidden" :label="t('channel-link')" :value="channelDevice?.channel_id.name || ''" @click.self="openChannel()">
+            <select id="selectableDisallow" :value="channelDevice?.channel_id?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="(event) => updateChannel(event)">
+              <option value="none">
+                {{ t('none') }}
+              </option>
+              <option v-for="ch in channels" :key="ch.id" :value="ch.id">
+                {{ ch.name }}
+              </option>
+            </select>
+          </InfoRow>
         </dl>
       </div>
     </div>
