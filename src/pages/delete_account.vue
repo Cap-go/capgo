@@ -25,6 +25,7 @@ async function deleteAccount() {
     buttons: [
       {
         text: t('button-remove'),
+        role: 'danger',
         handler: async () => {
           const supabaseClient = useSupabase()
 

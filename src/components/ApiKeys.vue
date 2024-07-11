@@ -222,6 +222,7 @@ async function showDeleteKeyModal() {
       },
       {
         text: t('button-delete'),
+        role: 'danger',
         id: 'confirm-button',
       },
     ],

@@ -41,6 +41,7 @@ async function deleteAccount() {
       },
       {
         text: t('button-remove'),
+        role: 'danger',
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
             return
@@ -306,6 +307,7 @@ async function handleMfa() {
         },
         {
           text: t('disable'),
+          role: 'danger',
           id: 'confirm-button',
         },
       ],
@@ -493,7 +495,7 @@ onMounted(async () => {
       <footer>
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button class="p-2 text-black bg-white border border-red-400 rounded-lg dark:bg-transparent dark:text-white btn hover:bg-red-600" @click="deleteAccount()">
+            <button class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
               {{ t('delete-account') }}
             </button>
             <button

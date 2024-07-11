@@ -51,6 +51,7 @@ async function didCancel(name: string) {
       },
       {
         text: t('button-delete'),
+        role: 'danger',
         id: 'confirm-button',
       },
     ],

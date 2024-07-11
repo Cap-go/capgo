@@ -183,6 +183,7 @@ async function didCancel() {
       },
       {
         text: t('button-delete'),
+        role: 'danger',
         id: 'confirm-button',
       },
     ],
