@@ -33,6 +33,13 @@ async function deleteAccount() {
     header: t('are-u-sure'),
     buttons: [
       {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+      {
         text: t('button-remove'),
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
@@ -99,13 +106,6 @@ async function deleteAccount() {
           }
         },
       },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
-        },
-      },
     ],
   }
   displayStore.showDialog = true
@@ -133,6 +133,13 @@ async function presentActionSheet() {
     header: t('change-your-picture'),
     buttons: [
       {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+      {
         text: t('button-camera'),
         handler: () => {
           takePhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
@@ -142,13 +149,6 @@ async function presentActionSheet() {
         text: t('button-browse'),
         handler: () => {
           pickPhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
-        },
-      },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
         },
       },
     ],
