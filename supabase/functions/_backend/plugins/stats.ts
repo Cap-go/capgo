@@ -28,7 +28,7 @@ import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
-import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts';
+import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
 
 const failActions = [
   'set_fail',
