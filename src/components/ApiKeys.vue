@@ -25,7 +25,7 @@ async function getKeys(retry = true): Promise<void> {
   const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', main.user?.id)
+    .eq('user_id', main.user?.id || '')
     .neq('mode', 'upload')
   if (data && data.length)
     keys.value = data

@@ -27,6 +27,7 @@ declare module 'vue' {
     Fab: typeof import('./components/tailwind-capacitor/fab.vue')['default']
     IIonCopyOutline: typeof import('~icons/ion/copy-outline')['default']
     InfoRow: typeof import('./components/package/InfoRow.vue')['default']
+    LangSelector: typeof import('./components/LangSelector.vue')['default']
     LineChartStats: typeof import('./components/LineChartStats.vue')['default']
     LogTable: typeof import('./components/tables/LogTable.vue')['default']
     MobileStats: typeof import('./components/MobileStats.vue')['default']
