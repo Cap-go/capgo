@@ -340,7 +340,6 @@ async function handleMfa() {
 }
 
 onMounted(async () => {
-
   const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
   if (error) {
     console.error('Cannot getm MFA factors', error)

@@ -150,7 +150,6 @@ async function fastBackward() {
     emit('reload')
   }
 }
-
 </script>
 
 <template>
