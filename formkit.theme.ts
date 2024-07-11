@@ -215,7 +215,7 @@ const classes: Record<string, Record<string, boolean>> = {
     "rounded": true,
     "border": true,
     "border-neutral-400": true,
-    "bg-white": true,
+    "bg-white": false,
     "focus-within:ring-1": true,
     "focus-within:!ring-blue-500": true,
     "focus-within:!border-blue-500": true,

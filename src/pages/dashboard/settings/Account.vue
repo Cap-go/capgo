@@ -161,6 +161,8 @@ async function presentActionSheet() {
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
   if (isLoading.value || !main.user?.id)
     return
+  if (form.first_name === main.user?.first_name && form.last_name === main.user?.last_name && form.email === main.user?.email && form.country === main.user?.country)
+    return
   isLoading.value = true
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {

@@ -333,7 +333,7 @@ onMounted(checkLogin)
             <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
               <div class="space-y-5 text-gray-500">
                 <FormKit
-                  type="text" name="code" :disabled="isLoading" input-class="!text-black"
+                  type="text" name="code" :disabled="isLoading"
                   :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
                   :validation-rules="{ mfa_code_validation }"
                   :validation-messages="{
