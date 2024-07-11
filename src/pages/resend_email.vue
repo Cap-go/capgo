@@ -45,7 +45,7 @@ async function submit(form: { email: string, password: string }) {
           <div class="overflow-hidden bg-white rounded-md shadow-md">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
               <FormKit id="resend-email" type="form" :actions="false" @submit="submit">
-                <div class="space-y-5">
+                <div class="space-y-5 text-gray-500">
                   <FormKit
                     type="email"
                     name="email"
