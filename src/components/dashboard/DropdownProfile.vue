@@ -39,7 +39,7 @@ function logOut() {
 
 <template>
   <div>
-    <details ref="dropdown" class="dropdown">
+    <details ref="dropdown" class="dropdown dropdown-end">
       <summary class="m-1 btn btn-outline text-slate-800 dark:text-white">
         <img v-if="main.user?.image_url" class="w-8 h-8 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
         <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-full dark:border-white">
