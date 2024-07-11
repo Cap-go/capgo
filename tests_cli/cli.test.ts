@@ -24,17 +24,15 @@ function resetAndSeedData() {
   return supabase.rpc('reset_and_seed_data')
 }
 
-describe('tests CLI', () => {
+describe('tests CLI upload', () => {
   beforeAll(async () => {
     await prepareCli(BASE_URL)
   })
-
   it('should upload bundle successfully', async () => {
     await resetAndSeedData()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], true)
     expect(output).toContain('Bundle Uploaded')
   })
-
   it('should download and verify uploaded bundle', async () => {
     const baseData = getUpdateBaseData()
     const response = await sendUpdate(BASE_URL, baseData)
@@ -59,6 +57,24 @@ describe('tests CLI', () => {
     const indexJsContent = indexJsEntry!.getData().toString('utf8')
     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
   })
+  it('should not upload same twice', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+    expect(output).toContain('Cannot upload the same bundle content')
+  })
+})
+
+describe('tests Wrong cases', () => {
+  beforeAll(async () => {
+    await prepareCli(BASE_URL)
+  })
+  it('cannot upload with wrong api key', async () => {
+    const testApiKey = crypto.randomUUID()
+
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false, testApiKey)
+    expect(output).toContain('Invalid API key or insufficient permissions.')
+  })
 
   it('should test selectable disallow upload', async () => {
     const supabase = createSupabase()
@@ -78,6 +94,12 @@ describe('tests CLI', () => {
     finally {
       await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
     }
+  })
+})
+
+describe('tests CLI for organization', () => {
+  beforeAll(async () => {
+    await prepareCli(BASE_URL)
   })
 
   // it.only('should test auto min version flag', async () => {
@@ -105,7 +127,7 @@ describe('tests CLI', () => {
   //     .eq('name', semver)
 
   //   increaseSemver()
-  //   const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+  //   const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'])
   //   expect(output).toContain('skipping auto setting compatibility')
 
   //   await supabase
@@ -122,6 +144,7 @@ describe('tests CLI', () => {
     const testApiKey = crypto.randomUUID()
     const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
     const supabase = createSupabase()
+    await resetAndSeedData()
     await supabase.from('apikeys')
       .insert({ key: testApiKey, user_id: testUserId, mode: 'upload' })
 
