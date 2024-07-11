@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { EMPTY_UUID, hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
 import { readDevices } from '../utils/stats.ts'
@@ -130,7 +130,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
         device_id: body.device_id,
         version: dataVersion.id,
         app_id: body.app_id,
-        owner_org: EMPTY_UUID,
+        owner_org: dataVersion?.owner_org,
       })
     if (dbErrorDev) {
       console.log('Cannot save device override', dbErrorDev)
@@ -162,7 +162,7 @@ async function post(c: Context, body: DeviceLink, apikey: Database['public']['Ta
         device_id: body.device_id,
         channel_id: dataChannel.id,
         app_id: body.app_id,
-        owner_org: EMPTY_UUID,
+        owner_org: dataChannel.owner_org,
       })
     if (dbErrorDev) {
       console.log('Cannot save channel override', dbErrorDev)

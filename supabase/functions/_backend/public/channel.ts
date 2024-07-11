@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { EMPTY_UUID, hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../utils/supabase.ts'
 import { fetchLimit } from '../utils/utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { BRES, getBody, middlewareKey } from '../utils/hono.ts'
@@ -154,7 +154,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
     version: -1,
-    owner_org: EMPTY_UUID,
+    owner_org: org.owner_org,
   }
 
   if (body.version) {
