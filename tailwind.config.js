@@ -36,7 +36,6 @@ module.exports = {
     './index.html',
     './formkit.config.ts',
     './src/**/*.{vue,js,ts,jsx,tsx}',
-    './node_modules/flowbite/**/*.js',
   ],
   theme: {
     extend: {
@@ -276,7 +275,6 @@ module.exports = {
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/container-queries'),
     require('daisyui'),
-    // require('flowbite/plugin'), // TODO: understand why this is not working
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {
       addVariant('sidebar-expanded', ({ modifySelectors, separator }) => {

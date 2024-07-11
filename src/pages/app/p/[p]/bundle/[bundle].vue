@@ -485,23 +485,6 @@ function hideString(str: string) {
   return `${first}...${last}`
 }
 
-// TODO: delete or fix
-// async function previewBundle() {
-//   if (!version.value)
-//     throw new Error('No version id?')
-
-//   if (version.value.session_key) {
-//     toast.error(t('preview-encrypted'))
-//     return
-//   }
-
-//   displayStore.appPreview = {
-//     appId: packageId.value,
-//     version: version.value,
-//   } as any
-//   displayStore.showAppPreview = true
-// }
-
 async function saveCustomId(input: string) {
   if (!id.value)
     return

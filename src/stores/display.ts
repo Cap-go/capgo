@@ -32,8 +32,6 @@ export const useDisplayStore = defineStore('display', () => {
   const dialogOption = ref<ActionSheetOption>()
   const toastOption = ref<ActionSheetOption>()
   const dialogCanceled = ref<boolean>(false)
-  const appPreview = ref<AppPreviewOptions>()
-  const showAppPreview = ref<boolean>(false)
   const showDialog = ref<boolean>(false)
   const NavTitle = ref<string>('')
   const defaultBack = ref<string>('')
@@ -65,8 +63,6 @@ export const useDisplayStore = defineStore('display', () => {
     lastButtonRole,
     NavTitle,
     defaultBack,
-    showAppPreview,
-    appPreview,
     dialogInputText,
   }
 })

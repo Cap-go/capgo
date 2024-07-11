@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
-import { computed, onMounted, ref, watch } from 'vue'
-import { initDropdowns } from 'flowbite'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { FormKit } from '@formkit/vue'
 import type { TableColumn } from './comp_def'
@@ -152,9 +151,6 @@ async function fastBackward() {
   }
 }
 
-onMounted(() => {
-  initDropdowns()
-})
 </script>
 
 <template>
@@ -166,21 +162,17 @@ onMounted(() => {
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
-        <button v-if="filterText && filterList.length" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="relative inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button">
-          <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
-            <!-- uppercase first letter in tailwind -->
-            {{ filterActivated }}
+        <div v-if="filterText && filterList.length" class="dropdown">
+          <div tabindex="0" role="button" class="m-1 btn btn-outline">
+            <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
+              <!-- uppercase first letter in tailwind -->
+              {{ filterActivated }}
+            </div>
+            <IconFilter class="m-1 mr-2" />
+            <span class="hidden md:block">{{ t(filterText) }}</span>
+            <IconDown class="hidden m-1 ml-2 md:block" />
           </div>
-          <IconFilter class="m-1 mr-2" />
-          <span class="hidden md:block">{{ t(filterText) }}</span>
-          <IconDown class="hidden m-1 ml-2 md:block" />
-        </button>
-        <!-- Dropdown menu -->
-        <div v-if="filterText && filterList.length" id="dropdownRadio" class="z-50 hidden w-48 bg-white border divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
-          <div class="block px-4 py-3 text-sm text-gray-900 md:hidden dark:text-white">
-            <div>{{ t(filterText) }}</div>
-          </div>
-          <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
+          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">

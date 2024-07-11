@@ -147,7 +147,6 @@
     "drizzle-orm": "^0.31.2",
     "envfile": "^7.1.0",
     "firebase": "10.12.2",
-    "flowbite": "^2.3.0",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
     "json2csv": "^5.0.7",

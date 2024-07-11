@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
 import { computed, onMounted, ref, watch } from 'vue'
-import { initDropdowns } from 'flowbite'
 import { useI18n } from 'vue-i18n'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
@@ -172,7 +171,6 @@ function formatValue(previewValue: Date[] | undefined) {
 }
 
 onMounted(async () => {
-  initDropdowns()
   await organizationStore.awaitInitialLoad()
   thisOrganization.value = organizationStore.getOrgByAppId(props.appId) ?? null
 
