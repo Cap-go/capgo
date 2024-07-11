@@ -54,11 +54,9 @@ onMounted(() => {
 <template>
   <dialog id="my_modal_1" class="modal" :open="displayStore.showDialog">
     <div class="modal-box" :class="displayStore.dialogOption?.size ?? ''">
-      <form method="dialog">
-        <button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2">
-          ✕
-        </button>
-      </form>
+      <button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" @click="close()">
+        ✕
+      </button>
       <h3 class="text-lg font-bold" :class="displayStore.dialogOption?.headerStyle">
         {{ displayStore.dialogOption?.header }}
       </h3>
@@ -83,8 +81,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="modal-action">
-        <form
-          method="dialog"
+        <div
           class="flex items-center rounded-b dark:border-gray-600"
           :class="{
             'space-x-2': !displayStore.dialogOption?.buttonCenter,
@@ -106,7 +103,7 @@ onMounted(() => {
           >
             {{ item.text }}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   </dialog>
