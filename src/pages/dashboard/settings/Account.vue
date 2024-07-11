@@ -452,8 +452,8 @@ onMounted(async () => {
           {{ t('settings') }}
         </h3>
         <!-- Language Info -->
-        <section class="flex flex-col md:flex-row md:items-center items-left">
-          <p class="text-slate-800 dark:text-white">
+        <section class="flex flex-col text-slate-800 dark:text-white md:flex-row md:items-center items-left">
+          <p class="">
             {{ t('language') }}:
           </p>
           <div class="md:ml-6">

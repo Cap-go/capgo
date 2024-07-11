@@ -40,7 +40,7 @@ function logOut() {
 <template>
   <div>
     <details ref="dropdown" class="dropdown">
-      <summary class="m-1 btn btn-outline">
+      <summary class="m-1 btn btn-outline text-slate-800 dark:text-white">
         <img v-if="main.user?.image_url" class="w-8 h-8 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
         <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-full dark:border-white">
           <p>{{ acronym }}</p>
@@ -50,7 +50,7 @@ function logOut() {
           <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
         </div>
       </summary>
-      <ul class="dropdown-content bg-base-100 rounded-box z-[1] w-52 p-2 shadow" @click="closeDropdown()">
+      <ul class="dropdown-content dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow" @click="closeDropdown()">
         <li class="text-sm text-gray-900 border-b border-gray-200 dark:text-white">
           <div>{{ `${main.user?.first_name} ${main.user?.last_name}` }}</div>
           <div class="font-medium truncate">
