@@ -145,6 +145,7 @@ cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
 change: Thay đổi
 change-api-key-name: Thay đổi tên của apikey
+change-your-picture: Thay đổi hình ảnh của bạn
 changed-app-name: Đã đổi tên ứng dụng thành công
 changed-name: Đã đổi tên apikey thành công
 changed-password-suc: Đã đổi mật khẩu thành công
@@ -178,6 +179,7 @@ confirm-public-desc: |-
   Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
 
   Các kênh mặc định khác sẽ không còn mặc định nữa.
+continue: Tiếp tục
 copied-to-clipboard: Sao chép vào clipboard
 copy-account-id: sao chép id tài khoản
 copy-command: Sao chép lệnh
@@ -231,6 +233,7 @@ discover-your-dashbo: Khám phá bảng điều khiển của bạn!
 documentation: Tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
 download: Tải xuống
+download-0: Tải xuống
 edit-name: Chỉnh sửa tên
 edit-pic: Chỉnh sửa hình ảnh
 email: E-mail
@@ -388,6 +391,7 @@ old-onboarding-mode: giới thiệu cũ
 one-day-left: Còn lại một ngày
 open: Mở
 open-channel: mở kênh
+open-in-new-tab: Mở ra trong trang mới
 open-settings: Nhấp để mở cài đặt
 open-sidebar: Mở thanh bên
 open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn

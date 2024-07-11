@@ -149,6 +149,7 @@ cannot-view-usage: No se puede ver la página de uso
 cannots-sign-off: No se puede iniciar sesión
 change: Cambiar
 change-api-key-name: Cambiar el nombre del apikey
+change-your-picture: Cambia tu fotografía
 changed-app-name: El nombre de la aplicación se cambió correctamente
 changed-name: Cambió exitosamente el nombre de apikey
 changed-password-suc: Contraseña cambiada con éxito
@@ -186,6 +187,7 @@ confirm-public-desc: >-
 
 
   Otros canales predeterminados ya no serán predeterminados.
+continue: Continuar
 copied-to-clipboard: Copiado al portapapeles
 copy-account-id: copiar identificación de cuenta
 copy-command: Copiar comando
@@ -239,6 +241,7 @@ discover-your-dashbo: ¡Descubre tu tablero!
 documentation: Documentación
 dont-have-an-account: ¿No tienes una cuenta?
 download: Descargar
+download-0: Descargar
 edit-name: Editar nombre
 edit-pic: Editar foto
 email: Correo electrónico
@@ -398,6 +401,7 @@ old-onboarding-mode: incorporación antigua
 one-day-left: Queda un día
 open: Abierto
 open-channel: Canal abierto
+open-in-new-tab: Abrir en una pestaña nueva
 open-settings: Haga clic para abrir la configuración
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abre este enlace para saber cómo probar tu actualización

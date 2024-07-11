@@ -141,6 +141,7 @@ cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
 change: Mengubah
 change-api-key-name: Ubah nama apikey
+change-your-picture: Ubah gambar Anda
 changed-app-name: Berhasil mengubah nama aplikasi
 changed-name: Berhasil mengubah nama apikey
 changed-password-suc: Kata sandi berhasil diubah
@@ -177,6 +178,7 @@ confirm-public-desc: >-
   semua pengguna Anda.
 
   Saluran default lainnya tidak akan menjadi default lagi.
+continue: Melanjutkan
 copied-to-clipboard: Disalin ke papan klip
 copy-account-id: salin id akun
 copy-command: Salin perintah
@@ -230,6 +232,7 @@ discover-your-dashbo: Temukan dasbor Anda!
 documentation: Dokumentasi
 dont-have-an-account: Belum punya akun?
 download: Unduh
+download-0: Unduh
 edit-name: Sunting nama
 edit-pic: Sunting gambar
 email: Surel
@@ -389,6 +392,7 @@ old-onboarding-mode: orientasi lama
 one-day-left: Tinggal satu hari
 open: Membuka
 open-channel: Buka saluran
+open-in-new-tab: Buka di tab baru
 open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
 open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda

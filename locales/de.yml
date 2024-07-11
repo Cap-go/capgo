@@ -155,6 +155,7 @@ cannot-view-usage: Die Nutzungsseite kann nicht angezeigt werden
 cannots-sign-off: Protokollierung nicht möglich
 change: Ändern
 change-api-key-name: Ändern Sie den Namen des Apikeys
+change-your-picture: Ändere dein Bild
 changed-app-name: App-Name erfolgreich geändert
 changed-name: Der Name von apikey wurde erfolgreich geändert
 changed-password-suc: das Passwort wurde erfolgreich geändert
@@ -192,6 +193,7 @@ confirm-public-desc: >-
 
 
   Andere Standardkanäle sind nicht mehr Standard.
+continue: Weitermachen
 copied-to-clipboard: In die Zwischenablage kopiert
 copy-account-id: Konto-ID kopieren
 copy-command: Befehl kopieren
@@ -245,6 +247,7 @@ discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
 download: Herunterladen
+download-0: Herunterladen
 edit-name: Namen bearbeiten
 edit-pic: Bild bearbeiten
 email: Email
@@ -406,6 +409,7 @@ old-onboarding-mode: altes Onboarding
 one-day-left: Ein Tag übrig
 open: Offen
 open-channel: Offener Kanal
+open-in-new-tab: In neuem Tab öffnen
 open-settings: Klicken Sie hier, um die Einstellungen zu öffnen
 open-sidebar: Seitenleiste öffnen
 open-this-link-to-le: Öffnen Sie diesen Link, um zu erfahren, wie Sie Ihr Update testen können

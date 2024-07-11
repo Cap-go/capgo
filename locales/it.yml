@@ -147,6 +147,7 @@ cannot-view-usage: Impossibile visualizzare la pagina di utilizzo
 cannots-sign-off: Impossibile accedere
 change: Modifica
 change-api-key-name: Cambia il nome dell'apikey
+change-your-picture: Cambia la tua immagine
 changed-app-name: Nome dell'app modificato correttamente
 changed-name: Nome di apikey modificato con successo
 changed-password-suc: password cambiata con successo
@@ -184,6 +185,7 @@ confirm-public-desc: >-
 
 
   Altri canali predefiniti non saranno più predefiniti.
+continue: Continua
 copied-to-clipboard: Copiato negli appunti
 copy-account-id: copiare l'ID dell'account
 copy-command: Comando Copia
@@ -237,6 +239,7 @@ discover-your-dashbo: Scopri la tua dashboard!
 documentation: Documentazione
 dont-have-an-account: Non hai un account?
 download: Scaricamento
+download-0: Scaricamento
 edit-name: Modifica nome
 edit-pic: Modifica immagine
 email: E-mail
@@ -394,6 +397,7 @@ old-onboarding-mode: vecchio onboarding
 one-day-left: Manca un giorno
 open: Aprire
 open-channel: Canale aperto
+open-in-new-tab: Apri in una nuova scheda
 open-settings: Fare clic per aprire le impostazioni
 open-sidebar: Apri la barra laterale
 open-this-link-to-le: Apri questo link per scoprire come testare il tuo aggiornamento

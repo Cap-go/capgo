@@ -139,6 +139,7 @@ cannot-view-usage: 사용량 페이지를 볼 수 없습니다
 cannots-sign-off: 로그할 수 없습니다.
 change: 변화
 change-api-key-name: apikey 이름 변경
+change-your-picture: 사진을 바꿔보세요
 changed-app-name: 앱 이름이 변경되었습니다.
 changed-name: apikey 이름이 변경되었습니다.
 changed-password-suc: 비밀번호가 성공적으로 변경되었습니다.
@@ -172,6 +173,7 @@ confirm-public-desc: |-
   이 채널을 기본으로 설정하면 모든 사용자에게 업데이트가 전송됩니다.
 
   다른 기본 채널은 더 이상 기본값이 아닙니다.
+continue: 계속하다
 copied-to-clipboard: 클립보드에 복사됨
 copy-account-id: 계정 ID 복사
 copy-command: 복사 명령
@@ -225,6 +227,7 @@ discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
 download: 다운로드
+download-0: 다운로드
 edit-name: 이름 수정
 edit-pic: 사진 편집
 email: 이메일
@@ -376,6 +379,7 @@ old-onboarding-mode: 오래된 온보딩
 one-day-left: 하루 남음
 open: 열려 있는
 open-channel: 채널 열기
+open-in-new-tab: 새 탭에서 열기
 open-settings: 클릭하여 설정 열기
 open-sidebar: 사이드바 열기
 open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.

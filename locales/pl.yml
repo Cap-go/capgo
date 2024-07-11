@@ -143,6 +143,7 @@ cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
 change: Zmiana
 change-api-key-name: Zmień nazwę apikey
+change-your-picture: Zmień swoje zdjęcie
 changed-app-name: Pomyślnie zmieniono nazwę aplikacji
 changed-name: Pomyślnie zmieniono nazwę apikey
 changed-password-suc: Hasło zostało zmienione pomyślnie
@@ -180,6 +181,7 @@ confirm-public-desc: >-
 
 
   Inne domyślne kanały nie będą już domyślne.
+continue: Kontynuować
 copied-to-clipboard: Skopiowane do schowka
 copy-account-id: skopiuj identyfikator konta
 copy-command: Kopiuj polecenie
@@ -233,6 +235,7 @@ discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: Dokumentacja
 dont-have-an-account: Nie masz konta?
 download: Pobierać
+download-0: Pobierać
 edit-name: Edytuj imię
 edit-pic: Edytuj zdjęcie
 email: E-mail
@@ -388,6 +391,7 @@ old-onboarding-mode: stary wstęp
 one-day-left: Został jeden dzień
 open: otwarty
 open-channel: Otwórz kanał
+open-in-new-tab: Otwórz w nowej karcie
 open-settings: Kliknij, aby otworzyć ustawienia
 open-sidebar: Otwórz pasek boczny
 open-this-link-to-le: Otwórz ten link, aby dowiedzieć się, jak przetestować aktualizację

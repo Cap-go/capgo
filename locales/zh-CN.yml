@@ -139,6 +139,7 @@ cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
 change: 改变
 change-api-key-name: 更改 apikey 的名称
+change-your-picture: 改变你的图片
 changed-app-name: 更改应用名称成功
 changed-name: 已成功更改 apikey 名称
 changed-password-suc: 密码修改成功
@@ -172,6 +173,7 @@ confirm-public-desc: |-
   将此频道设置为默认频道将使其向您的所有用户发送更新。
 
   其他默认频道将不再默认。
+continue: 继续
 copied-to-clipboard: 复制到剪贴板
 copy-account-id: 复制帐户 ID
 copy-command: 复制指令
@@ -225,6 +227,7 @@ discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
 dont-have-an-account: 没有帐户？
 download: 下载
+download-0: 下载
 edit-name: 编辑姓名
 edit-pic: 编辑图片
 email: 电子邮件
@@ -376,6 +379,7 @@ old-onboarding-mode: 旧入职
 one-day-left: 还剩一天
 open: 打开
 open-channel: 打开通道
+open-in-new-tab: 在新选项卡中打开
 open-settings: 点击打开设置
 open-sidebar: 打开侧边栏
 open-this-link-to-le: 打开此链接以了解如何测试您的更新

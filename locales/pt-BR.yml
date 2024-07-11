@@ -143,6 +143,7 @@ cannot-view-usage: Não é possível visualizar a página de uso
 cannots-sign-off: Não é possível registrar
 change: Mudar
 change-api-key-name: Alterar o nome do apikey
+change-your-picture: Mude sua foto
 changed-app-name: Nome do aplicativo alterado com sucesso
 changed-name: Nome do apikey alterado com sucesso
 changed-password-suc: Senha alterada com sucesso
@@ -178,6 +179,7 @@ confirm-public-desc: >-
 
 
   Outros canais padrão não serão mais padrão.
+continue: Continuar
 copied-to-clipboard: Copiado para a área de transferência
 copy-account-id: copiar ID da conta
 copy-command: Copiar comando
@@ -231,6 +233,7 @@ discover-your-dashbo: Descubra o seu painel!
 documentation: Documentação
 dont-have-an-account: Não tem uma conta?
 download: Download
+download-0: Download
 edit-name: Editar nome
 edit-pic: Editar imagem
 email: E-mail
@@ -386,6 +389,7 @@ old-onboarding-mode: integração antiga
 one-day-left: Falta um dia
 open: Abrir
 open-channel: canal aberto
+open-in-new-tab: Abrir em nova aba
 open-settings: Clique para abrir as configurações
 open-sidebar: Abrir barra lateral
 open-this-link-to-le: Abra este link para saber como testar sua atualização

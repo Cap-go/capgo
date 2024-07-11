@@ -141,6 +141,7 @@ cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
 change: Değiştirmek
 change-api-key-name: Apikey'in adını değiştirin
+change-your-picture: Resmini değiştir
 changed-app-name: Uygulama adı başarıyla değiştirildi
 changed-name: Apikey'in adı başarıyla değiştirildi
 changed-password-suc: parola başarıyla değiştirildi
@@ -176,6 +177,7 @@ confirm-public-desc: >-
 
 
   Diğer varsayılan kanallar artık varsayılan olmayacak.
+continue: Devam etmek
 copied-to-clipboard: Panoya kopyalandı
 copy-account-id: hesap kimliğini kopyala
 copy-command: Komutu kopyala
@@ -229,6 +231,7 @@ discover-your-dashbo: Kontrol panelinizi keşfedin!
 documentation: Belgeler
 dont-have-an-account: Hesabınız yok mu?
 download: İndirmek
+download-0: İndirmek
 edit-name: Adı düzenle
 edit-pic: Resmi düzenle
 email: E-posta
@@ -384,6 +387,7 @@ old-onboarding-mode: eski işe alım
 one-day-left: Bir gün kaldı
 open: Açık
 open-channel: kanalı aç
+open-in-new-tab: Yeni sekmede aç
 open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
 open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın

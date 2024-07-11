@@ -139,6 +139,7 @@ cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
 change: 変化
 change-api-key-name: apikey の名前を変更する
+change-your-picture: 写真を変更する
 changed-app-name: アプリ名が正常に変更されました
 changed-name: apikey の名前が正常に変更されました
 changed-password-suc: パスワードは正常に変更されました
@@ -172,6 +173,7 @@ confirm-public-desc: |-
   このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
 
   他のデフォルト チャネルはデフォルトではなくなります。
+continue: 続く
 copied-to-clipboard: クリップボードにコピーしました
 copy-account-id: アカウントIDをコピーする
 copy-command: コピー コマンド
@@ -225,6 +227,7 @@ discover-your-dashbo: あなたのダッシュボードを見つけてくださ�
 documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
 download: ダウンロード
+download-0: ダウンロード
 edit-name: 名前の編集
 edit-pic: 画像を編集する
 email: Eメール
@@ -376,6 +379,7 @@ old-onboarding-mode: 古いオンボーディング
 one-day-left: 残り一日
 open: 開ける
 open-channel: チャンネルを開く
+open-in-new-tab: 新しいタブで開く
 open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
 open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
