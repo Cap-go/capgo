@@ -67,6 +67,7 @@ async function deleteAccount() {
             router.replace('/login')
           }
           catch (error) {
+            console.error(error)
             return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
         },

@@ -35,7 +35,7 @@ interface Channel {
   }
   misconfigured: boolean | undefined
 }
-const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
+type Element = Database['public']['Tables']['channels']['Row'] & Channel
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
@@ -46,7 +46,7 @@ const router = useRouter()
 const main = useMainStore()
 const total = ref(0)
 const search = ref('')
-const elements = ref<(typeof element)[]>([])
+const elements = ref<(Element)[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const versionId = ref<number>()
@@ -161,7 +161,7 @@ async function getData() {
     let anyMisconfigured = false
     const channels = dataVersions
       .filter(e => e.disableAutoUpdate === 'version_number')
-      .map(e => e as any as typeof element)
+      .map(e => e as any as Element)
 
     for (const channel of channels) {
       if (channel.version.minUpdateVersion === null) {
@@ -195,7 +195,7 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function deleteOne(one: typeof element) {
+async function deleteOne(one: Element) {
   // console.log('deleteBundle', bundle)
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(one.app_id), ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
@@ -219,6 +219,7 @@ async function deleteOne(one: typeof element) {
     }
   }
   catch (error) {
+    console.error(error)
     toast.error(t('cannot-delete-channel'))
   }
 }
@@ -236,20 +237,20 @@ columns.value = [
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.updated_at || ''),
   },
   {
     label: t('last-version'),
     key: 'version',
     mobile: true,
     sortable: true,
-    displayFunction: (elem: typeof element) => elem.version.name,
+    displayFunction: (elem: Element) => elem.version.name,
   },
   {
     label: t('misconfigured'),
     mobile: false,
     key: 'misconfigured',
-    displayFunction: (elem: typeof element) => elem.misconfigured ? t('yes') : t('no'),
+    displayFunction: (elem: Element) => elem.misconfigured ? t('yes') : t('no'),
   },
   {
     label: t('action'),
@@ -302,7 +303,7 @@ async function showAddModal() {
   await displayStore.onDialogDismiss()
 }
 
-async function openOne(one: typeof element) {
+async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
 onMounted(async () => {

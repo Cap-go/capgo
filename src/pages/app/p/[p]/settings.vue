@@ -105,6 +105,7 @@ async function deleteApp() {
     router.push('/app/home')
   }
   catch (error) {
+    console.error(error)
     toast.error(t('cannot-delete-app'))
   }
 }

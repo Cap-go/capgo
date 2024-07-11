@@ -24,7 +24,8 @@ function close(item?: ActionSheetOptionButton) {
     else
       displayStore.dialogCanceled = false
 
-    item?.handler && item.handler()
+    if (item?.handler)
+      item.handler()
   }
 }
 

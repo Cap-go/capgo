@@ -29,13 +29,13 @@ interface LogData {
   version?: number
   created_at: string
 }
-const element: LogData & Channel = {} as any
+type Element = LogData & Channel
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const router = useRouter()
 const { t } = useI18n()
 const supabase = useSupabase()
 const search = ref('')
-const elements = ref<(typeof element)[]>([])
+const elements = ref<Element[]>([])
 const versions = ref<Channel['version'][]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
@@ -150,7 +150,7 @@ columns.value = [
     key: 'created_at',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
   },
   {
     label: t('device-id'),
@@ -173,7 +173,7 @@ columns.value = [
     key: 'version',
     mobile: false,
     sortable: false,
-    displayFunction: (elem: typeof element) => elem.version?.name,
+    displayFunction: (elem: Element) => elem.version?.name,
   },
 ]
 
@@ -188,7 +188,7 @@ async function reload() {
     console.error(error)
   }
 }
-async function openOne(one: typeof element) {
+async function openOne(one: Element) {
   if (props.deviceId || !props.appId)
     return
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)

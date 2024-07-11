@@ -15,14 +15,14 @@ const props = defineProps<{
   versionId?: number | undefined
 }>()
 
-const element: Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] } = {} as any
+type Element = Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }
 
 const { t } = useI18n()
 const supabase = useSupabase()
 const router = useRouter()
 const total = ref(0)
 const search = ref('')
-const elements = ref<typeof element[]>([])
+const elements = ref<Element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
@@ -46,7 +46,7 @@ const columns = ref<TableColumn[]>([
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.updated_at || ''),
   },
   {
     label: t('platform'),
@@ -54,7 +54,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: typeof element) => `${elem.platform} ${elem.os_version}`,
+    displayFunction: (elem: Element) => `${elem.platform} ${elem.os_version}`,
   },
   {
     label: t('bundle'),
@@ -62,7 +62,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
-    displayFunction: (elem: typeof element) => elem.version.name,
+    displayFunction: (elem: Element) => elem.version.name,
   },
 ])
 
@@ -207,7 +207,7 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function openOne(one: typeof element) {
+async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
 onMounted(async () => {

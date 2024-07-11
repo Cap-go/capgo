@@ -77,7 +77,8 @@ async function getVersion() {
       .throwOnError()
     versions.value = data || versions.value
   }
-  catch (_e) {
+  catch (error) {
+    console.error(error)
     versions.value = []
   }
 }
@@ -95,7 +96,8 @@ async function getChannels() {
       .throwOnError()
     channels.value = (data || []) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
   }
-  catch (_e) {
+  catch (error) {
+    console.error(error)
     channels.value = []
   }
 }
@@ -126,7 +128,8 @@ async function getChannelOverride() {
     }
     channelDevice.value = (data || undefined) as Database['public']['Tables']['channel_devices']['Row'] & ChannelDev
   }
-  catch (_e) {
+  catch (error) {
+    console.error(error)
     channelDevice.value = undefined
   }
 }
@@ -159,7 +162,8 @@ async function getDeviceOverride() {
       overwriteVersion.version = dataVersion! as any as typeof overwriteVersion.version
     deviceOverride.value = overwriteVersion
   }
-  catch (_e) {
+  catch (error) {
+    console.error(error)
     deviceOverride.value = undefined
   }
 }
@@ -283,7 +287,8 @@ async function updateOverride() {
     buttons.push({
       text: t('button-remove'),
       handler: async () => {
-        device.value?.device_id && await delDevVersion(device.value?.device_id)
+        if (device.value?.device_id)
+          await delDevVersion(device.value?.device_id)
         toast.success(t('unlink-version'))
         await loadData()
       },
@@ -359,7 +364,8 @@ async function updateChannel() {
       buttons.push({
         text: t('button-remove'),
         handler: async () => {
-          device.value?.device_id && await delDevChannel(device.value?.device_id)
+          if (device.value?.device_id)
+            await delDevChannel(device.value?.device_id)
           toast.success(t('unlink-channel'))
           await loadData()
         },
@@ -369,7 +375,8 @@ async function updateChannel() {
     buttons.push({
       text: t('open-channel'),
       handler: async () => {
-        device.value?.device_id && router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${channelDevice.value?.channel_id}`)
+        if (device.value?.device_id)
+          router.push(`/app/p/${appIdToUrl(device.value?.device_id)}/channel/${channelDevice.value?.channel_id}`)
       },
     })
   }
