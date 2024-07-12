@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "10.601.68",
+  "version": "10.601.71",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker rm minio1 && bun run minio:start && bun run minio:seed",
@@ -145,7 +145,7 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.31.2",
     "envfile": "^7.1.0",
-    "firebase": "10.12.2",
+    "firebase": "10.12.3",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
     "json2csv": "^5.0.7",
