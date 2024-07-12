@@ -4,39 +4,27 @@
 6-characters-minimum: Minimal 6 karakter, 1 huruf besar, 1 huruf kecil, 1 karakter khusus
 Bandwidth: Bandwidth
 Current: Saat ini
-Filters: Filter
-Override: Mengesampingkan
 Storage: Penyimpanan
 ab-testing-progressive-deploy-conflict: Pengujian AB dan penerapan progresif tidak dapat diaktifkan secara bersamaan
-account: Akun
 account-error: Terjadi kesalahan saat memperbarui akun Anda
 account-id: ID Akun
 account-password-error: Terjadi kesalahan, harap coba lagi
 account-password-heading: Ubah kata sandi saya
-account-settings: Pengaturan akun
 account-updated-succ: Akun berhasil diperbarui
 action: Tindakan
-activation-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
 activation-doi: Persetujuan opsional
 activation-doi-desc: Saya menerima buletin Email dan penawaran pemasaran di masa mendatang
 activation-heading: pengaktifan
-activation-headline: Pengaturan saya
 activation-legal: Ketentuan layanan
 activation-legal-desc: Saya menerima kebijakan privasi dan ketentuan penggunaan aplikasi Capgo
 activation-notification: Notifikasi
 activation-notification-desc: Saya menerima untuk menerima pemberitahuan ketika versi aplikasi baru tersedia
 activation-validate: Mengesahkan
 active_users_by_version: Perangkat aktif berdasarkan paket
-add: Menambahkan
 add-another-app: Tambahkan aplikasi Anda
 add-api-key: Berhasil menambahkan kunci API baru
 add-member: Tambahkan anggota
-add-shared-user: Tambahkan pengguna bersama
-add-this-code-to-you: Tambahkan kode ini ke proyek Anda
-add-your-app-to-your: Tambahkan aplikasi Anda ke akun Anda
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
-admin: Admin
-afternoon: sore
 alert-2fa-disable: Konfirmasikan bahwa Anda ingin menonaktifkan 2FA
 alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
@@ -57,21 +45,15 @@ allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
 allow-emulator: Izinkan Emulator
 already-account: Anda sudah memiliki akun?
 api-doc: dokumen API
-api-key: Kunci API
 api-keys: Kunci API
 api-keys-are-used-for-cli-and-public-api: Kunci API digunakan untuk CLI dan API publik
-api-keys-key-copied: Kunci API
 app: Aplikasi
 app-deleted: Aplikasi dihapus
-app-id: 'Id aplikasi:'
-app-id-example: Contoh ID aplikasi
 app-info: Informasi aplikasi
 app-info-desc: Di sini Anda dapat mengubah informasi aplikasi Anda
 app-logo-deleted: Gambar aplikasi berhasil dihapus
 app-name: Nama aplikasi
-app-not-found: Aplikasi tidak ditemukan
 app-perm: Izin aplikasi
-app-preview: Pratinjau aplikasi
 are-u-sure: Apa kamu yakin ?
 available-in-the-san: Tersedia di aplikasi kotak pasir
 back-to-login-page: Kembali ke halaman login
@@ -81,17 +63,12 @@ best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
 billed-annually-at: Ditagih setiap tahun pada
 billed-monthly-at: Ditagih setiap bulan pada
-billing: Penagihan
-build-your-app-and-s: bangun aplikasi Anda dan sinkronkan
-build-your-code-and-: Unggah ke Capgo kode Anda
 bulk-upload: Unggahan massal
 bundle: Bundel
 bundle-deleted: Bundel dihapus
-bundle-is-linked-channel: Bundel ditautkan dalam saluran, batalkan tautannya terlebih dahulu
 bundle-is-linked-device: Bundel ditautkan di perangkat, batalkan tautannya terlebih dahulu
 bundle-number: Nomor bundel
 bundles: bundel
-button-about: Tentang
 button-back: Kembali
 button-browse: Jelajahi
 button-camera: Kamera
@@ -99,18 +76,11 @@ button-cancel: Membatalkan
 button-confirm: Mengonfirmasi
 button-delete: Menghapus
 button-deny-invite: Membantah
-button-go: PERGI
-button-home: Rumah
 button-invite: Mengundang
 button-join: Menerima
-button-options: Pilihan
 button-regenerate: Diperbarui
 button-remove: Menghapus
-button-tabs: Tab
-button-toggle_dark: Alihkan mode gelap
-button-toggle_langs: Ubah bahasa
 by-clicking-on-them: dengan mengkliknya.
-cancel: Membatalkan
 canceled-delete: Penghapusan paket dibatalkan, tidak dapat menghapus paket tertaut
 canceled-photo-selection: Anda membatalkan pemilihan gambar
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
@@ -119,21 +89,17 @@ cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!
 cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
-cannot-delete-app-version: Tidak dapat menghapus versi aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
-cannot-download: Tidak dapat mengunduh bundel
 cannot-find-unknown-version: >-
   Tidak dapat menemukan versi yang tidak dikenal, silakan hubungi dukungan capgo
   dan periksa log browser
 cannot-get-the-test-: Tidak bisa mendapatkan versi uji
 cannot-invite-owner: Tidak dapat mengundang pemilik ke organisasi
 cannot-load-app-settings: Tidak dapat memuat pengaturan aplikasi
-cannot-save-custom-i: Tidak dapat menyimpan ID khusus
 cannot-set-this-vers: Tidak dapat menyetel versi ini
-cannot-share: Tidak dapat membagikan id pengguna, periksa konsol browser
 cannot-show: Tidak dapat menampilkan halaman ini
 cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
 cannot-view-plans: Tidak dapat melihat halaman rencana
@@ -154,7 +120,6 @@ channel-bundle-linked: |-
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
 channel-forced-devices: Perangkat Terpaksa
-channel-invit: Ketik email untuk mengundang
 channel-is-public: Saluran awal
 channel-link: Penimpaan saluran
 channel-link-fail: Tidak dapat mengganti saluran, terjadi kesalahan
@@ -182,19 +147,13 @@ continue: Melanjutkan
 copied-to-clipboard: Disalin ke papan klip
 copy-account-id: salin id akun
 copy-command: Salin perintah
-copy-your: Salin Anda
 country: Negara
 create-a-free-accoun: Buat Akun gratis
 create-new-org: Buat organisasi baru
 created-at: Dibuat di
-current-billing-cycle: Siklus Penagihan Saat Ini
 custom: Kebiasaan
 custom-domain: Domain khusus
 custom-id: ID khusus
-custom-id-saved: ID khusus disimpan
-dashboard: Dasbor
-days: hari
-defined-as: Didefinisikan sebagai
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete: Menghapus
@@ -204,57 +163,37 @@ delete-app: Hapus aplikasi
 delete-org: Hapus organisasi
 delete-your-account: Hapus akun anda
 deleted: dihapus
-dependencies:
-  js-yaml: ''
-  openai: ''
+dependencies: {}
 detailed-usage-plan: Penggunaan terperinci
-details-and-logs: Detail dan log
-devDependencies:
-  '@types/js-yaml': ''
+devDependencies: {}
 device: Perangkat
 device-id: ID perangkat
 devices: Perangkat
-devices-using-this-b: Perangkat yang menggunakan bundel ini
-dialog-warning-msg: |-
-  Informasi ini berasal dari pemilik organisasi.
-
-  Anda tidak dapat meningkatkan tingkat capgo untuk aplikasi ini
 did-not-recive-confirm-email: Tidak menerima email konfirmasi?
 disable: Cacat
 disable-ab-testing: Pengujian AB dinonaktifkan
 disable-auto-downgra: Nonaktifkan downgrade otomatis di bawah native
-disable-auto-upgrade: Nonaktifkan pemutakhiran otomatis di atas mayor
 disable-progressive-deploy: Menonaktifkan penerapan progresif
 disableAutoUpdateToMajor: Nonaktifkan pembaruan otomatis
-discord: Perselisihan
 discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
-documentation: Dokumentasi
 dont-have-an-account: Belum punya akun?
 download: Unduh
-download-0: Unduh
-edit-name: Sunting nama
-edit-pic: Sunting gambar
 email: Surel
-email-address: Alamat email
-email-does-not-exist: Pengguna ini tidak ada
 enable: Memungkinkan
 enable-2FA: Aktifkan 2FA
 enabled-ab-testing: Pengujian AB diaktifkan
 enabled-progressive-deploy: Mengaktifkan penerapan progresif
-encrypted: Bundel terenkripsi
 enter-your-email-add: >-
   Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mengatur
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 error: Kesalahan
-external-storage: Penyimpanan luar
 fail: Instal gagal
 failed: Gagal
 failed-to-get-user: Gagal memuat pengguna
 fast-backward: Mundur Cepat
 fast-forward: Maju Cepat
-filters: Filter
 first-name: Nama depan
 force-version: Versi paksa
 force-version-change: Lewati penerapan progresif
@@ -264,29 +203,22 @@ forgot-check-email: >-
   Anda
 forgot-success: Kata sandi berhasil diperbarui
 free-trial: Uji coba gratis
-from: Dari
 from-device: dari perangkat
 general-information: Informasi Umum
 generated-new-apikey: Menghasilkan kunci API baru!
 go-back: Kembali
 good: Bagus
 id: PENGENAL
-in-your-main-file: Di file utama Anda
-in-your-project-fold: Di folder proyek Anda
 included-in-plan: Termasuk dalam rencana
 info: Informasi
-informations: Informasi
 init-capgo-in-your-a: Init Capgo di aplikasi Anda
 insert-invite-email: Masukkan email pengguna yang ingin Anda undang
 install: Terpasang
-install-the-capacito: Instal plugin Kapasitor
-into-your-app-folder: Ke dalam folder aplikasi Anda.
 invalid-auth: Login Anda tidak cocok, coba lagi.
 invalid-email: Email yang diteruskan tidak valid
 invalid-mfa-code: Kode 2FA tidak valid
 invalid-version: Versi semver tidak valid
 invite-accepted: Berhasil menerima undangan organisasi
-invoices: faktur
 is-emulator: Apakah Emulator
 is-production-app: Apakah aplikasi Produksi
 key-admin: Admin
@@ -298,10 +230,7 @@ key-upload: Mengunggah
 key-write: Menulis
 language: Bahasa
 last-15-minutes: 15 menit terakhir
-last-24-hour: 24 jam terakhir
-last-3-hour: 3 jam terakhir
 last-3-minutes: 3 menit terakhir
-last-hour: Jam terakhir
 last-minute: Menit terakhir
 last-name: nama keluarga
 last-update: Pembaharuan Terakhir
@@ -310,16 +239,10 @@ last-version: Versi terakhir
 latest_version: Paket terbaru
 launch-bundle: Luncurkan bundel
 leaving: Meninggalkan
-limit-reached: Batas tercapai
 live-reload: Muat ulang langsung
-loading-more-data: Memuat lebih banyak data...
 log-in: Gabung
-log-to-the-capgo-cli: Masuk ke Capgo CLI
 login-to-your-accoun: masuk ke akun Anda
-logout: Keluar
 logs: Log
-lowerCaseError: Harus berisi huruf kecil
-main: ''
 main-bundle-number: Nomor bundel utama
 major: Besar
 make-default-android: Jadikan default untuk Android
@@ -351,13 +274,10 @@ missing-name: Nama tidak ada
 mo: bulan
 modify-org-info: Anda dapat mengubah informasi organisasi di sini.
 module-heading: Modul
-monthly: Bulanan
 monthly-active-users: Pengguna aktif bulanan
 monthly-plan: Rencana bulanan
 montly-active: Aktif bulanan
 more-version-storage: Lebih banyak versi Penyimpanan
-morning: Pagi
-my-account: Akun saya
 my-notifications: Notifikasi Saya
 name: Nama
 need-more-contact-us: |-
@@ -373,29 +293,20 @@ new-name-to-short: |-
 next: Berikutnya
 'no': TIDAK
 no-app-icon: Aplikasi ini tidak memiliki ikon aplikasi apa pun
-no-channel-linked: Tidak ada saluran, klik untuk menambahkan
-no-channel-linked-no-perm: Tidak ada saluran
 no-data: Tidak ada data
-no-devices: Tidak ada perangkat
-no-logs: Tidak ada log
 no-permission: Izin tidak memadai
-no-version-linked: Tidak ada versi, klik untuk menambahkan
-no-version-linked-no-perm: Tidak ada versi
 none: Tidak ada
 not-found: Tidak ditemukan
 not-paying-org-usage: >-
   Organisasi ini tidak membayar, tidak dapat menunjukkan penggunaan untuk
   organisasi uji coba gratis
-notifications: Notifikasi
 ok: OKE
 old-onboarding-mode: orientasi lama
 one-day-left: Tinggal satu hari
 open: Membuka
 open-channel: Buka saluran
 open-in-new-tab: Buka di tab baru
-open-settings: Klik untuk membuka pengaturan
 open-sidebar: Buka bilah sisi
-open-this-link-to-le: Buka tautan ini untuk mempelajari cara menguji pembaruan Anda
 open-your-portal: Buka portal Anda
 org-changes-saved: Organisasi berhasil diperbarui
 org-changes-set-email-not-unique: Email manajemen tidak unik, silakan pilih email lain
@@ -408,40 +319,27 @@ organization-email: Email manajemen organisasi
 organization-name: Nama Organisasi
 organization-settings: Pengaturan organisasi
 os-version: versi OS
-owner-org: 'Organisasi pemilik:'
 pages: Halaman
 password: Kata sandi
 password-confirmatio: konfirmasi kata kunci
 password-heading: Buat Kata Sandi
 password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
-password-new: kata sandi baru
 patch: Tambalan
 percent-fail: Persentase gagal
 permission-changed: Berhasil mengubah izin pengguna
 personal-information: Informasi pribadi
 picture-delete-fail: Tidak dapat menghapus gambar aplikasi, silakan periksa log konsol
 picture-uploaded: Gambar berhasil diunggah
-plan-abtest: Pengujian A/B
 plan-bandwidth: Bandwidth GB
-plan-buy: Membeli
 plan-desc: Mulailah membangun secara gratis, lalu tambahkan rencana untuk ditayangkan.
-plan-free: Terbaik untuk MVP dan pengujian
 plan-inactive: Rencana tidak aktif
-plan-is-the-best-pla: rencana adalah rencana terbaik untuk kebutuhan Anda.
-plan-maker: Terbaik untuk pemilik usaha kecil
-plan-member: anggota rencana.
 plan-page-warn: Membeli paket tidak akan memengaruhi organisasi tempat Anda diundang.
 plan-page-warn-2: Pelajari lebih lanjut tentang hal itu.
-plan-payasyougo: Terbaik untuk perusahaan skala
 plan-pricing-plans: Paket Harga
-plan-progressive-deploy: Penyebaran progresif
-plan-solo: Terbaik untuk indie
 plan-storage: Penyimpanan GB
-plan-team: Terbaik untuk pemilik bisnis besar
 plan-updates: Pembaruan
 plan-upgrade: Berlangganan
 plan-whats-included: Apa yang disertakan
-plans: Rencana
 plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan
 platform: Platform
 please-ask-the-user-to-create-account-first: Silakan minta pengguna untuk membuat akun terlebih dahulu
@@ -449,12 +347,9 @@ please-choose-your-p: Silakan pilih preferensi Anda
 please-confirm-org-del: >-
   Harap konfirmasikan bahwa Anda ingin menghapus "%1" organisasi dengan
   mengetikkan namanya
-please-type-new-app-name: Silakan ketik nama aplikasi baru
-please-upgrade: Tingkatkan versi paket Anda untuk menambahkan lebih banyak pengguna
 plugin-version: Versi plugin
 prediction: Ramalan
 preview: Paket pratinjau
-preview-encrypted: Tidak dapat melihat pratinjau paket yang dienkripsi
 preview-short: pratinjau
 previous: Sebelumnya
 price-per-unit-above: Harga per unit di atas rencana
@@ -465,11 +360,7 @@ progressive-deploy-set-percentage: >-
   Anda tidak dapat menetapkan persentase versi sekunder ketika penerapan
   progresif diaktifkan
 progressive-percentage: Status penerapan progresif
-projection: Proyeksi
 recommended: Direkomendasikan
-recommended-for-you: Direkomendasikan untukmu
-refresh-this-page: Segarkan halaman ini
-register-desc: Isi kolom berikut untuk menyelesaikan pendaftaran Anda
 register-heading: Registrasi
 register-next: Daftar
 reload: Muat ulang
@@ -480,24 +371,17 @@ reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
 save: Menghemat
 save-changes: Simpan perubahan
-search: Mencari
-search-bundle: Bundel Pencarian
 search-bundle-id: Cari berdasarkan bundel ID
-search-by-action: Cari berdasarkan tindakan
 search-by-device-id: Telusuri berdasarkan ID perangkat atau ID Khusus
 search-by-device-id-: Cari berdasarkan ID perangkat atau tindakan
 search-by-device-id-0: Cari berdasarkan ID perangkat
 search-by-name: Cari berdasarkan nama
-search-device: Cari perangkat
-search-user: Cari Pengguna
 see-usage: Lihat penggunaan
 select-user-perms: Pilih izin pengguna
 select-user-perms-expanded: Pilih izin mana yang harus dimiliki oleh pengguna yang diundang
 session_key: IvSessionKey
 set-bundle: Tetapkan bundel ke saluran
 settings: Pengaturan
-shared-apps: Aplikasi Bersama
-shared-users: Dibagikan ke
 showing: Menampilkan
 sign-out: Keluar
 size: Ukuran
@@ -506,7 +390,6 @@ something-went-wrong-try-again-later: |-
   Ada yang salah!
   Coba lagi nanti.
 special-api-access: Akses API khusus
-specialError: Harus mengandung karakter khusus
 start-new-deploy: Mulai penerapan progresif baru
 start-using-capgo: 'Mulai menggunakan:'
 status-complete: menyelesaikan
@@ -514,32 +397,19 @@ status-failed: gagal
 storage-usage: 'Penggunaan penyimpanan:'
 stored-externally: disimpan secara eksternal
 stripe-billing-portal-will-be-opened-in-a-new-tab: Portal penagihan Stripe akan dibuka di tab baru
-submit: Kirim
 support: Mendukung
-switch-to-all-device: Beralih ke semua perangkat
-switch-to-only-devic: Beralih ke hanya perangkat yang ditautkan
 terms-of-use: Syarat Penggunaan
-test-your-update-in-: Uji pembaruan Anda di aplikasi Anda
 tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 thank-you-for-sub: Terima kasih telah berlangganan Capgo
-the: Itu
 this-page-will-self-: Halaman ini akan menyegarkan diri
-title: judul
-tmp-disabled: (Dinonaktifkan sementara)
 to: Ke
-to-live-reload: tinggal isi ulang.
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
-top-apps: Aplikasi saya
 top-apps-v2: Aplikasi
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
-trial-plan-expires-in: Uji coba berakhir
-type: ''
-type-new-app-name: Nama aplikasi baru
 type-new-name: Silakan ketik nama kunci api baru
 type-new-org-name: Silakan ketikkan nama baru untuk organisasi tersebut
-undefined: belum diartikan
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
 unknown: tidak dikenal
@@ -553,9 +423,7 @@ update: Memperbarui
 updated-at: Diperbarui pada
 updated-min-version: Versi minimal yang diperbarui
 upgrade: Meningkatkan
-upgrade-now: Tingkatkan sekarang
 upload-img-error: Tidak dapat mengunggah gambar, silakan periksa konsol
-upperCaseError: Harus berisi huruf besar
 url: URL
 usage: Penggunaan
 usage-success: >-
@@ -564,22 +432,17 @@ usage-success: >-
 usage-super-only: Hanya admin super yang diizinkan melihat penggunaan
 usage-title: Total
 use-capgo: Gunakan Capgo
-use-the-command: 'Gunakan perintah:'
 used-in-period: Digunakan dalam periode
 used-to-create: Akun dengan email ini dulunya ada, tidak dapat dibuat ulang
-user: Pengguna
 user-already-invited: Pengguna ini sudah diundang ke organisasi ini
 validate: Mengesahkan
 verify: Memeriksa
 verify-2FA: Verifikasi 2FA
 version: 'Versi: kapan'
-version-build: Pembuatan versi
 version-builtin: Versi bawaan
+version-link-fail: Tidak dapat menyetel penggantian paket
 version-linked: Tautan versi
-version-linking: Tautan ke bundel
-versions: Versi
 want-to-unlink: Apakah Anda ingin membatalkan tautan?
-warning: Peringatan!
 welcome-to: Selamat Datang di
 welcome-to-your-capg: Selamat datang di Dasbor Capgo Anda
 what-to-do-with-photo: Sunting gambar
@@ -592,9 +455,5 @@ yearly: Tahunan
 'yes': Ya
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-reached-the-limi: Batas tercapai
-your-api-key: 'Kunci API Anda:'
-your-are-a: Anda adalah
-your-current-plan-is: Rencana Anda saat ini adalah
-your-current-suggested-plan-is: Rencana yang Anda sarankan saat ini adalah
 your-settings: Pengaturan Anda
 your-ussage: 'Penggunaan Anda:'

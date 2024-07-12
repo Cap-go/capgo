@@ -4,39 +4,27 @@
 6-characters-minimum: 最小 6 文字、大文字 1 つ、小文字 1 つ、特殊文字 1 つ
 Bandwidth: 帯域幅
 Current: 現在
-Filters: フィルター
-Override: オーバーライド
 Storage: 保管所
 ab-testing-progressive-deploy-conflict: AB テストとプログレッシブ デプロイを同時に有効にすることはできません
-account: アカウント
 account-error: アカウントの更新中にエラーが発生しました
 account-id: アカウントID
 account-password-error: エラーが発生しました。もう一度お試しください
 account-password-heading: パスワードを変更する
-account-settings: アカウント設定
 account-updated-succ: アカウントが正常に更新されました
 action: アクション
-activation-desc: 次のフィールドに入力して、登録を完了します
 activation-doi: オプションの同意
 activation-doi-desc: メールニュースレターと今後のマーケティングオファーに同意します
 activation-heading: アクティベーション
-activation-headline: 私の設定
 activation-legal: 利用規約
 activation-legal-desc: Capgo アプリのプライバシー ポリシーと利用規約に同意します
 activation-notification: 通知
 activation-notification-desc: アプリの新しいバージョンが利用可能になったときに通知を受け取ることに同意します
 activation-validate: 検証
 active_users_by_version: バンドルごとのアクティブなデバイス
-add: 追加
 add-another-app: アプリを追加する
 add-api-key: 新しい API キーが正常に追加されました
 add-member: メンバーを追加
-add-shared-user: 共有ユーザーを追加
-add-this-code-to-you: このコードをプロジェクトに追加します
-add-your-app-to-your: アプリをアカウントに追加する
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
-admin: 管理者
-afternoon: 午後
 alert-2fa-disable: 2FA を無効にすることを確認します
 alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
@@ -57,21 +45,15 @@ allow-device-to-self: デバイスの自己関連付けを許可する
 allow-emulator: エミュレータを許可
 already-account: すでにアカウントをお持ちですか？
 api-doc: APIドキュメント
-api-key: API キー
 api-keys: API キー
 api-keys-are-used-for-cli-and-public-api: API キーは CLI とパブリック API に使用されます
-api-keys-key-copied: API キー
 app: アプリ
 app-deleted: アプリを削除しました
-app-id: 'アプリID:'
-app-id-example: アプリ ID の例
 app-info: アプリ情報
 app-info-desc: ここでアプリ情報を変更できます
 app-logo-deleted: アプリの画像が正常に削除されました
 app-name: アプリ名
-app-not-found: アプリが見つかりません
 app-perm: アプリの許可
-app-preview: アプリのプレビュー
 are-u-sure: 本気ですか ？
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
@@ -81,17 +63,12 @@ best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
 billed-annually-at: 毎年請求されます
 billed-monthly-at: 毎月請求されるのは、
-billing: 請求する
-build-your-app-and-s: アプリをビルドして同期する
-build-your-code-and-: コードを Capgo にアップロードする
 bulk-upload: 一括アップロード
 bundle: バンドル
 bundle-deleted: バンドルを削除しました
-bundle-is-linked-channel: バンドルはチャンネルにリンクされています。まずリンクを解除してください
 bundle-is-linked-device: バンドルはデバイスにリンクされています。最初にリンクを解除してください
 bundle-number: バンドル番号
 bundles: バンドル
-button-about: だいたい
 button-back: 戻る
 button-browse: ブラウズ
 button-camera: カメラ
@@ -99,18 +76,11 @@ button-cancel: キャンセル
 button-confirm: 確認する
 button-delete: 消去
 button-deny-invite: 拒否
-button-go: 行く
-button-home: 家
 button-invite: 招待する
 button-join: 受け入れる
-button-options: オプション
 button-regenerate: 再生する
 button-remove: 削除
-button-tabs: タブ
-button-toggle_dark: ダークモードの切り替え
-button-toggle_langs: 言語を変更
 by-clicking-on-them: それらをクリックして。
-cancel: キャンセル
 canceled-delete: バンドルの削除がキャンセルされました。リンクされたバンドルは削除できません
 canceled-photo-selection: 画像の選択をキャンセルしました
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
@@ -119,19 +89,15 @@ cannot-create-org: 組織を作成できません。ブラウザのログを確�
 cannot-del-org: 組織を削除できません。ブラウザのログを確認してください。
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
-cannot-delete-app-version: アプリのバージョンを削除できません
 cannot-delete-bundle: バンドルを削除できません
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
-cannot-download: バンドルをダウンロードできない
 cannot-find-unknown-version: 不明なバージョンが見つかりません。capgo サポートに連絡し、ブラウザのログを確認してください。
 cannot-get-the-test-: テスト版を入手できません
 cannot-invite-owner: 所有者を組織に招待できません
 cannot-load-app-settings: アプリ設定を読み込めません
-cannot-save-custom-i: カスタム ID を保存できません
 cannot-set-this-vers: このバージョンは設定できません
-cannot-share: ユーザー ID を共有できません。ブラウザ コンソールを確認してください
 cannot-show: このページは表示できません
 cannot-test-app-some: アプリをテストできません
 cannot-view-plans: プランページが表示されない
@@ -152,7 +118,6 @@ channel-bundle-linked: |-
 channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
 channel-forced-devices: 強制デバイス
-channel-invit: 招待するメールを入力
 channel-is-public: デフォルトのチャンネル
 channel-link: チャンネルオーバーライド
 channel-link-fail: 何か問題が発生したため、チャネルをオーバーライドできません
@@ -177,19 +142,13 @@ continue: 続く
 copied-to-clipboard: クリップボードにコピーしました
 copy-account-id: アカウントIDをコピーする
 copy-command: コピー コマンド
-copy-your: あなたのコピー
 country: 国
 create-a-free-accoun: 無料アカウントを作成
 create-new-org: 新しい組織を作成する
 created-at: で作成
-current-billing-cycle: 現在の請求サイクル
 custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
-custom-id-saved: カスタム ID を保存しました
-dashboard: ダッシュボード
-days: 日々
-defined-as: として定義
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete: 消去
@@ -199,55 +158,35 @@ delete-app: アプリを削除する
 delete-org: 組織の削除
 delete-your-account: アカウントを削除する
 deleted: 削除された
-dependencies:
-  js-yaml: ''
-  openai: ''
+dependencies: {}
 detailed-usage-plan: 詳しい使い方
-details-and-logs: 詳細とログ
-devDependencies:
-  '@types/js-yaml': ''
+devDependencies: {}
 device: デバイス
 device-id: デバイスID
 devices: デバイス
-devices-using-this-b: このバンドルを使用するデバイス
-dialog-warning-msg: |-
-  この情報は組織の所有者から提供されます。
-
-  このアプリの Capgo レベルをアップグレードすることはできません
 did-not-recive-confirm-email: 確認メールが届きませんでしたか？
 disable: 無効にする
 disable-ab-testing: AB テストの無効化
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
-disable-auto-upgrade: メジャーを超える自動アップグレードを無効にする
 disable-progressive-deploy: プログレッシブ展開を無効にしました
 disableAutoUpdateToMajor: 自動アップデートを無効にする
-discord: 不和
 discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
-documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
 download: ダウンロード
-download-0: ダウンロード
-edit-name: 名前の編集
-edit-pic: 画像を編集する
 email: Eメール
-email-address: 電子メールアドレス
-email-does-not-exist: このユーザーは存在しません
 enable: 有効にする
 enable-2FA: 2FA を有効にする
 enabled-ab-testing: ABテストを有効にしました
 enabled-progressive-deploy: プログレッシブ展開を有効にしました
-encrypted: 暗号化されたバンドル
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
 error: エラー
-external-storage: 外部記憶装置
 fail: インストールに失敗しました
 failed: 失敗した
 failed-to-get-user: ユーザーのロードに失敗しました
 fast-backward: 早戻し
 fast-forward: 早送り
-filters: フィルター
 first-name: ファーストネーム
 force-version: 強制バージョン
 force-version-change: プログレッシブ展開をスキップする
@@ -255,29 +194,22 @@ forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました
 free-trial: 無料トライアル
-from: 請求元
 from-device: デバイスから
 general-information: 一般情報
 generated-new-apikey: 新しい API キーが生成されました。
 go-back: 戻る
 good: 良い
 id: ID
-in-your-main-file: メインファイルで
-in-your-project-fold: プロジェクト フォルダー内
 included-in-plan: プランに含まれるもの
 info: 情報
-informations: インフォメーション
 init-capgo-in-your-a: アプリで Capgo を初期化する
 insert-invite-email: 招待したいユーザーのメールアドレスを入力します
 install: インストール済み
-install-the-capacito: Capacitor プラグインをインストールする
-into-your-app-folder: アプリ フォルダーに移動します。
 invalid-auth: ログインが一致しません。もう一度お試しください。
 invalid-email: 渡されたメールは無効です
 invalid-mfa-code: 無効な 2FA コードです
 invalid-version: サーバーのバージョンが無効です
 invite-accepted: 組織化への招待が正常に受け入れられました
-invoices: 請求書
 is-emulator: エミュレータです
 is-production-app: 本番アプリです
 key-admin: 管理者
@@ -289,10 +221,7 @@ key-upload: アップロード
 key-write: 書く
 language: 言語
 last-15-minutes: 最後の 15 分
-last-24-hour: 過去 24 時間
-last-3-hour: 過去 3 時間
 last-3-minutes: 最後の 3 分
-last-hour: 最後の時間
 last-minute: ぎりぎり
 last-name: 苗字
 last-update: 最後の更新
@@ -301,16 +230,10 @@ last-version: 最後のバージョン
 latest_version: 最新バンドル
 launch-bundle: バンドルを起動
 leaving: 出発
-limit-reached: 制限に達しました
 live-reload: ライブリロード
-loading-more-data: さらにデータを読み込んでいます...
 log-in: ログイン
-log-to-the-capgo-cli: Capgo CLI にログインします。
 login-to-your-accoun: あなたのアカウントにログイン
-logout: ログアウト
 logs: ログ
-lowerCaseError: 小文字を含める必要があります
-main: ''
 main-bundle-number: メインバンドル番号
 major: 選考科目
 make-default-android: Android のデフォルトにする
@@ -340,13 +263,10 @@ missing-name: 名前がありません
 mo: 月
 modify-org-info: ここで組織の情報を変更できます。
 module-heading: モジュール
-monthly: 毎月
 monthly-active-users: 月間アクティブ ユーザー数
 monthly-plan: 月額プラン
 montly-active: 月間アクティブ
 more-version-storage: より多くのバージョン ストレージ
-morning: 朝
-my-account: マイアカウント
 my-notifications: 私の通知
 name: 名前
 need-more-contact-us: |-
@@ -362,27 +282,18 @@ new-name-to-short: |-
 next: 次
 'no': いいえ
 no-app-icon: このアプリにはアプリアイコンがありません
-no-channel-linked: チャンネルがありません。クリックして追加してください
-no-channel-linked-no-perm: チャンネルがありません
 no-data: データなし
-no-devices: デバイスがありません
-no-logs: ログなし
 no-permission: 権限が不十分です
-no-version-linked: バージョンなし、クリックして追加
-no-version-linked-no-perm: バージョンなし
 none: なし
 not-found: 見つかりません
 not-paying-org-usage: この組織は料金を支払っていないため、無料体験組織の使用状況を表示できません
-notifications: 通知
 ok: わかりました
 old-onboarding-mode: 古いオンボーディング
 one-day-left: 残り一日
 open: 開ける
 open-channel: チャンネルを開く
 open-in-new-tab: 新しいタブで開く
-open-settings: クリックして設定を開く
 open-sidebar: サイドバーを開く
-open-this-link-to-le: このリンクを開いて、更新をテストする方法を確認してください
 open-your-portal: ポータルを開く
 org-changes-saved: 組織が正常に更新されました
 org-changes-set-email-not-unique: 管理用メールアドレスは一意ではありません。別のメールアドレスを選択してください
@@ -395,51 +306,35 @@ organization-email: 組織の管理メール
 organization-name: 組織名
 organization-settings: 組織の設定
 os-version: OSバージョン
-owner-org: '所有者の組織:'
 pages: ページ
 password: パスワード
 password-confirmatio: パスワードの確認
 password-heading: パスワードの作成
 password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入力してください。
-password-new: 新しいパスワード
 patch: パッチ
 percent-fail: 失敗率
 permission-changed: ユーザー権限が正常に変更されました
 personal-information: 個人情報
 picture-delete-fail: アプリの画像を削除できません。コンソールのログを確認してください。
 picture-uploaded: 画像が正常にアップロードされました
-plan-abtest: A / Bテスト
 plan-bandwidth: GB帯域幅
-plan-buy: 買う
 plan-desc: 無料で構築を開始し、ライブに移行するための計画を追加します。
-plan-free: MVP とテストに最適
 plan-inactive: プランの非アクティブ
-plan-is-the-best-pla: plan はお客様のニーズに最適なプランです。
-plan-maker: 中小企業のオーナーに最適
-plan-member: 企画メンバー。
 plan-page-warn: プランを購入しても、招待された組織には影響しません。
 plan-page-warn-2: 詳しくはこちらをご覧ください。
-plan-payasyougo: 企業のスケーリングに最適
 plan-pricing-plans: 料金プラン
-plan-progressive-deploy: プログレッシブ デプロイ
-plan-solo: インディーズに最適
 plan-storage: GB ストレージ
-plan-team: 大企業のオーナーに最適
 plan-updates: アップデート
 plan-upgrade: 購読者
 plan-whats-included: 含まれるもの
-plans: 予定
 plans-super-only: スーパー管理者のみがプランと請求を表示できます
 platform: プラットホーム
 please-ask-the-user-to-create-account-first: 最初にユーザーにアカウントを作成するように依頼してください
 please-choose-your-p: お好みを選択してください
 please-confirm-org-del: 「%1」組織の名前を入力して、削除することを確認してください
-please-type-new-app-name: 新しいアプリ名を入力してください
-please-upgrade: プランをアップグレードしてユーザーを追加してください
 plugin-version: プラグインのバージョン
 prediction: 予測
 preview: プレビューバンドル
-preview-encrypted: 暗号化されたバンドルをプレビューできません
 preview-short: プレビュー
 previous: 前の
 price-per-unit-above: 上記プランの1台あたりの価格
@@ -448,11 +343,7 @@ progressive-bundle-number: プログレッシブバンドル番号
 progressive-deploy-option: プログレッシブ展開オプションを選択します
 progressive-deploy-set-percentage: プログレッシブ展開が有効な場合は、セカンダリ バージョンの割合を設定できません
 progressive-percentage: プログレッシブ展開ステータス
-projection: 予測
 recommended: おすすめされた
-recommended-for-you: あなたへのおすすめ
-refresh-this-page: このページを更新する
-register-desc: 次のフィールドに入力して、登録を完了します
 register-heading: 登録
 register-next: 登録
 reload: リロード
@@ -463,24 +354,17 @@ reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
 save: セーブ
 save-changes: 変更内容を保存
-search: 検索
-search-bundle: バンドルを検索
 search-bundle-id: バンドル ID で検索
-search-by-action: アクションで検索
 search-by-device-id: デバイス ID またはカスタム ID で検索
 search-by-device-id-: デバイス ID またはアクションで検索
 search-by-device-id-0: デバイス ID で検索
 search-by-name: 名前で検索
-search-device: 検索デバイス
-search-user: ユーザーを検索
 see-usage: 使い方を見る
 select-user-perms: ユーザーの権限を選択します
 select-user-perms-expanded: 招待されたユーザーにどの権限を持たせるかを選択します
 session_key: IvSessionKey
 set-bundle: バンドルをチャネルに設定
 settings: 設定
-shared-apps: 共有アプリ
-shared-users: 共有先
 showing: 表示中
 sign-out: サインアウト
 size: サイズ
@@ -489,7 +373,6 @@ something-went-wrong-try-again-later: |-
   エラーが発生しました。
   あとでもう一度試してみてください。
 special-api-access: 特別な API アクセス
-specialError: 特殊文字を含める必要があります
 start-new-deploy: 新しいプログレッシブ デプロイを開始する
 start-using-capgo: '使用を開始します:'
 status-complete: 完了
@@ -497,32 +380,19 @@ status-failed: 失敗した
 storage-usage: 'ストレージ使用量:'
 stored-externally: 外部保存
 stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 請求ポータルが新しいタブで開きます
-submit: 送信
 support: サポート
-switch-to-all-device: すべてのデバイスに切り替える
-switch-to-only-devic: リンクされているデバイスのみに切り替える
 terms-of-use: 利用規約
-test-your-update-in-: アプリで更新をテストする
 tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 thank-you-for-sub: Capgo をご購読いただきありがとうございます
-the: の
 this-page-will-self-: このページは自動的に更新されます
-title: タイトル
-tmp-disabled: (一時的に無効になります)
 to: 請求先
-to-live-reload: リロードを生きます。
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
-top-apps: 私のアプリ
 top-apps-v2: アプリ
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
-trial-plan-expires-in: トライアル終了まで
-type: ''
-type-new-app-name: 新しいアプリ名
 type-new-name: 新しい API キー名を入力してください
 type-new-org-name: 組織の新しい名前を入力してください
-undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
 unknown: 未知
@@ -536,31 +406,24 @@ update: アップデート
 updated-at: に更新
 updated-min-version: 最小バージョンを更新しました
 upgrade: アップグレード
-upgrade-now: 今すぐアップグレード
 upload-img-error: 画像をアップロードできません。コンソールを確認してください
-upperCaseError: 大文字を含める必要があります
 url: URL
 usage: 使用法
 usage-success: プランが設定されました。このページは数分後に更新されます
 usage-super-only: スーパー管理者のみが使用状況を表示できます
 usage-title: 合計
 use-capgo: Capgo を使用する
-use-the-command: 次のコマンドを使用します。
 used-in-period: 期間内に使用
 used-to-create: このメールアドレスを持つアカウントは以前存在していたため、再作成できません
-user: ユーザー
 user-already-invited: このユーザーはすでにこの組織に招待されています
 validate: 検証
 verify: 確認する
 verify-2FA: 2FA を検証する
 version: バージョン
-version-build: バージョンビルド
 version-builtin: バージョン組み込み
+version-link-fail: バンドルのオーバーライドを設定できません
 version-linked: バージョンリンク
-version-linking: バンドルへのリンク
-versions: バージョン
 want-to-unlink: リンクを解除しますか?
-warning: 警告！
 welcome-to: へようこそ
 welcome-to-your-capg: Capgo ダッシュボードへようこそ
 what-to-do-with-photo: 画像を編集する
@@ -573,9 +436,5 @@ yearly: 毎年
 'yes': はい
 you-can-change-your-: ここで個人情報を変更できます。
 you-reached-the-limi: 制限に達しました
-your-api-key: 'API キー:'
-your-are-a: あなたは
-your-current-plan-is: 現在のプランは
-your-current-suggested-plan-is: 現在お勧めのプランは
 your-settings: あなたの設定
 your-ussage: 'あなたの用途:'

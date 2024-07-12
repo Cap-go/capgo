@@ -4,39 +4,27 @@
 6-characters-minimum: 6 characters minimum, 1 uppercase, 1 lowercase, 1 special character
 Bandwidth: Bandwidth
 Current: Current
-Filters: Filters
-Override: Override
 Storage: Storage
 ab-testing-progressive-deploy-conflict: AB testing and progressive deploy cannot be enabled at the same time
-account: Account
 account-error: Error while updating your account
 account-id: Account id
 account-password-error: Error happened, please try again
 account-password-heading: Change my password
-account-settings: Account Settings
 account-updated-succ: Account updated successfully
 action: Action
-activation-desc: Fill the following fields to complete your registration
 activation-doi: Optional consent
 activation-doi-desc: I accept Email newsletter and future marketing offers
 activation-heading: activation
-activation-headline: My settings
 activation-legal: Terms of services
 activation-legal-desc: I accept Capgo app privacy policy and terms of use
 activation-notification: Notifications
 activation-notification-desc: I accept to receive notification when new app version are available
 activation-validate: Validate
 active_users_by_version: Active device by bundle
-add: Add
 add-another-app: Add your app
 add-api-key: Added new API key successfully
 add-member: Add Member
-add-shared-user: Add shared user
-add-this-code-to-you: Add this code to your project
-add-your-app-to-your: Add your app to your account
 add-your-first-app-t: Add your first app to your account and let's push updates !
-admin: Admin
-afternoon: afternoon
 alert-2fa-disable: Confirm that you want to disable 2FA
 alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
@@ -57,21 +45,15 @@ allow-device-to-self: Allow devices to self associate
 allow-emulator: Allow Emulators
 already-account: You already have an account?
 api-doc: API doc
-api-key: API key
 api-keys: API Keys
 api-keys-are-used-for-cli-and-public-api: API keys are used for CLI and public API
-api-keys-key-copied: API Keys
 app: App
 app-deleted: App deleted
-app-id: 'App id:'
-app-id-example: App ID example
 app-info: App informations
 app-info-desc: You can change here your app information
 app-logo-deleted: App picture deleted successfully
 app-name: App name
-app-not-found: App not found
 app-perm: App permission
-app-preview: App preview
 are-u-sure: Are you sure ?
 available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
@@ -81,17 +63,12 @@ best-plan: Best plan
 bigger-app-size: Bigger app size
 billed-annually-at: Billed annually at
 billed-monthly-at: Billed monthly at
-billing: Billing
-build-your-app-and-s: build your app and sync
-build-your-code-and-: Upload to Capgo your code
 bulk-upload: Bulk upload
 bundle: Bundle
 bundle-deleted: Bundle deleted
-bundle-is-linked-channel: Bundle is linked in channel, unlink it first
 bundle-is-linked-device: Bundle is linked in device, unlink it first
 bundle-number: Bundle number
 bundles: Bundles
-button-about: About
 button-back: Back
 button-browse: Browse
 button-camera: Camera
@@ -99,18 +76,11 @@ button-cancel: Cancel
 button-confirm: Confirm
 button-delete: Delete
 button-deny-invite: Deny
-button-go: GO
-button-home: Home
 button-invite: Invite
 button-join: Accept
-button-options: Options
 button-regenerate: Regenerate
 button-remove: Remove
-button-tabs: Tabs
-button-toggle_dark: Toggle dark mode
-button-toggle_langs: Change languages
 by-clicking-on-them: by clicking on them.
-cancel: Cancel
 canceled-delete: Canceled bundle deletion, cannot delete a linked bundle
 canceled-photo-selection: You canceled the picture selection
 cannot-change-name: Cannot change name, please check the browser console
@@ -119,21 +89,17 @@ cannot-create-org: Cannot create an organization, please check the browser logs!
 cannot-del-org: Cannot delete the organization, please check the browser log
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
-cannot-delete-app-version: Cannot delete app version
 cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
-cannot-download: Cannot download bundle
 cannot-find-unknown-version: >-
   Cannot find unknown version, please contact capgo support and check browser
   logs
 cannot-get-the-test-: Cannot get the test version
 cannot-invite-owner: Cannot invite owner into organization
 cannot-load-app-settings: Cannot load app settings
-cannot-save-custom-i: Cannot save custom ID
 cannot-set-this-vers: Cannot set this version
-cannot-share: Cannot share user id, check browser console
 cannot-show: Cannot show this page
 cannot-test-app-some: Cannot test app something wrong happened
 cannot-view-plans: Cannot view the plans page
@@ -154,7 +120,6 @@ channel-bundle-linked: >-
 channel-create: Create channel
 channel-deleted: Channel deleted
 channel-forced-devices: Forced devices
-channel-invit: Type email to invite
 channel-is-public: Default channel
 channel-link: Channel override
 channel-link-fail: Cannot override the channel something wrong happened
@@ -178,19 +143,13 @@ continue: Continue
 copied-to-clipboard: Copied to clipboard
 copy-account-id: copy account id
 copy-command: Copy command
-copy-your: Copy your
 country: Country
 create-a-free-accoun: Create a free account
 create-new-org: Create a new organization
 created-at: Created at
-current-billing-cycle: Current Billing Cycle
 custom: Custom
 custom-domain: Custom domain
 custom-id: Custom ID
-custom-id-saved: Custom ID saved
-dashboard: Dashboard
-days: days
-defined-as: Defined as
 defined-as-private: defined as normal
 defined-as-public: defined as default
 delete: Delete
@@ -201,48 +160,32 @@ delete-org: Delete organization
 delete-your-account: Delete your account
 deleted: deleted
 detailed-usage-plan: Detailed usage
-details-and-logs: Details and logs
 device: Device
 device-id: Device ID
 devices: Devices
-devices-using-this-b: Devices using this bundle
-dialog-warning-msg: |-
-  This information comes from the organization owner.
-  You cannot upgrade the capgo tier for this app
 did-not-recive-confirm-email: Didn't receive confirmation email?
 disable: Disable
 disable-ab-testing: Disabled AB testing
 disable-auto-downgra: Disable auto downgrade under native
-disable-auto-upgrade: Disable auto upgrade above major
 disable-progressive-deploy: Disabled progressive deploy
 disableAutoUpdateToMajor: Disable auto update
-discord: Discord
 discover-module-in-a: Discover module in Awesome-capacitor
 discover-your-dashbo: Discover your dashboard !
-documentation: Documentation
 dont-have-an-account: Don’t have an account?
 download: Download
-download-0: Download
-edit-name: Edit name
-edit-pic: Edit picture
 email: Email
-email-address: Email address
-email-does-not-exist: This user does not exist
 enable: Enable
 enable-2FA: Enable 2FA
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
-encrypted: Encrypted bundles
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
 error: Error
-external-storage: External storage
 fail: Install failed
 failed: Failed
 failed-to-get-user: Failed to load the user
 fast-backward: Fast Backward
 fast-forward: Fast Forward
-filters: Filters
 first-name: First name
 force-version: Force version
 force-version-change: Skip progressive deploy
@@ -250,29 +193,22 @@ forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 free-trial: Free trial
-from: From
 from-device: from device
 general-information: General Informations
 generated-new-apikey: Generated new API key!
 go-back: Go back
 good: Good
 id: ID
-in-your-main-file: In your main file
-in-your-project-fold: In your project folder
 included-in-plan: Included in plan
 info: Information
-informations: Informations
 init-capgo-in-your-a: Init Capgo in your app
 insert-invite-email: Insert email of the user you want to invite
 install: Installed
-install-the-capacito: Install the Capacitor plugin
-into-your-app-folder: Into your app folder.
 invalid-auth: Your login are not a match, try again.
 invalid-email: Passed email is not valid
 invalid-mfa-code: Invalid 2FA code
 invalid-version: Invalid semver version
 invite-accepted: Successfully accepted oranization inviation
-invoices: invoices
 is-emulator: Is Emulator
 is-production-app: Is Production app
 key-admin: Admin
@@ -284,10 +220,7 @@ key-upload: Upload
 key-write: Write
 language: Language
 last-15-minutes: Last 15 minutes
-last-24-hour: Last 24 hours
-last-3-hour: Last 3 hours
 last-3-minutes: Last 3 minutes
-last-hour: Last hour
 last-minute: Last minute
 last-name: Last name
 last-update: Last update
@@ -296,15 +229,10 @@ last-version: Last version
 latest_version: Latest bundle
 launch-bundle: Launch bundle
 leaving: Leaving
-limit-reached: Limit reached
 live-reload: Live reload
-loading-more-data: Loading more data...
 log-in: Log in
-log-to-the-capgo-cli: Log to the Capgo CLI
 login-to-your-accoun: Login to your account
-logout: Logout
 logs: Logs
-lowerCaseError: Should contain lowercase letters
 main-bundle-number: Main bundle number
 major: Major
 make-default-android: Make default for Android
@@ -334,13 +262,10 @@ missing-name: Missing name
 mo: mo
 modify-org-info: You can modify the organization's informations here.
 module-heading: Modules
-monthly: Monthly
 monthly-active-users: Monthly active users
 monthly-plan: Monthly Plan
 montly-active: Monthly active
 more-version-storage: More version Storage
-morning: morning
-my-account: My Account
 my-notifications: My Notifications
 name: Name
 need-more-contact-us: Need more ? Contact us for tailored plan
@@ -350,29 +275,20 @@ new-name-to-short: The apikey name is too short. It must be atleast 4 characters
 next: Next
 'no': 'no'
 no-app-icon: This app does not have any app icon
-no-channel-linked: No channel, click to add
-no-channel-linked-no-perm: No channel
 no-data: No Data
-no-devices: No devices
-no-logs: No logs
 no-permission: Insufficient permissions
-no-version-linked: No version, click to add
-no-version-linked-no-perm: No version
 none: None
 not-found: Not found
 not-paying-org-usage: >-
   This organization is not paying, cannot show usage for a free trier
   organization
-notifications: Notifications
 ok: OK
 old-onboarding-mode: old onboarding
 one-day-left: One day left
 open: Open
 open-channel: Open channel
 open-in-new-tab: Open in new tab
-open-settings: Click to open settings
 open-sidebar: Open sidebar
-open-this-link-to-le: Open this link to learn how to test your update
 open-your-portal: Open your portal
 org-changes-saved: Organization updated successfully
 org-changes-set-email-not-unique: The management email is not unique, please select a different one
@@ -385,51 +301,35 @@ organization-email: Organization's management email
 organization-name: Organization Name
 organization-settings: Organization settings
 os-version: OS version
-owner-org: 'Owner org:'
 pages: Pages
 password: Password
 password-confirmatio: Password confirmation
 password-heading: Create Password
 password-hint: Enter a combination of at least 6 numbers, letters and punctuations.
-password-new: New Password
 patch: Patch
 percent-fail: Fail percentage
 permission-changed: Successfully changed user permission
 personal-information: Personal Informations
 picture-delete-fail: Cannot delete app picture, please check console log
 picture-uploaded: Picture uploaded successfully
-plan-abtest: A / B testing
 plan-bandwidth: GB Bandwidth
-plan-buy: Buy
 plan-desc: Start building for free, then add a plan to go live.
-plan-free: Best for MVP and testing
 plan-inactive: Plan inactive
-plan-is-the-best-pla: plan is the best plan for your needs.
-plan-maker: Best for small business owners
-plan-member: plan member.
 plan-page-warn: Buying a plan will ONLY affect the "%ORG_NAME%" organization.
 plan-page-warn-2: Learn more about it.
-plan-payasyougo: Best for scalling enterprises
 plan-pricing-plans: Pricing Plans
-plan-progressive-deploy: Progressive deploy
-plan-solo: Best for indies
 plan-storage: GB Storage
-plan-team: Best for big business owners
 plan-updates: Updates
 plan-upgrade: Subscribe
 plan-whats-included: What's included
-plans: Plans
 plans-super-only: Only super admins are allowed to view plans and billing
 platform: Platform
 please-ask-the-user-to-create-account-first: Please ask the user to create account first
 please-choose-your-p: Please choose your preferences
 please-confirm-org-del: Please confirm that you want to delete "%1" org by typing it's name
-please-type-new-app-name: Please type the new app name
-please-upgrade: Please upgrade your plan to add more users
 plugin-version: Plugin version
 prediction: Prediction
 preview: Preview bundle
-preview-encrypted: Cannot preview encypted bundle
 preview-short: preview
 previous: Previous
 price-per-unit-above: Price per unit above plan
@@ -438,11 +338,7 @@ progressive-bundle-number: Progressive bundle number
 progressive-deploy-option: Select progressive deploy option
 progressive-deploy-set-percentage: You cannot set secondary version percentage when progressive deploy is enabled
 progressive-percentage: Progressive deploy status
-projection: Projections
 recommended: Recommended
-recommended-for-you: Recommended for you
-refresh-this-page: Refresh this page
-register-desc: Fill the following fields to complete your registration
 register-heading: Registration
 register-next: Register
 reload: Reload
@@ -453,31 +349,23 @@ reset-password: Reset Password
 reset-your-password: Reset your password
 save: Saves
 save-changes: Save Changes
-search: Search
-search-bundle: Search Bundle
 search-bundle-id: Search by bundle ID
-search-by-action: Search by action
 search-by-device-id: Search by device ID or Custom ID
 search-by-device-id-: Search by device ID or action
 search-by-device-id-0: Search by device ID
 search-by-name: Search by name
-search-device: Search device
-search-user: Search User
 see-usage: See usage
 select-user-perms: Select user's permissions
 select-user-perms-expanded: Select which permission should the invited user have
 session_key: IvSessionKey
 set-bundle: Set bundle to channel
 settings: Settings
-shared-apps: Shared Apps
-shared-users: Shared to
 showing: Showing
 sign-out: Sign Out
 size: Size
 size-not-found: Not found
 something-went-wrong-try-again-later: Something went wrong! Try again later.
 special-api-access: Special API access
-specialError: Should contain special characters
 start-new-deploy: Start new progressive deploy
 start-using-capgo: 'Start using:'
 status-complete: complete
@@ -485,31 +373,19 @@ status-failed: failed
 storage-usage: 'Storage usage: '
 stored-externally: stored externally
 stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe billing portal will be opened in a new tab
-submit: Submit
 support: Support
-switch-to-all-device: Switch to all devices
-switch-to-only-devic: Switch to only device linked
 terms-of-use: Terms of Use
-test-your-update-in-: Test your update in your app
 tests: tests
 thank-you-for-choosi: Thank you for choosing Capgo !
 thank-you-for-sub: Thank You for subscribing to Capgo
-the: The
 this-page-will-self-: This page will self refresh
-title: title
-tmp-disabled: (Temporary disabled)
 to: to
-to-live-reload: to live reload.
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
-top-apps: My Apps
 top-apps-v2: Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
-trial-plan-expires-in: Trial ends in
-type-new-app-name: New app name
 type-new-name: Please type the new api key name
 type-new-org-name: Please type the new name for the organization
-undefined: undefined
 undefined-fail: Undefined (updates will fail)
 uninstall: Uninstalled
 unknown: unknown
@@ -523,31 +399,24 @@ update: Update
 updated-at: Updated at
 updated-min-version: Updated minimal version
 upgrade: Upgrade
-upgrade-now: Upgrade now
 upload-img-error: Cannot upload picture, please check console
-upperCaseError: Should contain uppercase letters
 url: URL
 usage: Usage
 usage-success: Your plan has been setup this page will be update, in few minutes
 usage-super-only: Only super admins are allowed to view usage
 usage-title: Total
 use-capgo: Use Capgo
-use-the-command: 'Use the command:'
 used-in-period: Used in period
 used-to-create: Account with this email used to exist, cannot recreate
-user: User
 user-already-invited: This user is already invited to this organization
 validate: Validate
 verify: Verify
 verify-2FA: Verify 2FA
 version: Version
-version-build: Version build
 version-builtin: Version builtin
+version-link-fail: Cannot set bundle override
 version-linked: Version link
-version-linking: Link to bundle
-versions: Versions
 want-to-unlink: Do you want to unlink?
-warning: Warning!
 welcome-to: Welcome to
 welcome-to-your-capg: Welcome to your Capgo Dashboard
 what-to-do-with-photo: Edit picture
@@ -558,9 +427,5 @@ yearly: Yearly
 'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.
 you-reached-the-limi: Limit reached
-your-api-key: 'Your API key:'
-your-are-a: Your are a
-your-current-plan-is: Your current plan is
-your-current-suggested-plan-is: Your current suggested plan is
 your-settings: Your settings
 your-ussage: 'Your usage:'

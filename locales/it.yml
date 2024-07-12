@@ -4,25 +4,19 @@
 6-characters-minimum: Minimo 6 caratteri, 1 maiuscolo, 1 minuscolo, 1 carattere speciale
 Bandwidth: Larghezza di banda
 Current: Attuale
-Filters: Filtri
-Override: Oltrepassare
 Storage: Magazzinaggio
 ab-testing-progressive-deploy-conflict: >-
   Il test AB e la distribuzione progressiva non possono essere abilitati
   contemporaneamente
-account: Account
 account-error: Errore durante l'aggiornamento del tuo account
 account-id: Account ID
 account-password-error: Si è verificato un errore, riprova
 account-password-heading: Cambia la mia password
-account-settings: Impostazioni dell'account
 account-updated-succ: Account aggiornato con successo
 action: Azione
-activation-desc: Compila i seguenti campi per completare la tua registrazione
 activation-doi: Consenso facoltativo
 activation-doi-desc: Accetto la newsletter via e-mail e le future offerte di marketing
 activation-heading: Attivazione
-activation-headline: Le mie impostazioni
 activation-legal: Termini di servizio
 activation-legal-desc: Accetto l'informativa sulla privacy e i termini di utilizzo dell'app Capgo
 activation-notification: Notifiche
@@ -31,16 +25,10 @@ activation-notification-desc: >-
   dell'app
 activation-validate: Convalidare
 active_users_by_version: Dispositivo attivo per bundle
-add: Aggiungere
 add-another-app: Aggiungi la tua app
 add-api-key: Aggiunta con successo una nuova chiave API
 add-member: Aggiungi membro
-add-shared-user: Aggiungi utente condiviso
-add-this-code-to-you: Aggiungi questo codice al tuo progetto
-add-your-app-to-your: Aggiungi la tua app al tuo account
 add-your-first-app-t: Aggiungi la tua prima app al tuo account e inviamo gli aggiornamenti!
-admin: Amministratore
-afternoon: pomeriggio
 alert-2fa-disable: Conferma di voler disattivare 2FA
 alert-accept-inviation: Accetti l'invito a %ORG%?
 alert-add-new-key: Seleziona il nuovo tipo di chiave API
@@ -61,21 +49,15 @@ allow-device-to-self: Consenti ai dispositivi di associarsi automaticamente
 allow-emulator: Consenti emulatori
 already-account: Hai già un account?
 api-doc: Documento API
-api-key: Chiave dell'API
 api-keys: Chiavi API
 api-keys-are-used-for-cli-and-public-api: Le chiavi API vengono utilizzate per la CLI e l'API pubblica
-api-keys-key-copied: Chiavi API
 app: App
 app-deleted: Applicazione eliminata
-app-id: 'ID dell''applicazione:'
-app-id-example: Esempio di ID app
 app-info: Informazioni sull'app
 app-info-desc: Puoi modificare qui le informazioni sulla tua app
 app-logo-deleted: Immagine dell'app eliminata correttamente
 app-name: Nome dell'applicazione
-app-not-found: App non trovata
 app-perm: Autorizzazione dell'app
-app-preview: Anteprima dell'app
 are-u-sure: Sei sicuro ?
 available-in-the-san: Disponibile nell'app sandbox
 back-to-login-page: Torna alla pagina di accesso
@@ -85,17 +67,12 @@ best-plan: Miglior piano
 bigger-app-size: Dimensioni dell'app maggiori
 billed-annually-at: Fatturato annualmente a
 billed-monthly-at: Fatturato mensilmente a
-billing: Fatturazione
-build-your-app-and-s: crea la tua app e sincronizza
-build-your-code-and-: Carica su Capgo il tuo codice
 bulk-upload: Caricamento collettivo
 bundle: Fascio
 bundle-deleted: Pacchetto eliminato
-bundle-is-linked-channel: Il pacchetto è collegato nel canale, prima scollegalo
 bundle-is-linked-device: Il pacchetto è collegato nel dispositivo, prima scollegalo
 bundle-number: Numero di pacco
 bundles: gruppi
-button-about: Di
 button-back: Indietro
 button-browse: Navigare
 button-camera: Telecamera
@@ -103,18 +80,11 @@ button-cancel: Annulla
 button-confirm: Confermare
 button-delete: Eliminare
 button-deny-invite: Negare
-button-go: ANDARE
-button-home: Casa
 button-invite: Invitare
 button-join: Accettare
-button-options: Opzioni
 button-regenerate: Rigenerare
 button-remove: Rimuovere
-button-tabs: Schede
-button-toggle_dark: Attiva/disattiva la modalità oscura
-button-toggle_langs: Cambia lingua
 by-clicking-on-them: cliccandoci sopra.
-cancel: Annulla
 canceled-delete: >-
   Eliminazione del pacchetto annullata, impossibile eliminare un pacchetto
   collegato
@@ -125,21 +95,17 @@ cannot-create-org: Impossibile creare un'organizzazione, controlla i log del bro
 cannot-del-org: Impossibile eliminare l'organizzazione, controlla il registro del browser
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
-cannot-delete-app-version: Impossibile eliminare la versione dell'app
 cannot-delete-bundle: Impossibile eliminare il gruppo
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-delete-member: Impossibile eliminare il membro, controlla la console del browser
 cannot-delete-owner: Impossibile eliminare il proprietario dall'organizzazione
-cannot-download: Impossibile scaricare il pacchetto
 cannot-find-unknown-version: >-
   Impossibile trovare la versione sconosciuta, contattare l'assistenza capgo e
   controllare i registri del browser
 cannot-get-the-test-: Impossibile ottenere la versione di prova
 cannot-invite-owner: Impossibile invitare il proprietario nell'organizzazione
 cannot-load-app-settings: Impossibile caricare le impostazioni dell'app
-cannot-save-custom-i: Impossibile salvare l'ID personalizzato
 cannot-set-this-vers: Impossibile impostare questa versione
-cannot-share: Impossibile condividere l'ID utente, controlla la console del browser
 cannot-show: Impossibile visualizzare questa pagina
 cannot-test-app-some: Impossibile testare l'app, è successo qualcosa di sbagliato
 cannot-view-plans: Impossibile visualizzare la pagina dei piani
@@ -160,7 +126,6 @@ channel-bundle-linked: |-
 channel-create: Crea canale
 channel-deleted: Canale eliminato
 channel-forced-devices: Dispositivi forzati
-channel-invit: Digita l'e-mail per invitare
 channel-is-public: Canale di default
 channel-link: Override del canale
 channel-link-fail: Impossibile eseguire l'override del canale è successo qualcosa di sbagliato
@@ -189,19 +154,13 @@ continue: Continua
 copied-to-clipboard: Copiato negli appunti
 copy-account-id: copiare l'ID dell'account
 copy-command: Comando Copia
-copy-your: Copia il tuo
 country: Paese
 create-a-free-accoun: Crea un account gratis
 create-new-org: Crea una nuova organizzazione
 created-at: Creato a
-current-billing-cycle: Ciclo di fatturazione corrente
 custom: Costume
 custom-domain: Dominio personalizzato
 custom-id: ID personalizzato
-custom-id-saved: ID personalizzato salvato
-dashboard: Pannello di controllo
-days: giorni
-defined-as: Definito come
 defined-as-private: definita normale
 defined-as-public: definito come predefinito
 delete: Eliminare
@@ -211,57 +170,37 @@ delete-app: Elimina l'app
 delete-org: Elimina organizzazione
 delete-your-account: cancella il tuo account
 deleted: cancellato
-dependencies:
-  js-yaml: ''
-  openai: ''
+dependencies: {}
 detailed-usage-plan: Utilizzo dettagliato
-details-and-logs: Dettagli e registri
-devDependencies:
-  '@types/js-yaml': ''
+devDependencies: {}
 device: Dispositivo
 device-id: ID del dispositivo
 devices: Dispositivi
-devices-using-this-b: Dispositivi che utilizzano questo pacchetto
-dialog-warning-msg: |-
-  Queste informazioni provengono dal proprietario dell'organizzazione.
-
-  Non puoi aggiornare il livello capgo per questa app
 did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable: disattivare
 disable-ab-testing: Test AB disabilitato
 disable-auto-downgra: Disabilita il downgrade automatico in modalità nativa
-disable-auto-upgrade: Disabilita l'aggiornamento automatico sopra major
 disable-progressive-deploy: Distribuzione progressiva disabilitata
 disableAutoUpdateToMajor: Disabilita l'aggiornamento automatico
-discord: Discordia
 discover-module-in-a: Scopri il modulo in Awesome-condensatore
 discover-your-dashbo: Scopri la tua dashboard!
-documentation: Documentazione
 dont-have-an-account: Non hai un account?
 download: Scaricamento
-download-0: Scaricamento
-edit-name: Modifica nome
-edit-pic: Modifica immagine
 email: E-mail
-email-address: Indirizzo e-mail
-email-does-not-exist: Questo utente non esiste
 enable: Abilitare
 enable-2FA: Abilita 2FA
 enabled-ab-testing: Test AB abilitato
 enabled-progressive-deploy: Abilitata la distribuzione progressiva
-encrypted: Bundle crittografati
 enter-your-email-add: >-
   Inserisci il tuo indirizzo email e ti invieremo un link per reimpostare la
   password.
 enter-your-new-passw: Inserisci la tua nuova password e conferma
 error: Errore
-external-storage: Archiviazione esterna
 fail: Installazione non riuscita
 failed: Fallito
 failed-to-get-user: Impossibile caricare l'utente
 fast-backward: Indietro veloce
 fast-forward: Avanti veloce
-filters: Filtri
 first-name: Nome di battesimo
 force-version: Versione forzata
 force-version-change: Salta la distribuzione progressiva
@@ -269,29 +208,22 @@ forgot: Dimenticato
 forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
 forgot-success: Password aggiornata con successo
 free-trial: Prova gratuita
-from: Da
 from-device: dal dispositivo
 general-information: Informazioni generali
 generated-new-apikey: Generata nuova chiave API!
 go-back: Torna indietro
 good: Bene
 id: ID
-in-your-main-file: Nel tuo file principale
-in-your-project-fold: Nella cartella del tuo progetto
 included-in-plan: Incluso nel piano
 info: Informazione
-informations: Informazioni
 init-capgo-in-your-a: Avvia Capgo nella tua app
 insert-invite-email: Inserisci l'email dell'utente che vuoi invitare
 install: Installato
-install-the-capacito: Installa il plug-in Condensatore
-into-your-app-folder: Nella cartella dell'app.
 invalid-auth: I tuoi dati di accesso non corrispondono, riprova.
 invalid-email: L'email passata non è valida
 invalid-mfa-code: Codice 2FA non valido
 invalid-version: Versione del semestre non valida
 invite-accepted: Invito di organizzazione accettato con successo
-invoices: fatture
 is-emulator: È emulatore
 is-production-app: È l'app di produzione
 key-admin: Ammin
@@ -303,10 +235,7 @@ key-upload: Caricamento
 key-write: Scrivere
 language: Lingua
 last-15-minutes: Ultimi 15 minuti
-last-24-hour: Ultime 24 ore
-last-3-hour: Ultime 3 ore
 last-3-minutes: Ultimi 3 minuti
-last-hour: Ultima ora
 last-minute: Ultimo minuto
 last-name: Cognome
 last-update: Ultimo aggiornamento
@@ -315,16 +244,10 @@ last-version: Ultima versione
 latest_version: Ultimo pacchetto
 launch-bundle: Pacchetto di lancio
 leaving: In partenza
-limit-reached: Limite raggiunto
 live-reload: Ricarica dal vivo
-loading-more-data: Caricamento di altri dati...
 log-in: Login
-log-to-the-capgo-cli: Accedere all'interfaccia a riga di comando di Capgo
 login-to-your-accoun: Accedi al tuo account
-logout: Disconnettersi
 logs: Registri
-lowerCaseError: Dovrebbe contenere lettere minuscole
-main: ''
 main-bundle-number: Numero del pacchetto principale
 major: Maggiore
 make-default-android: Imposta come predefinito per Android
@@ -356,13 +279,10 @@ missing-name: Nome mancante
 mo: mo
 modify-org-info: Puoi modificare le informazioni dell'organizzazione qui.
 module-heading: Moduli
-monthly: Mensile
 monthly-active-users: Utenti attivi mensili
 monthly-plan: Piano mensile
 montly-active: Attivo mensile
 more-version-storage: Più versione Archiviazione
-morning: Mattina
-my-account: Il mio conto
 my-notifications: Le mie notifiche
 name: Nome
 need-more-contact-us: |-
@@ -378,29 +298,20 @@ new-name-to-short: |-
 next: Prossimo
 'no': 'NO'
 no-app-icon: Questa app non ha alcuna icona dell'app
-no-channel-linked: Nessun canale, fai clic per aggiungere
-no-channel-linked-no-perm: Nessun canale
 no-data: Nessun dato
-no-devices: Nessun dispositivo
-no-logs: Nessun registro
 no-permission: Permessi insufficienti
-no-version-linked: Nessuna versione, fai clic per aggiungere
-no-version-linked-no-perm: Nessuna versione
 none: Nessuno
 not-found: Non trovato
 not-paying-org-usage: >-
   Questa organizzazione non paga, non può mostrare l'utilizzo per
   un'organizzazione a pagamento gratuita
-notifications: Notifiche
 ok: OK
 old-onboarding-mode: vecchio onboarding
 one-day-left: Manca un giorno
 open: Aprire
 open-channel: Canale aperto
 open-in-new-tab: Apri in una nuova scheda
-open-settings: Fare clic per aprire le impostazioni
 open-sidebar: Apri la barra laterale
-open-this-link-to-le: Apri questo link per scoprire come testare il tuo aggiornamento
 open-your-portal: Apri il tuo portale
 org-changes-saved: Organizzazione aggiornata correttamente
 org-changes-set-email-not-unique: L'e-mail di gestione non è univoca, selezionane una diversa
@@ -413,7 +324,6 @@ organization-email: E-mail di gestione dell'organizzazione
 organization-name: Nome dell'organizzazione
 organization-settings: Impostazioni dell'organizzazione
 os-version: Versione del sistema operativo
-owner-org: 'Organizzazione proprietaria:'
 pages: Pagine
 password: Parola d'ordine
 password-confirmatio: conferma password
@@ -421,45 +331,30 @@ password-heading: Crea password
 password-hint: >-
   Inserisci una combinazione di almeno 6 numeri, lettere e segni di
   punteggiatura.
-password-new: nuova password
 patch: Toppa
 percent-fail: Percentuale di fallimento
 permission-changed: Autorizzazione utente modificata correttamente
 personal-information: Informazioni personali
 picture-delete-fail: Impossibile eliminare l'immagine dell'app, controlla il registro della console
 picture-uploaded: Immagine caricata correttamente
-plan-abtest: Test A/B
 plan-bandwidth: Larghezza di banda GB
-plan-buy: Acquistare
 plan-desc: Inizia a creare gratuitamente, quindi aggiungi un piano per la pubblicazione.
-plan-free: Ideale per MVP e test
 plan-inactive: Piano inattivo
-plan-is-the-best-pla: plan è il miglior piano per le tue esigenze.
-plan-maker: Ideale per i proprietari di piccole imprese
-plan-member: membro del piano.
 plan-page-warn: L'acquisto di un piano non influirà sulle organizzazioni a cui sei invitato.
 plan-page-warn-2: Scopri di più a riguardo.
-plan-payasyougo: Ideale per le imprese in espansione
 plan-pricing-plans: Piani tariffari
-plan-progressive-deploy: Distribuzione progressiva
-plan-solo: Il meglio per le indie
 plan-storage: Archiviazione GB
-plan-team: Il meglio per i grandi imprenditori
 plan-updates: Aggiornamenti
 plan-upgrade: Sottoscrizioni
 plan-whats-included: Cosa è incluso
-plans: Piani
 plans-super-only: Solo i super amministratori possono visualizzare i piani e la fatturazione
 platform: piattaforma
 please-ask-the-user-to-create-account-first: Chiedi prima all'utente di creare un account
 please-choose-your-p: Scegli le tue preferenze
 please-confirm-org-del: Conferma di voler eliminare l'organizzazione "%1" digitandone il nome
-please-type-new-app-name: Digita il nome della nuova app
-please-upgrade: Aggiorna il tuo piano per aggiungere altri utenti
 plugin-version: Versione plug-in
 prediction: Predizione
 preview: Pacchetto di anteprima
-preview-encrypted: Impossibile visualizzare l'anteprima del pacchetto crittografato
 preview-short: anteprima
 previous: Precedente
 price-per-unit-above: Prezzo per unità sopra il piano
@@ -470,11 +365,7 @@ progressive-deploy-set-percentage: >-
   Non è possibile impostare la percentuale della versione secondaria quando è
   abilitata la distribuzione progressiva
 progressive-percentage: Stato di distribuzione progressivo
-projection: Proiezioni
 recommended: Consigliato
-recommended-for-you: raccomandato per te
-refresh-this-page: Aggiorna questa pagina
-register-desc: Compila i seguenti campi per completare la tua registrazione
 register-heading: Registrazione
 register-next: Registrati
 reload: Ricaricare
@@ -487,24 +378,17 @@ reset-password: Resetta la password
 reset-your-password: reimposta la tua password
 save: Salva
 save-changes: Salvare le modifiche
-search: Ricerca
-search-bundle: Cerca pacchetto
 search-bundle-id: Cerca per ID pacchetto
-search-by-action: Cerca per azione
 search-by-device-id: Cerca per ID dispositivo o ID personalizzato
 search-by-device-id-: Cerca per ID dispositivo o azione
 search-by-device-id-0: Cerca per ID dispositivo
 search-by-name: Ricerca per nome
-search-device: Cerca dispositivo
-search-user: Cerca utente
 see-usage: Vedi utilizzo
 select-user-perms: Seleziona le autorizzazioni dell'utente
 select-user-perms-expanded: Seleziona quale autorizzazione dovrebbe avere l'utente invitato
 session_key: IvSessionKey
 set-bundle: Imposta il pacchetto sul canale
 settings: Impostazioni
-shared-apps: App condivise
-shared-users: Condiviso con
 showing: Mostrando
 sign-out: Disconnessione
 size: Misurare
@@ -513,7 +397,6 @@ something-went-wrong-try-again-later: |-
   Qualcosa è andato storto! 
   Riprovare più tardi.
 special-api-access: Accesso API speciale
-specialError: Deve contenere caratteri speciali
 start-new-deploy: Avvia una nuova distribuzione progressiva
 start-using-capgo: 'Inizia a utilizzare:'
 status-complete: completare
@@ -521,32 +404,19 @@ status-failed: fallito
 storage-usage: 'Utilizzo dello spazio di archiviazione:'
 stored-externally: memorizzati esternamente
 stripe-billing-portal-will-be-opened-in-a-new-tab: Il portale di fatturazione Stripe verrà aperto in una nuova scheda
-submit: Invia
 support: Supporto
-switch-to-all-device: Passa a tutti i dispositivi
-switch-to-only-devic: Passa al solo dispositivo collegato
 terms-of-use: Termini di utilizzo
-test-your-update-in-: Testa l'aggiornamento nella tua app
 tests: test
 thank-you-for-choosi: Grazie per aver scelto Capgo!
 thank-you-for-sub: Grazie per esserti iscritto a Capgo
-the: IL
 this-page-will-self-: Questa pagina si aggiornerà automaticamente
-title: titolo
-tmp-disabled: (Disabilitato temporaneamente)
 to: A
-to-live-reload: vivere ricaricare.
 to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il comando:'
-top-apps: Le mie applicazioni
 top-apps-v2: App
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
-trial-plan-expires-in: Il processo finisce tra
-type: ''
-type-new-app-name: Nuovo nome dell'app
 type-new-name: Digita il nuovo nome della chiave API
 type-new-org-name: Digita il nuovo nome per l'organizzazione
-undefined: non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato
 unknown: sconosciuto
@@ -560,31 +430,24 @@ update: Aggiornamento
 updated-at: Aggiornato a
 updated-min-version: Versione minima aggiornata
 upgrade: Aggiornamento
-upgrade-now: Aggiorna ora
 upload-img-error: Impossibile caricare l'immagine, controlla la console
-upperCaseError: Deve contenere lettere maiuscole
 url: URL
 usage: Utilizzo
 usage-success: Il tuo piano è stato impostato questa pagina sarà aggiornata, in pochi minuti
 usage-super-only: Solo i super amministratori possono visualizzare l'utilizzo
 usage-title: Totale
 use-capgo: Usa Capgo
-use-the-command: 'Usa il comando:'
 used-in-period: Usato nel periodo
 used-to-create: L'account con questo indirizzo email esisteva già, non è possibile ricrearlo
-user: Utente
 user-already-invited: Questo utente è già invitato in questa organizzazione
 validate: Convalidare
 verify: Verificare
 verify-2FA: Verifica 2FA
 version: Versione
-version-build: Costruzione della versione
 version-builtin: Versione incorporata
+version-link-fail: Impossibile impostare la sostituzione del pacchetto
 version-linked: Collegamento versione
-version-linking: Collegamento al pacchetto
-versions: Versioni
 want-to-unlink: Vuoi scollegarti?
-warning: Avvertimento!
 welcome-to: Benvenuto a
 welcome-to-your-capg: Benvenuto nella dashboard di Capgo
 what-to-do-with-photo: Modifica immagine
@@ -597,9 +460,5 @@ yearly: Annuale
 'yes': SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
 you-reached-the-limi: Limite raggiunto
-your-api-key: 'La tua chiave API:'
-your-are-a: Sei un
-your-current-plan-is: Il tuo piano attuale è
-your-current-suggested-plan-is: Il tuo attuale piano suggerito è
 your-settings: Le tue impostazioni
 your-ussage: 'Il tuo utilizzo:'

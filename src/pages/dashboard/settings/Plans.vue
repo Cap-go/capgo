@@ -4,9 +4,6 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { storeToRefs } from 'pinia'
-import { loadFull } from 'tsparticles'
-import { tsParticles } from '@tsparticles/engine'
-import { particlesOptions } from './particles.ts'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
@@ -16,7 +13,6 @@ import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
 import type { ArrayElement } from '~/services/types'
-import VueParticles from '~/components/VueParticles.vue'
 
 function openSupport() {
   openMessenger()
@@ -26,11 +22,6 @@ const { t } = useI18n()
 const mainStore = useMainStore()
 
 const displayStore = useDisplayStore()
-onBeforeMount(async () => {
-  console.log('tsParticles mounted')
-  tsParticles.init()
-  await loadFull(tsParticles)
-})
 
 interface PlansOrgData {
   stats: {
@@ -559,11 +550,6 @@ const hightLights = computed<Stat[]>(() => ([
     </div>
   </div>
   <div v-else class="relative w-full overflow-hidden ">
-    <VueParticles
-      id="tsparticles"
-      class="absolute z-0 w-full h-full"
-      :options="particlesOptions"
-    />
     <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
       <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
       {{ t('thank-you-for-sub') }}

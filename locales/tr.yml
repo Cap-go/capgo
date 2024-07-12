@@ -4,39 +4,27 @@
 6-characters-minimum: Minimum 6 karakter, 1 büyük harf, 1 küçük harf, 1 özel karakter
 Bandwidth: Bant genişliği
 Current: Akım
-Filters: Filtreler
-Override: Geçersiz kıl
 Storage: Depolamak
 ab-testing-progressive-deploy-conflict: AB testi ve aşamalı dağıtım aynı anda etkinleştirilemez
-account: Hesap
 account-error: Hesabınız güncellenirken hata oluştu
 account-id: Hesap kimliği
 account-password-error: Hata oluştu, lütfen tekrar deneyin
 account-password-heading: Şifremi Değiştir
-account-settings: Hesap ayarları
 account-updated-succ: Hesap başarıyla güncellendi
 action: Aksiyon
-activation-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
 activation-doi: İsteğe bağlı onay
 activation-doi-desc: E-posta bültenini ve gelecekteki pazarlama tekliflerini kabul ediyorum
 activation-heading: aktivasyon
-activation-headline: Ayarlarım
 activation-legal: Hizmet şartları
 activation-legal-desc: Capgo uygulaması gizlilik politikasını ve kullanım şartlarını kabul ediyorum
 activation-notification: Bildirimler
 activation-notification-desc: Yeni uygulama sürümü mevcut olduğunda bildirim almayı kabul ediyorum
 activation-validate: Doğrula
 active_users_by_version: Pakete göre etkin cihaz
-add: Eklemek
 add-another-app: uygulamanızı ekleyin
 add-api-key: Yeni API anahtarı başarıyla eklendi
 add-member: Üye ekle
-add-shared-user: Paylaşılan kullanıcı ekle
-add-this-code-to-you: Bu kodu projenize ekleyin
-add-your-app-to-your: Uygulamanızı hesabınıza ekleyin
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
-admin: yönetici
-afternoon: öğleden sonra
 alert-2fa-disable: 2FA'yı devre dışı bırakmak istediğinizi onaylayın
 alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
 alert-add-new-key: Yeni API anahtarı türünü seçin
@@ -57,21 +45,15 @@ allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
 allow-emulator: Öykünücülere İzin Ver
 already-account: Zaten bir hesabınız var mı?
 api-doc: API belgesi
-api-key: API anahtarı
 api-keys: API Anahtarları
 api-keys-are-used-for-cli-and-public-api: API anahtarları CLI ve genel API için kullanılır
-api-keys-key-copied: API Anahtarları
 app: Uygulama
 app-deleted: Uygulama silindi
-app-id: 'Uygulama kimliği:'
-app-id-example: Uygulama kimliği örneği
 app-info: Uygulama bilgileri
 app-info-desc: Uygulama bilgilerinizi buradan değiştirebilirsiniz
 app-logo-deleted: Uygulama resmi başarıyla silindi
 app-name: Uygulama ismi
-app-not-found: Uygulama bulunamadı
 app-perm: Uygulama izni
-app-preview: Uygulama önizlemesi
 are-u-sure: Emin misin ?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
@@ -81,17 +63,12 @@ best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
 billed-annually-at: Yıllık olarak faturalandırılır
 billed-monthly-at: Aylık olarak faturalandırılır
-billing: Faturalandırma
-build-your-app-and-s: uygulamanızı oluşturun ve senkronize edin
-build-your-code-and-: Kodunuzu Capgo'ya yükleyin
 bulk-upload: toplu yükleme
 bundle: paket
 bundle-deleted: Paket silindi
-bundle-is-linked-channel: Paket kanala bağlı, önce bağlantıyı kaldırın
 bundle-is-linked-device: Paket cihaza bağlı, önce bağlantısını kaldırın
 bundle-number: paket numarası
 bundles: Paketler
-button-about: Hakkında
 button-back: Geri
 button-browse: Araştır
 button-camera: Kamera
@@ -99,18 +76,11 @@ button-cancel: İptal etmek
 button-confirm: Onaylamak
 button-delete: Silmek
 button-deny-invite: Reddetmek
-button-go: GİTMEK
-button-home: Ev
 button-invite: Davet etmek
 button-join: Kabul etmek
-button-options: Seçenekler
 button-regenerate: Yenile
 button-remove: Kaldırmak
-button-tabs: Sekmeler
-button-toggle_dark: Karanlık modu değiştir
-button-toggle_langs: Dilleri değiştir
 by-clicking-on-them: üzerlerine tıklayarak.
-cancel: İptal etmek
 canceled-delete: Paket silme işlemi iptal edildi, bağlantılı paket silinemiyor
 canceled-photo-selection: Resim seçimini iptal ettiniz
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
@@ -119,21 +89,17 @@ cannot-create-org: Organizasyon oluşturulamıyor, lütfen tarayıcı kayıtlar�
 cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol edin
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
-cannot-delete-app-version: Uygulama sürümü silinemiyor
 cannot-delete-bundle: Paket silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
-cannot-download: Paket indirilemiyor
 cannot-find-unknown-version: >-
   Bilinmeyen sürüm bulunamıyor, lütfen Capgo desteğiyle iletişime geçin ve
   tarayıcı günlüklerini kontrol edin
 cannot-get-the-test-: Test sürümü alınamıyor
 cannot-invite-owner: Sahibi kuruluşa davet edilemiyor
 cannot-load-app-settings: Uygulama ayarları yüklenemiyor
-cannot-save-custom-i: Özel kimlik kaydedilemiyor
 cannot-set-this-vers: Bu sürüm ayarlanamıyor
-cannot-share: Kullanıcı kimliği paylaşılamıyor, tarayıcı konsolunu kontrol edin
 cannot-show: Bu sayfa gösterilemiyor
 cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 cannot-view-plans: Planlar sayfası görüntülenemiyor
@@ -154,7 +120,6 @@ channel-bundle-linked: |-
 channel-create: Kanal oluştur
 channel-deleted: kanal silindi
 channel-forced-devices: Zorla cihazlar
-channel-invit: Davet etmek için e-posta yazın
 channel-is-public: varsayılan kanal
 channel-link: Kanal geçersiz kılma
 channel-link-fail: Kanal geçersiz kılınamıyor yanlış bir şey oldu
@@ -181,19 +146,13 @@ continue: Devam etmek
 copied-to-clipboard: Panoya kopyalandı
 copy-account-id: hesap kimliğini kopyala
 copy-command: Komutu kopyala
-copy-your: kopyala
 country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
 create-new-org: Yeni bir kuruluş oluşturun
 created-at: oluşturuldu
-current-billing-cycle: Güncel Fatura Döngüsü
 custom: Gelenek
 custom-domain: Özel alan
 custom-id: özel kimlik
-custom-id-saved: Özel kimlik kaydedildi
-dashboard: Gösterge Paneli
-days: günler
-defined-as: olarak tanımlandı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete: Silmek
@@ -203,57 +162,37 @@ delete-app: Uygulamayı sil
 delete-org: Kuruluşu sil
 delete-your-account: Hesabını sil
 deleted: silindi
-dependencies:
-  js-yaml: ''
-  openai: ''
+dependencies: {}
 detailed-usage-plan: Detaylı kullanım
-details-and-logs: Ayrıntılar ve günlükler
-devDependencies:
-  '@types/js-yaml': ''
+devDependencies: {}
 device: Cihaz
 device-id: Cihaz Kimliği
 devices: Cihazlar
-devices-using-this-b: Bu paketi kullanan cihazlar
-dialog-warning-msg: |-
-  Bu bilgi kuruluş sahibinden gelir.
-
-  Bu uygulamanın capgo katmanını yükseltemezsiniz
 did-not-recive-confirm-email: Onay e-postası almadınız mı?
 disable: Devre dışı bırakmak
 disable-ab-testing: Engelli AB testi
 disable-auto-downgra: Yerel altında otomatik düşürmeyi devre dışı bırak
-disable-auto-upgrade: Binbaşının üzerinde otomatik yükseltmeyi devre dışı bırak
 disable-progressive-deploy: Aşamalı dağıtım devre dışı bırakıldı
 disableAutoUpdateToMajor: Otomatik güncellemeyi devre dışı bırak
-discord: Anlaşmazlık
 discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
-documentation: Belgeler
 dont-have-an-account: Hesabınız yok mu?
 download: İndirmek
-download-0: İndirmek
-edit-name: Adı düzenle
-edit-pic: Resmi düzenle
 email: E-posta
-email-address: E-posta adresi
-email-does-not-exist: Böyle bir kullanıcı yoktur
 enable: Olanak vermek
 enable-2FA: 2FA'yı etkinleştir
 enabled-ab-testing: AB testi etkinleştirildi
 enabled-progressive-deploy: Etkin aşamalı dağıtım
-encrypted: Şifrelenmiş paketler
 enter-your-email-add: >-
   E-posta adresinizi girin, size şifrenizi sıfırlamak için bir bağlantı
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 error: Hata
-external-storage: Harici depolama
 fail: Yükleme başarısız
 failed: Arızalı
 failed-to-get-user: Kullanıcı yüklenemedi
 fast-backward: Hızlı Geriye Dön
 fast-forward: İleri sar
-filters: Filtreler
 first-name: İlk adı
 force-version: Kuvvet versiyonu
 force-version-change: Aşamalı dağıtımı atla
@@ -261,29 +200,22 @@ forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
 free-trial: Ücretsiz deneme
-from: Kimden
 from-device: cihazdan
 general-information: Genel Bilgiler
 generated-new-apikey: Yeni API anahtarı oluşturuldu!
 go-back: Geri gitmek
 good: İyi
 id: İD
-in-your-main-file: ana dosyanızda
-in-your-project-fold: proje klasörünüzde
 included-in-plan: Plana dahil
 info: Bilgi
-informations: bilgiler
 init-capgo-in-your-a: Uygulamanızda Capgo'yu Başlatın
 insert-invite-email: Davet etmek istediğiniz kullanıcının e-posta adresini ekleyin
 install: Kurulmuş
-install-the-capacito: Kapasitör eklentisini kurun
-into-your-app-folder: Uygulama klasörünüze.
 invalid-auth: Oturum açma bilgileriniz eşleşmedi, tekrar deneyin.
 invalid-email: İletilen e-posta geçerli değil
 invalid-mfa-code: Geçersiz 2FA kodu
 invalid-version: Geçersiz semver sürümü
 invite-accepted: Organizasyon daveti başarıyla kabul edildi
-invoices: faturalar
 is-emulator: Emülatör mü
 is-production-app: Üretim uygulaması mı
 key-admin: Yönetici
@@ -295,10 +227,7 @@ key-upload: Yüklemek
 key-write: Yazmak
 language: Dil
 last-15-minutes: Son 15 dakika
-last-24-hour: Son 24 saat
-last-3-hour: Son 3 saat
 last-3-minutes: Son 3 dakika
-last-hour: Son saat
 last-minute: Son dakika
 last-name: Soy isim
 last-update: Son Güncelleme
@@ -307,16 +236,10 @@ last-version: Son sürüm
 latest_version: En son paket
 launch-bundle: Paketi başlat
 leaving: Ayrılıyorum
-limit-reached: Sınıra ulaşıldı
 live-reload: Canlı yeniden yükleme
-loading-more-data: Daha fazla veri yükleniyor...
 log-in: Giriş yapmak
-log-to-the-capgo-cli: Capgo CLI'da oturum açın
 login-to-your-accoun: hesabınıza giriş yapın
-logout: Çıkış Yap
 logs: Kütükler
-lowerCaseError: Küçük harf içermelidir
-main: ''
 main-bundle-number: Ana paket numarası
 major: Ana
 make-default-android: Android için varsayılan yap
@@ -348,13 +271,10 @@ missing-name: Eksik ad
 mo: Ay
 modify-org-info: Kuruluşun bilgilerini buradan değiştirebilirsiniz.
 module-heading: Modüller
-monthly: Aylık
 monthly-active-users: Aylık aktif kullanıcılar
 monthly-plan: Aylık plan
 montly-active: Aylık aktif
 more-version-storage: Daha fazla sürüm Depolama
-morning: Sabah
-my-account: Hesabım
 my-notifications: Bildirimlerim
 name: İsim
 need-more-contact-us: |-
@@ -370,27 +290,18 @@ new-name-to-short: |-
 next: Sonraki
 'no': HAYIR
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
-no-channel-linked: Kanal yok, eklemek için tıklayın
-no-channel-linked-no-perm: Kanal yok
 no-data: Veri yok
-no-devices: Cihaz yok
-no-logs: günlük yok
 no-permission: Yetersiz yetkiler
-no-version-linked: Sürüm yok, eklemek için tıklayın
-no-version-linked-no-perm: Sürüm yok
 none: Hiçbiri
 not-found: Bulunamadı
 not-paying-org-usage: Bu kuruluş ödeme yapmıyor, ücretsiz deneme kuruluşu için kullanım gösteremiyor
-notifications: Bildirimler
 ok: TAMAM
 old-onboarding-mode: eski işe alım
 one-day-left: Bir gün kaldı
 open: Açık
 open-channel: kanalı aç
 open-in-new-tab: Yeni sekmede aç
-open-settings: Ayarları açmak için tıklayın
 open-sidebar: Kenar çubuğunu aç
-open-this-link-to-le: Güncellemenizi nasıl test edeceğinizi öğrenmek için bu bağlantıyı açın
 open-your-portal: Portalınızı açın
 org-changes-saved: Kuruluş başarıyla güncellendi
 org-changes-set-email-not-unique: Yönetim e-postası benzersiz değil, lütfen farklı bir e-posta seçin
@@ -403,42 +314,29 @@ organization-email: Kuruluşun yönetim e-postası
 organization-name: Kuruluş Adı
 organization-settings: Organizasyon ayarları
 os-version: OS sürümü
-owner-org: 'Sahip kuruluşu:'
 pages: Sayfalar
 password: Şifre
 password-confirmatio: Şifre onayı
 password-heading: Şifre oluştur
 password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir kombinasyon girin.
-password-new: Yeni Şifre
 patch: Yama
 percent-fail: Başarısız yüzde
 permission-changed: Kullanıcı izni başarıyla değiştirildi
 personal-information: Kişisel bilgiler
 picture-delete-fail: Uygulama resmi silinemiyor, lütfen konsol günlüğünü kontrol edin
 picture-uploaded: Resim başarıyla yüklendi
-plan-abtest: A / B testi
 plan-bandwidth: GB Bant Genişliği
-plan-buy: Satın almak
 plan-desc: >-
   Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
   ekleyin.
-plan-free: MVP ve test için en iyisi
 plan-inactive: Plan etkin değil
-plan-is-the-best-pla: plan ihtiyaçlarınız için en iyi plandır.
-plan-maker: Küçük işletme sahipleri için en iyisi
-plan-member: plan üyesi.
 plan-page-warn: Plan satın almanız, davet edildiğiniz organizasyonları etkilemeyecektir.
 plan-page-warn-2: Bu konuda daha fazla bilgi edinin.
-plan-payasyougo: İşletmeleri ölçeklendirmek için en iyisi
 plan-pricing-plans: Fiyatlandırma Planları
-plan-progressive-deploy: aşamalı dağıtım
-plan-solo: Hintliler için en iyisi
 plan-storage: GB Depolama
-plan-team: Büyük işletme sahipleri için en iyisi
 plan-updates: Güncellemeler
 plan-upgrade: aboneler
 plan-whats-included: Neler dahil
-plans: planlar
 plans-super-only: >-
   Yalnızca süper yöneticilerin planları ve faturalandırmayı görüntülemesine izin
   verilir
@@ -446,12 +344,9 @@ platform: platformu
 please-ask-the-user-to-create-account-first: Lütfen önce kullanıcıdan hesap oluşturmasını isteyin
 please-choose-your-p: Lütfen tercihlerinizi seçin
 please-confirm-org-del: Lütfen adını yazarak "%1" kuruluşunu silmek istediğinizi onaylayın.
-please-type-new-app-name: Lütfen yeni uygulama adını yazın
-please-upgrade: Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin
 plugin-version: Eklenti sürümü
 prediction: Tahmin
 preview: Paketi önizle
-preview-encrypted: Şifrelenmiş paket önizlenemiyor
 preview-short: Ön izleme
 previous: Öncesi
 price-per-unit-above: Planın üzerindeki birim başına fiyat
@@ -460,11 +355,7 @@ progressive-bundle-number: Aşamalı paket numarası
 progressive-deploy-option: Aşamalı dağıtım seçeneğini seçin
 progressive-deploy-set-percentage: Aşamalı dağıtım etkinleştirildiğinde ikincil sürüm yüzdesini ayarlayamazsınız
 progressive-percentage: Aşamalı dağıtım durumu
-projection: Projeksiyonlar
 recommended: Tavsiye edilen
-recommended-for-you: Sizin için önerilen
-refresh-this-page: bu sayfayı yenile
-register-desc: Kaydınızı tamamlamak için aşağıdaki alanları doldurun
 register-heading: Kayıt
 register-next: Kayıt olmak
 reload: Tekrar yükle
@@ -475,24 +366,17 @@ reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
-search: Aramak
-search-bundle: Paket Ara
 search-bundle-id: Paket kimliğine göre ara
-search-by-action: İşleme göre ara
 search-by-device-id: Cihaz kimliğine veya Özel Kimliğe göre arayın
 search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
-search-device: Cihaz ara
-search-user: Kullanıcı Ara
 see-usage: Kullanıma bakın
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
 set-bundle: Paketi kanala ayarla
 settings: Ayarlar
-shared-apps: Paylaşılan Uygulamalar
-shared-users: 'şuraya paylaşıldı:'
 showing: Gösterilen
 sign-out: Oturumu Kapat
 size: Boyut
@@ -501,7 +385,6 @@ something-went-wrong-try-again-later: |-
   Bir şeyler yanlış gitti! 
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
-specialError: Özel karakterler içermelidir
 start-new-deploy: Yeni aşamalı dağıtımı başlatın
 start-using-capgo: 'Kullanmaya başla:'
 status-complete: tamamlamak
@@ -509,32 +392,19 @@ status-failed: arızalı
 storage-usage: 'Depolama kullanımı:'
 stored-externally: harici olarak depolanır
 stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe faturalandırma portalı yeni bir sekmede açılacak
-submit: Göndermek
 support: Destek
-switch-to-all-device: Tüm cihazlara geç
-switch-to-only-devic: Yalnızca bağlı cihaza geç
 terms-of-use: Kullanım Şartları
-test-your-update-in-: Güncellemenizi uygulamanızda test edin
 tests: testler
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 thank-you-for-sub: Capgo'ya abone olduğunuz için teşekkür ederiz
-the: bu
 this-page-will-self-: Bu sayfa kendini yenileyecek
-title: başlık
-tmp-disabled: (Geçici olarak devre dışı bırakıldı)
 to: için
-to-live-reload: canlı yeniden yüklemek için.
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
-top-apps: Benim uygulamalarım
 top-apps-v2: Uygulamalar
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
-trial-plan-expires-in: deneme bitiyor
-type: ''
-type-new-app-name: Yeni uygulama adı
 type-new-name: Lütfen yeni API anahtarı adını yazın
 type-new-org-name: Lütfen kuruluşun yeni adını yazın
-undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
 unknown: Bilinmeyen
@@ -548,31 +418,24 @@ update: Güncelleme
 updated-at: 'Şurada güncellendi:'
 updated-min-version: Minimum sürüm güncellendi
 upgrade: Güncelleme
-upgrade-now: Hemen Yükselt
 upload-img-error: Resim yüklenemiyor, lütfen konsolu kontrol edin
-upperCaseError: Büyük harfler içermelidir
 url: URL
 usage: Kullanım
 usage-success: Planınız ayarlandı, bu sayfa birkaç dakika içinde güncellenecek
 usage-super-only: Yalnızca süper yöneticilerin kullanımı görüntülemesine izin verilir
 usage-title: Toplam
 use-capgo: Capgo'yu kullan
-use-the-command: 'Şu komutu kullanın:'
 used-in-period: Döneminde kullanıldı
 used-to-create: Bu e-postaya sahip hesap önceden mevcuttu, yeniden oluşturulamıyor
-user: kullanıcı
 user-already-invited: Bu kullanıcı zaten bu kuruluşa davet edildi
 validate: Doğrula
 verify: Doğrulamak
 verify-2FA: 2FA'yı doğrulayın
 version: Sürüm
-version-build: Sürüm oluşturma
 version-builtin: Sürüm yerleşik
+version-link-fail: Paket geçersiz kılma ayarlanamıyor
 version-linked: Sürüm bağlantısı
-version-linking: Paket bağlantısı
-versions: Versiyonlar
 want-to-unlink: Bağlantıyı kaldırmak istiyor musunuz?
-warning: Uyarı!
 welcome-to: Hoşgeldiniz
 welcome-to-your-capg: Capgo Dashboard'unuza hoş geldiniz
 what-to-do-with-photo: Resmi düzenle
@@ -585,9 +448,5 @@ yearly: Yıllık
 'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-reached-the-limi: Sınıra ulaşıldı
-your-api-key: 'API anahtarınız:'
-your-are-a: Senin alanın
-your-current-plan-is: Mevcut planınız
-your-current-suggested-plan-is: 'Mevcut önerilen planınız:'
 your-settings: Ayarlarınız
 your-ussage: 'Kullanımınız:'

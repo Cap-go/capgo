@@ -41,7 +41,6 @@ declare module 'vue' {
     TopApps: typeof import('./components/dashboard/TopApps.vue')['default']
     Usage: typeof import('./components/dashboard/Usage.vue')['default']
     UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
-    VueParticles: typeof import('./components/VueParticles.vue')['default']
     WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
   }
 }

@@ -4,39 +4,27 @@
 6-characters-minimum: 최소 6자, 대문자 1개, 소문자 1개, 특수 문자 1개
 Bandwidth: 대역폭
 Current: 현재의
-Filters: 필터
-Override: 우세하다
 Storage: 저장
 ab-testing-progressive-deploy-conflict: AB 테스트와 점진적 배포를 동시에 활성화할 수 없습니다.
-account: 계정
 account-error: 계정을 업데이트하는 동안 오류가 발생했습니다.
 account-id: 계정 ID
 account-password-error: 오류가 발생했습니다. 다시 시도해 주세요.
 account-password-heading: 내 비밀번호 변경
-account-settings: 계정 설정
 account-updated-succ: 계정이 성공적으로 업데이트되었습니다.
 action: 행동
-activation-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 activation-doi: 선택적 동의
 activation-doi-desc: 이메일 뉴스레터 및 향후 마케팅 제안을 수락합니다.
 activation-heading: 활성화
-activation-headline: 내 설정
 activation-legal: 서비스 약관
 activation-legal-desc: Capgo 앱 개인 정보 보호 정책 및 사용 약관에 동의합니다.
 activation-notification: 알림
 activation-notification-desc: 새 앱 버전을 사용할 수 있을 때 알림 수신에 동의합니다.
 activation-validate: 확인
 active_users_by_version: 번들별 활성 기기
-add: 추가하다
 add-another-app: 앱 추가
 add-api-key: 새 API 키를 성공적으로 추가했습니다.
 add-member: 회원 추가
-add-shared-user: 공유 사용자 추가
-add-this-code-to-you: 이 코드를 프로젝트에 추가하십시오.
-add-your-app-to-your: 계정에 앱 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
-admin: 관리자
-afternoon: 오후
 alert-2fa-disable: 2FA를 비활성화할지 확인하세요.
 alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
@@ -57,21 +45,15 @@ allow-device-to-self: 장치가 자체 연결하도록 허용
 allow-emulator: 에뮬레이터 허용
 already-account: 이미 계정이 있으신가요?
 api-doc: API 문서
-api-key: API 키
 api-keys: API 키
 api-keys-are-used-for-cli-and-public-api: API 키는 CLI 및 공개 API에 사용됩니다.
-api-keys-key-copied: API 키
 app: 앱
 app-deleted: 앱 삭제됨
-app-id: '앱 ID:'
-app-id-example: 앱 ID 예시
 app-info: 앱 정보
 app-info-desc: 여기에서 앱 정보를 변경할 수 있습니다.
 app-logo-deleted: 앱 사진이 삭제되었습니다.
 app-name: 앱 이름
-app-not-found: 앱을 찾을 수 없음
 app-perm: 앱 권한
-app-preview: 앱 미리보기
 are-u-sure: 확실합니까 ?
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
@@ -81,17 +63,12 @@ best-plan: 최고의 계획
 bigger-app-size: 더 큰 앱 크기
 billed-annually-at: '매년 청구 금액:'
 billed-monthly-at: '월별 청구 시간:'
-billing: 청구
-build-your-app-and-s: 앱 빌드 및 동기화
-build-your-code-and-: Capgo에 코드 업로드
 bulk-upload: 대량 업로드
 bundle: 묶음
 bundle-deleted: 번들이 삭제되었습니다.
-bundle-is-linked-channel: 번들이 채널에 연결되어 있습니다. 먼저 연결을 해제하세요.
 bundle-is-linked-device: 번들이 기기에 연결되어 있습니다. 먼저 연결을 해제하세요.
 bundle-number: 번들 번호
 bundles: 묶음
-button-about: 에 대한
 button-back: 뒤쪽에
 button-browse: 검색
 button-camera: 카메라
@@ -99,18 +76,11 @@ button-cancel: 취소
 button-confirm: 확인하다
 button-delete: 삭제
 button-deny-invite: 부인하다
-button-go: 가다
-button-home: 집
 button-invite: 초대하다
 button-join: 수용하다
-button-options: 옵션
 button-regenerate: 재생성
 button-remove: 제거하다
-button-tabs: 탭
-button-toggle_dark: 다크 모드 전환
-button-toggle_langs: 언어 변경
 by-clicking-on-them: 그들을 클릭하여.
-cancel: 취소
 canceled-delete: 번들 삭제가 취소되었습니다. 연결된 번들을 삭제할 수 없습니다.
 canceled-photo-selection: 사진 선택을 취소했습니다.
 cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
@@ -119,19 +89,15 @@ cannot-create-org: 조직을 생성할 수 없습니다. 브라우저 로그를 
 cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확인하세요.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
-cannot-delete-app-version: 앱 버전을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
-cannot-download: 번들을 다운로드할 수 없습니다.
 cannot-find-unknown-version: 알 수 없는 버전을 찾을 수 없습니다. capgo 지원팀에 문의하여 브라우저 로그를 확인하세요.
 cannot-get-the-test-: 테스트 버전을 받을 수 없습니다
 cannot-invite-owner: 소유자를 조직에 초대할 수 없습니다.
 cannot-load-app-settings: 앱 설정을 로드할 수 없습니다.
-cannot-save-custom-i: 맞춤 ID를 저장할 수 없습니다.
 cannot-set-this-vers: 이 버전을 설정할 수 없습니다.
-cannot-share: 사용자 ID를 공유할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-show: 이 페이지를 표시할 수 없습니다
 cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했습니다.
 cannot-view-plans: 계획 페이지를 볼 수 없습니다
@@ -152,7 +118,6 @@ channel-bundle-linked: |-
 channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
 channel-forced-devices: 강제 장치
-channel-invit: 초대할 이메일 입력
 channel-is-public: 기본 채널
 channel-link: 채널 재정의
 channel-link-fail: 채널을 재정의할 수 없습니다. 문제가 발생했습니다.
@@ -177,19 +142,13 @@ continue: 계속하다
 copied-to-clipboard: 클립보드에 복사됨
 copy-account-id: 계정 ID 복사
 copy-command: 복사 명령
-copy-your: 복사
 country: 국가
 create-a-free-accoun: 무료 계정 만들기
 create-new-org: 새 조직 만들기
 created-at: 만든 시간
-current-billing-cycle: 현재 청구 주기
 custom: 관습
 custom-domain: 맞춤 도메인
 custom-id: 맞춤 ID
-custom-id-saved: 맞춤 ID가 저장됨
-dashboard: 계기반
-days: 날
-defined-as: 로써 정의 된
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete: 삭제
@@ -199,55 +158,35 @@ delete-app: 앱 삭제
 delete-org: 조직 삭제
 delete-your-account: 계정 삭제
 deleted: 삭제
-dependencies:
-  js-yaml: ''
-  openai: ''
+dependencies: {}
 detailed-usage-plan: 자세한 사용법
-details-and-logs: 세부 정보 및 로그
-devDependencies:
-  '@types/js-yaml': ''
+devDependencies: {}
 device: 장치
 device-id: 장치 아이디
 devices: 장치
-devices-using-this-b: 이 번들을 사용하는 기기
-dialog-warning-msg: |-
-  이 정보는 조직 소유자로부터 제공됩니다.
-
-  이 앱의 Capgo 등급을 업그레이드할 수 없습니다.
 did-not-recive-confirm-email: 확인 이메일을 받지 못하셨나요?
 disable: 장애를 입히다
 disable-ab-testing: 장애인 AB 테스트
 disable-auto-downgra: 네이티브에서 자동 다운그레이드 비활성화
-disable-auto-upgrade: 메이저 이상의 자동 업그레이드 비활성화
 disable-progressive-deploy: 비활성화된 점진적 배포
 disableAutoUpdateToMajor: 자동 업데이트 비활성화
-discord: 불화
 discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
-documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
 download: 다운로드
-download-0: 다운로드
-edit-name: 이름 수정
-edit-pic: 사진 편집
 email: 이메일
-email-address: 이메일 주소
-email-does-not-exist: 이 사용자는 존재하지 않습니다.
 enable: 할 수 있게 하다
 enable-2FA: 2FA 활성화
 enabled-ab-testing: AB 테스트 활성화
 enabled-progressive-deploy: 점진적 배포 활성화
-encrypted: 암호화된 번들
 enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
 enter-your-new-passw: 새 비밀번호를 입력하고 확인
 error: 오류
-external-storage: 외부 저장
 fail: 설치 실패
 failed: 실패한
 failed-to-get-user: 사용자를 로드하지 못했습니다.
 fast-backward: 빨리 뒤로
 fast-forward: 빨리 감기
-filters: 필터
 first-name: 이름
 force-version: 포스 버전
 force-version-change: 점진적 배포 건너뛰기
@@ -255,29 +194,22 @@ forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
 free-trial: 무료 시험판
-from: From
 from-device: 장치에서
 general-information: 일반 정보
 generated-new-apikey: 새로운 API 키가 생성되었습니다!
 go-back: 돌아가기
 good: 좋은
 id: ID
-in-your-main-file: 기본 파일에서
-in-your-project-fold: 프로젝트 폴더에서
 included-in-plan: 계획에 포함됨
 info: 정보
-informations: 정보
 init-capgo-in-your-a: 앱에서 Capgo 초기화
 insert-invite-email: 초대하려는 사용자의 이메일을 입력하세요.
 install: 설치됨
-install-the-capacito: Capacitor 플러그인 설치
-into-your-app-folder: 앱 폴더에.
 invalid-auth: 로그인이 일치하지 않습니다. 다시 시도하십시오.
 invalid-email: 전달된 이메일이 유효하지 않습니다.
 invalid-mfa-code: 잘못된 2FA 코드
 invalid-version: 잘못된 버전
 invite-accepted: 조직 초대가 성공적으로 수락되었습니다.
-invoices: 송장
 is-emulator: 에뮬레이터임
 is-production-app: 프로덕션 앱
 key-admin: 관리자
@@ -289,10 +221,7 @@ key-upload: 업로드
 key-write: 쓰다
 language: 언어
 last-15-minutes: 지난 15분
-last-24-hour: 지난 24시간
-last-3-hour: 지난 3시간
 last-3-minutes: 지난 3분
-last-hour: 지난 시간
 last-minute: 마지막 순간
 last-name: 성
 last-update: 마지막 업데이트
@@ -301,16 +230,10 @@ last-version: 마지막 버전
 latest_version: 최신 번들
 launch-bundle: 번들 실행
 leaving: 퇴거
-limit-reached: 한도 도달
 live-reload: 라이브 리로드
-loading-more-data: 더 많은 데이터 로드 중...
 log-in: 로그인
-log-to-the-capgo-cli: Capgo CLI에 로그인
 login-to-your-accoun: 계정에 로그인
-logout: 로그 아웃
 logs: 로그
-lowerCaseError: 소문자를 포함해야 합니다.
-main: ''
 main-bundle-number: 주요 번들 번호
 major: 주요한
 make-default-android: Android용 기본값으로 설정
@@ -340,13 +263,10 @@ missing-name: 이름이 누락되었습니다.
 mo: 개월
 modify-org-info: 여기에서 조직의 정보를 수정할 수 있습니다.
 module-heading: 모듈
-monthly: 월간 간행물
 monthly-active-users: 월간 활성 사용자
 monthly-plan: 월간 요금제
 montly-active: 월간 활성
 more-version-storage: 더 많은 버전 저장
-morning: 아침
-my-account: 내 계정
 my-notifications: 내 알림
 name: 이름
 need-more-contact-us: |-
@@ -362,27 +282,18 @@ new-name-to-short: |-
 next: 다음
 'no': 아니요
 no-app-icon: 이 앱에는 앱 아이콘이 없습니다.
-no-channel-linked: 채널이 없습니다. 추가하려면 클릭하세요.
-no-channel-linked-no-perm: 채널 없음
 no-data: 데이터 없음
-no-devices: 기기 없음
-no-logs: 로그 없음
 no-permission: 권한이 부족합니다.
-no-version-linked: 버전이 없습니다. 추가하려면 클릭하세요.
-no-version-linked-no-perm: 버전 없음
 none: 없음
 not-found: 찾을 수 없음
 not-paying-org-usage: 이 조직은 비용을 지불하지 않으며 무료 평가자 조직의 사용량을 표시할 수 없습니다.
-notifications: 알림
 ok: 좋아요
 old-onboarding-mode: 오래된 온보딩
 one-day-left: 하루 남음
 open: 열려 있는
 open-channel: 채널 열기
 open-in-new-tab: 새 탭에서 열기
-open-settings: 클릭하여 설정 열기
 open-sidebar: 사이드바 열기
-open-this-link-to-le: 이 링크를 열어 업데이트를 테스트하는 방법을 알아보세요.
 open-your-portal: 포털을 열어보세요
 org-changes-saved: 조직이 업데이트되었습니다.
 org-changes-set-email-not-unique: 관리 이메일이 고유하지 않습니다. 다른 이메일을 선택하세요.
@@ -395,51 +306,35 @@ organization-email: 조직의 관리 이메일
 organization-name: 조직 이름
 organization-settings: 조직 설정
 os-version: OS 버전
-owner-org: '소유자 조직:'
 pages: 페이지
 password: 비밀번호
 password-confirmatio: 비밀번호 확인
 password-heading: 비밀번호 만들기
 password-hint: 숫자, 문자, 구두점을 6개 이상 조합하여 입력하세요.
-password-new: 새 비밀번호
 patch: 반점
 percent-fail: 실패율
 permission-changed: 사용자 권한을 성공적으로 변경했습니다.
 personal-information: 개인 정보
 picture-delete-fail: 앱 사진을 삭제할 수 없습니다. 콘솔 로그를 확인하세요.
 picture-uploaded: 사진이 성공적으로 업로드되었습니다.
-plan-abtest: A/B 테스트
 plan-bandwidth: GB 대역폭
-plan-buy: 구입하다
 plan-desc: 무료로 구축을 시작한 다음 실행 계획을 추가하세요.
-plan-free: MVP 및 테스트에 가장 적합
 plan-inactive: 비활성 계획
-plan-is-the-best-pla: 계획은 귀하의 필요에 가장 적합한 계획입니다.
-plan-maker: 소기업 소유주에게 가장 적합
-plan-member: 계획 회원.
 plan-page-warn: 플랜 구매는 귀하가 초대된 조직에 영향을 미치지 않습니다.
 plan-page-warn-2: 그것에 대해 자세히 알아보세요.
-plan-payasyougo: 기업 확장에 가장 적합
 plan-pricing-plans: 요금제
-plan-progressive-deploy: 점진적 배포
-plan-solo: 인디에 가장 적합
 plan-storage: GB 스토리지
-plan-team: 대기업 소유주에게 가장 적합
 plan-updates: 업데이트
 plan-upgrade: 구독자
 plan-whats-included: 포함된 것
-plans: 계획
 plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니다.
 platform: 플랫폼
 please-ask-the-user-to-create-account-first: 먼저 사용자에게 계정을 생성하도록 요청하세요.
 please-choose-your-p: 기본 설정을 선택하십시오
 please-confirm-org-del: 이름을 입력하여 "%1" 조직을 삭제할 것인지 확인하십시오.
-please-type-new-app-name: 새 앱 이름을 입력하세요.
-please-upgrade: 더 많은 사용자를 추가하려면 요금제를 업그레이드하세요.
 plugin-version: 플러그인 버전
 prediction: 예측
 preview: 미리보기 번들
-preview-encrypted: 암호화된 번들을 미리 볼 수 없습니다.
 preview-short: 시사
 previous: 이전의
 price-per-unit-above: 계획보다 높은 단위당 가격
@@ -448,11 +343,7 @@ progressive-bundle-number: 프로그레시브 번들 번호
 progressive-deploy-option: 점진적 배포 옵션 선택
 progressive-deploy-set-percentage: 점진적 배포가 활성화된 경우 보조 버전 비율을 설정할 수 없습니다.
 progressive-percentage: 점진적 배포 상태
-projection: 예측
 recommended: 추천
-recommended-for-you: 당신을 위해 추천 된
-refresh-this-page: 이 페이지 새로 고침
-register-desc: 등록을 완료하려면 다음 필드를 채우십시오.
 register-heading: 등록
 register-next: 등록하다
 reload: 새로고침
@@ -463,24 +354,17 @@ reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
 save: 저장
 save-changes: 변경 사항을 저장하다
-search: 찾다
-search-bundle: 번들 검색
 search-bundle-id: 번들 ID로 검색
-search-by-action: 액션으로 검색
 search-by-device-id: 기기 ID 또는 맞춤 ID로 검색
 search-by-device-id-: 장치 ID 또는 작업으로 검색
 search-by-device-id-0: 기기 ID로 검색
 search-by-name: 이름으로 검색
-search-device: 장치 검색
-search-user: 사용자 검색
 see-usage: 사용법 보기
 select-user-perms: 사용자 권한 선택
 select-user-perms-expanded: 초대된 사용자가 어떤 권한을 가져야 하는지 선택하세요.
 session_key: IvSessionKey
 set-bundle: 번들을 채널로 설정
 settings: 설정
-shared-apps: 공유 앱
-shared-users: 공유 대상
 showing: 전시
 sign-out: 로그아웃
 size: 크기
@@ -489,7 +373,6 @@ something-went-wrong-try-again-later: |-
   문제가 발생했습니다. 
   나중에 다시 시도하십시오.
 special-api-access: 특수 API 액세스
-specialError: 특수 문자를 포함해야 합니다.
 start-new-deploy: 새로운 점진적 배포 시작
 start-using-capgo: '사용 시작:'
 status-complete: 완벽한
@@ -497,32 +380,19 @@ status-failed: 실패한
 storage-usage: '스토리지 사용량:'
 stored-externally: 외부에 저장
 stripe-billing-portal-will-be-opened-in-a-new-tab: Stripe 청구 포털이 새 탭에서 열립니다.
-submit: 제출하다
 support: 지원하다
-switch-to-all-device: 모든 기기로 전환
-switch-to-only-devic: 연결된 기기로만 전환
 terms-of-use: 이용약관
-test-your-update-in-: 앱에서 업데이트 테스트
 tests: 테스트
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 thank-you-for-sub: Capgo를 구독해 주셔서 감사합니다.
-the: 그만큼
 this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
-title: 제목
-tmp-disabled: (일시적으로 비활성화됨)
 to: To
-to-live-reload: 라이브 리로드.
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
-top-apps: 나의 앱들
 top-apps-v2: 앱
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
-trial-plan-expires-in: '평가판 종료:'
-type: ''
-type-new-app-name: 새 앱 이름
 type-new-name: 새 API 키 이름을 입력하세요.
 type-new-org-name: 조직의 새 이름을 입력하세요.
-undefined: 한정되지 않은
 undefined-fail: 정의되지 않음(업데이트가 실패함)
 uninstall: 제거됨
 unknown: 알려지지 않은
@@ -536,31 +406,24 @@ update: 업데이트
 updated-at: 업데이트 시간
 updated-min-version: 업데이트된 최소 버전
 upgrade: 업그레이드
-upgrade-now: 지금 업그레이드
 upload-img-error: 사진을 업로드할 수 없습니다. 콘솔을 확인하세요.
-upperCaseError: 대문자를 포함해야 함
 url: URL
 usage: 용법
 usage-success: 계획이 설정되었습니다. 이 페이지는 몇 분 안에 업데이트됩니다.
 usage-super-only: 최고 관리자만 사용량을 볼 수 있습니다.
 usage-title: 총
 use-capgo: 캡고 사용
-use-the-command: 다음 명령을 사용하십시오.
 used-in-period: 기간에 사용
 used-to-create: 이 이메일을 사용하는 계정이 이전에 존재했으므로 다시 만들 수 없습니다.
-user: 사용자
 user-already-invited: 이 사용자는 이미 이 조직에 초대되었습니다.
 validate: 확인
 verify: 확인하다
 verify-2FA: 2FA 확인
 version: 버전
-version-build: 버전 빌드
 version-builtin: 버전 내장
+version-link-fail: 번들 재정의를 설정할 수 없습니다.
 version-linked: 버전 링크
-version-linking: 번들 링크
-versions: 버전
 want-to-unlink: 연결을 해제하시겠습니까?
-warning: 경고!
 welcome-to: 에 오신 것을 환영합니다
 welcome-to-your-capg: Capgo 대시보드에 오신 것을 환영합니다.
 what-to-do-with-photo: 사진 편집
@@ -573,9 +436,5 @@ yearly: 매년
 'yes': 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-reached-the-limi: 한도 도달
-your-api-key: '귀하의 API 키:'
-your-are-a: 당신은
-your-current-plan-is: 현재 계획은
-your-current-suggested-plan-is: 현재 제안된 계획은 다음과 같습니다.
 your-settings: 귀하의 설정
 your-ussage: '귀하의 사용량:'
