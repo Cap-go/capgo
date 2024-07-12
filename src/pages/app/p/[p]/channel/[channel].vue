@@ -321,7 +321,7 @@ async function openPannel() {
         },
       },
       {
-        text: t('confirm'),
+        text: t('continue'),
         handler: async () => {
           const id = await getUnknownVersion()
           if (!id)

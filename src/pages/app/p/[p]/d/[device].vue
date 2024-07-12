@@ -278,16 +278,14 @@ async function delDevVersion(device: string) {
     .eq('device_id', device)
     .eq('app_id', packageId.value)
 }
-async function updateOverride(event: Event) {
+async function updateVersionOverride(event: Event) {
   const value = (event.target as HTMLSelectElement).value
-  console.log('updateOverride', value)
   const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
     toast.error(t('no-permission'))
     return
   }
-  console.log('updateOverride 1')
 
   if (deviceOverride.value && value === 'none') {
     if (device.value?.device_id)
@@ -307,16 +305,16 @@ async function updateOverride(event: Event) {
           return loadData()
         }).catch(async (error) => {
           console.error(error)
-          toast.error(t('channel-link-fail'))
+          toast.error(t('version-link-fail'))
         })
     }
     catch (error) {
       console.error(error)
-      toast.error(t('channel-link-fail'))
+      toast.error(t('version-link-fail'))
     }
   }
   else {
-    toast.error(t('channel-link-fail'))
+    toast.error(t('version-link-fail'))
   }
 }
 
@@ -331,8 +329,13 @@ async function upsertDevChannel(device: string, channelId: number) {
       channel_id: channelId,
       app_id: packageId.value,
       owner_org: currentGid,
-    })
+    }, { onConflict: 'app_id, device_id' })
+    .eq('app_id', packageId.value)
+    .eq('device_id', device)
     .throwOnError()
+
+  // .upsert(update, { onConflict: 'app_id, name' })
+  // .eq('app_id', update.app_id)
 }
 
 async function delDevChannel(device: string) {
@@ -345,7 +348,7 @@ async function delDevChannel(device: string) {
     .eq('app_id', packageId.value)
 }
 
-async function updateChannel(event: Event) {
+async function updateChannelOverride(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   console.log('updateChannel', value)
   const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
@@ -432,7 +435,7 @@ function openChannel() {
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
           <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click.self="openVersion()">
-            <select id="selectableDisallow" :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="(event) => updateOverride(event)">
+            <select id="selectableDisallow" :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="updateVersionOverride">
               <option value="none">
                 {{ t('none') }}
               </option>
@@ -443,7 +446,7 @@ function openChannel() {
           </InfoRow>
           <!-- TODO: fix channel override -->
           <InfoRow :is-link="true" class="hidden" :label="t('channel-link')" :value="channelDevice?.channel_id.name || ''" @click.self="openChannel()">
-            <select id="selectableDisallow" :value="channelDevice?.channel_id?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="(event) => updateChannel(event)">
+            <select id="selectableDisallow" :value="channelDevice?.channel_id?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="updateChannelOverride">
               <option value="none">
                 {{ t('none') }}
               </option>
