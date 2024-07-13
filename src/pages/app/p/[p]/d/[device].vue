@@ -326,11 +326,8 @@ async function upsertDevChannel(device: string, channelId: number) {
       channel_id: channelId,
       app_id: packageId.value,
       owner_org: currentGid,
-    }, { onConflict: ' device_id' })
+    }, { onConflict: 'app_id,device_id' })
     .throwOnError()
-
-  // .upsert(update, { onConflict: 'app_id, name' })
-  // .eq('app_id', update.app_id)
 }
 
 async function delDevChannel(device: string) {
