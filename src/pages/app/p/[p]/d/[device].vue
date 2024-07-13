@@ -23,9 +23,6 @@ interface Device {
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
-interface ChannelDev {
-  channel_id: Database['public']['Tables']['channels']['Row'] & Channel
-}
 
 interface Stat {
   version: {
@@ -49,7 +46,7 @@ const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
 const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row'] & Device>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
-const channelDevice = ref<Database['public']['Tables']['channel_devices']['Row'] & ChannelDev>()
+const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
 const role = ref<OrganizationRole | null>(null)
 const reloadCount = ref(0)
 
@@ -128,10 +125,9 @@ async function getChannelOverride() {
       console.error('getChannelOverride', error)
       return
     }
-    channelDevice.value = (data || undefined) as Database['public']['Tables']['channel_devices']['Row'] & ChannelDev
+    channelDevice.value = data.channel_id as any as Database['public']['Tables']['channels']['Row']
   }
-  catch (error) {
-    console.error(error)
+  catch {
     channelDevice.value = undefined
   }
 }
@@ -165,8 +161,7 @@ async function getDeviceOverride() {
       overwriteVersion.version = dataVersion! as any as typeof overwriteVersion.version
     deviceOverride.value = overwriteVersion
   }
-  catch (error) {
-    console.error(error)
+  catch {
     deviceOverride.value = undefined
   }
 }
@@ -401,13 +396,7 @@ watchEffect(async () => {
     displayStore.defaultBack = `/app/package/${route.params.p}/devices`
   }
 })
-function guardUpdate(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
-    toast.error(t('no-permission'))
-    event.preventDefault()
-    return false
-  }
-}
+
 function openVersion() {
   if (packageId.value && deviceOverride.value?.version?.id)
     router.push(`/app/p/${appIdToUrl(packageId.value)}/bundle/${deviceOverride.value.version.id}`)
@@ -434,8 +423,8 @@ function openChannel() {
           <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
           <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click.self="openVersion()">
-            <select id="selectableDisallow" :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="updateVersionOverride">
+          <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click="openVersion()">
+            <select :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateVersionOverride">
               <option value="none">
                 {{ t('none') }}
               </option>
@@ -444,9 +433,8 @@ function openChannel() {
               </option>
             </select>
           </InfoRow>
-          <!-- TODO: fix channel override -->
-          <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.channel_id.name || ''" @click.self="openChannel()">
-            <select id="selectableDisallow" :value="channelDevice?.channel_id?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="updateChannelOverride">
+          <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name || ''" @click="openChannel()">
+            <select :value="channelDevice?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateChannelOverride">
               <option value="none">
                 {{ t('none') }}
               </option>
