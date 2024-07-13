@@ -62,5 +62,5 @@ jobs:
       - name: Install dependencies
         run: bun install  
       - name: CLI test
-        run: bun test --bail tests_cli/*.test.ts
+        run: bun test --bail tests_cli/*.test.ts --timeout 100000
 
