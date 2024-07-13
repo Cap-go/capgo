@@ -362,7 +362,7 @@ async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType)
       channel_id: noAccessId,
       device_id: baseData.device_id,
       owner_org: ownerOrg,
-    })
+    }, { onConflict: 'device_id' })
 
   assert (error === null, `Error while inserting channel_device: ${error}`)
 
@@ -424,7 +424,7 @@ async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseTy
       channel_id: productionId,
       device_id: baseData.device_id,
       owner_org: ownerOrg,
-    })
+    }, { onConflict: 'device_id' })
 
   assert (error === null, `Error while inserting channel_device: ${error}`)
 
@@ -483,7 +483,7 @@ async function testPostWithDefaultChannel(backendBaseUrl: URL, supabase: Supabas
         channel_id: noAccessData!.id,
         device_id: baseData.device_id,
         owner_org: noAccessData!.owner_org,
-      })
+      }, { onConflict: 'device_id' })
 
     assert(overwriteUpsertError === null, `Error while inserting channel_device: ${overwriteUpsertError}`)
 

@@ -111,8 +111,10 @@ async function getChannelOverride() {
         app_id,
         channel_id (
           name,
+          id,
           version (
-            name
+            name,
+            id
           )
         ),
         created_at,
@@ -329,9 +331,7 @@ async function upsertDevChannel(device: string, channelId: number) {
       channel_id: channelId,
       app_id: packageId.value,
       owner_org: currentGid,
-    }, { onConflict: 'app_id, device_id' })
-    .eq('app_id', packageId.value)
-    .eq('device_id', device)
+    }, { onConflict: ' device_id' })
     .throwOnError()
 
   // .upsert(update, { onConflict: 'app_id, name' })
@@ -445,7 +445,7 @@ function openChannel() {
             </select>
           </InfoRow>
           <!-- TODO: fix channel override -->
-          <InfoRow :is-link="true" class="hidden" :label="t('channel-link')" :value="channelDevice?.channel_id.name || ''" @click.self="openChannel()">
+          <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.channel_id.name || ''" @click.self="openChannel()">
             <select id="selectableDisallow" :value="channelDevice?.channel_id?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardUpdate" @change="updateChannelOverride">
               <option value="none">
                 {{ t('none') }}
