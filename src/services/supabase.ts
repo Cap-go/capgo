@@ -267,10 +267,10 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
 export interface VersionName {
   id: number
   name: string
-  created_at: string | null
+  created_at: string
 }
 
-export async function getVersionNames(appId: string, versionIds: string[]): Promise<VersionName[]> {
+export async function getVersionNames(appId: string, versionIds: number[]): Promise<VersionName[]> {
   const { data, error: vError } = await useSupabase()
     .from('app_versions')
     .select('id, name, created_at')
@@ -280,7 +280,7 @@ export async function getVersionNames(appId: string, versionIds: string[]): Prom
   if (vError)
     return []
 
-  return data
+  return data as VersionName[]
 }
 
 export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<appUsageByVersion[]> {
