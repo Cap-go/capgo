@@ -1234,36 +1234,39 @@ $$;
 
 ALTER FUNCTION "public"."get_user_main_org_id_by_app_id"("app_id" "text") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_weekly_stats"("app_id" character varying) RETURNS TABLE("all_updates" bigint, "failed_updates" bigint, "open_app" bigint)
-    LANGUAGE "plpgsql"
-    AS $$
-Declare
-  seven_days_ago DATE;
-  all_updates bigint;
-  failed_updates bigint;
-Begin
-  seven_days_ago := CURRENT_DATE - INTERVAL '7 days';
-  
-  SELECT COALESCE(SUM(install), 0)
-  INTO all_updates
-  FROM public.daily_version
-  WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
-  AND app_id = get_weekly_stats.app_id;
+CREATE
+OR REPLACE FUNCTION public.get_weekly_stats (app_id CHARACTER VARYING) RETURNS TABLE (
+  all_updates BIGINT,
+  failed_updates BIGINT,
+  open_app BIGINT
+) LANGUAGE plpgsql AS $$
+DECLARE
+    seven_days_ago DATE;
+    all_updates bigint;
+    failed_updates bigint;
+BEGIN
+    seven_days_ago := CURRENT_DATE - INTERVAL '7 days';
 
-  SELECT COALESCE(SUM(fail), 0)
-  INTO failed_updates
-  FROM public.daily_version
-  WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
-  AND app_id = get_weekly_stats.app_id;
+    SELECT COALESCE(SUM(install), 0)
+    INTO all_updates
+    FROM public.daily_version
+    WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
+    AND public.daily_version.app_id = get_weekly_stats.app_id;
 
-  SELECT COALESCE(SUM(get), 0)
-  INTO open_app
-  FROM public.daily_version
-  WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
-  AND app_id = get_weekly_stats.app_id;
+    SELECT COALESCE(SUM(fail), 0)
+    INTO failed_updates
+    FROM public.daily_version
+    WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
+    AND public.daily_version.app_id = get_weekly_stats.app_id;
 
-  RETURN query (select all_updates, failed_updates, open_app);
-End;
+    SELECT COALESCE(SUM(get), 0)
+    INTO open_app
+    FROM public.daily_version
+    WHERE date BETWEEN seven_days_ago AND CURRENT_DATE
+    AND public.daily_version.app_id = get_weekly_stats.app_id;
+
+    RETURN QUERY SELECT all_updates, failed_updates, open_app;
+END;
 $$;
 
 ALTER FUNCTION "public"."get_weekly_stats"("app_id" character varying) OWNER TO "postgres";
