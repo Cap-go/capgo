@@ -471,6 +471,7 @@ onMounted(async () => {
           </p>
           <div class="md:ml-6">
             <button
+              type="button"
               class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
               :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
               @click="handleMfa"
@@ -484,7 +485,7 @@ onMounted(async () => {
             {{ t('account-id') }}:
           </p>
           <div class="md:ml-6">
-            <button class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
+            <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
               {{ t('copy-account-id') }}
             </button>
           </div>
@@ -497,7 +498,7 @@ onMounted(async () => {
       <footer>
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
+            <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
               {{ t('delete-account') }}
             </button>
             <button
