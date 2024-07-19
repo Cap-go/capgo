@@ -344,6 +344,7 @@ register-next: Register
 reload: Reload
 removed-apikey: API key has been successfully deleted
 resend: Resend
+resend-confirm: Resend confirmation email
 resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-your-password: Reset your password

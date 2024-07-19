@@ -260,14 +260,6 @@ onMounted(checkLogin)
                 />
 
                 <div>
-                  <div class="flex items-center justify-between">
-                    <router-link
-                      to="/forgot_password"
-                      class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
-                    >
-                      {{ t('forgot') }} {{ t('password') }} ?
-                    </router-link>
-                  </div>
                   <FormKit
                     id="passwordInput" type="password" :placeholder="t('password')"
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
@@ -297,25 +289,33 @@ onMounted(checkLogin)
                 </div>
 
                 <div class="text-center">
-                  <p class="text-base text-gray-600">
-                    {{ t('dont-have-an-account') }} <br> <router-link
-                      to="/register"
-                      class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
-                    >
-                      {{ t('create-a-free-accoun') }}
-                    </router-link>
-                  </p>
-                  <p class="text-base text-gray-600">
-                    {{ t('did-not-recive-confirm-email') }} <br> <router-link
-                      to="/resend_email"
-                      class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
-                    >
-                      {{ t('resend') }}
-                    </router-link>
-                  </p>
                   <p class="pt-2 text-gray-300">
                     {{ version }}
                   </p>
+                  <div class="">
+                    <router-link
+                      to="/resend_email"
+                      class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
+                    >
+                      {{ t('resend-confirm') }}
+                    </router-link>
+                  </div>
+                  <div class="">
+                    <router-link
+                      to="/register"
+                      class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
+                    >
+                      {{ t('create-a-free-accoun') }}
+                    </router-link>
+                  </div>
+                  <div class="">
+                    <router-link
+                      to="/forgot_password"
+                      class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
+                    >
+                      {{ t('forgot') }} {{ t('password') }} ?
+                    </router-link>
+                  </div>
                 </div>
               </div>
             </FormKit>

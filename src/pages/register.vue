@@ -86,6 +86,21 @@ async function submit(form: { first_name: string, last_name: string, password: s
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages />
               <div class="space-y-2 text-gray-500 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                <div class="col-span-2">
+                  <FormKit
+                    type="email"
+                    name="email"
+                    :prefix-icon="iconEmail"
+                    autocomplete="email"
+                    inputmode="email"
+                    enterkeyhint="next"
+                    validation="required:trim|email"
+                    :label="t('email')"
+                    :classes="{
+                      outer: '!mb-0',
+                    }"
+                  />
+                </div>
                 <FormKit
                   type="text"
                   name="first_name"
@@ -107,18 +122,6 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   validation="required:trim"
                   enterkeyhint="next"
                 />
-                <div class="col-span-2">
-                  <FormKit
-                    type="email"
-                    name="email"
-                    :prefix-icon="iconEmail"
-                    autocomplete="email"
-                    inputmode="email"
-                    enterkeyhint="next"
-                    validation="required:trim|email"
-                    :label="t('email')"
-                  />
-                </div>
 
                 <FormKit
                   type="password"
@@ -126,7 +129,6 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   :prefix-icon="iconPassword"
                   autocomplete="new-password"
                   :label="t('password')"
-                  :help="t('6-characters-minimum')"
                   validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
                   validation-visibility="live"
                 />
@@ -134,19 +136,12 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   type="password"
                   name="password_confirm"
                   :prefix-icon="iconPassword"
-                  :help="t('confirm-password')"
                   :label="t('confirm-password')"
                   autocomplete="new-password"
                   validation="required|confirm"
                   validation-visibility="live"
                   :validation-label="t('password-confirmatio')"
                 />
-
-                <div class="flex items-center col-span-2">
-                  <span class="text-sm font-medium text-gray-500">
-                    {{ t("password-hint") }}
-                  </span>
-                </div>
 
                 <div class="w-1/2 col-span-2 mx-auto">
                   <button
@@ -161,7 +156,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
 
                 <div class="col-span-2 text-center">
                   <p class="text-base text-gray-600">
-                    <a href="/login" title="" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">{{ t("already-account") }}</a>
+                    <a href="/login" title="" class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline">{{ t("already-account") }}</a>
                   </p>
                 </div>
               </div>
