@@ -133,17 +133,11 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         // TODO: find a better trigger for this since there is no more free plan, maybe percent of useage ?
         //   await trackEvent(c, org.management_email, {}, 'user:need_more_time')
         //   console.log('best_plan is free', orgId)
-        //   await logsnag(c).track({
-        //     channel: 'usage',
-        //     event: 'User need more time',
-        //     icon: '⏰',
-        //     user_id: orgId,
-        //     notify: false,
-        //   }).catch()
         // }
         // else
         if (planToInt(best_plan) > planToInt(current_plan)) {
-          const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { current_best_plan: bestPlanKey }, orgId, orgId, '0 0 * * 1', 'red')
+          await trackEvent(c, org.management_email, { current_best_plan: bestPlanKey }, `user:upgrade_to_${bestPlanKey}`)
+          const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { current_best_plan: bestPlanKey }, orgId, orgId, '0 0 * * 1')
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
             console.log(`user:upgrade_to_${bestPlanKey}`, orgId)
@@ -160,19 +154,13 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     }
     else if (!is_onboarded && is_onboarding_needed) {
       await trackEvent(c, org.management_email, {}, 'user:need_onboarding')
-      await logsnag(c).track({
-        channel: 'usage',
-        event: 'User need onboarding',
-        icon: '🥲',
-        user_id: orgId,
-        notify: false,
-      }).catch()
     }
     else if (is_good_plan && is_onboarded) {
       // check if user is at more than 90%, 50% or 70% of plan usage
       if (percentUsage.total_percent >= 90) {
+        await trackEvent(c, org.management_email, { current_percent: percentUsage }, 'user:90_percent_of_plan')
         // cron every month * * * * 1
-        const sent = await sendNotifOrg(c, 'user:90_percent_of_plan', { current_percent: percentUsage }, orgId, orgId, '0 0 1 * *', 'red')
+        const sent = await sendNotifOrg(c, 'user:90_percent_of_plan', { current_percent: percentUsage }, orgId, orgId, '0 0 1 * *')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:90_percent_of_plan', 'red')
           await logsnag(c).track({
@@ -185,8 +173,9 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         }
       }
       else if (percentUsage.total_percent >= 70) {
+        await trackEvent(c, org.management_email, { current_percent: percentUsage }, 'user:70_percent_of_plan')
         // cron every month * * * * 1
-        const sent = await sendNotifOrg(c, 'user:70_percent_of_plan', { current_percent: percentUsage }, orgId, orgId, '0 0 1 * *', 'orange')
+        const sent = await sendNotifOrg(c, 'user:70_percent_of_plan', { current_percent: percentUsage }, orgId, orgId, '0 0 1 * *')
         if (sent) {
           // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
           await logsnag(c).track({
@@ -199,7 +188,8 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         }
       }
       else if (percentUsage.total_percent >= 50) {
-        const sent = await sendNotifOrg(c, 'user:50_percent_of_plan', { current_percent: percentUsage }, orgId, orgId, '0 0 1 * *', 'orange')
+        await trackEvent(c, org.management_email, { current_percent: percentUsage }, 'user:50_percent_of_plan')
+        const sent = await sendNotifOrg(c, 'user:50_percent_of_plan', { current_percent: percentUsage }, orgId, orgId, '0 0 1 * *')
         if (sent) {
         // await addEventPerson(user.email, {}, 'user:70_percent_of_plan', 'orange')
           await logsnag(c).track({

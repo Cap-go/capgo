@@ -4,8 +4,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { addContact, trackEvent } from '../utils/plunk.ts'
-import { logsnag } from '../utils/logsnag.ts'
+import { addContact, trackEvent } from '../utils/tracking.ts'
 
 export const app = new Hono()
 
@@ -26,6 +25,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     await Promise.all([
       createApiKey(c, record.id),
       addContact(c, record.email, {
+        user_id: record.id,
         first_name: record.first_name || '',
         last_name: record.last_name || '',
         nickname: `${record.first_name || ''} ${record.last_name || ''}`,
@@ -35,21 +35,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     console.log('createCustomer stripe')
     if (record.customer_id)
       return c.json(BRES)
-    const LogSnag = logsnag(c)
-    await Promise.all([
-      trackEvent(c, record.email, {
-        first_name: record.first_name || '',
-        last_name: record.last_name || '',
-        nickname: `${record.first_name || ''} ${record.last_name || ''}`,
-      }, 'user:register'),
-      LogSnag.track({
-        channel: 'user-register',
-        event: 'User Joined',
-        icon: '🎉',
-        user_id: record.id,
-        notify: true,
-      }),
-    ])
+    await trackEvent(c, record.email, {
+      first_name: record.first_name || '',
+      last_name: record.last_name || '',
+      nickname: `${record.first_name || ''} ${record.last_name || ''}`,
+    }, 'user:register')
     return c.json(BRES)
   }
   catch (e) {

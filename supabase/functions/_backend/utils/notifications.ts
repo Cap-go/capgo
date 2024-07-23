@@ -4,19 +4,9 @@ import type { Context } from '@hono/hono'
 import dayjs from 'dayjs'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { trackEvent } from './plunk.ts'
 
-interface EventData {
-  [key: string]: any
-}
-
-async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
-  console.log('send notif', eventName, email, color)
-  const res = await trackEvent(c, email, eventData, eventName)
-  if (!res) {
-    console.log('trackEvent failed', eventName, email, eventData)
-    return
-  }
+export async function sendNow(c: Context, eventName: string, email: string, orgId: string, uniqId: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
+  console.log('send notif', eventName, email)
   if (past != null) {
     const { error } = await supabaseAdmin(c)
       .from('notifications')
@@ -62,7 +52,27 @@ function isSendable(last: string, cron: string) {
   // return false
 }
 
-export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, color: string) {
+export async function canSendNotifOrg(c: Context, eventName: string, orgId: string, uniqId: string, cron: string) {
+  // check if notif has already been send in notifications table
+  const { data: notif } = await supabaseAdmin(c)
+    .from('notifications')
+    .select()
+    .eq('owner_org', orgId)
+    .eq('event', eventName)
+    .eq('uniq_id', uniqId)
+    .single()
+  // set user data in crisp
+  if (!notif) {
+    return true
+  }
+
+  if (notif && !isSendable(notif.last_send_at, cron)) {
+    return false
+  }
+  return true
+}
+
+export async function sendNotifOrg(c: Context, eventName: string, orgId: string, uniqId: string, cron: string) {
   const { data: org, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
     .select()
@@ -84,7 +94,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   // set user data in crisp
   if (!notif) {
     console.log('notif never sent', eventName, uniqId)
-    return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, color, null).then(() => true)
+    return sendNow(c, eventName, org.management_email, orgId, uniqId, null).then(() => true)
   }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
@@ -92,7 +102,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     return Promise.resolve(false)
   }
   console.log('notif ready to sent', eventName, orgId)
-  return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, color, notif).then(() => true)
+  return sendNow(c, eventName, org.management_email, orgId, uniqId, notif).then(() => true)
 }
 
 // dayjs substract one week

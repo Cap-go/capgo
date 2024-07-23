@@ -23,12 +23,12 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import type { AppStats } from '../utils/types.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
+import { trackEvent } from '../utils/tracking.ts'
 
 const failActions = [
   'set_fail',
@@ -183,20 +183,9 @@ async function post(c: Context, body: AppStats) {
           current_device_id: device_id,
           current_version_id: appVersion.id,
           current_app_id_url: appIdToUrl(app_id),
-        }, appVersion.owner_org, app_id, '0 0 * * 1', 'orange')
+        }, appVersion.owner_org, app_id, '0 0 * * 1')
         if (sent) {
-          await logsnag(c).track({
-            channel: 'updates',
-            event: 'update fail',
-            icon: '⚠️',
-            user_id: appVersion.owner_org ?? undefined,
-            tags: {
-              app_id,
-              device_id,
-              version_id: appVersion.id,
-            },
-            notify: false,
-          }).catch()
+          await trackEvent(c, appVersion.owner_org, { app_id, device_id, version_id: appVersion.id }, 'user:update_fail')
         }
       }
     }

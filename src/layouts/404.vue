@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { openMessenger } from '~/services/chatwoot'
+import { openMessenger } from '~/services/bento'
 </script>
 
 <template>

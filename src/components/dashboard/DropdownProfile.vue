@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
-import { openMessenger } from '~/services/chatwoot'
+import { openMessenger } from '~/services/bento'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
 const { t } = useI18n()

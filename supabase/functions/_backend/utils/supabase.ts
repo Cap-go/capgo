@@ -5,8 +5,8 @@ import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Person, Segments } from './plunk.ts'
-import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
+import { trackEvent } from './tracking.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -489,9 +489,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     .eq('stripe_id', customer.id)
     .single()
   const segment = await customerToSegmentOrg(c, org.id, soloPlan.name, plan)
-  await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
-    console.log('updatePerson error', e)
-  })
+  await trackEvent(c, org.management_email, { ...person, ...segment }, 'user:add_stripe')
   console.log('stripe_info done')
 }
 

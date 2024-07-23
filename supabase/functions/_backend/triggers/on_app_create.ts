@@ -4,6 +4,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { trackEvent } from '../utils/tracking.ts'
 
 export const app = new Hono()
 
@@ -27,15 +28,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     }
 
-    const LogSnag = logsnag(c)
-    LogSnag.track({
-      channel: 'app-created',
-      event: 'App Created',
-      icon: '🎉',
-      user_id: record.owner_org,
-      notify: true,
-    })
-
+    await trackEvent(c, record.owner_org, { app_id: record.app_id }, 'user:app_create')
     return c.json(BRES)
   }
   catch (e) {

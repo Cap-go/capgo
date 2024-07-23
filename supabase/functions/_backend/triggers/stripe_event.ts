@@ -2,8 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import type { Person } from '../utils/plunk.ts'
-import { addDataContact, trackEvent } from '../utils/plunk.ts'
-import { logsnag } from '../utils/logsnag.ts'
+import { trackEvent } from '../utils/tracking.ts'
 import { removeOldSubscription } from '../utils/stripe.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -12,7 +11,6 @@ export const app = new Hono()
 
 app.post('/', async (c: Context) => {
   try {
-    const LogSnag = logsnag(c)
     if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no secret found' }, 400)
 
@@ -58,9 +56,8 @@ app.post('/', async (c: Context) => {
       price_id: stripeData.price_id || '',
       product_id: stripeData.product_id,
     }
-    await addDataContact(c, org.management_email, userData)
+    await trackEvent(c, org.management_email, userData, 'user:stripe_update')
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
-      const status = stripeData.status
       stripeData.status = 'succeeded'
       const { data: plan } = await supabaseAdmin(c)
         .from('plans')
@@ -72,8 +69,9 @@ app.post('/', async (c: Context) => {
           .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
-        if (customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
-          await removeOldSubscription(c, customer.subscription_id)
+        const upgrade = customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id
+        if (upgrade)
+          await removeOldSubscription(c, customer.subscription_id || '')
 
         if (dbError2)
           return c.json({ error: JSON.stringify(dbError) }, 500)
@@ -81,20 +79,11 @@ app.post('/', async (c: Context) => {
         const isMonthly = plan.price_m_id === stripeData.price_id
         const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id, plan)
         const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
-        await addDataContact(c, org.management_email, userData, segment)
+        await trackEvent(c, org.management_email, { ...userData, ...segment }, upgrade ? 'user:upgrade' : 'user:subcribe')
         await trackEvent(c, org.management_email, { plan: plan.name }, eventName)
-        await trackEvent(c, org.management_email, {}, 'user:upgrade')
-        await LogSnag.track({
-          channel: 'usage',
-          event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
-          icon: '💰',
-          user_id: org.id,
-          notify: status === 'succeeded',
-        }).catch()
       }
       else {
-        const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id)
-        await addDataContact(c, org.management_email, userData, segment)
+        console.error('no plan found', stripeData)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
@@ -102,15 +91,7 @@ app.post('/', async (c: Context) => {
         const statusCopy = stripeData.status
         stripeData.status = 'succeeded'
         const segment = await customerToSegmentOrg(c, org.id, 'canceled')
-        await addDataContact(c, org.management_email, userData, segment)
-        await trackEvent(c, org.management_email, {}, 'user:cancel')
-        await LogSnag.track({
-          channel: 'usage',
-          event: 'User cancel',
-          icon: '⚠️',
-          user_id: org.id,
-          notify: true,
-        }).catch()
+        await trackEvent(c, org.management_email, { ...userData, ...segment }, 'user:cancel')
         stripeData.status = statusCopy
       }
       stripeData.is_good_plan = false
@@ -123,7 +104,7 @@ app.post('/', async (c: Context) => {
     }
     else {
       const segment = await customerToSegmentOrg(c, org.id, 'canceled')
-      await addDataContact(c, org.management_email, userData, segment)
+      await trackEvent(c, org.management_email, { ...userData, ...segment }, 'user:cancel')
     }
 
     return c.json({ received: true })

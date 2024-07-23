@@ -7,6 +7,7 @@
     "hono/http-exception": "jsr:@hono/hono@^4.4.3/http-exception",
     "hono/adapter": "jsr:@hono/hono@^4.4.3/adapter",
     "hono/utils/buffer": "jsr:@hono/hono@^4.4.3/utils/buffer",
+    "@bentonow/bento-node-sdk": "https://esm.sh/@bentonow/bento-node-sdk@1.0.0?target=deno",
     "stripe": "npm:stripe@15.8.0",
     "zod": "https://esm.sh/zod@3.23.8?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.11?target=deno",

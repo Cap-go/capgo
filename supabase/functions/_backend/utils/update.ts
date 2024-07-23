@@ -8,13 +8,13 @@ import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { getBundleUrl } from './downloadUrl.ts'
-import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
 import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 import { saveStoreInfoCF } from './cloudflare.ts'
+import { trackEvent } from './tracking.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
@@ -234,7 +234,6 @@ async function getAppOwnerPostgres(
 }
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient>) {
-  const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body, new Date().toISOString())
@@ -282,15 +281,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, app_id, '0 0 * * 1')
       if (sent) {
-        await LogSnag.track({
-          channel: 'updates',
-          event: 'semver issue',
-          icon: '⚠️',
-          user_id: appOwner.owner_org,
-          notify: false,
-        }).catch()
+        await trackEvent(c, appOwner.owner_org, { app_id, device_id, version_id: version_build }, 'user:semver_issue')
       }
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
@@ -304,15 +297,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         current_device_id: device_id,
         current_version_id: version_build,
         current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, app_id, '0 0 * * 1')
       if (sent) {
-        await LogSnag.track({
-          channel: 'updates',
-          event: 'plugin issue',
-          icon: '⚠️',
-          user_id: appOwner.owner_org,
-          notify: false,
-        } as any).catch()
+        await trackEvent(c, appOwner.owner_org, { app_id, device_id, version_id: version_build }, 'user:plugin_issue')
       }
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name

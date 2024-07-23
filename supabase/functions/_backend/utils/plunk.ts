@@ -63,7 +63,7 @@ function convertToString(obj: any): any {
   return convertedObj
 }
 
-export async function trackEvent(c: Context, email: string, data: any, event: string) {
+export async function trackEventPlunk(c: Context, email: string, data: any, event: string) {
   if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/track`
@@ -90,7 +90,7 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
   }
 }
 
-export async function addContact(c: Context, email: string, data: any) {
+export async function addContactPlunk(c: Context, email: string, data: any) {
   if (!hasPlunk(c))
     return
   const url = `${baseUrl()}/v1/contacts`
@@ -121,7 +121,7 @@ export async function addContact(c: Context, email: string, data: any) {
 
 export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
   console.log('addDataContact', email, data, segments)
-  return trackEvent(c, email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
+  return trackEventPlunk(c, email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
 }
 
 export async function sendEmail(c: Context, to: string, subject: string, body: string) {

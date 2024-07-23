@@ -4,7 +4,7 @@ import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-import { logsnag } from '../utils/logsnag.ts'
+import { trackEvent } from '../utils/tracking.ts'
 import { initMultipartUpload } from './multipart.ts'
 
 interface dataUpload {
@@ -81,7 +81,8 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     let response: any
     if (body.version && body.version === 1) {
       console.log(`Multipart upload for ${JSON.stringify(body)}`)
-      const uploadId = await createMultipartRequest(c, filePath, app.owner_org)
+      const uploadId = await createMultipartRequest(c, filePath)
+      await trackEvent(c, app.owner_org, { app_id: app.app_id }, 'user:upload_get_link_multipart')
 
       response = { uploadId, key: filePath, url: getMultipartServerUrl(c, true) }
     }
@@ -93,14 +94,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
         return c.json({ status: 'Error unknow' }, 500)
       }
 
-      const LogSnag = logsnag(c)
-      await LogSnag.track({
-        channel: 'upload-get-link',
-        event: 'Upload via single file',
-        icon: '🏛️',
-        user_id: app.owner_org,
-        notify: false,
-      })
+      await trackEvent(c, app.owner_org, { app_id: app.app_id }, 'user:upload_get_link')
 
       console.log('url', filePath, url)
       response = { url }
@@ -129,7 +123,7 @@ function getMultipartServerUrl(c: Context, external = false) {
   return new URL(raw)
 }
 
-async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
+async function createMultipartRequest(c: Context, path: string): Promise<string | null> {
   const multipart = await initMultipartUpload(c, path)
   if (multipart.error)
     return null
@@ -138,15 +132,5 @@ async function createMultipartRequest(c: Context, path: string, orgid: string): 
     console.error('No upload id (?) for multipart')
     return null
   }
-
-  const LogSnag = logsnag(c)
-  await LogSnag.track({
-    channel: 'upload-get-link',
-    event: 'Upload via multipart',
-    icon: '🏗️',
-    user_id: orgid,
-    notify: false,
-  })
-
   return multipart.uploadId
 }

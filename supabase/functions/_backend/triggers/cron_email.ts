@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { trackEvent } from '../utils/plunk.ts'
+import { trackEvent } from '../utils/tracking.ts'
 
 // This is required propoably due to this https://github.com/supabase/postgrest-js/issues/408
 interface AppWithUser {
