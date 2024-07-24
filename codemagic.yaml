@@ -12,7 +12,7 @@ workflows:
       vars:
         XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
-        APP_STORE_APP_ID: 1555555551 # <-- Put the app id number here. This is found in App Store Connect > App > General > App Information
+        APP_STORE_APP_ID: 1602316563
       node: v20.14.0
       xcode: 15.4
       cocoapods: default
