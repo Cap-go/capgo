@@ -35,7 +35,7 @@ workflows:
       - name: Update dependencies and copy web assets to native project
         script: |
           ~/.bun/bin/bun run mobile
-          bun run sync:ios
+          ~/.bun/bin/bun run sync:ios
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
