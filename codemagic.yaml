@@ -10,7 +10,7 @@ workflows:
         distribution_type: app_store
         bundle_identifier: ee.forgr.capacitorgo
       vars:
-        XCODE_WORKSPACE: ios/App/App.xcworkspace
+        XCODE_WORKSPACE: ios/App.xcworkspace
         XCODE_SCHEME: App
         APP_STORE_APP_ID: 1602316563
       node: v20.14.0
