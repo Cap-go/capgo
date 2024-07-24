@@ -25,7 +25,7 @@ workflows:
     scripts:
       - name: Install bun
         script: |
-          brew install bun
+          curl -fsSL https://bun.sh/install | bash
       - name: Install dependencies
         script: |
           bun install
