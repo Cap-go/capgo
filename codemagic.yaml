@@ -20,8 +20,8 @@ workflows:
       events:
         - tag
       tag_patterns: # Exclude watched tag labels for alpha builds
-        - pattern: '*-alpha.*'
-          include: false
+        - pattern: '!(*-alpha)'
+          include: true
     scripts:
       - name: Install bun
         script: |
