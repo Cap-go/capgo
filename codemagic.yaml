@@ -10,7 +10,7 @@ workflows:
         distribution_type: app_store
         bundle_identifier: ee.forgr.capacitorgo
       vars:
-        XCODE_WORKSPACE: ios/App.xcworkspace
+        XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
         APP_STORE_APP_ID: 1602316563
       node: v20.14.0
@@ -46,7 +46,6 @@ workflows:
           agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
       - name: Build ipa for distribution
         script: |
-          cd $CM_BUILD_DIR/ios/App
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
