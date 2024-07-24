@@ -28,7 +28,7 @@ workflows:
           curl -fsSL https://bun.sh/install | bash
       - name: Install dependencies
         script: |
-          bun install
+          ~/.bun/bin/bun install
       - name: Cocoapods installation
         script: |
           cd ios/App && pod install
