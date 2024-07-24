@@ -34,7 +34,8 @@ workflows:
           cd ios/App && pod install
       - name: Update dependencies and copy web assets to native project
         script: |
-          npx cap sync # <- update native dependencies and copy web assets to native project
+          ~/.bun/bin/bun run mobile
+          bun run sync:ios
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
