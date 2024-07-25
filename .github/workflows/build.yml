@@ -233,8 +233,7 @@ jobs:
             APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
             DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
           with:
-            lane: closed_beta
-            # subdirectory: 'ios'
+            lane: ios beta
         - name: Upload release bundle
           uses: actions/upload-artifact@v3
           with:
