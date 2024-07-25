@@ -31,7 +31,6 @@ end
 platform :ios do
 
   lane :beta do
-    get_certificates
 
     build_app(
       configuration: "Release",
