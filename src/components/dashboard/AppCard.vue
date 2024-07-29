@@ -115,7 +115,7 @@ watchEffect(async () => {
     </td>
     <td class="w-1/5 p-2">
       <button
-        class="flex items-center p-3 mx-auto truncate" @click.stop="openSettngs(app)"
+        class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white" @click.stop="openSettngs(app)"
       >
         <IconSettings class="text-lg" />
       </button>
