@@ -6,6 +6,7 @@ Bandwidth: Bant genişliği
 Current: Akım
 Storage: Depolamak
 ab-testing-progressive-deploy-conflict: AB testi ve aşamalı dağıtım aynı anda etkinleştirilemez
+account: hesap
 account-error: Hesabınız güncellenirken hata oluştu
 account-id: Hesap kimliği
 account-password-error: Hata oluştu, lütfen tekrar deneyin
@@ -25,6 +26,7 @@ add-another-app: uygulamanızı ekleyin
 add-api-key: Yeni API anahtarı başarıyla eklendi
 add-member: Üye ekle
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
+admin: yönetici
 alert-2fa-disable: 2FA'yı devre dışı bırakmak istediğinizi onaylayın
 alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
 alert-add-new-key: Yeni API anahtarı türünü seçin
@@ -63,6 +65,7 @@ best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
 billed-annually-at: Yıllık olarak faturalandırılır
 billed-monthly-at: Aylık olarak faturalandırılır
+billing: faturalandırma
 bulk-upload: toplu yükleme
 bundle: paket
 bundle-deleted: Paket silindi
@@ -153,6 +156,7 @@ created-at: oluşturuldu
 custom: Gelenek
 custom-domain: Özel alan
 custom-id: özel kimlik
+dashboard: Gösterge Paneli
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete: Silmek
@@ -174,8 +178,10 @@ disable-ab-testing: Engelli AB testi
 disable-auto-downgra: Yerel altında otomatik düşürmeyi devre dışı bırak
 disable-progressive-deploy: Aşamalı dağıtım devre dışı bırakıldı
 disableAutoUpdateToMajor: Otomatik güncellemeyi devre dışı bırak
+discord: anlaşmazlık
 discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
+documentation: dokümantasyon
 dont-have-an-account: Hesabınız yok mu?
 download: İndirmek
 email: E-posta
@@ -295,6 +301,7 @@ no-permission: Yetersiz yetkiler
 none: Hiçbiri
 not-found: Bulunamadı
 not-paying-org-usage: Bu kuruluş ödeme yapmıyor, ücretsiz deneme kuruluşu için kullanım gösteremiyor
+notifications: bildirimler
 ok: TAMAM
 old-onboarding-mode: eski işe alım
 one-day-left: Bir gün kaldı
@@ -337,6 +344,7 @@ plan-storage: GB Depolama
 plan-updates: Güncellemeler
 plan-upgrade: aboneler
 plan-whats-included: Neler dahil
+plans: planlar
 plans-super-only: >-
   Yalnızca süper yöneticilerin planları ve faturalandırmayı görüntülemesine izin
   verilir
@@ -361,6 +369,7 @@ register-next: Kayıt olmak
 reload: Tekrar yükle
 removed-apikey: API anahtarı başarıyla silindi
 resend: Tekrar gönder
+resend-confirm: Doğrulama epostasını yeniden gönder
 resend-email: Yeniden Onay E-postası Gönder
 reset-password: Şifreyi yenile
 reset-your-password: şifrenizi sıfırlayın
@@ -397,7 +406,7 @@ terms-of-use: Kullanım Şartları
 tests: testler
 thank-you-for-choosi: Capgo'yu seçtiğiniz için teşekkür ederiz!
 thank-you-for-sub: Capgo'ya abone olduğunuz için teşekkür ederiz
-this-page-will-self-: Bu sayfa kendini yenileyecek
+this-page-will-self-: CLI'ye katılımınızı tamamladıktan sonra bu sayfa kendi kendine yenilenecektir
 to: için
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps-v2: Uygulamalar

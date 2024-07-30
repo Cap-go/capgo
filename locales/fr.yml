@@ -8,6 +8,7 @@ Storage: Stockage
 ab-testing-progressive-deploy-conflict: >-
   Les tests AB et le déploiement progressif ne peuvent pas être activés en même
   temps
+account: compte
 account-error: Erreur lors de la mise à jour de votre compte
 account-id: Identifiant de compte
 account-password-error: Une erreur s'est produite, veuillez réessayer
@@ -31,6 +32,7 @@ add-another-app: Ajoutez votre application
 add-api-key: Nouvelle clé API ajoutée avec succès
 add-member: Ajouter un membre
 add-your-first-app-t: "Ajoutez votre première application à votre compte et poussez les mises à jour\_!"
+admin: administrateur
 alert-2fa-disable: Confirmez que vous souhaitez désactiver 2FA
 alert-accept-inviation: "Acceptez-vous l'invitation à %ORG%\_?"
 alert-add-new-key: Sélectionnez un nouveau type de clé API
@@ -69,6 +71,7 @@ best-plan: Meilleur forfait
 bigger-app-size: Taille d'application plus grande
 billed-annually-at: Facturé annuellement à
 billed-monthly-at: Facturé mensuellement à
+billing: facturation
 bulk-upload: Transfert groupé
 bundle: bundle
 bundle-deleted: Groupe supprimé
@@ -161,6 +164,7 @@ created-at: Créé à
 custom: Coutume
 custom-domain: Domaine personnalisé
 custom-id: Identifiant personnalisé
+dashboard: tableau de bord
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
 delete: Supprimer
@@ -182,8 +186,10 @@ disable-ab-testing: Tests AB désactivés
 disable-auto-downgra: Désactiver la rétrogradation automatique en natif
 disable-progressive-deploy: Déploiement progressif désactivé
 disableAutoUpdateToMajor: Désactiver la mise à jour automatique
+discord: discorde
 discover-module-in-a: Découvrir le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
+documentation: Documentation
 dont-have-an-account: "Vous n'avez pas de compte\_?"
 download: Télécharger
 email: E-mail
@@ -301,6 +307,7 @@ not-found: Pas trouvé
 not-paying-org-usage: >-
   Cette organisation ne paie pas et ne peut pas montrer son utilisation pour une
   organisation de test gratuite.
+notifications: avis
 ok: D'ACCORD
 old-onboarding-mode: ancienne intégration
 one-day-left: Reste un jour
@@ -347,6 +354,7 @@ plan-storage: Go de stockage
 plan-updates: Mises à jour
 plan-upgrade: S'abonner
 plan-whats-included: Ce qui est inclus
+plans: des plans
 plans-super-only: >-
   Seuls les super-administrateurs sont autorisés à consulter les forfaits et la
   facturation.
@@ -375,6 +383,7 @@ register-next: Enregistrer
 reload: Recharger
 removed-apikey: La clé API a été supprimée avec succès
 resend: Renvoyer
+resend-confirm: Renvoyer un courriel de confirmation
 resend-email: Renvoyer l'email de confirmation
 reset-password: réinitialiser le mot de passe
 reset-your-password: réinitialisez votre mot de passe
@@ -409,7 +418,9 @@ terms-of-use: Conditions d'utilisation
 tests: essais
 thank-you-for-choosi: Merci d'avoir choisi Capgo !
 thank-you-for-sub: Merci de vous être abonné à Capgo
-this-page-will-self-: Cette page s'actualisera automatiquement
+this-page-will-self-: >-
+  Cette page s'actualisera automatiquement une fois l'intégration terminée avec
+  la CLI
 to: Au
 to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps-v2: applications

@@ -24,7 +24,6 @@ const router = useRouter()
 function getCurrentTab() {
   // look the path and set the active tab
   const path = router.currentRoute.value.path
-  console.log('path', path)
   if (path.includes('/dashboard/settings/account'))
     return '/dashboard/settings/account'
   else if (path.includes('/dashboard/settings/organization'))

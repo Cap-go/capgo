@@ -8,6 +8,7 @@ Storage: Lagerung
 ab-testing-progressive-deploy-conflict: >-
   AB-Tests und progressive Bereitstellung können nicht gleichzeitig aktiviert
   werden
+account: Konto
 account-error: Fehler beim Aktualisieren Ihres Kontos
 account-id: Konto-ID
 account-password-error: Fehler aufgetreten, bitte versuchen Sie es erneut
@@ -33,6 +34,7 @@ add-member: Mitglied hinzufügen
 add-your-first-app-t: >-
   Fügen Sie Ihrem Konto Ihre erste App hinzu und lassen Sie uns Updates
   veröffentlichen!
+admin: Administrator
 alert-2fa-disable: Bestätigen Sie, dass Sie 2FA deaktivieren möchten
 alert-accept-inviation: Nehmen Sie die Einladung zu %ORG% an?
 alert-add-new-key: Wählen Sie einen neuen API-Schlüsseltyp aus
@@ -71,6 +73,7 @@ best-plan: Bester Plan
 bigger-app-size: Größere App-Größe
 billed-annually-at: Jährliche Abrechnung bei
 billed-monthly-at: Monatliche Abrechnung bei
+billing: Abrechnung
 bulk-upload: Bulk-Upload
 bundle: Bündeln
 bundle-deleted: Bündel gelöscht
@@ -169,6 +172,7 @@ created-at: Hergestellt in
 custom: Brauch
 custom-domain: Benutzerdefinierten Domain
 custom-id: Benutzerdefinierte ID
+dashboard: Armaturenbrett
 defined-as-private: als normal definiert
 defined-as-public: als Standard definiert
 delete: Löschen
@@ -190,8 +194,10 @@ disable-ab-testing: AB-Test deaktiviert
 disable-auto-downgra: Deaktivieren Sie das automatische Downgrade unter native
 disable-progressive-deploy: Progressive Bereitstellung deaktiviert
 disableAutoUpdateToMajor: Deaktivieren Sie die automatische Aktualisierung
+discord: Zwietracht
 discover-module-in-a: Entdecken Sie das Modul in Awesome-capacitor
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!
+documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
 download: Herunterladen
 email: Email
@@ -317,6 +323,7 @@ not-found: Nicht gefunden
 not-paying-org-usage: >-
   Diese Organisation zahlt nicht und kann die Nutzung für eine kostenlose
   Trier-Organisation nicht anzeigen
+notifications: Benachrichtigungen
 ok: OK
 old-onboarding-mode: altes Onboarding
 one-day-left: Ein Tag übrig
@@ -369,6 +376,7 @@ plan-storage: GB Speicher
 plan-updates: Aktualisierung
 plan-upgrade: Abonniert
 plan-whats-included: Was ist inbegriffen
+plans: Pläne
 plans-super-only: Nur Superadministratoren dürfen Pläne und Abrechnungen einsehen
 platform: Plattform
 please-ask-the-user-to-create-account-first: Bitten Sie den Benutzer, zuerst ein Konto zu erstellen
@@ -395,6 +403,7 @@ register-next: Registrieren
 reload: Neu laden
 removed-apikey: Der API-Schlüssel wurde erfolgreich gelöscht
 resend: Erneut senden
+resend-confirm: Bestätigungsmail erneut senden
 resend-email: Bestätigungs-E-Mail erneut senden
 reset-password: Passwort zurücksetzen
 reset-your-password: Setze dein Passwort zurück
@@ -431,7 +440,9 @@ terms-of-use: Nutzungsbedingungen
 tests: Prüfungen
 thank-you-for-choosi: Vielen Dank, dass Sie sich für Capgo entschieden haben!
 thank-you-for-sub: Vielen Dank, dass Sie Capgo abonniert haben
-this-page-will-self-: Diese Seite wird sich selbst aktualisieren
+this-page-will-self-: >-
+  Diese Seite wird automatisch aktualisiert, nachdem Sie das Onboarding mit der
+  CLI abgeschlossen haben
 to: Bis
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps-v2: Apps

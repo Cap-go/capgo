@@ -6,6 +6,7 @@ Bandwidth: 帯域幅
 Current: 現在
 Storage: 保管所
 ab-testing-progressive-deploy-conflict: AB テストとプログレッシブ デプロイを同時に有効にすることはできません
+account: アカウント
 account-error: アカウントの更新中にエラーが発生しました
 account-id: アカウントID
 account-password-error: エラーが発生しました。もう一度お試しください
@@ -25,6 +26,7 @@ add-another-app: アプリを追加する
 add-api-key: 新しい API キーが正常に追加されました
 add-member: メンバーを追加
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
+admin: 管理者
 alert-2fa-disable: 2FA を無効にすることを確認します
 alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
@@ -63,6 +65,7 @@ best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
 billed-annually-at: 毎年請求されます
 billed-monthly-at: 毎月請求されるのは、
+billing: 請求する
 bulk-upload: 一括アップロード
 bundle: バンドル
 bundle-deleted: バンドルを削除しました
@@ -149,6 +152,7 @@ created-at: で作成
 custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
+dashboard: ダッシュボード
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete: 消去
@@ -170,8 +174,10 @@ disable-ab-testing: AB テストの無効化
 disable-auto-downgra: ネイティブでの自動ダウングレードを無効にする
 disable-progressive-deploy: プログレッシブ展開を無効にしました
 disableAutoUpdateToMajor: 自動アップデートを無効にする
+discord: 不和
 discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
+documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
 download: ダウンロード
 email: Eメール
@@ -287,6 +293,7 @@ no-permission: 権限が不十分です
 none: なし
 not-found: 見つかりません
 not-paying-org-usage: この組織は料金を支払っていないため、無料体験組織の使用状況を表示できません
+notifications: 通知
 ok: わかりました
 old-onboarding-mode: 古いオンボーディング
 one-day-left: 残り一日
@@ -327,6 +334,7 @@ plan-storage: GB ストレージ
 plan-updates: アップデート
 plan-upgrade: 購読者
 plan-whats-included: 含まれるもの
+plans: 予定
 plans-super-only: スーパー管理者のみがプランと請求を表示できます
 platform: プラットホーム
 please-ask-the-user-to-create-account-first: 最初にユーザーにアカウントを作成するように依頼してください
@@ -349,6 +357,7 @@ register-next: 登録
 reload: リロード
 removed-apikey: APIキーは正常に削除されました
 resend: 再送信してください
+resend-confirm: 確認メールを再送信
 resend-email: 確認メールを再送してください
 reset-password: パスワードを再設定する
 reset-your-password: あなたのパスワードをリセット
@@ -385,7 +394,7 @@ terms-of-use: 利用規約
 tests: テスト
 thank-you-for-choosi: Capgo をお選びいただきありがとうございます。
 thank-you-for-sub: Capgo をご購読いただきありがとうございます
-this-page-will-self-: このページは自動的に更新されます
+this-page-will-self-: このページは、CLI でのオンボーディングが完了すると自動的に更新されます。
 to: 請求先
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps-v2: アプリ

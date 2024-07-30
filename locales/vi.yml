@@ -6,6 +6,7 @@ Bandwidth: Băng thông
 Current: Hiện hành
 Storage: Kho
 ab-testing-progressive-deploy-conflict: Không thể bật thử nghiệm AB và triển khai lũy tiến cùng lúc
+account: tài khoản
 account-error: Lỗi khi cập nhật tài khoản của bạn
 account-id: Id tài khoản
 account-password-error: Đã xảy ra lỗi, vui lòng thử lại
@@ -29,6 +30,7 @@ add-member: Thêm thành viên
 add-your-first-app-t: >-
   Thêm ứng dụng đầu tiên của bạn vào tài khoản của bạn và hãy đẩy các bản cập
   nhật!
+admin: quản trị viên
 alert-2fa-disable: Xác nhận rằng bạn muốn tắt 2FA
 alert-accept-inviation: Bạn có chấp nhận lời mời tham gia %ORG% không?
 alert-add-new-key: Chọn loại khóa API mới
@@ -67,6 +69,7 @@ best-plan: kế hoạch tốt nhất
 bigger-app-size: Kích thước ứng dụng lớn hơn
 billed-annually-at: Thanh toán hàng năm tại
 billed-monthly-at: Thanh toán hàng tháng tại
+billing: thanh toán
 bulk-upload: Tải lên hàng loạt
 bundle: Bó
 bundle-deleted: Đã xóa gói
@@ -155,6 +158,7 @@ created-at: tạo tại
 custom: Phong tục
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
+dashboard: bảng điều khiển
 defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete: Xóa bỏ
@@ -176,8 +180,10 @@ disable-ab-testing: Kiểm tra AB bị vô hiệu hóa
 disable-auto-downgra: Vô hiệu hóa tự động hạ cấp theo bản địa
 disable-progressive-deploy: Đã tắt triển khai lũy tiến
 disableAutoUpdateToMajor: Tắt tự động cập nhật
+discord: sự bất hòa
 discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá bảng điều khiển của bạn!
+documentation: tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
 download: Tải xuống
 email: E-mail
@@ -299,6 +305,7 @@ not-found: Không tìm thấy
 not-paying-org-usage: >-
   Tổ chức này không thanh toán, không thể hiển thị việc sử dụng tổ chức dùng thử
   miễn phí
+notifications: thông báo
 ok: ĐƯỢC RỒI
 old-onboarding-mode: giới thiệu cũ
 one-day-left: Còn lại một ngày
@@ -339,6 +346,7 @@ plan-storage: Dung lượng GB
 plan-updates: cập nhật
 plan-upgrade: Đăng ký
 plan-whats-included: Bao gồm những gì
+plans: các kế hoạch
 plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem gói và thanh toán
 platform: Nền tảng
 please-ask-the-user-to-create-account-first: Vui lòng yêu cầu người dùng tạo tài khoản trước
@@ -363,6 +371,7 @@ register-next: Đăng ký
 reload: tải lại
 removed-apikey: Khóa API đã được xóa thành công
 resend: Gửi lại
+resend-confirm: Gửi lại email xác nhận
 resend-email: Gửi lại email xác nhận
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
@@ -399,7 +408,7 @@ terms-of-use: Điều khoản sử dụng
 tests: kiểm tra
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 thank-you-for-sub: Cảm ơn bạn đã đăng ký Capgo
-this-page-will-self-: Trang này sẽ tự làm mới
+this-page-will-self-: Trang này sẽ tự làm mới sau khi bạn hoàn tất quá trình làm quen với CLI
 to: ĐẾN
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps-v2: Ứng dụng

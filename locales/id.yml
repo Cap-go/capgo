@@ -6,6 +6,7 @@ Bandwidth: Bandwidth
 Current: Saat ini
 Storage: Penyimpanan
 ab-testing-progressive-deploy-conflict: Pengujian AB dan penerapan progresif tidak dapat diaktifkan secara bersamaan
+account: akun
 account-error: Terjadi kesalahan saat memperbarui akun Anda
 account-id: ID Akun
 account-password-error: Terjadi kesalahan, harap coba lagi
@@ -25,6 +26,7 @@ add-another-app: Tambahkan aplikasi Anda
 add-api-key: Berhasil menambahkan kunci API baru
 add-member: Tambahkan anggota
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
+admin: admin
 alert-2fa-disable: Konfirmasikan bahwa Anda ingin menonaktifkan 2FA
 alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
@@ -63,6 +65,7 @@ best-plan: Rencana terbaik
 bigger-app-size: Ukuran aplikasi lebih besar
 billed-annually-at: Ditagih setiap tahun pada
 billed-monthly-at: Ditagih setiap bulan pada
+billing: penagihan
 bulk-upload: Unggahan massal
 bundle: Bundel
 bundle-deleted: Bundel dihapus
@@ -154,6 +157,7 @@ created-at: Dibuat di
 custom: Kebiasaan
 custom-domain: Domain khusus
 custom-id: ID khusus
+dashboard: dasbor
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete: Menghapus
@@ -175,8 +179,10 @@ disable-ab-testing: Pengujian AB dinonaktifkan
 disable-auto-downgra: Nonaktifkan downgrade otomatis di bawah native
 disable-progressive-deploy: Menonaktifkan penerapan progresif
 disableAutoUpdateToMajor: Nonaktifkan pembaruan otomatis
+discord: perselisihan
 discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
+documentation: dokumentasi
 dont-have-an-account: Belum punya akun?
 download: Unduh
 email: Surel
@@ -300,6 +306,7 @@ not-found: Tidak ditemukan
 not-paying-org-usage: >-
   Organisasi ini tidak membayar, tidak dapat menunjukkan penggunaan untuk
   organisasi uji coba gratis
+notifications: pemberitahuan
 ok: OKE
 old-onboarding-mode: orientasi lama
 one-day-left: Tinggal satu hari
@@ -340,6 +347,7 @@ plan-storage: Penyimpanan GB
 plan-updates: Pembaruan
 plan-upgrade: Berlangganan
 plan-whats-included: Apa yang disertakan
+plans: rencana
 plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan
 platform: Platform
 please-ask-the-user-to-create-account-first: Silakan minta pengguna untuk membuat akun terlebih dahulu
@@ -366,6 +374,7 @@ register-next: Daftar
 reload: Muat ulang
 removed-apikey: Kunci API telah berhasil dihapus
 resend: Kirim ulang
+resend-confirm: Kirim ulang email konfirmasi
 resend-email: Kirim Ulang Email Konfirmasi
 reset-password: Atur Ulang Kata Sandi
 reset-your-password: Mereset password Anda
@@ -402,7 +411,9 @@ terms-of-use: Syarat Penggunaan
 tests: tes
 thank-you-for-choosi: Terima kasih telah memilih Capgo!
 thank-you-for-sub: Terima kasih telah berlangganan Capgo
-this-page-will-self-: Halaman ini akan menyegarkan diri
+this-page-will-self-: >-
+  Halaman ini akan disegarkan sendiri setelah Anda selesai melakukan orientasi
+  dengan CLI
 to: Ke
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps-v2: Aplikasi

@@ -6,6 +6,7 @@ Bandwidth: 대역폭
 Current: 현재의
 Storage: 저장
 ab-testing-progressive-deploy-conflict: AB 테스트와 점진적 배포를 동시에 활성화할 수 없습니다.
+account: 계정
 account-error: 계정을 업데이트하는 동안 오류가 발생했습니다.
 account-id: 계정 ID
 account-password-error: 오류가 발생했습니다. 다시 시도해 주세요.
@@ -25,6 +26,7 @@ add-another-app: 앱 추가
 add-api-key: 새 API 키를 성공적으로 추가했습니다.
 add-member: 회원 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
+admin: 관리자
 alert-2fa-disable: 2FA를 비활성화할지 확인하세요.
 alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
@@ -63,6 +65,7 @@ best-plan: 최고의 계획
 bigger-app-size: 더 큰 앱 크기
 billed-annually-at: '매년 청구 금액:'
 billed-monthly-at: '월별 청구 시간:'
+billing: 청구
 bulk-upload: 대량 업로드
 bundle: 묶음
 bundle-deleted: 번들이 삭제되었습니다.
@@ -149,6 +152,7 @@ created-at: 만든 시간
 custom: 관습
 custom-domain: 맞춤 도메인
 custom-id: 맞춤 ID
+dashboard: 계기반
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete: 삭제
@@ -170,8 +174,10 @@ disable-ab-testing: 장애인 AB 테스트
 disable-auto-downgra: 네이티브에서 자동 다운그레이드 비활성화
 disable-progressive-deploy: 비활성화된 점진적 배포
 disableAutoUpdateToMajor: 자동 업데이트 비활성화
+discord: 불화
 discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
+documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
 download: 다운로드
 email: 이메일
@@ -287,6 +293,7 @@ no-permission: 권한이 부족합니다.
 none: 없음
 not-found: 찾을 수 없음
 not-paying-org-usage: 이 조직은 비용을 지불하지 않으며 무료 평가자 조직의 사용량을 표시할 수 없습니다.
+notifications: 알림
 ok: 좋아요
 old-onboarding-mode: 오래된 온보딩
 one-day-left: 하루 남음
@@ -327,6 +334,7 @@ plan-storage: GB 스토리지
 plan-updates: 업데이트
 plan-upgrade: 구독자
 plan-whats-included: 포함된 것
+plans: 계획
 plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니다.
 platform: 플랫폼
 please-ask-the-user-to-create-account-first: 먼저 사용자에게 계정을 생성하도록 요청하세요.
@@ -349,6 +357,7 @@ register-next: 등록하다
 reload: 새로고침
 removed-apikey: API 키가 삭제되었습니다.
 resend: 재전송
+resend-confirm: 확인 이메일 다시 보내기
 resend-email: 확인 이메일 재전송
 reset-password: 암호를 재설정
 reset-your-password: 비밀번호를 재설정
@@ -385,7 +394,7 @@ terms-of-use: 이용약관
 tests: 테스트
 thank-you-for-choosi: Capgo를 선택해 주셔서 감사합니다!
 thank-you-for-sub: Capgo를 구독해 주셔서 감사합니다.
-this-page-will-self-: 이 페이지는 자동으로 새로고침됩니다.
+this-page-will-self-: CLI 온보딩을 완료하면 이 페이지가 자동으로 새로 고쳐집니다.
 to: To
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps-v2: 앱

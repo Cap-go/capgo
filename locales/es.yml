@@ -8,6 +8,7 @@ Storage: Almacenamiento
 ab-testing-progressive-deploy-conflict: >-
   Las pruebas AB y la implementación progresiva no se pueden habilitar al mismo
   tiempo
+account: cuenta
 account-error: Error al actualizar su cuenta
 account-id: ID de la cuenta
 account-password-error: Ocurrió un error, inténtalo de nuevo
@@ -31,6 +32,7 @@ add-another-app: Agrega tu aplicación
 add-api-key: Se agregó una nueva clave API con éxito
 add-member: Añadir miembro
 add-your-first-app-t: ¡Agregue su primera aplicación a su cuenta y empujemos las actualizaciones!
+admin: administración
 alert-2fa-disable: Confirma que deseas desactivar 2FA
 alert-accept-inviation: ¿Aceptas la invitación a %ORG%?
 alert-add-new-key: Seleccione un nuevo tipo de clave API
@@ -69,6 +71,7 @@ best-plan: mejor plan
 bigger-app-size: Tamaño de aplicación más grande
 billed-annually-at: Facturado anualmente en
 billed-monthly-at: Facturado mensualmente a
+billing: facturación
 bulk-upload: Carga masiva
 bundle: Manojo
 bundle-deleted: Paquete eliminado
@@ -161,6 +164,7 @@ created-at: Creado en
 custom: Costumbre
 custom-domain: Dominio personalizado
 custom-id: Identificación personalizada
+dashboard: panel
 defined-as-private: definido como normal
 defined-as-public: definido como predeterminado
 delete: Borrar
@@ -182,8 +186,10 @@ disable-ab-testing: Pruebas AB deshabilitadas
 disable-auto-downgra: Deshabilitar la degradación automática en nativo
 disable-progressive-deploy: Despliegue progresivo deshabilitado
 disableAutoUpdateToMajor: Deshabilitar la actualización automática
+discord: discordia
 discover-module-in-a: Descubra el módulo en Awesome-capacitor
 discover-your-dashbo: ¡Descubre tu tablero!
+documentation: documentación
 dont-have-an-account: ¿No tienes una cuenta?
 download: Descargar
 email: Correo electrónico
@@ -307,6 +313,7 @@ not-found: Extraviado
 not-paying-org-usage: >-
   Esta organización no paga, no puede mostrar el uso de una organización de
   prueba gratuita
+notifications: notificaciones
 ok: DE ACUERDO
 old-onboarding-mode: incorporación antigua
 one-day-left: Queda un día
@@ -355,6 +362,7 @@ plan-storage: GB de almacenamiento
 plan-updates: Actualizaciones
 plan-upgrade: suscribete
 plan-whats-included: Qué está incluido
+plans: planes
 plans-super-only: Solo los superadministradores pueden ver los planes y la facturación
 platform: Plataforma
 please-ask-the-user-to-create-account-first: Solicite al usuario que primero cree una cuenta.
@@ -379,6 +387,7 @@ register-next: Registro
 reload: Recargar
 removed-apikey: La clave API se ha eliminado correctamente
 resend: Reenviar
+resend-confirm: Reenviar correo electrónico de confirmación
 resend-email: Reenviar Correo Electrónico de Confirmación
 reset-password: Restablecer la contraseña
 reset-your-password: Restablecer su contraseña
@@ -415,7 +424,9 @@ terms-of-use: Condiciones de uso
 tests: pruebas
 thank-you-for-choosi: ¡Gracias por elegir Capgo!
 thank-you-for-sub: Gracias por suscribirte a Capgo
-this-page-will-self-: Esta página se actualizará automáticamente
+this-page-will-self-: >-
+  Esta página se actualizará automáticamente después de que termine de
+  incorporarse a la CLI
 to: Hasta
 to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps-v2: Aplicaciones

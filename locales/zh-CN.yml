@@ -6,6 +6,7 @@ Bandwidth: 带宽
 Current: 当前的
 Storage: 贮存
 ab-testing-progressive-deploy-conflict: AB测试和渐进式部署不能同时启用
+account: 帐户
 account-error: 更新您的帐户时出错
 account-id: 帐户ID
 account-password-error: 发生错误，请重试
@@ -25,6 +26,7 @@ add-another-app: 添加您的应用
 add-api-key: 成功添加新的 API 密钥
 add-member: 添加会员
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
+admin: 行政
 alert-2fa-disable: 确认您要禁用 2FA
 alert-accept-inviation: 您接受%ORG% 的邀请吗？
 alert-add-new-key: 选择新的 API 密钥类型
@@ -63,6 +65,7 @@ best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
 billed-annually-at: 每年计费于
 billed-monthly-at: 每月计费于
+billing: 计费
 bulk-upload: 批量上传
 bundle: 捆
 bundle-deleted: 捆绑包已删除
@@ -149,6 +152,7 @@ created-at: 创建于
 custom: 风俗
 custom-domain: 自定义域
 custom-id: 自定义编号
+dashboard: 仪表板
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete: 删除
@@ -170,8 +174,10 @@ disable-ab-testing: 禁用AB测试
 disable-auto-downgra: 在本机下禁用自动降级
 disable-progressive-deploy: 禁用渐进式部署
 disableAutoUpdateToMajor: 禁用自动更新
+discord: 不和谐
 discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
+documentation: 文档
 dont-have-an-account: 没有帐户？
 download: 下载
 email: 电子邮件
@@ -287,6 +293,7 @@ no-permission: 权限不足
 none: 没有任何
 not-found: 未找到
 not-paying-org-usage: 该组织未付费，无法显示免费试用组织的使用情况
+notifications: 通知
 ok: 好的
 old-onboarding-mode: 旧入职
 one-day-left: 还剩一天
@@ -327,6 +334,7 @@ plan-storage: GB 存储
 plan-updates: 更新
 plan-upgrade: 订阅
 plan-whats-included: 包括什么
+plans: 计划
 plans-super-only: 仅允许超级管理员查看计划和账单
 platform: 平台
 please-ask-the-user-to-create-account-first: 请先要求用户创建帐户
@@ -349,6 +357,7 @@ register-next: 登记
 reload: 重新加载
 removed-apikey: API密钥已成功删除
 resend: 重新发送
+resend-confirm: 重发确认邮件
 resend-email: 重新发送确认邮件
 reset-password: 重设密码
 reset-your-password: 重置你的密码
@@ -385,7 +394,7 @@ terms-of-use: 使用条款
 tests: 测试
 thank-you-for-choosi: 感谢您选择凯普高！
 thank-you-for-sub: 感谢您订阅 Capgo
-this-page-will-self-: 此页面会自动刷新
+this-page-will-self-: 完成 CLI 入门后，此页面将自动刷新
 to: 至
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps-v2: 应用

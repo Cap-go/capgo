@@ -6,6 +6,7 @@ Bandwidth: Przepustowość łącza
 Current: Aktualny
 Storage: Składowanie
 ab-testing-progressive-deploy-conflict: Nie można jednocześnie włączyć testów AB i wdrażania stopniowego
+account: konto
 account-error: Błąd podczas aktualizowania konta
 account-id: ID konta
 account-password-error: Wystąpił błąd, spróbuj ponownie
@@ -27,6 +28,7 @@ add-another-app: Dodaj swoją aplikację
 add-api-key: Pomyślnie dodano nowy klucz API
 add-member: Dodaj członka
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysyłajmy aktualizacje!
+admin: Admin
 alert-2fa-disable: Potwierdź, że chcesz wyłączyć 2FA
 alert-accept-inviation: Czy akceptujesz zaproszenie do %ORG%?
 alert-add-new-key: Wybór typu klucza do wygenerowania
@@ -65,6 +67,7 @@ best-plan: Najlepszy plan
 bigger-app-size: Większy rozmiar aplikacji
 billed-annually-at: Rozliczane co roku o godz
 billed-monthly-at: Rozliczane miesięcznie o godz
+billing: dane do faktury
 bulk-upload: Przesyłanie zbiorcze
 bundle: Pakiet
 bundle-deleted: Pakiet usunięty
@@ -157,6 +160,7 @@ created-at: Utworzono o godz
 custom: Zwyczaj
 custom-domain: Domena niestandardowa
 custom-id: Identyfikator niestandardowy
+dashboard: panel
 defined-as-private: określone jako normalne
 defined-as-public: zdefiniowane jako domyślne
 delete: Usuwać
@@ -178,8 +182,10 @@ disable-ab-testing: Wyłączono testy AB
 disable-auto-downgra: Wyłącz automatyczne obniżanie wersji natywnej
 disable-progressive-deploy: Wyłączono wdrażanie progresywne
 disableAutoUpdateToMajor: Wyłącz automatyczną aktualizację
+discord: niezgoda
 discover-module-in-a: Odkryj moduł w Awesome-capacitor
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
+documentation: dokumentacja
 dont-have-an-account: Nie masz konta?
 download: Pobierać
 email: E-mail
@@ -299,6 +305,7 @@ not-found: Nie znaleziono
 not-paying-org-usage: >-
   Ta organizacja nie płaci, nie może wykazać wykorzystania w przypadku
   organizacji bezpłatnej
+notifications: powiadomienia
 ok: OK
 old-onboarding-mode: stary wstęp
 one-day-left: Został jeden dzień
@@ -343,6 +350,7 @@ plan-storage: GB pamięci
 plan-updates: Aktualizacje
 plan-upgrade: Subskrybenci
 plan-whats-included: Co jest zawarte
+plans: plany
 plans-super-only: Tylko superadministratorzy mogą przeglądać plany i rozliczenia
 platform: Platforma
 please-ask-the-user-to-create-account-first: Najpierw poproś użytkownika o utworzenie konta
@@ -367,6 +375,7 @@ register-next: Rejestr
 reload: Przeładować
 removed-apikey: Klucz API został pomyślnie usunięty
 resend: Ponownie wyślij
+resend-confirm: Wyślij ponownie email potwierdzający
 resend-email: Wyślij ponownie email z potwierdzeniem
 reset-password: Zresetuj hasło
 reset-your-password: Zresetuj swoje hasło
@@ -403,7 +412,9 @@ terms-of-use: Warunki korzystania
 tests: testy
 thank-you-for-choosi: Dziękujemy za wybranie Capgo!
 thank-you-for-sub: Dziękujemy za subskrypcję Capgo
-this-page-will-self-: Ta strona odświeży się samoczynnie
+this-page-will-self-: >-
+  Ta strona odświeży się automatycznie po zakończeniu wdrażania za pomocą
+  interfejsu CLI
 to: do
 to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
 top-apps-v2: Aplikacje

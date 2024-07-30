@@ -6,6 +6,7 @@ Bandwidth: Пропускная способность
 Current: Текущий
 Storage: Хранилище
 ab-testing-progressive-deploy-conflict: AB-тестирование и постепенное развертывание нельзя включить одновременно.
+account: счет
 account-error: Ошибка при обновлении учетной записи
 account-id: Идентификатор аккаунта
 account-password-error: Произошла ошибка, попробуйте еще раз
@@ -29,6 +30,7 @@ add-member: Добавить участников
 add-your-first-app-t: >-
   Добавьте свое первое приложение в свою учетную запись и давайте получать
   обновления!
+admin: администратор
 alert-2fa-disable: Подтвердите, что вы хотите отключить 2FA.
 alert-accept-inviation: Вы принимаете приглашение в %ORG%?
 alert-add-new-key: Выберите новый тип ключа API
@@ -67,6 +69,7 @@ best-plan: Лучший план
 bigger-app-size: Большой размер приложения
 billed-annually-at: Счет выставляется ежегодно в
 billed-monthly-at: Оплата ежемесячно в
+billing: выставление счетов
 bulk-upload: Массовая загрузка
 bundle: Пучок
 bundle-deleted: Группа удалена
@@ -157,6 +160,7 @@ created-at: Создан в
 custom: Обычай
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
+dashboard: панель приборов
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete: Удалить
@@ -178,8 +182,10 @@ disable-ab-testing: Отключено AB-тестирование
 disable-auto-downgra: Отключить автоматическое понижение версии под нативным
 disable-progressive-deploy: Отключено прогрессивное развертывание
 disableAutoUpdateToMajor: Отключить автоматическое обновление
+discord: раздор
 discover-module-in-a: Откройте для себя модуль в Awesome-capacitor
 discover-your-dashbo: Откройте для себя панель инструментов!
+documentation: документация
 dont-have-an-account: У вас нет аккаунта?
 download: Скачать
 email: Электронная почта
@@ -299,6 +305,7 @@ not-found: Не найдено
 not-paying-org-usage: >-
   Эта организация не платит и не может показать использование для организации с
   бесплатной пробной версией.
+notifications: уведомления
 ok: ХОРОШО
 old-onboarding-mode: старый онбординг
 one-day-left: В один прекрасный день покинул
@@ -341,6 +348,7 @@ plan-storage: ГБ хранения
 plan-updates: Обновления
 plan-upgrade: Подписки
 plan-whats-included: Что включено
+plans: планы
 plans-super-only: Только суперадминистраторы могут просматривать планы и платежные данные.
 platform: Платформа
 please-ask-the-user-to-create-account-first: Пожалуйста, попросите пользователя сначала создать учетную запись
@@ -365,6 +373,7 @@ register-next: регистр
 reload: Перезагрузить
 removed-apikey: Ключ API успешно удален
 resend: Повторно отправить
+resend-confirm: Повторно отправить подтверждение по электронной почте
 resend-email: Отправить письмо подтверждения еще раз
 reset-password: Сброс пароля
 reset-your-password: Сбросить пароль
@@ -401,7 +410,9 @@ terms-of-use: Условия эксплуатации
 tests: тесты
 thank-you-for-choosi: Спасибо, что выбрали Капго!
 thank-you-for-sub: Спасибо за подписку на Capgo
-this-page-will-self-: Эта страница будет автоматически обновляться
+this-page-will-self-: >-
+  Эта страница автоматически обновится после завершения регистрации с помощью
+  CLI.
 to: По
 to-open-encrypted-bu: 'Чтобы открыть зашифрованный пакет, используйте команду:'
 top-apps-v2: Программы

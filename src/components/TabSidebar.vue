@@ -38,7 +38,6 @@ watch(props, (p) => {
   }
 })
 onMounted(() => {
-  console.log('onMounted', props.activeTab, router.currentRoute.value.path)
   if (props.activeTab && props.activeTab !== router.currentRoute.value.path) {
     console.log('activeTab', props.activeTab)
     openLink(props.activeTab)
