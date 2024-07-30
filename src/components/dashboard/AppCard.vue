@@ -72,7 +72,7 @@ watchEffect(async () => {
 
 <template>
   <!-- Row -->
-  <tr class="text-gray-500 cursor-pointer md:table-row dark:text-gray-400" @click="openPackage(app.app_id)">
+  <tr class="text-gray-500 cursor-pointer md:table-row dark:text-gray-400 hover:bg-slate-700" @click="openPackage(app.app_id)">
     <td class="table-cell w-1/5 p-2 md:hidden">
       <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3" width="36" height="36">
       <div v-else class="flex items-center justify-center w-8 h-8 border border-black rounded-lg dark:border-white sm:mr-3">
