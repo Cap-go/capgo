@@ -1,5 +1,6 @@
 {
   "imports": {
+    "posthog-node": "https://esm.sh/posthog-node@4.0.1?target=deno",
     "@hono/sentry": "npm:@hono/sentry@1.1.0",
     "@hono/hono": "jsr:@hono/hono@^4.4.3",
     "hono/cors": "jsr:@hono/hono@^4.4.3/cors",

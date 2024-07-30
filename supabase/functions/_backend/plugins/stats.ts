@@ -178,15 +178,7 @@ async function post(c: Context, body: AppStats) {
       else if (failActions.includes(action)) {
         await createStatsVersion(c, appVersion.id, app_id, 'fail')
         console.log('FAIL!')
-        const sent = await sendNotifOrg(c, 'user:update_fail', {
-          current_app_id: app_id,
-          current_device_id: device_id,
-          current_version_id: appVersion.id,
-          current_app_id_url: appIdToUrl(app_id),
-        }, appVersion.owner_org, app_id, '0 0 * * 1')
-        if (sent) {
-          await trackEvent(c, appVersion.owner_org, { app_id, device_id, version_id: appVersion.id }, 'user:update_fail')
-        }
+        await trackEvent(c, appVersion.owner_org, { app_id, device_id, version_id: appVersion.id }, 'user:update_fail')
       }
     }
     else {

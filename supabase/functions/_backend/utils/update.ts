@@ -275,16 +275,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       version_build = coerce.version
     }
     else {
-      // get app owner with app_id
-      const sent = await sendNotifOrg(c, 'user:semver_issue', {
-        current_app_id: app_id,
-        current_device_id: device_id,
-        current_version_id: version_build,
-        current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1')
-      if (sent) {
-        await trackEvent(c, appOwner.owner_org, { app_id, device_id, version_id: version_build }, 'user:semver_issue')
-      }
+      await trackEvent(c, appOwner.owner_org, { app_id, device_id, version_id: version_build }, 'user:semver_issue')
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
@@ -292,15 +283,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     // if plugin_version is < 4 send notif to alert
     if (semver.lt(plugin_version, '5.0.0')) {
-      const sent = await sendNotifOrg(c, 'user:plugin_issue', {
-        current_app_id: app_id,
-        current_device_id: device_id,
-        current_version_id: version_build,
-        current_app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1')
-      if (sent) {
-        await trackEvent(c, appOwner.owner_org, { app_id, device_id, version_id: version_build }, 'user:plugin_issue')
-      }
+      await trackEvent(c, appOwner.owner_org, { app_id, device_id, version_id: version_build }, 'user:plugin_issue')
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {

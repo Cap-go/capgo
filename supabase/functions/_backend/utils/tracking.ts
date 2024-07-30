@@ -4,8 +4,9 @@ import { addContactPlunk, trackEventPlunk } from './plunk.ts'
 import { logsnag } from './logsnag.ts'
 import { canSendNotifOrg, sendNow } from './notifications.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { posthogCapture } from './posthog.ts'
 
-export async function trackEvent(c: Context, orgId: string, data: any, event: string) {
+export async function trackEvent(c: Context, orgId: string, data: any, eventId: string) {
   const snag = logsnag(c)
 
   const { data: org, error: orgError } = await supabaseAdmin(c)
@@ -17,7 +18,7 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
     console.log('org not found', orgId)
     return Promise.resolve(false)
   }
-  switch (event) {
+  switch (eventId) {
     case 'user:subcribe':
       await snag.track({
         channel: 'usage',
@@ -63,27 +64,6 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
         notify: false,
       }).catch()
       break
-    case 'user:semver_issue':
-      if (await canSendNotifOrg(c, event, orgId, data.app_id, '0 0 * * 1')) {
-        await sendNow(c, event, org.management_email, orgId, data.app_id, notif)
-        await snag.track({
-          channel: 'updates',
-          event: 'User semver issue',
-          icon: '💀',
-          user_id: orgId,
-          notify: false,
-        }).catch()
-      }
-      break
-    case 'user:plugin_issue':
-      await snag.track({
-        channel: 'updates',
-        event: 'User plugin issue',
-        icon: '💀',
-        user_id: orgId,
-        notify: false,
-      } as any).catch()
-      break
     case 'user:register':
       await snag.track({
         channel: 'user-register',
@@ -91,16 +71,6 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
         icon: '🎉',
         user_id: orgId,
         notify: true,
-      })
-      break
-    case 'user:update_fail':
-      await snag.track({
-        channel: 'updates',
-        event: 'User update fail',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-        tags: data,
       })
       break
     case 'user:upload_get_link':
@@ -158,68 +128,126 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
         notify: false,
       })
       break
+    case 'user:semver_issue':
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 * * 1')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'updates',
+          event: 'User semver issue',
+          icon: '💀',
+          user_id: orgId,
+          notify: false,
+        }).catch()
+      }
+      break
+    case 'user:plugin_issue':
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 * * 1')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'updates',
+          event: 'User plugin issue',
+          icon: '💀',
+          user_id: orgId,
+          notify: false,
+        } as any).catch()
+      }
+      break
+    case 'user:update_fail':
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 * * 1')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'updates',
+          event: 'User update fail',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+          tags: data,
+        })
+      }
+      break
     case 'user:upgrade_to_team':
-      await snag.track({
-        channel: 'usage',
-        event: 'User upgrade to team',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User upgrade to team',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:upgrade_to_pay_as_you_go':
-      await snag.track({
-        channel: 'usage',
-        event: 'User upgrade to pay as you go',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User upgrade to pay as you go',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:upgrade_to_solo':
-      await snag.track({
-        channel: 'usage',
-        event: 'User upgrade to solo',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User upgrade to solo',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:upgrade_to_maker':
-      await snag.track({
-        channel: 'usage',
-        event: 'User upgrade to maker',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User upgrade to maker',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:70_percent_of_plan':
-      await snag.track({
-        channel: 'usage',
-        event: 'User is at 70% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User is at 70% of plan usage',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:50_percent_of_plan':
-      await snag.track({
-        channel: 'usage',
-        event: 'User is at 50% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User is at 50% of plan usage',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:90_percent_of_plan':
-      await snag.track({
-        channel: 'usage',
-        event: 'User is at 90% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        notify: false,
-      })
+      if (await canSendNotifOrg(c, eventId, orgId, data.app_id, '0 0 1 * *')) {
+        await sendNow(c, eventId, org.management_email, orgId, data.app_id)
+        await snag.track({
+          channel: 'usage',
+          event: 'User is at 90% of plan usage',
+          icon: '⚠️',
+          user_id: orgId,
+          notify: false,
+        })
+      }
       break
     case 'user:need_more_time':
       await snag.track({
@@ -231,15 +259,12 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
       })
       break
   }
-  const res = await trackEventPlunk(c, org.management_email, data, event)
+  const res = await trackEventPlunk(c, org.management_email, data, eventId)
   const bento = initBento(c)
   const res2 = await bento.V1.track({
     email: org.management_email,
-    type: event,
+    type: eventId,
     fields: data,
-    details: {
-      example: true,
-    },
   })
     .then((result) => {
       console.log(result)
@@ -249,6 +274,7 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
       console.error(error)
       return false
     })
+  await posthogCapture(c, eventId, data)
   return res2
 }
 
