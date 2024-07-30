@@ -19,6 +19,7 @@ import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../_backend/private/latency_postres.ts'
 import { app as multipart } from '../_backend/private/multipart.ts'
+import { app as track } from '../_backend/private/track.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -48,5 +49,6 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
 appGlobal.route('/multipart', multipart)
+appGlobal.route('/track', track)
 
 Deno.serve(appGlobal.fetch)

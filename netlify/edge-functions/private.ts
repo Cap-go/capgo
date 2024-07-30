@@ -16,6 +16,8 @@ import { app as stats_priv } from '../../supabase/functions/_backend/private/sta
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../../supabase/functions/_backend/private/latency_postres.ts'
+import { app as multipart } from '../../supabase/functions/_backend/private/multipart.ts'
+import { app as track } from '../../supabase/functions/_backend/private/track.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -42,5 +44,7 @@ appGlobal.route('/upload_link', upload_link)
 appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
+appGlobal.route('/multipart', multipart)
+appGlobal.route('/track', track)
 
 export default handle(appGlobal as any)
