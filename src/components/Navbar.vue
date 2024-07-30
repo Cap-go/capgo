@@ -45,11 +45,11 @@ const { t } = useI18n()
         <!-- Header: Left side -->
         <div class="flex">
           <div v-if="displayStore.NavTitle" class="pr-2">
-            <button class="flex" @click="back()">
+            <button class="flex p-2 rounded hover:bg-slate-600 dark:hover:bg-slate-50 hover:text-white dark:hover:text-slate-500 text-slate-500 dark:text-white" @click="back()">
               <IconBack
-                class="w-6 h-6 fill-current text-slate-500 dark:text-white hover:text-slate-600 dark:hover:text-slate-50"
+                class="w-6 h-6 fill-current"
               />
-              <span class="hidden text-dark md:block dark:text-white">{{ t('button-back') }}</span>
+              <span class="hidden md:block">{{ t('button-back') }}</span>
             </button>
           </div>
           <!-- Hamburger button -->

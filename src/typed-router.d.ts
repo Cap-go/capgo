@@ -38,7 +38,7 @@ declare module 'vue-router/auto-routes' {
     '/dashboard/settings/Notifications': RouteRecordInfo<'/dashboard/settings/Notifications', '/dashboard/settings/Notifications', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/organization/General': RouteRecordInfo<'/dashboard/settings/organization/General', '/dashboard/settings/organization/General', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/organization/Members': RouteRecordInfo<'/dashboard/settings/organization/Members', '/dashboard/settings/organization/Members', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/Plans': RouteRecordInfo<'/dashboard/settings/Plans', '/dashboard/settings/Plans', Record<never, never>, Record<never, never>>,
+    '/dashboard/settings/organization/Plans': RouteRecordInfo<'/dashboard/settings/organization/Plans', '/dashboard/settings/organization/Plans', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/Usage': RouteRecordInfo<'/dashboard/settings/Usage', '/dashboard/settings/Usage', Record<never, never>, Record<never, never>>,
     '/delete_account': RouteRecordInfo<'/delete_account', '/delete_account', Record<never, never>, Record<never, never>>,
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,

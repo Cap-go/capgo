@@ -4,15 +4,15 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m1
     integrations:
-      app_store_connect: codemagic
+      app_store_connect: CodeMagic
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: ee.forgr.capacitor_go
+        bundle_identifier: ee.forgr.capacitorgo
       vars:
         XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
-        APP_STORE_APP_ID: 1555555551 # <-- Put the app id number here. This is found in App Store Connect > App > General > App Information
+        APP_STORE_APP_ID: 1602316563
       node: v20.14.0
       xcode: 15.4
       cocoapods: default
@@ -20,21 +20,22 @@ workflows:
       events:
         - tag
       tag_patterns: # Exclude watched tag labels for alpha builds
-        - pattern: '*-alpha.*'
-          include: false
+        - pattern: '!(*-alpha)'
+          include: true
     scripts:
       - name: Install bun
         script: |
-          brew install bun
+          curl -fsSL https://bun.sh/install | bash
       - name: Install dependencies
         script: |
-          bun install
+          ~/.bun/bin/bun install
       - name: Cocoapods installation
         script: |
           cd ios/App && pod install
       - name: Update dependencies and copy web assets to native project
         script: |
-          npx cap sync # <- update native dependencies and copy web assets to native project
+          ~/.bun/bin/bun run mobile
+          ~/.bun/bin/bun run sync:ios
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
@@ -45,7 +46,6 @@ workflows:
           agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
       - name: Build ipa for distribution
         script: |
-          cd $CM_BUILD_DIR/ios/App
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
@@ -66,8 +66,6 @@ workflows:
         # Configuration related to TestFlight (optional)
         # Note: This action is performed during post-processing.
         submit_to_testflight: true
-        beta_groups: # Specify the names of beta tester groups that will get access to the build once it has passed beta review.
-          - testers
         # Configuration related to App Store (optional)
         # Note: This action is performed during post-processing.
         submit_to_app_store: false

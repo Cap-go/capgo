@@ -91,7 +91,6 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     if (plan.bandwidth_unit)
       features[2] += ` included, then $${plan.bandwidth_unit} per GB`
 
-    features.push('API Access')
     features.push('Dedicated support')
     features.push('Custom Domain')
   }
@@ -234,7 +233,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/dashboard/settings/plans') {
+  if (route.path === '/dashboard/settings/organization/plans') {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
       // toast.success(t('usage-success'))

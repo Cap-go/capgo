@@ -34,7 +34,12 @@ const newRoutes = routes.map((route) => {
 })
 const router = createRouter({
   // TODO: fix this redirect are not working
-  routes: [{ path: '/app', redirect: '/app/home' }, { path: '/', redirect: '/login' }, ...setupLayouts(newRoutes)],
+  routes: [
+    { path: '/app', redirect: '/app/home' },
+    { path: '/', redirect: '/login' },
+    { path: '/dashboard/settings/plans', redirect: '/dashboard/settings/organization/plans' },
+    ...setupLayouts(newRoutes),
+  ],
   history: createWebHistory(import.meta.env.BASE_URL),
 })
 app.use(router)
