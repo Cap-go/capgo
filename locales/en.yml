@@ -330,6 +330,11 @@ plan-updates: Updates
 plan-upgrade: Subscribe
 plan-whats-included: What's included
 plans: plans
+plan-free: Best for MVP and testing
+plan-maker: Best for small business owners
+plan-payasyougo: Best for scalling enterprises
+plan-solo: Best for indies
+plan-team: Best for big business owners
 plans-super-only: Only super admins are allowed to view plans and billing
 platform: Platform
 please-ask-the-user-to-create-account-first: Please ask the user to create account first

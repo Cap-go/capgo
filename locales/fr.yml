@@ -344,13 +344,18 @@ picture-delete-fail: >-
 picture-uploaded: Photo téléchargée avec succès
 plan-bandwidth: Bande passante Go
 plan-desc: Commencez à créer gratuitement, puis ajoutez un plan pour le mettre en ligne.
+plan-free: Idéal pour MVP et les tests
 plan-inactive: Forfait inactif
+plan-maker: Idéal pour les propriétaires de petites entreprises
 plan-page-warn: >-
   L’achat d’un forfait n’affectera pas les organisations dans lesquelles vous
   êtes invité.
 plan-page-warn-2: Apprenez-en davantage.
+plan-payasyougo: Idéal pour les entreprises en pleine croissance
 plan-pricing-plans: Forfaits tarifaires
+plan-solo: Idéal pour les indépendants
 plan-storage: Go de stockage
+plan-team: Idéal pour les propriétaires de grandes entreprises
 plan-updates: Mises à jour
 plan-upgrade: S'abonner
 plan-whats-included: Ce qui est inclus

@@ -338,11 +338,16 @@ picture-delete-fail: Không thể xóa ảnh ứng dụng, vui lòng kiểm tra 
 picture-uploaded: Hình ảnh được tải lên thành công
 plan-bandwidth: Băng thông GB
 plan-desc: Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động.
+plan-free: Tốt nhất cho MVP và thử nghiệm
 plan-inactive: Kế hoạch không hoạt động
+plan-maker: Tốt nhất cho chủ doanh nghiệp nhỏ
 plan-page-warn: Việc mua gói sẽ không ảnh hưởng đến các tổ chức mà bạn được mời tham gia.
 plan-page-warn-2: Tìm hiểu thêm về nó.
+plan-payasyougo: Tốt nhất cho các doanh nghiệp gọi vốn
 plan-pricing-plans: kế hoạch giá
+plan-solo: Tốt nhất cho người độc lập
 plan-storage: Dung lượng GB
+plan-team: Tốt nhất cho các chủ doanh nghiệp lớn
 plan-updates: cập nhật
 plan-upgrade: Đăng ký
 plan-whats-included: Bao gồm những gì

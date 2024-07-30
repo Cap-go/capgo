@@ -340,13 +340,18 @@ picture-delete-fail: Nie można usunąć obrazu aplikacji. Sprawdź dziennik kon
 picture-uploaded: Zdjęcie zostało pomyślnie przesłane
 plan-bandwidth: GB Przepustowość
 plan-desc: Zacznij budować za darmo, a następnie dodaj plan, aby rozpocząć.
+plan-free: Najlepszy dla MVP i testów
 plan-inactive: Plan nieaktywny
+plan-maker: Najlepsze dla właścicieli małych firm
 plan-page-warn: >-
   Zakup planu nie będzie miał wpływu na organizacje, do których zostaniesz
   zaproszony.
 plan-page-warn-2: Dowiedz się więcej na ten temat.
+plan-payasyougo: Najlepszy do skalowania przedsiębiorstw
 plan-pricing-plans: Plany cenowe
+plan-solo: Najlepsze dla indii
 plan-storage: GB pamięci
+plan-team: Najlepsze dla właścicieli dużych firm
 plan-updates: Aktualizacje
 plan-upgrade: Subskrybenci
 plan-whats-included: Co jest zawarte

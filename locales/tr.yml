@@ -336,11 +336,16 @@ plan-bandwidth: GB Bant Genişliği
 plan-desc: >-
   Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
   ekleyin.
+plan-free: MVP ve test için en iyisi
 plan-inactive: Plan etkin değil
+plan-maker: Küçük işletme sahipleri için en iyisi
 plan-page-warn: Plan satın almanız, davet edildiğiniz organizasyonları etkilemeyecektir.
 plan-page-warn-2: Bu konuda daha fazla bilgi edinin.
+plan-payasyougo: İşletmeleri ölçeklendirmek için en iyisi
 plan-pricing-plans: Fiyatlandırma Planları
+plan-solo: Bağımsızlar için en iyisi
 plan-storage: GB Depolama
+plan-team: Büyük işletme sahipleri için en iyisi
 plan-updates: Güncellemeler
 plan-upgrade: aboneler
 plan-whats-included: Neler dahil

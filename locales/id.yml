@@ -339,11 +339,16 @@ picture-delete-fail: Tidak dapat menghapus gambar aplikasi, silakan periksa log 
 picture-uploaded: Gambar berhasil diunggah
 plan-bandwidth: Bandwidth GB
 plan-desc: Mulailah membangun secara gratis, lalu tambahkan rencana untuk ditayangkan.
+plan-free: Terbaik untuk MVP dan pengujian
 plan-inactive: Rencana tidak aktif
+plan-maker: Terbaik untuk pemilik usaha kecil
 plan-page-warn: Membeli paket tidak akan memengaruhi organisasi tempat Anda diundang.
 plan-page-warn-2: Pelajari lebih lanjut tentang hal itu.
+plan-payasyougo: Terbaik untuk menskalakan perusahaan
 plan-pricing-plans: Paket Harga
+plan-solo: Terbaik untuk indie
 plan-storage: Penyimpanan GB
+plan-team: Terbaik untuk pemilik bisnis besar
 plan-updates: Pembaruan
 plan-upgrade: Berlangganan
 plan-whats-included: Apa yang disertakan

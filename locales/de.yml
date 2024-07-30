@@ -366,13 +366,18 @@ plan-bandwidth: GB Bandbreite
 plan-desc: >-
   Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan hinzu,
   um live zu gehen.
+plan-free: Am besten für MVP und Tests geeignet
 plan-inactive: Planen Sie inaktiv
+plan-maker: Am besten für Kleinunternehmer geeignet
 plan-page-warn: >-
   Der Kauf eines Plans hat keine Auswirkungen auf die Organisationen, zu denen
   Sie eingeladen werden.
 plan-page-warn-2: Erfahren Sie mehr darüber.
+plan-payasyougo: Am besten für wachsende Unternehmen geeignet
 plan-pricing-plans: Preispläne
+plan-solo: Am besten für Indies
 plan-storage: GB Speicher
+plan-team: Am besten für Großunternehmer geeignet
 plan-updates: Aktualisierung
 plan-upgrade: Abonniert
 plan-whats-included: Was ist inbegriffen

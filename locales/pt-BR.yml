@@ -338,13 +338,18 @@ picture-delete-fail: Não é possível excluir a imagem do aplicativo. Verifique
 picture-uploaded: Imagem enviada com sucesso
 plan-bandwidth: GB de largura de banda
 plan-desc: Comece a criar gratuitamente e adicione um plano para entrar no ar.
+plan-free: Melhor para MVP e testes
 plan-inactive: Plano inativo
+plan-maker: Melhor para proprietários de pequenas empresas
 plan-page-warn: >-
   A compra de um plano não afetará as organizações para as quais você foi
   convidado.
 plan-page-warn-2: Saiba mais sobre isso.
+plan-payasyougo: Melhor para escalar empresas
 plan-pricing-plans: Planos de preços
+plan-solo: Melhor para indies
 plan-storage: GB de armazenamento
+plan-team: Melhor para proprietários de grandes empresas
 plan-updates: Atualizações
 plan-upgrade: Assinaturas
 plan-whats-included: O que está incluído

@@ -91,7 +91,6 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     if (plan.bandwidth_unit)
       features[2] += ` included, then $${plan.bandwidth_unit} per GB`
 
-    features.push('API Access')
     features.push('Dedicated support')
     features.push('Custom Domain')
   }

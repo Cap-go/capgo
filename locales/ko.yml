@@ -326,11 +326,16 @@ picture-delete-fail: 앱 사진을 삭제할 수 없습니다. 콘솔 로그를 
 picture-uploaded: 사진이 성공적으로 업로드되었습니다.
 plan-bandwidth: GB 대역폭
 plan-desc: 무료로 구축을 시작한 다음 실행 계획을 추가하세요.
+plan-free: MVP 및 테스트에 가장 적합
 plan-inactive: 비활성 계획
+plan-maker: 중소기업 소유자에게 가장 적합
 plan-page-warn: 플랜 구매는 귀하가 초대된 조직에 영향을 미치지 않습니다.
 plan-page-warn-2: 그것에 대해 자세히 알아보세요.
+plan-payasyougo: 규모를 키우는 기업에 가장 적합
 plan-pricing-plans: 요금제
+plan-solo: 인디에 가장 적합
 plan-storage: GB 스토리지
+plan-team: 대기업 소유자에게 가장 적합
 plan-updates: 업데이트
 plan-upgrade: 구독자
 plan-whats-included: 포함된 것

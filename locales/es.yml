@@ -354,11 +354,16 @@ plan-bandwidth: Ancho de banda GB
 plan-desc: >-
   Comience a construir de forma gratuita, luego agregue un plan para ponerlo en
   marcha.
+plan-free: Lo mejor para MVP y pruebas
 plan-inactive: Plan inactivo
+plan-maker: Lo mejor para propietarios de pequeñas empresas
 plan-page-warn: Comprar un plan no afectará las organizaciones a las que está invitado.
 plan-page-warn-2: Obtenga más información al respecto.
+plan-payasyougo: Lo mejor para empresas en expansión
 plan-pricing-plans: Planes de precios
+plan-solo: Lo mejor para las indias
 plan-storage: GB de almacenamiento
+plan-team: Lo mejor para propietarios de grandes empresas
 plan-updates: Actualizaciones
 plan-upgrade: suscribete
 plan-whats-included: Qué está incluido
