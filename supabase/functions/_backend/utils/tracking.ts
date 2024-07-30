@@ -231,10 +231,10 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
       })
       break
   }
-  const res = await trackEventPlunk(c, email, data, event)
+  const res = await trackEventPlunk(c, org.management_email, data, event)
   const bento = initBento(c)
   const res2 = await bento.V1.track({
-    email,
+    email: org.management_email,
     type: event,
     fields: data,
     details: {
@@ -251,6 +251,7 @@ export async function trackEvent(c: Context, orgId: string, data: any, event: st
     })
   return res2
 }
+
 export async function addContact(c: Context, email: string, data: any) {
   const res = await addContactPlunk(c, email, data)
   const bento = initBento(c)
@@ -270,5 +271,5 @@ export async function addContact(c: Context, email: string, data: any) {
       console.error(error)
       return false
     })
-  return res2
+  return res
 }
