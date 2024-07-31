@@ -203,7 +203,6 @@ jobs:
         - uses: maierj/fastlane-action@v3.1.0
           env:
             APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
-            DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
           with:
             lane: ios beta
         - name: Upload release bundle
