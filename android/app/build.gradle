@@ -12,7 +12,7 @@ android {
         applicationId "ee.forgr.capacitor_go"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-		versionCode 10601113999
+		versionCode 1060111399
         versionName "10.601.113"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -56,6 +56,6 @@ try {
     if (servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
     }
-} catch(Exception e) {
+} catch(e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
