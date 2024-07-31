@@ -64,9 +64,7 @@ platform :ios do
       use_automatic_signing: false,
       path: "./ios/App/App.xcodeproj",
       code_sign_identity: "iPhone Distribution", # Assuming you're using a distribution certificate
-      provisioning_profile: { 
-        ENV['DEVELOPER_PACKAGE_NAME'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
-      },
+      profile_name: File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision'),
       team_id: ENV['APP_STORE_CONNECT_TEAM_ID']
     )
 
@@ -85,7 +83,7 @@ platform :ios do
       output_name: "App.ipa",
       export_options: {
         provisioningProfiles: {
-          ENV['DEVELOPER_PACKAGE_NAME'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
+          ENV['BUNDLE_IDENTIFIER'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
         }
       }
     )
