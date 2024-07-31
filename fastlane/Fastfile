@@ -8,26 +8,6 @@ KEYSTORE_KEY_PASSWORD = ENV["KEYSTORE_KEY_PASSWORD"]
 KEYSTORE_STORE_PASSWORD = ENV["KEYSTORE_STORE_PASSWORD"]
 ANDROID_JSON_KEY_FILE = ENV['ANDROID_JSON_KEY_FILE']
 
-def delete_temp_keychain(name)
-  delete_keychain(
-    name: name
-  ) if File.exist? File.expand_path("~/Library/Keychains/#{name}-db")
-end
-
-def create_temp_keychain(name, password)
-  create_keychain(
-    name: name,
-    password: password,
-    unlock: false,
-    timeout: 0
-  )
-end
-
-def ensure_temp_keychain(name, password)
-  delete_temp_keychain(name)
-  create_temp_keychain(name, password)
-end
-
 platform :ios do
   desc 'Export ipa and submit to TestFlight'
   lane :beta do
@@ -45,44 +25,38 @@ platform :ios do
       password: keychain_password,
       default_keychain: true,
       unlock: true,
-      timeout: 3600
+      timeout: 21600 # 6 hours
     )
 
-    import_certificates(keychain_name, keychain_password)
-    install_provisioning_profiles
+    import_certificate(keychain_name, keychain_password)
+    install_provisioning_profile
     update_project_settings
   end
 
-  private_lane :import_certificates do |keychain_name, keychain_password|
+  private_lane :import_certificate do |keychain_name, keychain_password|
     import_certificate(
-      certificate_data: ENV['P12_KEY_BASE64'],
-      certificate_password: ENV['CERTIFICATE_PASSWORD'],
-      keychain_name: keychain_name,
-      keychain_password: keychain_password,
-      log_output: true
-    )
-    import_certificate(
-      certificate_data: ENV['P12_CER_BASE64'],
-      certificate_password: ENV['CERTIFICATE_PASSWORD'],
+      certificate_data: ENV['BUILD_CERTIFICATE_BASE64'],
+      certificate_password: ENV['P12_PASSWORD'],
       keychain_name: keychain_name,
       keychain_password: keychain_password,
       log_output: true
     )
   end
 
-  private_lane :install_provisioning_profiles do
-    ENV['MOBILEPROVISION_BASE64'].split(/\R/).each.with_index(1) do |profile, index|
-      filename = "ios-build-#{index}.mobileprovision"
-      File.write(filename, Base64.decode64(profile))
-      install_provisioning_profile(path: filename)
-    end
+  private_lane :install_provisioning_profile do
+    profile_path = "#{Dir.home}/Library/MobileDevice/Provisioning Profiles/build_pp.mobileprovision"
+    File.write(profile_path, Base64.decode64(ENV['BUILD_PROVISION_PROFILE_BASE64']))
+    ENV['PROVISIONING_PROFILE_PATH'] = profile_path
   end
 
   private_lane :update_project_settings do
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "./ios/App/App.xcodeproj",
-      code_sign_identity: ENV['CODE_SIGNING_IDENTITY'],
+      code_sign_identity: "iPhone Distribution", # Assuming you're using a distribution certificate
+      provisioning_profile: { 
+        ENV['DEVELOPER_PACKAGE_NAME'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
+      },
       team_id: ENV['TEAM_ID']
     )
 
@@ -101,7 +75,7 @@ platform :ios do
       output_name: "App.ipa",
       export_options: {
         provisioningProfiles: {
-          ENV['BUNDLE_IDENTIFIER'] => ENV['PROVISIONING_PROFILE_SPECIFIER']
+          ENV['DEVELOPER_PACKAGE_NAME'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
         }
       }
     )
@@ -117,6 +91,7 @@ platform :ios do
     )
   end
 end
+
 
 platform :android do
     desc "Deploy a beta version to the Google Play"
