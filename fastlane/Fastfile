@@ -57,12 +57,12 @@ platform :ios do
       provisioning_profile: { 
         ENV['DEVELOPER_PACKAGE_NAME'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
       },
-      team_id: ENV['TEAM_ID']
+      team_id: ENV['APP_STORE_CONNECT_TEAM_ID']
     )
 
     update_project_team(
       path: "./ios/App/App.xcodeproj",
-      teamid: ENV['TEAM_ID']
+      teamid: ENV['APP_STORE_CONNECT_TEAM_ID']
     )
   end
 
