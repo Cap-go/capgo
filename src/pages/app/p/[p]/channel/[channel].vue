@@ -605,7 +605,7 @@ async function onChangeAutoUpdate(event: Event) {
               @change="enableProgressiveDeploy()"
             />
           </InfoRow>
-          <InfoRow :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
+          <InfoRow v-if="channel?.enable_progressive_deploy" :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
             <div>
               <input v-model="secondaryVersionPercentage" type="range" min="0" max="100" class="range range-info" step="10" @mouseup="onMouseDownSecondaryVersionSlider">
               <div class="w-full px-2 text-xs text-center">
