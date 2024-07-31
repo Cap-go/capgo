@@ -13,7 +13,7 @@ platform :ios do
   lane :beta do
     setup_signing
     build_app_with_signing
-    upload_to_testflight
+    submit_to_testflight
   end
 
   private_lane :setup_signing do
@@ -28,25 +28,35 @@ platform :ios do
       timeout: 21600 # 6 hours
     )
 
-    import_certificate(keychain_name, keychain_password)
-    install_provisioning_profile
+    import_cert(
+      keychain_name: keychain_name,
+      keychain_password: keychain_password
+    )
+    install_profile
     update_project_settings
   end
 
-  private_lane :import_certificate do |keychain_name, keychain_password|
+  private_lane :import_cert do |options|
+    cert_path = "#{Dir.tmpdir}/build_certificate.p12"
+    File.write(cert_path, Base64.decode64(ENV['BUILD_CERTIFICATE_BASE64']))
+
     import_certificate(
-      certificate_data: ENV['BUILD_CERTIFICATE_BASE64'],
+      certificate_path: cert_path,
       certificate_password: ENV['P12_PASSWORD'],
-      keychain_name: keychain_name,
-      keychain_password: keychain_password,
+      keychain_name: options[:keychain_name],
+      keychain_password: options[:keychain_password],
       log_output: true
     )
+
+    File.delete(cert_path) # Clean up the temporary file
   end
 
-  private_lane :install_provisioning_profile do
+  private_lane :install_profile do
     profile_path = "#{Dir.home}/Library/MobileDevice/Provisioning Profiles/build_pp.mobileprovision"
     File.write(profile_path, Base64.decode64(ENV['BUILD_PROVISION_PROFILE_BASE64']))
     ENV['PROVISIONING_PROFILE_PATH'] = profile_path
+    
+    install_provisioning_profile(path: profile_path)
   end
 
   private_lane :update_project_settings do
@@ -81,7 +91,7 @@ platform :ios do
     )
   end
 
-  private_lane :upload_to_testflight do
+  private_lane :submit_to_testflight do
     pilot(
       skip_waiting_for_build_processing: true,
       skip_submission: true,
@@ -91,6 +101,7 @@ platform :ios do
     )
   end
 end
+
 
 
 platform :android do
