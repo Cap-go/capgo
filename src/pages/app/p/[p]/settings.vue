@@ -325,7 +325,7 @@ async function editPhoto() {
       <footer>
         <div class="flex flex-col px-6 py-5 border-t dark:border-slate-200">
           <div class="flex self-end">
-            <button v-if="isSuperAdmin" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteApp()">
+            <button v-if="isSuperAdmin" type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteApp()">
               {{ t('delete-app') }}
             </button>
             <button
