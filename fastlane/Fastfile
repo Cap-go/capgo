@@ -28,19 +28,27 @@ platform :ios do
       timeout: 21600 # 6 hours
     )
 
-    import_cert(keychain_name, keychain_password)
+    import_cert(
+      keychain_name: keychain_name,
+      keychain_password: keychain_password
+    )
     install_profile
     update_project_settings
   end
 
-  private_lane :import_certificate do |keychain_name, keychain_password|
-    import_cert(
-      certificate_data: ENV['BUILD_CERTIFICATE_BASE64'],
+  private_lane :import_cert do |options|
+    cert_path = "#{Dir.tmpdir}/build_certificate.p12"
+    File.write(cert_path, Base64.decode64(ENV['BUILD_CERTIFICATE_BASE64']))
+
+    import_certificate(
+      certificate_path: cert_path,
       certificate_password: ENV['P12_PASSWORD'],
-      keychain_name: keychain_name,
-      keychain_password: keychain_password,
+      keychain_name: options[:keychain_name],
+      keychain_password: options[:keychain_password],
       log_output: true
     )
+
+    File.delete(cert_path) # Clean up the temporary file
   end
 
   private_lane :install_profile do
