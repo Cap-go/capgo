@@ -554,7 +554,7 @@ async function onChangeAutoUpdate(event: Event) {
           <InfoRow :label="t('disable-auto-downgra')">
             <Toggle
               :value="channel?.disable_auto_update_under_native"
-              @change="saveChannelChange('disableAutoUpdateUnderNative', !channel?.disable_auto_update)"
+              @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update)"
             />
           </InfoRow>
           <InfoRow :label="t('disableAutoUpdateToMajor')">
