@@ -11,9 +11,11 @@ ANDROID_JSON_KEY_FILE = ENV['ANDROID_JSON_KEY_FILE']
 platform :ios do
   desc 'Export ipa and submit to TestFlight'
   lane :beta do
-    setup_signing
-    build_app_with_signing
-    submit_to_testflight
+  keychain_name = 'ios-build.keychain'
+  setup_signing
+  build_app_with_signing
+  submit_to_testflight
+  cleanup_keychain(keychain_name: keychain_name)
   end
 
   private_lane :setup_signing do
@@ -39,34 +41,75 @@ platform :ios do
   private_lane :import_cert do |options|
     cert_path = "#{Dir.tmpdir}/build_certificate.p12"
     File.write(cert_path, Base64.decode64(ENV['BUILD_CERTIFICATE_BASE64']))
-
+  
+    keychain_password = options[:keychain_password]
+    keychain_name = options[:keychain_name]
+  
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
+    )
+  
     import_certificate(
       certificate_path: cert_path,
-      keychain_name: options[:keychain_name],
-      keychain_password: options[:keychain_password],
+      certificate_password: ENV['P12_PASSWORD'],
+      keychain_name: keychain_name,
+      keychain_password: keychain_password,
       log_output: true
     )
-
+  
     File.delete(cert_path) # Clean up the temporary file
   end
+  
+  private_lane :cleanup_keychain do |options|
+    delete_keychain(
+      name: options[:keychain_name]
+    ) if File.exist? File.expand_path("~/Library/Keychains/#{options[:keychain_name]}-db")
+  end  
 
   private_lane :install_profile do
     profile_path = "#{Dir.home}/Library/MobileDevice/Provisioning Profiles/build_pp.mobileprovision"
     File.write(profile_path, Base64.decode64(ENV['BUILD_PROVISION_PROFILE_BASE64']))
     ENV['PROVISIONING_PROFILE_PATH'] = profile_path
     
+    UI.message("Provisioning profile installed at: #{profile_path}")
+    UI.message("Provisioning profile decoded content:")
+    UI.message(`security cms -D -i "#{profile_path}"`)
+    
+    UI.message("\nProvisioning profile raw content (readable strings):")
+    UI.message(`cat "#{profile_path}" | strings`)
+    
     install_provisioning_profile(path: profile_path)
   end
 
+  private_lane :verify_team_id do
+    project = Xcodeproj::Project.open("./ios/App/App.xcodeproj")
+    main_target = project.targets.find { |t| t.name == "App" }
+    build_configuration = main_target.build_configurations.first
+    team_id = build_configuration.build_settings['DEVELOPMENT_TEAM']
+    UI.user_error!("Team ID in project (#{team_id}) doesn't match expected team ID (#{ENV['TEAM_ID']})") unless team_id == ENV['TEAM_ID']
+  end  
+
   private_lane :update_project_settings do
+    # profile_name = File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
+    profile_name = "Github action"
+    UI.message("Using profile name: #{profile_name}")
+    UI.message("Using team ID: #{ENV['TEAM_ID']}")
+    UI.message("Using bundle identifier: #{ENV['BUNDLE_IDENTIFIER']}")
+  
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "./ios/App/App.xcodeproj",
-      code_sign_identity: "iPhone Distribution", # Assuming you're using a distribution certificate
-      profile_name: File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision'),
+      code_sign_identity: "iPhone Distribution",
+      profile_name: profile_name,
+      bundle_identifier: ENV['BUNDLE_IDENTIFIER'],
       team_id: ENV['APP_STORE_CONNECT_TEAM_ID']
     )
-
+  
     update_project_team(
       path: "./ios/App/App.xcodeproj",
       teamid: ENV['APP_STORE_CONNECT_TEAM_ID']
@@ -74,6 +117,8 @@ platform :ios do
   end
 
   private_lane :build_app_with_signing do
+    # profile_name = File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
+    profile_name = "Github action"
     build_app(
       workspace: "./ios/App/App.xcworkspace",
       scheme: "App",
@@ -82,11 +127,14 @@ platform :ios do
       output_name: "App.ipa",
       export_options: {
         provisioningProfiles: {
-          ENV['BUNDLE_IDENTIFIER'] => File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
+          ENV['BUNDLE_IDENTIFIER'] => profile_name
         }
-      }
+      },
+      xcargs: "-verbose",
+      buildlog_path: "./build_logs",
+      export_xcargs: "-allowProvisioningUpdates"
     )
-  end
+  end  
 
   private_lane :submit_to_testflight do
     pilot(
