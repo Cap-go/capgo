@@ -227,15 +227,16 @@ jobs:
             cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
         - uses: ruby/setup-ruby@v1
           with:
-            ruby-version: '2.7.2'
-        - uses: maierj/fastlane-action@v2.3.0
+            ruby-version: '3.0'
+            bundler-cache: true
+        - uses: maierj/fastlane-action@v3.1.0
           env:
             APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
             DEVELOPER_PORTAL_TEAM_ID: ${{ secrets.DEVELOPER_PORTAL_TEAM_ID }}
           with:
             lane: ios beta
         - name: Upload release bundle
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: ios-release
             path: ./App.ipa
