@@ -418,12 +418,6 @@ async function openDownload() {
         },
       },
       {
-        text: t('set-bundle'),
-        handler: () => {
-          ASChannelChooser()
-        },
-      },
-      {
         text: t('button-cancel'),
         role: 'cancel',
         handler: () => {
