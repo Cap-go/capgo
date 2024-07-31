@@ -361,6 +361,7 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
     if (role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
       displayStore.dialogOption.buttons.splice(baseIndex + 1, 0, {
         text: t('unlink-channel'),
+        role: 'danger',
         handler: async () => {
           try {
             if (!channel.value)
