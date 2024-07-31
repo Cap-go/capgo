@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { useCors } from '../utils/hono.ts'
+import { middlewareKey, useCors } from '../utils/hono.ts'
 import { trackEvent } from '../utils/tracking.ts'
 
 export const app = new Hono()
@@ -13,13 +13,14 @@ interface dataTrack {
 
 app.use('/', useCors)
 
-app.get('/', async (c: Context) => {
+app.get('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
   try {
     const body = await c.req.json<dataTrack>()
-    await trackEvent(c, body.orgId, body.data, body.event)
+    const orgId = body.orgId
+    await trackEvent(c, orgId, body.data, body.event)
     return c.json({ status: 'ok' })
   }
   catch (e) {
-    return c.json({ status: 'Cannot get config', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot send tracking', error: JSON.stringify(e) }, 500)
   }
 })
