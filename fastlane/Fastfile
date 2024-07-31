@@ -55,6 +55,7 @@ platform :ios do
     profile_path = "#{Dir.home}/Library/MobileDevice/Provisioning Profiles/build_pp.mobileprovision"
     File.write(profile_path, Base64.decode64(ENV['BUILD_PROVISION_PROFILE_BASE64']))
     ENV['PROVISIONING_PROFILE_PATH'] = profile_path
+    
     install_provisioning_profile(path: profile_path)
   end
 
@@ -100,6 +101,7 @@ platform :ios do
     )
   end
 end
+
 
 
 platform :android do
