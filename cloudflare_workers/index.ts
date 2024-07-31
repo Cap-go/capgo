@@ -131,7 +131,8 @@ app.get('/test_sentry', (c) => {
 //     const body = await c.req.json()
 //     if (body.request) {
 //       const requestD1 = c.env.DB_DEVICES
-//         .exec(body.request)
+//         .prepare(body.request)
+//         .all()
 
 //       const res = await requestD1
 //       console.log('test d1 res', res)

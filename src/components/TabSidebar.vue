@@ -30,10 +30,18 @@ watch(props, (p) => {
   const tab = findTab(p.activeTab)
   if (!tab || props.noRoute)
     return
-  if (tab.onClick)
+  if (tab.onClick) {
     tab.onClick(p.activeTab)
-  else
+  }
+  else {
     router.push(tab.key)
+  }
+})
+onMounted(() => {
+  if (props.activeTab && props.activeTab !== router.currentRoute.value.path) {
+    console.log('activeTab', props.activeTab)
+    openLink(props.activeTab)
+  }
 })
 </script>
 
@@ -42,14 +50,14 @@ watch(props, (p) => {
     <!-- Content -->
     <div class="h-full mb-8 bg-white rounded-sm shadow-lg dark:bg-gray-800">
       <div class="flex flex-col h-full md:flex-row md:-mr-px">
-        <div class="hidden px-3 py-6 overflow-x-scroll border-b no-scrollbar min-w-60 flex-nowrap border-slate-200 md:block md:flex md:overflow-auto md:border-b-0 md:border-r md:space-y-3">
+        <div class="hidden px-3 py-6 overflow-x-scroll border-b no-scrollbar min-w-60 flex-nowrap border-slate-200 md:flex md:overflow-auto md:border-b-0 md:border-r md:space-y-3">
           <!-- Group 1 -->
-          <div>
+          <div class="w-full">
             <ul class="flex mr-3 flex-nowrap md:mr-0 md:block">
-              <li v-for="(m, i) in tabs" :key="i" class="mr-0.5 md:mb-0.5 md:mr-0" @click="openLink(m.key)">
-                <button :id="`tab-${m.label}`" class="flex items-center whitespace-nowrap rounded px-2.5 py-2">
-                  <component :is="m.icon" class="w-4 h-4 mr-2 fill-current shrink-0" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }" />
-                  <span class="hidden text-sm font-medium md:block" :class="{ 'text-blue-600': isActive(m.key), 'text-slate-400': !isActive(m.key) }">{{ t(m.label) }}</span>
+              <li v-for="(m, i) in tabs" :key="i" class="mr-0.5 md:mb-0.5 md:mr-0 w-full" @click="openLink(m.key)">
+                <button :id="`tab-${m.label}`" class="flex items-center whitespace-nowrap rounded px-2.5 py-2 hover:bg-gray-400 w-full" :class="{ 'text-blue-600 hover:text-blue-800': isActive(m.key), 'text-slate-400 hover:text-slate-100': !isActive(m.key) }">
+                  <component :is="m.icon" class="w-4 h-4 mr-2 fill-current shrink-0" />
+                  <span class="hidden text-sm font-medium md:block">{{ t(m.label) }}</span>
                 </button>
               </li>
             </ul>

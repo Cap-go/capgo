@@ -2,14 +2,18 @@
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
+import Navbar from '~/components/Navbar.vue'
 import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const route = useRoute()
 const supabase = useSupabase()
 
 const email = route.query.email as string
-
+const displayStore = useDisplayStore()
+displayStore.defaultBack = '/login'
+displayStore.NavTitle = t('activation-heading')
 async function resendEmail() {
   const { error } = await supabase.auth.resend({
     type: 'signup',
@@ -25,7 +29,7 @@ async function resendEmail() {
 
 <template>
   <div>
-    <TitleHead :big="true" :title="t('activation-heading')" />
+    <Navbar />
     <div class="h-screen">
       <div class="flex items-center justify-center w-full h-full px-4 py-5 overflow-y-auto sm:p-6">
         <div class="w-full max-w-sm bg-white shadow-lg rounded-xl">

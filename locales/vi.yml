@@ -4,23 +4,18 @@
 6-characters-minimum: Tối thiểu 6 ký tự, 1 chữ hoa, 1 chữ thường, 1 ký tự đặc biệt
 Bandwidth: Băng thông
 Current: Hiện hành
-Filters: bộ lọc
-Override: Ghi đè
 Storage: Kho
 ab-testing-progressive-deploy-conflict: Không thể bật thử nghiệm AB và triển khai lũy tiến cùng lúc
-account: Tài khoản
+account: tài khoản
 account-error: Lỗi khi cập nhật tài khoản của bạn
 account-id: Id tài khoản
 account-password-error: Đã xảy ra lỗi, vui lòng thử lại
 account-password-heading: Thay đổi mật khẩu của tôi
-account-settings: Cài đặt tài khoản
 account-updated-succ: Đã cập nhật tài khoản thành công
 action: Hoạt động
-activation-desc: Điền vào các trường sau để hoàn thành đăng ký của bạn
 activation-doi: đồng ý tùy chọn
 activation-doi-desc: Tôi chấp nhận bản tin Email và các ưu đãi tiếp thị trong tương lai
 activation-heading: kích hoạt
-activation-headline: Cài đặt của tôi
 activation-legal: Điều khoản dịch vụ
 activation-legal-desc: >-
   Tôi chấp nhận chính sách quyền riêng tư và điều khoản sử dụng của ứng dụng
@@ -29,18 +24,13 @@ activation-notification: thông báo
 activation-notification-desc: Tôi chấp nhận nhận thông báo khi có phiên bản ứng dụng mới
 activation-validate: xác thực
 active_users_by_version: Thiết bị hoạt động theo gói
-add: Thêm vào
 add-another-app: Thêm ứng dụng của bạn
 add-api-key: Đã thêm khóa API mới thành công
 add-member: Thêm thành viên
-add-shared-user: Thêm người dùng chung
-add-this-code-to-you: Thêm mã này vào dự án của bạn
-add-your-app-to-your: Thêm ứng dụng của bạn vào tài khoản của bạn
 add-your-first-app-t: >-
   Thêm ứng dụng đầu tiên của bạn vào tài khoản của bạn và hãy đẩy các bản cập
   nhật!
-admin: Quản trị viên
-afternoon: buổi chiều
+admin: quản trị viên
 alert-2fa-disable: Xác nhận rằng bạn muốn tắt 2FA
 alert-accept-inviation: Bạn có chấp nhận lời mời tham gia %ORG% không?
 alert-add-new-key: Chọn loại khóa API mới
@@ -61,21 +51,15 @@ allow-device-to-self: Cho phép các thiết bị tự liên kết
 allow-emulator: Cho phép giả lập
 already-account: Bạn đã có tài khoản?
 api-doc: tài liệu API
-api-key: Mã API
 api-keys: Khóa API
 api-keys-are-used-for-cli-and-public-api: Khóa API được sử dụng cho CLI và API công khai
-api-keys-key-copied: Khóa API
 app: Ứng dụng
 app-deleted: Đã xóa ứng dụng
-app-id: 'Id ứng dụng:'
-app-id-example: Ví dụ về ID ứng dụng
 app-info: Thông tin ứng dụng
 app-info-desc: Bạn có thể thay đổi thông tin ứng dụng của mình tại đây
 app-logo-deleted: Đã xóa ảnh ứng dụng thành công
 app-name: Tên ứng dụng
-app-not-found: Không tìm thấy ứng dụng
 app-perm: Quyền ứng dụng
-app-preview: Xem trước ứng dụng
 are-u-sure: Bạn có chắc không ?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
 back-to-login-page: Quay lại trang đăng nhập
@@ -86,16 +70,12 @@ bigger-app-size: Kích thước ứng dụng lớn hơn
 billed-annually-at: Thanh toán hàng năm tại
 billed-monthly-at: Thanh toán hàng tháng tại
 billing: thanh toán
-build-your-app-and-s: xây dựng ứng dụng của bạn và đồng bộ hóa
-build-your-code-and-: Tải lên Capgo mã của bạn
 bulk-upload: Tải lên hàng loạt
 bundle: Bó
 bundle-deleted: Đã xóa gói
-bundle-is-linked-channel: Gói được liên kết trong kênh, trước tiên hãy hủy liên kết gói đó
 bundle-is-linked-device: Gói được liên kết trong thiết bị, trước tiên hãy hủy liên kết gói đó
 bundle-number: số gói
 bundles: Bó
-button-about: Về
 button-back: Mặt sau
 button-browse: duyệt
 button-camera: Máy ảnh
@@ -103,18 +83,11 @@ button-cancel: Hủy bỏ
 button-confirm: Xác nhận
 button-delete: Xóa bỏ
 button-deny-invite: Từ chối
-button-go: ĐI
-button-home: Trang chủ
 button-invite: Mời
 button-join: Chấp nhận
-button-options: Tùy chọn
 button-regenerate: tái sinh
 button-remove: Di dời
-button-tabs: tab
-button-toggle_dark: Chuyển đổi chế độ tối
-button-toggle_langs: Thay đổi ngôn ngữ
 by-clicking-on-them: bằng cách nhấp vào chúng.
-cancel: Hủy bỏ
 canceled-delete: Đã hủy xóa gói, không thể xóa gói được liên kết
 canceled-photo-selection: Bạn đã hủy việc chọn ảnh
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
@@ -123,21 +96,17 @@ cannot-create-org: Không thể tạo tổ chức, vui lòng kiểm tra nhật k
 cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký trình duyệt
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
-cannot-delete-app-version: Không thể xóa phiên bản ứng dụng
 cannot-delete-bundle: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
-cannot-download: Không thể tải xuống gói
 cannot-find-unknown-version: >-
   Không thể tìm thấy phiên bản không xác định, vui lòng liên hệ với bộ phận hỗ
   trợ của capgo và kiểm tra nhật ký trình duyệt
 cannot-get-the-test-: Không thể tải phiên bản thử nghiệm
 cannot-invite-owner: Không thể mời chủ sở hữu vào tổ chức
 cannot-load-app-settings: Không thể tải cài đặt ứng dụng
-cannot-save-custom-i: Không thể lưu ID tùy chỉnh
 cannot-set-this-vers: Không thể đặt phiên bản này
-cannot-share: Không thể chia sẻ id người dùng, hãy kiểm tra bảng điều khiển trình duyệt
 cannot-show: Không thể hiển thị trang này
 cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
 cannot-view-plans: Không thể xem trang kế hoạch
@@ -145,6 +114,7 @@ cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
 change: Thay đổi
 change-api-key-name: Thay đổi tên của apikey
+change-your-picture: Thay đổi hình ảnh của bạn
 changed-app-name: Đã đổi tên ứng dụng thành công
 changed-name: Đã đổi tên apikey thành công
 changed-password-suc: Đã đổi mật khẩu thành công
@@ -157,7 +127,6 @@ channel-bundle-linked: |-
 channel-create: Tạo kênh
 channel-deleted: Kênh đã bị xóa
 channel-forced-devices: Thiết bị bắt buộc
-channel-invit: Nhập email để mời
 channel-is-public: Kênh mặc định
 channel-link: ghi đè kênh
 channel-link-fail: Không thể ghi đè lên kênh đã xảy ra sự cố
@@ -178,22 +147,18 @@ confirm-public-desc: |-
   Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
 
   Các kênh mặc định khác sẽ không còn mặc định nữa.
+continue: Tiếp tục
 copied-to-clipboard: Sao chép vào clipboard
 copy-account-id: sao chép id tài khoản
 copy-command: Sao chép lệnh
-copy-your: Sao chép của bạn
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
 create-new-org: Tạo một tổ chức mới
 created-at: tạo tại
-current-billing-cycle: Chu kỳ thanh toán hiện tại
 custom: Phong tục
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
-custom-id-saved: Đã lưu ID tùy chỉnh
 dashboard: bảng điều khiển
-days: ngày
-defined-as: Định nghĩa là
 defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete: Xóa bỏ
@@ -203,56 +168,39 @@ delete-app: Xóa ứng dụng
 delete-org: Xóa tổ chức
 delete-your-account: Xóa tài khoản của bạn
 deleted: đã xóa
-dependencies:
-  js-yaml: ''
-  openai: ''
+dependencies: {}
 detailed-usage-plan: Cách sử dụng chi tiết
-details-and-logs: Chi tiết và nhật ký
-devDependencies:
-  '@types/js-yaml': ''
+devDependencies: {}
 device: Thiết bị
 device-id: ID thiết bị
 devices: thiết bị
-devices-using-this-b: Thiết bị sử dụng gói này
-dialog-warning-msg: |-
-  Thông tin này đến từ chủ sở hữu tổ chức.
-
-  Bạn không thể nâng cấp cấp capgo cho ứng dụng này
 did-not-recive-confirm-email: Không nhận được email xác nhận?
 disable: Vô hiệu hóa
 disable-ab-testing: Kiểm tra AB bị vô hiệu hóa
 disable-auto-downgra: Vô hiệu hóa tự động hạ cấp theo bản địa
-disable-auto-upgrade: Vô hiệu hóa nâng cấp tự động trên chính
 disable-progressive-deploy: Đã tắt triển khai lũy tiến
 disableAutoUpdateToMajor: Tắt tự động cập nhật
-discord: bất hòa
+discord: sự bất hòa
 discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá bảng điều khiển của bạn!
-documentation: Tài liệu
+documentation: tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
 download: Tải xuống
-edit-name: Chỉnh sửa tên
-edit-pic: Chỉnh sửa hình ảnh
 email: E-mail
-email-address: Địa chỉ email
-email-does-not-exist: Người dùng này không tòn tại
 enable: Cho phép
 enable-2FA: Kích hoạt 2FA
 enabled-ab-testing: Đã bật thử nghiệm AB
 enabled-progressive-deploy: Đã bật triển khai lũy tiến
-encrypted: Gói được mã hóa
 enter-your-email-add: >-
   Nhập địa chỉ email của bạn và chúng tôi sẽ gửi cho bạn một liên kết để đặt lại
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 error: Lỗi
-external-storage: Lưu trữ ngoài
 fail: Cài đặt không thành công
 failed: Thất bại
 failed-to-get-user: Không tải được người dùng
 fast-backward: Lùi nhanh
 fast-forward: Nhanh về phía trước
-filters: bộ lọc
 first-name: Họ
 force-version: Phiên bản bắt buộc
 force-version-change: Bỏ qua triển khai lũy tiến
@@ -260,29 +208,22 @@ forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công
 free-trial: Dùng thử miễn phí
-from: Từ
 from-device: từ thiết bị
 general-information: Thông tin chung
 generated-new-apikey: Đã tạo khóa API mới!
 go-back: Quay lại
 good: Tốt
 id: NHẬN DẠNG
-in-your-main-file: Trong tập tin chính của bạn
-in-your-project-fold: Trong thư mục dự án của bạn
 included-in-plan: Bao gồm trong kế hoạch
 info: Thông tin
-informations: thông tin
 init-capgo-in-your-a: Khởi tạo Capgo trong ứng dụng của bạn
 insert-invite-email: Chèn email của người dùng bạn muốn mời
 install: Cài đặt
-install-the-capacito: Cài đặt plugin Tụ điện
-into-your-app-folder: Vào thư mục ứng dụng của bạn.
 invalid-auth: Thông tin đăng nhập của bạn không khớp, hãy thử lại.
 invalid-email: Email đã gửi không hợp lệ
 invalid-mfa-code: Mã 2FA không hợp lệ
 invalid-version: Phiên bản học kỳ không hợp lệ
 invite-accepted: Đã chấp nhận thành công lời mời tổ chức
-invoices: hóa đơn
 is-emulator: là giả lập
 is-production-app: Là ứng dụng sản xuất
 key-admin: Quản trị viên
@@ -294,10 +235,7 @@ key-upload: Tải lên
 key-write: Viết
 language: Ngôn ngữ
 last-15-minutes: 15 phút cuối
-last-24-hour: 24 giờ qua
-last-3-hour: 3 giờ qua
 last-3-minutes: 3 phút cuối
-last-hour: Giờ cuối cùng
 last-minute: Phút trước
 last-name: Họ
 last-update: Cập nhật cuối cùng
@@ -306,16 +244,10 @@ last-version: Phiên bản cuối cùng
 latest_version: Gói mới nhất
 launch-bundle: Khởi chạy gói
 leaving: Rời đi
-limit-reached: Đạt tới giới hạn
 live-reload: tải lại trực tiếp
-loading-more-data: Đang tải thêm dữ liệu...
 log-in: Đăng nhập
-log-to-the-capgo-cli: Đăng nhập vào Capgo CLI
 login-to-your-accoun: đăng nhập vào tài khoản của bạn
-logout: Đăng xuất
 logs: Nhật ký
-lowerCaseError: Nên chứa chữ thường
-main: ''
 main-bundle-number: Số gói chính
 major: Lớn lao
 make-default-android: Đặt làm mặc định cho Android
@@ -347,13 +279,10 @@ missing-name: Thiếu tên
 mo: Th
 modify-org-info: Bạn có thể sửa đổi thông tin của tổ chức tại đây.
 module-heading: mô-đun
-monthly: hàng tháng
 monthly-active-users: Người dùng hoạt động hàng tháng
 monthly-plan: Kế hoạch hàng tháng
 montly-active: hoạt động hàng tháng
 more-version-storage: Phiên bản khác
-morning: buổi sáng
-my-account: Tài khoản của tôi
 my-notifications: Thông báo của tôi
 name: Tên
 need-more-contact-us: |-
@@ -369,14 +298,8 @@ new-name-to-short: |-
 next: Kế tiếp
 'no': KHÔNG
 no-app-icon: Ứng dụng này không có bất kỳ biểu tượng ứng dụng nào
-no-channel-linked: Không có kênh, nhấp để thêm
-no-channel-linked-no-perm: Không có kênh
 no-data: Không có dữ liệu
-no-devices: Không có thiết bị
-no-logs: Không có nhật ký
 no-permission: Không đủ quyền
-no-version-linked: Không có phiên bản, nhấp để thêm
-no-version-linked-no-perm: Không có phiên bản
 none: Không có
 not-found: Không tìm thấy
 not-paying-org-usage: >-
@@ -388,9 +311,8 @@ old-onboarding-mode: giới thiệu cũ
 one-day-left: Còn lại một ngày
 open: Mở
 open-channel: mở kênh
-open-settings: Nhấp để mở cài đặt
+open-in-new-tab: Mở ra trong trang mới
 open-sidebar: Mở thanh bên
-open-this-link-to-le: Mở liên kết này để tìm hiểu cách kiểm tra bản cập nhật của bạn
 open-your-portal: Mở cổng thông tin của bạn
 org-changes-saved: Tổ chức được cập nhật thành công
 org-changes-set-email-not-unique: Email quản lý không phải là duy nhất, vui lòng chọn email khác
@@ -403,40 +325,33 @@ organization-email: Email quản lý của tổ chức
 organization-name: tên tổ chức
 organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
-owner-org: 'Tổ chức chủ sở hữu:'
 pages: trang
 password: Mật khẩu
 password-confirmatio: xác nhận mật khẩu
 password-heading: Tạo mật khẩu
 password-hint: Nhập kết hợp ít nhất 6 số, chữ cái và dấu chấm câu.
-password-new: mật khẩu mới
 patch: Vá
 percent-fail: tỷ lệ thất bại
 permission-changed: Đã thay đổi thành công quyền của người dùng
 personal-information: Thông tin cá nhân
 picture-delete-fail: Không thể xóa ảnh ứng dụng, vui lòng kiểm tra nhật ký bảng điều khiển
 picture-uploaded: Hình ảnh được tải lên thành công
-plan-abtest: Thử nghiệm A/B
 plan-bandwidth: Băng thông GB
-plan-buy: Mua
 plan-desc: Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động.
 plan-free: Tốt nhất cho MVP và thử nghiệm
 plan-inactive: Kế hoạch không hoạt động
-plan-is-the-best-pla: kế hoạch là kế hoạch tốt nhất cho nhu cầu của bạn.
-plan-maker: Tốt nhất cho các chủ doanh nghiệp nhỏ
-plan-member: thành viên kế hoạch.
+plan-maker: Tốt nhất cho chủ doanh nghiệp nhỏ
 plan-page-warn: Việc mua gói sẽ không ảnh hưởng đến các tổ chức mà bạn được mời tham gia.
 plan-page-warn-2: Tìm hiểu thêm về nó.
-plan-payasyougo: Tốt nhất cho các doanh nghiệp kêu gọi
+plan-payasyougo: Tốt nhất cho các doanh nghiệp gọi vốn
 plan-pricing-plans: kế hoạch giá
-plan-progressive-deploy: triển khai lũy tiến
-plan-solo: Tốt nhất cho indies
+plan-solo: Tốt nhất cho người độc lập
 plan-storage: Dung lượng GB
 plan-team: Tốt nhất cho các chủ doanh nghiệp lớn
 plan-updates: cập nhật
 plan-upgrade: Đăng ký
 plan-whats-included: Bao gồm những gì
-plans: Các kế hoạch
+plans: các kế hoạch
 plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem gói và thanh toán
 platform: Nền tảng
 please-ask-the-user-to-create-account-first: Vui lòng yêu cầu người dùng tạo tài khoản trước
@@ -444,12 +359,9 @@ please-choose-your-p: Vui lòng chọn sở thích của bạn
 please-confirm-org-del: >-
   Vui lòng xác nhận rằng bạn muốn xóa tổ chức "%1" bằng cách nhập tên của tổ
   chức đó
-please-type-new-app-name: Vui lòng nhập tên ứng dụng mới
-please-upgrade: Vui lòng nâng cấp gói của bạn để thêm nhiều người dùng hơn
 plugin-version: phiên bản plugin
 prediction: Sự dự đoán
 preview: Gói xem trước
-preview-encrypted: Không thể xem trước gói đã mã hóa
 preview-short: xem trước
 previous: Trước
 price-per-unit-above: Giá mỗi căn trên kế hoạch
@@ -458,39 +370,29 @@ progressive-bundle-number: Số gói lũy tiến
 progressive-deploy-option: Chọn tùy chọn triển khai lũy tiến
 progressive-deploy-set-percentage: Bạn không thể đặt phần trăm phiên bản phụ khi bật triển khai lũy tiến
 progressive-percentage: Trạng thái triển khai lũy tiến
-projection: dự đoán
 recommended: Khuyến khích
-recommended-for-you: Đề xuất cho bạn
-refresh-this-page: Làm mới trang này
-register-desc: Điền vào các trường sau để hoàn thành đăng ký của bạn
 register-heading: Sự đăng ký
 register-next: Đăng ký
 reload: tải lại
 removed-apikey: Khóa API đã được xóa thành công
 resend: Gửi lại
+resend-confirm: Gửi lại email xác nhận
 resend-email: Gửi lại email xác nhận
 reset-password: Đặt lại mật khẩu
 reset-your-password: Đặt lại mật khẩu của bạn
 save: tiết kiệm
 save-changes: Lưu thay đổi
-search: Tìm kiếm
-search-bundle: Gói tìm kiếm
 search-bundle-id: Tìm kiếm theo ID gói
-search-by-action: Tìm kiếm theo hành động
 search-by-device-id: Tìm kiếm theo ID thiết bị hoặc ID tùy chỉnh
 search-by-device-id-: Tìm kiếm theo ID thiết bị hoặc hành động
 search-by-device-id-0: Tìm kiếm theo ID thiết bị
 search-by-name: Tìm kiếm theo tên
-search-device: Tìm kiếm thiết bị
-search-user: Tìm kiếm người dùng
 see-usage: xem cách sử dụng
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
 session_key: IvSessionKey
 set-bundle: Đặt gói thành kênh
 settings: Cài đặt
-shared-apps: Ứng dụng được chia sẻ
-shared-users: Đã chia sẻ với
 showing: Đang hiển thị
 sign-out: Đăng xuất
 size: Kích cỡ
@@ -499,7 +401,6 @@ something-went-wrong-try-again-later: |-
   Đã xảy ra sự cố! 
   Thử lại sau.
 special-api-access: Quyền truy cập API đặc biệt
-specialError: Nên chứa các ký tự đặc biệt
 start-new-deploy: Bắt đầu triển khai lũy tiến mới
 start-using-capgo: 'Bắt đầu sử dụng:'
 status-complete: hoàn thành
@@ -507,32 +408,19 @@ status-failed: thất bại
 storage-usage: 'Sử dụng lưu trữ:'
 stored-externally: được lưu trữ bên ngoài
 stripe-billing-portal-will-be-opened-in-a-new-tab: Cổng thanh toán sọc sẽ được mở trong tab mới
-submit: Nộp
 support: Ủng hộ
-switch-to-all-device: Chuyển sang tất cả các thiết bị
-switch-to-only-devic: Chuyển sang thiết bị duy nhất được liên kết
 terms-of-use: Điều khoản sử dụng
-test-your-update-in-: Kiểm tra bản cập nhật của bạn trong ứng dụng của bạn
 tests: kiểm tra
 thank-you-for-choosi: Cảm ơn bạn đã chọn Capgo!
 thank-you-for-sub: Cảm ơn bạn đã đăng ký Capgo
-the: Các
-this-page-will-self-: Trang này sẽ tự làm mới
-title: tiêu đề
-tmp-disabled: (Tạm thời bị vô hiệu hóa)
+this-page-will-self-: Trang này sẽ tự làm mới sau khi bạn hoàn tất quá trình làm quen với CLI
 to: ĐẾN
-to-live-reload: để tải lại trực tiếp.
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
-top-apps: Những ứng dụng của tôi
 top-apps-v2: Ứng dụng
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
-trial-plan-expires-in: Thử nghiệm kết thúc sau
-type: ''
-type-new-app-name: Tên ứng dụng mới
 type-new-name: Vui lòng nhập tên khóa api mới
 type-new-org-name: Vui lòng nhập tên mới cho tổ chức
-undefined: không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt
 unknown: không xác định
@@ -546,9 +434,7 @@ update: Cập nhật
 updated-at: Cập nhật tại
 updated-min-version: Đã cập nhật phiên bản tối thiểu
 upgrade: Nâng cấp
-upgrade-now: Nâng cấp ngay bây giờ
 upload-img-error: Không thể tải ảnh lên, vui lòng kiểm tra bảng điều khiển
-upperCaseError: Nên chứa chữ in hoa
 url: URL
 usage: Cách sử dụng
 usage-success: >-
@@ -557,22 +443,17 @@ usage-success: >-
 usage-super-only: Chỉ quản trị viên cấp cao mới được phép xem mức sử dụng
 usage-title: Tổng cộng
 use-capgo: Sử dụng Capgo
-use-the-command: 'Sử dụng lệnh:'
 used-in-period: Được sử dụng trong kỳ
 used-to-create: Tài khoản có email này đã từng tồn tại, không thể tạo lại
-user: Người dùng
 user-already-invited: Người dùng này đã được mời vào tổ chức này
 validate: xác thực
 verify: Xác minh
 verify-2FA: Xác minh 2FA
 version: Phiên bản
-version-build: Phiên bản xây dựng
 version-builtin: Phiên bản dựng sẵn
+version-link-fail: Không thể đặt ghi đè gói
 version-linked: liên kết phiên bản
-version-linking: Liên kết đến gói
-versions: phiên bản
 want-to-unlink: Bạn có muốn hủy liên kết không?
-warning: Cảnh báo!
 welcome-to: Chào mừng bạn đến
 welcome-to-your-capg: Chào mừng bạn đến với Bảng điều khiển Capgo của bạn
 what-to-do-with-photo: Chỉnh sửa hình ảnh
@@ -585,9 +466,5 @@ yearly: hàng năm
 'yes': Đúng
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-reached-the-limi: Đạt tới giới hạn
-your-api-key: 'Khóa API của bạn:'
-your-are-a: bạn là một
-your-current-plan-is: Kế hoạch hiện tại của bạn là
-your-current-suggested-plan-is: Gói đề xuất hiện tại của bạn là
 your-settings: Cài đặt của bạn
 your-ussage: 'Cách sử dụng của bạn:'

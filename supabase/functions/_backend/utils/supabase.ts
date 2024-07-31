@@ -8,7 +8,6 @@ import type { Person, Segments } from './plunk.ts'
 import { addDataContact } from './plunk.ts'
 import type { Order } from './types.ts'
 
-export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
 

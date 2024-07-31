@@ -8,7 +8,7 @@ import type { Tab } from '~/components/comp_def'
 const { t } = useI18n()
 const route = useRoute()
 const displayStore = useDisplayStore()
-const ActiveTab = ref('')
+const ActiveTab = ref(`/app/p/${route.params.p}/settings`)
 
 const tabs = ref<Tab[]>([
   {

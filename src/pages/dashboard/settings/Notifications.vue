@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { kListItem, kToggle } from 'konsta/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSupabase } from '~/services/supabase'
@@ -69,28 +68,20 @@ async function submitDoi() {
       </h2>
 
       <div class="w-full mx-auto dark:text-white">
-        <div class="px-6 py-4 list-none divide-y divide-gray-500">
-          <k-list-item label :title="t('activation-notification')" :subtitle="t('activation-notification-desc')">
-            <template #after>
-              <k-toggle
-                component="div"
-                class="k-color-success"
-                :checked="enableNotifications"
-                @change="submitNotif()"
-              />
-            </template>
-          </k-list-item>
-          <k-list-item label :title="t('activation-doi')" :subtitle="t('activation-doi-desc')">
-            <template #after>
-              <k-toggle
-                component="div"
-                class="k-color-success"
-                :checked="optForNewsletters"
-                @change="submitDoi()"
-              />
-            </template>
-          </k-list-item>
-        </div>
+        <dl class="divide-y divide-gray-500">
+          <InfoRow :label="t('activation-notification')" :editable="false" :value="t('activation-notification-desc')">
+            <Toggle
+              :value="enableNotifications"
+              @change="submitNotif()"
+            />
+          </InfoRow>
+          <InfoRow :label="t('activation-doi')" :editable="false" :value="t('activation-doi-desc')">
+            <Toggle
+              :value="optForNewsletters"
+              @change="submitDoi()"
+            />
+          </InfoRow>
+        </dl>
       </div>
     </div>
   </div>

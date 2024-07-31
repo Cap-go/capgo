@@ -6,18 +6,26 @@ on:
       - 'main'
   pull_request:
 
+env:
+  DENO_DIR: my_cache_directory
+
 jobs:
   test_base_sql:
     runs-on: ubuntu-latest
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     name: "Run test"
     steps:
+      - name: Cache Deno dependencies 
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DENO_DIR }}
+          key: my_cache_key
       - name: "Checkout capgo"
         uses: actions/checkout@v4
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 1.176.10
+          version: 1.178.2
       - name: Set env PROD
         if: ${{ !contains(github.ref, '-alpha.') }}
         run: echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS }}" >> $GITHUB_ENV
@@ -35,7 +43,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Run Supabase Start
-        run: supabase start
+        run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
       - run: supabase test db
       - uses: denoland/setup-deno@v1
         with:

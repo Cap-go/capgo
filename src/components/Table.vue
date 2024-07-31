@@ -1,14 +1,9 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
-import { computed, onMounted, ref, watch } from 'vue'
-import { initDropdowns } from 'flowbite'
-import {
-  kList,
-  kListItem,
-} from 'konsta/vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { FormKit } from '@formkit/vue'
-import type { MobileColType, TableColumn } from './comp_def'
+import type { TableColumn } from './comp_def'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
@@ -116,10 +111,6 @@ const displayElemRange = computed(() => {
   return `${begin}-${end}`
 })
 
-function findMobileCol(name: MobileColType) {
-  return props.columns ? props.columns.find(col => col.mobile === name) : undefined
-}
-
 function canNext() {
   return props.currentPage < Math.ceil(props.total / offset.value)
 }
@@ -159,36 +150,28 @@ async function fastBackward() {
     emit('reload')
   }
 }
-
-onMounted(() => {
-  initDropdowns()
-})
 </script>
 
 <template>
   <div class="pb-4 overflow-x-auto md:pb-0 min-h-[300px]">
     <div class="flex items-start justify-between pb-4 md:items-center">
-      <div class="flex mb-2">
+      <div class="flex">
         <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
-        <button v-if="filterText && filterList.length" id="dropdownRadioButton" data-dropdown-offset-skidding="100" data-dropdown-toggle="dropdownRadio" class="relative inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button">
-          <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
-            <!-- uppercase first letter in tailwind -->
-            {{ filterActivated }}
+        <div v-if="filterText && filterList.length" class="dropdown">
+          <div tabindex="0" role="button" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700">
+            <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
+              <!-- uppercase first letter in tailwind -->
+              {{ filterActivated }}
+            </div>
+            <IconFilter class="m-1 mr-2" />
+            <span class="hidden md:block">{{ t(filterText) }}</span>
+            <IconDown class="hidden m-1 ml-2 md:block" />
           </div>
-          <IconFilter class="m-1 mr-2" />
-          <span class="hidden md:block">{{ t(filterText) }}</span>
-          <IconDown class="hidden m-1 ml-2 md:block" />
-        </button>
-        <!-- Dropdown menu -->
-        <div v-if="filterText && filterList.length" id="dropdownRadio" class="z-50 hidden w-48 bg-white border divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" data-popper-reference-hidden="" data-popper-escaped="" data-popper-placement="top">
-          <div class="block px-4 py-3 text-sm text-gray-900 md:hidden dark:text-white">
-            <div>{{ t(filterText) }}</div>
-          </div>
-          <ul class="p-3 space-y-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownRadioButton">
+          <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">
@@ -199,20 +182,24 @@ onMounted(() => {
         </div>
       </div>
       <!-- </div> -->
-      <div class="flex h-10 w-70 md:w-auto">
+      <div class="flex h-10 md:w-auto">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
           :prefix-icon="IconSearch" :disabled="isLoading"
           enterkeyhint="send"
+          :classes="{
+            outer: '!mb-0 md:w-96',
+            inner: '!rounded-full',
+          }"
         />
       </div>
     </div>
-    <div class="hidden md:block">
+    <div class="block">
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -232,11 +219,11 @@ onMounted(() => {
             @click="emit('rowClick', elem)"
           >
             <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="col.class" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
-              <td v-else class="px-6 py-4">
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4">
                 {{ displayValueKey(elem, col) }}
               </td>
             </template>
@@ -251,7 +238,7 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
-    <kList class="block !my-0 md:hidden">
+    <!-- <kList class="block !my-0 md:hidden">
       <kListItem
         v-for="(elem, i) in elementList" :key="i"
         :title="displayValueKey(elem, findMobileCol('title'))"
@@ -264,7 +251,7 @@ onMounted(() => {
           <span v-else>{{ displayValueKey(elem, findMobileCol('after')) }}</span>
         </template>
       </kListItem>
-    </kList>
+    </kList> -->
     <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400"><span class="hidden md:inline-block">{{ t('showing') }}</span> <span class="font-semibold text-gray-900 dark:text-white">{{ displayElemRange }}</span> of <span class="font-semibold text-gray-900 dark:text-white">{{ total }}</span></span>
       <ul class="inline-flex items-center -space-x-px">

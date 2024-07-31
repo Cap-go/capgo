@@ -43,6 +43,7 @@ function openTab(tab: Tab) {
     tab.onClick(tab.key)
   else
     router.push(tab.key)
+  emit('closeSidebar')
 }
 const tabs = ref<Tab[]>([
   {
@@ -108,7 +109,7 @@ const tabs = ref<Tab[]>([
           </h3>
           <ul class="mt-3">
             <li v-for="tab, i in tabs" :key="i" class="mb-0.5 rounded-sm px-3 py-2 last:mb-0">
-              <button class="block truncate transition duration-150 text-slate-200 hover:text-white" :class="{ 'hover:text-slate-200': isTabActive(tab.key) }" @click="openTab(tab)">
+              <button class="block w-full p-2 truncate transition duration-150 rounded text-slate-200" :class="{ 'hover:bg-slate-700': !isTabActive(tab.key), 'pointer-events-none': isTabActive(tab.key) }" @click="openTab(tab)">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center">
                     <component :is="tab.icon" class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />

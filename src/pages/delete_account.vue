@@ -20,12 +20,12 @@ const router = useRouter()
 const version = import.meta.env.VITE_APP_VERSION
 
 async function deleteAccount() {
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('are-u-sure'),
     buttons: [
       {
         text: t('button-remove'),
+        role: 'danger',
         handler: async () => {
           const supabaseClient = useSupabase()
 
@@ -68,6 +68,7 @@ async function deleteAccount() {
             router.replace('/login')
           }
           catch (error) {
+            console.error(error)
             return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
         },
@@ -81,6 +82,8 @@ async function deleteAccount() {
       },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function submit(form: { email: string, password: string }) {
@@ -128,7 +131,7 @@ onMounted (() => {
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
-                  type="email" name="email" :disabled="isLoading" enterkeyhint="next" input-class="!text-black"
+                  type="email" name="email" :disabled="isLoading" enterkeyhint="next"
                   :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                   validation="required:trim"
                 />
@@ -143,7 +146,7 @@ onMounted (() => {
                     </router-link>
                   </div>
                   <FormKit
-                    id="passwordInput" type="password" input-class="!text-black" :placeholder="t('password')"
+                    id="passwordInput" type="password" :placeholder="t('password')"
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />

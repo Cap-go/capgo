@@ -45,12 +45,11 @@ async function submit(form: { email: string, password: string }) {
           <div class="overflow-hidden bg-white rounded-md shadow-md">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
               <FormKit id="resend-email" type="form" :actions="false" @submit="submit">
-                <div class="space-y-5">
+                <div class="space-y-5 text-gray-500">
                   <FormKit
                     type="email"
                     name="email"
                     :label="t('email')"
-                    input-class="!text-black"
                     :disabled="isLoading"
                     :prefix-icon="iconEmail"
                     inputmode="email"
@@ -73,19 +72,19 @@ async function submit(form: { email: string, password: string }) {
                         />
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
-                      <button v-if="!isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none">
+                      <div v-if="!isLoading" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none">
                         Submit
-                      </button>
+                      </div>
                     </button>
                   </div>
                 </div>
               </FormKit>
+              <div class="flex flex-row justify-center w-full mt-5">
+                <router-link to="/login" class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline">
+                  {{ t('back-to-login-page') }}
+                </router-link>
+              </div>
             </div>
-          </div>
-          <div class="flex flex-row justify-center w-full mt-5">
-            <router-link to="/login" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
-              {{ t('back-to-login-page') }}
-            </router-link>
           </div>
         </div>
       </div>

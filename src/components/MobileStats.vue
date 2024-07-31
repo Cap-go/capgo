@@ -1,43 +1,52 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Line } from 'vue-chartjs'
-import type {
-  ChartOptions,
-} from 'chart.js'
-import {
-  CategoryScale,
-  Chart,
-  LineElement,
-  LinearScale,
-  PointElement,
-  Tooltip,
-} from 'chart.js'
-import colors from 'tailwindcss/colors'
-import type { appUsageByVersion } from '~/services/supabase'
+import type { ChartOptions } from 'chart.js'
+import { CategoryScale, Chart, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
+import type { VersionName, appUsageByVersion } from '~/services/supabase'
 import { getDailyVersion, getVersionNames } from '~/services/supabase'
+import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
+
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 const { t } = useI18n()
 const route = useRoute()
 
 const appId = ref('')
 const isLoading = ref(true)
-const SKIP_COLOR = 10
-const colorKeys = Object.keys(colors)
 const dailyUsage = ref<appUsageByVersion[]>([])
-const versionNames = ref<{ id: string, name: string, created_at: string }[]>([])
+const versionNames = ref<VersionName[]>([])
 
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
+const chartOptions = computed<ChartOptions<'line'>>(() => ({
+  maintainAspectRatio: false,
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { color: isDark.value ? 'white' : 'black' },
+    },
+    y: {
+      min: 0,
+      max: 100,
+      ticks: {
+        callback: (value: number) => `${value}%`,
+        color: isDark.value ? 'white' : 'black',
+      },
+    },
+  },
+  plugins: {
+    legend: { display: false },
+    title: { display: false },
+  },
+}))
+
+const chartData = useChartData(dailyUsage, versionNames)
 
 async function loadData() {
   isLoading.value = true
-
-  const endDate = new Date()
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - 30)
-
+  const { startDate, endDate } = getDateRange(30)
   dailyUsage.value = await getDailyVersion(appId.value, startDate.toISOString(), endDate.toISOString())
   versionNames.value = await getVersionNames(appId.value, dailyUsage.value.map(d => d.version_id))
   isLoading.value = false
@@ -54,139 +63,18 @@ function getLast30Days() {
   return dates
 }
 
-const chartData = computed(() => {
-  // Get unique version IDs and dates from the dailyUsage data
-  const versions = [...new Set(dailyUsage.value.map(d => d.version_id))]
-  const dates = [...new Set(dailyUsage.value.map(d => d.date))]
-
-  // Create an object to store the accumulated data for each version by date
-  const accumulatedDataByVersionAndDate: { [date: string]: { [version: number]: number } } = {}
-
-  // Calculate the accumulated data for each version by date
-  dailyUsage.value.forEach((usage) => {
-    const { date, version_id, install, uninstall } = usage
-    if (!accumulatedDataByVersionAndDate[date]) {
-      accumulatedDataByVersionAndDate[date] = {}
-    }
-    const lastTotal = accumulatedDataByVersionAndDate[date][version_id] || 0
-    const currentTotal = lastTotal + (install ?? 0) - (uninstall ?? 0)
-    accumulatedDataByVersionAndDate[date][version_id] = currentTotal
-  })
-
-  // Calculate the total accumulated value for each date
-  const totalAccumulatedByDate: { [date: string]: number } = {}
-  dates.forEach((date) => {
-    const totalAccumulated = Object.values(accumulatedDataByVersionAndDate[date] || {}).reduce(
-      (sum, value) => sum + value,
-      0,
-    )
-    totalAccumulatedByDate[date] = totalAccumulated
-  })
-
-  // Filter out versions with 0 active users on every day
-  const activeVersions = versions.filter((version) => {
-    return dates.some((date) => {
-      // version is more than 0 and version name is not 'builtin'
-      return accumulatedDataByVersionAndDate[date]?.[version] > 0 && versionNames.value.find(v => v.id === version)?.name !== 'builtin'
-    })
-  })
-
-  // Create a dataset for each active version
-  const datasets = activeVersions.map((version, i) => {
-    // Calculate the percentage of the maximum total accumulated value for each date
-    const percentageData = dates.map((date) => {
-      const versionAccumulated = accumulatedDataByVersionAndDate[date]?.[version] || 0
-      const totalAccumulated = totalAccumulatedByDate[date] || 0
-      return totalAccumulated > 0 ? (versionAccumulated / totalAccumulated) * 100 : 0
-    })
-
-    // Get a color from the colorKeys array based on the version index
-    const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
-
-    const versionName = versionNames.value.find(v => v.id === version)?.name || version
-    // Return the dataset object for the current version
-    return {
-      label: versionName,
-      data: percentageData,
-      borderColor: colors[color][400],
-      backgroundColor: colors[color][200],
-      tension: 0.3,
-      pointRadius: 2,
-      pointBorderWidth: 0,
-    }
-  })
-
-  // Find the maximum accumulated value across all versions and dates
-  const maxAccumulatedValue = Math.max(...datasets.map(dataset => Math.max(...dataset.data)))
-
-  // Normalize the data to represent percentages
-  const normalizedDatasets = datasets.map((dataset) => {
-    const normalizedData = dataset.data.map(value => (value / maxAccumulatedValue) * 100)
-    return {
-      ...dataset,
-      data: normalizedData,
-    }
-  })
-
-  // Find the latest released version based on the created_at field
-  const latestVersion = versionNames.value.reduce((latest, current) => {
-    return new Date(current.created_at) > new Date(latest.created_at) ? current : latest
-  }, versionNames.value[0])
-
-  // Find the dataset corresponding to the latest version
-  const latestVersionDataset = normalizedDatasets.find(dataset => dataset.label === latestVersion?.name)
-
-  // Get the current percentage of the latest version (last data point)
-  const latestVersionPercentage = latestVersionDataset ? latestVersionDataset.data[latestVersionDataset.data.length - 1] : 0
-
-  // Return the chart data object
-  return {
-    labels: dates,
-    datasets: normalizedDatasets,
-    latestVersion: {
-      name: latestVersion?.name,
-      percentage: latestVersionPercentage.toFixed(2),
-    },
-  }
-})
-
-const chartOptions = ref<ChartOptions>({
-  maintainAspectRatio: false,
-  scales: {
-    x: {
-      grid: {
-        display: false,
-      },
-      ticks: {
-        color: `${isDark.value ? 'white' : 'black'}`,
-      },
-    },
-    y: {
-      min: 0,
-      max: 100,
-      ticks: {
-        callback: (value: number) => `${value}%`,
-        color: `${isDark.value ? 'white' : 'black'}`,
-      },
-    },
-  },
-  plugins: {
-    legend: {
-      display: false,
-    },
-    title: {
-      display: false,
-    },
-  },
-})
+function getDateRange(days: number) {
+  const endDate = new Date()
+  const startDate = new Date(endDate)
+  startDate.setDate(startDate.getDate() - days)
+  return { startDate, endDate }
+}
 
 watchEffect(async () => {
   if (route.path.includes('/package/')) {
-    appId.value = route.params.package as string
-    appId.value = urlToAppId(appId.value)
+    appId.value = urlToAppId(route.params.package as string)
     try {
       await loadData()
-      isLoading.value = false
     }
     catch (error) {
       console.error(error)

@@ -2,12 +2,12 @@ import * as crypto from 'node:crypto'
 import type { APIRequestContext } from '@playwright/test'
 import { test } from '@playwright/test'
 import { z } from 'zod'
-import { EMPTY_UUID, useSupabaseAdmin } from './utils'
+import { useSupabaseAdmin } from './utils'
 import { expect } from './zodUtils'
 import type { Database } from '~/types/supabase.types'
 
 const functionUrl = process.env.BACKEND_URL || 'http://localhost:54321/functions/v1/'
-const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
+// const defaultUserId = '6aa76066-55ef-4238-ade6-0b32334a4097'
 
 const updateAndroidBaseData = {
   platform: 'android',
@@ -302,7 +302,7 @@ backendTest.describe('Test update logic', () => {
             device_id: uuid,
             channel_id: 23,
             app_id: updateAndroidBaseData.app_id,
-            owner_org: EMPTY_UUID,
+            owner_org: '00000000-0000-0000-0000-000000000000',
           })
         expect(error).toBeFalsy()
 
@@ -354,7 +354,7 @@ backendTest.describe('Test update logic', () => {
             device_id: uuid,
             version: 9601,
             app_id: updateAndroidBaseData.app_id,
-            owner_org: EMPTY_UUID,
+            owner_org: '00000000-0000-0000-0000-000000000000',
           })
         expect(error).toBeFalsy()
 

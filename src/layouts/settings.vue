@@ -20,7 +20,20 @@ const { t } = useI18n()
 const main = useMainStore()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
-const ActiveTab = ref('')
+const router = useRouter()
+function getCurrentTab() {
+  // look the path and set the active tab
+  const path = router.currentRoute.value.path
+  if (path.includes('/dashboard/settings/account'))
+    return '/dashboard/settings/account'
+  else if (path.includes('/dashboard/settings/organization'))
+    return '/dashboard/settings/organization'
+  else if (path.includes('/dashboard/settings/organization/plans'))
+    return '/dashboard/settings/organization/plans'
+  return '/dashboard/settings/account'
+}
+
+const ActiveTab = ref(getCurrentTab())
 
 const tabs = ref<Tab[]>([
   {
@@ -53,7 +66,6 @@ const organizationTabs = ref<Tab[]>([
   },
 ])
 
-const router = useRouter()
 const type = ref<'user' | 'organization'>(router.currentRoute.value.path.includes('organization') ? 'organization' : 'user')
 
 watch(type, (val) => {
@@ -74,7 +86,7 @@ watchEffect(() => {
       {
         label: 'plans',
         icon: shallowRef(IconPlans),
-        key: '/dashboard/settings/plans',
+        key: '/dashboard/settings/organization/plans',
       },
     )
   }
@@ -94,40 +106,6 @@ watchEffect(() => {
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
-  // if (!Capacitor.isNativePlatform()
-  //   && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-  //   && !organizationTabs.value.find(tab => tab.label === 'invoices')) {
-  //     organizationTabs.value.push(
-  //     {
-  //       label: 'invoices',
-  //       icon: shallowRef(MdiInvoiceListOutline),
-  //       key: '/invoices',
-  //       onClick: async() => {
-  //         // post on that and display a popup to say check your mailbox
-  //         // https://zenvoice.io/api/invoices/send?userId=65e615635afbec6a6d29f6df&email=paul@kick.com
-  //         if (!main.user?.email) return
-  //         ky.get(`https://zenvoice.io/api/invoices/send?userId=65e615635afbec6a6d29f6df&email=${main.user?.email}`, {
-  //           // searchParams: {
-  //           //   userId: '5e615635afbec6a6d29f6df',
-  //           //   email: main.user?.email
-  //           // }
-  //         })
-  //         .then(()=> {
-  //           // check your mailbox toast
-  //           toast.info('Check your email to access to the link')
-  //         })
-  //         .catch(() => {
-  //           toast.error('Cannot find any invoices')
-  //         })
-
-  //         // openBlank(`https://zenvoice.io/p/65e615635afbec6a6d29f6df?email=${main.user?.email}`) old code
-  //       }
-  //     },
-  //   )
-  // }
-  // else {
-  //   organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'invoices')
-  // }
 
   // TODO: reenable after we fix usage
   if (organizationStore.currentOrganization?.paying

@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
 import { computed, onMounted, ref, watch } from 'vue'
-import { initDropdowns } from 'flowbite'
-import {
-  kList,
-  kListItem,
-} from 'konsta/vue'
 import { useI18n } from 'vue-i18n'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import dayjs from 'dayjs'
 import { FormKit } from '@formkit/vue'
-import type { MobileColType, TableColumn } from './comp_def'
+import { useDark } from '@vueuse/core'
+import type { TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconSortUp from '~icons/lucide/chevron-up'
@@ -52,10 +48,16 @@ const emit = defineEmits([
   'sortClick',
   'rangeChange',
 ])
+const dropdown = ref<HTMLElement | null>(null)
+function closeDropdown() {
+  if (dropdown.value) {
+    dropdown.value.removeAttribute('open')
+  }
+}
 const { t } = useI18n()
+const isDark = useDark()
 const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
-const showTimeDropdown = ref(false)
 type Minutes = 1 | 3 | 15
 const currentGeneralTime = ref<Minutes>(1)
 const preciseDates = ref<[Date, Date]>()
@@ -122,10 +124,6 @@ function displayValueKey(elem: any, col: TableColumn | undefined) {
   return col.displayFunction ? col.displayFunction(elem) : elem[col.key]
 }
 
-function findMobileCol(name: MobileColType) {
-  return props.columns ? props.columns.find(col => col.mobile === name) : undefined
-}
-
 async function fastBackward() {
   console.log('fastBackward')
   emit('fastBackward')
@@ -133,16 +131,12 @@ async function fastBackward() {
   emit('reload')
 }
 
-async function clickLeft() {
-  currentSelected.value = 'general'
-  showTimeDropdown.value = !showTimeDropdown.value
-}
-
 async function clickRight() {
   currentSelected.value = 'precise'
 }
 
 async function setTime(time: Minutes) {
+  currentSelected.value = 'general'
   currentGeneralTime.value = time
   if (time === 1) {
     preciseDates.value = [
@@ -162,6 +156,7 @@ async function setTime(time: Minutes) {
       new Date(),
     ]
   }
+  closeDropdown()
 }
 
 function formatValue(previewValue: Date[] | undefined) {
@@ -178,7 +173,6 @@ function formatValue(previewValue: Date[] | undefined) {
 }
 
 onMounted(async () => {
-  initDropdowns()
   await organizationStore.awaitInitialLoad()
   thisOrganization.value = organizationStore.getOrgByAppId(props.appId) ?? null
 
@@ -197,28 +191,20 @@ onMounted(async () => {
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-300 rounded-lg md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
-        <div class="flex flex-col items-center justify-center flex-auto px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'hover:bg-gray-700 hover:text-white': !showTimeDropdown, 'general': currentSelected, 'bg-gray-100 text-gray-800': !currentSelected }" @click="clickLeft">
-          <div class="flex items-center justify-center">
+      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-100 rounded-lg dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-4">
+        <div ref="dropdown" class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="flex flex-row items-center justify-center flex-auto h-10 px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'general': currentSelected, 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'general' }">
             <IconClock class="mr-1" />
             <span class="hidden md:block">{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
           </div>
-          <div v-if="showTimeDropdown" class="absolute z-50 block w-32 h-40 text-white bg-gray-800 pointer-events-none top-14">
-            <div class="flex flex-col items-center justify-center cursor-pointer pointer-events-auto">
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 1, 'hover:bg-gray-700': currentGeneralTime !== 1 }" @click="setTime(1)">
-                {{ t('last-minute') }}
-              </div>
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 3, 'hover:bg-gray-700': currentGeneralTime !== 3 }" @click="setTime(3)">
-                {{ t('last-3-minutes') }}
-              </div>
-              <div class="w-full py-3 text-center" :class="{ 'bg-gray-900': currentGeneralTime === 15, 'hover:bg-gray-700': currentGeneralTime !== 15 }" @click="setTime(15)">
-                {{ t('last-15-minutes') }}
-              </div>
-            </div>
-          </div>
+          <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow">
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-minutes') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 15 }" @click="setTime(15)">{{ t('last-15-minutes') }}</a></li>
+          </ul>
         </div>
-        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-600" />
-        <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-800 hover:text-white': currentSelected === 'precise' }" @click="clickRight">
+        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
+        <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
               v-model="preciseDates"
@@ -226,8 +212,11 @@ onMounted(async () => {
               :max-date="dayjs().toDate()"
               :start-time="startTime"
               prevent-min-max-navigation
-              dark
+              :dark="isDark"
               range
+              :ui="{
+                menu: 'custom-timepicker-button',
+              }"
               @update:model-value="clickRight"
             >
               <template #trigger>
@@ -238,10 +227,9 @@ onMounted(async () => {
                   </p>
                 </div>
               </template>
-              <template #action-preview />
               <template #top-extra="{ value }">
                 <div class="flex items-center justify-center">
-                  <div class="flex items-center space-x-2 bg-[#444] px-3 py-2 rounded-full">
+                  <div class="flex items-center space-x-2 text-black dark:text-white bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="24"
@@ -252,12 +240,12 @@ onMounted(async () => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5 text-white"
+                      class="w-5 h-5 text-black dark:text-white"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="font-mono text-white">{{ formatValue(value as any).start }}</span>
+                    <span class="font-mono text-black dark:text-white">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -269,12 +257,12 @@ onMounted(async () => {
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-5 h-5 mx-4 text-white"
+                    class="w-5 h-5 mx-4 text-black dark:text-white"
                   >
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
                   </svg>
-                  <div class="flex items-center space-x-2 bg-[#444] px-3 py-2 rounded-full">
+                  <div class="flex items-center space-x-2 bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="24"
@@ -285,12 +273,12 @@ onMounted(async () => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5 text-white"
+                      class="w-5 h-5 text-black dark:text-white"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="font-mono text-white">{{ formatValue(value as any).end }}</span>
+                    <span class="font-mono text-black dark:text-white">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
               </template>
@@ -304,14 +292,18 @@ onMounted(async () => {
           :placeholder="searchPlaceholder"
           :prefix-icon="IconSearch" :disabled="isLoading"
           enterkeyhint="send"
+          :classes="{
+            outer: '!mb-0 md:w-96',
+            inner: '!rounded-full',
+          }"
         />
       </div>
     </div>
-    <div class="hidden md:block">
+    <div class="block">
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -331,11 +323,11 @@ onMounted(async () => {
             @click="emit('rowClick', elem)"
           >
             <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="col.class" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
-              <td v-else class="px-6 py-4">
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4">
                 {{ displayValueKey(elem, col) }}
               </td>
             </template>
@@ -350,27 +342,9 @@ onMounted(async () => {
         </tbody>
       </table>
     </div>
-    <kList class="block !my-0 md:hidden">
-      <kListItem
-        v-for="(elem, i) in elementList"
-        :key="i"
-        content-class="block"
-        inner-class="block"
-        title-wrap-class="block"
-        :title="displayValueKey(elem, findMobileCol('title'))"
-        :footer="displayValueKey(elem, findMobileCol('footer'))"
-        :header="displayValueKey(elem, findMobileCol('header'))"
-        @click="emit('rowClick', elem)"
-      >
-        <template #after>
-          <div v-if="findMobileCol('after')?.icon" @click.stop="findMobileCol('after')?.onClick" v-html="findMobileCol('after')?.icon" />
-          <span v-else>{{ displayValueKey(elem, findMobileCol('after')) }}</span>
-        </template>
-      </kListItem>
-    </kList>
     <nav class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative dark:bg-gray-900 md:bg-transparent md:pt-4 dark:md:bg-transparent" aria-label="Table navigation">
       <button
-        class="flex items-center justify-center h-10 px-4 py-2 space-x-2 text-sm font-medium text-white transition-colors border border-gray-300 rounded-md dark:border-gray-700 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary/90"
+        class="flex items-center justify-center h-10 px-4 py-2 space-x-2 text-sm font-medium transition-colors border border-gray-300 rounded-md dark:text-white dark:border-gray-700 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary/10 dark:hover:bg-primary/90"
         @click="fastBackward"
       >
         <IconFastBackward />
@@ -379,3 +353,13 @@ onMounted(async () => {
     </nav>
   </div>
 </template>
+
+<style>
+.custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
+  @apply btn btn-outline  btn-sm;
+}
+.custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
+  @apply btn btn-primary  btn-sm;
+
+}
+</style>

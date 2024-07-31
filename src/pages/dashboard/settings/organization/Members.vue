@@ -183,6 +183,7 @@ async function didCancel() {
       },
       {
         text: t('button-delete'),
+        role: 'danger',
         id: 'confirm-button',
       },
     ],
@@ -260,7 +261,7 @@ function canDelete(member: ExtendedOrganizationMember) {
       <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
         {{ t('members') }}
       </h2>
-      <button type="button" class="text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm px-5 py-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" @click="showInviteModal">
+      <button type="button" class="btn btn-outline btn-secondary" @click="showInviteModal">
         <Plus />
         <p class="hidden ml-2 md:block">
           {{ t('add-member') }}
