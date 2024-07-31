@@ -42,7 +42,6 @@ platform :ios do
 
     import_certificate(
       certificate_path: cert_path,
-      certificate_password: ENV['P12_PASSWORD'],
       keychain_name: options[:keychain_name],
       keychain_password: options[:keychain_password],
       log_output: true

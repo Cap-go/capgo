@@ -203,6 +203,9 @@ jobs:
         - uses: maierj/fastlane-action@v3.1.0
           env:
             APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+            BUNDLE_IDENTIFIER: ${{ secrets.BUNDLE_IDENTIFIER }}
+            BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+            BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           with:
             lane: ios beta
         - name: Upload release bundle
