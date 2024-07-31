@@ -568,7 +568,7 @@ function preventInputChangePerm(event: Event) {
             <InfoRow
               v-if="showBundleMetadataInput" id="metadata-bundle"
               :label="t('min-update-version')" editable :value="version.minUpdateVersion ?? ''"
-              :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])"
+              :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
               @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
             />
             <!-- meta devices -->
