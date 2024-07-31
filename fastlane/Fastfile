@@ -29,41 +29,91 @@ def ensure_temp_keychain(name, password)
 end
 
 platform :ios do
-
+  desc 'Export ipa and submit to TestFlight'
   lane :beta do
+    setup_signing
+    build_app_with_signing
+    upload_to_testflight
+  end
 
-    build_app(
-      configuration: "Release",
-      workspace: "./ios/App/App.xcworkspace",
-      scheme: "App",
-      export_method: "app-store",
+  private_lane :setup_signing do
+    keychain_password = SecureRandom.uuid
+    keychain_name = 'ios-build.keychain'
+
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600
     )
 
+    import_certificates(keychain_name, keychain_password)
+    install_provisioning_profiles
+    update_project_settings
+  end
+
+  private_lane :import_certificates do |keychain_name, keychain_password|
+    import_certificate(
+      certificate_data: ENV['P12_KEY_BASE64'],
+      certificate_password: ENV['CERTIFICATE_PASSWORD'],
+      keychain_name: keychain_name,
+      keychain_password: keychain_password,
+      log_output: true
+    )
+    import_certificate(
+      certificate_data: ENV['P12_CER_BASE64'],
+      certificate_password: ENV['CERTIFICATE_PASSWORD'],
+      keychain_name: keychain_name,
+      keychain_password: keychain_password,
+      log_output: true
+    )
+  end
+
+  private_lane :install_provisioning_profiles do
+    ENV['MOBILEPROVISION_BASE64'].split(/\R/).each.with_index(1) do |profile, index|
+      filename = "ios-build-#{index}.mobileprovision"
+      File.write(filename, Base64.decode64(profile))
+      install_provisioning_profile(path: filename)
+    end
+  end
+
+  private_lane :update_project_settings do
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "./ios/App/App.xcodeproj",
+      code_sign_identity: ENV['CODE_SIGNING_IDENTITY'],
+      team_id: ENV['TEAM_ID']
+    )
+
+    update_project_team(
+      path: "./ios/App/App.xcodeproj",
+      teamid: ENV['TEAM_ID']
+    )
+  end
+
+  private_lane :build_app_with_signing do
+    build_app(
+      workspace: "./ios/App/App.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_name: "App.ipa",
+      export_options: {
+        provisioningProfiles: {
+          ENV['BUNDLE_IDENTIFIER'] => ENV['PROVISIONING_PROFILE_SPECIFIER']
+        }
+      }
+    )
+  end
+
+  private_lane :upload_to_testflight do
     pilot(
       skip_waiting_for_build_processing: true,
       skip_submission: true,
       distribute_external: false,
       notify_external_testers: false,
       ipa: "./App.ipa"
-    )
-
-  end
-
-  lane :submit_review do
-    version = ''
-    Dir.chdir("..") do
-      file = File.read("package.json")
-      data = JSON.parse(file)
-      version = data["version"]
-    end
-    deliver(
-      app_version: version,
-      submit_for_review: true,
-      automatic_release: true,
-      force: true, # Skip HTMl report verification
-      skip_metadata: false,
-      skip_screenshots: false,
-      skip_binary_upload: true
     )
   end
 end
