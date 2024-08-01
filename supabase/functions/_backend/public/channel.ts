@@ -93,7 +93,12 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       console.log('Cannot find channels', dbError)
       return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
     }
-    return c.json(dataChannels)
+    return c.json(dataChannels.map((o) => {
+      const newObject = o as any
+      delete Object.assign(newObject, { disableAutoUpdateUnderNative: o.disable_auto_update_under_native }).disable_auto_update_under_native
+      delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
+      return newObject
+    }))
   }
 }
 
