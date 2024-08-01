@@ -63,6 +63,7 @@ app-logo-deleted: Image de l'application supprimée avec succès
 app-name: Nom de l'application
 app-perm: Autorisation de l'application
 are-u-sure: Êtes-vous sûr ?
+are-you-sure-you-want-to-download: Êtes-vous sûr de vouloir télécharger ?
 available-in-the-san: Disponible dans l'application bac à sable
 back-to-login-page: Retour à la page de connexion
 bandwith-usage: "Utilisation de la bande passante\_:"

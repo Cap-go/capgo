@@ -10,6 +10,7 @@ import { useDisplayStore } from '~/stores/display'
 * options: optional
 */
 const displayStore = useDisplayStore()
+const route = useRoute()
 
 function close(item?: ActionSheetOptionButton) {
   if (displayStore?.dialogOption)
@@ -47,6 +48,16 @@ onMounted(() => {
       displayStore.dialogCanceled = true
     else
       displayStore.dialogInputText = ''
+  })
+
+  addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && displayStore.showDialog && !displayStore?.dialogOption?.preventAccidentalClose)
+      displayStore.showDialog = false
+  })
+
+  watch(route, () => {
+    if (displayStore.showDialog)
+      displayStore.showDialog = false
   })
 })
 </script>

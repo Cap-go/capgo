@@ -402,6 +402,13 @@ async function openDownload() {
     buttonCenter: true,
     buttons: [
       {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          // console.log('Cancel clicked')
+        },
+      },
+      {
         text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
         handler: async () => {
           if (!version.value)
@@ -424,13 +431,6 @@ async function openDownload() {
             return
           }
           openVersion(version.value)
-        },
-      },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-        handler: () => {
-          // console.log('Cancel clicked')
         },
       },
     ],

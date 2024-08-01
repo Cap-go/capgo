@@ -59,6 +59,7 @@ app-logo-deleted: Imagem do aplicativo excluída com sucesso
 app-name: Nome do aplicativo
 app-perm: Permissão do aplicativo
 are-u-sure: Tem certeza ?
+are-you-sure-you-want-to-download: Tem a certeza de que pretende efetuar o download?
 available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
 bandwith-usage: 'Uso de largura de banda:'
