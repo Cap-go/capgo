@@ -1,36 +1,16 @@
-require 'json'
-
 default_platform(:ios)
-
-KEYSTORE_PATH = ENV["KEYSTORE_PATH"]
-KEYSTORE_KEY_ALIAS = ENV["KEYSTORE_KEY_ALIAS"]
-KEYSTORE_KEY_PASSWORD = ENV["KEYSTORE_KEY_PASSWORD"]
-KEYSTORE_STORE_PASSWORD = ENV["KEYSTORE_STORE_PASSWORD"]
-ANDROID_JSON_KEY_FILE = ENV['ANDROID_JSON_KEY_FILE']
-APPLE_KEY_ID = ENV['APPLE_KEY_ID']
-APPLE_ISSUER_ID = ENV['APPLE_ISSUER_ID']
 
 platform :ios do
   desc 'Export ipa and submit to TestFlight'
   lane :beta do
-    UI.message("Starting beta deployment process")
-  
     keychain_info = { keychain_name: "ios-build-#{Time.now.to_i}.keychain", keychain_password: SecureRandom.uuid }
     setup_signing(keychain_info)
-    UI.message("Signing setup completed")
-    
     build_app_with_signing(keychain_info)
-    UI.message("App build completed")
-    
     submit_to_testflight
-    UI.message("Submitted to TestFlight")
-    
     cleanup_keychain(name: keychain_info[:keychain_name])
-    UI.message("Keychain cleanup completed")
   end
 
   private_lane :setup_signing do |options|
-  
     create_keychain(
       name: options[:keychain_name],
       password: options[:keychain_password],
@@ -40,11 +20,7 @@ platform :ios do
       lock_when_sleeps: false, 
       add_to_search_list: true
     )
-  
-    import_cert({
-      keychain_name: options[:keychain_name],
-      keychain_password: options[:keychain_password]
-    })
+    import_cert(options)
     install_profile
     update_project_settings
   end
@@ -52,7 +28,6 @@ platform :ios do
   private_lane :import_cert do |options|
     cert_path = "#{Dir.tmpdir}/build_certificate.p12"
     File.write(cert_path, Base64.decode64(ENV['BUILD_CERTIFICATE_BASE64']))
-  
     import_certificate(
       certificate_path: cert_path,
       certificate_password: ENV['P12_PASSWORD'] || "",
@@ -60,79 +35,24 @@ platform :ios do
       keychain_password: options[:keychain_password],
       log_output: true
     )
-  
-    File.delete(cert_path) # Clean up the temporary file
+    File.delete(cert_path)
   end  
   
   private_lane :cleanup_keychain do |options|
-    delete_keychain(
-      name: options[:name]
-    ) if File.exist? File.expand_path("~/Library/Keychains/#{options[:name]}-db")
+    delete_keychain(name: options[:name]) if File.exist? File.expand_path("~/Library/Keychains/#{options[:name]}-db")
   end  
 
   private_lane :install_profile do
     profile_path = "#{Dir.home}/Library/MobileDevice/Provisioning Profiles/build_pp.mobileprovision"
-    
-    # Ensure the directory exists
     FileUtils.mkdir_p(File.dirname(profile_path))
-  
-    # Write the profile
     File.write(profile_path, Base64.decode64(ENV['BUILD_PROVISION_PROFILE_BASE64']))
-    
-    # Check if the file was created successfully
-    unless File.exist?(profile_path)
-      UI.user_error!("Failed to create provisioning profile at #{profile_path}")
-    end
-  
+    UI.user_error!("Failed to create provisioning profile at #{profile_path}") unless File.exist?(profile_path)
     ENV['PROVISIONING_PROFILE_PATH'] = profile_path
-    
-    UI.message("Provisioning profile installed at: #{profile_path}")
-    
-    # Try to decode and display the profile content
-    begin
-      decoded_content = `security cms -D -i "#{profile_path}"`
-      UI.message("Provisioning profile decoded content:")
-      UI.message(decoded_content)
-    rescue => e
-      UI.error("Failed to decode provisioning profile: #{e.message}")
-    end
-    
-    # Display raw content
-    begin
-      raw_content = File.read(profile_path)
-      UI.message("\nProvisioning profile raw content (readable strings):")
-      UI.message(raw_content.scan(/[[:print:]]/).join)
-    rescue => e
-      UI.error("Failed to read raw provisioning profile: #{e.message}")
-    end
-    
-    # Install the profile
-    begin
-      install_provisioning_profile(path: profile_path)
-    rescue => e
-      UI.error("Failed to install provisioning profile: #{e.message}")
-      UI.error("Profile path: #{profile_path}")
-      UI.error("Profile exists: #{File.exist?(profile_path)}")
-      UI.error("Profile size: #{File.size(profile_path)} bytes")
-    end
+    install_provisioning_profile(path: profile_path)
   end
-  
-
-  private_lane :verify_team_id do
-    project = Xcodeproj::Project.open("./ios/App/App.xcodeproj")
-    main_target = project.targets.find { |t| t.name == "App" }
-    build_configuration = main_target.build_configurations.first
-    team_id = build_configuration.build_settings['DEVELOPMENT_TEAM']
-    UI.user_error!("Team ID in project (#{team_id}) doesn't match expected team ID (#{ENV['TEAM_ID']})") unless team_id == ENV['TEAM_ID']
-  end  
 
   private_lane :update_project_settings do
-    # profile_name = File.basename(ENV['PROVISIONING_PROFILE_PATH'], '.mobileprovision')
     profile_name = "Github action"
-    UI.message("Using profile name: #{profile_name}")
-    UI.message("Using team ID: #{ENV['TEAM_ID']}")
-    UI.message("Using bundle identifier: #{ENV['BUNDLE_IDENTIFIER']}")
-  
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "./ios/App/App.xcodeproj",
@@ -141,7 +61,6 @@ platform :ios do
       bundle_identifier: ENV['BUNDLE_IDENTIFIER'],
       team_id: ENV['APP_STORE_CONNECT_TEAM_ID']
     )
-  
     update_project_team(
       path: "./ios/App/App.xcodeproj",
       teamid: ENV['APP_STORE_CONNECT_TEAM_ID']
@@ -150,7 +69,7 @@ platform :ios do
 
   private_lane :build_app_with_signing do |options|
     profile_name = "Github action"
-    unlock_keychain( # Unlock an existing keychain and add it to the keychain search list
+    unlock_keychain(
       path: "~/Library/Keychains/#{options[:keychain_name]}-db",
       password: options[:keychain_password],
       set_default: true
@@ -174,8 +93,8 @@ platform :ios do
 
   private_lane :submit_to_testflight do
     api_key = app_store_connect_api_key(
-      key_id: APPLE_KEY_ID,
-      issuer_id: APPLE_ISSUER_ID,
+      key_id: ENV['APPLE_KEY_ID'],
+      issuer_id: ENV['APPLE_ISSUER_ID'],
       key_content: Base64.decode64(ENV['APPLE_KEY_CONTENT']),
       duration: 1200,
       in_house: false
@@ -191,80 +110,27 @@ platform :ios do
   end
 end
 
-
-
 platform :android do
-    desc "Deploy a beta version to the Google Play"
-    private_lane :verify_changelog_exists do |version_code: |
-      changelog_path = "android/metadata/en-US/changelogs/#{version_code}.txt"
-      UI.user_error!("Missing changelog file at #{changelog_path}") unless File.exist?(changelog_path)
-      UI.message("Changelog exists for version code #{version_code}")
-    end
-  
-    private_lane :verify_upload_to_staging do |version_name: |
-      UI.message "Skipping staging verification step"
-      # require 'open-uri'
-      # staging_version = nil
-      # begin
-      #   versions = JSON.parse(open(URI.join(STAGING_API_URL, "/--/api/v2/versions")).read)
-      #   latest_major_version = versions['sdkVersions'].keys.map(&:to_i).sort().reverse().first()
-      #   latest_version = versions['sdkVersions']["#{latest_major_version}.0.0"]
-      #   staging_version = latest_version['androidClientVersion']
-      # rescue StandardError => e
-      #   UI.user_error!("Unable to validate androidClientVersion for latest SDK version on versions endpoint: #{e.inspect}. If this issue persists, remove the verify_upload_to_staging step from Fastfile and manually verify that the Android client has been deployed and tested on staging.")
-      # end
-  
-      # unless staging_version == version_name
-      #   UI.user_error!("APK version #{version_name} is not yet uploaded to staging. Please download from the client_android CI job, test and upload manually.")
-      # end
-      # UI.message "APK version #{version_name} has been uploaded to staging"
-    end
-    lane :beta do
-        gradle(
-          task: "clean bundleRelease",
-          project_dir: 'android/',
-          print_command: false,
-          properties: {
-            "android.injected.signing.store.file" => "#{KEYSTORE_PATH}",
-            "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
-            "android.injected.signing.key.alias" => "#{KEYSTORE_KEY_ALIAS}",
-            "android.injected.signing.key.password" => "#{KEYSTORE_KEY_PASSWORD}",
-          })
-        upload_to_play_store(
-          json_key: ANDROID_JSON_KEY_FILE,
-          track: 'beta',
-          skip_upload_metadata: true,
-          skip_upload_changelogs: true,
-          skip_upload_images: true,
-          skip_upload_screenshots: true,
-        )
-    end
-    lane :build do
-      gradle(
-        task: "clean bundleRelease",
-        project_dir: 'android/',
-        print_command: false,
-        properties: {
-          "android.injected.signing.store.file" => "#{KEYSTORE_PATH}",
-          "android.injected.signing.store.password" => "#{KEYSTORE_STORE_PASSWORD}",
-          "android.injected.signing.key.alias" => "#{KEYSTORE_KEY_ALIAS}",
-          "android.injected.signing.key.password" => "#{KEYSTORE_KEY_PASSWORD}",
-        })
-    end
-    lane :prod_release do
-      build_gradle = File.read("../android/app/build.gradle")
-
-      verify_changelog_exists(version_code: build_gradle.match(/versionCode (\d+)/)[1])
-      verify_upload_to_staging(version_name: build_gradle.match(/versionName '([\d\.]+)'/)[1])
-  
-      supply(
-        track_promote_to: 'beta',
-        skip_upload_apk: true,
-        skip_upload_aab: true,
-        skip_upload_metadata: false,
-        skip_upload_changelogs: false,
-        skip_upload_images: false,
-        skip_upload_screenshots: false
-      )
-    end
+  desc "Deploy a beta version to the Google Play"
+  lane :beta do
+    gradle(
+      task: "clean bundleRelease",
+      project_dir: 'android/',
+      print_command: false,
+      properties: {
+        "android.injected.signing.store.file" => ENV["KEYSTORE_PATH"],
+        "android.injected.signing.store.password" => ENV["KEYSTORE_STORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["KEYSTORE_KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["KEYSTORE_KEY_PASSWORD"],
+      }
+    )
+    upload_to_play_store(
+      json_key: ENV['ANDROID_JSON_KEY_FILE'],
+      track: 'beta',
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
 end
