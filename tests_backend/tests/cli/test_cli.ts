@@ -229,7 +229,7 @@ async function checkDownload(backendBaseUrl: URL, _supabase: SupabaseType) {
 async function testSelectableDisallow(_backendBaseUrl: URL, supabase: SupabaseType) {
   // We set the channel update scheme to version_number, then will revert it back to major
   // 22 = channel 'production'
-  const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'version_number' }).eq('id', 22)
+  const { error } = await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('id', 22)
 
   assert(error === null, `Supabase channel update error ${JSON.stringify(error)} is not null`)
 
@@ -244,7 +244,7 @@ async function testSelectableDisallow(_backendBaseUrl: URL, supabase: SupabaseTy
   }
   finally {
     // We set the channel update scheme to major
-    const { error } = await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+    const { error } = await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('id', 22)
 
     assert(error === null, `Supabase channel update error (2) ${JSON.stringify(error)} is not null`)
   }
