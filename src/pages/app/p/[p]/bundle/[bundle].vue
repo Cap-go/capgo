@@ -313,6 +313,9 @@ async function ASChannelChooser() {
   displayStore.dialogOption = {
     header: t('channel-linking'),
     buttons,
+    buttonVertical: true,
+    headerStyle: 'text-center',
+    size: 'max-w-fit px-12',
   }
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
@@ -327,6 +330,9 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
 
   displayStore.dialogOption = {
     header: t('channel-linking'),
+    buttonVertical: true,
+    headerStyle: 'text-center',
+    size: 'max-w-fit px-12',
     buttons: [
       {
         text: t('button-cancel'),
@@ -390,7 +396,10 @@ async function openDownload() {
   if (!version.value || !main.auth)
     return
   displayStore.dialogOption = {
-    header: t('download'),
+    header: t('are-you-sure-you-want-to-download'),
+    headerStyle: 'w-full text-center',
+    size: 'max-w-fit px-12',
+    buttonCenter: true,
     buttons: [
       {
         text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
@@ -412,14 +421,9 @@ async function openDownload() {
             displayStore.showDialog = true
             await displayStore.onDialogDismiss()
             copyToast(command)
+            return
           }
           openVersion(version.value)
-        },
-      },
-      {
-        text: t('set-bundle'),
-        handler: () => {
-          ASChannelChooser()
         },
       },
       {

@@ -44,6 +44,7 @@ watch(channel, async (channel) => {
     return
   }
 
+  await organizationStore.awaitInitialLoad()
   role.value = await organizationStore.getCurrentRoleForApp(channel.app_id)
   console.log(role.value)
 })
@@ -312,6 +313,9 @@ async function openPannel() {
   }
   displayStore.dialogOption = {
     header: t('unlink-bundle'),
+    headerStyle: 'w-full text-center',
+    size: 'max-w-fit px-12',
+    buttonCenter: true,
     buttons: [
       {
         text: t('button-cancel'),
@@ -419,13 +423,20 @@ async function setSecondaryVersionPercentage(percentage: number) {
   await debouncedSetSecondaryVersionPercentage(percentage)
 }
 
-function onMouseDownSecondaryVersionSlider() {
+function onMouseDownSecondaryVersionSlider(event: Event) {
   console.log('onMouseDownSecondaryVersionSlider', secondaryVersionPercentage.value)
-  if (channel.value?.enable_progressive_deploy || !(role.value && organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin']))) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
+    toast.error(t('no-permission'))
+    event.preventDefault()
+    return
+  }
+
+  if (!channel.value?.enable_progressive_deploy) {
     setSecondaryVersionPercentage(secondaryVersionPercentage.value)
   }
   else {
     toast.error(t('progressive-deploy-set-percentage'))
+    event.preventDefault()
   }
 }
 
@@ -548,7 +559,7 @@ async function onChangeAutoUpdate(event: Event) {
           <InfoRow label="Android">
             <Toggle
               :value="channel?.android"
-              @change="saveChannelChange('android', !channel?.ios)"
+              @change="saveChannelChange('android', !channel?.android)"
             />
           </InfoRow>
           <InfoRow :label="t('disable-auto-downgra')">
@@ -582,12 +593,6 @@ async function onChangeAutoUpdate(event: Event) {
               @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
             />
           </InfoRow>
-          <InfoRow :label="t('allow-develoment-bui')">
-            <Toggle
-              :value="channel?.allow_dev"
-              @change="saveChannelChange('allow_dev', !channel?.allow_dev)"
-            />
-          </InfoRow>
           <InfoRow :label="t('allow-emulator')">
             <Toggle
               :value="channel?.allow_emulator"
@@ -612,9 +617,9 @@ async function onChangeAutoUpdate(event: Event) {
               @change="enableProgressiveDeploy()"
             />
           </InfoRow>
-          <InfoRow :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
+          <InfoRow v-if="channel.enable_ab_testing || channel.enable_progressive_deploy" :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
             <div>
-              <input v-model="secondaryVersionPercentage" type="range" min="0" max="100" class="range range-info" step="10" @mouseup="onMouseDownSecondaryVersionSlider">
+              <input v-model="secondaryVersionPercentage" type="range" min="0" max="100" class="range range-info" step="10" @mousedown="onMouseDownSecondaryVersionSlider">
               <div class="w-full px-2 text-xs text-center">
                 <span>{{ secondaryVersionPercentage }}%</span>
               </div>
