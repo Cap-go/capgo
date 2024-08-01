@@ -367,6 +367,7 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
     if (role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
       displayStore.dialogOption.buttons.splice(baseIndex + 1, 0, {
         text: t('unlink-channel'),
+        role: 'danger',
         handler: async () => {
           try {
             if (!channel.value)
@@ -431,6 +432,13 @@ async function openDownload() {
             return
           }
           openVersion(version.value)
+        },
+      },
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          // console.log('Cancel clicked')
         },
       },
     ],
@@ -572,7 +580,7 @@ function preventInputChangePerm(event: Event) {
             <InfoRow
               v-if="showBundleMetadataInput" id="metadata-bundle"
               :label="t('min-update-version')" editable :value="version.min_update_version ?? ''"
-              :readonly="!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])"
+              :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
               @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
             />
             <!-- meta devices -->
