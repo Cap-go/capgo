@@ -206,6 +206,10 @@ jobs:
             BUNDLE_IDENTIFIER: ${{ secrets.BUNDLE_IDENTIFIER }}
             BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
             BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+            APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+            APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+            APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
+            APPLE_PROFILE_NAME: ${{ secrets.APPLE_PROFILE_NAME }}
           with:
             lane: ios beta
         - name: Upload release bundle
