@@ -51,7 +51,7 @@ async function requestInfosPostgres(
     .then(data => data.at(0))
 
   const versionAlias = alias(schema.app_versions, 'version')
-  const secondVersionAlias = alias(schema.app_versions, 'secondVersion')
+  const secondVersionAlias = alias(schema.app_versions, 'second_version')
 
   const deviceOverwrite = drizzleCient
     .select({
@@ -68,7 +68,7 @@ async function requestInfosPostgres(
         bucket_id: versionAlias.bucket_id,
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
-        minUpdateVersion: versionAlias.minUpdateVersion,
+        min_update_version: versionAlias.min_update_version,
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
     })
@@ -93,7 +93,7 @@ async function requestInfosPostgres(
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
       secondVersion: {
@@ -105,7 +105,7 @@ async function requestInfosPostgres(
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+        min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
         r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
       },
       channels: {
@@ -116,13 +116,13 @@ async function requestInfosPostgres(
         app_id: schema.channels.app_id,
         allow_dev: schema.channels.allow_dev,
         allow_emulator: schema.channels.allow_emulator,
-        disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
-        disableAutoUpdate: schema.channels.disableAutoUpdate,
+        disable_auto_update_under_native: schema.channels.disable_auto_update_under_native,
+        disable_auto_update: schema.channels.disable_auto_update,
         ios: schema.channels.ios,
         android: schema.channels.android,
-        secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+        secondary_version_percentage: schema.channels.secondary_version_percentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
-        enableAbTesting: schema.channels.enableAbTesting,
+        enable_ab_testing: schema.channels.enable_ab_testing,
         allow_device_self_set: schema.channels.allow_device_self_set,
         public: schema.channels.public,
       },
@@ -131,7 +131,7 @@ async function requestInfosPostgres(
     .from(schema.channel_devices)
     .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.second_version, secondVersionAlias.id))
     .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
   const channelDevice = channelDeviceReq
     .limit(1)
@@ -150,7 +150,7 @@ async function requestInfosPostgres(
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-        minUpdateVersion: sql<string | null>`${versionAlias.minUpdateVersion}`.as('vminUpdateVersion'),
+        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
       },
       secondVersion: {
@@ -162,7 +162,7 @@ async function requestInfosPostgres(
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        minUpdateVersion: sql<string | null>`${secondVersionAlias.minUpdateVersion}`.as('svminUpdateVersion'),
+        min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
         r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
       },
       channels: {
@@ -173,20 +173,20 @@ async function requestInfosPostgres(
         app_id: schema.channels.app_id,
         allow_dev: schema.channels.allow_dev,
         allow_emulator: schema.channels.allow_emulator,
-        disableAutoUpdateUnderNative: schema.channels.disableAutoUpdateUnderNative,
-        disableAutoUpdate: schema.channels.disableAutoUpdate,
+        disable_auto_update_under_native: schema.channels.disable_auto_update_under_native,
+        disable_auto_update: schema.channels.disable_auto_update,
         ios: schema.channels.ios,
         android: schema.channels.android,
-        secondaryVersionPercentage: schema.channels.secondaryVersionPercentage,
+        secondary_version_percentage: schema.channels.secondary_version_percentage,
         enable_progressive_deploy: schema.channels.enable_progressive_deploy,
-        enableAbTesting: schema.channels.enableAbTesting,
+        enable_ab_testing: schema.channels.enable_ab_testing,
         allow_device_self_set: schema.channels.allow_device_self_set,
         public: schema.channels.public,
       },
     })
     .from(schema.channels)
     .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schema.channels.secondVersion, secondVersionAlias.id))
+    .leftJoin(secondVersionAlias, eq(schema.channels.second_version, secondVersionAlias.id))
     .where(!defaultChannel
       ? and(
         eq(schema.channels.public, true),
@@ -374,7 +374,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    let enableAbTesting: boolean = channelData.channels.enableAbTesting
+    let enableAbTesting: boolean = channelData.channels.enable_ab_testing
     const enableProgressiveDeploy: boolean = channelData.channels.enable_progressive_deploy
     // let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
 
@@ -389,7 +389,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     if (enableAbTesting || enableProgressiveDeploy) {
       if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = channelData.channels.secondaryVersionPercentage // ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
+        const secondVersionPercentage: number = channelData.channels.secondary_version_percentage // ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
 
         if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) {
           version = secondVersion
@@ -473,7 +473,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           old: version_name,
         }, 200)
       }
-      if (channelData.channels.disableAutoUpdate === 'major' && semver.major(version.name) > semver.major(version_name)) {
+      if (channelData.channels.disable_auto_update === 'major' && semver.major(version.name) > semver.major(version_name)) {
         console.log(id, 'Cannot upgrade major version', device_id, new Date().toISOString())
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
@@ -494,7 +494,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (channelData.channels.disableAutoUpdate === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
+      if (channelData.channels.disable_auto_update === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
         console.log(id, 'Cannot upgrade minor version', device_id, new Date().toISOString())
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
@@ -507,7 +507,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       console.log(version.name, version_name)
-      if (channelData.channels.disableAutoUpdate === 'patch' && !(
+      if (channelData.channels.disable_auto_update === 'patch' && !(
         semver.patch(version.name) > semver.patch(version_name)
         && semver.major(version.name) === semver.major(version_name)
         && semver.minor(version.name) === semver.minor(version_name)
@@ -524,8 +524,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (channelData.channels.disableAutoUpdate === 'version_number') {
-        const minUpdateVersion = version.minUpdateVersion
+      if (channelData.channels.disable_auto_update === 'version_number') {
+        const minUpdateVersion = version.min_update_version
 
         // The channel is misconfigured
         if (minUpdateVersion === null) {
@@ -554,7 +554,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       // console.log(id, 'check disableAutoUpdateUnderNative', device_id)
-      if (channelData.channels.disableAutoUpdateUnderNative && semver.lt(version.name, version_build)) {
+      if (channelData.channels.disable_auto_update_under_native && semver.lt(version.name, version_build)) {
         console.log(id, 'Cannot revert under native version', device_id, new Date().toISOString())
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
         return c.json({

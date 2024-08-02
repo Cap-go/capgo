@@ -10,6 +10,7 @@ import { useDisplayStore } from '~/stores/display'
 * options: optional
 */
 const displayStore = useDisplayStore()
+const route = useRoute()
 
 function close(item?: ActionSheetOptionButton) {
   if (displayStore?.dialogOption)
@@ -48,6 +49,16 @@ onMounted(() => {
     else
       displayStore.dialogInputText = ''
   })
+
+  addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && displayStore.showDialog && !displayStore?.dialogOption?.preventAccidentalClose)
+      displayStore.showDialog = false
+  })
+
+  watch(route, () => {
+    if (displayStore.showDialog)
+      displayStore.showDialog = false
+  })
 })
 </script>
 
@@ -60,7 +71,11 @@ onMounted(() => {
       <h3 class="text-lg font-bold" :class="displayStore.dialogOption?.headerStyle">
         {{ displayStore.dialogOption?.header }}
       </h3>
-      <div class="py-4">
+      <div
+        :class="{
+          'py-4': !displayStore.dialogOption?.buttonVertical,
+        }"
+      >
         <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" :class="displayStore.dialogOption?.textStyle" v-html="displayText(displayStore.dialogOption?.message)" />
         <img v-if="displayStore.dialogOption?.image" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
         <div v-if="displayStore.dialogOption?.input" class="w-full">
@@ -82,9 +97,10 @@ onMounted(() => {
       </div>
       <div class="modal-action">
         <div
-          class="flex items-center rounded-b dark:border-gray-600"
+          class="flex items-center rounded-b dark:border-gray-600 w-full"
           :class="{
             'space-x-2': !displayStore.dialogOption?.buttonCenter,
+            'flex-col mx-auto': displayStore.dialogOption?.buttonVertical,
           }"
         >
           <!-- if there is a button in form, it will close the modal -->
@@ -98,6 +114,8 @@ onMounted(() => {
               'ml-auto mr-2': displayStore.dialogOption?.buttonCenter && i === 0 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
               'mr-auto ml-2': displayStore.dialogOption?.buttonCenter && i === (displayStore.dialogOption?.buttons?.length ?? 0) - 1 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
               'mx-auto': displayStore.dialogOption?.buttonCenter && (displayStore.dialogOption?.buttons?.length ?? 0) === 1,
+              'my-1': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
+              'my-4': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
             }"
             class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
             @click="close(item)"
