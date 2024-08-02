@@ -41,33 +41,31 @@ async function presentActionSheet() {
     return
   }
 
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
-    header: '',
+  displayStore.dialogOption = {
+    header: t('change-your-picture'),
     buttons: [
       {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
         text: t('button-camera'),
-        handler: () => {
-          displayStore.showActionSheet = false
+        id: 'camera-button',
+        handler: async () => {
           takePhoto(isLoading, 'org', '')
         },
       },
       {
+        id: 'browse-button',
         text: t('button-browse'),
         handler: () => {
-          displayStore.showActionSheet = false
           pickPhoto(isLoading, 'org', '')
-        },
-      },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
         },
       },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function saveChanges(form: { orgName: string, email: string }) {
@@ -273,7 +271,7 @@ async function deleteOrganization() {
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
             <button
-              class="p-2 text-white border border-red-400 rounded-lg btn hover:bg-red-600 mr-4 mb-2"
+              class="p-2 mb-2 mr-4 text-white border border-red-400 rounded-lg btn hover:bg-red-600"
               color="secondary"
               shape="round"
               type="button"

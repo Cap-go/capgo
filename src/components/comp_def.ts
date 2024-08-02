@@ -15,7 +15,7 @@ export interface TableSort {
 export interface TableColumn {
   label: string
   key: string
-  mobile: MobileColType
+  mobile: boolean
   displayFunction?: (elem: any) => string
   sortable?: 'asc' | 'desc' | boolean
   head?: boolean

@@ -2,15 +2,12 @@
 import { ref, watchEffect } from 'vue'
 import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
-import {
-  kFab,
-} from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
 import { pushEvent } from '~/services/chatwoot'
-import arrowBack from '~icons/ion/arrow-back?width=1em&height=1em'
+import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 
 const props = defineProps<{
   onboarding: boolean
@@ -221,7 +218,7 @@ watchEffect(async () => {
               <div class="ml-6 text-xl font-medium text-gray-900 font-pj">
                 {{ s.title }}<br>
                 <span class="text-sm">{{ s.subtitle }}</span>
-                <div class="p-3 rounded-lg" :class="{ 'bg-black': s.command }">
+                <div class="p-3 rounded-lg" :class="{ 'dark:bg-black bg-gray-100': s.command }">
                   <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />
@@ -238,9 +235,7 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <k-fab v-if="!onboarding" class="fixed z-20 right-4-safe bottom-4-safe" @click="emit('done')">
-    <template #icon>
-      <component :is="arrowBack" />
-    </template>
-  </k-fab>
+  <button v-if="!onboarding" class="fixed z-20 bg-gray-800 btn btn-lg btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
+    <arrowBack />
+  </button>
 </template>

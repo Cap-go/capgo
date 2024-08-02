@@ -108,10 +108,7 @@ const bannerColor = computed(() => {
       <a class="text-xl font-bold text-black normal-case">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a href="/dashboard/settings/plans" class="btn">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
-      <!-- <button v-else class="ml-3 mr-3" @click="showInfo">
-        <InformationInfo class="h-10 rounded-full w-10 bg-[#252b36]" />
-      </button> -->
+      <a href="/dashboard/settings/organization/plans" class="btn btn-outline btn-primary">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
     </div>
   </div>
 </template>

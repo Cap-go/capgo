@@ -5,8 +5,22 @@ import process from 'node:process'
 import type { ExecSyncOptions } from 'node:child_process'
 import rimraf from 'rimraf'
 
-let appPath: string | null = null
-let tempFileFolder = ''
+export const TEMP_DIR_NAME = 'temp_cli_test'
+export const BASE_PACKAGE_JSON = `{
+  "name": "test-cli-app",
+  "version": "1.0.0",
+  "description": "An Amazing Test App",
+  "dependencies": %DEPENDENCIES%,
+  "devDependencies": {
+    "@capacitor/cli": "^5.4.1",
+    "typescript": "^5.2.2"
+  },
+  "author": ""
+}`
+export const BASE_DEPENDENCIES = {
+  '@capacitor/android': '^4.5.0',
+}
+const tempFileFolder = path.join(process.cwd(), TEMP_DIR_NAME)
 
 const defaultApiKey = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
 
@@ -39,10 +53,17 @@ const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(ba
 export default config;\n`
 }
 
+export function setDependencies(dependencies: Record<string, string>) {
+  // write package.json
+  const pathPack = path.join(tempFileFolder, 'package.json')
+  const res = BASE_PACKAGE_JSON.replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
+  console.log('setDependencies', pathPack, res)
+  writeFileSync(pathPack, res)
+}
+
 export async function prepareCli(backendBaseUrl: URL) {
   const defaultConfig = generateCliConfig(backendBaseUrl)
   // clean up temp folder
-  tempFileFolder = path.join(process.cwd(), 'temp_cli_test')
   if (existsSync(tempFileFolder)) {
     rimraf.sync(tempFileFolder)
   }
@@ -54,22 +75,7 @@ export async function prepareCli(backendBaseUrl: URL) {
   mkdirSync(path.join(tempFileFolder, 'dist'), { recursive: true })
   writeFileSync(path.join(tempFileFolder, 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(path.join(tempFileFolder, 'dist', 'index.html'), '')
-  // write package.json
-  writeFileSync(path.join(tempFileFolder, 'package.json'), JSON.stringify({
-    name: 'test-cli-app',
-    version: '1.0.0',
-    description: 'An Amazing Test App',
-    dependencies: {
-      '@capacitor/android': '^4.5.0',
-    },
-    devDependencies: {
-      '@capacitor/cli': '^5.4.1',
-      'typescript': '^5.2.2',
-    },
-    author: '',
-  }, null, 2))
-
-  appPath = tempFileFolder
+  setDependencies(BASE_DEPENDENCIES)
 
   await npmInstall()
 }
@@ -96,7 +102,7 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   ].join(' ')
 
   const options: ExecSyncOptions = {
-    cwd: appPath!,
+    cwd: tempFileFolder!,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, FORCE_COLOR: '1' },

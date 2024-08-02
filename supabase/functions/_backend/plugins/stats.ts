@@ -28,6 +28,7 @@ import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
+import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
 
 const failActions = [
   'set_fail',
@@ -115,17 +116,16 @@ async function post(c: Context, body: AppStats) {
       .eq('app_id', app_id)
       .single()
     if (!appOwner) {
-      // TODO: transfer to clickhouse
-      // if (app_id) {
-      //   await saveStoreInfoCF(c, {
-      //     app_id,
-      //     onprem: true,
-      //     capacitor: true,
-      //     capgo: true,
-      //   })
-      // }
-      // if (action === 'get')
-      //   await updateStoreApp(c, app_id, 1)
+      if (app_id) {
+        await saveStoreInfoCF(c, {
+          app_id,
+          onprem: true,
+          capacitor: true,
+          capgo: true,
+        })
+      }
+      if (action === 'get')
+        await updateStoreApp(c, app_id, 1)
 
       return c.json({
         message: 'App not found',

@@ -14,6 +14,7 @@ import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
+import { saveStoreInfoCF } from './cloudflare.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
   const res: {
@@ -256,15 +257,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const coerce = semver.coerce(version_build, { includePrerelease: true })
     const appOwner = await getAppOwnerPostgres(app_id, drizzleCient)
     if (!appOwner) {
-      // TODO: transfer to clickhouse
-      // if (app_id) {
-      //   await saveStoreInfoCF(c, {
-      //     app_id,
-      //     onprem: true,
-      //     capacitor: true,
-      //     capgo: true,
-      //   })
-      // }
+      if (app_id) {
+        await saveStoreInfoCF(c, {
+          app_id,
+          onprem: true,
+          capacitor: true,
+          capgo: true,
+        })
+      }
       console.log(id, 'App not found', app_id, new Date().toISOString())
       return c.json({
         message: 'App not found',

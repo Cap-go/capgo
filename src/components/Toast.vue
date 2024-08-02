@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Toaster } from 'vue-sonner'
 
-const toastOptions = {
-  class: 'safe-areas',
-}
+const toastOptions = ref({
+  classes: {
+    toast: '!top-safe',
+  },
+})
 </script>
 
 <template>

@@ -5,14 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
-import { initDropdowns } from 'flowbite'
 import { useSupabase } from '~/services/supabase'
 import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { reflioLoader } from '~/services/reflio'
-import { changeLanguage, getEmoji } from '~/services/i18n'
-import { availableLocales, i18n, languages } from '~/modules/i18n'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -70,9 +67,6 @@ async function submit(form: { first_name: string, last_name: string, password: s
   }
   router.push(`/onboarding/confirm_email?email=${encodeURI(form.email)}`)
 }
-onMounted(async () => {
-  initDropdowns()
-})
 </script>
 
 <template>
@@ -92,13 +86,27 @@ onMounted(async () => {
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages />
               <div class="space-y-2 text-gray-500 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                <div class="col-span-2">
+                  <FormKit
+                    type="email"
+                    name="email"
+                    :prefix-icon="iconEmail"
+                    autocomplete="email"
+                    inputmode="email"
+                    enterkeyhint="next"
+                    validation="required:trim|email"
+                    :label="t('email')"
+                    :classes="{
+                      outer: '!mb-0',
+                    }"
+                  />
+                </div>
                 <FormKit
                   type="text"
                   name="first_name"
                   :disabled="isLoading"
                   :prefix-icon="iconName"
                   :label="t('first-name')"
-                  input-class="!text-black"
                   autocomplete="given-name"
                   validation="required:trim"
                   enterkeyhint="next"
@@ -109,34 +117,18 @@ onMounted(async () => {
                   name="last_name"
                   :label="t('last-name')"
                   autocomplete="family-name"
-                  input-class="!text-black"
                   :prefix-icon="iconName"
                   :disabled="isLoading"
                   validation="required:trim"
                   enterkeyhint="next"
                 />
-                <div class="col-span-2">
-                  <FormKit
-                    type="email"
-                    name="email"
-                    :prefix-icon="iconEmail"
-                    input-class="!text-black"
-                    autocomplete="email"
-                    inputmode="email"
-                    enterkeyhint="next"
-                    validation="required:trim|email"
-                    :label="t('email')"
-                  />
-                </div>
 
                 <FormKit
                   type="password"
                   name="password"
                   :prefix-icon="iconPassword"
-                  input-class="!text-black"
                   autocomplete="new-password"
                   :label="t('password')"
-                  :help="t('6-characters-minimum')"
                   validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
                   validation-visibility="live"
                 />
@@ -144,20 +136,12 @@ onMounted(async () => {
                   type="password"
                   name="password_confirm"
                   :prefix-icon="iconPassword"
-                  input-class="!text-black"
-                  :help="t('confirm-password')"
                   :label="t('confirm-password')"
                   autocomplete="new-password"
                   validation="required|confirm"
                   validation-visibility="live"
                   :validation-label="t('password-confirmatio')"
                 />
-
-                <div class="flex items-center col-span-2">
-                  <span class="text-sm font-medium text-gray-500">
-                    {{ t("password-hint") }}
-                  </span>
-                </div>
 
                 <div class="w-1/2 col-span-2 mx-auto">
                   <button
@@ -172,7 +156,7 @@ onMounted(async () => {
 
                 <div class="col-span-2 text-center">
                   <p class="text-base text-gray-600">
-                    <a href="/login" title="" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">{{ t("already-account") }}</a>
+                    <a href="/login" title="" class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline">{{ t("already-account") }}</a>
                   </p>
                 </div>
               </div>
@@ -181,17 +165,7 @@ onMounted(async () => {
         </div>
         <section class="flex flex-col mt-6 md:flex-row md:items-center items-left">
           <div class="mx-auto">
-            <button id="dropdownDefaultButton" data-dropdown-toggle="dropdown" class="inline-flex px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" type="button">
-              {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            <!-- Dropdown menu -->
-            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
-              <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
-                <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
-                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-900': locale === i18n.global.locale.value }">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
-                </li>
-              </ul>
-            </div>
+            <LangSelector />
           </div>
         </section>
       </div>

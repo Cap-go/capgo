@@ -8,7 +8,6 @@ const DEFAULT_PASSWORD = 'testtest'
 const START_TIMEOUT = 3000
 
 export const BASE_URL = 'http://localhost:5173'
-export const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 
 const defaultSupabaseUrl = 'http://localhost:54321'
 const defaultSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'

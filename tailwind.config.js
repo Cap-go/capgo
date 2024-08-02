@@ -1,7 +1,6 @@
 const plugin = require('tailwindcss/plugin')
 const colors = require('tailwindcss/colors')
 const defaultTheme = require('tailwindcss/defaultTheme')
-const konstaConfig = require('konsta/config')
 
 // https://icon-sets.iconify.design/
 const primary = '#515271'
@@ -15,16 +14,7 @@ const neutral = '#191D24'
 const base100 = '#2A303C'
 const info = '#3ABFF8'
 
-module.exports = konstaConfig({
-  konsta: {
-    colors: {
-      primary,
-      secondary,
-      success,
-      warning,
-      danger,
-    },
-  },
+module.exports = {
   daisyui: {
     themes: [
       {
@@ -46,7 +36,6 @@ module.exports = konstaConfig({
     './index.html',
     './formkit.config.ts',
     './src/**/*.{vue,js,ts,jsx,tsx}',
-    './node_modules/flowbite/**/*.js',
   ],
   theme: {
     extend: {
@@ -112,6 +101,11 @@ module.exports = konstaConfig({
       },
       colors: {
         ...colors,
+        primary,
+        secondary,
+        success,
+        warning,
+        danger,
         'gray': colors.gray,
         'amber': colors.amber,
         'rose': colors.rose,
@@ -277,10 +271,10 @@ module.exports = konstaConfig({
   },
   plugins: [
     require('@tailwindcss/typography'),
+    require('tailwind-capacitor').safeAreas,
     require('@tailwindcss/aspect-ratio'),
     require('@tailwindcss/container-queries'),
     require('daisyui'),
-    // require('flowbite/plugin'), // TODO: understand why this is not working
     // add custom variant for expanding sidebar
     plugin(({ addVariant, e }) => {
       addVariant('sidebar-expanded', ({ modifySelectors, separator }) => {
@@ -288,4 +282,4 @@ module.exports = konstaConfig({
       })
     }),
   ],
-})
+}

@@ -3,15 +3,14 @@ import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { kFab } from 'konsta/vue'
 import { toast } from 'vue-sonner'
 import { storeToRefs } from 'pinia'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
-import { EMPTY_UUID, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import IconTrash from '~icons/heroicons/trash?raw'
-import IconPlus from '~icons/heroicons/plus?width=1em&height=1em'
+import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { appIdToUrl } from '~/services/conversion'
@@ -36,7 +35,7 @@ interface Channel {
   }
   misconfigured: boolean | undefined
 }
-const element: Database['public']['Tables']['channels']['Row'] & Channel = {} as any
+type Element = Database['public']['Tables']['channels']['Row'] & Channel
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
@@ -47,7 +46,7 @@ const router = useRouter()
 const main = useMainStore()
 const total = ref(0)
 const search = ref('')
-const elements = ref<(typeof element)[]>([])
+const elements = ref<(Element)[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const versionId = ref<number>()
@@ -68,6 +67,7 @@ async function didCancel(name: string) {
       },
       {
         text: t('button-delete'),
+        role: 'danger',
         id: 'confirm-button',
       },
     ],
@@ -92,6 +92,7 @@ async function addChannel(name: string) {
     return
   try {
     console.log('addChannel', name, versionId.value, main.user)
+    const currentGid = organizationStore.currentOrganization?.gid
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }
     const { data: dataChannel } = await supabase
       .from('channels')
@@ -100,7 +101,7 @@ async function addChannel(name: string) {
           name,
           app_id: props.appId,
           version: versionId.value,
-          owner_org: EMPTY_UUID,
+          owner_org: currentGid,
         },
       ])
       .select()
@@ -162,7 +163,7 @@ async function getData() {
     let anyMisconfigured = false
     const channels = dataVersions
       .filter(e => e.disableAutoUpdate === 'version_number')
-      .map(e => e as any as typeof element)
+      .map(e => e as any as Element)
 
     for (const channel of channels) {
       if (channel.version.minUpdateVersion === null) {
@@ -196,7 +197,7 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function deleteOne(one: typeof element) {
+async function deleteOne(one: Element) {
   // console.log('deleteBundle', bundle)
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(one.app_id), ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
@@ -220,6 +221,7 @@ async function deleteOne(one: typeof element) {
     }
   }
   catch (error) {
+    console.error(error)
     toast.error(t('cannot-delete-channel'))
   }
 }
@@ -228,34 +230,34 @@ columns.value = [
   {
     label: t('name'),
     key: 'name',
-    mobile: 'title',
+    mobile: true,
     sortable: true,
     head: true,
   },
   {
     label: t('last-upload'),
     key: 'updated_at',
-    mobile: 'header',
+    mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.updated_at || ''),
   },
   {
     label: t('last-version'),
     key: 'version',
-    mobile: 'footer',
+    mobile: true,
     sortable: true,
-    displayFunction: (elem: typeof element) => elem.version.name,
+    displayFunction: (elem: Element) => elem.version.name,
   },
   {
     label: t('misconfigured'),
+    mobile: false,
     key: 'misconfigured',
-    mobile: 'footer',
-    displayFunction: (elem: typeof element) => elem.misconfigured ? t('yes') : t('no'),
+    displayFunction: (elem: Element) => elem.misconfigured ? t('yes') : t('no'),
   },
   {
     label: t('action'),
     key: 'action',
-    mobile: 'after',
+    mobile: true,
     icon: IconTrash,
     class: 'text-red-500',
     onClick: deleteOne,
@@ -303,7 +305,7 @@ async function showAddModal() {
   await displayStore.onDialogDismiss()
 }
 
-async function openOne(one: typeof element) {
+async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
 onMounted(async () => {
@@ -325,10 +327,8 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <k-fab id="create_channel" class="fixed z-20 right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
-      <template #icon>
-        <component :is="IconPlus" />
-      </template>
-    </k-fab>
+    <button id="create_channel" class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
+      <IconPlus />
+    </button>
   </div>
 </template>

@@ -5,6 +5,8 @@ import type { User } from '@supabase/supabase-js'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import Spinner from '~/components/Spinner.vue'
 import { useMainStore } from '~/stores/main'
+import Navbar from '~/components/Navbar.vue'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -13,6 +15,10 @@ const router = useRouter()
 const main = useMainStore()
 
 const isLoading = ref(true)
+const displayStore = useDisplayStore()
+
+displayStore.defaultBack = '/login'
+displayStore.NavTitle = t('activation-heading')
 
 const user = ref<User | null>(null)
 
@@ -72,7 +78,7 @@ watchEffect(() => {
 
 <template>
   <div>
-    <TitleHead :big="true" :title="t('activation-heading')" />
+    <Navbar />
     <div class="flex h-screen">
       <div class="m-auto">
         <Spinner size="w-40 h-40" class="my-auto" />

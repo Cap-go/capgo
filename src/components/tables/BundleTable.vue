@@ -11,12 +11,13 @@ import { useSupabase } from '~/services/supabase'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import IconTrash from '~icons/heroicons/trash?raw'
 import { useDisplayStore } from '~/stores/display'
+import type { OrganizationRole } from '~/stores/organization'
 
 const props = defineProps<{
   appId: string
 }>()
 
-const element: Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row'] = {} as any
+type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const role = ref<OrganizationRole | null>(null)
@@ -28,7 +29,7 @@ const router = useRouter()
 const organizationStore = useOrganizationStore()
 const total = ref(0)
 const search = ref('')
-const elements = ref<(typeof element)[]>([])
+const elements = ref<Element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
@@ -50,6 +51,7 @@ async function didCancel(name: string) {
       },
       {
         text: t('button-delete'),
+        role: 'danger',
         id: 'confirm-button',
       },
     ],
@@ -64,7 +66,7 @@ async function enhenceVersionElems(dataVersions: Database['public']['Tables']['a
     .in('id', dataVersions.map(({ id }) => id))
   const newVersions = dataVersions.map(({ id, ...rest }) => {
     const version = dataVersionsMeta ? dataVersionsMeta.find(({ id: idMeta }) => idMeta === id) : { size: 0, checksum: '' }
-    return { id, ...rest, ...version } as typeof element
+    return { id, ...rest, ...version } as Element
   })
   return newVersions
 }
@@ -114,7 +116,7 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function deleteOne(one: typeof element) {
+async function deleteOne(one: Element) {
   // console.log('deleteBundle', bundle)
 
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
@@ -211,6 +213,7 @@ async function deleteOne(one: typeof element) {
     }
   }
   catch (error) {
+    console.error(error)
     toast.error(t('cannot-delete-bundle'))
   }
 }
@@ -219,23 +222,23 @@ columns.value = [
   {
     label: t('name'),
     key: 'name',
-    mobile: 'title',
+    mobile: true,
     sortable: true,
     head: true,
   },
   {
     label: t('created-at'),
     key: 'created_at',
-    mobile: 'header',
+    mobile: true,
     sortable: 'desc',
-    displayFunction: (elem: typeof element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
   },
   {
     label: t('size'),
-    mobile: 'footer',
+    mobile: false,
     key: 'size',
     sortable: true,
-    displayFunction: (elem: typeof element) => {
+    displayFunction: (elem: Element) => {
       if (elem.size)
         return bytesToMbText(elem.size)
       else if (elem.external_url)
@@ -249,7 +252,7 @@ columns.value = [
   {
     label: t('action'),
     key: 'action',
-    mobile: 'after',
+    mobile: true,
     icon: IconTrash,
     class: 'text-red-500',
     onClick: deleteOne,
@@ -267,7 +270,7 @@ async function reload() {
   }
 }
 
-async function openOne(one: typeof element) {
+async function openOne(one: Element) {
   if (one.deleted)
     return
   router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)

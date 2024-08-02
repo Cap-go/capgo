@@ -4,6 +4,7 @@ import AdmZip from 'adm-zip'
 import { createClient } from '@supabase/supabase-js'
 import { getUpdateBaseData, responseOk, sendUpdate } from './utils'
 import { prepareCli, runCli } from './cliUtils'
+// import { prepareCli, runCli, setDependencies } from './cliUtils'
 import type { Database } from '~/types/supabase.types'
 
 const BASE_URL = new URL('http://localhost:54321/functions/v1')
@@ -24,17 +25,15 @@ function resetAndSeedData() {
   return supabase.rpc('reset_and_seed_data')
 }
 
-describe('tests CLI', () => {
+describe('tests CLI upload', () => {
   beforeAll(async () => {
     await prepareCli(BASE_URL)
   })
-
   it('should upload bundle successfully', async () => {
     await resetAndSeedData()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], true)
     expect(output).toContain('Bundle Uploaded')
   })
-
   it('should download and verify uploaded bundle', async () => {
     const baseData = getUpdateBaseData()
     const response = await sendUpdate(BASE_URL, baseData)
@@ -59,6 +58,24 @@ describe('tests CLI', () => {
     const indexJsContent = indexJsEntry!.getData().toString('utf8')
     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
   })
+  it('should not upload same twice', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+    expect(output).toContain('Cannot upload the same bundle content')
+  })
+})
+
+describe('tests Wrong cases', () => {
+  beforeAll(async () => {
+    await prepareCli(BASE_URL)
+  })
+  it('cannot upload with wrong api key', async () => {
+    const testApiKey = crypto.randomUUID()
+
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false, testApiKey)
+    expect(output).toContain('Invalid API key or insufficient permissions.')
+  })
 
   it('should test selectable disallow upload', async () => {
     const supabase = createSupabase()
@@ -78,6 +95,12 @@ describe('tests CLI', () => {
     finally {
       await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
     }
+  })
+})
+
+describe('tests CLI for organization', () => {
+  beforeAll(async () => {
+    await prepareCli(BASE_URL)
   })
 
   // it.only('should test auto min version flag', async () => {
@@ -105,7 +128,7 @@ describe('tests CLI', () => {
   //     .eq('name', semver)
 
   //   increaseSemver()
-  //   const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
+  //   const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'])
   //   expect(output).toContain('skipping auto setting compatibility')
 
   //   await supabase
@@ -122,6 +145,7 @@ describe('tests CLI', () => {
     const testApiKey = crypto.randomUUID()
     const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
     const supabase = createSupabase()
+    await resetAndSeedData()
     await supabase.from('apikeys')
       .insert({ key: testApiKey, user_id: testUserId, mode: 'upload' })
 
@@ -159,36 +183,40 @@ describe('tests CLI', () => {
         .eq('user_id', testUserId)
     }
   })
-
-  // TODO: Fix this test
-  // it('should test compatibility table', async () => {
-  //   await resetAndSeedData()
-  //   // Setup dependencies
-  //   // ... (code to update package.json with @capacitor/android dependency)
-
-  //   const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-  //     const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
-  //     const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
-  //     expect(androidPackage).toBeDefined()
-
-  //     const columns = androidPackage!.split('│').slice(2, -1)
-  //     expect(columns.length).toBe(4)
-  //     expect(columns[0]).toContain(column1)
-  //     expect(columns[1]).toContain(column2)
-  //     expect(columns[2]).toContain(column3)
-  //     expect(columns[3]).toContain(column4)
-  //   }
-
-  //   await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
-
-  //   increaseSemver()
-  //   await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
-
-  //   await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
-
-  //   // Remove dependency and check again
-  //   // ... (code to update package.json removing @capacitor/android)
-
-  //   await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
-  // })
 })
+
+// describe('tests CLI metadata', () => {
+//   beforeAll(async () => {
+//     await prepareCli(BASE_URL)
+//   })
+
+//   it.only('should test compatibility table', async () => {
+//     await resetAndSeedData()
+//     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
+//     expect(output).toContain('Bundle Uploaded')
+
+//     const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
+//       const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
+//       const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
+//       expect(androidPackage).toBeDefined()
+
+//       const columns = androidPackage!.split('│').slice(2, -1)
+//       expect(columns.length).toBe(4)
+//       expect(columns[0]).toContain(column1)
+//       expect(columns[1]).toContain(column2)
+//       expect(columns[2]).toContain(column3)
+//       expect(columns[3]).toContain(column4)
+//     }
+
+//     await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
+
+//     increaseSemver()
+//     await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
+
+//     await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
+
+//     setDependencies({})
+
+//     await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
+//   })
+// })

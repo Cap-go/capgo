@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
-import { initDropdowns } from 'flowbite'
 import copy from 'copy-text-to-clipboard'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
@@ -17,9 +16,7 @@ import IconVersion from '~icons/radix-icons/update'
 import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
 import iconFlag from '~icons/ph/flag?raw'
-import { availableLocales, i18n, languages } from '~/modules/i18n'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { changeLanguage, getEmoji } from '~/services/i18n'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()
@@ -32,12 +29,19 @@ const isLoading = ref(false)
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
 async function deleteAccount() {
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
+  displayStore.dialogOption = {
     header: t('are-u-sure'),
     buttons: [
       {
+        text: t('button-cancel'),
+        role: 'cancel',
+        handler: () => {
+          console.log('Cancel clicked')
+        },
+      },
+      {
         text: t('button-remove'),
+        role: 'danger',
         handler: async () => {
           if (!main.auth || main.auth?.email == null)
             return
@@ -98,19 +102,15 @@ async function deleteAccount() {
             router.replace('/login')
           }
           catch (error) {
+            console.error(error)
             return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
           }
         },
       },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-        handler: () => {
-          console.log('Cancel clicked')
-        },
-      },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function copyAccountId() {
@@ -130,24 +130,9 @@ const acronym = computed(() => {
 })
 
 async function presentActionSheet() {
-  displayStore.showActionSheet = true
-  displayStore.actionSheetOption = {
-    header: '',
+  displayStore.dialogOption = {
+    header: t('change-your-picture'),
     buttons: [
-      {
-        text: t('button-camera'),
-        handler: () => {
-          displayStore.showActionSheet = false
-          takePhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
-        },
-      },
-      {
-        text: t('button-browse'),
-        handler: () => {
-          displayStore.showActionSheet = false
-          pickPhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
-        },
-      },
       {
         text: t('button-cancel'),
         role: 'cancel',
@@ -155,12 +140,28 @@ async function presentActionSheet() {
           console.log('Cancel clicked')
         },
       },
+      {
+        text: t('button-camera'),
+        handler: () => {
+          takePhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
+        },
+      },
+      {
+        text: t('button-browse'),
+        handler: () => {
+          pickPhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
+        },
+      },
     ],
   }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
 }
 
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
   if (isLoading.value || !main.user?.id)
+    return
+  if (form.first_name === main.user?.first_name && form.last_name === main.user?.last_name && form.email === main.user?.email && form.country === main.user?.country)
     return
   isLoading.value = true
 
@@ -308,6 +309,7 @@ async function handleMfa() {
         },
         {
           text: t('disable'),
+          role: 'danger',
           id: 'confirm-button',
         },
       ],
@@ -341,8 +343,6 @@ async function handleMfa() {
 }
 
 onMounted(async () => {
-  initDropdowns()
-
   const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
   if (error) {
     console.error('Cannot getm MFA factors', error)
@@ -456,26 +456,12 @@ onMounted(async () => {
           {{ t('settings') }}
         </h3>
         <!-- Language Info -->
-        <section class="flex flex-col md:flex-row md:items-center items-left">
-          <p class="text-slate-800 dark:text-white">
+        <section class="flex flex-col text-slate-800 dark:text-white md:flex-row md:items-center items-left">
+          <p class="">
             {{ t('language') }}:
           </p>
           <div class="md:ml-6">
-            <button
-              id="dropdownDefaultButton" data-dropdown-toggle="dropdown"
-              class="inline-flex px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
-              type="button"
-            >
-              {{ getEmoji(i18n.global.locale.value) }} {{ languages[i18n.global.locale.value as keyof typeof languages] }} <svg class="w-4 h-4 ml-2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            <!-- Dropdown menu -->
-            <div id="dropdown" class="z-10 hidden overflow-y-scroll bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 h-72">
-              <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
-                <li v-for="locale in availableLocales" :key="locale" @click="changeLanguage(locale)">
-                  <span class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-900': locale === i18n.global.locale.value }">{{ getEmoji(locale) }} {{ languages[locale as keyof typeof languages] }}</span>
-                </li>
-              </ul>
-            </div>
+            <LangSelector />
           </div>
         </section>
 
@@ -485,6 +471,7 @@ onMounted(async () => {
           </p>
           <div class="md:ml-6">
             <button
+              type="button"
               class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
               :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
               @click="handleMfa"
@@ -498,7 +485,7 @@ onMounted(async () => {
             {{ t('account-id') }}:
           </p>
           <div class="md:ml-6">
-            <button class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
+            <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
               {{ t('copy-account-id') }}
             </button>
           </div>
@@ -511,7 +498,7 @@ onMounted(async () => {
       <footer>
         <div class="flex flex-col px-6 py-5 border-t border-slate-200">
           <div class="flex self-end">
-            <button class="p-2 text-black bg-white border border-red-400 rounded-lg dark:bg-transparent dark:text-white btn hover:bg-red-600" @click="deleteAccount()">
+            <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
               {{ t('delete-account') }}
             </button>
             <button

@@ -15,45 +15,13 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ## iOS
 
-### ios refresh_profiles
+### ios beta
 
 ```sh
-[bundle exec] fastlane ios refresh_profiles
+[bundle exec] fastlane ios beta
 ```
 
-
-
-### ios register_new_device
-
-```sh
-[bundle exec] fastlane ios register_new_device
-```
-
-Register new device
-
-### ios build
-
-```sh
-[bundle exec] fastlane ios build
-```
-
-
-
-### ios closed_beta
-
-```sh
-[bundle exec] fastlane ios closed_beta
-```
-
-
-
-### ios submit_review
-
-```sh
-[bundle exec] fastlane ios submit_review
-```
-
-
+Export ipa and submit to TestFlight
 
 ----
 
