@@ -52,12 +52,11 @@ platform :ios do
   end
 
   private_lane :update_project_settings do
-    profile_name = ENV['APPLE_PROFILE_NAME']
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "./ios/App/App.xcodeproj",
       code_sign_identity: "iPhone Distribution",
-      profile_name: profile_name,
+      profile_name: ENV['APPLE_PROFILE_NAME'],
       bundle_identifier: ENV['BUNDLE_IDENTIFIER'],
       team_id: ENV['APP_STORE_CONNECT_TEAM_ID']
     )
@@ -68,7 +67,6 @@ platform :ios do
   end
 
   private_lane :build_app_with_signing do |options|
-    profile_name = ENV['APPLE_PROFILE_NAME']
     unlock_keychain(
       path: "~/Library/Keychains/#{options[:keychain_name]}-db",
       password: options[:keychain_password],
@@ -82,7 +80,7 @@ platform :ios do
       output_name: "App.ipa",
       export_options: {
         provisioningProfiles: {
-          ENV['BUNDLE_IDENTIFIER'] => profile_name
+          ENV['BUNDLE_IDENTIFIER'] => ENV['APPLE_PROFILE_NAME']
         }
       },
       xcargs: "-verbose",
