@@ -34,13 +34,13 @@ $$;
 -- Add dummy columns
 
 ALTER TABLE channels 
-ADD COLUMN secondaryVersionPercentage double precision;
+ADD COLUMN "secondaryVersionPercentage" double precision;
 
 ALTER TABLE channels 
-ADD COLUMN secondVersion bigint;
+ADD COLUMN "secondVersion" bigint;
 
 ALTER TABLE app_versions 
-ADD COLUMN minUpdateVersion character varying;
+ADD COLUMN "minUpdateVersion" character varying;
 
 CREATE OR REPLACE FUNCTION "public"."sync_min_update_version"() RETURNS "trigger"
     LANGUAGE "plpgsql"
