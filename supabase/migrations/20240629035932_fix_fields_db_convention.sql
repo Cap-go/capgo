@@ -34,7 +34,10 @@ $$;
 -- Add dummy columns
 
 ALTER TABLE channels 
-ADD COLUMN disableAutoUpdate boolean;
+ADD COLUMN secondaryVersionPercentage double precision;
+
+ALTER TABLE channels 
+ADD COLUMN second_version bigint;
 
 ALTER TABLE app_versions 
 ADD COLUMN minUpdateVersion character varying;
