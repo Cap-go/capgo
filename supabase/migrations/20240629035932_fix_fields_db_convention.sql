@@ -45,9 +45,9 @@ ADD COLUMN "minUpdateVersion" character varying;
 CREATE OR REPLACE FUNCTION "public"."sync_min_update_version"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$BEGIN
-  IF NEW.minUpdateVersion IS DISTINCT FROM OLD.minUpdateVersion
+  IF NEW."minUpdateVersion" IS DISTINCT FROM OLD."minUpdateVersion"
   THEN
-    NEW.min_update_version = NEW.minUpdateVersion;
+    NEW.min_update_version = NEW."minUpdateVersion";
   END IF;
 
   RETURN NEW;
