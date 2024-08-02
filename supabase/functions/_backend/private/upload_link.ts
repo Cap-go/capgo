@@ -1,5 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import { z } from 'zod'
 import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -12,7 +13,25 @@ interface dataUpload {
   app_id: string
   bucket_id?: string
   version?: number
+  manifest?: {
+    file: string
+    hash: string
+  }[]
 }
+
+function isValidFilePath(path: string) {
+  return !path.includes('..') && !path.startsWith('/')
+}
+const hexRegex = /[0-9a-f]+/i
+
+const manifestEntriesSchema = z.object({
+  file: z.string().refine(val => isValidFilePath(val), {
+    message: 'Manifest file path containst directory traversal attempt or it starts with a "/"',
+  }),
+  hash: z.string().refine(val => hexRegex.test(val), {
+    message: 'The manifest hash does not match the HEX regex (/[0-9a-fA-F]+/)',
+  }),
+}).array()
 
 export const app = new Hono()
 
@@ -60,6 +79,26 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     if (errorVersion) {
       console.log('errorVersion', errorVersion)
       return c.json({ status: 'Error App or Version not found' }, 500)
+    }
+
+    if (body.version === 2 && body.manifest) {
+      const parsedManifest = manifestEntriesSchema.safeParse(body.manifest)
+      if (parsedManifest.error) {
+        console.error('Invalid manifest', parsedManifest.error)
+        return c.json({ error: 'Invalid manifest', detailed_error: parsedManifest.error }, 400)
+      }
+
+      const uploadObjects = await Promise.all(parsedManifest.data.map(async (manifestObj) => {
+        const finalPath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}/${manifestObj.hash}`
+        return {
+          path: manifestObj.file,
+          hash: manifestObj.hash,
+          finalPath,
+          uploadLink: await s3.getUploadUrl(c, finalPath),
+        }
+      }))
+
+      return c.json(uploadObjects)
     }
 
     // const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
