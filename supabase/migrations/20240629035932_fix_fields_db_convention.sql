@@ -29,4 +29,26 @@ BEGIN
     WHERE channels.enable_progressive_deploy = true
     AND channels."secondary_version_percentage" between 0 AND 0.9;
 END;
-$$
+$$;
+
+-- Add dummy columns
+
+ALTER TABLE channels 
+ADD COLUMN disableAutoUpdate boolean;
+
+ALTER TABLE app_versions 
+ADD COLUMN minUpdateVersion character varying;
+
+CREATE OR REPLACE FUNCTION "public"."sync_min_update_version"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$BEGIN
+  IF NEW.minUpdateVersion IS DISTINCT FROM OLD.minUpdateVersion
+  THEN
+    NEW.min_update_version = NEW.minUpdateVersion;
+  END IF;
+
+  RETURN NEW;
+END;$$;
+
+CREATE OR REPLACE TRIGGER "sync_min_update_version" BEFORE UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."sync_min_update_version"();
+
