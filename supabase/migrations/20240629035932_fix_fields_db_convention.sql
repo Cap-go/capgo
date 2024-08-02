@@ -37,7 +37,7 @@ ALTER TABLE channels
 ADD COLUMN secondaryVersionPercentage double precision;
 
 ALTER TABLE channels 
-ADD COLUMN second_version bigint;
+ADD COLUMN secondVersion bigint;
 
 ALTER TABLE app_versions 
 ADD COLUMN minUpdateVersion character varying;
