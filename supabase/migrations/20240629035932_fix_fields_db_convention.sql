@@ -22,7 +22,7 @@ CREATE OR REPLACE PROCEDURE "public"."update_channels_progressive_deploy"()
 BEGIN
     UPDATE channels
     SET "secondary_version_percentage" = CASE 
-        WHEN channels."secondVersion" not in (select version from stats where stats.action='update_fail' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) 
+        WHEN channels."second_version" not in (select version from stats where stats.action='update_fail' and 10800 > extract(epoch from now()) - extract(epoch from stats.created_at)) 
         THEN "secondary_version_percentage" + 0.1 
         ELSE 0 
     END
