@@ -5,6 +5,8 @@ import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
 // import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
 // import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { swaggerUI } from '@hono/swagger-ui'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
@@ -57,7 +59,7 @@ import { app as on_app_create } from '../supabase/functions/_backend/triggers/on
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
 import { version } from '../package.json'
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new OpenAPIHono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
 const appFront = new Hono<{ Bindings: Bindings }>()
 
@@ -185,6 +187,21 @@ app.onError((e, c) => {
     return e.getResponse()
 
   return c.text('Internal Server Error', 500)
+})
+
+app.get(
+  '/ui',
+  swaggerUI({
+    url: '/doc',
+  }),
+)
+
+app.doc('/doc', {
+  info: {
+    title: 'An API',
+    version: 'v1',
+  },
+  openapi: '3.1.0',
 })
 
 export default {
