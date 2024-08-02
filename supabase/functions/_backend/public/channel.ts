@@ -42,8 +42,8 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         created_by,
         updated_at,
         public,
-        disableAutoUpdateUnderNative,
-        disableAutoUpdate,
+        disable_auto_update_under_native,
+        disable_auto_update,
         allow_device_self_set,
         allow_emulator,
         public,
@@ -76,8 +76,8 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         created_by,
         updated_at,
         public,
-        disableAutoUpdateUnderNative,
-        disableAutoUpdate,
+        disable_auto_update_under_native,
+        disable_auto_update,
         allow_device_self_set,
         allow_emulator,
         allow_dev,
@@ -93,7 +93,12 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       console.log('Cannot find channels', dbError)
       return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
     }
-    return c.json(dataChannels)
+    return c.json(dataChannels.map((o) => {
+      const newObject = o as any
+      delete Object.assign(newObject, { disableAutoUpdateUnderNative: o.disable_auto_update_under_native }).disable_auto_update_under_native
+      delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
+      return newObject
+    }))
   }
 }
 
@@ -146,8 +151,8 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     app_id: body.app_id,
     name: body.channel,
     ...(body.public == null ? {} : { public: body.public }),
-    ...(body.disableAutoUpdateUnderNative == null ? {} : { disableAutoUpdateUnderNative: body.disableAutoUpdateUnderNative }),
-    ...(body.disableAutoUpdate == null ? {} : { disableAutoUpdate: body.disableAutoUpdate }),
+    ...(body.disableAutoUpdateUnderNative == null ? {} : { disable_auto_update_under_native: body.disableAutoUpdateUnderNative }),
+    ...(body.disableAutoUpdate == null ? {} : { disable_auto_update: body.disableAutoUpdate }),
     ...(body.allow_device_self_set == null ? {} : { allow_device_self_set: body.allow_device_self_set }),
     ...(body.allow_emulator == null ? {} : { allow_emulator: body.allow_emulator }),
     ...(body.allow_dev == null ? {} : { allow_dev: body.allow_dev }),

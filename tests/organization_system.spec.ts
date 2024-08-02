@@ -601,7 +601,7 @@ test.describe('Test organization system permissions', () => {
 
         // Set supabase prod channel to 'metadata' disallow strategy
         const { error: errorSetMetadataOnProd } = await supabase.from('channels')
-          .update({ disableAutoUpdate: 'version_number', version: 9601 })
+          .update({ disable_auto_update: 'version_number', version: 9601 })
           .eq('name', 'production')
 
         await expect(errorSetMetadataOnProd).toBeFalsy()

@@ -129,7 +129,7 @@ Deno.test('Test disable auto update to minor', async () => {
   await resetAndSeedData()
 
   const { error } = await supabase.from('channels')
-    .update({ disableAutoUpdate: 'minor', version: 9653 })
+    .update({ disable_auto_update: 'minor', version: 9653 })
     .eq('id', 22)
   assertEquals(error, null)
 
@@ -238,7 +238,7 @@ Deno.test('Test channel overwrite', async () => {
   assertEquals(error, null)
 
   const { error: error2 } = await supabase.from('channels')
-    .update({ disableAutoUpdate: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
+    .update({ disable_auto_update: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
     .eq('id', 23)
   assertEquals(error2, null)
 
@@ -274,7 +274,7 @@ Deno.test('Test version overwrite', async () => {
   assertEquals(error, null)
 
   const { error: error2 } = await supabase.from('channels')
-    .update({ disableAutoUpdate: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
+    .update({ disable_auto_update: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
     .eq('id', 23)
   assertEquals(error2, null)
 
