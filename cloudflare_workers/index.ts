@@ -9,9 +9,9 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import { swaggerUI } from '@hono/swagger-ui'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
-import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
+import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
 import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
-import { app as channels } from '../supabase/functions/_backend/public/channel.ts'
+import { getApp as channels } from '../supabase/functions/_backend/public/channel/index.ts'
 
 // Plugin API
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
@@ -69,8 +69,8 @@ app.use('*', sentry({
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
-app.route('/channels', channels) // TODO: deprecated remove when everyone use the new endpoint
-app.route('/channel', channels)
+app.route('/channels', channels(true)) // TODO: deprecated remove when everyone use the new endpoint
+app.route('/channel', channels(false))
 app.route('/device', devices)
 app.route('/on_app_create', on_app_create)
 
@@ -189,6 +189,12 @@ app.onError((e, c) => {
   return c.text('Internal Server Error', 500)
 })
 
+app.openAPIRegistry.registerComponent('securitySchemes', 'apikey', {
+  type: 'apiKey',
+  in: 'header',
+  name: 'authorization',
+})
+
 app.get(
   '/ui',
   swaggerUI({
@@ -198,7 +204,7 @@ app.get(
 
 app.doc('/doc', {
   info: {
-    title: 'An API',
+    title: 'Capgo cloud API',
     version: 'v1',
   },
   openapi: '3.1.0',
