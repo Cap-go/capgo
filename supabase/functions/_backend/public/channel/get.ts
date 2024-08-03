@@ -240,7 +240,7 @@ export function getApp(deprecated: boolean) {
           console.log('Cannot find channels', dbError)
           return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
         }
-        const parsedResponse = singleChannelSchema.safeParse(dataChannel)
+        const parsedResponse = validResponseSchema.safeParse(dataChannels)
         if (!parsedResponse.success) {
           console.error('Database response does not match schema', parsedResponse.error)
           return c.json({ status: 'Database response does not match schema', error: parsedResponse.error }, 500)
@@ -250,6 +250,7 @@ export function getApp(deprecated: boolean) {
       }
     }
     catch (e) {
+      console.error('Cannot get channel', e)
       return c.json({ status: 'Cannot get channel', error: JSON.stringify(e) }, 500)
     }
   })
