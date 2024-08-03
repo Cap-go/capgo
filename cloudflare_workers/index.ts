@@ -10,7 +10,7 @@ import { swaggerUI } from '@hono/swagger-ui'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
-import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
+import { getApp as devices } from '../supabase/functions/_backend/public/device/index.ts'
 import { getApp as channels } from '../supabase/functions/_backend/public/channel/index.ts'
 
 // Plugin API
@@ -71,7 +71,7 @@ app.route('/ok', ok)
 app.route('/bundle', bundle)
 app.route('/channels', channels(true)) // TODO: deprecated remove when everyone use the new endpoint
 app.route('/channel', channels(false))
-app.route('/device', devices)
+app.route('/device', devices(false))
 app.route('/on_app_create', on_app_create)
 
 // Plugin API
