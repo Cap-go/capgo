@@ -60,7 +60,11 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
     }
 
-    return c.json(dataChannel)
+    const newObject = dataChannel as any
+    delete Object.assign(newObject, { disableAutoUpdateUnderNative: dataChannel.disable_auto_update_under_native }).disable_auto_update_under_native
+    delete Object.assign(newObject, { disableAutoUpdate: dataChannel.disable_auto_update }).disable_auto_update
+
+    return c.json(newObject)
   }
   else {
     const fetchOffset = body.page == null ? 0 : body.page
