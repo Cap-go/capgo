@@ -142,6 +142,10 @@ export async function deleteChannel(c: Context, body: ChannelSet, apikey: Databa
 }
 
 export async function post(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write'))) {
+    console.log('You can\'t access this app', body.app_id)
+    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+  }
   const { data: org, error } = await supabaseAdmin(c).from('apps')
     .select('owner_org')
     .eq('app_id', body.app_id)
