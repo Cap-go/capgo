@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { z } from '@hono/zod-openapi'
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../../utils/supabase.ts'
 import type { MiddlewareKeyEnv } from '../../../utils/hono.ts'
 import { BRES, middlewareKey } from '../../../utils/hono.ts'

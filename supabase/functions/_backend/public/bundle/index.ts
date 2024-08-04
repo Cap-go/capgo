@@ -1,5 +1,4 @@
-import { OpenAPIHono, z } from '@hono/zod-openapi'
-import { plainError } from '../../utils/open_api.ts'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { app as get } from './get/get.ts'
 import { app as deleteEndpoint } from './delete/delete.ts'
 

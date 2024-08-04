@@ -1,6 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { errorResponse_422, error_500, response_400 } from '../../../utils/open_api.ts'
-import { fetchLimit } from '../../../utils/utils.ts'
 
 export function getRouteAndSchema(deprecated: boolean) {
   const requestSchema = z.object({
