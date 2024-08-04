@@ -11,6 +11,7 @@ fi
 
 # Start the Minio container
 docker run -d \
+   --restart unless-stopped \
    -p 9000:9000 \
    -p 9090:9090 \
    --user $(id -u):$(id -g) \

@@ -5,6 +5,11 @@ import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
 // const EXPIRATION_SECONDS = 120
+export interface ManifestEntry {
+  file_name: string | null
+  file_hash: string | null
+  download_url: string | null
+}
 
 export async function getBundleUrl(
   c: Context,
@@ -52,4 +57,32 @@ export async function getBundleUrl(
     console.error('getBundleUrl', error)
   }
   return null
+}
+
+export async function getManifestUrl(c: Context, createdBy: string, version: {
+  id: Database['public']['Tables']['app_versions']['Row']['id']
+  storage_provider: Database['public']['Tables']['app_versions']['Row']['storage_provider']
+  r2_path: Database['public']['Tables']['app_versions']['Row']['r2_path']
+  bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
+  app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
+  manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null
+}): Promise<ManifestEntry[]> {
+  if (!version.manifest) {
+    return []
+  }
+  const finalManifest = await Promise.all(version.manifest.map(async (entry) => {
+    try {
+      const downloadUrl = await getBundleUrl(c, createdBy, version)
+      return {
+        file_name: entry.file_name,
+        file_hash: entry.file_hash,
+        download_url: downloadUrl?.url ?? null,
+      }
+    }
+    catch (e: any) {
+      console.error(`Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}`)
+      return null
+    }
+  }))
+  return finalManifest.filter(entry => entry !== null)
 }

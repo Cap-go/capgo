@@ -19,9 +19,12 @@ interface dataUpload {
   }[]
 }
 
-function isValidFilePath(path: string) {
-  return !path.includes('..') && !path.startsWith('/')
+const validFilePathRegex = /^(?!\/|.*(?:^|\/)\.\.|.*\0)(?:[^/\0]+(?:\/[^/\0]+)*)?$/
+
+function isValidFilePath(path: string): boolean {
+  return validFilePathRegex.test(path)
 }
+
 const hexRegex = /[0-9a-f]+/i
 
 const manifestEntriesSchema = z.object({
@@ -50,8 +53,10 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       return c.json({ status: 'Error User not found' }, 500)
     }
 
-    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+    if (!(await hasAppRight(c, body.app_id, userId, 'read'))) {
+      console.log('no read')
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    }
 
     const { data: app, error: errorApp } = await supabaseAdmin(c)
       .from('apps')

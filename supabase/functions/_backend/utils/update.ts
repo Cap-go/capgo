@@ -7,7 +7,8 @@ import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { getBundleUrl } from './downloadUrl.ts'
+import type { ManifestEntry } from './downloadUrl.ts'
+import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { logsnag } from './logsnag.ts'
 import { appIdToUrl } from './conversion.ts'
 import * as schema from './postgress_schema.ts'
@@ -16,12 +17,13 @@ import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndD
 import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 import { saveStoreInfoCF } from './cloudflare.ts'
 
-function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row']) {
+function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
     version: string
     url: string
     session_key?: string
     checksum?: string | null
+    manifest?: ManifestEntry[]
   } = {
     version: version.name,
     url: signedURL,
@@ -30,6 +32,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
     res.session_key = version.session_key || ''
   if (semver.gte(plugin_version, '4.4.0'))
     res.checksum = version.checksum
+  if (semver.gte(plugin_version, '6.2.0') && manifest.length > 0)
+    res.manifest = manifest
   return res
 }
 
@@ -57,19 +61,17 @@ async function requestInfosPostgres(
     .select({
       device_id: schema.devices_override.device_id,
       app_id: schema.devices_override.app_id,
-      // created_at: schema.devices_override.created_at,
-      // updated_at: schema.devices_override.updated_at,
       version: {
         id: versionAlias.id,
         name: versionAlias.name,
         checksum: versionAlias.checksum,
         session_key: versionAlias.session_key,
-        // user_id: versionAlias.user_id,
         bucket_id: versionAlias.bucket_id,
         storage_provider: versionAlias.storage_provider,
         external_url: versionAlias.external_url,
         min_update_version: versionAlias.min_update_version,
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
     })
     .from(schema.devices_override)
@@ -89,29 +91,27 @@ async function requestInfosPostgres(
         name: sql<string>`${versionAlias.name}`.as('vname'),
         checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
         session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        // user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
         name: sql<string>`${secondVersionAlias.name}`.as('svname'),
         checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
         session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        // user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
         r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: schema.channels.id,
-        // created_at: schema.channels.created_at,
-        // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
         allow_dev: schema.channels.allow_dev,
@@ -146,29 +146,27 @@ async function requestInfosPostgres(
         name: sql<string>`${versionAlias.name}`.as('vname'),
         checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
         session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-        // user_id: sql<string | null>`${versionAlias.user_id}`.as('vuser_id'),
         bucket_id: sql<string | null>`${versionAlias.bucket_id}`.as('vbucket_id'),
         storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
         name: sql<string>`${secondVersionAlias.name}`.as('svname'),
         checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
         session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        // user_id: sql<string | null>`${secondVersionAlias.user_id}`.as('svuser_id'),
         bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
         storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
         r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: schema.channels.id,
-        // created_at: schema.channels.created_at,
-        // created_by: schema.channels.created_by,
         name: schema.channels.name,
         app_id: schema.channels.app_id,
         allow_dev: schema.channels.allow_dev,
@@ -587,12 +585,16 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
     }
     let signedURL = version.external_url || ''
+    let manifest: ManifestEntry[] = []
     if ((version.bucket_id || version.r2_path) && !version.external_url) {
       const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
       if (res) {
         signedURL = res.url
         // only count the size of the bundle if it's not external
         await createStatsBandwidth(c, device_id, app_id, res.size)
+      }
+      if (semver.gte(plugin_version, '6.2.0')) {
+        manifest = await getManifestUrl(c, appOwner.orgs.created_by, { app_id, ...version })
       }
     }
     //  check signedURL and if it's url
@@ -608,7 +610,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     await createStatsVersion(c, version.id, app_id, 'get')
     await sendStatsAndDevice(c, device, [{ action: 'get' }])
     console.log(id, 'New version available', app_id, version.name, signedURL, new Date().toISOString())
-    return c.json(resToVersion(plugin_version, signedURL, version as any), 200)
+    return c.json(resToVersion(plugin_version, signedURL, version as any, manifest), 200)
   }
   catch (e) {
     console.error('e', e)
