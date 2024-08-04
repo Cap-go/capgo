@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { z } from '@hono/zod-openapi'
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../../utils/supabase.ts'
 import type { MiddlewareKeyEnv } from '../../../utils/hono.ts'
 import { BRES, middlewareKey } from '../../../utils/hono.ts'
@@ -15,7 +15,7 @@ export function deleteApp(deprecated: boolean) {
   // eslint-disable-next-line unused-imports/no-unused-vars
   const { route, requestSchema } = getRouteAndSchema(deprecated)
 
-  app.use(route.getRoutingPath(), middlewareKey(['all', 'write', 'read', 'upload']))
+  app.use(route.getRoutingPath(), middlewareKey(['all', 'write']))
   app.openapi(route, async (c: Context) => {
     const body = c.req.query() as any as z.infer<typeof requestSchema>
     const apikey = c.get('apikey')

@@ -50,28 +50,55 @@ export function plainError() {
   }
 }
 
-export function response_400(status: string) {
+export function response_400(status: string, emptyStauts = false) {
+  const schema = !emptyStauts
+    ? z.object({
+      status: z.string().openapi({
+        example: status,
+        description: 'A short description explaining the error',
+      }),
+      error: z.any().optional().openapi({
+        description: 'A detailed fail information',
+      }),
+    }).or(
+      z.object({
+        status: z.string().openapi({
+          example: 'You can\'t access this app',
+          description: 'A short description explaining the error',
+        }),
+        app_id: z.string(),
+      }),
+    )
+    : z.object({
+      status: z.string().openapi({
+        example: status,
+        description: 'A short description explaining the error',
+      }),
+      error: z.any().optional().openapi({
+        description: 'A detailed fail information',
+      }),
+    }).or(
+      z.object({
+        status: z.string().openapi({
+          example: 'You can\'t access this app',
+          description: 'A short description explaining the error',
+        }),
+        app_id: z.string(),
+      }),
+    ).or(
+      z.object({
+        status: z.string().openapi({
+          description: 'Invalid request',
+          example: 'ok',
+        }),
+      }),
+    )
+
   return {
     description: 'Returns a problem with the request',
     content: {
       'application/json': {
-        schema: z.object({
-          status: z.string().openapi({
-            example: status,
-            description: 'A short description explaining the error',
-          }),
-          error: z.any().optional().openapi({
-            description: 'A detailed fail information',
-          }),
-        }).or(
-          z.object({
-            status: z.string().openapi({
-              example: 'You can\'t access this app',
-              description: 'A short description explaining the error',
-            }),
-            app_id: z.string(),
-          }),
-        ),
+        schema,
       },
       'text/plain': plainError(),
     },

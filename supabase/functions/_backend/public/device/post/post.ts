@@ -15,7 +15,7 @@ export function postApp(deprecated: boolean) {
   // eslint-disable-next-line unused-imports/no-unused-vars
   const { route, requestSchema } = getRouteAndSchema(deprecated)
 
-  app.use(route.getRoutingPath(), middlewareKey(['all', 'write', 'read', 'upload']))
+  app.use(route.getRoutingPath(), middlewareKey(['all', 'write']))
   app.openapi(route, async (c: Context) => {
     const body = await c.req.json() as any as z.infer<typeof requestSchema>
     const apikey = c.get('apikey')

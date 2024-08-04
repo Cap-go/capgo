@@ -37,7 +37,7 @@ export function getRouteAndSchema(deprecated: boolean) {
       },
       422: errorResponse_422(),
       500: error_500('Cannot delete channel'),
-      400: response_400('Cannot find channel'),
+      400: response_400('Cannot find channel', true),
     },
   })
 

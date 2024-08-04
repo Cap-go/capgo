@@ -1,7 +1,6 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import type { z } from '@hono/zod-openapi'
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../../../utils/supabase.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import type { MiddlewareKeyEnv } from '../../../utils/hono.ts'
@@ -17,7 +16,7 @@ export function postApp(deprecated: boolean) {
   // eslint-disable-next-line unused-imports/no-unused-vars
   const { route, requestSchema } = getRouteAndSchema(deprecated)
 
-  app.use(route.getRoutingPath(), middlewareKey(['all', 'write', 'read', 'upload']))
+  app.use(route.getRoutingPath(), middlewareKey(['all', 'write']))
   app.openapi(route, async (c: Context) => {
     const body = await c.req.json() as any as z.infer<typeof requestSchema>
     const apikey = c.get('apikey')
@@ -94,7 +93,7 @@ export function postApp(deprecated: boolean) {
     }
     catch (e) {
       console.log('Cannot update channel', e)
-      return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
+      return c.json({ status: 'Cannot update channel', error: JSON.stringify(e) }, 500)
     }
   })
 

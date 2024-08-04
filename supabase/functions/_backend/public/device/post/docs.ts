@@ -44,38 +44,7 @@ export function getRouteAndSchema(deprecated: boolean) {
       },
       422: errorResponse_422(),
       500: error_500('Cannot update channel'),
-      400: {
-        description: 'Returns a problem with the request',
-        content: {
-          'application/json': {
-            schema: z.object({
-              status: z.string().openapi({
-                example: 'Cannot save channel override',
-                description: 'A short description explaining the error',
-              }),
-              error: z.any().optional().openapi({
-                description: 'A detailed fail information',
-              }),
-            }).or(
-              z.object({
-                status: z.string().openapi({
-                  example: 'You can\'t access this app',
-                  description: 'A short description explaining the error',
-                }),
-                app_id: z.string(),
-              }),
-            ).or(
-              z.object({
-                status: z.string().openapi({
-                  description: 'Cannot set channel override for public channel',
-                  example: 'ok',
-                }),
-              }),
-            ),
-          },
-          'text/plain': plainError(),
-        },
-      },
+      400: response_400('Cannot save channel override', true),
     },
   })
 

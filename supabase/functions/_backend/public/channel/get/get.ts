@@ -1,13 +1,11 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import type { z } from '@hono/zod-openapi'
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../../utils/supabase.ts'
 import { fetchLimit } from '../../../utils/utils.ts'
-import type { Database } from '../../../utils/supabase.types.ts'
 import type { MiddlewareKeyEnv } from '../../../utils/hono.ts'
-import { BRES, middlewareKey } from '../../../utils/hono.ts'
-import { errorHook, errorResponse_422, error_500, response_400 } from '../../../utils/open_api.ts'
+import { middlewareKey } from '../../../utils/hono.ts'
+import { errorHook } from '../../../utils/open_api.ts'
 import { getRouteAndSchema } from './docs.ts'
 
 export function getApp(deprecated: boolean) {

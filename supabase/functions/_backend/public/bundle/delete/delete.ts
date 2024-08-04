@@ -1,10 +1,10 @@
 import type { Context } from '@hono/hono'
 import type { z } from '@hono/zod-openapi'
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../../utils/supabase.ts'
 import type { MiddlewareKeyEnv } from '../../../utils/hono.ts'
 import { BRES, middlewareKey } from '../../../utils/hono.ts'
-import { errorHook, errorResponse_422, error_500, response_400 } from '../../../utils/open_api.ts'
+import { errorHook } from '../../../utils/open_api.ts'
 import type { requestSchema } from './docs.ts'
 import { route } from './docs.ts'
 
