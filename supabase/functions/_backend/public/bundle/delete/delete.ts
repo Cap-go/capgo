@@ -17,9 +17,6 @@ app.openapi(route, async (c: Context) => {
   const body = c.req.query() as any as z.infer<typeof requestSchema>
   const apikey = c.get('apikey')
 
-  if (!body.app_id)
-    return c.json({ status: 'Missing app_id' }, 400)
-
   if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 

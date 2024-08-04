@@ -21,32 +21,24 @@ export function deleteApp(deprecated: boolean) {
     const apikey = c.get('apikey')
 
     try {
-      if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'admin'))) {
-        console.log('You can\'t access this app', body.app_id)
+      if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
         return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
-      }
-      if (!body.channel) {
-        console.log('You must provide a channel name')
-        return c.json({ status: 'You must provide a channel name' }, 400)
-      }
 
-      // search if that exist first
-      const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
-        .from('channels')
-        .select('id')
-        .eq('app_id', body.app_id)
-        .eq('name', body.channel)
-        .single()
-      if (dbError || !dataChannel) {
-        console.log('Cannot find channel', dbError)
-        return c.json({ status: 'Cannot find channel', error: JSON.stringify(dbError) }, 400)
-      }
-      await supabaseAdmin(c)
-        .from('channels')
+      const { error } = await supabaseAdmin(c)
+        .from('devices_override')
         .delete()
         .eq('app_id', body.app_id)
-        .eq('name', body.channel)
+        .eq('device_id', body.device_id)
+      if (error)
+        return c.json({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
 
+      const { error: errorChannel } = await supabaseAdmin(c)
+        .from('channel_devices')
+        .delete()
+        .eq('app_id', body.app_id)
+        .eq('device_id', body.device_id)
+      if (errorChannel)
+        return c.json({ status: 'Cannot delete channel override', error: JSON.stringify(errorChannel) }, 400)
       return c.json(BRES, 200)
     }
     catch (e) {

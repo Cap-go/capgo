@@ -196,7 +196,7 @@ app.openAPIRegistry.registerComponent('securitySchemes', 'apikey', {
 })
 
 app.get(
-  '/ui',
+  '/swagger_doc',
   swaggerUI({
     url: '/doc',
   }),
