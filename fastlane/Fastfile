@@ -4,10 +4,14 @@ platform :ios do
   desc 'Export ipa and submit to TestFlight'
   lane :beta do
     keychain_info = { keychain_name: "ios-build-#{Time.now.to_i}.keychain", keychain_password: SecureRandom.uuid }
-    setup_signing(keychain_info)
-    build_app_with_signing(keychain_info)
-    submit_to_testflight
-    cleanup_keychain(name: keychain_info[:keychain_name])
+    
+    begin
+      setup_signing(keychain_info)
+      build_app_with_signing(keychain_info)
+      submit_to_testflight
+    ensure
+      cleanup_keychain(keychain_info)
+    end
   end
 
   private_lane :setup_signing do |options|
@@ -16,7 +20,6 @@ platform :ios do
       password: options[:keychain_password],
       unlock: true,
       timeout: 0,
-      default_keychain: true, 
       lock_when_sleeps: false, 
       add_to_search_list: true
     )
@@ -39,16 +42,18 @@ platform :ios do
   end  
   
   private_lane :cleanup_keychain do |options|
-    delete_keychain(name: options[:name]) if File.exist? File.expand_path("~/Library/Keychains/#{options[:name]}-db")
+    delete_keychain(
+      name: options[:keychain_name]
+    )
   end  
 
   private_lane :install_profile do
-    profile_path = "#{Dir.home}/Library/MobileDevice/Provisioning Profiles/build_pp.mobileprovision"
-    FileUtils.mkdir_p(File.dirname(profile_path))
+    profile_path = "#{Dir.tmpdir}/build_pp.mobileprovision"
     File.write(profile_path, Base64.decode64(ENV['BUILD_PROVISION_PROFILE_BASE64']))
     UI.user_error!("Failed to create provisioning profile at #{profile_path}") unless File.exist?(profile_path)
     ENV['PROVISIONING_PROFILE_PATH'] = profile_path
     install_provisioning_profile(path: profile_path)
+    File.delete(profile_path)
   end
 
   private_lane :update_project_settings do
@@ -68,9 +73,9 @@ platform :ios do
 
   private_lane :build_app_with_signing do |options|
     unlock_keychain(
-      path: "~/Library/Keychains/#{options[:keychain_name]}-db",
+      path: options[:keychain_name],
       password: options[:keychain_password],
-      set_default: true
+      set_default: false
     )
     build_app(
       workspace: "./ios/App/App.xcworkspace",
