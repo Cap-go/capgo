@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.2.0",
+  "version": "11.2.4",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker rm minio1 && bun run minio:start && bun run minio:seed",
@@ -181,10 +181,10 @@
     "@capacitor/cli": "^6.1.1",
     "@capacitor/core": "^6.1.1",
     "@cloudflare/workers-types": "4.20240722.0",
-    "@iconify-json/carbon": "1.1.36",
+    "@iconify-json/carbon": "1.1.37",
     "@iconify-json/heroicons": "^1.1.21",
-    "@iconify-json/ion": "1.1.18",
-    "@iconify-json/ls": "1.1.8",
+    "@iconify-json/ion": "1.1.19",
+    "@iconify-json/ls": "1.1.9",
     "@iconify/json": "^2.2.222",
     "@playwright/test": "1.44.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
