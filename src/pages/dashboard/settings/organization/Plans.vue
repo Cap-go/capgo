@@ -228,6 +228,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
   }
 
   await loadData(false)
+  segmentVal.value = currentOrganization.value?.is_yearly ? 'y' : 'm'
 
   // isSubscribeLoading.value.fill(false, 0, plans.value.length)
 })
@@ -256,8 +257,29 @@ watchEffect(async () => {
     }
   }
 })
+// create function to check button status
+function buttonName(p: Database['public']['Tables']['plans']['Row']) {
+  if (isMobile)
+    return t('check-on-web')
+  if (currentPlan.value?.name === p.name && currentData.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
+    return t('Current')
+  }
+  return t('plan-upgrade')
+}
+
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
-  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying) || isMobile
+  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
+}
+
+function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
+  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value
+}
+function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
+  return {
+    'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': isRecommended(p),
+    'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest.value?.name !== p.name,
+    'cursor-not-allowed bg-gray-500 dark:bg-gray-400': isDisabled(p),
+  }
 }
 
 const hightLights = computed<Stat[]>(() => ([
@@ -336,8 +358,8 @@ const hightLights = computed<Stat[]>(() => ([
         </div>
       </div>
       <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-        <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="p.name === currentPlan?.name ? 'border-4 border-muted-blue-600' : ''">
-          <div v-if="currentPlanSuggest?.name === p.name && currentPlan?.name !== p.name" class="absolute top-0 right-0 flex items-start -mt-8">
+        <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
+          <div v-if="isRecommended(p)" class="absolute top-0 right-0 flex items-start -mt-8">
             <svg
               class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
               xmlns="http://www.w3.org/2000/svg"
@@ -369,7 +391,7 @@ const hightLights = computed<Stat[]>(() => ([
               <span class="text-base font-medium text-gray-500 dark:text-gray-100">/{{ t('mo') }}</span>
             </p>
             <button
-              :class="{ 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': currentPlanSuggest?.name === p.name, 'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest?.name !== p.name, 'cursor-not-allowed bg-gray-500 dark:bg-gray-400': currentPlan?.name === p.name && currentData?.paying }"
+              :class="buttonStyle(p)"
               class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
               :disabled="isDisabled(p)" @click="openChangePlan(p, index)"
             >
@@ -384,7 +406,7 @@ const hightLights = computed<Stat[]>(() => ([
                 />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              {{ isMobile ? t('check-on-web') : (currentPlan?.name === p.name && currentData?.paying ? t('Current') : t('plan-upgrade')) }}
+              {{ buttonName(p) }}
             </button>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-8">
               <span class="text-gray-900 dark:text-white">{{ p.price_m !== p.price_y ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ p.price_y }}</span>

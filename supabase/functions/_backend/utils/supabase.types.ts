@@ -1562,6 +1562,47 @@ export type Database = {
               management_email: string
             }[]
           }
+      get_orgs_v6:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              gid: string
+              created_by: string
+              logo: string
+              name: string
+              role: string
+              paying: boolean
+              trial_left: number
+              can_use_more: boolean
+              is_canceled: boolean
+              app_count: number
+              subscription_start: string
+              subscription_end: string
+              management_email: string
+              is_yearly: boolean
+            }[]
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              gid: string
+              created_by: string
+              logo: string
+              name: string
+              role: string
+              paying: boolean
+              trial_left: number
+              can_use_more: boolean
+              is_canceled: boolean
+              app_count: number
+              subscription_start: string
+              subscription_end: string
+              management_email: string
+              is_yearly: boolean
+            }[]
+          }
       get_plan_usage_percent_detailed:
         | {
             Args: {
@@ -1830,6 +1871,12 @@ export type Database = {
         Returns: boolean
       }
       is_onboarding_needed_org: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
+      is_org_yearly: {
         Args: {
           orgid: string
         }
