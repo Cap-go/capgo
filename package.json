@@ -184,7 +184,7 @@
     "@iconify-json/carbon": "1.1.37",
     "@iconify-json/heroicons": "^1.1.21",
     "@iconify-json/ion": "1.1.19",
-    "@iconify-json/ls": "1.1.8",
+    "@iconify-json/ls": "1.1.9",
     "@iconify/json": "^2.2.222",
     "@playwright/test": "1.44.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
