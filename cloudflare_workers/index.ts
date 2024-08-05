@@ -7,9 +7,9 @@ import { HTTPException } from 'hono/http-exception'
 // import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
-import { app as bundle } from '../supabase/functions/_backend/public/bundles.ts'
-import { app as devices } from '../supabase/functions/_backend/public/devices.ts'
-import { app as channels } from '../supabase/functions/_backend/public/channel.ts'
+import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
+import { app as device } from '../supabase/functions/_backend/public/device/index.ts'
+import { app as channel } from '../supabase/functions/_backend/public/channel/index.ts'
 
 // Plugin API
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
@@ -67,9 +67,9 @@ app.use('*', sentry({
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
-app.route('/channels', channels) // TODO: deprecated remove when everyone use the new endpoint
-app.route('/channel', channels)
-app.route('/device', devices)
+app.route('/channels', channel) // TODO: deprecated remove when everyone use the new endpoint
+app.route('/channel', channel)
+app.route('/device', device)
 app.route('/on_app_create', on_app_create)
 
 // Plugin API
