@@ -2066,7 +2066,7 @@ BEGIN
     (now(), 'com.demo.app', now(), '44913a9f', 1012541, 9652, 30),
     (now(), 'com.demo.app', now(), '9f74e70a', 1012548, 9601, 40);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disableAutoUpdateUnderNative", "disableAutoUpdate", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
     (22, now(), 'production', 'com.demo.app', 9654, now(), 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
     (23, now(), 'no_access', 'com.demo.app', 9653, now(), 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
     (24, now(), 'two_default', 'com.demo.app', 9654, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');

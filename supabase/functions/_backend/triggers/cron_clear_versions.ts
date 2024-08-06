@@ -77,7 +77,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       // Ensure that the version is not linked anywhere
       const { count, error, data } = await supabase.from('channels')
         .select('id', { count: 'exact' })
-        .or(`version.eq.${version.id},secondVersion.eq.${version.id}`)
+        .or(`version.eq.${version.id},second_version.eq.${version.id}`)
 
       if (error)
         return errorOut(c, `Cannot check channel count for ${version.id} because of error: ${error}`)
@@ -96,8 +96,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           if (!unknowVersion)
             return errorOut(c, `Cannot find unknow version for app_id ${version.app_id} because of no unknow version found`)
           await supabase.from('channels')
-            .update({ version: unknowVersion.id, secondVersion: null })
-            .or(`version.eq.${version.id},secondVersion.eq.${version.id}`)
+            .update({ version: unknowVersion.id, second_version: null })
+            .or(`version.eq.${version.id},second_version.eq.${version.id}`)
         }
         else {
           return errorOut(c, `cannot delete failed version ${version.id}, linked in some channels (${data.map(d => d.id).join(', ')})`)

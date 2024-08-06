@@ -57,6 +57,7 @@ app-logo-deleted: アプリの画像が正常に削除されました
 app-name: アプリ名
 app-perm: アプリの許可
 are-u-sure: 本気ですか ？
+are-you-sure-you-want-to-download: 本当にダウンロードしますか？
 available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
 bandwith-usage: '帯域幅の使用量:'

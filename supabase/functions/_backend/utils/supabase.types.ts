@@ -56,6 +56,10 @@ export type Database = {
           deleted: boolean
           external_url: string | null
           id: number
+          manifest:
+            | Database["public"]["CompositeTypes"]["manifest_entry"][]
+            | null
+          min_update_version: string | null
           minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
@@ -74,6 +78,10 @@ export type Database = {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          manifest?:
+            | Database["public"]["CompositeTypes"]["manifest_entry"][]
+            | null
+          min_update_version?: string | null
           minUpdateVersion?: string | null
           name: string
           native_packages?: Json[] | null
@@ -92,6 +100,10 @@ export type Database = {
           deleted?: boolean
           external_url?: string | null
           id?: number
+          manifest?:
+            | Database["public"]["CompositeTypes"]["manifest_entry"][]
+            | null
+          min_update_version?: string | null
           minUpdateVersion?: string | null
           name?: string
           native_packages?: Json[] | null
@@ -323,16 +335,21 @@ export type Database = {
           beta: boolean
           created_at: string
           created_by: string | null
-          disableAutoUpdate: Database["public"]["Enums"]["disable_update"]
-          disableAutoUpdateUnderNative: boolean
+          disable_auto_update: Database["public"]["Enums"]["disable_update"]
+          disable_auto_update_under_native: boolean
+          disableAutoUpdate:
+            | Database["public"]["Enums"]["disable_update"]
+            | null
+          enable_ab_testing: boolean
           enable_progressive_deploy: boolean
-          enableAbTesting: boolean
           id: number
           ios: boolean
           name: string
           owner_org: string
           public: boolean
-          secondaryVersionPercentage: number
+          second_version: number | null
+          secondary_version_percentage: number
+          secondaryVersionPercentage: number | null
           secondVersion: number | null
           updated_at: string
           version: number
@@ -346,16 +363,21 @@ export type Database = {
           beta?: boolean
           created_at?: string
           created_by?: string | null
-          disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
-          disableAutoUpdateUnderNative?: boolean
+          disable_auto_update?: Database["public"]["Enums"]["disable_update"]
+          disable_auto_update_under_native?: boolean
+          disableAutoUpdate?:
+            | Database["public"]["Enums"]["disable_update"]
+            | null
+          enable_ab_testing?: boolean
           enable_progressive_deploy?: boolean
-          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name: string
           owner_org: string
           public?: boolean
-          secondaryVersionPercentage?: number
+          second_version?: number | null
+          secondary_version_percentage?: number
+          secondaryVersionPercentage?: number | null
           secondVersion?: number | null
           updated_at?: string
           version: number
@@ -369,16 +391,21 @@ export type Database = {
           beta?: boolean
           created_at?: string
           created_by?: string | null
-          disableAutoUpdate?: Database["public"]["Enums"]["disable_update"]
-          disableAutoUpdateUnderNative?: boolean
+          disable_auto_update?: Database["public"]["Enums"]["disable_update"]
+          disable_auto_update_under_native?: boolean
+          disableAutoUpdate?:
+            | Database["public"]["Enums"]["disable_update"]
+            | null
+          enable_ab_testing?: boolean
           enable_progressive_deploy?: boolean
-          enableAbTesting?: boolean
           id?: number
           ios?: boolean
           name?: string
           owner_org?: string
           public?: boolean
-          secondaryVersionPercentage?: number
+          second_version?: number | null
+          secondary_version_percentage?: number
+          secondaryVersionPercentage?: number | null
           secondVersion?: number | null
           updated_at?: string
           version?: number
@@ -393,7 +420,7 @@ export type Database = {
           },
           {
             foreignKeyName: "channels_secondVersion_fkey"
-            columns: ["secondVersion"]
+            columns: ["second_version"]
             isOneToOne: false
             referencedRelation: "app_versions"
             referencedColumns: ["id"]
@@ -1535,6 +1562,47 @@ export type Database = {
               management_email: string
             }[]
           }
+      get_orgs_v6:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              gid: string
+              created_by: string
+              logo: string
+              name: string
+              role: string
+              paying: boolean
+              trial_left: number
+              can_use_more: boolean
+              is_canceled: boolean
+              app_count: number
+              subscription_start: string
+              subscription_end: string
+              management_email: string
+              is_yearly: boolean
+            }[]
+          }
+        | {
+            Args: {
+              userid: string
+            }
+            Returns: {
+              gid: string
+              created_by: string
+              logo: string
+              name: string
+              role: string
+              paying: boolean
+              trial_left: number
+              can_use_more: boolean
+              is_canceled: boolean
+              app_count: number
+              subscription_start: string
+              subscription_end: string
+              management_email: string
+              is_yearly: boolean
+            }[]
+          }
       get_plan_usage_percent_detailed:
         | {
             Args: {
@@ -1654,6 +1722,10 @@ export type Database = {
           deleted: boolean
           external_url: string | null
           id: number
+          manifest:
+            | Database["public"]["CompositeTypes"]["manifest_entry"][]
+            | null
+          min_update_version: string | null
           minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
@@ -1804,6 +1876,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_org_yearly: {
+        Args: {
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_owner_of_org: {
         Args: {
           user_id: string
@@ -1932,6 +2010,22 @@ export type Database = {
             }
             Returns: undefined
           }
+      update_notification: {
+        Args: {
+          p_event: string
+          p_uniq_id: string
+          p_owner_org: string
+        }
+        Returns: undefined
+      }
+      upsert_notification: {
+        Args: {
+          p_event: string
+          p_uniq_id: string
+          p_owner_org: string
+        }
+        Returns: undefined
+      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -2013,6 +2107,11 @@ export type Database = {
       version_action: "get" | "fail" | "install" | "uninstall"
     }
     CompositeTypes: {
+      manifest_entry: {
+        file_name: string | null
+        s3_path: string | null
+        file_hash: string | null
+      }
       match_plan: {
         name: string | null
       }

@@ -80,10 +80,10 @@ describe('tests Wrong cases', () => {
   it('should test selectable disallow upload', async () => {
     const supabase = createSupabase()
     increaseSemver()
-    await supabase.from('channels').update({ disableAutoUpdate: 'version_number' }).eq('id', 22)
+    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('id', 22)
     // test if is set correctly
     const { data: channel } = await supabase.from('channels').select('*').eq('id', 22).single()
-    expect(channel?.disableAutoUpdate).toBe('version_number')
+    expect(channel?.disable_auto_update).toBe('version_number')
 
     try {
       const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'])
@@ -93,7 +93,7 @@ describe('tests Wrong cases', () => {
       expect(output2).toContain('should follow semver convention')
     }
     finally {
-      await supabase.from('channels').update({ disableAutoUpdate: 'major' }).eq('id', 22)
+      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('id', 22)
     }
   })
 })
@@ -103,6 +103,7 @@ describe('tests CLI for organization', () => {
     await prepareCli(BASE_URL)
   })
 
+  // todo: fix this test
   // it.only('should test auto min version flag', async () => {
   //   await resetAndSeedData()
   //   // const { error } = await supabase.from('channels').update({  }).eq('id', 22)

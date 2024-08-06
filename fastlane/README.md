@@ -21,15 +21,7 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 [bundle exec] fastlane ios beta
 ```
 
-
-
-### ios submit_review
-
-```sh
-[bundle exec] fastlane ios submit_review
-```
-
-
+Export ipa and submit to TestFlight
 
 ----
 

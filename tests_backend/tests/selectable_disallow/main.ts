@@ -45,7 +45,7 @@ async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // Make the channels major allways
   // We disable ab testing so that the second test can safely enable it
   const { error: error1, count } = await supabase.from('channels')
-    .update({ disableAutoUpdate: 'major', enableAbTesting: false, enable_progressive_deploy: false, secondVersion: null }, { count: 'exact' })
+    .update({ disable_auto_update: 'major', enableAbTesting: false, enable_progressive_deploy: false, secondVersion: null }, { count: 'exact' })
     .or('id.in.(22,23)')
 
   assert(error1 === null, `Supabase channel error ${JSON.stringify(error1)} is not null`)
@@ -56,7 +56,7 @@ async function prepareTest(_backendBaseUrl: URL, supabase: SupabaseType) {
   // We set 1.359.0 from the playwright test
   // This will make the test alter the data in supabase, the developer was warned about this
   const { error: error2 } = await supabase.from('app_versions')
-    .update({ minUpdateVersion: null })
+    .update({ min_update_version: null })
     .or('id.in.(9601,9652,9653)')
 
   assert(error2 === null, `Supabase app_versions error ${JSON.stringify(error2)} is not null`)
@@ -70,8 +70,8 @@ async function prepareMetadataTestFail(_backendBaseUrl: URL, supabase: SupabaseT
   // 9601 is the id for the  1.359.0 version
   const { error } = await supabase.from('channels')
     .update({
-      disableAutoUpdate: 'version_number',
-      enableAbTesting: false,
+      disable_auto_update: 'version_number',
+      enable_ab_testing: false,
       enable_progressive_deploy: false,
       secondVersion: null,
       version: 9601,
@@ -82,7 +82,7 @@ async function prepareMetadataTestFail(_backendBaseUrl: URL, supabase: SupabaseT
 
   // Set the 9601 metadata to null
   const { error: versionError } = await supabase.from('app_versions')
-    .update({ minUpdateVersion: null })
+    .update({ min_update_version: null })
     .eq('id', 9601)
 
   assert(versionError === null, `Supabase app_versions error ${JSON.stringify(versionError)} is not null`)

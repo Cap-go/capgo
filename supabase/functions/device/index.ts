@@ -1,6 +1,6 @@
 import { sentry } from '@hono/sentry'
 import { Hono } from 'hono/tiny'
-import { app } from '../_backend/public/devices.ts'
+import { app } from '../_backend/public/device/index.ts'
 
 const functionName = 'device'
 const appGlobal = new Hono().basePath(`/${functionName}`)

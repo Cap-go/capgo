@@ -28,10 +28,10 @@ interface Channel {
   version: {
     name: string
     created_at: string
-    minUpdateVersion: string | null
+    min_update_version: string | null
   }
-  secondVersion: {
-    minUpdateVersion: string | null
+  second_version: {
+    min_update_version: string | null
   }
   misconfigured: boolean | undefined
 }
@@ -127,15 +127,15 @@ async function getData() {
           version (
             name,
             created_at,
-            minUpdateVersion
+            min_update_version
           ),
-          secondVersion (
-            minUpdateVersion
+          second_version (
+            min_update_version
           ),
           created_at,
           updated_at,
-          disableAutoUpdate,
-          enableAbTesting,
+          disable_auto_update,
+          enable_ab_testing,
           enable_progressive_deploy
           `, { count: 'exact' })
       .eq('app_id', props.appId)
@@ -162,16 +162,16 @@ async function getData() {
     // This will trigger if the channel disables updates based on metadata + if the metadata is undefined
     let anyMisconfigured = false
     const channels = dataVersions
-      .filter(e => e.disableAutoUpdate === 'version_number')
+      .filter(e => e.disable_auto_update === 'version_number')
       .map(e => e as any as Element)
 
     for (const channel of channels) {
-      if (channel.version.minUpdateVersion === null) {
+      if (channel.version.min_update_version === null) {
         channel.misconfigured = true
         anyMisconfigured = true
       }
 
-      if ((channel.enable_progressive_deploy || channel.enableAbTesting) && channel.secondVersion.minUpdateVersion === null) {
+      if ((channel.enable_progressive_deploy || channel.enable_ab_testing) && channel.second_version.min_update_version === null) {
         channel.misconfigured = true
         anyMisconfigured = true
       }

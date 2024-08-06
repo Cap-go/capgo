@@ -57,6 +57,7 @@ app-logo-deleted: 앱 사진이 삭제되었습니다.
 app-name: 앱 이름
 app-perm: 앱 권한
 are-u-sure: 확실합니까 ?
+are-you-sure-you-want-to-download: 정말 다운로드하시겠습니까?
 available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
 bandwith-usage: '대역폭 사용량:'

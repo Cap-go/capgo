@@ -5,7 +5,7 @@ import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObj
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 import { getEnv } from './utils.ts'
 
-function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
+export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
   const access_key_id = uploadKey ? getEnv(c, 'S3_ACCESS_KEY_ID_UPLOAD') : getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = uploadKey ? getEnv(c, 'S3_SECRET_ACCESS_KEY_UPLOAD') : getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = !clientSideOnly ? getEnv(c, 'S3_ENDPOINT') : getEnv(c, 'S3_ENDPOINT').replace('host.docker.internal', '0.0.0.0')

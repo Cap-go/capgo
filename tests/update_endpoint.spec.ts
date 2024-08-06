@@ -83,7 +83,7 @@ backendTest.describe('Test update logic', () => {
         version: 9654,
         public: true,
         android: true,
-        disableAutoUpdate: 'major',
+        disable_auto_update: 'major',
       })
       .eq('id', 22)
 
@@ -133,7 +133,7 @@ backendTest.describe('Test update logic', () => {
 
       // Set version to 1.361.0
       const { error } = await supabase.from('channels')
-        .update({ disableAutoUpdate: 'minor', version: 9653 })
+        .update({ disable_auto_update: 'minor', version: 9653 })
         .eq('id', 22)
 
       expect(error).toBeFalsy()
@@ -308,7 +308,7 @@ backendTest.describe('Test update logic', () => {
 
         const { error: error2 } = await supabase
           .from('channels')
-          .update({ disableAutoUpdate: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
+          .update({ disable_auto_update: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
           .eq('id', 23)
 
         expect(error2).toBeFalsy()
@@ -360,7 +360,7 @@ backendTest.describe('Test update logic', () => {
 
         const { error: error2 } = await supabase
           .from('channels')
-          .update({ disableAutoUpdate: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
+          .update({ disable_auto_update: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true })
           .eq('id', 23)
 
         expect(error2).toBeFalsy()

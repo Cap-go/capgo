@@ -6,7 +6,7 @@ import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v5']['Returns']>
+export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>
 export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
@@ -178,7 +178,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // We have RLS that ensure that we only selct rows where we are member or owner
     const { data, error } = await supabase
-      .rpc('get_orgs_v5')
+      .rpc('get_orgs_v6')
 
     if (error)
       throw error

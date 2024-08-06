@@ -57,6 +57,7 @@ app-logo-deleted: 应用图片删除成功
 app-name: 应用名称
 app-perm: 应用程序权限
 are-u-sure: 你确定吗 ？
+are-you-sure-you-want-to-download: 您确定要下载吗？
 available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
 bandwith-usage: 带宽使用情况：
