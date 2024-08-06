@@ -1,4 +1,5 @@
-import { Hono } from 'hono/tiny'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { swaggerUI } from '@hono/swagger-ui'
 import { sentry } from '@hono/sentry'
 
 // Public API
@@ -9,7 +10,7 @@ import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.t
 import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
 import { app as device } from '../supabase/functions/_backend/public/device/index.ts'
-// import { app as channel } from '../supabase/functions/_backend/public/channel/index.ts'
+import { appGenerator as channel } from '../supabase/functions/_backend/public/channel/index.ts'
 
 // Plugin API
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
@@ -57,9 +58,9 @@ import { app as on_app_create } from '../supabase/functions/_backend/triggers/on
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
 import { version } from '../package.json'
 
-const app = new Hono<{ Bindings: Bindings }>()
-const appTriggers = new Hono<{ Bindings: Bindings }>()
-const appFront = new Hono<{ Bindings: Bindings }>()
+const app = new OpenAPIHono<{ Bindings: Bindings }>()
+const appTriggers = new OpenAPIHono<{ Bindings: Bindings }>()
+const appFront = new OpenAPIHono<{ Bindings: Bindings }>()
 
 app.use('*', sentry({
   release: version,
@@ -67,8 +68,8 @@ app.use('*', sentry({
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
-// app.route('/channels', channel) // TODO: deprecated remove when everyone use the new endpoint
-// app.route('/channel', channel)
+app.route('/channels', channel(true)) // TODO: deprecated remove when everyone use the new endpoint
+app.route('/channel', channel(false))
 app.route('/device', device)
 app.route('/on_app_create', on_app_create)
 
@@ -185,6 +186,27 @@ app.onError((e, c) => {
     return e.getResponse()
 
   return c.text('Internal Server Error', 500)
+})
+
+app.openAPIRegistry.registerComponent('securitySchemes', 'apikey', {
+  type: 'apiKey',
+  in: 'header',
+  name: 'authorization',
+})
+
+app.get(
+  '/swagger_doc',
+  swaggerUI({
+    url: '/doc',
+  }),
+)
+
+app.doc('/doc', {
+  info: {
+    title: 'Capgo cloud API',
+    version: 'v1',
+  },
+  openapi: '3.1.0',
 })
 
 export default {

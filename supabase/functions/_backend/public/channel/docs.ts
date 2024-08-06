@@ -21,7 +21,24 @@ export function deleteRouteAndSchema(deprecated: boolean) {
     request: {
       query: requestSchema,
     },
-    responses: {},
+    responses: {
+      200: {
+        description: 'Returns a bundle (version) from supabase',
+        content: {
+          'application/json': {
+            schema: z.object({
+              status: z.string().openapi({
+                description: 'A stauts of the request',
+                example: 'ok',
+              }),
+            }),
+          },
+        },
+      },
+      422: errorResponse_422(),
+      500: error_500('Cannot delete channel'),
+      400: response_400('Cannot find channel', true),
+    },
   })
 
   return { route, requestSchema }
@@ -170,7 +187,7 @@ export function getRouteAndSchema(deprecated: boolean) {
       },
       422: errorResponse_422(),
       500: error_500('Cannot get channel'),
-      // 400: response_400('Cannot find channel', false),
+      400: response_400('Cannot find channel', false),
     },
   })
 

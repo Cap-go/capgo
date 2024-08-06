@@ -4,7 +4,7 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import type { z } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
-import type { MiddlewareKeyEnv } from '../../utils/hono.ts'
+import { type MiddlewareKeyEnv, middlewareKey } from '../../utils/hono.ts'
 import { errorHook } from '../../utils/open_api.ts'
 import { getRouteAndSchema } from './docs.ts'
 
@@ -13,8 +13,9 @@ export function getApp(deprecated: boolean) {
     defaultHook: errorHook(),
   })
 
-  const { route, requestSchema } = getRouteAndSchema(deprecated)
+  const { route, requestSchema, validResponseSchema } = getRouteAndSchema(deprecated)
 
+  app.use(route.getRoutingPath(), middlewareKey(['all', 'write', 'read', 'upload']))
   app.openapi(route, async (c: Context) => {
     try {
       const body = c.req.query() as any as z.infer<typeof requestSchema>
@@ -22,7 +23,7 @@ export function getApp(deprecated: boolean) {
 
       if (!body.app_id || !(await hasAppRight(c, body.app_id, apikey.user_id, 'read'))) {
         console.log('You can\'t access this app', body.app_id)
-        return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 500)
+        return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
       }
 
       // get one channel or all channels
@@ -52,7 +53,7 @@ export function getApp(deprecated: boolean) {
           .single()
         if (dbError || !dataChannel) {
           console.log('Cannot find version', dbError)
-          return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 500)
+          return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
         }
 
         const newObject = dataChannel as any
@@ -90,14 +91,22 @@ export function getApp(deprecated: boolean) {
           .order('created_at', { ascending: true })
         if (dbError || !dataChannels) {
           console.log('Cannot find channels', dbError)
-          return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 500)
+          return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
         }
-        return c.json(dataChannels.map((o) => {
+        const response = c.json(dataChannels.map((o) => {
           const newObject = o as any
           delete Object.assign(newObject, { disableAutoUpdateUnderNative: o.disable_auto_update_under_native }).disable_auto_update_under_native
           delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
           return newObject
         }))
+
+        const parsedResponse = validResponseSchema.safeParse(response)
+        if (!parsedResponse.success) {
+          console.error('Database response does not match schema', parsedResponse.error)
+          return c.json({ status: 'Database response does not match schema', error: parsedResponse.error }, 500)
+        }
+
+        return c.json(parsedResponse, 200)
       }
     }
     catch (e) {

@@ -1,7 +1,12 @@
 import type { Context } from '@hono/hono'
+import type { z } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { type MiddlewareKeyEnv, middlewareKey } from '../../utils/hono.ts'
+import { errorHook } from '../../utils/open_api.ts'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { getRequestSchema } from './docs.ts'
+import { getRoute, getValidResponseSchema } from './docs.ts'
 
 export interface GetLatest {
   app_id?: string
@@ -9,8 +14,16 @@ export interface GetLatest {
   page?: number
 }
 
-export async function get(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export const getApp = new OpenAPIHono<MiddlewareKeyEnv>({
+  defaultHook: errorHook(),
+})
+
+getApp.use(getRoute.getRoutingPath(), middlewareKey(['all', 'write', 'read', 'upload']))
+getApp.openapi(getRoute, async (c: Context) => {
   try {
+    const body = c.req.query() as any as z.infer<typeof getRequestSchema>
+    const apikey = c.get('apikey')
+
     if (!body.app_id)
       return c.json({ status: 'Missing app_id' }, 400)
 
@@ -30,9 +43,15 @@ export async function get(c: Context, body: GetLatest, apikey: Database['public'
     if (dbError || !dataBundles || !dataBundles.length)
       return c.json({ status: 'Cannot get bundle', error: dbError }, 400)
 
-    return c.json(dataBundles as any)
+    const parsedResponse = getValidResponseSchema.safeParse(dataBundles)
+    if (!parsedResponse.success) {
+      console.error('Database response does not match schema', parsedResponse.error)
+      return c.json({ status: 'Database response does not match schema', error: parsedResponse.error }, 500)
+    }
+
+    return c.json(parsedResponse.data, 200)
   }
   catch (e) {
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
-}
+})

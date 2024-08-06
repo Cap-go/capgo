@@ -1,19 +1,14 @@
-import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
-import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
-import type { MiddlewareKeyEnv } from '../../utils/hono.ts'
-import { getBody, middlewareKey } from '../../utils/hono.ts'
-import { errorHook } from '../../utils/open_api.ts'
-import { post } from './post.ts'
-import type { ChannelSet } from './delete.ts'
-import { deleteChannel } from './delete.ts'
-import { getRouteAndSchema } from './docs.ts'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { deleteApp } from './delete.ts'
 import { getApp } from './get.ts'
+import { postApp } from './post.ts'
 
 export function appGenerator(deprecated: boolean) {
   const app = new OpenAPIHono()
 
   app.route('/', getApp(deprecated))
+  app.route('/', postApp(deprecated))
+  app.route('/', deleteApp(deprecated))
 
   return app
 }
