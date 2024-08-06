@@ -415,7 +415,12 @@ async function openDownload() {
           if (!version.value)
             return
           if (version.value.session_key) {
-            const command = `bunx @capgo/cli bundle decrypt ./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'} ${version.value.session_key} --key ./.capgo_key`
+            let localPath = `./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'}`
+            if (version.value.r2_path) {
+              const filename = version.value.r2_path.split('/').slice(-1)[0]
+              localPath = `./${filename}`
+            }
+            const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
             displayStore.dialogOption = {
               header: '',
               message: `${t('to-open-encrypted-bu')}<br/><code>${command}</code>`,
@@ -429,7 +434,6 @@ async function openDownload() {
             displayStore.showDialog = true
             await displayStore.onDialogDismiss()
             copyToast(command)
-            return
           }
           openVersion(version.value)
         },
