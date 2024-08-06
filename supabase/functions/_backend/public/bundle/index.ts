@@ -1,3 +1,4 @@
+import type { Context } from '@hono/hono'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { defaultOpenApiErrorHandler } from '../../utils/open_api.ts'
 import { getApp } from './get.ts'
