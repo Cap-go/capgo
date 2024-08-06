@@ -1,4 +1,3 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { getBody, middlewareKey } from '../../utils/hono.ts'
