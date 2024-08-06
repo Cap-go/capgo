@@ -462,6 +462,7 @@ wrong-name-org-del: |-
 yearly: Yıllık
 'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
+you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı
 your-settings: Ayarlarınız
 your-ussage: 'Kullanımınız:'

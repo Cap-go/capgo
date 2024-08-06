@@ -472,6 +472,7 @@ wrong-name-org-del: |-
 yearly: Ежегодно
 'yes': да
 you-can-change-your-: Вы можете изменить свою личную информацию здесь.
+you-cannot-reuse: Вы не сможете повторно использовать эту версию пакета после удаления.
 you-reached-the-limi: Достигнут предел
 your-settings: Ваши настройки
 your-ussage: 'Ваше использование:'

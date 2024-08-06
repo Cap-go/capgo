@@ -450,6 +450,7 @@ wrong-name-org-del: |-
 yearly: 매년
 'yes': 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
+you-cannot-reuse: 삭제 후에는 이 번들 버전을 재사용할 수 없습니다.
 you-reached-the-limi: 한도 도달
 your-settings: 귀하의 설정
 your-ussage: '귀하의 사용량:'

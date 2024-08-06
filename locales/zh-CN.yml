@@ -450,6 +450,7 @@ wrong-name-org-del: |-
 yearly: 每年
 'yes': 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。
+you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制
 your-settings: 您的设置
 your-ussage: 您的使用情况：

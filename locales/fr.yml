@@ -474,6 +474,7 @@ wrong-name-org-del: "Vous n'avez pas saisi le nom de l'organisation. \nVous éti
 yearly: Annuel
 'yes': Oui
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
+you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du bundle après la suppression
 you-reached-the-limi: Limite atteinte
 your-settings: Vos paramètres
 your-ussage: "Votre utilisation\_:"

@@ -500,6 +500,7 @@ wrong-name-org-del: |-
 yearly: Jährlich
 'yes': Ja
 you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.
+you-cannot-reuse: Sie können diese Bundle-Version nach dem Löschen nicht wiederverwenden
 you-reached-the-limi: Limit erreicht
 your-settings: Ihre Einstellungen
 your-ussage: 'Ihre Nutzung:'

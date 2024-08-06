@@ -476,6 +476,7 @@ wrong-name-org-del: |-
 yearly: Annuale
 'yes': SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
+you-cannot-reuse: Non è possibile riutilizzare questa versione del bundle dopo l'eliminazione
 you-reached-the-limi: Limite raggiunto
 your-settings: Le tue impostazioni
 your-ussage: 'Il tuo utilizzo:'

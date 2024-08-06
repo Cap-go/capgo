@@ -43,7 +43,7 @@ const currentVersionsNumber = computed(() => {
 async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`,
     buttons: [
       {
         text: t('button-cancel'),

@@ -468,6 +468,7 @@ wrong-name-org-del: |-
 yearly: Anual
 'yes': sim
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.
+you-cannot-reuse: Você não pode reutilizar esta versão do pacote após a exclusão
 you-reached-the-limi: Limite alcançado
 your-settings: Suas configurações
 your-ussage: 'Seu uso:'
