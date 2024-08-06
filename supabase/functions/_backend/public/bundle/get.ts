@@ -8,12 +8,6 @@ import { fetchLimit } from '../../utils/utils.ts'
 import type { getRequestSchema } from './docs.ts'
 import { getRoute, getValidResponseSchema } from './docs.ts'
 
-export interface GetLatest {
-  app_id?: string
-  version?: string
-  page?: number
-}
-
 export const getApp = new OpenAPIHono<MiddlewareKeyEnv>({
   defaultHook: errorHook(),
 })

@@ -2,25 +2,10 @@ import type { Context } from '@hono/hono'
 import type { z } from '@hono/zod-openapi'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
-import type { Database } from '../../utils/supabase.types.ts'
 import type { MiddlewareKeyEnv } from '../../utils/hono.ts'
 import { BRES, middlewareKey } from '../../utils/hono.ts'
 import { errorHook } from '../../utils/open_api.ts'
 import { deleteRouteAndSchema } from './docs.ts'
-
-export interface ChannelSet {
-  app_id: string
-  channel: string
-  version?: string
-  public?: boolean
-  disableAutoUpdateUnderNative?: boolean
-  disableAutoUpdate?: Database['public']['Enums']['disable_update']
-  ios?: boolean
-  android?: boolean
-  allow_device_self_set?: boolean
-  allow_emulator?: boolean
-  allow_dev?: boolean
-}
 
 export function deleteApp(deprecated: boolean) {
   const app = new OpenAPIHono<MiddlewareKeyEnv>({

@@ -1,10 +1,13 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { defaultOpenApiErrorHandler } from '../../utils/open_api.ts'
 import { deleteApp } from './delete.ts'
 import { getApp } from './get.ts'
 import { postApp } from './post.ts'
 
 export function appGenerator(deprecated: boolean) {
   const app = new OpenAPIHono()
+
+  app.use('*', defaultOpenApiErrorHandler)
 
   app.route('/', getApp(deprecated))
   app.route('/', postApp(deprecated))

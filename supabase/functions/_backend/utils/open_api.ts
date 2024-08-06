@@ -1,5 +1,5 @@
 import type { Hook } from '@hono/zod-openapi'
-import type { Env } from '@hono/hono'
+import type { Context, Env, MiddlewareHandler, Next } from '@hono/hono'
 import { z } from '@hono/zod-openapi'
 
 export function errorHook<E extends Env>(): Hook<any, E, any, any> {
@@ -47,6 +47,15 @@ export function plainError() {
       description: 'Represents an error with the request',
       example: 'Invalid apikey',
     }),
+  }
+}
+
+export const defaultOpenApiErrorHandler: MiddlewareHandler = async (c: Context, next: Next) => {
+  await next()
+
+  if (c.error) {
+    console.error(`Uncaugth error in the public api: ${c.error.message}. More detail: (${c.error}, ${JSON.stringify(c.error.message)})`)
+    c.res = new Response(JSON.stringify({ status: 'Uncaugth error' }), { status: 500, headers: { 'Content-type': 'application/json' } })
   }
 }
 

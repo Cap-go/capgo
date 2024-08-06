@@ -1,15 +1,22 @@
 import type { Context } from '@hono/hono'
+import type { z } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import type { MiddlewareKeyEnv } from '../../utils/hono.ts'
+import { BRES, middlewareKey } from '../../utils/hono.ts'
+import { errorHook } from '../../utils/open_api.ts'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
-import type { Database } from '../../utils/supabase.types.ts'
-import { BRES } from '../../utils/hono.ts'
+import type { deleteRequestSchema } from './docs.ts'
+import { deleteRoute } from './docs.ts'
 
-interface GetLatest {
-  app_id?: string
-  version?: string
-  page?: number
-}
+export const deleteApp = new OpenAPIHono<MiddlewareKeyEnv>({
+  defaultHook: errorHook(),
+})
 
-export async function deleteBundle(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+deleteApp.use(deleteRoute.getRoutingPath(), middlewareKey(['all', 'write']))
+deleteApp.openapi(deleteRoute, async (c: Context) => {
+  const body = c.req.query() as any as z.infer<typeof deleteRequestSchema>
+  const apikey = c.get('apikey')
+
   if (!body.app_id)
     return c.json({ status: 'Missing app_id' }, 400)
 
@@ -44,5 +51,5 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
   catch (e) {
     return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
-  return c.json(BRES)
-}
+  return c.json(BRES, 200)
+})
