@@ -1,10 +1,22 @@
 import type { Context } from '@hono/hono'
-import { BRES } from '../../utils/hono.ts'
+import type { z } from '@hono/zod-openapi'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import type { MiddlewareKeyEnv } from '../../utils/hono.ts'
+import { BRES, middlewareKey } from '../../utils/hono.ts'
+import { errorHook } from '../../utils/open_api.ts'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
-import type { Database } from '../../utils/supabase.types.ts'
-import type { DeviceLink } from './delete.ts'
+import type { postRequestSchema } from './docs.ts'
+import { postRoute } from './docs.ts'
 
-export async function post(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export const postApp = new OpenAPIHono<MiddlewareKeyEnv>({
+  defaultHook: errorHook(),
+})
+
+postApp.use(postRoute.getRoutingPath(), middlewareKey(['all', 'write']))
+postApp.openapi(postRoute, async (c: Context) => {
+  const body = await c.req.json() as any as z.infer<typeof postRequestSchema>
+  const apikey = c.get('apikey')
+
   if (!body.device_id || !body.app_id) {
     console.log('Missing device_id or app_id')
     return c.json({ status: 'Missing device_id or app_id' }, 400)
@@ -88,5 +100,5 @@ export async function post(c: Context, body: DeviceLink, apikey: Database['publi
       return c.json({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
     }
   }
-  return c.json(BRES)
-}
+  return c.json(BRES, 200)
+})

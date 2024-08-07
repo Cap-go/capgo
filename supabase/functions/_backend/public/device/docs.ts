@@ -93,3 +93,89 @@ export const getRoute = createRoute({
     400: response_400('Cannot find device'),
   },
 })
+
+// --------------
+
+export const postRequestSchema = z.object({
+  app_id: z.string().openapi({ description: 'A unique identifier of the application', example: 'com.demo.app' }),
+  device_id: z.string().uuid().openapi({ param: { name: 'device_id', in: 'query', description: 'A unique identifier for a device' } }),
+  channel: z.string().nullish().openapi({ description: 'The channel to use for this device overwrite', example: 'production' }),
+  version_id: z.string().nullish().openapi({ description: 'A SEMVER compatible version string to use for this device overwrite', example: '1.0.0' }),
+}).strict()
+
+export const postRoute = createRoute({
+  method: 'post',
+  path: '/',
+  summary: 'Update the device overwrites for a specific device',
+  security: [
+    {
+      apikey: [],
+    },
+  ],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: postRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Returns a bundle (version) from supabase',
+      content: {
+        'application/json': {
+          schema: z.object({
+            status: z.string().openapi({
+              description: 'A stauts of the request',
+              example: 'ok',
+            }),
+          }),
+        },
+      },
+    },
+    422: errorResponse_422(),
+    500: error_500('Uncaught error'),
+    400: response_400('Cannot save device override', true),
+  },
+})
+
+// -------------------
+
+export const deleteRequestSchema = z.object({
+  app_id: z.string().openapi({ param: { name: 'app_id', in: 'query', description: 'A unique identifier of the application' } }),
+  device_id: z.string().uuid().openapi({ param: { name: 'device_id', in: 'query', description: 'A unique identifier for a device' } }),
+}).strict()
+
+export const deleteRoute = createRoute({
+  method: 'delete',
+  path: '/',
+  summary: 'Delete every device overwrite for a specific device. It does not delete the device from capgo cloud. You cannot delete a device from capgo cloud',
+  security: [
+    {
+      apikey: [],
+    },
+  ],
+  request: {
+    query: deleteRequestSchema,
+  },
+  responses: {
+    200: {
+      description: 'Returns a bundle (version) from supabase',
+      content: {
+        'application/json': {
+          schema: z.object({
+            status: z.string().openapi({
+              description: 'A stauts of the request',
+              example: 'ok',
+            }),
+          }),
+        },
+      },
+    },
+    422: errorResponse_422(),
+    500: error_500('Cannot delete channel'),
+    400: response_400('Cannot find channel'),
+  },
+})
