@@ -24,6 +24,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
     session_key?: string
     checksum?: string | null
     manifest?: ManifestEntry[]
+    signature?: string | null
   } = {
     version: version.name,
     url: signedURL,
@@ -34,6 +35,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
     res.checksum = version.checksum
   if (semver.gte(plugin_version, '6.2.0') && manifest.length > 0)
     res.manifest = manifest
+  if (semver.gte(plugin_version, '6.1.0') && !!version.signature)
+    res.signature = version.signature
   return res
 }
 
@@ -72,6 +75,7 @@ async function requestInfosPostgres(
         min_update_version: versionAlias.min_update_version,
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        signature: sql`${versionAlias.signature}`.mapWith(versionAlias.signature).as('vsignature'),
       },
     })
     .from(schema.devices_override)
@@ -97,6 +101,7 @@ async function requestInfosPostgres(
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        signature: sql`${versionAlias.signature}`.mapWith(versionAlias.signature).as('vsignature'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -108,7 +113,8 @@ async function requestInfosPostgres(
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
         r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
+        signature: sql`${versionAlias.signature}`.mapWith(versionAlias.signature).as('svsignature'),
       },
       channels: {
         id: schema.channels.id,
@@ -152,6 +158,7 @@ async function requestInfosPostgres(
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        signature: sql`${versionAlias.signature}`.mapWith(versionAlias.signature).as('vsignature'),
       },
       secondVersion: {
         id: sql<number>`${secondVersionAlias.id}`.as('svid'),
@@ -163,7 +170,8 @@ async function requestInfosPostgres(
         external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
         min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
         r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
+        signature: sql`${versionAlias.signature}`.mapWith(versionAlias.signature).as('svsignature'),
       },
       channels: {
         id: schema.channels.id,
