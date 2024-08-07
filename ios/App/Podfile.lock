@@ -54,11 +54,11 @@ PODS:
     - Capacitor
   - CapacitorToast (6.0.1):
     - Capacitor
-  - CapawesomeCapacitorFilePicker (6.0.0):
+  - CapawesomeCapacitorFilePicker (6.0.1):
     - Capacitor
-  - CapawesomeCapacitorScreenOrientation (6.0.0):
+  - CapawesomeCapacitorScreenOrientation (6.0.1):
     - Capacitor
-  - CapgoCapacitorCrisp (6.0.22):
+  - CapgoCapacitorCrisp (6.0.40):
     - Capacitor
     - Crisp
   - CapgoCapacitorFlash (6.0.0):
@@ -253,9 +253,9 @@ SPEC CHECKSUMS:
   CapacitorStatusBar: 2e4369f99166125435641b1908d05f561eaba6f6
   CapacitorTextZoom: 391f584cadac5ffb36534d045fae612c122c541b
   CapacitorToast: d4c42ea810e223bdd66b95a7c661f5467666896d
-  CapawesomeCapacitorFilePicker: 983e8d272d200897cf1c12cf9a62439fa2fb2c35
-  CapawesomeCapacitorScreenOrientation: 82675c41cb616a64630c834b06344515a2849ff3
-  CapgoCapacitorCrisp: 0484364ad661b6573c915badcb4b2c9f3709c485
+  CapawesomeCapacitorFilePicker: c80c30759ba48986ff34a2b51b23ac2babfd3774
+  CapawesomeCapacitorScreenOrientation: 9cc68ecd085fcea2e1755475a3ed60d85e604a6c
+  CapgoCapacitorCrisp: 19eb6577eed44aa06d49fca8619c7f4c56306ccb
   CapgoCapacitorFlash: a570db525cf7d42477e650615b32e933858937f8
   CapgoCapacitorMute: 4581f843a3b79eaa1106d1ef1ee18a093b7c9907
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
