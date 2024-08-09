@@ -19,7 +19,7 @@ const devicesNb = ref(0)
 const updatesNb = ref(0)
 const channelsNb = ref(0)
 const capgoVersion = ref('')
-const canShowMobileStats = ref(false)
+const canShowMobileStats = ref(true)
 const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
@@ -38,8 +38,8 @@ async function loadAppInfo() {
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
     // normalize version
     // capgoVersion.value =
-    if (capgoVersion.value && gte(capgoVersion.value, '6.0.1')) // TODO: removed in 2025 if there is not more old plugin used
-      canShowMobileStats.value = true
+    // if (capgoVersion.value && gte(capgoVersion.value, '6.0.1')) // TODO: removed in 2025 if there is not more old plugin used
+    // canShowMobileStats.value = true
     updatesNb.value = main.getTotalStatsByApp(id.value)
     devicesNb.value = main.getTotalMauByApp(id.value)
 
