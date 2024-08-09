@@ -2,7 +2,6 @@
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { computed, ref, watchEffect } from 'vue'
-import { gte } from 'semver'
 import { useMainStore } from '~/stores/main'
 import Spinner from '~/components/Spinner.vue'
 import type { Stat } from '~/components/comp_def'
