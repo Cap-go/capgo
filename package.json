@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.2.16",
+  "version": "11.3.2",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker rm minio1 && bun run minio:start && bun run minio:seed",
@@ -72,6 +72,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.617.0",
     "@aws-sdk/s3-request-presigner": "^3.617.0",
+    "@bentonow/bento-node-sdk": "^0.2.1",
     "@capacitor-community/in-app-review": "^6.0.0",
     "@capacitor-community/keep-awake": "^5.0.0",
     "@capacitor/action-sheet": "^6.0.1",
