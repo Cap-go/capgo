@@ -63,12 +63,12 @@ function logOut() {
           </router-link>
         </li>
         <li v-if="isMobile">
-          <router-link to="/app/modules_test" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+          <router-link to="/app/modules" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
             {{ t('module-heading') }}
           </router-link>
         </li>
         <li v-if="isMobile">
-          <router-link to="/app/modules" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+          <router-link to="/app/modules_test" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
             {{ t('module-heading') }} {{ t('tests') }}
           </router-link>
         </li>
