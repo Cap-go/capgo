@@ -1,30 +1,10 @@
-import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
-import { getBody, middlewareKey } from '../../utils/hono.ts'
-import { get } from './get.ts'
-import { deleteBundle } from './delete.ts'
-import type { GetLatest } from './get.ts'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { defaultOpenApiErrorHandler } from '../../utils/open_api.ts'
+import { getApp } from './get.ts'
+import { deleteApp } from './delete.ts'
 
-export const app = new Hono()
+export const app = new OpenAPIHono()
 
-app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
-  try {
-    const body = await getBody<GetLatest>(c)
-    const apikey = c.get('apikey')
-    return get(c, body, apikey)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
-  }
-})
-
-app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
-  try {
-    const body = await getBody<GetLatest>(c)
-    const apikey = c.get('apikey')
-    return deleteBundle(c, body, apikey)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
-  }
-})
+app.use('*', defaultOpenApiErrorHandler)
+app.route('/', getApp)
+app.route('/', deleteApp)

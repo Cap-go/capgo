@@ -1,7 +1,12 @@
 import type { Context } from '@hono/hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import type { z } from '@hono/zod-openapi'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
-import type { Database } from '../../utils/supabase.types.ts'
-import { BRES } from '../../utils/hono.ts'
+import type { MiddlewareKeyEnv } from '../../utils/hono.ts'
+import { BRES, middlewareKey } from '../../utils/hono.ts'
+import { errorHook } from '../../utils/open_api.ts'
+import type { deleteRequestSchema } from './docs.ts'
+import { deleteRoute } from './docs.ts'
 
 export interface DeviceLink {
   app_id: string
@@ -10,7 +15,15 @@ export interface DeviceLink {
   channel?: string
 }
 
-export async function deleteOverride(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export const deleteApp = new OpenAPIHono<MiddlewareKeyEnv>({
+  defaultHook: errorHook(),
+})
+
+deleteApp.use(deleteRoute.getRoutingPath(), middlewareKey(['all', 'write']))
+deleteApp.openapi(deleteRoute, async (c: Context) => {
+  const body = c.req.query() as any as z.infer<typeof deleteRequestSchema>
+  const apikey = c.get('apikey')
+
   if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
@@ -34,5 +47,5 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
   catch (e) {
     return c.json({ status: 'Cannot delete override', error: JSON.stringify(e) }, 500)
   }
-  return c.json(BRES)
-}
+  return c.json(BRES, 200)
+})
