@@ -4,7 +4,7 @@
   "version": "11.3.3",
   "private": true,
   "scripts": {
-    "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker rm minio1 && bun run minio:start && bun run minio:seed",
+    "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker stop minio1 && docker rm minio1 && sudo rm -rf /tmp/minio-data/ && bun run minio:start && bun run minio:seed",
     "test": "vitest --bail=1",
     "build": "vite build",
     "test-front": "playwright test",
