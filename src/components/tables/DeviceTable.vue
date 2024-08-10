@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ky from 'ky'
+import { toast } from 'vue-sonner'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
@@ -20,6 +21,7 @@ type Element = Database['public']['Tables']['devices']['Row'] & { version: Datab
 const { t } = useI18n()
 const supabase = useSupabase()
 const router = useRouter()
+const displayStore = useDisplayStore()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Element[]>([])
@@ -210,6 +212,139 @@ async function refreshData() {
 async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
+
+function countLowercaseLetters(str) {
+  const matches = str.match(/[a-z]/g)
+  return matches ? matches.length : 0
+}
+
+function countCapitalLetters(str) {
+  const matches = str.match(/[A-Z]/g)
+  return matches ? matches.length : 0
+}
+
+const deviceIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function handlePlus() {
+  displayStore.dialogOption = {
+    header: t('generate-device-overwrite'),
+    message: `${t('generate-device-overwrite-msg')}`,
+    buttonCenter: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-xl',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('continue'),
+        id: 'confirm-button',
+        handler: () => {
+          displayStore.dialogOption = {
+            header: t('type-device-id'),
+            message: `${t('type-device-id-msg')}`,
+            buttonCenter: true,
+            headerStyle: 'w-full text-center',
+            textStyle: 'w-full text-center',
+            preventAccidentalClose: true,
+            input: true,
+            size: 'max-w-xl',
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('continue'),
+                id: 'confirm-button',
+                handler: async () => {
+                  const input = displayStore.dialogInputText
+                  const deviceId = input
+
+                  if (!deviceIdRegex.test(input)) {
+                    toast.error(t('invalid-uuid'))
+                    return
+                  }
+
+                  const bigLetters = countCapitalLetters(input)
+                  const smallLetters = countLowercaseLetters(input)
+
+                  if (bigLetters === smallLetters) {
+                    toast.error(t('cannot-determine-platform'))
+                    return
+                  }
+                  const platform = bigLetters > smallLetters ? 'ios' : 'android'
+
+                  const { data: channelsR, error } = await supabase
+                    .from('channels')
+                    .select('id, name, version ( id, name )')
+                    .eq('app_id', props.appId)
+
+                  if (error) {
+                    toast.error(t('cannot-fetch-channels'))
+                    console.error('chan error', error)
+                    return
+                  }
+
+                  const channels = channelsR as any as (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] })[]
+
+                  const buttons = channels.map((chan) => {
+                    return {
+                      text: chan.name,
+                      id: chan.id,
+                      handler: async () => {
+                        displayStore.dialogOption = {
+                          header: t('confirm-overwrite'),
+                          message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', chan.name).replace('$3', chan.version.name)}`,
+                          headerStyle: 'w-full text-left',
+                          size: 'max-w-xl',
+                          buttons: [
+                            {
+                              text: t('yes'),
+                              role: 'yes',
+                            },
+                            {
+                              text: t('no'),
+                              role: 'cancel',
+                            },
+                          ],
+                        }
+                        displayStore.showDialog = true
+                      },
+                    }
+                  })
+
+                  displayStore.dialogOption = {
+                    header: t('select-channel'),
+                    message: `${t('select-channel-msg')}`,
+                    headerStyle: 'w-full text-center',
+                    textStyle: 'w-full text-center',
+                    buttonVertical: true,
+                    size: 'max-w-xl',
+                    buttons: Array.prototype.concat(
+                      buttons,
+                      [
+                        {
+                          text: t('button-cancel'),
+                          role: 'cancel',
+                        },
+                      ],
+                    ),
+                  }
+                  displayStore.showDialog = true
+                },
+              },
+            ],
+          }
+          displayStore.showDialog = true
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
 onMounted(async () => {
   await refreshData()
 })
@@ -220,9 +355,11 @@ onMounted(async () => {
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
+    :plus-button="true"
     :is-loading="isLoading"
     :search-placeholder="t('search-by-device-id')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"
+    @plus-click="handlePlus"
   />
 </template>

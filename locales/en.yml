@@ -97,6 +97,8 @@ cannot-delete-bundle: Cannot delete bundle
 cannot-delete-channel: Cannot delete channel
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
+cannot-determine-platform: Cannot determine if the given UUID belongs to IOS or Android
+cannot-fetch-channels: Cannot fetch channels. Please check browser console
 cannot-find-unknown-version: >-
   Cannot find unknown version, please contact capgo support and check browser
   logs
@@ -139,6 +141,15 @@ cli-doc: CLI doc
 commands: commands
 confirm-email: Confirm your email
 confirm-email-sent: A confirmation email was sent click to link to confirm your email
+confirm-overwrite: Confirm overwrite
+confirm-overwrite-msg: |-
+  You are about to create the following overwrite:
+
+  Device ID: $1
+  Channel: $2
+  Channel version: $3
+
+  Does that sound correct?
 confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users.
@@ -202,6 +213,8 @@ forgot-success: Password updated successfully
 free-trial: Free trial
 from-device: from device
 general-information: General Informations
+generate-device-overwrite: Generate device overwrite
+generate-device-overwrite-msg: You are about to generate a device overwrite. Do you want to continue?
 generated-new-apikey: Generated new API key!
 go-back: Go back
 good: Good
@@ -214,6 +227,7 @@ install: Installed
 invalid-auth: Your login are not a match, try again.
 invalid-email: Passed email is not valid
 invalid-mfa-code: Invalid 2FA code
+invalid-uuid: Invalid UUID
 invalid-version: Invalid semver version
 invite-accepted: Successfully accepted oranization inviation
 is-emulator: Is Emulator
@@ -370,6 +384,8 @@ search-by-device-id-: Search by device ID or action
 search-by-device-id-0: Search by device ID
 search-by-name: Search by name
 see-usage: See usage
+select-channel: Select channel
+select-channel-msg: Please select the channel that you would like to use in this overwrite
 select-user-perms: Select user's permissions
 select-user-perms-expanded: Select which permission should the invited user have
 session_key: IvSessionKey
@@ -399,6 +415,8 @@ to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps-v2: Apps
 trial-left: days left
 trial-plan-expired: Trial Expired
+type-device-id: Enter device ID
+type-device-id-msg: Please enter the ID of the device that you would like to overwrite
 type-new-name: Please type the new api key name
 type-new-org-name: Please type the new name for the organization
 undefined-fail: Undefined (updates will fail)
