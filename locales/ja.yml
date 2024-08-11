@@ -206,6 +206,7 @@ general-information: 一般情報
 generated-new-apikey: 新しい API キーが生成されました。
 go-back: 戻る
 good: 良い
+here: これ
 id: ID
 included-in-plan: プランに含まれるもの
 info: 情報
@@ -291,7 +292,9 @@ next: 次
 no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし
 no-permission: 権限が不十分です
+no-permission-ask-super-admin: このバンドルを安全に削除するには、スーパー管理者に依頼してください。
 none: なし
+normal: ノーマル
 not-found: 見つかりません
 not-paying-org-usage: この組織は料金を支払っていないため、無料体験組織の使用状況を表示できません
 notifications: 通知
@@ -322,6 +325,7 @@ password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入�
 patch: パッチ
 percent-fail: 失敗率
 permission-changed: ユーザー権限が正常に変更されました
+pernament: ペルナメント
 personal-information: 個人情報
 picture-delete-fail: アプリの画像を削除できません。コンソールのログを確認してください。
 picture-uploaded: 画像が正常にアップロードされました
@@ -375,6 +379,11 @@ search-by-device-id-: デバイス ID またはアクションで検索
 search-by-device-id-0: デバイス ID で検索
 search-by-name: 名前で検索
 see-usage: 使い方を見る
+select-style-of-deletion: 削除スタイルの選択
+select-style-of-deletion-msg: |-
+  このチャンネルを削除する方法を選択してください。
+  ノーマルをお勧めします。
+  違いについてはこちらをご覧ください。
 select-user-perms: ユーザーの権限を選択します
 select-user-perms-expanded: 招待されたユーザーにどの権限を持たせるかを選択します
 session_key: IvSessionKey
@@ -417,6 +426,7 @@ unlink-bundle: バンドルのリンクを解除
 unlink-channel: チャンネルのリンクを解除
 unlink-error: リンク解除エラー。コンソールを確認してください
 unlink-version: バージョンのリンクを解除
+unsafe: 危険
 update: アップデート
 updated-at: に更新
 updated-min-version: 最小バージョンを更新しました

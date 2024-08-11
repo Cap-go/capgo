@@ -220,6 +220,7 @@ general-information: Informazioni generali
 generated-new-apikey: Generata nuova chiave API!
 go-back: Torna indietro
 good: Bene
+here: qui
 id: ID
 included-in-plan: Incluso nel piano
 info: Informazione
@@ -307,7 +308,11 @@ next: Prossimo
 no-app-icon: Questa app non ha alcuna icona dell'app
 no-data: Nessun dato
 no-permission: Permessi insufficienti
+no-permission-ask-super-admin: >-
+  Autorizzazione insufficiente, chiedere a un super amministratore di eliminare
+  questo bundle in modo non sicuro.
 none: Nessuno
+normal: Normale
 not-found: Non trovato
 not-paying-org-usage: >-
   Questa organizzazione non paga, non può mostrare l'utilizzo per
@@ -342,6 +347,7 @@ password-hint: >-
 patch: Toppa
 percent-fail: Percentuale di fallimento
 permission-changed: Autorizzazione utente modificata correttamente
+pernament: Pernamento
 personal-information: Informazioni personali
 picture-delete-fail: Impossibile eliminare l'immagine dell'app, controlla il registro della console
 picture-uploaded: Immagine caricata correttamente
@@ -399,6 +405,11 @@ search-by-device-id-: Cerca per ID dispositivo o azione
 search-by-device-id-0: Cerca per ID dispositivo
 search-by-name: Ricerca per nome
 see-usage: Vedi utilizzo
+select-style-of-deletion: Selezionare lo stile di cancellazione
+select-style-of-deletion-msg: |-
+  Selezionare il modo in cui si desidera eliminare questo canale.
+  Si consiglia di scegliere la modalità normale.
+  Potete leggere la differenza $1
 select-user-perms: Seleziona le autorizzazioni dell'utente
 select-user-perms-expanded: Seleziona quale autorizzazione dovrebbe avere l'utente invitato
 session_key: IvSessionKey
@@ -443,6 +454,7 @@ unlink-bundle: Scollega gruppo
 unlink-channel: Scollega canale
 unlink-error: Errore di scollegamento, controlla la console
 unlink-version: Scollega versione
+unsafe: Non sicuro
 update: Aggiornamento
 updated-at: Aggiornato a
 updated-min-version: Versione minima aggiornata

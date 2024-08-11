@@ -215,6 +215,7 @@ general-information: Informasi Umum
 generated-new-apikey: Menghasilkan kunci API baru!
 go-back: Kembali
 good: Bagus
+here: di sini
 id: PENGENAL
 included-in-plan: Termasuk dalam rencana
 info: Informasi
@@ -302,7 +303,11 @@ next: Berikutnya
 no-app-icon: Aplikasi ini tidak memiliki ikon aplikasi apa pun
 no-data: Tidak ada data
 no-permission: Izin tidak memadai
+no-permission-ask-super-admin: >-
+  izin tidak mencukupi, silakan minta admin super untuk menghapus bundel ini
+  secara tidak aman
 none: Tidak ada
+normal: Normal
 not-found: Tidak ditemukan
 not-paying-org-usage: >-
   Organisasi ini tidak membayar, tidak dapat menunjukkan penggunaan untuk
@@ -335,6 +340,7 @@ password-hint: Masukkan kombinasi minimal 6 angka, huruf, dan tanda baca.
 patch: Tambalan
 percent-fail: Persentase gagal
 permission-changed: Berhasil mengubah izin pengguna
+pernament: Hiasan
 personal-information: Informasi pribadi
 picture-delete-fail: Tidak dapat menghapus gambar aplikasi, silakan periksa log konsol
 picture-uploaded: Gambar berhasil diunggah
@@ -392,6 +398,11 @@ search-by-device-id-: Cari berdasarkan ID perangkat atau tindakan
 search-by-device-id-0: Cari berdasarkan ID perangkat
 search-by-name: Cari berdasarkan nama
 see-usage: Lihat penggunaan
+select-style-of-deletion: Memilih gaya penghapusan
+select-style-of-deletion-msg: |-
+  Pilih cara yang Anda inginkan untuk menghapus saluran ini.
+  Disarankan untuk menggunakan cara yang normal.
+  Anda dapat membaca tentang perbedaannya di $1
 select-user-perms: Pilih izin pengguna
 select-user-perms-expanded: Pilih izin mana yang harus dimiliki oleh pengguna yang diundang
 session_key: IvSessionKey
@@ -436,6 +447,7 @@ unlink-bundle: Putuskan tautan bundel
 unlink-channel: Batalkan tautan saluran
 unlink-error: Kesalahan pembatalan tautan, silakan periksa konsol
 unlink-version: Batalkan tautan versi
+unsafe: Tidak aman
 update: Memperbarui
 updated-at: Diperbarui pada
 updated-min-version: Versi minimal yang diperbarui

@@ -214,6 +214,7 @@ general-information: Ogólne informacje
 generated-new-apikey: Nowy klucz API został wygenerowany!
 go-back: Wróć
 good: Dobry
+here: tutaj
 id: ID
 included-in-plan: Zawarte w planie
 info: Informacja
@@ -301,7 +302,11 @@ next: Następny
 no-app-icon: Ta aplikacja nie ma żadnej ikony aplikacji
 no-data: Brak danych
 no-permission: Niewystarczające uprawnienia
+no-permission-ask-super-admin: >-
+  Niewystarczające uprawnienia, poproś superadministratora o niebezpieczne
+  usunięcie tego pakietu
 none: Nic
+normal: Normalny
 not-found: Nie znaleziono
 not-paying-org-usage: >-
   Ta organizacja nie płaci, nie może wykazać wykorzystania w przypadku
@@ -336,6 +341,7 @@ password-hint: Wprowadź kombinację co najmniej 6 cyfr, liter i znaków interpu
 patch: Skrawek
 percent-fail: Procent niepowodzeń
 permission-changed: Pomyślnie zmieniono uprawnienia użytkownika
+pernament: Pernament
 personal-information: Informacje osobiste
 picture-delete-fail: Nie można usunąć obrazu aplikacji. Sprawdź dziennik konsoli
 picture-uploaded: Zdjęcie zostało pomyślnie przesłane
@@ -393,6 +399,11 @@ search-by-device-id-: Szukaj według identyfikatora urządzenia lub akcji
 search-by-device-id-0: Wyszukaj według identyfikatora urządzenia
 search-by-name: Szukaj według nazwy
 see-usage: Zobacz użycie
+select-style-of-deletion: Wybierz styl usuwania
+select-style-of-deletion-msg: |-
+  Wybierz sposób, w jaki chcesz usunąć ten kanał.
+  Zaleca się wybranie normalnego sposobu.
+  Możesz przeczytać o różnicy $1
 select-user-perms: Wybierz uprawnienia użytkownika
 select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
 session_key: Klucz IVSesji
@@ -437,6 +448,7 @@ unlink-bundle: Odłącz pakiet
 unlink-channel: Odłącz kanał
 unlink-error: Błąd rozłączenia. Sprawdź konsolę
 unlink-version: Odłącz wersję
+unsafe: Niebezpieczne
 update: Aktualizacja
 updated-at: Zaktualizowano o godz
 updated-min-version: Zaktualizowana wersja minimalna

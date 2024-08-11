@@ -212,6 +212,7 @@ general-information: Informações gerais
 generated-new-apikey: Gerada nova chave de API!
 go-back: Volte
 good: Bom
+here: aqui
 id: EU IA
 included-in-plan: Incluído no plano
 info: Informação
@@ -299,7 +300,11 @@ next: Próximo
 no-app-icon: Este aplicativo não possui nenhum ícone de aplicativo
 no-data: Sem dados
 no-permission: Permissões insuficientes
+no-permission-ask-super-admin: >-
+  permissão insuficiente, por favor peça a um super administrador para eliminar
+  este pacote sem segurança
 none: Nenhum
+normal: Normal
 not-found: Não encontrado
 not-paying-org-usage: >-
   Esta organização não está pagando e não pode mostrar o uso de uma organização
@@ -334,6 +339,7 @@ password-hint: Digite uma combinação de pelo menos 6 números, letras e pontua
 patch: Correção
 percent-fail: Porcentagem de reprovação
 permission-changed: Permissão do usuário alterada com sucesso
+pernament: Pernamento
 personal-information: Informações pessoais
 picture-delete-fail: Não é possível excluir a imagem do aplicativo. Verifique o log do console
 picture-uploaded: Imagem enviada com sucesso
@@ -391,6 +397,11 @@ search-by-device-id-: Pesquise por ID de dispositivo ou ação
 search-by-device-id-0: Pesquisar por ID do dispositivo
 search-by-name: Procura por nome
 see-usage: Ver uso
+select-style-of-deletion: Selecionar o estilo de eliminação
+select-style-of-deletion-msg: |-
+  Seleccione a forma como pretende eliminar este canal.
+  Recomenda-se que opte pela forma normal.
+  Pode ler sobre a diferença $1
 select-user-perms: Selecione as permissões do usuário
 select-user-perms-expanded: Selecione qual permissão o usuário convidado deve ter
 session_key: IvSessionKey
@@ -435,6 +446,7 @@ unlink-bundle: Desvincular pacote
 unlink-channel: Desvincular canal
 unlink-error: Erro ao desvincular, verifique o console
 unlink-version: Desvincular versão
+unsafe: Inseguro
 update: Atualizar
 updated-at: Atualizado em
 updated-min-version: Versão mínima atualizada

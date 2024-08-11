@@ -230,6 +230,7 @@ general-information: Allgemeine Informationen
 generated-new-apikey: Neuer API-Schlüssel generiert!
 go-back: Geh zurück
 good: Gut
+here: hier
 id: AUSWEIS
 included-in-plan: Im Plan enthalten
 info: Information
@@ -319,7 +320,11 @@ next: Nächste
 no-app-icon: Diese App hat kein App-Symbol
 no-data: Keine Daten
 no-permission: Nicht ausreichende Berechtigungen
+no-permission-ask-super-admin: >-
+  unzureichende Berechtigung, bitte bitten Sie einen Superadministrator, dieses
+  Paket unsicher zu löschen
 none: Keiner
+normal: Normal
 not-found: Nicht gefunden
 not-paying-org-usage: >-
   Diese Organisation zahlt nicht und kann die Nutzung für eine kostenlose
@@ -358,6 +363,7 @@ password-hint: >-
 patch: Patch
 percent-fail: Fehlerprozentsatz
 permission-changed: Benutzerberechtigung erfolgreich geändert
+pernament: Pernament
 personal-information: Persönliche Informationen
 picture-delete-fail: >-
   Das App-Bild kann nicht gelöscht werden. Bitte überprüfen Sie das
@@ -421,6 +427,11 @@ search-by-device-id-: Suche nach Geräte-ID oder Aktion
 search-by-device-id-0: Suche nach Geräte-ID
 search-by-name: Suche mit Name
 see-usage: Siehe Verwendung
+select-style-of-deletion: Wählen Sie die Art der Löschung
+select-style-of-deletion-msg: |-
+  Bitte wählen Sie die Art und Weise, wie Sie diesen Kanal löschen möchten.
+  Es wird empfohlen, die normale Methode zu verwenden.
+  Sie können über den Unterschied lesen $1
 select-user-perms: Wählen Sie die Berechtigungen des Benutzers aus
 select-user-perms-expanded: Wählen Sie aus, welche Berechtigung der eingeladene Benutzer haben soll
 session_key: IvSessionKey
@@ -465,6 +476,7 @@ unlink-bundle: Bündel aufheben
 unlink-channel: Verknüpfung des Kanals aufheben
 unlink-error: Fehler beim Aufheben der Verknüpfung. Bitte überprüfen Sie die Konsole
 unlink-version: Verknüpfung aufheben
+unsafe: Unsicher
 update: Aktualisieren
 updated-at: Aktualisiert am
 updated-min-version: Aktualisierte Minimalversion

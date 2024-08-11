@@ -212,6 +212,7 @@ general-information: Genel Bilgiler
 generated-new-apikey: Yeni API anahtarı oluşturuldu!
 go-back: Geri gitmek
 good: İyi
+here: Burada
 id: İD
 included-in-plan: Plana dahil
 info: Bilgi
@@ -299,7 +300,11 @@ next: Sonraki
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-data: Veri yok
 no-permission: Yetersiz yetkiler
+no-permission-ask-super-admin: >-
+  Yetersiz izin, lütfen bir süper yöneticiden bu paketi güvenli olmayan bir
+  şekilde silmesini isteyin
 none: Hiçbiri
+normal: Normal
 not-found: Bulunamadı
 not-paying-org-usage: Bu kuruluş ödeme yapmıyor, ücretsiz deneme kuruluşu için kullanım gösteremiyor
 notifications: bildirimler
@@ -330,6 +335,7 @@ password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir komb
 patch: Yama
 percent-fail: Başarısız yüzde
 permission-changed: Kullanıcı izni başarıyla değiştirildi
+pernament: Pernament
 personal-information: Kişisel bilgiler
 picture-delete-fail: Uygulama resmi silinemiyor, lütfen konsol günlüğünü kontrol edin
 picture-uploaded: Resim başarıyla yüklendi
@@ -387,6 +393,11 @@ search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
+select-style-of-deletion: Silme stilini seçin
+select-style-of-deletion-msg: |-
+  Lütfen bu kanalı silmek istediğiniz yolu seçin.
+  Normal olanı seçmeniz tavsiye edilir.
+  Fark hakkında okuyabilirsiniz $1
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
@@ -429,6 +440,7 @@ unlink-bundle: Paketin bağlantısını kaldır
 unlink-channel: Kanalın bağlantısını kaldır
 unlink-error: Bağlantıyı kaldırma hatası, lütfen konsolu kontrol edin
 unlink-version: Sürümün bağlantısını kaldır
+unsafe: Güvensiz
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
 updated-min-version: Minimum sürüm güncellendi

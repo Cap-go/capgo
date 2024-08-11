@@ -222,6 +222,7 @@ general-information: Informations générales
 generated-new-apikey: "Génération d'une nouvelle clé API\_!"
 go-back: Retourner
 good: Bien
+here: ici
 id: Identifiant
 included-in-plan: Inclus dans le forfait
 info: Information
@@ -303,7 +304,11 @@ next: Suivant
 no-app-icon: Cette application n'a pas d'icône d'application
 no-data: Pas de données
 no-permission: Permissions insuffisantes
+no-permission-ask-super-admin: >-
+  permission insuffisante, veuillez demander à un super administrateur de
+  supprimer ce paquet de manière non sécurisée
 none: Aucun
+normal: Normal
 not-found: Pas trouvé
 not-paying-org-usage: >-
   Cette organisation ne paie pas et ne peut pas montrer son utilisation pour une
@@ -338,6 +343,7 @@ password-hint: >-
 patch: Correctif
 percent-fail: Pourcentage d'échec
 permission-changed: L'autorisation de l'utilisateur a été modifiée avec succès
+pernament: Pernament
 personal-information: Informations personnelles
 picture-delete-fail: >-
   Impossible de supprimer l'image de l'application, veuillez vérifier le journal
@@ -401,6 +407,11 @@ search-by-device-id-: Rechercher par ID d'appareil ou action
 search-by-device-id-0: Rechercher par ID d'appareil
 search-by-name: Rechercher par nom
 see-usage: Voir l'utilisation
+select-style-of-deletion: Sélectionner le style de suppression
+select-style-of-deletion-msg: |-
+  Veuillez sélectionner la manière dont vous souhaitez supprimer ce canal.
+  Il est recommandé d'utiliser la méthode normale.
+  Vous pouvez lire la différence $1
 select-user-perms: Sélectionnez les autorisations de l'utilisateur
 select-user-perms-expanded: Sélectionnez quelle autorisation l'utilisateur invité doit avoir
 session_key: Session ID
@@ -443,6 +454,7 @@ unlink-bundle: Dissocier le groupe
 unlink-channel: Dissocier le canal
 unlink-error: Erreur de dissociation, veuillez vérifier la console
 unlink-version: Dissocier la version
+unsafe: Peu sûr
 update: Mise à jour
 updated-at: Mis à jour à
 updated-min-version: Version minimale mise à jour

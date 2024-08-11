@@ -214,6 +214,7 @@ general-information: Thông tin chung
 generated-new-apikey: Đã tạo khóa API mới!
 go-back: Quay lại
 good: Tốt
+here: đây
 id: NHẬN DẠNG
 included-in-plan: Bao gồm trong kế hoạch
 info: Thông tin
@@ -301,7 +302,11 @@ next: Kế tiếp
 no-app-icon: Ứng dụng này không có bất kỳ biểu tượng ứng dụng nào
 no-data: Không có dữ liệu
 no-permission: Không đủ quyền
+no-permission-ask-super-admin: >-
+  không đủ quyền, vui lòng yêu cầu quản trị viên cấp cao xóa gói này một cách
+  không an toàn
 none: Không có
+normal: Bình thường
 not-found: Không tìm thấy
 not-paying-org-usage: >-
   Tổ chức này không thanh toán, không thể hiển thị việc sử dụng tổ chức dùng thử
@@ -334,6 +339,7 @@ password-hint: Nhập kết hợp ít nhất 6 số, chữ cái và dấu chấm
 patch: Vá
 percent-fail: tỷ lệ thất bại
 permission-changed: Đã thay đổi thành công quyền của người dùng
+pernament: Pernament
 personal-information: Thông tin cá nhân
 picture-delete-fail: Không thể xóa ảnh ứng dụng, vui lòng kiểm tra nhật ký bảng điều khiển
 picture-uploaded: Hình ảnh được tải lên thành công
@@ -389,6 +395,13 @@ search-by-device-id-: Tìm kiếm theo ID thiết bị hoặc hành động
 search-by-device-id-0: Tìm kiếm theo ID thiết bị
 search-by-name: Tìm kiếm theo tên
 see-usage: xem cách sử dụng
+select-style-of-deletion: Chọn kiểu xóa
+select-style-of-deletion-msg: |-
+  Vui lòng chọn cách bạn muốn xóa kênh này.
+
+  Nên đi với cái bình thường.
+
+  Bạn có thể đọc về sự khác biệt $1
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
 session_key: IvSessionKey
@@ -431,6 +444,7 @@ unlink-bundle: Hủy liên kết gói
 unlink-channel: Hủy liên kết kênh
 unlink-error: Lỗi hủy liên kết, vui lòng kiểm tra bảng điều khiển
 unlink-version: Hủy liên kết phiên bản
+unsafe: Không an toàn
 update: Cập nhật
 updated-at: Cập nhật tại
 updated-min-version: Đã cập nhật phiên bản tối thiểu
