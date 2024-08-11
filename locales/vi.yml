@@ -93,7 +93,13 @@ canceled-delete: Đã hủy xóa gói, không thể xóa gói được liên k�
 canceled-photo-selection: Bạn đã hủy việc chọn ảnh
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
+cannot-create-empty-device: |-
+  Không thể tạo thiết bị trống. 
+  Vui lòng kiểm tra bảng điều khiển của trình duyệt
 cannot-create-org: Không thể tạo tổ chức, vui lòng kiểm tra nhật ký trình duyệt!
+cannot-create-overwrite: |-
+  Không thể tạo ghi đè. 
+  Vui lòng kiểm tra bảng điều khiển của trình duyệt
 cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký trình duyệt
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
@@ -101,6 +107,10 @@ cannot-delete-bundle: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
+cannot-determine-platform: Không thể xác định xem UUID đã cho thuộc về iOS hay Android
+cannot-fetch-channels: |-
+  Không thể tìm nạp kênh. 
+  Vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-find-unknown-version: >-
   Không thể tìm thấy phiên bản không xác định, vui lòng liên hệ với bộ phận hỗ
   trợ của capgo và kiểm tra nhật ký trình duyệt
@@ -143,6 +153,19 @@ cli-doc: tài liệu CLI
 commands: mệnh lệnh
 confirm-email: Xác nhận email của bạn
 confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
+confirm-overwrite: Xác nhận ghi đè
+confirm-overwrite-msg: |-
+  Bạn sắp tạo ghi đè sau:
+
+
+  ID thiết bị: $1
+
+  Kênh: $2
+
+  Phiên bản kênh: $3
+
+
+  Điều đó nghe có đúng không?
 confirm-password: Xác nhận mật khẩu
 confirm-public-desc: |-
   Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
@@ -174,6 +197,10 @@ detailed-usage-plan: Cách sử dụng chi tiết
 devDependencies: {}
 device: Thiết bị
 device-id: ID thiết bị
+device-injected: Thiết bị này đã được tạo thủ công để thêm ghi đè.
+device-injected-2: >-
+  Một số giá trị là phần giữ chỗ và chúng sẽ được cập nhật sau lần cập nhật đầu
+  tiên của thiết bị
 devices: thiết bị
 did-not-recive-confirm-email: Không nhận được email xác nhận?
 disable: Vô hiệu hóa
@@ -211,6 +238,10 @@ forgot-success: Đã cập nhật mật khẩu thành công
 free-trial: Dùng thử miễn phí
 from-device: từ thiết bị
 general-information: Thông tin chung
+generate-device-overwrite: Tạo ghi đè thiết bị
+generate-device-overwrite-msg: |-
+  Bạn sắp tạo ghi đè thiết bị. 
+  Bạn có muốn tiếp tục không?
 generated-new-apikey: Đã tạo khóa API mới!
 go-back: Quay lại
 good: Tốt
@@ -223,6 +254,7 @@ install: Cài đặt
 invalid-auth: Thông tin đăng nhập của bạn không khớp, hãy thử lại.
 invalid-email: Email đã gửi không hợp lệ
 invalid-mfa-code: Mã 2FA không hợp lệ
+invalid-uuid: UUID không hợp lệ
 invalid-version: Phiên bản học kỳ không hợp lệ
 invite-accepted: Đã chấp nhận thành công lời mời tổ chức
 is-emulator: là giả lập
@@ -389,6 +421,8 @@ search-by-device-id-: Tìm kiếm theo ID thiết bị hoặc hành động
 search-by-device-id-0: Tìm kiếm theo ID thiết bị
 search-by-name: Tìm kiếm theo tên
 see-usage: xem cách sử dụng
+select-channel: Chọn kênh
+select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
 session_key: IvSessionKey
@@ -420,6 +454,8 @@ to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lện
 top-apps-v2: Ứng dụng
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
+type-device-id: Nhập ID thiết bị
+type-device-id-msg: Vui lòng nhập ID của thiết bị mà bạn muốn ghi đè
 type-new-name: Vui lòng nhập tên khóa api mới
 type-new-org-name: Vui lòng nhập tên mới cho tổ chức
 undefined-fail: Không xác định (cập nhật sẽ thất bại)

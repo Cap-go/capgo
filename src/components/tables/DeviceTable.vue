@@ -213,17 +213,165 @@ async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
 
-function countLowercaseLetters(str) {
+function countLowercaseLetters(str: string) {
   const matches = str.match(/[a-z]/g)
   return matches ? matches.length : 0
 }
 
-function countCapitalLetters(str) {
+function countCapitalLetters(str: string) {
   const matches = str.match(/[A-Z]/g)
   return matches ? matches.length : 0
 }
 
 const deviceIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function customDeviceOverwritePart2() {
+  displayStore.dialogOption = {
+    header: t('type-device-id'),
+    message: `${t('type-device-id-msg')}`,
+    buttonCenter: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    preventAccidentalClose: true,
+    input: true,
+    size: 'max-w-xl',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('continue'),
+        id: 'confirm-button',
+        preventClose: true,
+        handler: async () => {
+          await customDeviceOverwritePart3()
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
+
+async function customDeviceOverwritePart3() {
+  const input = displayStore.dialogInputText
+  const deviceId = input
+
+  if (!deviceIdRegex.test(input)) {
+    toast.error(t('invalid-uuid'))
+    return
+  }
+
+  const bigLetters = countCapitalLetters(input)
+  const smallLetters = countLowercaseLetters(input)
+
+  if (bigLetters === smallLetters) {
+    toast.error(t('cannot-determine-platform'))
+    return
+  }
+  const platform = bigLetters > smallLetters ? 'ios' : 'android'
+
+  const { data: channelsR, error } = await supabase
+    .from('channels')
+    .select('id, name, owner_org, version ( id, name )')
+    .eq('app_id', props.appId)
+
+  if (error) {
+    toast.error(t('cannot-fetch-channels'))
+    console.error('chan error', error)
+    return
+  }
+
+  const channels = channelsR as any as (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] })[]
+
+  const buttons = channels.map((chan) => {
+    return {
+      text: chan.name,
+      id: chan.id,
+      handler: async () => {
+        displayStore.dialogOption = {
+          buttonCenter: true,
+          headerStyle: 'w-full text-center',
+          textStyle: 'w-full text-center',
+          preventAccidentalClose: true,
+          header: t('confirm-overwrite'),
+          message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', chan.name).replace('$3', chan.version.name)}`,
+          size: 'max-w-xl',
+          buttons: [
+            {
+              text: t('yes'),
+              role: 'yes',
+              handler: async () => {
+                await customDeviceOverwritePart4(deviceId, chan, platform)
+              },
+            },
+            {
+              text: t('no'),
+              role: 'cancel',
+            },
+          ],
+        }
+        displayStore.showDialog = true
+      },
+    }
+  })
+
+  displayStore.dialogOption = {
+    header: t('select-channel'),
+    message: `${t('select-channel-msg')}`,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    preventAccidentalClose: true,
+    buttonVertical: true,
+    size: 'max-w-xl',
+    buttons: Array.prototype.concat(
+      buttons,
+      [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    ),
+  }
+  displayStore.showDialog = true
+}
+
+async function customDeviceOverwritePart4(
+  deviceId: string,
+  chan: (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }),
+  platform: 'ios' | 'android',
+) {
+  const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
+    body: {
+      device_id: deviceId,
+      app_id: props.appId,
+      platform,
+      version: chan.version.id,
+    },
+  })
+
+  if (addDeviceError) {
+    console.error('addDeviceError', addDeviceError)
+    toast.error(t('cannot-create-empty-device'))
+    return
+  }
+
+  const { error: overwriteError } = await supabase.from('channel_devices')
+    .insert({
+      app_id: props.appId,
+      channel_id: chan.id,
+      device_id: deviceId,
+      owner_org: chan.owner_org,
+    })
+
+  if (overwriteError) {
+    console.error('overwriteError', overwriteError)
+    toast.error(t('cannot-create-overwrite'))
+  }
+
+  router.push(`/app/p/${appIdToUrl(props.appId)}/d/${deviceId}`)
+}
 
 async function handlePlus() {
   displayStore.dialogOption = {
@@ -241,140 +389,8 @@ async function handlePlus() {
       {
         text: t('continue'),
         id: 'confirm-button',
-        handler: () => {
-          displayStore.dialogOption = {
-            header: t('type-device-id'),
-            message: `${t('type-device-id-msg')}`,
-            buttonCenter: true,
-            headerStyle: 'w-full text-center',
-            textStyle: 'w-full text-center',
-            preventAccidentalClose: true,
-            input: true,
-            size: 'max-w-xl',
-            buttons: [
-              {
-                text: t('button-cancel'),
-                role: 'cancel',
-              },
-              {
-                text: t('continue'),
-                id: 'confirm-button',
-                preventClose: true,
-                handler: async () => {
-                  const input = displayStore.dialogInputText
-                  const deviceId = input
-
-                  if (!deviceIdRegex.test(input)) {
-                    toast.error(t('invalid-uuid'))
-                    return
-                  }
-
-                  const bigLetters = countCapitalLetters(input)
-                  const smallLetters = countLowercaseLetters(input)
-
-                  if (bigLetters === smallLetters) {
-                    toast.error(t('cannot-determine-platform'))
-                    return
-                  }
-                  const platform = bigLetters > smallLetters ? 'ios' : 'android'
-
-                  const { data: channelsR, error } = await supabase
-                    .from('channels')
-                    .select('id, name, owner_org, version ( id, name )')
-                    .eq('app_id', props.appId)
-
-                  if (error) {
-                    toast.error(t('cannot-fetch-channels'))
-                    console.error('chan error', error)
-                    return
-                  }
-
-                  const channels = channelsR as any as (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] })[]
-
-                  const buttons = channels.map((chan) => {
-                    return {
-                      text: chan.name,
-                      id: chan.id,
-                      handler: async () => {
-                        displayStore.dialogOption = {
-                          buttonCenter: true,
-                          headerStyle: 'w-full text-center',
-                          textStyle: 'w-full text-center',
-                          preventAccidentalClose: true,
-                          header: t('confirm-overwrite'),
-                          message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', chan.name).replace('$3', chan.version.name)}`,
-                          size: 'max-w-xl',
-                          buttons: [
-                            {
-                              text: t('yes'),
-                              role: 'yes',
-                              handler: async () => {
-                                const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
-                                  body: {
-                                    device_id: deviceId,
-                                    app_id: props.appId,
-                                    platform,
-                                    version: chan.version.id,
-                                  },
-                                })
-
-                                if (addDeviceError) {
-                                  console.error('addDeviceError', addDeviceError)
-                                  toast.error(t('cannot-create-empty-device'))
-                                  return
-                                }
-
-                                const { error: overwriteError } = await supabase.from('channel_devices')
-                                  .insert({
-                                    app_id: props.appId,
-                                    channel_id: chan.id,
-                                    device_id: deviceId,
-                                    owner_org: chan.owner_org,
-                                  })
-
-                                if (overwriteError) {
-                                  console.error('overwriteError', overwriteError)
-                                  toast.error(t('cannot-create-overwrite'))
-                                }
-
-                                router.push(`/app/p/${appIdToUrl(props.appId)}/d/${deviceId}`)
-                              },
-                            },
-                            {
-                              text: t('no'),
-                              role: 'cancel',
-                            },
-                          ],
-                        }
-                        displayStore.showDialog = true
-                      },
-                    }
-                  })
-
-                  displayStore.dialogOption = {
-                    header: t('select-channel'),
-                    message: `${t('select-channel-msg')}`,
-                    headerStyle: 'w-full text-center',
-                    textStyle: 'w-full text-center',
-                    preventAccidentalClose: true,
-                    buttonVertical: true,
-                    size: 'max-w-xl',
-                    buttons: Array.prototype.concat(
-                      buttons,
-                      [
-                        {
-                          text: t('button-cancel'),
-                          role: 'cancel',
-                        },
-                      ],
-                    ),
-                  }
-                  displayStore.showDialog = true
-                },
-              },
-            ],
-          }
-          displayStore.showDialog = true
+        handler: async () => {
+          await customDeviceOverwritePart2()
         },
       },
     ],

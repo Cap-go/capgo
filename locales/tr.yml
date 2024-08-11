@@ -89,7 +89,9 @@ canceled-delete: Paket silme işlemi iptal edildi, bağlantılı paket silinemiy
 canceled-photo-selection: Resim seçimini iptal ettiniz
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
+cannot-create-empty-device: Boş cihaz oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-create-org: Organizasyon oluşturulamıyor, lütfen tarayıcı kayıtlarını kontrol edin!
+cannot-create-overwrite: Üzerine yazma oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol edin
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
@@ -97,6 +99,8 @@ cannot-delete-bundle: Paket silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
+cannot-determine-platform: Verilen UUID'nin IOS'a mı yoksa Android'e mi ait olduğu belirlenemiyor
+cannot-fetch-channels: Kanallar getirilemiyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-find-unknown-version: >-
   Bilinmeyen sürüm bulunamıyor, lütfen Capgo desteğiyle iletişime geçin ve
   tarayıcı günlüklerini kontrol edin
@@ -139,6 +143,15 @@ cli-doc: CLI belgesi
 commands: komutlar
 confirm-email: e-postanızı onaylayın
 confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
+confirm-overwrite: Üzerine yazmayı onayla
+confirm-overwrite-msg: |-
+  Aşağıdaki üzerine yazmayı oluşturmak üzeresiniz:
+
+  Cihaz Kimliği: $1
+  Kanal: 2 Dolar
+  Kanal sürümü: $3
+
+  Bu doğru mu?
 confirm-password: Şifreyi Onayla
 confirm-public-desc: >-
   Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler göndermesini
@@ -172,6 +185,10 @@ detailed-usage-plan: Detaylı kullanım
 devDependencies: {}
 device: Cihaz
 device-id: Cihaz Kimliği
+device-injected: Bu cihaz, üzerine yazma eklemek için manuel olarak oluşturulmuştur.
+device-injected-2: >-
+  Bazı değerler yer tutucudur ve cihazın ilk güncellemesinden sonra
+  güncellenecektir
 devices: Cihazlar
 did-not-recive-confirm-email: Onay e-postası almadınız mı?
 disable: Devre dışı bırakmak
@@ -209,6 +226,8 @@ forgot-success: şifre başarıyla güncellendi
 free-trial: Ücretsiz deneme
 from-device: cihazdan
 general-information: Genel Bilgiler
+generate-device-overwrite: Aygıt üzerine yazma oluştur
+generate-device-overwrite-msg: Bir aygıt üzerine yazma oluşturmak üzeresiniz. Devam etmek istiyor musunuz?
 generated-new-apikey: Yeni API anahtarı oluşturuldu!
 go-back: Geri gitmek
 good: İyi
@@ -221,6 +240,7 @@ install: Kurulmuş
 invalid-auth: Oturum açma bilgileriniz eşleşmedi, tekrar deneyin.
 invalid-email: İletilen e-posta geçerli değil
 invalid-mfa-code: Geçersiz 2FA kodu
+invalid-uuid: Geçersiz UUID
 invalid-version: Geçersiz semver sürümü
 invite-accepted: Organizasyon daveti başarıyla kabul edildi
 is-emulator: Emülatör mü
@@ -387,6 +407,8 @@ search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
+select-channel: Kanal seçin
+select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
@@ -418,6 +440,8 @@ to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps-v2: Uygulamalar
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
+type-device-id: Cihaz kimliğini girin
+type-device-id-msg: Lütfen üzerine yazmak istediğiniz cihazın kimliğini girin
 type-new-name: Lütfen yeni API anahtarı adını yazın
 type-new-org-name: Lütfen kuruluşun yeni adını yazın
 undefined-fail: Tanımsız (güncellemeler başarısız olur)

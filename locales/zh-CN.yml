@@ -89,7 +89,9 @@ canceled-delete: 已取消捆绑包删除，无法删除链接的捆绑包
 canceled-photo-selection: 您取消了图片选择
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
+cannot-create-empty-device: 无法创建空设备。请检查浏览器控制台
 cannot-create-org: 无法创建组织，请检查浏览器日志！
+cannot-create-overwrite: 无法创建覆盖。请检查浏览器控制台
 cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
@@ -97,6 +99,8 @@ cannot-delete-bundle: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
+cannot-determine-platform: 无法确定给定的 UUID 属于 IOS 还是 Android
+cannot-fetch-channels: 无法获取频道。请检查浏览器控制台
 cannot-find-unknown-version: 找不到未知版本，请联系 capgo 支持并检查浏览器日志
 cannot-get-the-test-: 无法获取测试版
 cannot-invite-owner: 无法邀请所有者加入组织
@@ -137,6 +141,15 @@ cli-doc: CLI文档
 commands: 命令
 confirm-email: 确认您的电子邮件
 confirm-email-sent: 已发送确认邮件，请点击链接确认您的电子邮件。
+confirm-overwrite: 确认覆盖
+confirm-overwrite-msg: |-
+  您将创建以下覆盖：
+
+  设备 ID：1 美元
+  通道：2 美元
+  通道版本：3
+
+  听起来正确吗？
 confirm-password: 确认密码
 confirm-public-desc: |-
   将此频道设置为默认频道将使其向您的所有用户发送更新。
@@ -168,6 +181,8 @@ detailed-usage-plan: 详细使用方法
 devDependencies: {}
 device: 设备
 device-id: 设备ID
+device-injected: 该设备是手动创建的，用于添加覆盖。
+device-injected-2: 某些值为占位符，将在设备首次更新后更新
 devices: 设备
 did-not-recive-confirm-email: 没有收到确认邮件吗？
 disable: 禁用
@@ -203,6 +218,8 @@ forgot-success: 密码更新成功
 free-trial: 免费试用
 from-device: 从设备
 general-information: 一般信息
+generate-device-overwrite: 生成设备覆盖
+generate-device-overwrite-msg: 您即将生成设备覆盖。要继续吗？
 generated-new-apikey: 已生成新的 API 密钥！
 go-back: 回去
 good: 好的
@@ -215,6 +232,7 @@ install: 已安装
 invalid-auth: 您的登录信息不匹配，请重试。
 invalid-email: 传递的电子邮件无效
 invalid-mfa-code: 2FA 代码无效
+invalid-uuid: 无效的 UUID
 invalid-version: 语义版本无效
 invite-accepted: 成功接受组织邀请
 is-emulator: 是模拟器
@@ -375,6 +393,8 @@ search-by-device-id-: 按设备 ID 或操作搜索
 search-by-device-id-0: 按设备 ID 搜索
 search-by-name: 按名称搜索
 see-usage: 查看用法
+select-channel: 选择频道
+select-channel-msg: 请选择您希望用于覆盖的频道
 select-user-perms: 选择用户的权限
 select-user-perms-expanded: 选择受邀用户应拥有的权限
 session_key: Iv会话密钥
@@ -406,6 +426,8 @@ to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps-v2: 应用
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
+type-device-id: 输入设备 ID
+type-device-id-msg: 请输入要覆盖的设备 ID
 type-new-name: 请输入新的 api 密钥名称
 type-new-org-name: 请输入组织的新名称
 undefined-fail: 未定义（更新将失败）

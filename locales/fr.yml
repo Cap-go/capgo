@@ -95,7 +95,11 @@ canceled-delete: Suppression du bundle annulée, impossible de supprimer un bund
 canceled-photo-selection: Vous avez annulé la sélection d'image
 cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
+cannot-create-empty-device: >-
+  Impossible de créer un appareil vide. Veuillez vérifier la console du
+  navigateur
 cannot-create-org: "Impossible de créer une organisation, veuillez vérifier les journaux du navigateur\_!"
+cannot-create-overwrite: Impossible de créer l'écrasement. Veuillez vérifier la console du navigateur
 cannot-del-org: >-
   Impossible de supprimer l'organisation, veuillez vérifier le journal du
   navigateur
@@ -105,6 +109,8 @@ cannot-delete-bundle: Impossible de supprimer le groupe
 cannot-delete-channel: Impossible de supprimer le canal
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
+cannot-determine-platform: Impossible de déterminer si l'UUID donné appartient à IOS ou Android
+cannot-fetch-channels: Impossible de récupérer les canaux. Veuillez vérifier la console du navigateur
 cannot-find-unknown-version: >-
   Impossible de trouver la version inconnue, veuillez contacter le support capgo
   et vérifier les journaux du navigateur
@@ -147,6 +153,15 @@ confirm-email: confirmez votre email
 confirm-email-sent: >-
   Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
   votre email.
+confirm-overwrite: Confirmer l'écrasement
+confirm-overwrite-msg: |-
+  Vous êtes sur le point de créer le remplacement suivant :
+
+  ID de l'appareil : 1
+  Canal : $2
+  Version du canal : 3
+
+  Cela vous semble-t-il correct ?
 confirm-password: Confirmez le mot de passe
 confirm-public-desc: >-
   Si vous définissez ce canal par défaut, il enverra des mises à jour à tous vos
@@ -180,6 +195,10 @@ detailed-usage-plan: Utilisation détaillée
 devDependencies: {}
 device: Appareil
 device-id: Identifiant de l'appareil
+device-injected: Ce dispositif a été créé manuellement pour ajouter un écrasement.
+device-injected-2: >-
+  Certaines valeurs sont des espaces réservés et seront mises à jour après la
+  première mise à jour de l'appareil.
 devices: Appareils
 did-not-recive-confirm-email: Vous n'avez pas reçu d'email de confirmation?
 disable: Désactiver
@@ -219,6 +238,10 @@ forgot-success: Mot de passe mis à jour avec succès
 free-trial: Essai gratuit
 from-device: depuis l'appareil
 general-information: Informations générales
+generate-device-overwrite: Générer l'écrasement de l'appareil
+generate-device-overwrite-msg: >-
+  Vous êtes sur le point de générer un écrasement de périphérique. Voulez-vous
+  continuer ?
 generated-new-apikey: "Génération d'une nouvelle clé API\_!"
 go-back: Retourner
 good: Bien
@@ -231,6 +254,7 @@ install: installée
 invalid-auth: Vos identifiants ne correspondent pas, réessayez.
 invalid-email: L'e-mail transmis n'est pas valide
 invalid-mfa-code: Code 2FA invalide
+invalid-uuid: UUID invalide
 invalid-version: Version Semver invalide
 invite-accepted: Invitation d'organisation acceptée avec succès
 is-emulator: Est-ce un émulateur
@@ -401,6 +425,10 @@ search-by-device-id-: Rechercher par ID d'appareil ou action
 search-by-device-id-0: Rechercher par ID d'appareil
 search-by-name: Rechercher par nom
 see-usage: Voir l'utilisation
+select-channel: Sélectionner un canal
+select-channel-msg: >-
+  Veuillez sélectionner le canal que vous souhaitez utiliser dans ce
+  remplacement.
 select-user-perms: Sélectionnez les autorisations de l'utilisateur
 select-user-perms-expanded: Sélectionnez quelle autorisation l'utilisateur invité doit avoir
 session_key: Session ID
@@ -432,6 +460,8 @@ to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
 top-apps-v2: applications
 trial-left: Jours restants
 trial-plan-expired: Essai expiré
+type-device-id: Saisir l'ID de l'appareil
+type-device-id-msg: Veuillez saisir l'ID de l'appareil que vous souhaitez écraser.
 type-new-name: Veuillez saisir le nouveau nom de la clé API
 type-new-org-name: Veuillez saisir le nouveau nom de l'organisation
 undefined-fail: Non défini (les mises à jour échoueront)
