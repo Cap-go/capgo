@@ -259,6 +259,7 @@ async function handlePlus() {
               {
                 text: t('continue'),
                 id: 'confirm-button',
+                preventClose: true,
                 handler: async () => {
                   const input = displayStore.dialogInputText
                   const deviceId = input
@@ -279,7 +280,7 @@ async function handlePlus() {
 
                   const { data: channelsR, error } = await supabase
                     .from('channels')
-                    .select('id, name, version ( id, name )')
+                    .select('id, name, owner_org, version ( id, name )')
                     .eq('app_id', props.appId)
 
                   if (error) {
@@ -296,14 +297,48 @@ async function handlePlus() {
                       id: chan.id,
                       handler: async () => {
                         displayStore.dialogOption = {
+                          buttonCenter: true,
+                          headerStyle: 'w-full text-center',
+                          textStyle: 'w-full text-center',
+                          preventAccidentalClose: true,
                           header: t('confirm-overwrite'),
                           message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', chan.name).replace('$3', chan.version.name)}`,
-                          headerStyle: 'w-full text-left',
                           size: 'max-w-xl',
                           buttons: [
                             {
                               text: t('yes'),
                               role: 'yes',
+                              handler: async () => {
+                                const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
+                                  body: {
+                                    device_id: deviceId,
+                                    app_id: props.appId,
+                                    platform,
+                                    version: chan.version.id,
+                                  },
+                                })
+
+                                if (addDeviceError) {
+                                  console.error('addDeviceError', addDeviceError)
+                                  toast.error(t('cannot-create-empty-device'))
+                                  return
+                                }
+
+                                const { error: overwriteError } = await supabase.from('channel_devices')
+                                  .insert({
+                                    app_id: props.appId,
+                                    channel_id: chan.id,
+                                    device_id: deviceId,
+                                    owner_org: chan.owner_org,
+                                  })
+
+                                if (overwriteError) {
+                                  console.error('overwriteError', overwriteError)
+                                  toast.error(t('cannot-create-overwrite'))
+                                }
+
+                                router.push(`/app/p/${appIdToUrl(props.appId)}/d/${deviceId}`)
+                              },
                             },
                             {
                               text: t('no'),
@@ -321,6 +356,7 @@ async function handlePlus() {
                     message: `${t('select-channel-msg')}`,
                     headerStyle: 'w-full text-center',
                     textStyle: 'w-full text-center',
+                    preventAccidentalClose: true,
                     buttonVertical: true,
                     size: 'max-w-xl',
                     buttons: Array.prototype.concat(

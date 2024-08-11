@@ -89,7 +89,9 @@ canceled-delete: Canceled bundle deletion, cannot delete a linked bundle
 canceled-photo-selection: You canceled the picture selection
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
+cannot-create-empty-device: Cannot create empty device. Please check the browser's console
 cannot-create-org: Cannot create an organization, please check the browser logs!
+cannot-create-overwrite: Cannot create overwrite. Please check the browser's console
 cannot-del-org: Cannot delete the organization, please check the browser log
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
@@ -178,6 +180,10 @@ deleted: deleted
 detailed-usage-plan: Detailed usage
 device: Device
 device-id: Device ID
+device-injected: This device has been created manually to add an overwrite.
+device-injected-2: >-
+  Some values are placeholders and they will be updated after the device's first
+  update
 devices: Devices
 did-not-recive-confirm-email: Didn't receive confirmation email?
 disable: Disable
