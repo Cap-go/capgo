@@ -129,7 +129,7 @@
     "@vuepic/vue-datepicker": "^8.8.1",
     "@vueuse/components": "^10.11.0",
     "@vueuse/core": "10.11.0",
-    "@zip.js/zip.js": "2.7.45",
+    "@zip.js/zip.js": "2.7.47",
     "adm-zip": "^0.5.14",
     "atropos": "^1.0.2",
     "base64-arraybuffer": "1.0.2",
