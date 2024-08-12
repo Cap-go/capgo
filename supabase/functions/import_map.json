@@ -8,7 +8,7 @@
     "hono/adapter": "jsr:@hono/hono@^4.4.3/adapter",
     "hono/utils/buffer": "jsr:@hono/hono@^4.4.3/utils/buffer",
     "stripe": "npm:stripe@15.8.0",
-    "@bentonow/bento-node-sdk": "https://esm.sh/@bentonow/bento-node-sdk@1.0.0?target=deno",
+    "@bentonow/bento-node-sdk": "https://esm.sh/@bentonow/bento-node-sdk@0.2.1?target=deno",
     "zod": "https://esm.sh/zod@3.23.8?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.11?target=deno",
     "ky": "https://esm.sh/ky@1.2.4",
