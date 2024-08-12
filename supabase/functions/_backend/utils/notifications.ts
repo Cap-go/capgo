@@ -4,7 +4,7 @@ import type { Context } from '@hono/hono'
 import dayjs from 'dayjs'
 import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { trackEvent } from './plunk.ts'
+import { trackBentoEvent } from './bento.ts'
 
 interface EventData {
   [key: string]: any
@@ -12,7 +12,7 @@ interface EventData {
 
 async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
   console.log('send notif', eventName, email, color)
-  const res = await trackEvent(c, email, eventData, eventName)
+  const res = await trackBentoEvent(c, email, eventData, eventName)
   if (!res) {
     console.log('trackEvent failed', eventName, email, eventData)
     return

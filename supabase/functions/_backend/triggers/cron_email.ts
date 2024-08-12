@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { trackEvent } from '../utils/plunk.ts'
+import { trackBentoEvent } from '../utils/bento.ts'
 
 // This is required propoably due to this https://github.com/supabase/postgrest-js/issues/408
 interface AppWithUser {
@@ -127,7 +127,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
       }
 
-      await trackEvent(c, mapApp.user_id.email, metadata, 'cron-stats')
+      await trackBentoEvent(c, mapApp.user_id.email, metadata, 'cron-stats')
     }
 
     return c.json(BRES)

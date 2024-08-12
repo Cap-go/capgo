@@ -36,20 +36,13 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (record.customer_id)
       return c.json(BRES)
     const LogSnag = logsnag(c)
-    await Promise.all([
-      trackEvent(c, record.email, {
-        first_name: record.first_name || '',
-        last_name: record.last_name || '',
-        nickname: `${record.first_name || ''} ${record.last_name || ''}`,
-      }, 'user:register'),
-      LogSnag.track({
-        channel: 'user-register',
-        event: 'User Joined',
-        icon: '🎉',
-        user_id: record.id,
-        notify: true,
-      }),
-    ])
+    await LogSnag.track({
+      channel: 'user-register',
+      event: 'User Joined',
+      icon: '🎉',
+      user_id: record.id,
+      notify: true,
+    }).catch()
     return c.json(BRES)
   }
   catch (e) {

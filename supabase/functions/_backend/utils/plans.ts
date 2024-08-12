@@ -14,6 +14,7 @@ import type { Database } from './supabase.types.ts'
 import { recordUsage, setThreshold } from './stripe.ts'
 import { logsnag } from './logsnag.ts'
 import { trackEvent } from './plunk.ts'
+import { trackBentoEvent } from './bento.ts'
 
 function planToInt(plan: string) {
   switch (plan) {
@@ -159,14 +160,16 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       }
     }
     else if (!is_onboarded && is_onboarding_needed) {
-      await trackEvent(c, org.management_email, {}, 'user:need_onboarding')
-      await logsnag(c).track({
-        channel: 'usage',
-        event: 'User need onboarding',
-        icon: '🥲',
-        user_id: orgId,
-        notify: false,
-      }).catch()
+      await Promise.all([
+        logsnag(c).track({
+          channel: 'usage',
+          event: 'User need onboarding',
+          icon: '🥲',
+          user_id: orgId,
+          notify: false,
+        }).catch(),
+        trackBentoEvent(c, org.management_email, {}, 'user:need_onboarding'),
+      ])
     }
     else if (is_good_plan && is_onboarded) {
       // check if user is at more than 90%, 50% or 70% of plan usage
