@@ -1,4 +1,4 @@
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/testing/asserts.ts'
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.44.3'
 
 const BASE_URL = 'http://localhost:54321/functions/v1/'
