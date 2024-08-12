@@ -12,7 +12,6 @@ env:
 jobs:
   test_base_sql:
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     name: "Run test"
     steps:
       - name: Cache Deno dependencies 
