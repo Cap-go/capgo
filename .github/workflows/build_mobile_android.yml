@@ -1,0 +1,74 @@
+name: Build source code and send to Capgo
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v1.0.0)'
+        required: true
+
+jobs:
+  build_android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Validate tag
+        run: |
+          git fetch --all --tags
+          if ! git tag -l | grep -q "^${{ github.event.inputs.tag }}$"; then
+            echo "Error: Tag ${{ github.event.inputs.tag }} does not exist."
+            exit 1
+          fi
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        id: install_code
+        run: bun install
+      - name: Build
+        id: build_code
+        run: bun mobile
+      - name: Sync
+        id: sync_code
+        run: bun x cap sync android
+      - name: Setup java
+        uses: actions/setup-java@v4
+        with:
+            distribution: 'zulu'
+            java-version: '17'
+      - name: Decode Keystore File
+        uses: timheuer/base64-to-file@v1
+        id: android_keystore
+        with:
+          fileName: "android_keystore.keystore"
+          encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+      - name: Decode Google Play Confi File
+        uses: timheuer/base64-to-file@v1
+        id: service_account_json_file
+        with:
+          fileName: "serviceAccount.json"
+          encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - uses: maierj/fastlane-action@v3.1.0
+        env:
+          KEYSTORE_PATH: ${{ steps.android_keystore.outputs.filePath }}
+          ANDROID_JSON_KEY_FILE: ${{ steps.service_account_json_file.outputs.filePath }}
+          DEVELOPER_PACKAGE_NAME: ${{ secrets.DEVELOPER_PACKAGE_NAME }}
+          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+        with:
+          lane: android beta
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: ./android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 10
