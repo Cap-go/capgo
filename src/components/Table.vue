@@ -183,7 +183,7 @@ async function fastBackward() {
         </div>
       </div>
       <!-- </div> -->
-      <div class="flex h-10 md:w-fit">
+      <div class="flex h-10 md:w-auto">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
