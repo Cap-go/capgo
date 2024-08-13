@@ -211,7 +211,7 @@ async function checkLogin() {
 }
 
 // eslint-disable-next-line regexp/no-unused-capturing-group
-const mfaRegex = /((\d){6})|((\d){3} (\d){3})$/
+const mfaRegex = /(((\d){6})|((\d){3} (\d){3}))$/
 const mfa_code_validation = function (node: { value: any }) {
   return Promise.resolve(mfaRegex.test(node.value))
 }
