@@ -60,7 +60,7 @@ jobs:
         with:
           ref: ${{ github.ref }}
           check-name: 'Run tests'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           wait-interval: 10
       - name: 🦤 Apply Supabase Migrations
         run: supabase db push --include-all
