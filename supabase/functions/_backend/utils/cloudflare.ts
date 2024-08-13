@@ -483,7 +483,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
 export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
   if (!c.env.DB_DEVICES)
     return Promise.resolve(0)
-  // use countUpdatesFromStoreAppsClickHouse as exemple to make it work with Cloudflare
+  // use countUpdatesFromStoreApps exemple to make it work with Cloudflare
   const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
 
   console.log('countUpdatesFromStoreAppsCF query', query)
