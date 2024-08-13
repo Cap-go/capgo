@@ -12,7 +12,7 @@ env:
 jobs:
   test_base_sql:
     runs-on: ubuntu-latest
-    name: "Run test"
+    name: "Run tests"
     steps:
       - name: Cache Deno dependencies 
         uses: actions/cache@v4
