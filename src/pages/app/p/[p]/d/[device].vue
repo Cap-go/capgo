@@ -177,7 +177,7 @@ async function getDevice() {
       .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt}` || '',
+          'authorization': `Bearer ${currentJwt || ''}`,
         },
         body: JSON.stringify({
           appId: packageId.value,

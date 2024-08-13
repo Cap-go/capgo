@@ -106,7 +106,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/stats`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt}` || '',
+          'authorization': `Bearer ${currentJwt || ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,

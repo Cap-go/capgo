@@ -108,7 +108,7 @@ async function countDevices() {
     .post(`${defaultApiHost}/private/devices`, {
       headers: {
         'Content-Type': 'application/json',
-        'authorization': `Bearer ${currentJwt}` || '',
+        'authorization': `Bearer ${currentJwt || ''}`,
       },
       body: JSON.stringify({
         count: true,
@@ -138,7 +138,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt}` || '',
+          'authorization': `Bearer ${currentJwt || ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,
