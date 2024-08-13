@@ -23,6 +23,7 @@ interface Props {
   isLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
+  range?: [Date, Date]
   searchPlaceholder?: string
   search?: string
   currentPage: number
@@ -41,12 +42,12 @@ const emit = defineEmits([
   'fastBackward',
   'update:search',
   'update:filters',
+  'update:range',
   'update:columns',
   'update:currentPage',
   'filterClick',
   'rowClick',
   'sortClick',
-  'rangeChange',
 ])
 const dropdown = ref<HTMLElement | null>(null)
 function closeDropdown() {
@@ -107,9 +108,9 @@ if (props.filters) {
     emit('reload')
   })
 }
-
 watch(preciseDates, () => {
-  console.log('preciseDates', preciseDates.value)
+  // console.log('preciseDates', preciseDates.value)
+  emit('update:range', preciseDates.value)
   emit('reload')
 })
 
@@ -138,6 +139,7 @@ async function clickRight() {
 async function setTime(time: Minutes) {
   currentSelected.value = 'general'
   currentGeneralTime.value = time
+  console.log('setTime', time)
   if (time === 1) {
     preciseDates.value = [
       dayjs().subtract(1, 'minute').toDate(),
