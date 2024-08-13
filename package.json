@@ -46,7 +46,7 @@
     "ionic:serve": "vite",
     "cf-build": "wrangler publish --dry-run --outdir=dist_cf",
     "create-sentry-release": "npm run sentry-cli releases new \"1.0.0\" --finalize && npm run sentry-cli releases files \"1.0.0\" upload-sourcemaps ./dist_cf",
-    "cf-edge:run": "clang -O3 -o ./scripts/local_cf_backend/spawn ./scripts/local_cf_backend/spawn.c && ./scripts/local_cf_backend/spawn",
+    "cf-edge:run": "./scripts/local_cf_backend/spawn.sh",
     "deploy:cloudflare": "npm run deploy:cloudflare:preprod",
     "deploy:cloudflare:prod": "bunx wrangler deploy --name capgo_api",
     "deploy:cloudflare:preprod": "bunx wrangler deploy --name capgo_api-preprod",
