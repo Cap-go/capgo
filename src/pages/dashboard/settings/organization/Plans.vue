@@ -554,7 +554,6 @@ const hightLights = computed<Stat[]>(() => ([
                   <div class="!mx-auto mt-10 md:mt-0">
                     <button
                       class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
-                      role="button"
                       @click="openSupport()"
                     >
                       Get quote now
