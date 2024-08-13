@@ -11,6 +11,7 @@
 [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
 [![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Cap-go_capgo&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=Cap-go_capgo)
+![Known Vulnerabilities](https://snyk.io/test/github/Cap-go/capgo/badge.svg)
 ![GitHub license](https://img.shields.io/github/license/Cap-go/capgo)
 [![Bump version](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/bump_version.yml)
 [![Build source code and send to Capgo](https://github.com/Cap-go/capgo/actions/workflows/build.yml/badge.svg)](https://github.com/Cap-go/capgo/actions/workflows/build.yml)
