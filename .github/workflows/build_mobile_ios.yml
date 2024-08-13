@@ -1,0 +1,58 @@
+name: Build source code and send to Capgo
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v1.0.0)'
+        required: true
+
+jobs:
+  build_ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+      - name: Validate tag
+        run: |
+          git fetch --all --tags
+          if ! git tag -l | grep -q "^${{ github.event.inputs.tag }}$"; then
+            echo "Error: Tag ${{ github.event.inputs.tag }} does not exist."
+            exit 1
+          fi
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        id: install_code
+        run: bun install
+      - name: Build
+        id: build_code
+        run: bun mobile
+      - name: Sync
+        id: sync_code
+        run: bun x cap sync ios
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - uses: maierj/fastlane-action@v3.1.0
+        env:
+          APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+          BUNDLE_IDENTIFIER: ${{ secrets.BUNDLE_IDENTIFIER }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
+          APPLE_PROFILE_NAME: ${{ secrets.APPLE_PROFILE_NAME }}
+        with:
+          lane: ios beta
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release
+          path: ./App.ipa
+          retention-days: 10

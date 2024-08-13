@@ -9,7 +9,7 @@ const colorKeys = Object.keys(colors)
 export function useChartData(dailyUsage: Ref<appUsageByVersion[]>, versionNames: Ref<VersionName[]>) {
   return computed(() => {
     const versions = [...new Set(dailyUsage.value.map(d => d.version_id))]
-    const dates = [...new Set(dailyUsage.value.map(d => d.date))].sort()
+    const dates = [...new Set(dailyUsage.value.map(d => d.date))].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
 
     // Step 1: Calculate accumulated data
     const accumulatedData = calculateAccumulatedData(dailyUsage.value, dates, versions)

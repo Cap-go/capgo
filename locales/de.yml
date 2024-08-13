@@ -99,9 +99,15 @@ canceled-delete: >-
 canceled-photo-selection: Sie haben die Bildauswahl abgebrochen
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
+cannot-create-empty-device: >-
+  Es kann kein leeres Gerät erstellt werden. Bitte prüfen Sie die Konsole des
+  Browsers
 cannot-create-org: >-
   Es kann keine Organisation erstellt werden. Bitte überprüfen Sie die
   Browserprotokolle!
+cannot-create-overwrite: >-
+  Überschreiben kann nicht erstellt werden. Bitte prüfen Sie die Konsole des
+  Browsers
 cannot-del-org: >-
   Die Organisation kann nicht gelöscht werden. Bitte überprüfen Sie das
   Browserprotokoll
@@ -111,6 +117,8 @@ cannot-delete-bundle: Paket kann nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
+cannot-determine-platform: Kann nicht feststellen, ob die angegebene UUID zu IOS oder Android gehört
+cannot-fetch-channels: Kanäle können nicht abgerufen werden. Bitte überprüfen Sie die Browserkonsole
 cannot-find-unknown-version: >-
   Unbekannte Version kann nicht gefunden werden. Bitte wenden Sie sich an den
   Capgo-Support und überprüfen Sie die Browserprotokolle
@@ -155,6 +163,15 @@ confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-
   Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
   E-Mail zu bestätigen.
+confirm-overwrite: Bestätigen Sie das Überschreiben
+confirm-overwrite-msg: |-
+  Sie sind dabei, die folgende Überschreibung zu erstellen:
+
+  Geräte-ID: $1
+  Kanal: $2
+  Kanalversion: $3
+
+  Klingt das korrekt?
 confirm-password: Bestätige das Passwort
 confirm-public-desc: >-
   Wenn Sie diesen Kanal als Standard festlegen, werden Updates an alle Ihre
@@ -188,6 +205,10 @@ detailed-usage-plan: Detaillierte Verwendung
 devDependencies: {}
 device: Gerät
 device-id: Geräte ID
+device-injected: Dieses Gerät wurde manuell erstellt, um eine Überschreibung hinzuzufügen.
+device-injected-2: >-
+  Einige Werte sind Platzhalter und werden nach der ersten Aktualisierung des
+  Geräts aktualisiert
 devices: Geräte
 did-not-recive-confirm-email: Haben Sie die Bestätigungs-E-Mail nicht erhalten?
 disable: Deaktivieren
@@ -227,6 +248,8 @@ forgot-success: Passwort erfolgreich aktualisiert
 free-trial: Kostenlose Testphase
 from-device: vom Gerät
 general-information: Allgemeine Informationen
+generate-device-overwrite: Geräteüberschreibung generieren
+generate-device-overwrite-msg: Sie sind dabei, ein Gerät zu überschreiben. Möchten Sie fortfahren?
 generated-new-apikey: Neuer API-Schlüssel generiert!
 go-back: Geh zurück
 good: Gut
@@ -240,6 +263,7 @@ install: Eingerichtet
 invalid-auth: Ihr Login stimmt nicht überein, versuchen Sie es erneut.
 invalid-email: Die übergebene E-Mail ist ungültig
 invalid-mfa-code: Ungültiger 2FA-Code
+invalid-uuid: Ungültige UUID
 invalid-version: Ungültige Semver-Version
 invite-accepted: Organisationseinladung erfolgreich angenommen
 is-emulator: Ist Emulator
@@ -432,6 +456,10 @@ select-style-of-deletion-msg: |-
   Bitte wählen Sie die Art und Weise, wie Sie diesen Kanal löschen möchten.
   Es wird empfohlen, die normale Methode zu verwenden.
   Sie können über den Unterschied lesen $1
+select-channel: Kanal auswählen
+select-channel-msg: >-
+  Bitte wählen Sie den Kanal aus, den Sie für das Überschreiben verwenden
+  möchten
 select-user-perms: Wählen Sie die Berechtigungen des Benutzers aus
 select-user-perms-expanded: Wählen Sie aus, welche Berechtigung der eingeladene Benutzer haben soll
 session_key: IvSessionKey
@@ -465,6 +493,8 @@ to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie de
 top-apps-v2: Apps
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
+type-device-id: Geräte-ID eingeben
+type-device-id-msg: Bitte geben Sie die ID des Gerätes ein, das Sie überschreiben möchten
 type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
 type-new-org-name: Bitte geben Sie den neuen Namen für die Organisation ein
 undefined-fail: Undefiniert (Updates schlagen fehl)

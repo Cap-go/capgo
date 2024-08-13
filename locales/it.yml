@@ -95,7 +95,9 @@ canceled-delete: >-
 canceled-photo-selection: Hai annullato la selezione dell'immagine
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
+cannot-create-empty-device: Impossibile creare un dispositivo vuoto. Controllare la console del browser
 cannot-create-org: Impossibile creare un'organizzazione, controlla i log del browser!
+cannot-create-overwrite: Impossibile creare una sovrascrittura. Controllare la console del browser
 cannot-del-org: Impossibile eliminare l'organizzazione, controlla il registro del browser
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
@@ -103,6 +105,8 @@ cannot-delete-bundle: Impossibile eliminare il gruppo
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-delete-member: Impossibile eliminare il membro, controlla la console del browser
 cannot-delete-owner: Impossibile eliminare il proprietario dall'organizzazione
+cannot-determine-platform: Impossibile determinare se l'UUID dato appartiene a IOS o Android
+cannot-fetch-channels: Impossibile recuperare i canali. Controllare la console del browser
 cannot-find-unknown-version: >-
   Impossibile trovare la versione sconosciuta, contattare l'assistenza capgo e
   controllare i registri del browser
@@ -125,7 +129,7 @@ channel: Canale
 channel-ab-testing: Abilita test AB
 channel-ab-testing-percentage: Percentuale di utenti che hanno ricevuto la versione secondaria
 channel-bundle-linked: |-
-  Questo pacchetto è collegato a uno o più canali. 
+  Questo pacchetto è collegato a uno o più canali.
   (%) Desideri scollegarlo da questi canali?
 channel-create: Crea canale
 channel-deleted: Canale eliminato
@@ -147,11 +151,19 @@ confirm-email: conferma la tua email
 confirm-email-sent: >-
   Se envió un correo electrónico de confirmación, haz clic en el enlace para
   confirmar tu correo electrónico.
+confirm-overwrite: Confermare la sovrascrittura
+confirm-overwrite-msg: |-
+  Si sta per creare la seguente sovrascrittura:
+
+  ID dispositivo: $1
+  Canale: $2
+  Versione del canale: $3
+
+  Vi sembra corretto?
 confirm-password: Conferma password
 confirm-public-desc: >-
   Impostando questo canale come predefinito, invierà aggiornamenti a tutti i
   tuoi utenti.
-
 
   Altri canali predefiniti non saranno più predefiniti.
 continue: Continua
@@ -180,6 +192,12 @@ detailed-usage-plan: Utilizzo dettagliato
 devDependencies: {}
 device: Dispositivo
 device-id: ID del dispositivo
+device-injected: >-
+  Questo dispositivo è stato creato manualmente per aggiungere una
+  sovrascrittura.
+device-injected-2: >-
+  Alcuni valori sono segnaposto e verranno aggiornati dopo il primo
+  aggiornamento del dispositivo.
 devices: Dispositivi
 did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable: disattivare
@@ -217,6 +235,8 @@ forgot-success: Password aggiornata con successo
 free-trial: Prova gratuita
 from-device: dal dispositivo
 general-information: Informazioni generali
+generate-device-overwrite: Generare la sovrascrittura del dispositivo
+generate-device-overwrite-msg: Si sta per generare una sovrascrittura del dispositivo. Volete continuare?
 generated-new-apikey: Generata nuova chiave API!
 go-back: Torna indietro
 good: Bene
@@ -230,6 +250,7 @@ install: Installato
 invalid-auth: I tuoi dati di accesso non corrispondono, riprova.
 invalid-email: L'email passata non è valida
 invalid-mfa-code: Codice 2FA non valido
+invalid-uuid: UUID non valido
 invalid-version: Versione del semestre non valida
 invite-accepted: Invito di organizzazione accettato con successo
 is-emulator: È emulatore
@@ -280,7 +301,7 @@ min-update-version: Versione di aggiornamento minima
 minor: Minore
 misconfigured: Non configurato correttamente
 misconfigured-channels: |-
-  Alcuni canali sono configurati in modo errato. 
+  Alcuni canali sono configurati in modo errato.
   Gli aggiornamenti falliranno per quei canali!
 missing-email: E-mail mancante
 missing-name: Nome mancante
@@ -294,17 +315,17 @@ more-version-storage: Più versione Archiviazione
 my-notifications: Le mie notifiche
 name: Nome
 need-more-contact-us: |-
-  Bisogno di piu ? 
+  Bisogno di piu ?
   Contattaci per un piano su misura
 new-name-not-changed: Il nuovo nome è lo stesso di quello vecchio
 new-name-to-long: |-
-  Il nuovo nome è troppo lungo. 
+  Il nuovo nome è troppo lungo.
   Puoi utilizzare solo 32 caratteri
 new-name-to-short: |-
-  Il nome apikey è troppo corto. 
+  Il nome apikey è troppo corto.
   Deve contenere almeno 4 caratteri
 next: Prossimo
-'no': 'NO'
+no: NO
 no-app-icon: Questa app non ha alcuna icona dell'app
 no-data: Nessun dato
 no-permission: Permessi insufficienti
@@ -410,6 +431,8 @@ select-style-of-deletion-msg: |-
   Selezionare il modo in cui si desidera eliminare questo canale.
   Si consiglia di scegliere la modalità normale.
   Potete leggere la differenza $1
+select-channel: Selezionare il canale
+select-channel-msg: Selezionare il canale che si desidera utilizzare per la sovrascrittura.
 select-user-perms: Seleziona le autorizzazioni dell'utente
 select-user-perms-expanded: Seleziona quale autorizzazione dovrebbe avere l'utente invitato
 session_key: IvSessionKey
@@ -420,7 +443,7 @@ sign-out: Disconnessione
 size: Misurare
 size-not-found: Non trovato
 something-went-wrong-try-again-later: |-
-  Qualcosa è andato storto! 
+  Qualcosa è andato storto!
   Riprovare più tardi.
 special-api-access: Accesso API speciale
 start-new-deploy: Avvia una nuova distribuzione progressiva
@@ -443,6 +466,8 @@ to-open-encrypted-bu: 'Per aprire il pacchetto crittografato utilizzare il coman
 top-apps-v2: App
 trial-left: giorni rimasti
 trial-plan-expired: Prova scaduta
+type-device-id: Immettere l'ID del dispositivo
+type-device-id-msg: Immettere l'ID del dispositivo che si desidera sovrascrivere.
 type-new-name: Digita il nuovo nome della chiave API
 type-new-org-name: Digita il nuovo nome per l'organizzazione
 undefined-fail: Non definito (gli aggiornamenti falliranno)
@@ -483,10 +508,10 @@ what-to-do-with-photo: Modifica immagine
 what-to-do-with-photo-dec: Cosa vorresti fare con la foto dell'app?
 write-key: Scrivere
 wrong-name-org-del: |-
-  Non hai digitato il nome dell'organizzazione. 
+  Non hai digitato il nome dell'organizzazione.
   Avresti dovuto digitare: %1
 yearly: Annuale
-'yes': SÌ
+yes: SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
 you-cannot-reuse: Non è possibile riutilizzare questa versione del bundle dopo l'eliminazione
 you-reached-the-limi: Limite raggiunto

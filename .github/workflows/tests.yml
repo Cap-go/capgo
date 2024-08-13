@@ -2,8 +2,8 @@ name: Run tests
 
 on:
   push:
-    branches:
-      - 'main'
+    tags:
+      - '*'
   pull_request:
 
 env:
@@ -12,8 +12,7 @@ env:
 jobs:
   test_base_sql:
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
-    name: "Run test"
+    name: "Run tests"
     steps:
       - name: Cache Deno dependencies 
         uses: actions/cache@v4

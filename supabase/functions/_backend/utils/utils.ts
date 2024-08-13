@@ -74,6 +74,21 @@ interface LimitedApp {
   ignore: number
 }
 
+export interface Segments {
+  capgo: boolean
+  onboarded: boolean
+  trial: boolean
+  trial7: boolean
+  trial1: boolean
+  trial0: boolean
+  paying: boolean
+  plan: string
+  payingMonthly: boolean
+  overuse: boolean
+  canceled: boolean
+  issueSegment: boolean
+}
+
 export function isLimited(c: Context, id: string) {
   const limits = getEnv(c, 'LIMITED_APPS')
   if (!limits)

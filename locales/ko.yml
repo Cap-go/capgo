@@ -89,7 +89,9 @@ canceled-delete: 번들 삭제가 취소되었습니다. 연결된 번들을 삭
 canceled-photo-selection: 사진 선택을 취소했습니다.
 cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
+cannot-create-empty-device: 빈 장치를 만들 수 없습니다. 브라우저의 콘솔을 확인하세요.
 cannot-create-org: 조직을 생성할 수 없습니다. 브라우저 로그를 확인하세요!
+cannot-create-overwrite: 덮어쓰기를 생성할 수 없습니다. 브라우저의 콘솔을 확인하세요.
 cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확인하세요.
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
@@ -97,6 +99,8 @@ cannot-delete-bundle: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
+cannot-determine-platform: 주어진 UUID가 IOS 또는 Android에 속하는지 확인할 수 없습니다.
+cannot-fetch-channels: 채널을 가져올 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-find-unknown-version: 알 수 없는 버전을 찾을 수 없습니다. capgo 지원팀에 문의하여 브라우저 로그를 확인하세요.
 cannot-get-the-test-: 테스트 버전을 받을 수 없습니다
 cannot-invite-owner: 소유자를 조직에 초대할 수 없습니다.
@@ -117,7 +121,7 @@ channel: 채널
 channel-ab-testing: AB 테스트 활성화
 channel-ab-testing-percentage: 보조 버전을 수신하는 사용자 비율
 channel-bundle-linked: |-
-  이 번들은 하나 이상의 채널에 연결되어 있습니다. 
+  이 번들은 하나 이상의 채널에 연결되어 있습니다.
   (%) 해당 채널에서 연결을 해제하시겠습니까?
 channel-create: 채널 만들기
 channel-deleted: 채널 삭제됨
@@ -137,6 +141,15 @@ cli-doc: CLI 문서
 commands: 명령
 confirm-email: 이메일 확인
 confirm-email-sent: 확인 이메일이 전송되었습니다. 이메일을 확인하려면 링크를 클릭하세요.
+confirm-overwrite: 덮어쓰기 확인
+confirm-overwrite-msg: |-
+  다음과 같은 덮어쓰기를 만들려고 합니다:
+
+  디바이스 ID: $1
+  채널: $2
+  채널 버전: $3
+
+  올바르게 들리나요?
 confirm-password: 비밀번호 확인
 confirm-public-desc: |-
   이 채널을 기본으로 설정하면 모든 사용자에게 업데이트가 전송됩니다.
@@ -168,6 +181,8 @@ detailed-usage-plan: 자세한 사용법
 devDependencies: {}
 device: 장치
 device-id: 장치 아이디
+device-injected: 이 장치는 덮어쓰기를 추가하기 위해 수동으로 생성되었습니다.
+device-injected-2: 일부 값은 자리 표시자이며 기기의 첫 번째 업데이트 후에 업데이트됩니다.
 devices: 장치
 did-not-recive-confirm-email: 확인 이메일을 받지 못하셨나요?
 disable: 장애를 입히다
@@ -203,6 +218,8 @@ forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
 free-trial: 무료 시험판
 from-device: 장치에서
 general-information: 일반 정보
+generate-device-overwrite: 장치 덮어쓰기 생성
+generate-device-overwrite-msg: 장치 덮어쓰기를 생성하려고 합니다. 계속하시겠습니까?
 generated-new-apikey: 새로운 API 키가 생성되었습니다!
 go-back: 돌아가기
 good: 좋은
@@ -216,6 +233,7 @@ install: 설치됨
 invalid-auth: 로그인이 일치하지 않습니다. 다시 시도하십시오.
 invalid-email: 전달된 이메일이 유효하지 않습니다.
 invalid-mfa-code: 잘못된 2FA 코드
+invalid-uuid: 잘못된 UUID
 invalid-version: 잘못된 버전
 invite-accepted: 조직 초대가 성공적으로 수락되었습니다.
 is-emulator: 에뮬레이터임
@@ -264,7 +282,7 @@ min-update-version: 최소 업데이트 버전
 minor: 미성년자
 misconfigured: 잘못 구성됨
 misconfigured-channels: |-
-  일부 채널이 잘못 구성되었습니다. 
+  일부 채널이 잘못 구성되었습니다.
   해당 채널에 대한 업데이트가 실패합니다!
 missing-email: 이메일 누락
 missing-name: 이름이 누락되었습니다.
@@ -278,17 +296,17 @@ more-version-storage: 더 많은 버전 저장
 my-notifications: 내 알림
 name: 이름
 need-more-contact-us: |-
-  더 필요하십니까? 
+  더 필요하십니까?
   맞춤형 계획을 위해 저희에게 연락하십시오
 new-name-not-changed: 새 이름은 기존 이름과 동일합니다.
 new-name-to-long: |-
-  새 이름이 너무 깁니다. 
+  새 이름이 너무 깁니다.
   32자까지만 사용할 수 있습니다.
 new-name-to-short: |-
-  apikey 이름이 너무 짧습니다. 
+  apikey 이름이 너무 짧습니다.
   길이는 4자 이상이어야 합니다.
 next: 다음
-'no': 아니요
+no: 아니요
 no-app-icon: 이 앱에는 앱 아이콘이 없습니다.
 no-data: 데이터 없음
 no-permission: 권한이 부족합니다.
@@ -384,6 +402,8 @@ select-style-of-deletion-msg: |-
   이 채널을 삭제할 방법을 선택하세요.
   일반 방법을 사용하는 것이 좋습니다.
   차이점에 대해 읽을 수 있습니다 $1
+select-channel: 채널 선택
+select-channel-msg: 이 덮어쓰기에 사용할 채널을 선택하세요.
 select-user-perms: 사용자 권한 선택
 select-user-perms-expanded: 초대된 사용자가 어떤 권한을 가져야 하는지 선택하세요.
 session_key: IvSessionKey
@@ -394,7 +414,7 @@ sign-out: 로그아웃
 size: 크기
 size-not-found: 찾을 수 없음
 something-went-wrong-try-again-later: |-
-  문제가 발생했습니다. 
+  문제가 발생했습니다.
   나중에 다시 시도하십시오.
 special-api-access: 특수 API 액세스
 start-new-deploy: 새로운 점진적 배포 시작
@@ -415,6 +435,8 @@ to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용�
 top-apps-v2: 앱
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
+type-device-id: 장치 ID 입력
+type-device-id-msg: 덮어쓰려는 디바이스의 ID를 입력하세요.
 type-new-name: 새 API 키 이름을 입력하세요.
 type-new-org-name: 조직의 새 이름을 입력하세요.
 undefined-fail: 정의되지 않음(업데이트가 실패함)
@@ -455,10 +477,10 @@ what-to-do-with-photo: 사진 편집
 what-to-do-with-photo-dec: 앱 사진으로 무엇을 하고 싶으신가요?
 write-key: 쓰다
 wrong-name-org-del: |-
-  조직 이름을 입력하지 않았습니다. 
+  조직 이름을 입력하지 않았습니다.
   다음을 입력해야 했습니다: %1
 yearly: 매년
-'yes': 예
+yes: 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-cannot-reuse: 삭제 후에는 이 번들 버전을 재사용할 수 없습니다.
 you-reached-the-limi: 한도 도달

@@ -91,7 +91,9 @@ canceled-delete: Anulowano usunięcie pakietu. Nie można usunąć połączonego
 canceled-photo-selection: Anulowałeś wybór zdjęć
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
+cannot-create-empty-device: Nie można utworzyć pustego urządzenia. Sprawdź konsolę przeglądarki
 cannot-create-org: Nie można utworzyć organizacji. Sprawdź logi przeglądarki!
+cannot-create-overwrite: Nie można utworzyć nadpisania. Sprawdź konsolę przeglądarki
 cannot-del-org: Nie można usunąć organizacji. Sprawdź dziennik przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
@@ -99,6 +101,10 @@ cannot-delete-bundle: Nie można usunąć pakietu
 cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
+cannot-determine-platform: >-
+  Nie można określić, czy dany identyfikator UUID należy do systemu IOS czy
+  Android
+cannot-fetch-channels: Nie można pobrać kanałów. Sprawdź konsolę przeglądarki
 cannot-find-unknown-version: >-
   Nie można znaleźć nieznanej wersji. Skontaktuj się z pomocą techniczną Capgo i
   sprawdź logi przeglądarki
@@ -121,7 +127,7 @@ channel: Kanał
 channel-ab-testing: Włącz testowanie AB
 channel-ab-testing-percentage: Procent użytkowników którzy otrzymają drugą wersję
 channel-bundle-linked: |-
-  Ten pakiet jest powiązany z jednym lub większą liczbą kanałów. 
+  Ten pakiet jest powiązany z jednym lub większą liczbą kanałów.
   (%) Czy chcesz odłączyć go od tych kanałów?
 channel-create: Utwórz kanał
 channel-deleted: Kanał usunięty
@@ -143,11 +149,19 @@ confirm-email: Potwierdź swój email
 confirm-email-sent: >-
   Wysłano email z potwierdzeniem, kliknij link, aby potwierdzić swój adres
   email.
+confirm-overwrite: Potwierdź nadpisanie
+confirm-overwrite-msg: |-
+  Zamierzasz utworzyć następujące nadpisanie:
+
+  ID urządzenia: $1
+  Kanał: $2
+  Wersja kanału: $3
+
+  Czy to brzmi poprawnie?
 confirm-password: Potwierdź hasło
 confirm-public-desc: >-
   Ustawienie tego kanału jako domyślnego spowoduje wysyłanie aktualizacji do
   wszystkich Twoich użytkowników.
-
 
   Inne domyślne kanały nie będą już domyślne.
 continue: Kontynuować
@@ -176,6 +190,10 @@ detailed-usage-plan: Szczegółowe wykorzystanie
 devDependencies: {}
 device: Urządzenie
 device-id: Identyfikator urzadzenia
+device-injected: To urządzenie zostało utworzone ręcznie w celu dodania nadpisywania.
+device-injected-2: >-
+  Niektóre wartości są zastępcze i zostaną zaktualizowane po pierwszej
+  aktualizacji urządzenia
 devices: Urządzenia
 did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable: Wyłączyć
@@ -211,6 +229,8 @@ forgot-success: Hasło zostało zmienione
 free-trial: Bezpłatny okres próbny
 from-device: z urządzenia
 general-information: Ogólne informacje
+generate-device-overwrite: Generowanie nadpisywania urządzenia
+generate-device-overwrite-msg: Zamierzasz wygenerować nadpisanie urządzenia. Czy chcesz kontynuować?
 generated-new-apikey: Nowy klucz API został wygenerowany!
 go-back: Wróć
 good: Dobry
@@ -224,6 +244,7 @@ install: Zainstalowane
 invalid-auth: Twój login się nie zgadza, spróbuj ponownie.
 invalid-email: Przekazany adres e-mail jest nieprawidłowy
 invalid-mfa-code: Nieprawidłowy kod 2FA
+invalid-uuid: Nieprawidłowy identyfikator UUID
 invalid-version: Nieprawidłowa wersja serwera
 invite-accepted: Zaproszenie do oranizacji zostało przyjęte pomyślnie
 is-emulator: jest emulatorem
@@ -274,7 +295,7 @@ min-update-version: Minimalna wersja aktualizacji
 minor: Drobny
 misconfigured: Źle skonfigurowany
 misconfigured-channels: |-
-  Niektóre kanały są źle skonfigurowane. 
+  Niektóre kanały są źle skonfigurowane.
   Aktualizacje tych kanałów nie powiodą się!
 missing-email: Brak e-maila
 missing-name: Brak imienia
@@ -288,17 +309,17 @@ more-version-storage: Więcej wersji Przechowywanie
 my-notifications: moje powiadomienia
 name: Nazwa
 need-more-contact-us: |-
-  Potrzeba więcej ? 
+  Potrzeba więcej ?
   Skontaktuj się z nami, aby uzyskać dostosowany plan
 new-name-not-changed: Nowa nazwa jest taka sama jak stara
 new-name-to-long: |-
-  Nowa nazwa jest za długa. 
+  Nowa nazwa jest za długa.
   Możesz użyć tylko 32 znaków
 new-name-to-short: |-
-  Nazwa apikey jest za krótka. 
+  Nazwa apikey jest za krótka.
   Musi mieć co najmniej 4 znaki
 next: Następny
-'no': NIE
+no: NIE
 no-app-icon: Ta aplikacja nie ma żadnej ikony aplikacji
 no-data: Brak danych
 no-permission: Niewystarczające uprawnienia
@@ -404,6 +425,8 @@ select-style-of-deletion-msg: |-
   Wybierz sposób, w jaki chcesz usunąć ten kanał.
   Zaleca się wybranie normalnego sposobu.
   Możesz przeczytać o różnicy $1
+select-channel: Wybierz kanał
+select-channel-msg: Wybierz kanał, którego chcesz użyć podczas nadpisywania.
 select-user-perms: Wybierz uprawnienia użytkownika
 select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
 session_key: Klucz IVSesji
@@ -414,7 +437,7 @@ sign-out: Wyloguj się
 size: Rozmiar
 size-not-found: Nie znaleziono
 something-went-wrong-try-again-later: |-
-  Coś poszło nie tak! 
+  Coś poszło nie tak!
   Spróbuj ponownie później.
 special-api-access: Specjalny dostęp do API
 start-new-deploy: Rozpocznij nowe, stopniowe wdrażanie
@@ -437,6 +460,8 @@ to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
 top-apps-v2: Aplikacje
 trial-left: Pozostałe dni
 trial-plan-expired: Wersja czasowa wygasła
+type-device-id: Wprowadź identyfikator urządzenia
+type-device-id-msg: Wprowadź identyfikator urządzenia, które chcesz nadpisać
 type-new-name: Wpisz nową nazwę klucza API
 type-new-org-name: Wpisz nową nazwę organizacji
 undefined-fail: Niezdefiniowany (aktualizacje nie powiodą się)
@@ -479,10 +504,10 @@ what-to-do-with-photo: Edytuj zdjęcie
 what-to-do-with-photo-dec: Co chcesz zrobić ze zdjęciem w aplikacji?
 write-key: Pisać
 wrong-name-org-del: |-
-  Nie wpisałeś nazwy organizacji. 
+  Nie wpisałeś nazwy organizacji.
   Miałeś wpisać: %1
 yearly: Rocznie
-'yes': Tak
+yes: Tak
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-cannot-reuse: Po usunięciu nie można ponownie użyć tej wersji pakietu
 you-reached-the-limi: Limit osiągnięty

@@ -26,7 +26,3 @@ dataset = "app_log"
 binding = "DB_DEVICES"
 database_name = "capgo_prod_devices"
 database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
-
-[[hyperdrive]]
-binding = "HYPERDRIVE"
-id = "0f1d77550db142fbb17cb6b3ee659a06"

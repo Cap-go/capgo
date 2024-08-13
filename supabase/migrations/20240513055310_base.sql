@@ -1801,7 +1801,7 @@ BEGIN
             END IF;
 
             -- Note: In 20231020160052_queue_system.sql there is a section for APP_DELETE etc.
-            -- Here I deleted it, it's not needed when clickhouse is enabled
+            -- Here I deleted it, it's not needed
             -- When selfhosting capgo concider readding that section here ;-)
 
             -- Delete the job from the queue

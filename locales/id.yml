@@ -89,7 +89,9 @@ canceled-delete: Penghapusan paket dibatalkan, tidak dapat menghapus paket terta
 canceled-photo-selection: Anda membatalkan pemilihan gambar
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
+cannot-create-empty-device: Tidak dapat membuat perangkat kosong. Silakan periksa konsol browser
 cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!
+cannot-create-overwrite: Tidak dapat membuat penimpaan. Silakan periksa konsol browser
 cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
@@ -97,6 +99,8 @@ cannot-delete-bundle: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
+cannot-determine-platform: Tidak dapat menentukan apakah UUID yang diberikan milik iOS atau Android
+cannot-fetch-channels: Tidak dapat mengambil saluran. Silakan periksa konsol browser
 cannot-find-unknown-version: >-
   Tidak dapat menemukan versi yang tidak dikenal, silakan hubungi dukungan capgo
   dan periksa log browser
@@ -119,7 +123,7 @@ channel: Saluran
 channel-ab-testing: Aktifkan pengujian AB
 channel-ab-testing-percentage: Persentase pengguna yang menerima versi sekunder
 channel-bundle-linked: |-
-  Paket ini tertaut ke satu atau beberapa saluran. 
+  Paket ini tertaut ke satu atau beberapa saluran.
   (%) Apakah Anda ingin membatalkan tautannya dari saluran tersebut?
 channel-create: Buat saluran
 channel-deleted: Saluran dihapus
@@ -141,6 +145,15 @@ confirm-email: Konfirmasi email Anda
 confirm-email-sent: >-
   Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
   Anda
+confirm-overwrite: Konfirmasi penimpaan
+confirm-overwrite-msg: |-
+  Anda akan membuat penimpaan berikut ini:
+
+  ID Perangkat: $1
+  Saluran: $2
+  Versi saluran: $3
+
+  Apakah kedengarannya benar?
 confirm-password: Konfirmasi sandi
 confirm-public-desc: >-
   Menjadikan saluran ini sebagai default akan membuatnya mengirim pembaruan ke
@@ -173,6 +186,10 @@ detailed-usage-plan: Penggunaan terperinci
 devDependencies: {}
 device: Perangkat
 device-id: ID perangkat
+device-injected: Perangkat ini dibuat secara manual untuk menambahkan timpa.
+device-injected-2: >-
+  Beberapa nilai merupakan placeholder dan akan diperbarui setelah pembaruan
+  pertama perangkat
 devices: Perangkat
 did-not-recive-confirm-email: Tidak menerima email konfirmasi?
 disable: Cacat
@@ -212,6 +229,8 @@ forgot-success: Kata sandi berhasil diperbarui
 free-trial: Uji coba gratis
 from-device: dari perangkat
 general-information: Informasi Umum
+generate-device-overwrite: Menghasilkan penimpaan perangkat
+generate-device-overwrite-msg: Anda akan membuat penimpaan perangkat. Apakah Anda ingin melanjutkan?
 generated-new-apikey: Menghasilkan kunci API baru!
 go-back: Kembali
 good: Bagus
@@ -225,6 +244,7 @@ install: Terpasang
 invalid-auth: Login Anda tidak cocok, coba lagi.
 invalid-email: Email yang diteruskan tidak valid
 invalid-mfa-code: Kode 2FA tidak valid
+invalid-uuid: UUID tidak valid
 invalid-version: Versi semver tidak valid
 invite-accepted: Berhasil menerima undangan organisasi
 is-emulator: Apakah Emulator
@@ -293,13 +313,13 @@ need-more-contact-us: |-
   Hubungi kami untuk rencana yang disesuaikan
 new-name-not-changed: Nama barunya sama dengan nama lama
 new-name-to-long: |-
-  Nama barunya terlalu panjang. 
+  Nama barunya terlalu panjang.
   Anda hanya dapat menggunakan 32 karakter
 new-name-to-short: |-
-  Nama apikey terlalu pendek. 
+  Nama apikey terlalu pendek.
   Panjangnya minimal harus 4 karakter
 next: Berikutnya
-'no': TIDAK
+no: TIDAK
 no-app-icon: Aplikasi ini tidak memiliki ikon aplikasi apa pun
 no-data: Tidak ada data
 no-permission: Izin tidak memadai
@@ -403,6 +423,8 @@ select-style-of-deletion-msg: |-
   Pilih cara yang Anda inginkan untuk menghapus saluran ini.
   Disarankan untuk menggunakan cara yang normal.
   Anda dapat membaca tentang perbedaannya di $1
+select-channel: Pilih saluran
+select-channel-msg: Pilih saluran yang ingin Anda gunakan dalam penimpaan ini
 select-user-perms: Pilih izin pengguna
 select-user-perms-expanded: Pilih izin mana yang harus dimiliki oleh pengguna yang diundang
 session_key: IvSessionKey
@@ -436,6 +458,8 @@ to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps-v2: Aplikasi
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
+type-device-id: Masukkan ID perangkat
+type-device-id-msg: Masukkan ID perangkat yang ingin ditimpa
 type-new-name: Silakan ketik nama kunci api baru
 type-new-org-name: Silakan ketikkan nama baru untuk organisasi tersebut
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
@@ -478,10 +502,10 @@ what-to-do-with-photo: Sunting gambar
 what-to-do-with-photo-dec: Apa yang ingin Anda lakukan dengan foto aplikasi?
 write-key: Menulis
 wrong-name-org-del: |-
-  Anda belum mengetikkan nama organisasi. 
+  Anda belum mengetikkan nama organisasi.
   Anda seharusnya mengetik: %1
 yearly: Tahunan
-'yes': Ya
+yes: Ya
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-cannot-reuse: Anda tidak dapat menggunakan kembali versi bundel ini setelah penghapusan
 you-reached-the-limi: Batas tercapai
