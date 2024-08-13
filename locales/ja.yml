@@ -121,7 +121,7 @@ channel: チャネル
 channel-ab-testing: AB テストを有効にする
 channel-ab-testing-percentage: セカンダリ バージョンを受信して​​いるユーザーの割合
 channel-bundle-linked: |-
-  このバンドルは 1 つ以上のチャネルにリンクされています。 
+  このバンドルは 1 つ以上のチャネルにリンクされています。
   (%) これらのチャンネルからのリンクを解除しますか?
 channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
@@ -223,6 +223,7 @@ generate-device-overwrite-msg: デバイスを上書きしようとしていま�
 generated-new-apikey: 新しい API キーが生成されました。
 go-back: 戻る
 good: 良い
+here: これ
 id: ID
 included-in-plan: プランに含まれるもの
 info: 情報
@@ -299,17 +300,19 @@ need-more-contact-us: |-
   オーダーメイドプランはお問い合わせください
 new-name-not-changed: 新しい名前は古い名前と同じです
 new-name-to-long: |-
-  新しい名前は長すぎます。 
+  新しい名前は長すぎます。
   32 文字のみ使用できます
 new-name-to-short: |-
   apikey 名が短すぎます。
   少なくとも 4 文字の長さである必要があります
 next: 次
-'no': いいえ
+no: いいえ
 no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし
 no-permission: 権限が不十分です
+no-permission-ask-super-admin: このバンドルを安全に削除するには、スーパー管理者に依頼してください。
 none: なし
+normal: ノーマル
 not-found: 見つかりません
 not-paying-org-usage: この組織は料金を支払っていないため、無料体験組織の使用状況を表示できません
 notifications: 通知
@@ -340,6 +343,7 @@ password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入�
 patch: パッチ
 percent-fail: 失敗率
 permission-changed: ユーザー権限が正常に変更されました
+pernament: ペルナメント
 personal-information: 個人情報
 picture-delete-fail: アプリの画像を削除できません。コンソールのログを確認してください。
 picture-uploaded: 画像が正常にアップロードされました
@@ -393,6 +397,11 @@ search-by-device-id-: デバイス ID またはアクションで検索
 search-by-device-id-0: デバイス ID で検索
 search-by-name: 名前で検索
 see-usage: 使い方を見る
+select-style-of-deletion: 削除スタイルの選択
+select-style-of-deletion-msg: |-
+  このチャンネルを削除する方法を選択してください。
+  ノーマルをお勧めします。
+  違いについてはこちらをご覧ください。
 select-channel: チャンネル選択
 select-channel-msg: 上書きで使用するチャンネルを選択してください。
 select-user-perms: ユーザーの権限を選択します
@@ -439,6 +448,7 @@ unlink-bundle: バンドルのリンクを解除
 unlink-channel: チャンネルのリンクを解除
 unlink-error: リンク解除エラー。コンソールを確認してください
 unlink-version: バージョンのリンクを解除
+unsafe: 危険
 update: アップデート
 updated-at: に更新
 updated-min-version: 最小バージョンを更新しました
@@ -470,7 +480,7 @@ wrong-name-org-del: |-
   組織名が入力されていません。
   次のように入力する必要がありました: %1
 yearly: 毎年
-'yes': はい
+yes: はい
 you-can-change-your-: ここで個人情報を変更できます。
 you-cannot-reuse: このバンドル バージョンは削除後は再利用できません
 you-reached-the-limi: 制限に達しました

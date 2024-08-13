@@ -40,7 +40,37 @@ const filters = ref({
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-async function didCancel(name: string) {
+async function didCancel(name: string): Promise<boolean | 'normal' | 'unsafe'> {
+  let method: 'normal' | 'unsafe' | null = null
+  displayStore.dialogOption = {
+    header: t('select-style-of-deletion'),
+    message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">${t('here')}</a>`),
+    buttons: [
+      {
+        text: t('normal'),
+        role: 'normal',
+        handler: () => {
+          method = 'normal'
+        },
+      },
+      {
+        text: t('unsafe'),
+        role: 'danger',
+        id: 'unsafe',
+        handler: async () => {
+          if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
+            toast.error(t('no-permission-ask-super-admin'))
+            return
+          }
+          method = 'unsafe'
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  if (await displayStore.onDialogDismiss() || !method) {
+    return true
+  }
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`,
@@ -57,7 +87,11 @@ async function didCancel(name: string) {
     ],
   }
   displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  if (await displayStore.onDialogDismiss())
+    return true
+  if (method === null)
+    throw new Error('Unreachable, method = null')
+  return method
 }
 async function enhenceVersionElems(dataVersions: Database['public']['Tables']['app_versions']['Row'][]) {
   const { data: dataVersionsMeta } = await supabase
@@ -161,7 +195,10 @@ async function deleteOne(one: Element) {
       }
     }
 
-    if (one.deleted || await didCancel(t('version')))
+    if (one.deleted)
+      return
+    const didCancelRes = await didCancel(t('version'))
+    if (typeof didCancelRes === 'boolean' && didCancelRes === true)
       return
 
     if (unlink.length > 0) {
@@ -199,11 +236,19 @@ async function deleteOne(one: Element) {
       toast.error(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-device')}`)
       return
     }
-    const { error: delAppError } = await supabase
-      .from('app_versions')
-      .update({ deleted: true })
-      .eq('app_id', one.app_id)
-      .eq('id', one.id)
+    const { error: delAppError } = await (didCancelRes === 'normal'
+      ? supabase
+        .from('app_versions')
+        .update({ deleted: true })
+        .eq('app_id', one.app_id)
+        .eq('id', one.id)
+      : supabase
+        .from('app_versions')
+        .delete()
+        .eq('app_id', one.app_id)
+        .eq('id', one.id)
+    )
+
     if (delAppError) {
       toast.error(t('cannot-delete-bundle'))
     }

@@ -125,7 +125,7 @@ channel: Canal
 channel-ab-testing: Habilitar teste AB
 channel-ab-testing-percentage: Porcentagem de usuários que recebem a versão secundária
 channel-bundle-linked: |-
-  Este pacote está vinculado a um ou mais canais. 
+  Este pacote está vinculado a um ou mais canais.
   (%) Gostaria de desvinculá-lo desses canais?
 channel-create: Criar canal
 channel-deleted: Canal deletado
@@ -158,7 +158,6 @@ confirm-password: Confirme sua senha
 confirm-public-desc: >-
   Tornar este canal padrão fará com que ele envie atualizações para todos os
   seus usuários.
-
 
   Outros canais padrão não serão mais padrão.
 continue: Continuar
@@ -231,6 +230,7 @@ generate-device-overwrite-msg: Está prestes a gerar uma substituição de dispo
 generated-new-apikey: Gerada nova chave de API!
 go-back: Volte
 good: Bom
+here: aqui
 id: EU IA
 included-in-plan: Incluído no plano
 info: Informação
@@ -291,7 +291,7 @@ min-update-version: Versão de atualização mínima
 minor: Menor
 misconfigured: Mal configurado
 misconfigured-channels: |-
-  Alguns canais estão configurados incorretamente. 
+  Alguns canais estão configurados incorretamente.
   As atualizações falharão para esses canais!
 missing-email: E-mail ausente
 missing-name: Nome ausente
@@ -305,21 +305,25 @@ more-version-storage: Mais armazenamento de versões
 my-notifications: Minhas notificações
 name: Nome
 need-more-contact-us: |-
-  Preciso de mais ? 
+  Preciso de mais ?
   Contacte-nos para um plano à medida
 new-name-not-changed: O novo nome é igual ao antigo
 new-name-to-long: |-
-  O novo nome é muito longo. 
+  O novo nome é muito longo.
   Você só pode usar 32 caracteres
 new-name-to-short: |-
-  O nome apikey é muito curto. 
+  O nome apikey é muito curto.
   Deve ter pelo menos 4 caracteres
 next: Próximo
-'no': não
+no: não
 no-app-icon: Este aplicativo não possui nenhum ícone de aplicativo
 no-data: Sem dados
 no-permission: Permissões insuficientes
+no-permission-ask-super-admin: >-
+  permissão insuficiente, por favor peça a um super administrador para eliminar
+  este pacote sem segurança
 none: Nenhum
+normal: Normal
 not-found: Não encontrado
 not-paying-org-usage: >-
   Esta organização não está pagando e não pode mostrar o uso de uma organização
@@ -354,6 +358,7 @@ password-hint: Digite uma combinação de pelo menos 6 números, letras e pontua
 patch: Correção
 percent-fail: Porcentagem de reprovação
 permission-changed: Permissão do usuário alterada com sucesso
+pernament: Pernamento
 personal-information: Informações pessoais
 picture-delete-fail: Não é possível excluir a imagem do aplicativo. Verifique o log do console
 picture-uploaded: Imagem enviada com sucesso
@@ -411,6 +416,11 @@ search-by-device-id-: Pesquise por ID de dispositivo ou ação
 search-by-device-id-0: Pesquisar por ID do dispositivo
 search-by-name: Procura por nome
 see-usage: Ver uso
+select-style-of-deletion: Selecionar o estilo de eliminação
+select-style-of-deletion-msg: |-
+  Seleccione a forma como pretende eliminar este canal.
+  Recomenda-se que opte pela forma normal.
+  Pode ler sobre a diferença $1
 select-channel: Selecionar canal
 select-channel-msg: Seleccione o canal que pretende utilizar nesta substituição
 select-user-perms: Selecione as permissões do usuário
@@ -423,7 +433,7 @@ sign-out: Sair
 size: Tamanho
 size-not-found: Não encontrado
 something-went-wrong-try-again-later: |-
-  Algo deu errado! 
+  Algo deu errado!
   Tente mais tarde.
 special-api-access: Acesso especial à API
 start-new-deploy: Iniciar uma nova implantação progressiva
@@ -459,6 +469,7 @@ unlink-bundle: Desvincular pacote
 unlink-channel: Desvincular canal
 unlink-error: Erro ao desvincular, verifique o console
 unlink-version: Desvincular versão
+unsafe: Inseguro
 update: Atualizar
 updated-at: Atualizado em
 updated-min-version: Versão mínima atualizada
@@ -487,10 +498,10 @@ what-to-do-with-photo: Editar imagem
 what-to-do-with-photo-dec: O que você gostaria de fazer com a foto do aplicativo?
 write-key: Escrever
 wrong-name-org-del: |-
-  Você não digitou o nome da organização. 
+  Você não digitou o nome da organização.
   Você deveria ter digitado:% 1
 yearly: Anual
-'yes': sim
+yes: sim
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.
 you-cannot-reuse: Você não pode reutilizar esta versão do pacote após a exclusão
 you-reached-the-limi: Limite alcançado

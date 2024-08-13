@@ -121,7 +121,7 @@ channel: 渠道
 channel-ab-testing: 启用AB测试
 channel-ab-testing-percentage: 接收辅助版本的用户百分比
 channel-bundle-linked: |-
-  该捆绑包链接到一个或多个频道。 
+  该捆绑包链接到一个或多个频道。
   (%) 您想取消它与这些频道的链接吗？
 channel-create: 创建频道
 channel-deleted: 频道已删除
@@ -223,6 +223,7 @@ generate-device-overwrite-msg: 您即将生成设备覆盖。要继续吗？
 generated-new-apikey: 已生成新的 API 密钥！
 go-back: 回去
 good: 好的
+here: 这里
 id: ID
 included-in-plan: 包含在计划中
 info: 信息
@@ -305,11 +306,13 @@ new-name-to-short: |-
   apikey 名称太短。
   长度必须至少为 4 个字符
 next: 下一个
-'no': 不
+no: 不
 no-app-icon: 此应用程序没有任何应用程序图标
 no-data: 没有数据
 no-permission: 权限不足
+no-permission-ask-super-admin: 权限不足，请请求超级管理员不安全地删除此捆绑包
 none: 没有任何
+normal: 正常
 not-found: 未找到
 not-paying-org-usage: 该组织未付费，无法显示免费试用组织的使用情况
 notifications: 通知
@@ -340,6 +343,7 @@ password-hint: 输入至少 6 个数字、字母和标点符号的组合。
 patch: 修补
 percent-fail: 失败百分比
 permission-changed: 成功更改用户权限
+pernament: 诗歌
 personal-information: 个人信息
 picture-delete-fail: 无法删除应用图片，请检查控制台日志
 picture-uploaded: 图片上传成功
@@ -393,6 +397,11 @@ search-by-device-id-: 按设备 ID 或操作搜索
 search-by-device-id-0: 按设备 ID 搜索
 search-by-name: 按名称搜索
 see-usage: 查看用法
+select-style-of-deletion: 选择删除方式
+select-style-of-deletion-msg: |-
+  请选择要删除此频道的方式。
+  建议使用普通方式。
+  您可以阅读有关区别的信息 $1
 select-channel: 选择频道
 select-channel-msg: 请选择您希望用于覆盖的频道
 select-user-perms: 选择用户的权限
@@ -439,6 +448,7 @@ unlink-bundle: 取消链接包
 unlink-channel: 取消链接频道
 unlink-error: 取消链接错误，请检查控制台
 unlink-version: 取消链接版本
+unsafe: 不安全
 update: 更新
 updated-at: 更新于
 updated-min-version: 更新了最小版本
@@ -470,7 +480,7 @@ wrong-name-org-del: |-
   您尚未输入组织名称。
   您应该输入：%1
 yearly: 每年
-'yes': 是的
+yes: 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制

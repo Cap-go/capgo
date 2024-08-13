@@ -224,6 +224,7 @@ generate-device-overwrite-msg: You are about to generate a device overwrite. Do 
 generated-new-apikey: Generated new API key!
 go-back: Go back
 good: Good
+here: here
 id: ID
 included-in-plan: Included in plan
 info: Information
@@ -300,11 +301,15 @@ new-name-not-changed: The new name is the same as the old one
 new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
-'no': 'no'
+no: no
 no-app-icon: This app does not have any app icon
 no-data: No Data
 no-permission: Insufficient permissions
+no-permission-ask-super-admin: >-
+  insufficient permission, please ask a super admin to delete this bundle
+  unsafely
 none: None
+normal: Normal
 not-found: Not found
 not-paying-org-usage: >-
   This organization is not paying, cannot show usage for a free trier
@@ -337,6 +342,7 @@ password-hint: Enter a combination of at least 6 numbers, letters and punctuatio
 patch: Patch
 percent-fail: Fail percentage
 permission-changed: Successfully changed user permission
+pernament: Pernament
 personal-information: Personal Informations
 picture-delete-fail: Cannot delete app picture, please check console log
 picture-uploaded: Picture uploaded successfully
@@ -390,6 +396,11 @@ search-by-device-id-: Search by device ID or action
 search-by-device-id-0: Search by device ID
 search-by-name: Search by name
 see-usage: See usage
+select-style-of-deletion: Select the style of deletion
+select-style-of-deletion-msg: |-
+  Please select the way that you would like to delete this channel.
+  It is recomended to go with the normal one.
+  You can read about the difference $1
 select-channel: Select channel
 select-channel-msg: Please select the channel that you would like to use in this overwrite
 select-user-perms: Select user's permissions
@@ -434,6 +445,7 @@ unlink-bundle: Unlink bundle
 unlink-channel: Unlink channel
 unlink-error: Unlink error, please check console
 unlink-version: Unlink version
+unsafe: Unsafe
 update: Update
 updated-at: Updated at
 updated-min-version: Updated minimal version
@@ -463,7 +475,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-'yes': 'yes'
+yes: yes
 you-can-change-your-: You can change your personal informations here.
 you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached

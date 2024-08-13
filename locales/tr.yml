@@ -123,7 +123,7 @@ channel: Kanal
 channel-ab-testing: AB testini etkinleştir
 channel-ab-testing-percentage: İkincil sürümü alan kullanıcıların yüzdesi
 channel-bundle-linked: |-
-  Bu paket bir veya daha fazla kanala bağlı. 
+  Bu paket bir veya daha fazla kanala bağlı.
   (%) Bu kanallardan bağlantısını kaldırmak ister misiniz?
 channel-create: Kanal oluştur
 channel-deleted: kanal silindi
@@ -156,7 +156,6 @@ confirm-password: Şifreyi Onayla
 confirm-public-desc: >-
   Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler göndermesini
   sağlar.
-
 
   Diğer varsayılan kanallar artık varsayılan olmayacak.
 continue: Devam etmek
@@ -231,6 +230,7 @@ generate-device-overwrite-msg: Bir aygıt üzerine yazma oluşturmak üzeresiniz
 generated-new-apikey: Yeni API anahtarı oluşturuldu!
 go-back: Geri gitmek
 good: İyi
+here: Burada
 id: İD
 included-in-plan: Plana dahil
 info: Bilgi
@@ -291,7 +291,7 @@ min-update-version: Minimum güncelleme sürümü
 minor: Küçük
 misconfigured: Yanlış yapılandırılmış
 misconfigured-channels: |-
-  Bazı kanallar yanlış yapılandırılmış. 
+  Bazı kanallar yanlış yapılandırılmış.
   Bu kanallar için güncellemeler başarısız olacaktır!
 missing-email: Eksik e-posta
 missing-name: Eksik ad
@@ -305,21 +305,25 @@ more-version-storage: Daha fazla sürüm Depolama
 my-notifications: Bildirimlerim
 name: İsim
 need-more-contact-us: |-
-  Daha fazlasına ihtiyaç var ? 
+  Daha fazlasına ihtiyaç var ?
   Size özel plan için bize ulaşın
 new-name-not-changed: Yeni isim eskisiyle aynı
 new-name-to-long: |-
-  Yeni isim çok uzun. 
+  Yeni isim çok uzun.
   Yalnızca 32 karakter kullanabilirsiniz
 new-name-to-short: |-
-  Apikey adı çok kısa. 
+  Apikey adı çok kısa.
   En az 4 karakter uzunluğunda olmalı
 next: Sonraki
-'no': HAYIR
+no: HAYIR
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-data: Veri yok
 no-permission: Yetersiz yetkiler
+no-permission-ask-super-admin: >-
+  Yetersiz izin, lütfen bir süper yöneticiden bu paketi güvenli olmayan bir
+  şekilde silmesini isteyin
 none: Hiçbiri
+normal: Normal
 not-found: Bulunamadı
 not-paying-org-usage: Bu kuruluş ödeme yapmıyor, ücretsiz deneme kuruluşu için kullanım gösteremiyor
 notifications: bildirimler
@@ -350,6 +354,7 @@ password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir komb
 patch: Yama
 percent-fail: Başarısız yüzde
 permission-changed: Kullanıcı izni başarıyla değiştirildi
+pernament: Pernament
 personal-information: Kişisel bilgiler
 picture-delete-fail: Uygulama resmi silinemiyor, lütfen konsol günlüğünü kontrol edin
 picture-uploaded: Resim başarıyla yüklendi
@@ -407,6 +412,11 @@ search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
+select-style-of-deletion: Silme stilini seçin
+select-style-of-deletion-msg: |-
+  Lütfen bu kanalı silmek istediğiniz yolu seçin.
+  Normal olanı seçmeniz tavsiye edilir.
+  Fark hakkında okuyabilirsiniz $1
 select-channel: Kanal seçin
 select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
 select-user-perms: Kullanıcının izinlerini seçin
@@ -419,7 +429,7 @@ sign-out: Oturumu Kapat
 size: Boyut
 size-not-found: Bulunamadı
 something-went-wrong-try-again-later: |-
-  Bir şeyler yanlış gitti! 
+  Bir şeyler yanlış gitti!
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
 start-new-deploy: Yeni aşamalı dağıtımı başlatın
@@ -453,6 +463,7 @@ unlink-bundle: Paketin bağlantısını kaldır
 unlink-channel: Kanalın bağlantısını kaldır
 unlink-error: Bağlantıyı kaldırma hatası, lütfen konsolu kontrol edin
 unlink-version: Sürümün bağlantısını kaldır
+unsafe: Güvensiz
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
 updated-min-version: Minimum sürüm güncellendi
@@ -481,10 +492,10 @@ what-to-do-with-photo: Resmi düzenle
 what-to-do-with-photo-dec: Uygulama fotoğrafıyla ne yapmak istersiniz?
 write-key: Yazmak
 wrong-name-org-del: |-
-  Kuruluşun adını yazmadınız. 
+  Kuruluşun adını yazmadınız.
   Şunu yazmanız gerekiyordu: %1
 yearly: Yıllık
-'yes': Evet
+yes: Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı
