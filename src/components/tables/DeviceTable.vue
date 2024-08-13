@@ -14,10 +14,12 @@ import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 const props = defineProps<{
   appId: string
   ids?: string[]
+  channel?: ExtraChannel
   versionId?: number | undefined
 }>()
 
 type Element = Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }
+type ExtraChannel = (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] })
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -275,6 +277,11 @@ async function customDeviceOverwritePart3() {
   }
   const platform = bigLetters > smallLetters ? 'ios' : 'android'
 
+  if (props.channel) {
+    await customDeviceOverwritePart4(deviceId, props.channel, platform)
+    return
+  }
+
   const { data: channelsR, error } = await supabase
     .from('channels')
     .select('id, name, owner_org, version ( id, name )')
@@ -286,36 +293,14 @@ async function customDeviceOverwritePart3() {
     return
   }
 
-  const channels = channelsR as any as (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] })[]
+  const channels = channelsR as any as ExtraChannel[]
 
   const buttons = channels.map((chan) => {
     return {
       text: chan.name,
       id: chan.id,
       handler: async () => {
-        displayStore.dialogOption = {
-          buttonCenter: true,
-          headerStyle: 'w-full text-center',
-          textStyle: 'w-full text-center',
-          preventAccidentalClose: true,
-          header: t('confirm-overwrite'),
-          message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', chan.name).replace('$3', chan.version.name)}`,
-          size: 'max-w-xl',
-          buttons: [
-            {
-              text: t('yes'),
-              role: 'yes',
-              handler: async () => {
-                await customDeviceOverwritePart4(deviceId, chan, platform)
-              },
-            },
-            {
-              text: t('no'),
-              role: 'cancel',
-            },
-          ],
-        }
-        displayStore.showDialog = true
+        await customDeviceOverwritePart4(deviceId, chan, platform)
       },
     }
   })
@@ -343,7 +328,37 @@ async function customDeviceOverwritePart3() {
 
 async function customDeviceOverwritePart4(
   deviceId: string,
-  chan: (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }),
+  chan: ExtraChannel,
+  platform: 'ios' | 'android',
+) {
+  displayStore.dialogOption = {
+    buttonCenter: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    preventAccidentalClose: true,
+    header: t('confirm-overwrite'),
+    message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', chan.name).replace('$3', chan.version.name)}`,
+    size: 'max-w-xl',
+    buttons: [
+      {
+        text: t('yes'),
+        role: 'yes',
+        handler: async () => {
+          await customDeviceOverwritePart5(deviceId, chan, platform)
+        },
+      },
+      {
+        text: t('no'),
+        role: 'cancel',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
+
+async function customDeviceOverwritePart5(
+  deviceId: string,
+  chan: ExtraChannel,
   platform: 'ios' | 'android',
 ) {
   const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
