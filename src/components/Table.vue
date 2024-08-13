@@ -162,7 +162,7 @@ async function fastBackward() {
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
         <div v-if="filterText && filterList.length" class="dropdown">
-          <div tabindex="0" role="button" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700">
+          <button tabindex="0"class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               <!-- uppercase first letter in tailwind -->
               {{ filterActivated }}
@@ -170,7 +170,7 @@ async function fastBackward() {
             <IconFilter class="m-1 mr-2" />
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden m-1 ml-2 md:block" />
-          </div>
+          </button>
           <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
