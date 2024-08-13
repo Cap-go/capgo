@@ -95,7 +95,13 @@ canceled-delete: Eliminación de paquete cancelada, no se puede eliminar un paqu
 canceled-photo-selection: Cancelaste la selección de fotos.
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
+cannot-create-empty-device: >-
+  No se puede crear un dispositivo vacío. Por favor, compruebe la consola del
+  navegador
 cannot-create-org: No se puede crear una organización; verifique los registros del navegador.
+cannot-create-overwrite: >-
+  No se puede crear la sobreescritura. Por favor, compruebe la consola del
+  navegador
 cannot-del-org: No se puede eliminar la organización; consulte el registro del navegador.
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
@@ -103,6 +109,8 @@ cannot-delete-bundle: No se puede eliminar el paquete
 cannot-delete-channel: No se puede eliminar el canal
 cannot-delete-member: No se puede eliminar un miembro, verifique la consola del navegador
 cannot-delete-owner: No se puede eliminar el propietario de la organización
+cannot-determine-platform: No se puede determinar si el UUID dado pertenece a IOS o Android
+cannot-fetch-channels: No se pueden recuperar canales. Compruebe la consola del navegador
 cannot-find-unknown-version: >-
   No puedo encontrar la versión desconocida, comuníquese con el soporte de capgo
   y verifique los registros del navegador
@@ -147,6 +155,15 @@ confirm-email: confirme su email
 confirm-email-sent: >-
   Se envió un correo electrónico de confirmación, haz clic en el enlace para
   confirmar tu correo electrónico.
+confirm-overwrite: Confirmar sobrescritura
+confirm-overwrite-msg: |-
+  Está a punto de crear la siguiente sobreescritura:
+
+  ID de dispositivo: $1
+  Canal: $2
+  Versión del canal: $3
+
+  ¿Le parece correcto?
 confirm-password: Confirmar Contraseña
 confirm-public-desc: >-
   Hacer que este canal sea el predeterminado hará que envíe actualizaciones a
@@ -180,6 +197,10 @@ detailed-usage-plan: Uso detallado
 devDependencies: {}
 device: Dispositivo
 device-id: ID del dispositivo
+device-injected: Este dispositivo se ha creado manualmente para añadir una sobreescritura.
+device-injected-2: >-
+  Algunos valores son marcadores de posición y se actualizarán tras la primera
+  actualización del dispositivo
 devices: Dispositivos
 did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable: Desactivar
@@ -219,6 +240,8 @@ forgot-success: Contraseña actualizada exitosamente
 free-trial: Prueba gratis
 from-device: desde el dispositivo
 general-information: Información general
+generate-device-overwrite: Generar sobreescritura de dispositivo
+generate-device-overwrite-msg: Está a punto de generar una sobreescritura de dispositivo. ¿Desea continuar?
 generated-new-apikey: ¡Nueva clave API generada!
 go-back: Regresa
 good: Bien
@@ -231,6 +254,7 @@ install: Instalado
 invalid-auth: Su nombre de usuario no coincide, inténtelo de nuevo.
 invalid-email: El correo electrónico pasado no es válido
 invalid-mfa-code: Código 2FA no válido
+invalid-uuid: UUID no válido
 invalid-version: Versión de semver no válida
 invite-accepted: Invitación de organización aceptada con éxito.
 is-emulator: es emulador
@@ -405,6 +429,8 @@ search-by-device-id-: Buscar por ID de dispositivo o acción
 search-by-device-id-0: Buscar por ID de dispositivo
 search-by-name: Buscar por nombre
 see-usage: Ver uso
+select-channel: Seleccionar canal
+select-channel-msg: Seleccione el canal que desea utilizar en esta sobrescritura
 select-user-perms: Seleccionar los permisos del usuario
 select-user-perms-expanded: Seleccione qué permiso debe tener el usuario invitado
 session_key: IvSessionKey
@@ -438,6 +464,8 @@ to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps-v2: Aplicaciones
 trial-left: Días restantes
 trial-plan-expired: Prueba caducada
+type-device-id: Introduzca el ID del dispositivo
+type-device-id-msg: Introduzca el ID del dispositivo que desea sobrescribir
 type-new-name: Por favor escriba el nuevo nombre de la clave API
 type-new-org-name: Por favor escriba el nuevo nombre de la organización.
 undefined-fail: Indefinido (las actualizaciones fallarán)

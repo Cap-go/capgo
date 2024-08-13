@@ -635,7 +635,7 @@ async function onChangeAutoUpdate(event: Event) {
     </div>
     <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <DeviceTable class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" />
+        <DeviceTable class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" />
       </div>
     </div>
   </div>

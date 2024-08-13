@@ -42,6 +42,7 @@ const emit = defineEmits([
   'update:columns',
   'update:currentPage',
   'filterClick',
+  'plusClick',
   'rowClick',
   'sortClick',
 ])
