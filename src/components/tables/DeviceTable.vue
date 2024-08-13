@@ -9,6 +9,7 @@ import type { Database } from '~/types/supabase.types'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { appIdToUrl } from '~/services/conversion'
+import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 
 const props = defineProps<{
   appId: string
@@ -114,6 +115,7 @@ async function countDevices() {
       },
       body: JSON.stringify({
         count: true,
+        // devicesId: props.ids?.length ? props.ids : undefined,
         appId: props.appId,
       }),
     })
@@ -131,6 +133,8 @@ async function getData() {
     let ids: string[] = []
     if (filters.value.Override)
       ids = await getDevicesID()
+    // if (props.ids)
+    //   ids = props.ids
 
     const { data: currentSession } = await supabase.auth.getSession()!
     if (!currentSession.session)
@@ -412,6 +416,8 @@ onMounted(async () => {
     :search-placeholder="t('search-by-device-id')"
     @reload="reload()" @reset="refreshData()"
     @row-click="openOne"
-    @plus-click="handlePlus"
   />
+  <button class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-4-safe secondary" @click="handlePlus">
+    <plusOutline />
+  </button>
 </template>

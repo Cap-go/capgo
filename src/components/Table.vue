@@ -10,7 +10,6 @@ import IconSortUp from '~icons/lucide/chevron-up'
 import IconSortDown from '~icons/lucide/chevron-down'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconReload from '~icons/tabler/reload'
-import PlusCircle from '~icons/heroicons/plus-circle'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
@@ -25,7 +24,6 @@ interface Props {
   searchPlaceholder?: string
   search?: string
   total: number
-  plusButton: boolean
   currentPage: number
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
@@ -196,10 +194,6 @@ async function fastBackward() {
             inner: '!rounded-full',
           }"
         />
-
-        <button v-if="props.plusButton" class="ml-4 pr-3" @click="() => emit('plusClick')">
-          <PlusCircle width="40px" height="40px" />
-        </button>
       </div>
     </div>
     <div class="block">
