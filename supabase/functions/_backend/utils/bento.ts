@@ -20,7 +20,8 @@ function initBentoKy(c: Context) {
     prefixUrl: 'https://app.bentonow.com/api/v1',
     headers: {
       'Authorization': `Basic ${authKey}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
+      'User-Agent': 'Capgo',
     },
   })
 }
@@ -36,18 +37,23 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
 
     const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
 
+    const payload = {
+      events: [{
+        type: event,
+        email,
+        fields: data,
+      }],
+    }
     const res = await bentoKy.post('batch/events', {
-      json: {
+      searchParams: {
         site_uuid: siteUuid,
-        events: [{
-          type: event,
-          email,
-          fields: data,
-        }],
       },
-    }).json()
-
-    console.log('trackBentoEvent', email, event, res)
+      json: payload,
+    }).json<{ results: number, failed: number }>()
+    if (res.failed > 0) {
+      console.error('trackBentoEvent failed', res)
+      return false
+    }
     return true
   }
   catch (e) {
@@ -69,27 +75,29 @@ export async function addTagBento(c: Context, email: string, segments: { segment
 
     const commands = [
       ...segments.deleteSegments.map(segment => ({
-        command: '$remove_tag',
+        command: 'remove_tag',
         email,
         query: segment,
       })),
       ...segments.segments.map(segment => ({
-        command: '$tag',
+        command: 'add_tag',
         email,
         query: segment,
       })),
     ]
 
     const results = await Promise.all(commands.map(command =>
-      bentoKy.post('subscriber', {
-        json: {
+      bentoKy.post('fetch/commands', {
+        searchParams: {
           site_uuid: siteUuid,
+        },
+        json: {
           command,
         },
       }).json(),
     ))
 
-    console.log('addTagBento', email, segments, results)
+    console.log('addTagBento', email, commands, results)
     return true
   }
   catch (e) {
