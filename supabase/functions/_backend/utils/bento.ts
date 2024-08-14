@@ -1,56 +1,52 @@
-import { Analytics } from '@bentonow/bento-node-sdk'
+import ky from 'ky'
 import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
 
 function hasBento(c: Context) {
   return getEnv(c, 'BENTO_PUBLISHABLE_KEY').length > 0 && getEnv(c, 'BENTO_SECRET_KEY').length > 0 && getEnv(c, 'BENTO_SITE_UUID').length > 0
 }
-export function initBento(c: Context) {
+
+function initBentoKy(c: Context) {
   if (!hasBento(c)) {
-    return {
-      V1: {
-        track: (data: any) => {
-          console.log('track', data)
-          return true
-        },
-        tagSubscriber: (data: any) => {
-          console.log('tagSubscriber', data)
-          return true
-        },
-        Commands: {
-          addTag: (data: any) => {
-            console.log('addTag', data)
-            return true
-          },
-          removeTag: (data: any) => {
-            console.log('removeTag', data)
-            return true
-          },
-        },
-      },
-    }
+    return null
   }
-  const bento = new Analytics({
-    authentication: {
-      publishableKey: getEnv(c, 'BENTO_PUBLISHABLE_KEY'),
-      secretKey: getEnv(c, 'BENTO_SECRET_KEY'),
+
+  const publishableKey = getEnv(c, 'BENTO_PUBLISHABLE_KEY')
+  const secretKey = getEnv(c, 'BENTO_SECRET_KEY')
+
+  const authKey = btoa(`${publishableKey}:${secretKey}`)
+
+  return ky.extend({
+    prefixUrl: 'https://app.bentonow.com/api/v1',
+    headers: {
+      'Authorization': `Basic ${authKey}`,
+      'Content-Type': 'application/json',
     },
-    logErrors: false,
-    siteUuid: getEnv(c, 'BENTO_SITE_UUID'),
   })
-  return bento
 }
 
 export async function trackBentoEvent(c: Context, email: string, data: any, event: string) {
   if (!hasBento(c))
     return
+
   try {
-    const bento = initBento(c)
-    const res = await bento.V1.track({
-      email,
-      type: event,
-      fields: data,
-    })
+    const bentoKy = initBentoKy(c)
+    if (!bentoKy)
+      return
+
+    const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
+
+    const res = await bentoKy.post('batch/events', {
+      json: {
+        site_uuid: siteUuid,
+        events: [{
+          type: event,
+          email,
+          fields: data,
+        }],
+      },
+    }).json()
+
     console.log('trackBentoEvent', email, event, res)
     return true
   }
@@ -61,30 +57,43 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
 }
 
 export async function addTagBento(c: Context, email: string, segments: { segments: string[], deleteSegments: string[] }) {
-  // console.log('addDataContact', email, data, segments)
-  // return trackEvent(c, email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
   if (!hasBento(c))
     return
+
   try {
-    const bento = initBento(c)
-    const deleteSeg = segments.deleteSegments.map((segment) => {
-      return bento.V1.Commands.removeTag({
+    const bentoKy = initBentoKy(c)
+    if (!bentoKy)
+      return
+
+    const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
+
+    const commands = [
+      ...segments.deleteSegments.map(segment => ({
+        command: '$remove_tag',
         email,
-        tagName: segment,
-      })
-    })
-    const addSeg = segments.segments.map((segment) => {
-      return bento.V1.Commands.addTag({
+        query: segment,
+      })),
+      ...segments.segments.map(segment => ({
+        command: '$tag',
         email,
-        tagName: segment,
-      })
-    })
-    await Promise.all([...deleteSeg, ...addSeg])
-    console.log('trackBentoEvent', email, segments)
+        query: segment,
+      })),
+    ]
+
+    const results = await Promise.all(commands.map(command =>
+      bentoKy.post('subscriber', {
+        json: {
+          site_uuid: siteUuid,
+          command,
+        },
+      }).json(),
+    ))
+
+    console.log('addTagBento', email, segments, results)
     return true
   }
   catch (e) {
-    console.log('trackBentoEvent error', e)
+    console.log('addTagBento error', e)
     return false
   }
 }
