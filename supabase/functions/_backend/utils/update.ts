@@ -288,7 +288,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         device_id,
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, app_id, '0 0 * * 1')
       if (sent) {
         await LogSnag.track({
           channel: 'updates',
@@ -310,7 +310,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         device_id,
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
+      }, appOwner.owner_org, app_id, '0 0 * * 1')
       if (sent) {
         await LogSnag.track({
           channel: 'updates',

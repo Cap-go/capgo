@@ -10,8 +10,8 @@ interface EventData {
   [key: string]: any
 }
 
-async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, color: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
-  console.log('send notif', eventName, email, color)
+async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
+  console.log('send notif', eventName, email)
   const res = await trackBentoEvent(c, email, eventData, eventName)
   if (!res) {
     console.log('trackEvent failed', eventName, email, eventData)
@@ -62,7 +62,7 @@ function isSendable(last: string, cron: string) {
   // return false
 }
 
-export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string, color: string) {
+export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string) {
   const { data: org, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
     .select()
@@ -84,7 +84,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
   // set user data in crisp
   if (!notif) {
     console.log('notif never sent', eventName, uniqId)
-    return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, color, null).then(() => true)
+    return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null).then(() => true)
   }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
@@ -92,7 +92,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     return Promise.resolve(false)
   }
   console.log('notif ready to sent', eventName, orgId)
-  return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, color, notif).then(() => true)
+  return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
 }
 
 // dayjs substract one week
