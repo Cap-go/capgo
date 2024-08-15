@@ -91,6 +91,9 @@ button-remove: Di dời
 by-clicking-on-them: bằng cách nhấp vào chúng.
 canceled-delete: Đã hủy xóa gói, không thể xóa gói được liên kết
 canceled-photo-selection: Bạn đã hủy việc chọn ảnh
+cannot-change-default-upload-channel: >-
+  Không thể thay đổi kênh tải lên mặc định, vui lòng kiểm tra bảng điều khiển
+  trình duyệt
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
 cannot-create-empty-device: |-
@@ -181,6 +184,7 @@ custom: Phong tục
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
 dashboard: bảng điều khiển
+default-upload-channel: Kênh tải lên mặc định
 defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete: Xóa bỏ
@@ -328,7 +332,7 @@ new-name-to-short: |-
   Tên apikey quá ngắn.
   Nó phải dài ít nhất 4 ký tự
 next: Kế tiếp
-no: KHÔNG
+'no': KHÔNG
 no-app-icon: Ứng dụng này không có bất kỳ biểu tượng ứng dụng nào
 no-data: Không có dữ liệu
 no-permission: Không đủ quyền
@@ -425,6 +429,10 @@ search-by-device-id-: Tìm kiếm theo ID thiết bị hoặc hành động
 search-by-device-id-0: Tìm kiếm theo ID thiết bị
 search-by-name: Tìm kiếm theo tên
 see-usage: xem cách sử dụng
+select-channel: Chọn kênh
+select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
+select-default-upload-channel: Vui lòng chọn kênh tải lên mặc định
+select-default-upload-channel-header: Chọn kênh mặc định
 select-style-of-deletion: Chọn kiểu xóa
 select-style-of-deletion-msg: |-
   Vui lòng chọn cách bạn muốn xóa kênh này.
@@ -432,8 +440,6 @@ select-style-of-deletion-msg: |-
   Nên đi với cái bình thường.
 
   Bạn có thể đọc về sự khác biệt $1
-select-channel: Chọn kênh
-select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
 session_key: IvSessionKey
@@ -469,6 +475,7 @@ type-device-id: Nhập ID thiết bị
 type-device-id-msg: Vui lòng nhập ID của thiết bị mà bạn muốn ghi đè
 type-new-name: Vui lòng nhập tên khóa api mới
 type-new-org-name: Vui lòng nhập tên mới cho tổ chức
+undefined: Không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt
 unknown: không xác định
@@ -481,6 +488,7 @@ unlink-version: Hủy liên kết phiên bản
 unsafe: Không an toàn
 update: Cập nhật
 updated-at: Cập nhật tại
+updated-default-upload-channel: Đã cập nhật kênh tải lên mặc định
 updated-min-version: Đã cập nhật phiên bản tối thiểu
 upgrade: Nâng cấp
 upload-img-error: Không thể tải ảnh lên, vui lòng kiểm tra bảng điều khiển
@@ -512,7 +520,7 @@ wrong-name-org-del: |-
   Bạn chưa gõ tên tổ chức.
   Bạn phải gõ: %1
 yearly: hàng năm
-yes: Đúng
+'yes': Đúng
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-cannot-reuse: Bạn không thể sử dụng lại phiên bản gói này sau khi xóa
 you-reached-the-limi: Đạt tới giới hạn

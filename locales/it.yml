@@ -93,6 +93,9 @@ canceled-delete: >-
   Eliminazione del pacchetto annullata, impossibile eliminare un pacchetto
   collegato
 canceled-photo-selection: Hai annullato la selezione dell'immagine
+cannot-change-default-upload-channel: >-
+  Impossibile modificare il canale di caricamento predefinito, controllare la
+  console del browser
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
 cannot-create-empty-device: Impossibile creare un dispositivo vuoto. Controllare la console del browser
@@ -178,6 +181,7 @@ custom: Costume
 custom-domain: Dominio personalizzato
 custom-id: ID personalizzato
 dashboard: pannello di controllo
+default-upload-channel: Canale di caricamento predefinito
 defined-as-private: definita normale
 defined-as-public: definito come predefinito
 delete: Eliminare
@@ -325,7 +329,7 @@ new-name-to-short: |-
   Il nome apikey è troppo corto.
   Deve contenere almeno 4 caratteri
 next: Prossimo
-no: NO
+'no': 'NO'
 no-app-icon: Questa app non ha alcuna icona dell'app
 no-data: Nessun dato
 no-permission: Permessi insufficienti
@@ -426,13 +430,15 @@ search-by-device-id-: Cerca per ID dispositivo o azione
 search-by-device-id-0: Cerca per ID dispositivo
 search-by-name: Ricerca per nome
 see-usage: Vedi utilizzo
+select-channel: Selezionare il canale
+select-channel-msg: Selezionare il canale che si desidera utilizzare per la sovrascrittura.
+select-default-upload-channel: Selezionare il canale di caricamento predefinito
+select-default-upload-channel-header: Selezionare il canale predefinito
 select-style-of-deletion: Selezionare lo stile di cancellazione
 select-style-of-deletion-msg: |-
   Selezionare il modo in cui si desidera eliminare questo canale.
   Si consiglia di scegliere la modalità normale.
   Potete leggere la differenza $1
-select-channel: Selezionare il canale
-select-channel-msg: Selezionare il canale che si desidera utilizzare per la sovrascrittura.
 select-user-perms: Seleziona le autorizzazioni dell'utente
 select-user-perms-expanded: Seleziona quale autorizzazione dovrebbe avere l'utente invitato
 session_key: IvSessionKey
@@ -470,6 +476,7 @@ type-device-id: Immettere l'ID del dispositivo
 type-device-id-msg: Immettere l'ID del dispositivo che si desidera sovrascrivere.
 type-new-name: Digita il nuovo nome della chiave API
 type-new-org-name: Digita il nuovo nome per l'organizzazione
+undefined: Non definito
 undefined-fail: Non definito (gli aggiornamenti falliranno)
 uninstall: Disinstallato
 unknown: sconosciuto
@@ -482,6 +489,7 @@ unlink-version: Scollega versione
 unsafe: Non sicuro
 update: Aggiornamento
 updated-at: Aggiornato a
+updated-default-upload-channel: Aggiornato il canale di caricamento predefinito
 updated-min-version: Versione minima aggiornata
 upgrade: Aggiornamento
 upload-img-error: Impossibile caricare l'immagine, controlla la console
@@ -511,7 +519,7 @@ wrong-name-org-del: |-
   Non hai digitato il nome dell'organizzazione.
   Avresti dovuto digitare: %1
 yearly: Annuale
-yes: SÌ
+'yes': SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
 you-cannot-reuse: Non è possibile riutilizzare questa versione del bundle dopo l'eliminazione
 you-reached-the-limi: Limite raggiunto

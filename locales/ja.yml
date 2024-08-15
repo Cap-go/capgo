@@ -87,6 +87,7 @@ button-remove: 削除
 by-clicking-on-them: それらをクリックして。
 canceled-delete: バンドルの削除がキャンセルされました。リンクされたバンドルは削除できません
 canceled-photo-selection: 画像の選択をキャンセルしました
+cannot-change-default-upload-channel: デフォルトのアップロードチャンネルを変更できません。
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
 cannot-create-empty-device: 空のデバイスを作成できません。ブラウザのコンソールを確認してください。
@@ -167,6 +168,7 @@ custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 dashboard: ダッシュボード
+default-upload-channel: デフォルトのアップロードチャンネル
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete: 消去
@@ -306,7 +308,7 @@ new-name-to-short: |-
   apikey 名が短すぎます。
   少なくとも 4 文字の長さである必要があります
 next: 次
-no: いいえ
+'no': いいえ
 no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし
 no-permission: 権限が不十分です
@@ -397,13 +399,15 @@ search-by-device-id-: デバイス ID またはアクションで検索
 search-by-device-id-0: デバイス ID で検索
 search-by-name: 名前で検索
 see-usage: 使い方を見る
+select-channel: チャンネル選択
+select-channel-msg: 上書きで使用するチャンネルを選択してください。
+select-default-upload-channel: デフォルトのアップロードチャンネルを選択してください。
+select-default-upload-channel-header: デフォルト・チャンネルを選択
 select-style-of-deletion: 削除スタイルの選択
 select-style-of-deletion-msg: |-
   このチャンネルを削除する方法を選択してください。
   ノーマルをお勧めします。
   違いについてはこちらをご覧ください。
-select-channel: チャンネル選択
-select-channel-msg: 上書きで使用するチャンネルを選択してください。
 select-user-perms: ユーザーの権限を選択します
 select-user-perms-expanded: 招待されたユーザーにどの権限を持たせるかを選択します
 session_key: IvSessionKey
@@ -439,6 +443,7 @@ type-device-id: デバイスIDを入力
 type-device-id-msg: 上書きしたいデバイスのIDを入力してください。
 type-new-name: 新しい API キー名を入力してください
 type-new-org-name: 組織の新しい名前を入力してください
+undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
 unknown: 未知
@@ -451,6 +456,7 @@ unlink-version: バージョンのリンクを解除
 unsafe: 危険
 update: アップデート
 updated-at: に更新
+updated-default-upload-channel: デフォルトのアップロードチャンネルを更新
 updated-min-version: 最小バージョンを更新しました
 upgrade: アップグレード
 upload-img-error: 画像をアップロードできません。コンソールを確認してください
@@ -480,7 +486,7 @@ wrong-name-org-del: |-
   組織名が入力されていません。
   次のように入力する必要がありました: %1
 yearly: 毎年
-yes: はい
+'yes': はい
 you-can-change-your-: ここで個人情報を変更できます。
 you-cannot-reuse: このバンドル バージョンは削除後は再利用できません
 you-reached-the-limi: 制限に達しました

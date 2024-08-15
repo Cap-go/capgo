@@ -87,6 +87,9 @@ button-remove: Kaldırmak
 by-clicking-on-them: üzerlerine tıklayarak.
 canceled-delete: Paket silme işlemi iptal edildi, bağlantılı paket silinemiyor
 canceled-photo-selection: Resim seçimini iptal ettiniz
+cannot-change-default-upload-channel: >-
+  Varsayılan yükleme kanalı değiştirilemiyor, lütfen tarayıcı konsolunu kontrol
+  edin
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
 cannot-create-empty-device: Boş cihaz oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
@@ -170,6 +173,7 @@ custom: Gelenek
 custom-domain: Özel alan
 custom-id: özel kimlik
 dashboard: Gösterge Paneli
+default-upload-channel: Varsayılan yükleme kanalı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete: Silmek
@@ -315,7 +319,7 @@ new-name-to-short: |-
   Apikey adı çok kısa.
   En az 4 karakter uzunluğunda olmalı
 next: Sonraki
-no: HAYIR
+'no': HAYIR
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-data: Veri yok
 no-permission: Yetersiz yetkiler
@@ -412,13 +416,15 @@ search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
+select-channel: Kanal seçin
+select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
+select-default-upload-channel: Lütfen varsayılan yükleme kanalını seçin
+select-default-upload-channel-header: Varsayılan kanalı seçin
 select-style-of-deletion: Silme stilini seçin
 select-style-of-deletion-msg: |-
   Lütfen bu kanalı silmek istediğiniz yolu seçin.
   Normal olanı seçmeniz tavsiye edilir.
   Fark hakkında okuyabilirsiniz $1
-select-channel: Kanal seçin
-select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
@@ -454,6 +460,7 @@ type-device-id: Cihaz kimliğini girin
 type-device-id-msg: Lütfen üzerine yazmak istediğiniz cihazın kimliğini girin
 type-new-name: Lütfen yeni API anahtarı adını yazın
 type-new-org-name: Lütfen kuruluşun yeni adını yazın
+undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
 unknown: Bilinmeyen
@@ -466,6 +473,7 @@ unlink-version: Sürümün bağlantısını kaldır
 unsafe: Güvensiz
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
+updated-default-upload-channel: Varsayılan yükleme kanalı güncellendi
 updated-min-version: Minimum sürüm güncellendi
 upgrade: Güncelleme
 upload-img-error: Resim yüklenemiyor, lütfen konsolu kontrol edin
@@ -495,7 +503,7 @@ wrong-name-org-del: |-
   Kuruluşun adını yazmadınız.
   Şunu yazmanız gerekiyordu: %1
 yearly: Yıllık
-yes: Evet
+'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı
