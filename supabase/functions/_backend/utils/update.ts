@@ -284,10 +284,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     else {
       // get app owner with app_id
       const sent = await sendNotifOrg(c, 'user:semver_issue', {
-        current_app_id: app_id,
-        current_device_id: device_id,
-        current_version_id: version_build,
-        current_app_id_url: appIdToUrl(app_id),
+        app_id,
+        device_id,
+        version_id: version_build,
+        app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
       if (sent) {
         await LogSnag.track({
@@ -306,10 +306,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     // if plugin_version is < 4 send notif to alert
     if (semver.lt(plugin_version, '5.0.0')) {
       const sent = await sendNotifOrg(c, 'user:plugin_issue', {
-        current_app_id: app_id,
-        current_device_id: device_id,
-        current_version_id: version_build,
-        current_app_id_url: appIdToUrl(app_id),
+        app_id,
+        device_id,
+        version_id: version_build,
+        app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1', 'red')
       if (sent) {
         await LogSnag.track({
