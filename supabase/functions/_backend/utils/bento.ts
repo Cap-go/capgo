@@ -34,8 +34,8 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
     const bentoKy = initBentoKy(c)
     if (!bentoKy)
       return
-// https://web.capgo.app/app/p/ee--forgr--capacitor_go/d/BDACE2AB-53F9-411F-AF7A-C22D104DA632
-// https://web.capgo.app/app/p/ee--forgr--capacitor_go/d/BDACE2AB-53F9-411F-AF7A-C22D104DA632
+    // https://web.capgo.app/app/p/ee--forgr--capacitor_go/d/BDACE2AB-53F9-411F-AF7A-C22D104DA632
+    // https://web.capgo.app/app/p/ee--forgr--capacitor_go/d/BDACE2AB-53F9-411F-AF7A-C22D104DA632
     const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
 
     const payload = {
