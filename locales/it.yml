@@ -267,6 +267,7 @@ last-15-minutes: Ultimi 15 minuti
 last-3-minutes: Ultimi 3 minuti
 last-minute: Ultimo minuto
 last-name: Cognome
+last-run: Ultimo aggiornamento
 last-update: Ultimo aggiornamento
 last-upload: Ultimo caricamento
 last-version: Ultima versione
@@ -325,7 +326,8 @@ new-name-to-short: |-
   Il nome apikey è troppo corto.
   Deve contenere almeno 4 caratteri
 next: Prossimo
-no: NO
+next-run: Prossimo aggiornamento
+'no': 'NO'
 no-app-icon: Questa app non ha alcuna icona dell'app
 no-data: Nessun dato
 no-permission: Permessi insufficienti
@@ -426,13 +428,13 @@ search-by-device-id-: Cerca per ID dispositivo o azione
 search-by-device-id-0: Cerca per ID dispositivo
 search-by-name: Ricerca per nome
 see-usage: Vedi utilizzo
+select-channel: Selezionare il canale
+select-channel-msg: Selezionare il canale che si desidera utilizzare per la sovrascrittura.
 select-style-of-deletion: Selezionare lo stile di cancellazione
 select-style-of-deletion-msg: |-
   Selezionare il modo in cui si desidera eliminare questo canale.
   Si consiglia di scegliere la modalità normale.
   Potete leggere la differenza $1
-select-channel: Selezionare il canale
-select-channel-msg: Selezionare il canale che si desidera utilizzare per la sovrascrittura.
 select-user-perms: Seleziona le autorizzazioni dell'utente
 select-user-perms-expanded: Seleziona quale autorizzazione dovrebbe avere l'utente invitato
 session_key: IvSessionKey
@@ -511,7 +513,7 @@ wrong-name-org-del: |-
   Non hai digitato il nome dell'organizzazione.
   Avresti dovuto digitare: %1
 yearly: Annuale
-yes: SÌ
+'yes': SÌ
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
 you-cannot-reuse: Non è possibile riutilizzare questa versione del bundle dopo l'eliminazione
 you-reached-the-limi: Limite raggiunto

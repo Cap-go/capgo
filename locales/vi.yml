@@ -270,6 +270,7 @@ last-15-minutes: 15 phút cuối
 last-3-minutes: 3 phút cuối
 last-minute: Phút trước
 last-name: Họ
+last-run: Cập nhật cuối cùng
 last-update: Cập nhật cuối cùng
 last-upload: Tải lên lần cuối
 last-version: Phiên bản cuối cùng
@@ -328,7 +329,8 @@ new-name-to-short: |-
   Tên apikey quá ngắn.
   Nó phải dài ít nhất 4 ký tự
 next: Kế tiếp
-no: KHÔNG
+next-run: Cập nhật tiếp theo
+'no': KHÔNG
 no-app-icon: Ứng dụng này không có bất kỳ biểu tượng ứng dụng nào
 no-data: Không có dữ liệu
 no-permission: Không đủ quyền
@@ -425,6 +427,8 @@ search-by-device-id-: Tìm kiếm theo ID thiết bị hoặc hành động
 search-by-device-id-0: Tìm kiếm theo ID thiết bị
 search-by-name: Tìm kiếm theo tên
 see-usage: xem cách sử dụng
+select-channel: Chọn kênh
+select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
 select-style-of-deletion: Chọn kiểu xóa
 select-style-of-deletion-msg: |-
   Vui lòng chọn cách bạn muốn xóa kênh này.
@@ -432,8 +436,6 @@ select-style-of-deletion-msg: |-
   Nên đi với cái bình thường.
 
   Bạn có thể đọc về sự khác biệt $1
-select-channel: Chọn kênh
-select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
 session_key: IvSessionKey
@@ -512,7 +514,7 @@ wrong-name-org-del: |-
   Bạn chưa gõ tên tổ chức.
   Bạn phải gõ: %1
 yearly: hàng năm
-yes: Đúng
+'yes': Đúng
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-cannot-reuse: Bạn không thể sử dụng lại phiên bản gói này sau khi xóa
 you-reached-the-limi: Đạt tới giới hạn

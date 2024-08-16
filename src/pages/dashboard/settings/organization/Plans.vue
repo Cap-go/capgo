@@ -4,6 +4,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { storeToRefs } from 'pinia'
+import dayjs from 'dayjs'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
@@ -136,6 +137,13 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 //   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 // }
 
+function lastRunDate() {
+  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+
+  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+}
+
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -179,23 +187,7 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
-// watch(
-//   () => plans.value,
-//   (myPlan, prevMyPlan) => {
-//     if (myPlan && !prevMyPlan) {
-//       loadData(true)
-//       // reGenerate annotations
-//       isUsageLoading.value = true
-//     }
-//     else if (prevMyPlan && !myPlan) {
-//       isUsageLoading.value = true
-//     }
-//   },
-// )
-
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
-
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
     if (!initialLoad.value) {
       const orgsMap = organizationStore.getAllOrgs()
@@ -296,7 +288,7 @@ const hightLights = computed<Stat[]>(() => ([
 
       displayStore.dialogOption = {
         header: t('detailed-usage-plan'),
-        message: `${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%`,
+        message: `${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
         buttons: [
           {
             text: t('ok'),

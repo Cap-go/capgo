@@ -271,6 +271,7 @@ last-15-minutes: últimos 15 minutos
 last-3-minutes: últimos 3 minutos
 last-minute: Último minuto
 last-name: Apellido
+last-run: Última actualización
 last-update: Última actualización
 last-upload: última carga
 last-version: Última versión
@@ -329,7 +330,8 @@ new-name-to-short: |-
   El nombre apikey es demasiado corto.
   Debe tener al menos 4 caracteres.
 next: Próximo
-no: No
+next-run: Próxima actualización
+'no': 'No'
 no-app-icon: Esta aplicación no tiene ningún ícono de aplicación.
 no-data: Sin datos
 no-permission: Permisos insuficientes
@@ -434,13 +436,13 @@ search-by-device-id-: Buscar por ID de dispositivo o acción
 search-by-device-id-0: Buscar por ID de dispositivo
 search-by-name: Buscar por nombre
 see-usage: Ver uso
+select-channel: Seleccionar canal
+select-channel-msg: Seleccione el canal que desea utilizar en esta sobrescritura
 select-style-of-deletion: Seleccione el estilo de borrado
 select-style-of-deletion-msg: |-
   Por favor, seleccione la forma en que desea eliminar este canal.
   Se recomienda ir con la normal.
   Puedes leer sobre la diferencia $1
-select-channel: Seleccionar canal
-select-channel-msg: Seleccione el canal que desea utilizar en esta sobrescritura
 select-user-perms: Seleccionar los permisos del usuario
 select-user-perms-expanded: Seleccione qué permiso debe tener el usuario invitado
 session_key: IvSessionKey
@@ -521,7 +523,7 @@ wrong-name-org-del: |-
   No ha escrito el nombre de la organización.
   Se suponía que debías escribir: %1
 yearly: Anual
-yes: Sí
+'yes': Sí
 you-can-change-your-: Puede cambiar su información personal aquí.
 you-cannot-reuse: No puedes reutilizar esta versión del paquete después de eliminarla.
 you-reached-the-limi: Límite alcanzado

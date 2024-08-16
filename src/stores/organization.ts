@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { useMainStore } from './main'
 import type { Database } from '~/types/supabase.types'
-import { useSupabase } from '~/services/supabase'
+import { getProcessCronStatsJobInfo, useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>
@@ -200,6 +200,11 @@ export const useOrganizationStore = defineStore('organization', () => {
       currentOrganization.value = organization
 
     // console.log('done', currentOrganization.value)
+    getProcessCronStatsJobInfo()
+      .then((data) => {
+        main.statsTime.last_run = data.last_run
+        main.statsTime.next_run = data.next_run
+      }).catch()
   }
 
   const dedupFetchOrganizations = async () => {

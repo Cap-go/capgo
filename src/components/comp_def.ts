@@ -8,6 +8,7 @@ export interface Stat {
   value: string | Ref<string> | number | Ref<number> | undefined
   link?: string
   hoverLabel?: string
+  informationIcon?: FunctionalComponent
 }
 export interface TableSort {
   [key: string]: 'asc' | 'desc' | null

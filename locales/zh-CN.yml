@@ -250,6 +250,7 @@ last-15-minutes: 最后 15 分钟
 last-3-minutes: 最后3分钟
 last-minute: 最后一分钟
 last-name: 姓
+last-run: 最后更新
 last-update: 最后更新
 last-upload: 最后上传
 last-version: 最新版本
@@ -306,7 +307,8 @@ new-name-to-short: |-
   apikey 名称太短。
   长度必须至少为 4 个字符
 next: 下一个
-no: 不
+next-run: 下次更新
+'no': 不
 no-app-icon: 此应用程序没有任何应用程序图标
 no-data: 没有数据
 no-permission: 权限不足
@@ -397,13 +399,13 @@ search-by-device-id-: 按设备 ID 或操作搜索
 search-by-device-id-0: 按设备 ID 搜索
 search-by-name: 按名称搜索
 see-usage: 查看用法
+select-channel: 选择频道
+select-channel-msg: 请选择您希望用于覆盖的频道
 select-style-of-deletion: 选择删除方式
 select-style-of-deletion-msg: |-
   请选择要删除此频道的方式。
   建议使用普通方式。
   您可以阅读有关区别的信息 $1
-select-channel: 选择频道
-select-channel-msg: 请选择您希望用于覆盖的频道
 select-user-perms: 选择用户的权限
 select-user-perms-expanded: 选择受邀用户应拥有的权限
 session_key: Iv会话密钥
@@ -480,7 +482,7 @@ wrong-name-org-del: |-
   您尚未输入组织名称。
   您应该输入：%1
 yearly: 每年
-yes: 是的
+'yes': 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制

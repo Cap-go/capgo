@@ -257,6 +257,7 @@ last-15-minutes: Últimos 15 minutos
 last-3-minutes: Últimos 3 minutos
 last-minute: Último minuto
 last-name: Sobrenome
+last-run: Última atualização
 last-update: Última atualização
 last-upload: último upload
 last-version: Última versão
@@ -315,7 +316,8 @@ new-name-to-short: |-
   O nome apikey é muito curto.
   Deve ter pelo menos 4 caracteres
 next: Próximo
-no: não
+next-run: Próxima atualização
+'no': não
 no-app-icon: Este aplicativo não possui nenhum ícone de aplicativo
 no-data: Sem dados
 no-permission: Permissões insuficientes
@@ -416,13 +418,13 @@ search-by-device-id-: Pesquise por ID de dispositivo ou ação
 search-by-device-id-0: Pesquisar por ID do dispositivo
 search-by-name: Procura por nome
 see-usage: Ver uso
+select-channel: Selecionar canal
+select-channel-msg: Seleccione o canal que pretende utilizar nesta substituição
 select-style-of-deletion: Selecionar o estilo de eliminação
 select-style-of-deletion-msg: |-
   Seleccione a forma como pretende eliminar este canal.
   Recomenda-se que opte pela forma normal.
   Pode ler sobre a diferença $1
-select-channel: Selecionar canal
-select-channel-msg: Seleccione o canal que pretende utilizar nesta substituição
 select-user-perms: Selecione as permissões do usuário
 select-user-perms-expanded: Selecione qual permissão o usuário convidado deve ter
 session_key: IvSessionKey
@@ -501,7 +503,7 @@ wrong-name-org-del: |-
   Você não digitou o nome da organização.
   Você deveria ter digitado:% 1
 yearly: Anual
-yes: sim
+'yes': sim
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.
 you-cannot-reuse: Você não pode reutilizar esta versão do pacote após a exclusão
 you-reached-the-limi: Limite alcançado

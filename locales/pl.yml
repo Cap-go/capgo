@@ -261,6 +261,7 @@ last-15-minutes: Ostatnie 15 minut
 last-3-minutes: Ostatnie 3 minuty
 last-minute: Ostatnia minuta
 last-name: Nazwisko
+last-run: Ostatnia aktualizacja
 last-update: Ostatnia aktualizacja
 last-upload: Ostatnie przesyłanie
 last-version: Ostatnia wersja
@@ -319,7 +320,8 @@ new-name-to-short: |-
   Nazwa apikey jest za krótka.
   Musi mieć co najmniej 4 znaki
 next: Następny
-no: NIE
+next-run: Następna aktualizacja
+'no': NIE
 no-app-icon: Ta aplikacja nie ma żadnej ikony aplikacji
 no-data: Brak danych
 no-permission: Niewystarczające uprawnienia
@@ -420,13 +422,13 @@ search-by-device-id-: Szukaj według identyfikatora urządzenia lub akcji
 search-by-device-id-0: Wyszukaj według identyfikatora urządzenia
 search-by-name: Szukaj według nazwy
 see-usage: Zobacz użycie
+select-channel: Wybierz kanał
+select-channel-msg: Wybierz kanał, którego chcesz użyć podczas nadpisywania.
 select-style-of-deletion: Wybierz styl usuwania
 select-style-of-deletion-msg: |-
   Wybierz sposób, w jaki chcesz usunąć ten kanał.
   Zaleca się wybranie normalnego sposobu.
   Możesz przeczytać o różnicy $1
-select-channel: Wybierz kanał
-select-channel-msg: Wybierz kanał, którego chcesz użyć podczas nadpisywania.
 select-user-perms: Wybierz uprawnienia użytkownika
 select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
 session_key: Klucz IVSesji
@@ -507,7 +509,7 @@ wrong-name-org-del: |-
   Nie wpisałeś nazwy organizacji.
   Miałeś wpisać: %1
 yearly: Rocznie
-yes: Tak
+'yes': Tak
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-cannot-reuse: Po usunięciu nie można ponownie użyć tej wersji pakietu
 you-reached-the-limi: Limit osiągnięty

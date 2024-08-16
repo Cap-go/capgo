@@ -303,8 +303,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'semver_error',
       }, 400)
     }
-    // if plugin_version is < 4 send notif to alert
-    if (semver.lt(plugin_version, '5.0.0')) {
+    // if plugin_version is < 6 send notif to alert for update
+    if (semver.lt(plugin_version, '6.0.0')) {
       const sent = await sendNotifOrg(c, 'user:plugin_issue', {
         app_id,
         device_id,

@@ -257,6 +257,7 @@ last-15-minutes: Son 15 dakika
 last-3-minutes: Son 3 dakika
 last-minute: Son dakika
 last-name: Soy isim
+last-run: Son güncelleme
 last-update: Son Güncelleme
 last-upload: Son yükleme
 last-version: Son sürüm
@@ -315,7 +316,8 @@ new-name-to-short: |-
   Apikey adı çok kısa.
   En az 4 karakter uzunluğunda olmalı
 next: Sonraki
-no: HAYIR
+next-run: Sonraki güncelleme
+'no': HAYIR
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-data: Veri yok
 no-permission: Yetersiz yetkiler
@@ -412,13 +414,13 @@ search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
+select-channel: Kanal seçin
+select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
 select-style-of-deletion: Silme stilini seçin
 select-style-of-deletion-msg: |-
   Lütfen bu kanalı silmek istediğiniz yolu seçin.
   Normal olanı seçmeniz tavsiye edilir.
   Fark hakkında okuyabilirsiniz $1
-select-channel: Kanal seçin
-select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
@@ -495,7 +497,7 @@ wrong-name-org-del: |-
   Kuruluşun adını yazmadınız.
   Şunu yazmanız gerekiyordu: %1
 yearly: Yıllık
-yes: Evet
+'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı

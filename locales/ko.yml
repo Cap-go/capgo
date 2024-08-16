@@ -250,6 +250,7 @@ last-15-minutes: 지난 15분
 last-3-minutes: 지난 3분
 last-minute: 마지막 순간
 last-name: 성
+last-run: 마지막 업데이트
 last-update: 마지막 업데이트
 last-upload: 마지막 업로드
 last-version: 마지막 버전
@@ -306,7 +307,8 @@ new-name-to-short: |-
   apikey 이름이 너무 짧습니다.
   길이는 4자 이상이어야 합니다.
 next: 다음
-no: 아니요
+next-run: 다음 업데이트
+'no': 아니요
 no-app-icon: 이 앱에는 앱 아이콘이 없습니다.
 no-data: 데이터 없음
 no-permission: 권한이 부족합니다.
@@ -397,13 +399,13 @@ search-by-device-id-: 장치 ID 또는 작업으로 검색
 search-by-device-id-0: 기기 ID로 검색
 search-by-name: 이름으로 검색
 see-usage: 사용법 보기
+select-channel: 채널 선택
+select-channel-msg: 이 덮어쓰기에 사용할 채널을 선택하세요.
 select-style-of-deletion: 삭제 스타일 선택
 select-style-of-deletion-msg: |-
   이 채널을 삭제할 방법을 선택하세요.
   일반 방법을 사용하는 것이 좋습니다.
   차이점에 대해 읽을 수 있습니다 $1
-select-channel: 채널 선택
-select-channel-msg: 이 덮어쓰기에 사용할 채널을 선택하세요.
 select-user-perms: 사용자 권한 선택
 select-user-perms-expanded: 초대된 사용자가 어떤 권한을 가져야 하는지 선택하세요.
 session_key: IvSessionKey
@@ -480,7 +482,7 @@ wrong-name-org-del: |-
   조직 이름을 입력하지 않았습니다.
   다음을 입력해야 했습니다: %1
 yearly: 매년
-yes: 예
+'yes': 예
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-cannot-reuse: 삭제 후에는 이 번들 버전을 재사용할 수 없습니다.
 you-reached-the-limi: 한도 도달
