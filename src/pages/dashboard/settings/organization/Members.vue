@@ -47,6 +47,7 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
   displayStore.dialogOption = {
     header: t('select-user-perms'),
     message: t('select-user-perms-expanded'),
+    size: 'max-w-fit',
     buttons: [
       {
         text: t('button-cancel'),
