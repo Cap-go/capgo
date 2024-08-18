@@ -151,7 +151,7 @@
     "logsnag": "^1.0.0",
     "mime": "4.0.4",
     "nprogress": "1.0.0-1",
-    "pinia": "2.1.7",
+    "pinia": "2.2.0",
     "plausible-tracker": "^0.3.9",
     "postgres": "^3.4.4",
     "prism-theme-vars": "^0.2.5",
