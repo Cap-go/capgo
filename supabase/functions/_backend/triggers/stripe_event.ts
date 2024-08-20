@@ -52,6 +52,7 @@ app.post('/', async (c: Context) => {
 
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
+      const statusName = status
       stripeData.status = 'succeeded'
       const { data: plan } = await supabaseAdmin(c)
         .from('plans')
@@ -71,9 +72,8 @@ app.post('/', async (c: Context) => {
 
         const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id, plan)
         const isMonthly = plan.price_m_id === stripeData.price_id
-        const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
+        const eventName = `user:subcribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
         await trackBentoEvent(c, org.management_email, { plan: plan.name }, eventName)
-        await trackBentoEvent(c, org.management_email, {}, 'user:upgraded')
         await addTagBento(c, org.management_email, segment)
         await LogSnag.track({
           channel: 'usage',
