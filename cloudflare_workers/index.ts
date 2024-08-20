@@ -34,6 +34,7 @@ import { app as latency_postres } from '../supabase/functions/_backend/private/l
 import { app as latency_drizzle } from '../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as multipart } from '../supabase/functions/_backend/private/multipart.ts'
 import { app as create_device } from '../supabase/functions/_backend/private/create_device.ts'
+import { app as partial_upload } from '../supabase/functions/_backend/private/partial_upload.ts'
 
 // Triggers API
 import { app as clear_app_cache } from '../supabase/functions/_backend/triggers/clear_app_cache.ts'
@@ -97,6 +98,7 @@ appFront.route('/latency_drizzle', latency_drizzle)
 appFront.route('/latency_postres', latency_postres)
 appFront.route('/multipart', multipart)
 appFront.route('/create_device', create_device)
+appFront.route('/partial_upload', partial_upload)
 
 // Triggers
 
