@@ -351,6 +351,7 @@ picture-delete-fail: アプリの画像を削除できません。コンソー�
 picture-uploaded: 画像が正常にアップロードされました
 plan-bandwidth: GB帯域幅
 plan-desc: 無料で構築を開始し、ライブに移行するための計画を追加します。
+plan-failed: プランに失敗しました。
 plan-free: MVP とテストに最適
 plan-inactive: プランの非アクティブ
 plan-maker: 中小企業の経営者に最適

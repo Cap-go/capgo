@@ -377,6 +377,7 @@ picture-delete-fail: Không thể xóa ảnh ứng dụng, vui lòng kiểm tra 
 picture-uploaded: Hình ảnh được tải lên thành công
 plan-bandwidth: Băng thông GB
 plan-desc: Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động.
+plan-failed: Kế hoạch không thành công, vui lòng xác minh chi tiết thẻ của bạn
 plan-free: Tốt nhất cho MVP và thử nghiệm
 plan-inactive: Kế hoạch không hoạt động
 plan-maker: Tốt nhất cho chủ doanh nghiệp nhỏ

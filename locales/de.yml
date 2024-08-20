@@ -399,6 +399,7 @@ plan-bandwidth: GB Bandbreite
 plan-desc: >-
   Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan hinzu,
   um live zu gehen.
+plan-failed: Plan fehlgeschlagen, bitte überprüfen Sie Ihre Kartendaten
 plan-free: Am besten für MVP und Tests geeignet
 plan-inactive: Planen Sie inaktiv
 plan-maker: Am besten für Kleinunternehmer geeignet

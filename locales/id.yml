@@ -368,6 +368,7 @@ picture-delete-fail: Tidak dapat menghapus gambar aplikasi, silakan periksa log 
 picture-uploaded: Gambar berhasil diunggah
 plan-bandwidth: Bandwidth GB
 plan-desc: Mulailah membangun secara gratis, lalu tambahkan rencana untuk ditayangkan.
+plan-failed: Paket gagal, mohon verifikasi detail kartu Anda
 plan-free: Terbaik untuk MVP dan pengujian
 plan-inactive: Rencana tidak aktif
 plan-maker: Terbaik untuk pemilik usaha kecil

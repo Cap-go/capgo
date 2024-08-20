@@ -350,6 +350,7 @@ picture-delete-fail: Cannot delete app picture, please check console log
 picture-uploaded: Picture uploaded successfully
 plan-bandwidth: GB Bandwidth
 plan-desc: Start building for free, then add a plan to go live.
+plan-failed: Plan failed, please verify your card details
 plan-free: Best for MVP and testing
 plan-inactive: Plan inactive
 plan-maker: Best for small business owners
