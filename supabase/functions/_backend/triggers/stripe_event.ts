@@ -5,7 +5,7 @@ import { logsnag } from '../utils/logsnag.ts'
 import { removeOldSubscription } from '../utils/stripe.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
 import { getEnv } from '../utils/utils.ts'
-import { addTagBento } from '../utils/bento.ts'
+import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 
 export const app = new Hono()
 
@@ -70,6 +70,10 @@ app.post('/', async (c: Context) => {
           return c.json({ error: JSON.stringify(dbError) }, 500)
 
         const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id, plan)
+        const isMonthly = plan.price_m_id === stripeData.price_id
+        const eventName = `user:subcribe:${isMonthly ? 'monthly' : 'yearly'}`
+        await trackBentoEvent(c, org.management_email, { plan: plan.name }, eventName)
+        await trackBentoEvent(c, org.management_email, {}, 'user:upgrade')
         await addTagBento(c, org.management_email, segment)
         await LogSnag.track({
           channel: 'usage',
@@ -90,6 +94,7 @@ app.post('/', async (c: Context) => {
         stripeData.status = 'succeeded'
         const segment = await customerToSegmentOrg(c, org.id, 'canceled')
         await addTagBento(c, org.management_email, segment)
+        await trackBentoEvent(c, org.management_email, {}, 'user:cancel')
         await LogSnag.track({
           channel: 'usage',
           event: 'User cancel',
