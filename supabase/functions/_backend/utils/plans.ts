@@ -13,7 +13,6 @@ import { sendNotifOrg } from './notifications.ts'
 import type { Database } from './supabase.types.ts'
 import { recordUsage, setThreshold } from './stripe.ts'
 import { logsnag } from './logsnag.ts'
-import { trackBentoEvent } from './bento.ts'
 
 function planToInt(plan: string) {
   switch (plan) {
