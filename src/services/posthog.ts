@@ -5,7 +5,7 @@ import 'posthog-js/dist/exception-autocapture'
 import 'posthog-js/dist/tracing-headers'
 import 'posthog-js/dist/web-vitals'
 
-export function posthigLoader() {
+export function posthogLoader() {
   posthog.init('phc_NXDyDajQaTQVwb25DEhIVZfxVUn4R0Y348Z7vWYHZUi', {
     api_host: 'https://eu.i.posthog.com',
     person_profiles: 'identified_only',
