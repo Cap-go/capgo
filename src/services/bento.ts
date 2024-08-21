@@ -2,6 +2,7 @@ import { isSpoofed } from './supabase'
 
 declare global {
   interface Window {
+    $bentoChat: any
     bentoChatSDK: any
     bento$: any
     bento: any
@@ -108,7 +109,6 @@ export function reset(): void {
   if (isSpoofed())
     return
   chatLoader(() => {
-    // window.$chatwoot.reset()
-
+    window.$bentoChat.reset()
   })
 }
