@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
-import { openMessenger } from '~/services/chatwoot'
+import { openMessenger } from '~/services/bento'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 
 const { t } = useI18n()
@@ -73,10 +73,14 @@ function logOut() {
           </router-link>
         </li>
         <li>
-          <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="openSupport">{{ t('support') }}</a>
+          <div class="block px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="openSupport">
+            {{ t('support') }}
+          </div>
         </li>
         <li class="border-t border-gray-200">
-          <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="logOut">{{ t('sign-out') }}</a>
+          <div class="block px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="logOut">
+            {{ t('sign-out') }}
+          </div>
         </li>
       </ul>
     </details>

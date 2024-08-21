@@ -2,7 +2,7 @@ import { getPlans, isAdmin } from './../services/supabase'
 import type { UserModule } from '~/types'
 import { useMainStore } from '~/stores/main'
 import { useSupabase } from '~/services/supabase'
-import { setUser } from '~/services/chatwoot'
+import { setUser } from '~/services/bento'
 import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
 

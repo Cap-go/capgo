@@ -52,13 +52,11 @@ onMounted(() => {
   })
 
   addEventListener('keydown', (event: KeyboardEvent) => {
-    console.log('keydown', event.key)
     if (event.key === 'Escape' && displayStore.showDialog && !displayStore?.dialogOption?.preventAccidentalClose)
       displayStore.showDialog = false
   })
 
   watch(route, () => {
-    console.log('route changed')
     if (displayStore.showDialog)
       displayStore.showDialog = false
   })

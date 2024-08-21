@@ -10,7 +10,7 @@ import {
 } from './../services/supabase'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
-import { reset } from '~/services/chatwoot'
+import { reset } from '~/services/bento'
 
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
