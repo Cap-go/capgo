@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useLogSnag } from '~/services/logsnag'
-import { pushEvent } from '~/services/chatwoot'
+import { pushEvent } from '~/services/bento'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 
 const props = defineProps<{
@@ -62,7 +62,6 @@ function setLog() {
 
     if (step.value === 4)
       pushEvent('user:onboarding-done')
-    // TODO add emailing on onboarding done to send blog article versioning
   }
 }
 function openExt(url?: string) {

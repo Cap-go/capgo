@@ -8,8 +8,10 @@ const refStats = toRef(() => props.stats)
 
 <template>
   <template v-for="s, i in refStats" :key="i">
-    <a
-      :href="s.link || '#'" class="flex flex-col items-center w-full"
+    <component
+      :is="s.link ? 'a' : 'div'"
+      :href="s.link || undefined"
+      class="flex flex-col items-center w-full"
       :class="{
         'group hover:bg-gray-100 dark:hover:bg-gray-800': s.link && (s.hoverLabel || s.link),
         'p-10 sm:px-12 lg:px-16 lg:py-14': !props.mini,
@@ -41,6 +43,6 @@ const refStats = toRef(() => props.stats)
           <InformationInfo v-if="!!s.informationIcon" class="ml-1" @click="s.informationIcon" />
         </div>
       </span>
-    </a>
+    </component>
   </template>
 </template>

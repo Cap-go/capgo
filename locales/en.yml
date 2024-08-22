@@ -253,6 +253,7 @@ last-15-minutes: Last 15 minutes
 last-3-minutes: Last 3 minutes
 last-minute: Last minute
 last-name: Last name
+last-run: Last update
 last-update: Last update
 last-upload: Last upload
 last-version: Last version
@@ -303,6 +304,7 @@ new-name-not-changed: The new name is the same as the old one
 new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
+next-run: Next update
 'no': 'no'
 no-app-icon: This app does not have any app icon
 no-data: No Data

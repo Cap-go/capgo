@@ -252,6 +252,7 @@ last-15-minutes: 最後の 15 分
 last-3-minutes: 最後の 3 分
 last-minute: ぎりぎり
 last-name: 苗字
+last-run: 最終更新
 last-update: 最後の更新
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
@@ -308,6 +309,7 @@ new-name-to-short: |-
   apikey 名が短すぎます。
   少なくとも 4 文字の長さである必要があります
 next: 次
+next-run: 次のアップデート
 'no': いいえ
 no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし

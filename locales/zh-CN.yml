@@ -252,6 +252,7 @@ last-15-minutes: 最后 15 分钟
 last-3-minutes: 最后3分钟
 last-minute: 最后一分钟
 last-name: 姓
+last-run: 最后更新
 last-update: 最后更新
 last-upload: 最后上传
 last-version: 最新版本
@@ -308,6 +309,7 @@ new-name-to-short: |-
   apikey 名称太短。
   长度必须至少为 4 个字符
 next: 下一个
+next-run: 下次更新
 'no': 不
 no-app-icon: 此应用程序没有任何应用程序图标
 no-data: 没有数据

@@ -117,6 +117,18 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
   return res.data.url
 }
 
+// do a function to get get_process_cron_stats_job_info for supabase
+
+export async function getProcessCronStatsJobInfo() {
+  const { data, error } = await useSupabase()
+    .rpc('get_process_cron_stats_job_info')
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data
+}
+
 export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   const supabase = useSupabase()
   const { data: session } = await supabase.auth.getSession()!

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import dayjs from 'dayjs'
 import LineChartStats from '~/components/LineChartStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
+import { useMainStore } from '~/stores/main'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -23,6 +26,7 @@ const props = defineProps({
   },
 })
 const { t } = useI18n()
+const main = useMainStore()
 function sum(arr: number[]) {
   return arr.reduce((a, b) => a + b, 0)
 }
@@ -43,16 +47,26 @@ const lastDayEvolution = computed(() => {
   return res
 })
 
-// const lastDayEvolution = evolution(props.datas as number[])
+function lastRunDate() {
+  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+
+  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+}
 </script>
 
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
-      <div class="flex flex-row">
-        <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
+      <div class="flex flex-row items-center">
+        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
+        <div class="tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
+          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
+            <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
+          </div>
+        </div>
       </div>
 
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">

@@ -5,15 +5,19 @@ import { useI18n } from 'vue-i18n'
 import { Line } from 'vue-chartjs'
 import type { ChartOptions } from 'chart.js'
 import { CategoryScale, Chart, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
+import dayjs from 'dayjs'
 import type { VersionName, appUsageByVersion } from '~/services/supabase'
 import { getDailyVersion, getVersionNames } from '~/services/supabase'
 import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
+import { useMainStore } from '~/stores/main'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 const { t } = useI18n()
 const route = useRoute()
+const main = useMainStore()
 
 const appId = ref('')
 const isLoading = ref(true)
@@ -84,15 +88,27 @@ watchEffect(async () => {
     isLoading.value = true
   }
 })
+
+function lastRunDate() {
+  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+
+  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+}
 </script>
 
 <template>
   <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
-      <div class="flex flex-row">
-        <h2 class="mb-2 mr-4 text-2xl font-semibold text-slate-800 dark:text-white">
+      <div class="flex flex-row items-center">
+        <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ t('active_users_by_version') }}
         </h2>
+        <div class="tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
+          <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
+            <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
+          </div>
+        </div>
         <div class="font-medium badge badge-primary">
           beta
         </div>

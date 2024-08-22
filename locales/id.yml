@@ -263,6 +263,7 @@ last-15-minutes: 15 menit terakhir
 last-3-minutes: 3 menit terakhir
 last-minute: Menit terakhir
 last-name: nama keluarga
+last-run: Pembaruan terakhir
 last-update: Pembaharuan Terakhir
 last-upload: Unggahan terakhir
 last-version: Versi terakhir
@@ -321,6 +322,7 @@ new-name-to-short: |-
   Nama apikey terlalu pendek.
   Panjangnya minimal harus 4 karakter
 next: Berikutnya
+next-run: Pembaruan selanjutnya
 'no': TIDAK
 no-app-icon: Aplikasi ini tidak memiliki ikon aplikasi apa pun
 no-data: Tidak ada data

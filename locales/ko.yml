@@ -252,6 +252,7 @@ last-15-minutes: 지난 15분
 last-3-minutes: 지난 3분
 last-minute: 마지막 순간
 last-name: 성
+last-run: 마지막 업데이트
 last-update: 마지막 업데이트
 last-upload: 마지막 업로드
 last-version: 마지막 버전
@@ -308,6 +309,7 @@ new-name-to-short: |-
   apikey 이름이 너무 짧습니다.
   길이는 4자 이상이어야 합니다.
 next: 다음
+next-run: 다음 업데이트
 'no': 아니요
 no-app-icon: 이 앱에는 앱 아이콘이 없습니다.
 no-data: 데이터 없음

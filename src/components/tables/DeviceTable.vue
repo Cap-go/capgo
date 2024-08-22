@@ -429,7 +429,8 @@ onMounted(async () => {
     :plus-button="true"
     :is-loading="isLoading"
     :search-placeholder="t('search-by-device-id')"
-    @reload="reload()" @reset="refreshData()"
+    class="p-3" @reload="reload()"
+    @reset="refreshData()"
     @row-click="openOne"
   />
   <button class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-4-safe secondary" @click="handlePlus">

@@ -284,6 +284,7 @@ last-15-minutes: Letzte 15 Minuten
 last-3-minutes: Letzte 3 Minuten
 last-minute: Letzte Minute
 last-name: Familienname, Nachname
+last-run: Letzte Aktualisierung
 last-update: Letztes Update
 last-upload: Letzter Upload
 last-version: Letzte Version
@@ -344,6 +345,7 @@ new-name-to-short: |-
   Der apikey-Name ist zu kurz. 
   Es muss mindestens 4 Zeichen lang sein
 next: Nächste
+next-run: Nächstes Update
 'no': NEIN
 no-app-icon: Diese App hat kein App-Symbol
 no-data: Keine Daten

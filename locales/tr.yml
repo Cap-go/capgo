@@ -261,6 +261,7 @@ last-15-minutes: Son 15 dakika
 last-3-minutes: Son 3 dakika
 last-minute: Son dakika
 last-name: Soy isim
+last-run: Son güncelleme
 last-update: Son Güncelleme
 last-upload: Son yükleme
 last-version: Son sürüm
@@ -319,6 +320,7 @@ new-name-to-short: |-
   Apikey adı çok kısa.
   En az 4 karakter uzunluğunda olmalı
 next: Sonraki
+next-run: Sonraki güncelleme
 'no': HAYIR
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-data: Veri yok

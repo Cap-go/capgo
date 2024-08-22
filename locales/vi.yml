@@ -274,6 +274,7 @@ last-15-minutes: 15 phút cuối
 last-3-minutes: 3 phút cuối
 last-minute: Phút trước
 last-name: Họ
+last-run: Cập nhật cuối cùng
 last-update: Cập nhật cuối cùng
 last-upload: Tải lên lần cuối
 last-version: Phiên bản cuối cùng
@@ -332,6 +333,7 @@ new-name-to-short: |-
   Tên apikey quá ngắn.
   Nó phải dài ít nhất 4 ký tự
 next: Kế tiếp
+next-run: Cập nhật tiếp theo
 'no': KHÔNG
 no-app-icon: Ứng dụng này không có bất kỳ biểu tượng ứng dụng nào
 no-data: Không có dữ liệu

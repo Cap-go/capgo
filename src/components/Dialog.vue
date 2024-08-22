@@ -13,6 +13,7 @@ const displayStore = useDisplayStore()
 const route = useRoute()
 
 function close(item?: ActionSheetOptionButton) {
+  console.log('close', item)
   if (displayStore?.dialogOption)
     displayStore.dialogOption.preventAccidentalClose = false
   if (!item?.preventClose)
