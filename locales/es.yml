@@ -93,6 +93,9 @@ button-remove: Eliminar
 by-clicking-on-them: haciendo clic en ellos.
 canceled-delete: Eliminación de paquete cancelada, no se puede eliminar un paquete vinculado
 canceled-photo-selection: Cancelaste la selección de fotos.
+cannot-change-default-upload-channel: >-
+  No se puede cambiar el canal de carga por defecto, por favor, compruebe la
+  consola del navegador
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
 cannot-create-empty-device: >-
@@ -182,6 +185,7 @@ custom: Costumbre
 custom-domain: Dominio personalizado
 custom-id: Identificación personalizada
 dashboard: panel
+default-upload-channel: Canal de carga por defecto
 defined-as-private: definido como normal
 defined-as-public: definido como predeterminado
 delete: Borrar
@@ -439,6 +443,8 @@ search-by-name: Buscar por nombre
 see-usage: Ver uso
 select-channel: Seleccionar canal
 select-channel-msg: Seleccione el canal que desea utilizar en esta sobrescritura
+select-default-upload-channel: Seleccione el canal de carga por defecto
+select-default-upload-channel-header: Seleccionar canal por defecto
 select-style-of-deletion: Seleccione el estilo de borrado
 select-style-of-deletion-msg: |-
   Por favor, seleccione la forma en que desea eliminar este canal.
@@ -481,6 +487,7 @@ type-device-id: Introduzca el ID del dispositivo
 type-device-id-msg: Introduzca el ID del dispositivo que desea sobrescribir
 type-new-name: Por favor escriba el nuevo nombre de la clave API
 type-new-org-name: Por favor escriba el nuevo nombre de la organización.
+undefined: Sin definir
 undefined-fail: Indefinido (las actualizaciones fallarán)
 uninstall: desinstalado
 unknown: desconocido
@@ -493,6 +500,7 @@ unlink-version: Desvincular versión
 unsafe: Inseguro
 update: Actualizar
 updated-at: Actualizado en
+updated-default-upload-channel: Actualizado el canal de carga por defecto
 updated-min-version: Versión mínima actualizada
 upgrade: Mejora
 upload-img-error: No se puede subir la imagen, por favor revisa la consola.

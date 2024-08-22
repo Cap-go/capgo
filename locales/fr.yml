@@ -95,6 +95,9 @@ button-remove: Retirer
 by-clicking-on-them: en cliquant sur eux.
 canceled-delete: Annulation de la suppression du bundle, impossible de supprimer un bundle lié
 canceled-photo-selection: Vous avez annulé la sélection de l'image
+cannot-change-default-upload-channel: >-
+  Impossible de changer le canal de téléchargement par défaut, veuillez vérifier
+  la console du navigateur
 cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
 cannot-create-empty-device: >-
@@ -188,6 +191,7 @@ custom: Personnalisé
 custom-domain: Domaine personnalisé
 custom-id: ID personnalisé
 dashboard: tableau de bord
+default-upload-channel: Canal de téléchargement par défaut
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
 delete: Supprimer
@@ -439,6 +443,8 @@ search-by-name: Recherche par nom
 see-usage: Voir l'utilisation
 select-channel: Sélectionnez la chaîne
 select-channel-msg: Veuillez sélectionner le canal que vous souhaitez utiliser dans cet écrasement
+select-default-upload-channel: Veuillez sélectionner le canal de téléchargement par défaut
+select-default-upload-channel-header: Sélection du canal par défaut
 select-style-of-deletion: Sélectionnez le style de suppression
 select-style-of-deletion-msg: |-
   Veuillez sélectionner la manière dont vous souhaitez supprimer cette chaîne.
@@ -479,6 +485,7 @@ type-device-id: Entrez l'ID de l'appareil
 type-device-id-msg: Veuillez entrer l'ID de l'appareil que vous souhaitez écraser
 type-new-name: Veuillez taper le nouveau nom de la clé API
 type-new-org-name: Veuillez taper le nouveau nom pour l'organisation
+undefined: Non défini
 undefined-fail: Indéfini (les mises à jour échoueront)
 uninstall: Désinstallé
 unknown: inconnu
@@ -491,6 +498,7 @@ unlink-version: Dissocier la version
 unsafe: Dangereux
 update: Mise à jour
 updated-at: Mis à jour à
+updated-default-upload-channel: Mise à jour du canal de téléchargement par défaut
 updated-min-version: Version minimale mise à jour
 upgrade: Mise à niveau
 upload-img-error: Impossible de télécharger l'image, veuillez vérifier la console

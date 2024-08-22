@@ -89,6 +89,7 @@ button-remove: Usunąć
 by-clicking-on-them: klikając na nie.
 canceled-delete: Anulowano usunięcie pakietu. Nie można usunąć połączonego pakietu
 canceled-photo-selection: Anulowałeś wybór zdjęć
+cannot-change-default-upload-channel: Nie można zmienić domyślnego kanału przesyłania, sprawdź konsolę przeglądarki
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
 cannot-create-empty-device: Nie można utworzyć pustego urządzenia. Sprawdź konsolę przeglądarki
@@ -176,6 +177,7 @@ custom: Zwyczaj
 custom-domain: Domena niestandardowa
 custom-id: Identyfikator niestandardowy
 dashboard: panel
+default-upload-channel: Domyślny kanał przesyłania
 defined-as-private: określone jako normalne
 defined-as-public: zdefiniowane jako domyślne
 delete: Usuwać
@@ -425,6 +427,8 @@ search-by-name: Szukaj według nazwy
 see-usage: Zobacz użycie
 select-channel: Wybierz kanał
 select-channel-msg: Wybierz kanał, którego chcesz użyć podczas nadpisywania.
+select-default-upload-channel: Wybierz domyślny kanał przesyłania
+select-default-upload-channel-header: Wybór domyślnego kanału
 select-style-of-deletion: Wybierz styl usuwania
 select-style-of-deletion-msg: |-
   Wybierz sposób, w jaki chcesz usunąć ten kanał.
@@ -467,6 +471,7 @@ type-device-id: Wprowadź identyfikator urządzenia
 type-device-id-msg: Wprowadź identyfikator urządzenia, które chcesz nadpisać
 type-new-name: Wpisz nową nazwę klucza API
 type-new-org-name: Wpisz nową nazwę organizacji
+undefined: Niezdefiniowany
 undefined-fail: Niezdefiniowany (aktualizacje nie powiodą się)
 uninstall: Odinstalowano
 unknown: nieznany
@@ -479,6 +484,7 @@ unlink-version: Odłącz wersję
 unsafe: Niebezpieczne
 update: Aktualizacja
 updated-at: Zaktualizowano o godz
+updated-default-upload-channel: Zaktualizowano domyślny kanał przesyłania
 updated-min-version: Zaktualizowana wersja minimalna
 upgrade: Aktualizacja
 upload-img-error: Nie można przesłać zdjęcia. Sprawdź w konsoli

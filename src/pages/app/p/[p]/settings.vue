@@ -7,6 +7,8 @@ import { useSupabase } from '~/services/supabase'
 import { urlToAppId } from '~/services/conversion'
 import type { Database } from '~/types/supabase.types'
 import iconName from '~icons/ph/user?raw'
+import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
+import Pencil from '~icons/heroicons/pencil-square'
 import type { OrganizationRole } from '~/stores/organization'
 
 const isLoading = ref(false)
@@ -19,6 +21,7 @@ const appRef = ref<Database['public']['Tables']['apps']['Row'] & { owner_org: Da
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const role = ref<OrganizationRole | null>(null)
+const forceBump = ref(0)
 const organizationStore = useOrganizationStore()
 
 onMounted(async () => {
@@ -118,31 +121,80 @@ async function submit(form: { app_name: string }) {
     return
   }
   const newName = form.app_name
-  if (newName === (appRef.value?.name ?? '')) {
-    toast.error(t('new-name-not-changed'))
-    isLoading.value = false
-    return
-  }
+  if (newName !== (appRef.value?.name ?? '')) {
+    if (newName.length > 32) {
+      toast.error(t('new-name-to-long'))
+      isLoading.value = false
+      return
+    }
 
-  if (newName.length > 32) {
-    toast.error(t('new-name-to-long'))
-    isLoading.value = false
-    return
-  }
+    const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', appId.value)
+    if (error) {
+      toast.error(t('cannot-change-name'))
+      console.error(error)
+      isLoading.value = false
+      return
+    }
 
-  const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', appId.value)
+    if (appRef.value?.name)
+      appRef.value.name = newName
+
+    toast.success(t('changed-app-name'))
+  }
+}
+
+async function setDefaultChannel() {
+  const { data: channels, error } = await supabase.from('channels')
+    .select('name')
+    .eq('app_id', appRef.value?.app_id ?? '')
+
   if (error) {
-    toast.error(t('cannot-change-name'))
+    toast.error(t('cannot-change-default-upload-channel'))
     console.error(error)
-    isLoading.value = false
     return
   }
 
-  if (appRef.value?.name)
-    appRef.value.name = newName
+  const buttons = channels.map((chann) => {
+    return {
+      text: chann.name,
+      handler: async () => {
+        const { error: appError } = await supabase.from('apps')
+          .update({ default_upload_channel: chann.name })
+          .eq('app_id', appRef.value?.app_id ?? '')
 
-  toast.success(t('changed-app-name'))
-  isLoading.value = false
+        if (appError) {
+          toast.error(t('cannot-change-default-upload-channel'))
+          console.error(error)
+          return
+        }
+        if (appRef.value) {
+          appRef.value.default_upload_channel = chann.name
+          forceBump.value += 1
+        }
+        toast.success(t('updated-default-upload-channel'))
+      },
+    }
+  })
+
+  displayStore.dialogOption = {
+    header: t('select-default-upload-channel-header'),
+    message: `${t('select-default-upload-channel')}`,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    preventAccidentalClose: true,
+    buttonVertical: true,
+    size: 'max-w-xl',
+    buttons: Array.prototype.concat(
+      buttons,
+      [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    ),
+  }
+  displayStore.showDialog = true
 }
 
 const isSuperAdmin = computed(() => {
@@ -316,6 +368,29 @@ async function editPhoto() {
                 :value="appRef?.name || ''"
                 :label="t('app-name')"
               />
+              <div :key="forceBump" class="flex flex-row">
+                <FormKit
+                  type="text"
+                  name="default_upload_channel"
+                  :prefix-icon="ArrowUpTray"
+                  :value="appRef?.default_upload_channel ?? t('undefined')"
+                  :label="t('default-upload-channel')"
+                  :sections-schema="{
+                    suffix: {
+                      children: [
+                        '$slots.magic',
+                      ],
+                    },
+                  }"
+                  :disabled="true"
+                >
+                  <template #magic>
+                    <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultChannel">
+                      <Pencil width="24px" height="24px" />
+                    </button>
+                  </template>
+                </FormKit>
+              </div>
             </div>
           </div>
           <FormKitMessages />

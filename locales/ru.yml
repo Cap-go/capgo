@@ -91,6 +91,9 @@ button-remove: Удалять
 by-clicking-on-them: нажав на них.
 canceled-delete: Удаление пакета отменено, невозможно удалить связанный пакет.
 canceled-photo-selection: Вы отменили выбор изображения
+cannot-change-default-upload-channel: >-
+  Невозможно изменить канал загрузки по умолчанию, пожалуйста, проверьте консоль
+  браузера
 cannot-change-name: Невозможно изменить имя, проверьте консоль браузера.
 cannot-change-permission: Невозможно изменить разрешения, проверьте консоль браузера
 cannot-create-empty-device: Невозможно создать пустое устройство. Проверьте консоль браузера
@@ -175,6 +178,7 @@ custom: Обычай
 custom-domain: Пользовательский домен
 custom-id: Пользовательский идентификатор
 dashboard: панель приборов
+default-upload-channel: Канал загрузки по умолчанию
 defined-as-private: определяется как нормальный
 defined-as-public: определено по умолчанию
 delete: Удалить
@@ -422,6 +426,8 @@ search-by-name: Поиск по имени
 see-usage: См. использование
 select-channel: Выберите канал
 select-channel-msg: Пожалуйста, выберите канал, который вы хотите использовать в этой перезаписи
+select-default-upload-channel: Выберите канал загрузки по умолчанию
+select-default-upload-channel-header: Выберите канал по умолчанию
 select-style-of-deletion: Выберите стиль удаления
 select-style-of-deletion-msg: |-
   Пожалуйста, выберите способ удаления этого канала.
@@ -464,6 +470,7 @@ type-device-id: Введите идентификатор устройства
 type-device-id-msg: Введите идентификатор устройства, которое вы хотите перезаписать
 type-new-name: Введите новое имя ключа API.
 type-new-org-name: Пожалуйста, введите новое название организации
+undefined: Неопределенный
 undefined-fail: Не определено (обновления не будут выполнены)
 uninstall: Удалено
 unknown: неизвестный
@@ -476,6 +483,7 @@ unlink-version: Отключить версию
 unsafe: Небезопасно
 update: Обновлять
 updated-at: Обновлено в
+updated-default-upload-channel: Обновлен канал загрузки по умолчанию
 updated-min-version: Обновлена ​​минимальная версия
 upgrade: Обновление
 upload-img-error: Невозможно загрузить изображение, проверьте консоль

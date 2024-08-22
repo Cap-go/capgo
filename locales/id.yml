@@ -87,6 +87,7 @@ button-remove: Menghapus
 by-clicking-on-them: dengan mengkliknya.
 canceled-delete: Penghapusan paket dibatalkan, tidak dapat menghapus paket tertaut
 canceled-photo-selection: Anda membatalkan pemilihan gambar
+cannot-change-default-upload-channel: Tidak dapat mengubah saluran unggahan default, silakan periksa konsol browser
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
 cannot-create-empty-device: Tidak dapat membuat perangkat kosong. Silakan periksa konsol browser
@@ -172,6 +173,7 @@ custom: Kebiasaan
 custom-domain: Domain khusus
 custom-id: ID khusus
 dashboard: dasbor
+default-upload-channel: Saluran unggahan default
 defined-as-private: didefinisikan sebagai normal
 defined-as-public: didefinisikan sebagai default
 delete: Menghapus
@@ -423,6 +425,8 @@ search-by-name: Cari berdasarkan nama
 see-usage: Lihat penggunaan
 select-channel: Pilih saluran
 select-channel-msg: Pilih saluran yang ingin Anda gunakan dalam penimpaan ini
+select-default-upload-channel: Pilih saluran unggahan default
+select-default-upload-channel-header: Memilih saluran default
 select-style-of-deletion: Memilih gaya penghapusan
 select-style-of-deletion-msg: |-
   Pilih cara yang Anda inginkan untuk menghapus saluran ini.
@@ -465,6 +469,7 @@ type-device-id: Masukkan ID perangkat
 type-device-id-msg: Masukkan ID perangkat yang ingin ditimpa
 type-new-name: Silakan ketik nama kunci api baru
 type-new-org-name: Silakan ketikkan nama baru untuk organisasi tersebut
+undefined: Tidak terdefinisi
 undefined-fail: Tidak ditentukan (pembaruan akan gagal)
 uninstall: Tidak terinstal
 unknown: tidak dikenal
@@ -477,6 +482,7 @@ unlink-version: Batalkan tautan versi
 unsafe: Tidak aman
 update: Memperbarui
 updated-at: Diperbarui pada
+updated-default-upload-channel: Memperbarui saluran unggahan default
 updated-min-version: Versi minimal yang diperbarui
 upgrade: Meningkatkan
 upload-img-error: Tidak dapat mengunggah gambar, silakan periksa konsol

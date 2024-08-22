@@ -87,6 +87,7 @@ button-remove: 消除
 by-clicking-on-them: 通过点击它们。
 canceled-delete: 已取消捆绑包删除，无法删除链接的捆绑包
 canceled-photo-selection: 您取消了图片选择
+cannot-change-default-upload-channel: 无法更改默认上传通道，请检查浏览器控制台
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
 cannot-create-empty-device: 无法创建空设备。请检查浏览器控制台
@@ -167,6 +168,7 @@ custom: 风俗
 custom-domain: 自定义域
 custom-id: 自定义编号
 dashboard: 仪表板
+default-upload-channel: 默认上传通道
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete: 删除
@@ -402,6 +404,8 @@ search-by-name: 按名称搜索
 see-usage: 查看用法
 select-channel: 选择频道
 select-channel-msg: 请选择您希望用于覆盖的频道
+select-default-upload-channel: 请选择默认上传通道
+select-default-upload-channel-header: 选择默认频道
 select-style-of-deletion: 选择删除方式
 select-style-of-deletion-msg: |-
   请选择要删除此频道的方式。
@@ -442,6 +446,7 @@ type-device-id: 输入设备 ID
 type-device-id-msg: 请输入要覆盖的设备 ID
 type-new-name: 请输入新的 api 密钥名称
 type-new-org-name: 请输入组织的新名称
+undefined: 未定义
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载
 unknown: 未知
@@ -454,6 +459,7 @@ unlink-version: 取消链接版本
 unsafe: 不安全
 update: 更新
 updated-at: 更新于
+updated-default-upload-channel: 更新了默认上传通道
 updated-min-version: 更新了最小版本
 upgrade: 升级
 upload-img-error: 无法上传图片，请检查控制台
