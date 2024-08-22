@@ -371,6 +371,7 @@ picture-delete-fail: Não é possível excluir a imagem do aplicativo. Verifique
 picture-uploaded: Imagem enviada com sucesso
 plan-bandwidth: GB de largura de banda
 plan-desc: Comece a criar gratuitamente e adicione um plano para entrar no ar.
+plan-failed: O plano falhou, verifique os dados do seu cartão
 plan-free: Melhor para MVP e testes
 plan-inactive: Plano inativo
 plan-maker: Melhor para proprietários de pequenas empresas

@@ -354,6 +354,7 @@ picture-delete-fail: 앱 사진을 삭제할 수 없습니다. 콘솔 로그를 
 picture-uploaded: 사진이 성공적으로 업로드되었습니다.
 plan-bandwidth: GB 대역폭
 plan-desc: 무료로 구축을 시작한 다음 실행 계획을 추가하세요.
+plan-failed: 요금제에 실패했습니다. 카드 정보를 확인해 주세요.
 plan-free: MVP 및 테스트에 가장 적합
 plan-inactive: 비활성 계획
 plan-maker: 중소기업 소유자에게 가장 적합

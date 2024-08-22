@@ -354,6 +354,7 @@ picture-delete-fail: 无法删除应用图片，请检查控制台日志
 picture-uploaded: 图片上传成功
 plan-bandwidth: 国标带宽
 plan-desc: 开始免费构建，然后添加上线计划。
+plan-failed: 计划失败，请验证您的银行卡信息
 plan-free: 最适合 MVP 和测试
 plan-inactive: 计划无效
 plan-maker: 最适合小企业主

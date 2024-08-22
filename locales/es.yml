@@ -391,6 +391,7 @@ plan-bandwidth: Ancho de banda GB
 plan-desc: >-
   Comience a construir de forma gratuita, luego agregue un plan para ponerlo en
   marcha.
+plan-failed: Plan fallido, por favor verifique los datos de su tarjeta
 plan-free: Lo mejor para MVP y pruebas
 plan-inactive: Plan inactivo
 plan-maker: Lo mejor para propietarios de pequeñas empresas

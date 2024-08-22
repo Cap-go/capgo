@@ -387,6 +387,7 @@ plan-bandwidth: Bande passante GB
 plan-desc: >-
   Commencez à construire gratuitement, puis ajoutez un plan pour passer en
   direct.
+plan-failed: Le plan a échoué, veuillez vérifier les détails de votre carte
 plan-free: Meilleur pour MVP et tests
 plan-inactive: Plan inactif
 plan-maker: Meilleur pour les petits propriétaires d'entreprises
