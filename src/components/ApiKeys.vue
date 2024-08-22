@@ -276,7 +276,7 @@ displayStore.defaultBack = '/app/home'
     <div class="flex flex-col">
       <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
         <dl :key="magicVal" class="divide-y divide-gray-500">
-          <InfoRow v-for="key in keys" :key="key.id" :label="key.mode.toUpperCase()" :value="key.name" :is-link="true">
+          <InfoRow v-for="key in keys" :key="key.id" :label="key.name" :value="key.mode.toUpperCase()" :is-link="false">
             <button class="mx-1 text-center bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
               <ArrowPath class="mx-auto text-lg" />
             </button>

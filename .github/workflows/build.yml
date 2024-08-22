@@ -55,9 +55,13 @@ jobs:
         if: ${{ contains(github.ref, '-alpha.') }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      # - name: 🚨 Seed Supabase ALPHA
-      #   if: ${{ contains(github.ref, '-alpha.') }}
-      #   run: supabase db reset --linked
+      - name: Wait for tests to succeed
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Run tests'
+          repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          wait-interval: 10
       - name: 🦤 Apply Supabase Migrations
         run: supabase db push --include-all
       - name: 🆙 Update functions
@@ -123,98 +127,3 @@ jobs:
           environment: production
           sourcemaps: dist_cf
           version: ${{ github.ref }}
-
-  build_android:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v1.1.1
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        id: install_code
-        run: bun install
-      - name: Build
-        id: build_code
-        run: bun mobile
-      - name: Sync
-        id: sync_code
-        run: bun x cap sync android
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-            distribution: 'zulu'
-            java-version: '17'
-      - name: Decode Keystore File
-        uses: timheuer/base64-to-file@v1
-        id: android_keystore
-        with:
-          fileName: "android_keystore.keystore"
-          encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
-      - name: Decode Google Play Confi File
-        uses: timheuer/base64-to-file@v1
-        id: service_account_json_file
-        with:
-          fileName: "serviceAccount.json"
-          encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.0'
-          bundler-cache: true
-      - uses: maierj/fastlane-action@v3.1.0
-        env:
-          KEYSTORE_PATH: ${{ steps.android_keystore.outputs.filePath }}
-          ANDROID_JSON_KEY_FILE: ${{ steps.service_account_json_file.outputs.filePath }}
-          DEVELOPER_PACKAGE_NAME: ${{ secrets.DEVELOPER_PACKAGE_NAME }}
-          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
-          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
-          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
-        with:
-          lane: android beta
-      - name: Upload release bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release
-          path: ./android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: 10
-  build_ios:
-      runs-on: macos-latest
-      steps:
-        - uses: actions/checkout@v4
-        - name: Setup bun
-          uses: oven-sh/setup-bun@v1.1.1
-          with:
-            bun-version: latest
-        - name: Install dependencies
-          id: install_code
-          run: bun install
-        - name: Build
-          id: build_code
-          run: bun mobile
-        - name: Sync
-          id: sync_code
-          run: bun x cap sync ios
-        - uses: ruby/setup-ruby@v1
-          with:
-            ruby-version: '3.0'
-            bundler-cache: true
-        - uses: maierj/fastlane-action@v3.1.0
-          env:
-            APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
-            BUNDLE_IDENTIFIER: ${{ secrets.BUNDLE_IDENTIFIER }}
-            BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-            BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-            APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
-            APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-            APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
-            APPLE_PROFILE_NAME: ${{ secrets.APPLE_PROFILE_NAME }}
-          with:
-            lane: ios beta
-        - name: Upload release bundle
-          uses: actions/upload-artifact@v4
-          with:
-            name: ios-release
-            path: ./App.ipa
-            retention-days: 10

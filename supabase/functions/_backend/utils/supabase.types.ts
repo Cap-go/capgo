@@ -66,6 +66,7 @@ export type Database = {
           owner_org: string
           r2_path: string | null
           session_key: string | null
+          signature: string | null
           storage_provider: string
           updated_at: string | null
           user_id: string | null
@@ -88,6 +89,7 @@ export type Database = {
           owner_org: string
           r2_path?: string | null
           session_key?: string | null
+          signature?: string | null
           storage_provider?: string
           updated_at?: string | null
           user_id?: string | null
@@ -110,6 +112,7 @@ export type Database = {
           owner_org?: string
           r2_path?: string | null
           session_key?: string | null
+          signature?: string | null
           storage_provider?: string
           updated_at?: string | null
           user_id?: string | null
@@ -1732,6 +1735,7 @@ export type Database = {
           owner_org: string
           r2_path: string | null
           session_key: string | null
+          signature: string | null
           storage_provider: string
           updated_at: string | null
           user_id: string | null

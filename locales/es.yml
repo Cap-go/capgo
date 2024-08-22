@@ -93,9 +93,18 @@ button-remove: Eliminar
 by-clicking-on-them: haciendo clic en ellos.
 canceled-delete: Eliminación de paquete cancelada, no se puede eliminar un paquete vinculado
 canceled-photo-selection: Cancelaste la selección de fotos.
+cannot-change-default-upload-channel: >-
+  No se puede cambiar el canal de carga por defecto, por favor, compruebe la
+  consola del navegador
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
+cannot-create-empty-device: >-
+  No se puede crear un dispositivo vacío. Por favor, compruebe la consola del
+  navegador
 cannot-create-org: No se puede crear una organización; verifique los registros del navegador.
+cannot-create-overwrite: >-
+  No se puede crear la sobreescritura. Por favor, compruebe la consola del
+  navegador
 cannot-del-org: No se puede eliminar la organización; consulte el registro del navegador.
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
@@ -103,6 +112,8 @@ cannot-delete-bundle: No se puede eliminar el paquete
 cannot-delete-channel: No se puede eliminar el canal
 cannot-delete-member: No se puede eliminar un miembro, verifique la consola del navegador
 cannot-delete-owner: No se puede eliminar el propietario de la organización
+cannot-determine-platform: No se puede determinar si el UUID dado pertenece a IOS o Android
+cannot-fetch-channels: No se pueden recuperar canales. Compruebe la consola del navegador
 cannot-find-unknown-version: >-
   No puedo encontrar la versión desconocida, comuníquese con el soporte de capgo
   y verifique los registros del navegador
@@ -125,7 +136,7 @@ channel: Canal
 channel-ab-testing: Habilitar pruebas AB
 channel-ab-testing-percentage: Porcentaje de usuarios que reciben la versión secundaria
 channel-bundle-linked: |-
-  Este paquete está vinculado a uno o más canales. 
+  Este paquete está vinculado a uno o más canales.
   (%) ¿Te gustaría desvincularlo de esos canales?
 channel-create: Crear canal
 channel-deleted: Canal eliminado
@@ -147,11 +158,19 @@ confirm-email: confirme su email
 confirm-email-sent: >-
   Se envió un correo electrónico de confirmación, haz clic en el enlace para
   confirmar tu correo electrónico.
+confirm-overwrite: Confirmar sobrescritura
+confirm-overwrite-msg: |-
+  Está a punto de crear la siguiente sobreescritura:
+
+  ID de dispositivo: $1
+  Canal: $2
+  Versión del canal: $3
+
+  ¿Le parece correcto?
 confirm-password: Confirmar Contraseña
 confirm-public-desc: >-
   Hacer que este canal sea el predeterminado hará que envíe actualizaciones a
   todos sus usuarios.
-
 
   Otros canales predeterminados ya no serán predeterminados.
 continue: Continuar
@@ -166,6 +185,7 @@ custom: Costumbre
 custom-domain: Dominio personalizado
 custom-id: Identificación personalizada
 dashboard: panel
+default-upload-channel: Canal de carga por defecto
 defined-as-private: definido como normal
 defined-as-public: definido como predeterminado
 delete: Borrar
@@ -180,6 +200,10 @@ detailed-usage-plan: Uso detallado
 devDependencies: {}
 device: Dispositivo
 device-id: ID del dispositivo
+device-injected: Este dispositivo se ha creado manualmente para añadir una sobreescritura.
+device-injected-2: >-
+  Algunos valores son marcadores de posición y se actualizarán tras la primera
+  actualización del dispositivo
 devices: Dispositivos
 did-not-recive-confirm-email: ¿No recibiste el correo electrónico de confirmación?
 disable: Desactivar
@@ -211,6 +235,7 @@ fast-forward: Avance rápido
 first-name: Nombre de pila
 force-version: Forzar versión
 force-version-change: Saltar implementación progresiva
+forced-devices-not-found: Este canal no tiene ningún dispositivo forzado
 forgot: Olvidó
 forgot-check-email: >-
   Revise su correo electrónico para obtener el enlace para restablecer su
@@ -219,9 +244,12 @@ forgot-success: Contraseña actualizada exitosamente
 free-trial: Prueba gratis
 from-device: desde el dispositivo
 general-information: Información general
+generate-device-overwrite: Generar sobreescritura de dispositivo
+generate-device-overwrite-msg: Está a punto de generar una sobreescritura de dispositivo. ¿Desea continuar?
 generated-new-apikey: ¡Nueva clave API generada!
 go-back: Regresa
 good: Bien
+here: aquí
 id: IDENTIFICACIÓN
 included-in-plan: Incluido en el plan
 info: Información
@@ -231,6 +259,7 @@ install: Instalado
 invalid-auth: Su nombre de usuario no coincide, inténtelo de nuevo.
 invalid-email: El correo electrónico pasado no es válido
 invalid-mfa-code: Código 2FA no válido
+invalid-uuid: UUID no válido
 invalid-version: Versión de semver no válida
 invite-accepted: Invitación de organización aceptada con éxito.
 is-emulator: es emulador
@@ -247,6 +276,7 @@ last-15-minutes: últimos 15 minutos
 last-3-minutes: últimos 3 minutos
 last-minute: Último minuto
 last-name: Apellido
+last-run: Última actualización
 last-update: Última actualización
 last-upload: última carga
 last-version: Última versión
@@ -281,7 +311,7 @@ min-update-version: Versión de actualización mínima
 minor: Menor
 misconfigured: Mal configurado
 misconfigured-channels: |-
-  Algunos canales están mal configurados. 
+  Algunos canales están mal configurados.
   ¡Las actualizaciones fallarán para esos canales!
 missing-email: correo electrónico faltante
 missing-name: Nombre faltante
@@ -295,21 +325,26 @@ more-version-storage: Más almacenamiento de versiones
 my-notifications: Mis Notificaciones
 name: Nombre
 need-more-contact-us: |-
-  Necesitar más ? 
+  Necesitar más ?
   Contáctenos para un plan a medida
 new-name-not-changed: El nuevo nombre es el mismo que el antiguo.
 new-name-to-long: |-
-  El nuevo nombre es demasiado largo. 
+  El nuevo nombre es demasiado largo.
   Sólo puedes usar 32 caracteres.
 new-name-to-short: |-
-  El nombre apikey es demasiado corto. 
+  El nombre apikey es demasiado corto.
   Debe tener al menos 4 caracteres.
 next: Próximo
+next-run: Próxima actualización
 'no': 'No'
 no-app-icon: Esta aplicación no tiene ningún ícono de aplicación.
 no-data: Sin datos
 no-permission: Permisos insuficientes
+no-permission-ask-super-admin: >-
+  permiso insuficiente, por favor, pregunte a un super admin para eliminar este
+  paquete de forma insegura
 none: Ninguno
+normal: Normal
 not-found: Extraviado
 not-paying-org-usage: >-
   Esta organización no paga, no puede mostrar el uso de una organización de
@@ -346,6 +381,7 @@ password-hint: >-
 patch: Parche
 percent-fail: porcentaje de fallas
 permission-changed: Permiso de usuario cambiado exitosamente
+pernament: Pernambuco
 personal-information: Informaciones personales
 picture-delete-fail: >-
   No se puede eliminar la imagen de la aplicación; verifique el registro de la
@@ -355,6 +391,7 @@ plan-bandwidth: Ancho de banda GB
 plan-desc: >-
   Comience a construir de forma gratuita, luego agregue un plan para ponerlo en
   marcha.
+plan-failed: Plan fallido, por favor verifique los datos de su tarjeta
 plan-free: Lo mejor para MVP y pruebas
 plan-inactive: Plan inactivo
 plan-maker: Lo mejor para propietarios de pequeñas empresas
@@ -405,6 +442,15 @@ search-by-device-id-: Buscar por ID de dispositivo o acción
 search-by-device-id-0: Buscar por ID de dispositivo
 search-by-name: Buscar por nombre
 see-usage: Ver uso
+select-channel: Seleccionar canal
+select-channel-msg: Seleccione el canal que desea utilizar en esta sobrescritura
+select-default-upload-channel: Seleccione el canal de carga por defecto
+select-default-upload-channel-header: Seleccionar canal por defecto
+select-style-of-deletion: Seleccione el estilo de borrado
+select-style-of-deletion-msg: |-
+  Por favor, seleccione la forma en que desea eliminar este canal.
+  Se recomienda ir con la normal.
+  Puedes leer sobre la diferencia $1
 select-user-perms: Seleccionar los permisos del usuario
 select-user-perms-expanded: Seleccione qué permiso debe tener el usuario invitado
 session_key: IvSessionKey
@@ -415,7 +461,7 @@ sign-out: Desconectar
 size: Tamaño
 size-not-found: Extraviado
 something-went-wrong-try-again-later: |-
-  ¡Algo salió mal! 
+  ¡Algo salió mal!
   Vuelva a intentarlo más tarde.
 special-api-access: Acceso especial a la API
 start-new-deploy: Iniciar una nueva implementación progresiva
@@ -438,8 +484,11 @@ to-open-encrypted-bu: 'Para abrir el paquete cifrado, use el comando:'
 top-apps-v2: Aplicaciones
 trial-left: Días restantes
 trial-plan-expired: Prueba caducada
+type-device-id: Introduzca el ID del dispositivo
+type-device-id-msg: Introduzca el ID del dispositivo que desea sobrescribir
 type-new-name: Por favor escriba el nuevo nombre de la clave API
 type-new-org-name: Por favor escriba el nuevo nombre de la organización.
+undefined: Sin definir
 undefined-fail: Indefinido (las actualizaciones fallarán)
 uninstall: desinstalado
 unknown: desconocido
@@ -449,8 +498,10 @@ unlink-bundle: Desvincular paquete
 unlink-channel: Desvincular canal
 unlink-error: Error de desvinculación, verifique la consola
 unlink-version: Desvincular versión
+unsafe: Inseguro
 update: Actualizar
 updated-at: Actualizado en
+updated-default-upload-channel: Actualizado el canal de carga por defecto
 updated-min-version: Versión mínima actualizada
 upgrade: Mejora
 upload-img-error: No se puede subir la imagen, por favor revisa la consola.
@@ -479,11 +530,12 @@ what-to-do-with-photo: Editar foto
 what-to-do-with-photo-dec: ¿Qué te gustaría hacer con la foto de la aplicación?
 write-key: Escribir
 wrong-name-org-del: |-
-  No ha escrito el nombre de la organización. 
+  No ha escrito el nombre de la organización.
   Se suponía que debías escribir: %1
 yearly: Anual
 'yes': Sí
 you-can-change-your-: Puede cambiar su información personal aquí.
+you-cannot-reuse: No puedes reutilizar esta versión del paquete después de eliminarla.
 you-reached-the-limi: Límite alcanzado
 your-settings: Tu configuración
 your-ussage: 'Su uso:'

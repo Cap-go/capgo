@@ -97,11 +97,20 @@ canceled-delete: >-
   Das Löschen des Bundles wurde abgebrochen. Ein verknüpftes Bundle kann nicht
   gelöscht werden
 canceled-photo-selection: Sie haben die Bildauswahl abgebrochen
+cannot-change-default-upload-channel: >-
+  Standard-Upload-Kanal kann nicht geändert werden, bitte überprüfen Sie die
+  Browser-Konsole
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
+cannot-create-empty-device: >-
+  Es kann kein leeres Gerät erstellt werden. Bitte prüfen Sie die Konsole des
+  Browsers
 cannot-create-org: >-
   Es kann keine Organisation erstellt werden. Bitte überprüfen Sie die
   Browserprotokolle!
+cannot-create-overwrite: >-
+  Überschreiben kann nicht erstellt werden. Bitte prüfen Sie die Konsole des
+  Browsers
 cannot-del-org: >-
   Die Organisation kann nicht gelöscht werden. Bitte überprüfen Sie das
   Browserprotokoll
@@ -111,6 +120,8 @@ cannot-delete-bundle: Paket kann nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
+cannot-determine-platform: Kann nicht feststellen, ob die angegebene UUID zu IOS oder Android gehört
+cannot-fetch-channels: Kanäle können nicht abgerufen werden. Bitte überprüfen Sie die Browserkonsole
 cannot-find-unknown-version: >-
   Unbekannte Version kann nicht gefunden werden. Bitte wenden Sie sich an den
   Capgo-Support und überprüfen Sie die Browserprotokolle
@@ -155,6 +166,15 @@ confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-
   Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
   E-Mail zu bestätigen.
+confirm-overwrite: Bestätigen Sie das Überschreiben
+confirm-overwrite-msg: |-
+  Sie sind dabei, die folgende Überschreibung zu erstellen:
+
+  Geräte-ID: $1
+  Kanal: $2
+  Kanalversion: $3
+
+  Klingt das korrekt?
 confirm-password: Bestätige das Passwort
 confirm-public-desc: >-
   Wenn Sie diesen Kanal als Standard festlegen, werden Updates an alle Ihre
@@ -174,6 +194,7 @@ custom: Brauch
 custom-domain: Benutzerdefinierten Domain
 custom-id: Benutzerdefinierte ID
 dashboard: Armaturenbrett
+default-upload-channel: Standard-Upload-Kanal
 defined-as-private: als normal definiert
 defined-as-public: als Standard definiert
 delete: Löschen
@@ -188,6 +209,10 @@ detailed-usage-plan: Detaillierte Verwendung
 devDependencies: {}
 device: Gerät
 device-id: Geräte ID
+device-injected: Dieses Gerät wurde manuell erstellt, um eine Überschreibung hinzuzufügen.
+device-injected-2: >-
+  Einige Werte sind Platzhalter und werden nach der ersten Aktualisierung des
+  Geräts aktualisiert
 devices: Geräte
 did-not-recive-confirm-email: Haben Sie die Bestätigungs-E-Mail nicht erhalten?
 disable: Deaktivieren
@@ -219,6 +244,7 @@ fast-forward: Schneller Vorlauf
 first-name: Vorname
 force-version: Force-Version
 force-version-change: Überspringen Sie die progressive Bereitstellung
+forced-devices-not-found: Dieser Kanal hat keine Zwangsgeräte
 forgot: Vergessen
 forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
@@ -227,9 +253,12 @@ forgot-success: Passwort erfolgreich aktualisiert
 free-trial: Kostenlose Testphase
 from-device: vom Gerät
 general-information: Allgemeine Informationen
+generate-device-overwrite: Geräteüberschreibung generieren
+generate-device-overwrite-msg: Sie sind dabei, ein Gerät zu überschreiben. Möchten Sie fortfahren?
 generated-new-apikey: Neuer API-Schlüssel generiert!
 go-back: Geh zurück
 good: Gut
+here: hier
 id: AUSWEIS
 included-in-plan: Im Plan enthalten
 info: Information
@@ -239,6 +268,7 @@ install: Eingerichtet
 invalid-auth: Ihr Login stimmt nicht überein, versuchen Sie es erneut.
 invalid-email: Die übergebene E-Mail ist ungültig
 invalid-mfa-code: Ungültiger 2FA-Code
+invalid-uuid: Ungültige UUID
 invalid-version: Ungültige Semver-Version
 invite-accepted: Organisationseinladung erfolgreich angenommen
 is-emulator: Ist Emulator
@@ -255,6 +285,7 @@ last-15-minutes: Letzte 15 Minuten
 last-3-minutes: Letzte 3 Minuten
 last-minute: Letzte Minute
 last-name: Familienname, Nachname
+last-run: Letzte Aktualisierung
 last-update: Letztes Update
 last-upload: Letzter Upload
 last-version: Letzte Version
@@ -315,11 +346,16 @@ new-name-to-short: |-
   Der apikey-Name ist zu kurz. 
   Es muss mindestens 4 Zeichen lang sein
 next: Nächste
+next-run: Nächstes Update
 'no': NEIN
 no-app-icon: Diese App hat kein App-Symbol
 no-data: Keine Daten
 no-permission: Nicht ausreichende Berechtigungen
+no-permission-ask-super-admin: >-
+  unzureichende Berechtigung, bitte bitten Sie einen Superadministrator, dieses
+  Paket unsicher zu löschen
 none: Keiner
+normal: Normal
 not-found: Nicht gefunden
 not-paying-org-usage: >-
   Diese Organisation zahlt nicht und kann die Nutzung für eine kostenlose
@@ -358,6 +394,7 @@ password-hint: >-
 patch: Patch
 percent-fail: Fehlerprozentsatz
 permission-changed: Benutzerberechtigung erfolgreich geändert
+pernament: Pernament
 personal-information: Persönliche Informationen
 picture-delete-fail: >-
   Das App-Bild kann nicht gelöscht werden. Bitte überprüfen Sie das
@@ -367,6 +404,7 @@ plan-bandwidth: GB Bandbreite
 plan-desc: >-
   Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan hinzu,
   um live zu gehen.
+plan-failed: Plan fehlgeschlagen, bitte überprüfen Sie Ihre Kartendaten
 plan-free: Am besten für MVP und Tests geeignet
 plan-inactive: Planen Sie inaktiv
 plan-maker: Am besten für Kleinunternehmer geeignet
@@ -421,6 +459,17 @@ search-by-device-id-: Suche nach Geräte-ID oder Aktion
 search-by-device-id-0: Suche nach Geräte-ID
 search-by-name: Suche mit Name
 see-usage: Siehe Verwendung
+select-channel: Kanal auswählen
+select-channel-msg: >-
+  Bitte wählen Sie den Kanal aus, den Sie für das Überschreiben verwenden
+  möchten
+select-default-upload-channel: Bitte wählen Sie den Standard-Upload-Kanal
+select-default-upload-channel-header: Standard-Kanal auswählen
+select-style-of-deletion: Wählen Sie die Art der Löschung
+select-style-of-deletion-msg: |-
+  Bitte wählen Sie die Art und Weise, wie Sie diesen Kanal löschen möchten.
+  Es wird empfohlen, die normale Methode zu verwenden.
+  Sie können über den Unterschied lesen $1
 select-user-perms: Wählen Sie die Berechtigungen des Benutzers aus
 select-user-perms-expanded: Wählen Sie aus, welche Berechtigung der eingeladene Benutzer haben soll
 session_key: IvSessionKey
@@ -454,8 +503,11 @@ to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie de
 top-apps-v2: Apps
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
+type-device-id: Geräte-ID eingeben
+type-device-id-msg: Bitte geben Sie die ID des Gerätes ein, das Sie überschreiben möchten
 type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
 type-new-org-name: Bitte geben Sie den neuen Namen für die Organisation ein
+undefined: Unbestimmt
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert
 unknown: Unbekannt
@@ -465,8 +517,10 @@ unlink-bundle: Bündel aufheben
 unlink-channel: Verknüpfung des Kanals aufheben
 unlink-error: Fehler beim Aufheben der Verknüpfung. Bitte überprüfen Sie die Konsole
 unlink-version: Verknüpfung aufheben
+unsafe: Unsicher
 update: Aktualisieren
 updated-at: Aktualisiert am
+updated-default-upload-channel: Der Standard-Upload-Kanal wurde aktualisiert
 updated-min-version: Aktualisierte Minimalversion
 upgrade: Aktualisierung
 upload-img-error: Bild kann nicht hochgeladen werden. Bitte überprüfen Sie die Konsole
@@ -500,6 +554,7 @@ wrong-name-org-del: |-
 yearly: Jährlich
 'yes': Ja
 you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.
+you-cannot-reuse: Sie können diese Bundle-Version nach dem Löschen nicht wiederverwenden
 you-reached-the-limi: Limit erreicht
 your-settings: Ihre Einstellungen
 your-ussage: 'Ihre Nutzung:'

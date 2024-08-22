@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
+import { bentoLoader } from '~/services/bento'
+import { posthogLoader } from '~/services/posthog'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
+onMounted(() => {
+  bentoLoader()
+  posthogLoader()
+})
 </script>
 
 <template>

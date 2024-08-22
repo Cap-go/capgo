@@ -87,9 +87,12 @@ button-remove: 消除
 by-clicking-on-them: 通过点击它们。
 canceled-delete: 已取消捆绑包删除，无法删除链接的捆绑包
 canceled-photo-selection: 您取消了图片选择
+cannot-change-default-upload-channel: 无法更改默认上传通道，请检查浏览器控制台
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
+cannot-create-empty-device: 无法创建空设备。请检查浏览器控制台
 cannot-create-org: 无法创建组织，请检查浏览器日志！
+cannot-create-overwrite: 无法创建覆盖。请检查浏览器控制台
 cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
@@ -97,6 +100,8 @@ cannot-delete-bundle: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
+cannot-determine-platform: 无法确定给定的 UUID 属于 IOS 还是 Android
+cannot-fetch-channels: 无法获取频道。请检查浏览器控制台
 cannot-find-unknown-version: 找不到未知版本，请联系 capgo 支持并检查浏览器日志
 cannot-get-the-test-: 无法获取测试版
 cannot-invite-owner: 无法邀请所有者加入组织
@@ -117,7 +122,7 @@ channel: 渠道
 channel-ab-testing: 启用AB测试
 channel-ab-testing-percentage: 接收辅助版本的用户百分比
 channel-bundle-linked: |-
-  该捆绑包链接到一个或多个频道。 
+  该捆绑包链接到一个或多个频道。
   (%) 您想取消它与这些频道的链接吗？
 channel-create: 创建频道
 channel-deleted: 频道已删除
@@ -137,6 +142,15 @@ cli-doc: CLI文档
 commands: 命令
 confirm-email: 确认您的电子邮件
 confirm-email-sent: 已发送确认邮件，请点击链接确认您的电子邮件。
+confirm-overwrite: 确认覆盖
+confirm-overwrite-msg: |-
+  您将创建以下覆盖：
+
+  设备 ID：1 美元
+  通道：2 美元
+  通道版本：3
+
+  听起来正确吗？
 confirm-password: 确认密码
 confirm-public-desc: |-
   将此频道设置为默认频道将使其向您的所有用户发送更新。
@@ -154,6 +168,7 @@ custom: 风俗
 custom-domain: 自定义域
 custom-id: 自定义编号
 dashboard: 仪表板
+default-upload-channel: 默认上传通道
 defined-as-private: 定义为正常
 defined-as-public: 定义为默认
 delete: 删除
@@ -168,6 +183,8 @@ detailed-usage-plan: 详细使用方法
 devDependencies: {}
 device: 设备
 device-id: 设备ID
+device-injected: 该设备是手动创建的，用于添加覆盖。
+device-injected-2: 某些值为占位符，将在设备首次更新后更新
 devices: 设备
 did-not-recive-confirm-email: 没有收到确认邮件吗？
 disable: 禁用
@@ -197,15 +214,19 @@ fast-forward: 快进
 first-name: 名
 force-version: 强制版本
 force-version-change: 跳过渐进式部署
+forced-devices-not-found: 该通道没有任何强制设备
 forgot: 忘记
 forgot-check-email: 检查您的电子邮件以获取重置密码的链接
 forgot-success: 密码更新成功
 free-trial: 免费试用
 from-device: 从设备
 general-information: 一般信息
+generate-device-overwrite: 生成设备覆盖
+generate-device-overwrite-msg: 您即将生成设备覆盖。要继续吗？
 generated-new-apikey: 已生成新的 API 密钥！
 go-back: 回去
 good: 好的
+here: 这里
 id: ID
 included-in-plan: 包含在计划中
 info: 信息
@@ -215,6 +236,7 @@ install: 已安装
 invalid-auth: 您的登录信息不匹配，请重试。
 invalid-email: 传递的电子邮件无效
 invalid-mfa-code: 2FA 代码无效
+invalid-uuid: 无效的 UUID
 invalid-version: 语义版本无效
 invite-accepted: 成功接受组织邀请
 is-emulator: 是模拟器
@@ -231,6 +253,7 @@ last-15-minutes: 最后 15 分钟
 last-3-minutes: 最后3分钟
 last-minute: 最后一分钟
 last-name: 姓
+last-run: 最后更新
 last-update: 最后更新
 last-upload: 最后上传
 last-version: 最新版本
@@ -287,11 +310,14 @@ new-name-to-short: |-
   apikey 名称太短。
   长度必须至少为 4 个字符
 next: 下一个
+next-run: 下次更新
 'no': 不
 no-app-icon: 此应用程序没有任何应用程序图标
 no-data: 没有数据
 no-permission: 权限不足
+no-permission-ask-super-admin: 权限不足，请请求超级管理员不安全地删除此捆绑包
 none: 没有任何
+normal: 正常
 not-found: 未找到
 not-paying-org-usage: 该组织未付费，无法显示免费试用组织的使用情况
 notifications: 通知
@@ -322,11 +348,13 @@ password-hint: 输入至少 6 个数字、字母和标点符号的组合。
 patch: 修补
 percent-fail: 失败百分比
 permission-changed: 成功更改用户权限
+pernament: 诗歌
 personal-information: 个人信息
 picture-delete-fail: 无法删除应用图片，请检查控制台日志
 picture-uploaded: 图片上传成功
 plan-bandwidth: 国标带宽
 plan-desc: 开始免费构建，然后添加上线计划。
+plan-failed: 计划失败，请验证您的银行卡信息
 plan-free: 最适合 MVP 和测试
 plan-inactive: 计划无效
 plan-maker: 最适合小企业主
@@ -375,6 +403,15 @@ search-by-device-id-: 按设备 ID 或操作搜索
 search-by-device-id-0: 按设备 ID 搜索
 search-by-name: 按名称搜索
 see-usage: 查看用法
+select-channel: 选择频道
+select-channel-msg: 请选择您希望用于覆盖的频道
+select-default-upload-channel: 请选择默认上传通道
+select-default-upload-channel-header: 选择默认频道
+select-style-of-deletion: 选择删除方式
+select-style-of-deletion-msg: |-
+  请选择要删除此频道的方式。
+  建议使用普通方式。
+  您可以阅读有关区别的信息 $1
 select-user-perms: 选择用户的权限
 select-user-perms-expanded: 选择受邀用户应拥有的权限
 session_key: Iv会话密钥
@@ -406,8 +443,11 @@ to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps-v2: 应用
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
+type-device-id: 输入设备 ID
+type-device-id-msg: 请输入要覆盖的设备 ID
 type-new-name: 请输入新的 api 密钥名称
 type-new-org-name: 请输入组织的新名称
+undefined: 未定义
 undefined-fail: 未定义（更新将失败）
 uninstall: 已卸载
 unknown: 未知
@@ -417,8 +457,10 @@ unlink-bundle: 取消链接包
 unlink-channel: 取消链接频道
 unlink-error: 取消链接错误，请检查控制台
 unlink-version: 取消链接版本
+unsafe: 不安全
 update: 更新
 updated-at: 更新于
+updated-default-upload-channel: 更新了默认上传通道
 updated-min-version: 更新了最小版本
 upgrade: 升级
 upload-img-error: 无法上传图片，请检查控制台
@@ -450,6 +492,7 @@ wrong-name-org-del: |-
 yearly: 每年
 'yes': 是的
 you-can-change-your-: 您可以在此处更改您的个人信息。
+you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制
 your-settings: 您的设置
 your-ussage: 您的使用情况：

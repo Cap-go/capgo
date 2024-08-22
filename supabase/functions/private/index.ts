@@ -14,6 +14,7 @@ import { app as upload_link } from '../_backend/private/upload_link.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
+import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
@@ -36,6 +37,7 @@ appGlobal.route('/store_top', storeTop)
 appGlobal.route('/website_stats', publicStats)
 appGlobal.route('/config', config)
 appGlobal.route('/devices', devices_priv)
+appGlobal.route('/create_device', create_device)
 appGlobal.route('/download_link', download_link)
 appGlobal.route('/log_as', log_as)
 appGlobal.route('/stats', stats_priv)

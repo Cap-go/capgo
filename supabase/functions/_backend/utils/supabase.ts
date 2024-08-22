@@ -4,8 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createCustomer } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
-import type { Person, Segments } from './plunk.ts'
-import { addDataContact } from './plunk.ts'
+import type { Segments } from './plunk.ts'
 import type { Order } from './types.ts'
 
 const DEFAULT_LIMIT = 1000
@@ -368,20 +367,13 @@ export async function createApiKey(c: Context, userId: string) {
   return Promise.resolve()
 }
 
-export function userToPerson(user: Database['public']['Tables']['users']['Row'], customer: Database['public']['Tables']['stripe_info']['Row']): Person {
-  const person: Person = {
-    id: user.id,
-    product_id: customer.product_id,
-    customer_id: customer.customer_id,
-    nickname: `${user.first_name ?? ''} ${user.last_name ?? ''}`,
-    avatar: user.image_url ? user.image_url : undefined,
-    country: user.country ? user.country : undefined,
-  }
-  return person
-}
-
-export async function customerToSegmentOrg(c: Context, orgId: string, price_id: string, plan?: Database['public']['Tables']['plans']['Row'] | null): Promise<Segments> {
-  const segments: Segments = {
+export async function customerToSegmentOrg(
+  c: Context,
+  orgId: string,
+  price_id: string,
+  plan?: Database['public']['Tables']['plans']['Row'] | null,
+): Promise<{ segments: string[], deleteSegments: string[] }> {
+  const segmentsObj: Segments = {
     capgo: true,
     onboarded: await isOnboardedOrg(c, orgId),
     trial: false,
@@ -395,40 +387,58 @@ export async function customerToSegmentOrg(c: Context, orgId: string, price_id: 
     canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,
   }
+
   const trialDaysLeft = await isTrialOrg(c, orgId)
   const paying = await isPayingOrg(c, orgId)
   const canUseMore = await isGoodPlanOrg(c, orgId)
 
-  if (!segments.onboarded)
-    return segments
+  if (!segmentsObj.onboarded) {
+    return processSegments(segmentsObj)
+  }
 
   if (!paying && trialDaysLeft > 1 && trialDaysLeft <= 7) {
-    segments.trial = true
-    segments.trial7 = true
+    segmentsObj.trial = true
+    segmentsObj.trial7 = true
   }
   else if (!paying && trialDaysLeft === 1) {
-    segments.trial = true
-    segments.trial1 = true
+    segmentsObj.trial = true
+    segmentsObj.trial1 = true
   }
-
   else if (!paying && !canUseMore) {
-    segments.trial = true
-    segments.trial0 = true
+    segmentsObj.trial = true
+    segmentsObj.trial0 = true
   }
-
   else if (paying && !canUseMore && plan) {
-    segments.overuse = true
-    segments.paying = true
+    segmentsObj.overuse = true
+    segmentsObj.paying = true
   }
-
   else if (paying && canUseMore && plan) {
-    segments.paying = true
+    segmentsObj.paying = true
   }
   else {
-    segments.issueSegment = true
+    segmentsObj.issueSegment = true
   }
 
-  return segments
+  return processSegments(segmentsObj)
+}
+
+function processSegments(segmentsObj: Segments): { segments: string[], deleteSegments: string[] } {
+  const segments: string[] = []
+  const deleteSegments: string[] = []
+
+  Object.entries(segmentsObj).forEach(([key, value]) => {
+    if (typeof value === 'boolean') {
+      if (value)
+        segments.push(key)
+      else
+        deleteSegments.push(key)
+    }
+    else if (typeof value === 'string' && value !== '') {
+      segments.push(`${key}:${value}`)
+    }
+  })
+
+  return { segments, deleteSegments }
 }
 
 export async function getStripeCustomer(c: Context, customerId: string) {
@@ -475,23 +485,6 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     .eq('id', org.id)
   if (updateUserError)
     console.log('updateUserError', updateUserError)
-  const person: Person = {
-    id: org.id,
-    customer_id: customer.id,
-    product_id: soloPlan.name,
-    nickname: org.name,
-    avatar: org.logo ? org.logo : undefined,
-    // country: user.country ? user.country : undefined,
-  }
-  const { data: plan } = await supabaseAdmin(c)
-    .from('plans')
-    .select()
-    .eq('stripe_id', customer.id)
-    .single()
-  const segment = await customerToSegmentOrg(c, org.id, soloPlan.name, plan)
-  await addDataContact(c, org.management_email, { ...person, ...segment }).catch((e) => {
-    console.log('updatePerson error', e)
-  })
   console.log('stripe_info done')
 }
 

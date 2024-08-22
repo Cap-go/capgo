@@ -103,15 +103,19 @@ async function countDevices() {
   const { data: currentSession } = await supabase.auth.getSession()!
   if (!currentSession.session)
     return 0
+  if (props.ids && props.ids.length > 0)
+    return props.ids.length
+
   const currentJwt = currentSession.session.access_token
   const dataD = await ky
     .post(`${defaultApiHost}/private/devices`, {
       headers: {
         'Content-Type': 'application/json',
-        'authorization': `Bearer ${currentJwt}` || '',
+        'authorization': `Bearer ${currentJwt || ''}`,
       },
       body: JSON.stringify({
         count: true,
+        // devicesId: props.ids?.length ? props.ids : undefined,
         appId: props.appId,
       }),
     })
@@ -129,6 +133,8 @@ async function getData() {
     let ids: string[] = []
     if (filters.value.Override)
       ids = await getDevicesID()
+    else if (props.ids)
+      ids = props.ids
 
     const { data: currentSession } = await supabase.auth.getSession()!
     if (!currentSession.session)
@@ -138,7 +144,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt}` || '',
+          'authorization': `Bearer ${currentJwt || ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,
@@ -210,6 +216,7 @@ async function refreshData() {
 async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
+
 onMounted(async () => {
   await refreshData()
 })
@@ -220,9 +227,12 @@ onMounted(async () => {
     v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
     :total="total" row-click :element-list="elements"
     filter-text="Filters"
+    :plus-button="true"
     :is-loading="isLoading"
     :search-placeholder="t('search-by-device-id')"
-    @reload="reload()" @reset="refreshData()"
+    class="p-3" @reload="reload()"
+    @reset="refreshData()"
     @row-click="openOne"
   />
+  <AddDeviceOverwriteButton :app-id="props.appId" />
 </template>

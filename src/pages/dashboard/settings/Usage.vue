@@ -10,6 +10,7 @@ import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/sup
 import { useLogSnag } from '~/services/logsnag'
 import type { Database } from '~/types/supabase.types'
 import { bytesToGb } from '~/services/conversion'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -189,14 +190,22 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
   // isSubscribeLoading.value.fill(false, 0, plans.value.length)
 })
+
+function lastRunDate() {
+  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+
+  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+}
 </script>
 
 <template>
   <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
     <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="sm:align-center sm:flex sm:flex-col">
-        <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
+        <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip-bottom tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
           {{ t('usage') }}
+          <IcBaselineInfo class="w-4 h-4 cursor-pointer text-slate-400 dark:text-white" />
         </h1>
 
         <div class="my-2">

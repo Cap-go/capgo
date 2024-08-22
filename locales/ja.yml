@@ -87,9 +87,12 @@ button-remove: 削除
 by-clicking-on-them: それらをクリックして。
 canceled-delete: バンドルの削除がキャンセルされました。リンクされたバンドルは削除できません
 canceled-photo-selection: 画像の選択をキャンセルしました
+cannot-change-default-upload-channel: デフォルトのアップロードチャンネルを変更できません。
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
+cannot-create-empty-device: 空のデバイスを作成できません。ブラウザのコンソールを確認してください。
 cannot-create-org: 組織を作成できません。ブラウザのログを確認してください。
+cannot-create-overwrite: 上書き作成ができません。ブラウザのコンソールを確認してください。
 cannot-del-org: 組織を削除できません。ブラウザのログを確認してください。
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
@@ -97,6 +100,8 @@ cannot-delete-bundle: バンドルを削除できません
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
+cannot-determine-platform: 指定されたUUIDがIOSに属するのかAndroidに属するのか判断できない。
+cannot-fetch-channels: チャンネルを取得できません。ブラウザのコンソールを確認してください。
 cannot-find-unknown-version: 不明なバージョンが見つかりません。capgo サポートに連絡し、ブラウザのログを確認してください。
 cannot-get-the-test-: テスト版を入手できません
 cannot-invite-owner: 所有者を組織に招待できません
@@ -117,7 +122,7 @@ channel: チャネル
 channel-ab-testing: AB テストを有効にする
 channel-ab-testing-percentage: セカンダリ バージョンを受信して​​いるユーザーの割合
 channel-bundle-linked: |-
-  このバンドルは 1 つ以上のチャネルにリンクされています。 
+  このバンドルは 1 つ以上のチャネルにリンクされています。
   (%) これらのチャンネルからのリンクを解除しますか?
 channel-create: チャンネルを作成
 channel-deleted: チャンネルを削除しました
@@ -137,6 +142,15 @@ cli-doc: CLIドキュメント
 commands: コマンド
 confirm-email: メールを確認する
 confirm-email-sent: 確認メールが送信されました。リンクをクリックしてメールアドレスを確認してください。
+confirm-overwrite: 上書き確認
+confirm-overwrite-msg: |-
+  次のように上書きしようとしている：
+
+  デバイスID: $1
+  チャンネル: $2
+  チャンネル・バージョン: $3
+
+  これで合っていますか？
 confirm-password: パスワードを認証する
 confirm-public-desc: |-
   このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
@@ -154,6 +168,7 @@ custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 dashboard: ダッシュボード
+default-upload-channel: デフォルトのアップロードチャンネル
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete: 消去
@@ -168,6 +183,8 @@ detailed-usage-plan: 詳しい使い方
 devDependencies: {}
 device: デバイス
 device-id: デバイスID
+device-injected: このデバイスは、上書きを追加するために手動で作成されました。
+device-injected-2: いくつかの値はプレースホルダーであり、デバイスの最初のアップデート後に更新されます。
 devices: デバイス
 did-not-recive-confirm-email: 確認メールが届きませんでしたか？
 disable: 無効にする
@@ -197,15 +214,19 @@ fast-forward: 早送り
 first-name: ファーストネーム
 force-version: 強制バージョン
 force-version-change: プログレッシブ展開をスキップする
+forced-devices-not-found: このチャンネルには強制装置はない
 forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました
 free-trial: 無料トライアル
 from-device: デバイスから
 general-information: 一般情報
+generate-device-overwrite: デバイスの上書きを生成する
+generate-device-overwrite-msg: デバイスを上書きしようとしています。続行しますか？
 generated-new-apikey: 新しい API キーが生成されました。
 go-back: 戻る
 good: 良い
+here: これ
 id: ID
 included-in-plan: プランに含まれるもの
 info: 情報
@@ -215,6 +236,7 @@ install: インストール済み
 invalid-auth: ログインが一致しません。もう一度お試しください。
 invalid-email: 渡されたメールは無効です
 invalid-mfa-code: 無効な 2FA コードです
+invalid-uuid: 無効なUUID
 invalid-version: サーバーのバージョンが無効です
 invite-accepted: 組織化への招待が正常に受け入れられました
 is-emulator: エミュレータです
@@ -231,6 +253,7 @@ last-15-minutes: 最後の 15 分
 last-3-minutes: 最後の 3 分
 last-minute: ぎりぎり
 last-name: 苗字
+last-run: 最終更新
 last-update: 最後の更新
 last-upload: 最後のアップロード
 last-version: 最後のバージョン
@@ -281,17 +304,20 @@ need-more-contact-us: |-
   オーダーメイドプランはお問い合わせください
 new-name-not-changed: 新しい名前は古い名前と同じです
 new-name-to-long: |-
-  新しい名前は長すぎます。 
+  新しい名前は長すぎます。
   32 文字のみ使用できます
 new-name-to-short: |-
   apikey 名が短すぎます。
   少なくとも 4 文字の長さである必要があります
 next: 次
+next-run: 次のアップデート
 'no': いいえ
 no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし
 no-permission: 権限が不十分です
+no-permission-ask-super-admin: このバンドルを安全に削除するには、スーパー管理者に依頼してください。
 none: なし
+normal: ノーマル
 not-found: 見つかりません
 not-paying-org-usage: この組織は料金を支払っていないため、無料体験組織の使用状況を表示できません
 notifications: 通知
@@ -322,11 +348,13 @@ password-hint: 数字、文字、句読点を 6 つ以上組み合わせて入�
 patch: パッチ
 percent-fail: 失敗率
 permission-changed: ユーザー権限が正常に変更されました
+pernament: ペルナメント
 personal-information: 個人情報
 picture-delete-fail: アプリの画像を削除できません。コンソールのログを確認してください。
 picture-uploaded: 画像が正常にアップロードされました
 plan-bandwidth: GB帯域幅
 plan-desc: 無料で構築を開始し、ライブに移行するための計画を追加します。
+plan-failed: プランに失敗しました。
 plan-free: MVP とテストに最適
 plan-inactive: プランの非アクティブ
 plan-maker: 中小企業の経営者に最適
@@ -375,6 +403,15 @@ search-by-device-id-: デバイス ID またはアクションで検索
 search-by-device-id-0: デバイス ID で検索
 search-by-name: 名前で検索
 see-usage: 使い方を見る
+select-channel: チャンネル選択
+select-channel-msg: 上書きで使用するチャンネルを選択してください。
+select-default-upload-channel: デフォルトのアップロードチャンネルを選択してください。
+select-default-upload-channel-header: デフォルト・チャンネルを選択
+select-style-of-deletion: 削除スタイルの選択
+select-style-of-deletion-msg: |-
+  このチャンネルを削除する方法を選択してください。
+  ノーマルをお勧めします。
+  違いについてはこちらをご覧ください。
 select-user-perms: ユーザーの権限を選択します
 select-user-perms-expanded: 招待されたユーザーにどの権限を持たせるかを選択します
 session_key: IvSessionKey
@@ -406,8 +443,11 @@ to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコ�
 top-apps-v2: アプリ
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
+type-device-id: デバイスIDを入力
+type-device-id-msg: 上書きしたいデバイスのIDを入力してください。
 type-new-name: 新しい API キー名を入力してください
 type-new-org-name: 組織の新しい名前を入力してください
+undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
 unknown: 未知
@@ -417,8 +457,10 @@ unlink-bundle: バンドルのリンクを解除
 unlink-channel: チャンネルのリンクを解除
 unlink-error: リンク解除エラー。コンソールを確認してください
 unlink-version: バージョンのリンクを解除
+unsafe: 危険
 update: アップデート
 updated-at: に更新
+updated-default-upload-channel: デフォルトのアップロードチャンネルを更新
 updated-min-version: 最小バージョンを更新しました
 upgrade: アップグレード
 upload-img-error: 画像をアップロードできません。コンソールを確認してください
@@ -450,6 +492,7 @@ wrong-name-org-del: |-
 yearly: 毎年
 'yes': はい
 you-can-change-your-: ここで個人情報を変更できます。
+you-cannot-reuse: このバンドル バージョンは削除後は再利用できません
 you-reached-the-limi: 制限に達しました
 your-settings: あなたの設定
 your-ussage: 'あなたの用途:'

@@ -633,10 +633,34 @@ async function onChangeAutoUpdate(event: Event) {
         </dl>
       </div>
     </div>
-    <div v-if="channel && ActiveTab === 'devices'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <DeviceTable class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" />
+    <div
+      v-if="channel && ActiveTab === 'devices'"
+      class="flex flex-col"
+      :class="{
+        // 'translate-y-[-50%] translate-x-[-50%] top-1/2 left-1/2 absolute m-0': deviceIds.length === 0,
+        'm-0 w-full h-screen items-center justify-center overflow-hidden': deviceIds.length === 0,
+      }"
+    >
+      <div
+        class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+        :class="{
+          'md:mt-5 md:w-2/3': deviceIds.length !== 0,
+          'my-auto w-fit': deviceIds.length === 0,
+          'p-4': deviceIds.length === 0 && !displayStore.showDialog,
+        }"
+      >
+        <DeviceTable v-if="deviceIds.length > 0" class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" />
+        <template v-else-if="!displayStore.showDialog">
+          <div>
+            {{ t('forced-devices-not-found') }}
+          </div>
+        </template>
       </div>
     </div>
   </div>
+  <AddDeviceOverwriteButton
+    v-if="channel && deviceIds.length === 0 && ActiveTab === 'devices'"
+    :app-id="channel.version.app_id"
+    :channel="channel"
+  />
 </template>

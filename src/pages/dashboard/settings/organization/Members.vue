@@ -47,6 +47,7 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
   displayStore.dialogOption = {
     header: t('select-user-perms'),
     message: t('select-user-perms-expanded'),
+    size: 'max-w-fit',
     buttons: [
       {
         text: t('button-cancel'),
@@ -275,7 +276,7 @@ function canDelete(member: ExtendedOrganizationMember) {
             <div class="hidden md:flex">
               <img
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
-                width="80" height="80" alt="profile_photo"
+                width="80" height="80" alt="profile"
               >
               <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
                 <p>{{ acronym(member.email) }}</p>

@@ -4,11 +4,12 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { storeToRefs } from 'pinia'
+import dayjs from 'dayjs'
 import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
-import { openMessenger } from '~/services/chatwoot'
+import { openMessenger } from '~/services/bento'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
@@ -136,6 +137,13 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
 //   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
 // }
 
+function lastRunDate() {
+  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
+
+  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+}
+
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -179,23 +187,7 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
-// watch(
-//   () => plans.value,
-//   (myPlan, prevMyPlan) => {
-//     if (myPlan && !prevMyPlan) {
-//       loadData(true)
-//       // reGenerate annotations
-//       isUsageLoading.value = true
-//     }
-//     else if (prevMyPlan && !myPlan) {
-//       isUsageLoading.value = true
-//     }
-//   },
-// )
-
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
-
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
     if (!initialLoad.value) {
       const orgsMap = organizationStore.getAllOrgs()
@@ -282,9 +274,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
   }
 }
 
+const failed = computed(() => {
+  return !(!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value)
+})
+
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value) ? t('Current') : t('failed'),
+    label: !failed.value ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {
@@ -296,7 +292,7 @@ const hightLights = computed<Stat[]>(() => ([
 
       displayStore.dialogOption = {
         header: t('detailed-usage-plan'),
-        message: `${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%`,
+        message: `${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
         buttons: [
           {
             text: t('ok'),
@@ -323,6 +319,9 @@ const hightLights = computed<Stat[]>(() => ([
         <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
           {{ t('plan-desc') }}<br>
         </p>
+      </div>
+      <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+        {{ t('plan-failed') }}
       </div>
       <section class="px-8 pt-4 sm:px-0">
         <BlurBg :mini="true">
@@ -416,7 +415,7 @@ const hightLights = computed<Stat[]>(() => ([
             <h3 class="text-xs font-medium tracking-wide text-gray-900 uppercase dark:text-white">
               {{ t('plan-whats-included') }}
             </h3>
-            <ul role="list" class="mt-6 space-y-4">
+            <ul class="mt-6 space-y-4">
               <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex space-x-3">
                 <svg class="flex-shrink-0 w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -552,15 +551,12 @@ const hightLights = computed<Stat[]>(() => ([
                   </div>
 
                   <div class="!mx-auto mt-10 md:mt-0">
-                    <a
-                      href="#"
-                      title="Get quote now"
+                    <button
                       class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
-                      role="button"
                       @click="openSupport()"
                     >
                       Get quote now
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>

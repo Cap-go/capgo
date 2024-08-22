@@ -1,11 +1,13 @@
-import { Hono } from 'hono/tiny'
+import { PutObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 import type { Context } from '@hono/hono'
+import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { s3 } from '../utils/s3.ts'
 import { middlewareKey } from '../utils/hono.ts'
+import { logsnag } from '../utils/logsnag.ts'
+import { initS3, s3 } from '../utils/s3.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { initMultipartUpload } from './multipart.ts'
 
 interface dataUpload {
@@ -93,13 +95,21 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
         return c.json({ error: 'Invalid manifest', detailed_error: parsedManifest.error }, 400)
       }
 
+      const clientS3 = initS3(c, true, true)
+
       const uploadObjects = await Promise.all(parsedManifest.data.map(async (manifestObj) => {
         const finalPath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}/${manifestObj.hash}`
+        const command = new PutObjectCommand({
+          Bucket: getEnv(c, 'S3_BUCKET'),
+          Key: finalPath,
+        })
+        const url = await getSignedUrlSDK(clientS3, command, { expiresIn: 300 })
+
         return {
           path: manifestObj.file,
           hash: manifestObj.hash,
           finalPath,
-          uploadLink: await s3.getUploadUrl(c, finalPath),
+          uploadLink: url,
         }
       }))
 

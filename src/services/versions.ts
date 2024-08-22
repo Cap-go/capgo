@@ -10,7 +10,6 @@ import { i18n } from '~/modules/i18n'
 export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {
   const { t } = i18n.global
 
-  showLoader()
   let signedURL
   if (app.bucket_id || app.r2_path)
     signedURL = await downloadUrl(app.storage_provider, app.user_id ?? '', app.app_id, app.id)
@@ -18,6 +17,7 @@ export async function openVersion(app: Database['public']['Tables']['app_version
     signedURL = app.external_url
 
   if (signedURL && Capacitor.isNativePlatform()) {
+    showLoader()
     try {
       // const newBundle = await CapacitorUpdater.download({
       //   url: signedURL
@@ -45,11 +45,9 @@ export async function openVersion(app: Database['public']['Tables']['app_version
   else {
     if (!signedURL) {
       toast.error(t('cannot-get-the-test-'))
-      hideLoader()
     }
     else {
       window.location.assign(signedURL)
-      hideLoader()
     }
   }
 }

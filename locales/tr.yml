@@ -87,9 +87,14 @@ button-remove: Kaldırmak
 by-clicking-on-them: üzerlerine tıklayarak.
 canceled-delete: Paket silme işlemi iptal edildi, bağlantılı paket silinemiyor
 canceled-photo-selection: Resim seçimini iptal ettiniz
+cannot-change-default-upload-channel: >-
+  Varsayılan yükleme kanalı değiştirilemiyor, lütfen tarayıcı konsolunu kontrol
+  edin
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
+cannot-create-empty-device: Boş cihaz oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-create-org: Organizasyon oluşturulamıyor, lütfen tarayıcı kayıtlarını kontrol edin!
+cannot-create-overwrite: Üzerine yazma oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol edin
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
@@ -97,6 +102,8 @@ cannot-delete-bundle: Paket silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
+cannot-determine-platform: Verilen UUID'nin IOS'a mı yoksa Android'e mi ait olduğu belirlenemiyor
+cannot-fetch-channels: Kanallar getirilemiyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-find-unknown-version: >-
   Bilinmeyen sürüm bulunamıyor, lütfen Capgo desteğiyle iletişime geçin ve
   tarayıcı günlüklerini kontrol edin
@@ -119,7 +126,7 @@ channel: Kanal
 channel-ab-testing: AB testini etkinleştir
 channel-ab-testing-percentage: İkincil sürümü alan kullanıcıların yüzdesi
 channel-bundle-linked: |-
-  Bu paket bir veya daha fazla kanala bağlı. 
+  Bu paket bir veya daha fazla kanala bağlı.
   (%) Bu kanallardan bağlantısını kaldırmak ister misiniz?
 channel-create: Kanal oluştur
 channel-deleted: kanal silindi
@@ -139,11 +146,19 @@ cli-doc: CLI belgesi
 commands: komutlar
 confirm-email: e-postanızı onaylayın
 confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
+confirm-overwrite: Üzerine yazmayı onayla
+confirm-overwrite-msg: |-
+  Aşağıdaki üzerine yazmayı oluşturmak üzeresiniz:
+
+  Cihaz Kimliği: $1
+  Kanal: 2 Dolar
+  Kanal sürümü: $3
+
+  Bu doğru mu?
 confirm-password: Şifreyi Onayla
 confirm-public-desc: >-
   Bu kanalı varsayılan yapmak, tüm kullanıcılarınıza güncellemeler göndermesini
   sağlar.
-
 
   Diğer varsayılan kanallar artık varsayılan olmayacak.
 continue: Devam etmek
@@ -158,6 +173,7 @@ custom: Gelenek
 custom-domain: Özel alan
 custom-id: özel kimlik
 dashboard: Gösterge Paneli
+default-upload-channel: Varsayılan yükleme kanalı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete: Silmek
@@ -172,6 +188,10 @@ detailed-usage-plan: Detaylı kullanım
 devDependencies: {}
 device: Cihaz
 device-id: Cihaz Kimliği
+device-injected: Bu cihaz, üzerine yazma eklemek için manuel olarak oluşturulmuştur.
+device-injected-2: >-
+  Bazı değerler yer tutucudur ve cihazın ilk güncellemesinden sonra
+  güncellenecektir
 devices: Cihazlar
 did-not-recive-confirm-email: Onay e-postası almadınız mı?
 disable: Devre dışı bırakmak
@@ -203,15 +223,19 @@ fast-forward: İleri sar
 first-name: İlk adı
 force-version: Kuvvet versiyonu
 force-version-change: Aşamalı dağıtımı atla
+forced-devices-not-found: Bu kanalda herhangi bir zorunlu cihaz bulunmamaktadır
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
 free-trial: Ücretsiz deneme
 from-device: cihazdan
 general-information: Genel Bilgiler
+generate-device-overwrite: Aygıt üzerine yazma oluştur
+generate-device-overwrite-msg: Bir aygıt üzerine yazma oluşturmak üzeresiniz. Devam etmek istiyor musunuz?
 generated-new-apikey: Yeni API anahtarı oluşturuldu!
 go-back: Geri gitmek
 good: İyi
+here: Burada
 id: İD
 included-in-plan: Plana dahil
 info: Bilgi
@@ -221,6 +245,7 @@ install: Kurulmuş
 invalid-auth: Oturum açma bilgileriniz eşleşmedi, tekrar deneyin.
 invalid-email: İletilen e-posta geçerli değil
 invalid-mfa-code: Geçersiz 2FA kodu
+invalid-uuid: Geçersiz UUID
 invalid-version: Geçersiz semver sürümü
 invite-accepted: Organizasyon daveti başarıyla kabul edildi
 is-emulator: Emülatör mü
@@ -237,6 +262,7 @@ last-15-minutes: Son 15 dakika
 last-3-minutes: Son 3 dakika
 last-minute: Son dakika
 last-name: Soy isim
+last-run: Son güncelleme
 last-update: Son Güncelleme
 last-upload: Son yükleme
 last-version: Son sürüm
@@ -271,7 +297,7 @@ min-update-version: Minimum güncelleme sürümü
 minor: Küçük
 misconfigured: Yanlış yapılandırılmış
 misconfigured-channels: |-
-  Bazı kanallar yanlış yapılandırılmış. 
+  Bazı kanallar yanlış yapılandırılmış.
   Bu kanallar için güncellemeler başarısız olacaktır!
 missing-email: Eksik e-posta
 missing-name: Eksik ad
@@ -285,21 +311,26 @@ more-version-storage: Daha fazla sürüm Depolama
 my-notifications: Bildirimlerim
 name: İsim
 need-more-contact-us: |-
-  Daha fazlasına ihtiyaç var ? 
+  Daha fazlasına ihtiyaç var ?
   Size özel plan için bize ulaşın
 new-name-not-changed: Yeni isim eskisiyle aynı
 new-name-to-long: |-
-  Yeni isim çok uzun. 
+  Yeni isim çok uzun.
   Yalnızca 32 karakter kullanabilirsiniz
 new-name-to-short: |-
-  Apikey adı çok kısa. 
+  Apikey adı çok kısa.
   En az 4 karakter uzunluğunda olmalı
 next: Sonraki
+next-run: Sonraki güncelleme
 'no': HAYIR
 no-app-icon: Bu uygulamanın herhangi bir uygulama simgesi yok
 no-data: Veri yok
 no-permission: Yetersiz yetkiler
+no-permission-ask-super-admin: >-
+  Yetersiz izin, lütfen bir süper yöneticiden bu paketi güvenli olmayan bir
+  şekilde silmesini isteyin
 none: Hiçbiri
+normal: Normal
 not-found: Bulunamadı
 not-paying-org-usage: Bu kuruluş ödeme yapmıyor, ücretsiz deneme kuruluşu için kullanım gösteremiyor
 notifications: bildirimler
@@ -330,6 +361,7 @@ password-hint: En az 6 rakam, harf ve noktalama işaretlerinden oluşan bir komb
 patch: Yama
 percent-fail: Başarısız yüzde
 permission-changed: Kullanıcı izni başarıyla değiştirildi
+pernament: Pernament
 personal-information: Kişisel bilgiler
 picture-delete-fail: Uygulama resmi silinemiyor, lütfen konsol günlüğünü kontrol edin
 picture-uploaded: Resim başarıyla yüklendi
@@ -337,6 +369,7 @@ plan-bandwidth: GB Bant Genişliği
 plan-desc: >-
   Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
   ekleyin.
+plan-failed: Plan başarısız oldu, lütfen kart bilgilerinizi doğrulayın
 plan-free: MVP ve test için en iyisi
 plan-inactive: Plan etkin değil
 plan-maker: Küçük işletme sahipleri için en iyisi
@@ -387,6 +420,15 @@ search-by-device-id-: Cihaz kimliğine veya eyleme göre arama yapın
 search-by-device-id-0: Cihaz kimliğine göre ara
 search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
+select-channel: Kanal seçin
+select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
+select-default-upload-channel: Lütfen varsayılan yükleme kanalını seçin
+select-default-upload-channel-header: Varsayılan kanalı seçin
+select-style-of-deletion: Silme stilini seçin
+select-style-of-deletion-msg: |-
+  Lütfen bu kanalı silmek istediğiniz yolu seçin.
+  Normal olanı seçmeniz tavsiye edilir.
+  Fark hakkında okuyabilirsiniz $1
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
 session_key: IvSessionKey
@@ -397,7 +439,7 @@ sign-out: Oturumu Kapat
 size: Boyut
 size-not-found: Bulunamadı
 something-went-wrong-try-again-later: |-
-  Bir şeyler yanlış gitti! 
+  Bir şeyler yanlış gitti!
   Daha sonra tekrar deneyin.
 special-api-access: Özel API erişimi
 start-new-deploy: Yeni aşamalı dağıtımı başlatın
@@ -418,8 +460,11 @@ to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps-v2: Uygulamalar
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
+type-device-id: Cihaz kimliğini girin
+type-device-id-msg: Lütfen üzerine yazmak istediğiniz cihazın kimliğini girin
 type-new-name: Lütfen yeni API anahtarı adını yazın
 type-new-org-name: Lütfen kuruluşun yeni adını yazın
+undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
 unknown: Bilinmeyen
@@ -429,8 +474,10 @@ unlink-bundle: Paketin bağlantısını kaldır
 unlink-channel: Kanalın bağlantısını kaldır
 unlink-error: Bağlantıyı kaldırma hatası, lütfen konsolu kontrol edin
 unlink-version: Sürümün bağlantısını kaldır
+unsafe: Güvensiz
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
+updated-default-upload-channel: Varsayılan yükleme kanalı güncellendi
 updated-min-version: Minimum sürüm güncellendi
 upgrade: Güncelleme
 upload-img-error: Resim yüklenemiyor, lütfen konsolu kontrol edin
@@ -457,11 +504,12 @@ what-to-do-with-photo: Resmi düzenle
 what-to-do-with-photo-dec: Uygulama fotoğrafıyla ne yapmak istersiniz?
 write-key: Yazmak
 wrong-name-org-del: |-
-  Kuruluşun adını yazmadınız. 
+  Kuruluşun adını yazmadınız.
   Şunu yazmanız gerekiyordu: %1
 yearly: Yıllık
 'yes': Evet
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
+you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı
 your-settings: Ayarlarınız
 your-ussage: 'Kullanımınız:'

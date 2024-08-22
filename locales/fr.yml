@@ -1,13 +1,13 @@
-2fa: Gérer 2FA
-2fa-code: Code d'authentification 2FA
-2fa-disabled: 2FA désactivé
+2fa: Gérer le 2FA
+2fa-code: code d'authentification 2FA
+2fa-disabled: Désactivé 2FA
 6-characters-minimum: 6 caractères minimum, 1 majuscule, 1 minuscule, 1 caractère spécial
 Bandwidth: Bande passante
 Current: Actuel
 Storage: Stockage
 ab-testing-progressive-deploy-conflict: >-
   Les tests AB et le déploiement progressif ne peuvent pas être activés en même
-  temps
+  temps.
 account: compte
 account-error: Erreur lors de la mise à jour de votre compte
 account-id: Identifiant de compte
@@ -16,70 +16,72 @@ account-password-heading: Changer mon mot de passe
 account-updated-succ: Compte mis à jour avec succès
 action: Action
 activation-doi: Consentement facultatif
-activation-doi-desc: J'accepte la newsletter par e-mail et les futures offres marketing
-activation-heading: Activation
-activation-legal: Conditions d'utilisation
+activation-doi-desc: J'accepte la newsletter par email et les futures offres marketing
+activation-heading: activation
+activation-legal: Conditions de service
 activation-legal-desc: >-
   J'accepte la politique de confidentialité et les conditions d'utilisation de
   l'application Capgo
 activation-notification: Notifications
 activation-notification-desc: >-
-  J'accepte de recevoir une notification lorsqu'une nouvelle version de
-  l'application est disponible
+  J'accepte de recevoir une notification lorsque de nouvelles versions de
+  l'application sont disponibles
 activation-validate: Valider
-active_users_by_version: Appareil actif par bundle
+active_users_by_version: Appareil actif par paquet
 add-another-app: Ajoutez votre application
-add-api-key: Nouvelle clé API ajoutée avec succès
+add-api-key: Ajouté avec succès une nouvelle clé API
 add-member: Ajouter un membre
-add-your-first-app-t: "Ajoutez votre première application à votre compte et poussez les mises à jour\_!"
+add-your-first-app-t: >-
+  Ajoutez votre première application à votre compte et lançons des mises à jour
+  !
 admin: administrateur
 alert-2fa-disable: Confirmez que vous souhaitez désactiver 2FA
-alert-accept-inviation: "Acceptez-vous l'invitation à %ORG%\_?"
-alert-add-new-key: Sélectionnez un nouveau type de clé API
-alert-confirm-delete: Confirmation de la suppression
+alert-accept-inviation: Acceptez-vous l'invitation à %ORG%?
+alert-add-new-key: Sélectionnez le nouveau type de clé API
+alert-confirm-delete: Confirmer la suppression
 alert-confirm-invite: Confirmer l'invitation
 alert-confirm-regenerate: Confirmer la régénération de la clé API
-alert-delete-message: Êtes-vous sûr de vouloir supprimer ce
+alert-delete-message: Êtes-vous sûr de vouloir supprimer ceci ?
 alert-denied-invite: Invitation refusée
-alert-disable-2fa-message: "Êtes-vous sûr de vouloir désactiver 2FA\_?"
+alert-disable-2fa-message: Êtes-vous sûr de vouloir désactiver 2FA ?
 alert-generate-new-key: Veuillez sélectionner le type de clé API que vous souhaitez générer.
 alert-no-invite: Cette invitation n'existe plus
-alert-not-invited: Invitation invalide, impossible d'accepter
+alert-not-invited: Invitation non valide, impossible d'accepter
 alert-not-reverse-message: Cette action n'est pas réversible
-alert-regenerate-key: Êtes-vous sûr de vouloir régénérer cette clé
+alert-regenerate-key: Êtes-vous sûr de vouloir régénérer cette clé ?
 alert-unknown-error: Erreur inconnue, voir la console de développement
-allow-develoment-bui: Autoriser la compilation de développement
-allow-device-to-self: Autoriser les appareils à s'auto-associer
-allow-emulator: Autoriser les émulateurs
-already-account: Avez-vous déjà un compte?
-api-doc: Documentation API
+allow-develoment-bui: Autoriser la construction de développement
+allow-device-to-self: Permettre aux appareils de s'associer automatiquement
+allow-emulator: Permettre les émulateurs
+already-account: Vous avez déjà un compte ?
+api-doc: doc API
 api-keys: Clés API
-api-keys-are-used-for-cli-and-public-api: Les clés API sont utilisées pour la CLI et l'API publique
+api-keys-are-used-for-cli-and-public-api: Les clés API sont utilisées pour le CLI et l'API publique
 app: Application
 app-deleted: Application supprimée
 app-info: Informations sur l'application
 app-info-desc: Vous pouvez modifier ici les informations de votre application
-app-logo-deleted: Image de l'application supprimée avec succès
+app-logo-deleted: L'image de l'application a été supprimée avec succès
 app-name: Nom de l'application
-app-perm: Autorisation de l'application
+app-perm: Autorisation d'application
 are-u-sure: Êtes-vous sûr ?
-are-you-sure-you-want-to-download: Êtes-vous sûr de vouloir télécharger ?
-available-in-the-san: Disponible dans l'application bac à sable
+are-you-sure-you-want-to-download: Êtes-vous sûr que vous voulez télécharger?
+available-in-the-san: Disponible dans l'application sandbox
 back-to-login-page: Retour à la page de connexion
-bandwith-usage: "Utilisation de la bande passante\_:"
+bandwith-usage: 'Utilisation de la bande passante:'
 base: Base
-best-plan: Meilleur forfait
+best-plan: Meilleur plan
 bigger-app-size: Taille d'application plus grande
 billed-annually-at: Facturé annuellement à
 billed-monthly-at: Facturé mensuellement à
 billing: facturation
-bulk-upload: Transfert groupé
-bundle: bundle
-bundle-deleted: Groupe supprimé
-bundle-is-linked-device: Le bundle est lié à l'appareil, dissociez-le d'abord
-bundle-number: Numéro de version
-bundles: Canaux
-button-back: Retour
+bulk-upload: Téléchargement en masse
+bundle: Paquet
+bundle-deleted: Lot supprimé
+bundle-is-linked-device: Le bundle est lié à l'appareil, déliez-le d'abord
+bundle-number: Numéro de lot
+bundles: Paquets
+button-back: Dos
 button-browse: Parcourir
 button-camera: Caméra
 button-cancel: Annuler
@@ -87,24 +89,37 @@ button-confirm: Confirmer
 button-delete: Supprimer
 button-deny-invite: Refuser
 button-invite: Inviter
-button-join: Accepter
+button-join: Accepte
 button-regenerate: Régénérer
 button-remove: Retirer
-by-clicking-on-them: en cliquant dessus.
-canceled-delete: Suppression du bundle annulée, impossible de supprimer un bundle lié
-canceled-photo-selection: Vous avez annulé la sélection d'image
+by-clicking-on-them: en cliquant sur eux.
+canceled-delete: Annulation de la suppression du bundle, impossible de supprimer un bundle lié
+canceled-photo-selection: Vous avez annulé la sélection de l'image
+cannot-change-default-upload-channel: >-
+  Impossible de changer le canal de téléchargement par défaut, veuillez vérifier
+  la console du navigateur
 cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
-cannot-create-org: "Impossible de créer une organisation, veuillez vérifier les journaux du navigateur\_!"
+cannot-create-empty-device: >-
+  Impossible de créer un appareil vide. Veuillez vérifier la console du
+  navigateur
+cannot-create-org: >-
+  Impossible de créer une organisation, veuillez vérifier les journaux du
+  navigateur !
+cannot-create-overwrite: Impossible de créer une réécriture. Veuillez vérifier la console du navigateur
 cannot-del-org: >-
   Impossible de supprimer l'organisation, veuillez vérifier le journal du
   navigateur
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
-cannot-delete-bundle: Impossible de supprimer le groupe
-cannot-delete-channel: Impossible de supprimer le canal
+cannot-delete-bundle: Impossible de supprimer le paquet
+cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
+cannot-determine-platform: Impossible de déterminer si l'UUID donné appartient à IOS ou Android
+cannot-fetch-channels: >-
+  Impossible de récupérer les chaînes. Veuillez vérifier la console du
+  navigateur
 cannot-find-unknown-version: >-
   Impossible de trouver la version inconnue, veuillez contacter le support capgo
   et vérifier les journaux du navigateur
@@ -113,59 +128,70 @@ cannot-invite-owner: Impossible d'inviter le propriétaire dans l'organisation
 cannot-load-app-settings: Impossible de charger les paramètres de l'application
 cannot-set-this-vers: Impossible de définir cette version
 cannot-show: Impossible d'afficher cette page
-cannot-test-app-some: Impossible de tester l'application, une erreur s'est produite
-cannot-view-plans: Impossible d'afficher la page des forfaits
-cannot-view-usage: Impossible d'afficher la page d'utilisation
-cannots-sign-off: Impossible de se connecter
+cannot-test-app-some: Impossible de tester l'application, quelque chose s'est mal passé
+cannot-view-plans: Impossible de voir la page des plans
+cannot-view-usage: Impossible de voir la page d'utilisation
+cannots-sign-off: Impossible de se déconnecter
 change: Changement
 change-api-key-name: Changer le nom de l'apikey
 change-your-picture: Changez votre photo
-changed-app-name: Le nom de l'application a bien été modifié
-changed-name: Le nom d'Apikey a été modifié avec succès
-changed-password-suc: Le mot de passe a été changé avec succès
-channel: Canaux
-channel-ab-testing: Activer les tests AB
+changed-app-name: Nom de l'application modifié avec succès
+changed-name: Le nom de l'apikey a été modifié avec succès
+changed-password-suc: Mot de passe modifié avec succès
+channel: Canal
+channel-ab-testing: Activer le test AB
 channel-ab-testing-percentage: Pourcentage d'utilisateurs recevant la version secondaire
-channel-bundle-linked: "Ce forfait est lié à une ou plusieurs chaînes. \n(%) Souhaitez-vous le dissocier de ces chaînes\_?"
-channel-create: Créer un canal
-channel-deleted: Canal supprimé
+channel-bundle-linked: >-
+  Ce lot est lié à une ou plusieurs chaînes. (%) Souhaitez-vous le dissocier de
+  ces chaînes?
+channel-create: Créer une chaîne
+channel-deleted: Chaîne supprimée
 channel-forced-devices: Appareils forcés
-channel-is-public: Chaîne par défaut
-channel-link: Remplacement de canal
-channel-link-fail: Impossible de remplacer le canal, quelque chose de mal s'est produit
-channel-linked: Remplacement de canal défini
-channel-linking: Lien vers le canal
-channel-make-now: Mettre par défaut
+channel-is-public: Canal par défaut
+channel-link: Dépassement de canal
+channel-link-fail: Impossible de remplacer la chaîne, quelque chose s'est mal passé
+channel-linked: Dépassement de canal défini
+channel-linking: Lien vers la chaîne
+channel-make-now: Définir par défaut
 channel-progressive-deploy: Activer le déploiement progressif
 channels: Canaux
-check-email: Veuillez vérifier votre e-mail et vérifier
-check-on-web: Vérifier sur le site Web
-checksum: checksum
+check-email: Veuillez vérifier votre email et confirmer
+check-on-web: Vérifiez sur le site web
+checksum: Somme de contrôle
 cli-doc: Document CLI
 commands: commandes
-confirm-email: confirmez votre email
+confirm-email: Confirmez votre email
 confirm-email-sent: >-
   Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
-  votre email.
-confirm-password: Confirmez le mot de passe
+  votre email
+confirm-overwrite: Confirmer l'écrasement
+confirm-overwrite-msg: |-
+  Vous êtes sur le point de créer la réécriture suivante :
+
+  ID de l'appareil : $1
+  Canal : $2
+  Version du canal : $3
+
+  Cela vous semble-t-il correct ?
+confirm-password: Confirmer le mot de passe
 confirm-public-desc: >-
-  Si vous définissez ce canal par défaut, il enverra des mises à jour à tous vos
+  Rendre cette chaîne par défaut enverra des mises à jour à tous vos
   utilisateurs.
 
-
-  Les autres canaux par défaut ne seront plus par défaut.
+  Les autres chaînes par défaut ne seront plus par défaut.
 continue: Continuer
-copied-to-clipboard: Copié dans le presse-papier
+copied-to-clipboard: Copié dans le presse-papiers
 copy-account-id: copier l'identifiant du compte
-copy-command: Copier la commande
+copy-command: Commande de copie
 country: Pays
-create-a-free-accoun: Créer un compte gratuit
-create-new-org: Créer une nouvelle organisation
+create-a-free-accoun: Créez un compte gratuit
+create-new-org: Créez une nouvelle organisation
 created-at: Créé à
-custom: Coutume
+custom: Personnalisé
 custom-domain: Domaine personnalisé
-custom-id: Identifiant personnalisé
+custom-id: ID personnalisé
 dashboard: tableau de bord
+default-upload-channel: Canal de téléchargement par défaut
 defined-as-private: défini comme normal
 defined-as-public: défini par défaut
 delete: Supprimer
@@ -173,307 +199,337 @@ delete-account: Supprimer le compte
 delete-account-0: Supprimer le compte
 delete-app: Supprimer l'application
 delete-org: Supprimer l'organisation
-delete-your-account: Supprimer votre compte
+delete-your-account: Supprimez votre compte
 deleted: supprimé
-dependencies: {}
 detailed-usage-plan: Utilisation détaillée
-devDependencies: {}
 device: Appareil
-device-id: Identifiant de l'appareil
+device-id: ID de l'appareil
+device-injected: Cet appareil a été créé manuellement pour ajouter une réécriture.
+device-injected-2: >-
+  Certaines valeurs sont des espaces réservés et elles seront mises à jour après
+  la première mise à jour de l'appareil.
 devices: Appareils
-did-not-recive-confirm-email: Vous n'avez pas reçu d'email de confirmation?
+did-not-recive-confirm-email: Vous n'avez pas reçu l'email de confirmation?
 disable: Désactiver
-disable-ab-testing: Tests AB désactivés
-disable-auto-downgra: Désactiver la rétrogradation automatique en natif
+disable-ab-testing: Désactivé le test AB
+disable-auto-downgra: Désactiver la rétrogradation automatique sous natif
 disable-progressive-deploy: Déploiement progressif désactivé
 disableAutoUpdateToMajor: Désactiver la mise à jour automatique
-discord: discorde
-discover-module-in-a: Découvrir le module dans Awesome-capacitor
+discord: discord
+discover-module-in-a: Découvrez le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
-documentation: Documentation
-dont-have-an-account: "Vous n'avez pas de compte\_?"
+documentation: documentation
+dont-have-an-account: Vous n'avez pas de compte ?
 download: Télécharger
-email: E-mail
+email: Courriel
 enable: Activer
 enable-2FA: Activer 2FA
-enabled-ab-testing: Tests AB activés
+enabled-ab-testing: AB testing activé
 enabled-progressive-deploy: Déploiement progressif activé
 enter-your-email-add: >-
   Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 error: Erreur
-fail: Échec de l'installation
+fail: L'installation a échoué
 failed: Échoué
 failed-to-get-user: Échec du chargement de l'utilisateur
-fast-backward: Retour rapide
-fast-forward: Avance rapide
+fast-backward: Retour Rapide
+fast-forward: Avance Rapide
 first-name: Prénom
 force-version: Version forcée
-force-version-change: Ignorer le déploiement progressif
+force-version-change: Sauter le déploiement progressif
+forced-devices-not-found: Ce canal n'a pas de dispositifs forcés
 forgot: Oublié
 forgot-check-email: >-
-  Vérifiez votre email pour obtenir le lien pour réinitialiser votre mot de
+  Vérifiez votre email pour obtenir le lien de réinitialisation de votre mot de
   passe
 forgot-success: Mot de passe mis à jour avec succès
 free-trial: Essai gratuit
-from-device: depuis l'appareil
-general-information: Informations générales
-generated-new-apikey: "Génération d'une nouvelle clé API\_!"
-go-back: Retourner
-good: Bien
-id: Identifiant
-included-in-plan: Inclus dans le forfait
+from-device: de l'appareil
+general-information: Informations Générales
+generate-device-overwrite: Générer la réécriture de l'appareil
+generate-device-overwrite-msg: >-
+  Vous êtes sur le point de générer une réécriture de l'appareil. Voulez-vous
+  continuer?
+generated-new-apikey: Généré une nouvelle clé API !
+go-back: Reviens
+good: Bon
+here: ici
+id: ID
+included-in-plan: Inclus dans le plan
 info: Information
-init-capgo-in-your-a: Init Capgo dans votre application
-insert-invite-email: Insérez l'e-mail de l'utilisateur que vous souhaitez inviter
-install: installée
-invalid-auth: Vos identifiants ne correspondent pas, réessayez.
-invalid-email: L'e-mail transmis n'est pas valide
+init-capgo-in-your-a: Initialisez Capgo dans votre application
+insert-invite-email: Insérez l'email de l'utilisateur que vous souhaitez inviter
+install: Installé
+invalid-auth: Vos identifiants ne correspondent pas, essayez à nouveau.
+invalid-email: L'email passé n'est pas valide
 invalid-mfa-code: Code 2FA invalide
-invalid-version: Version Semver invalide
-invite-accepted: Invitation d'organisation acceptée avec succès
-is-emulator: Est-ce un émulateur
-is-production-app: Est-ce l'application de Production
+invalid-uuid: UUID non valide
+invalid-version: Version semver invalide
+invite-accepted: Invitation à l'organisation acceptée avec succès
+is-emulator: Est Emulateur
+is-production-app: Est-ce l'application de production
 key-admin: Administrateur
-key-all: Tous
+key-all: Tout
 key-copied: Clé copiée dans votre presse-papiers
 key-read: Lire
 key-super-admin: Super administrateur
 key-upload: Télécharger
 key-write: Écrire
 language: Langue
-last-15-minutes: 15 dernières minutes
-last-3-minutes: 3 dernières minutes
+last-15-minutes: Derniers 15 minutes
+last-3-minutes: Dernières 3 minutes
 last-minute: Dernière minute
 last-name: Nom de famille
+last-run: Dernière mise à jour
 last-update: Dernière mise à jour
 last-upload: Dernier téléchargement
 last-version: Dernière version
-latest_version: Dernier forfait
-launch-bundle: Lancer le bundle
-leaving: Sortie
+latest_version: Dernier paquet
+launch-bundle: Lancement du bundle
+leaving: Partir
 live-reload: Rechargement en direct
-log-in: Connexion
+log-in: Se connecter
 login-to-your-accoun: Connectez-vous à votre compte
-logs: Journaux
-main-bundle-number: Numéro du forfait principal
+logs: Bûches
+main-bundle-number: Numéro de lot principal
 major: Majeur
 make-default-android: Définir par défaut pour Android
 make-default-ios: Définir par défaut pour iOS
 make-normal: Rendre normal
 making-this-channel-: >-
-  Pour rendre ce canal "normal", vous devrez configurer un autre canal par
-  défaut ou laisser l'appareil s'auto-attribuer.
+  Pour rendre cette chaîne "normale", vous devrez configurer une autre chaîne
+  par défaut ou laisser l'appareil s'attribuer lui-même.
 mau: Utilisateurs actifs mensuels
-mau-usage: "Utilisation mensuelle des utilisateurs actifs\_:"
+mau-usage: 'Utilisation des utilisateurs actifs mensuels :'
 member-deleted: Membre supprimé avec succès
 members: Membres
 metadata: Métadonnées
-metadata-min-ver-not-set: La version de mise à jour minimale pour le bundle actuel n'est pas définie
+metadata-min-ver-not-set: La version de mise à jour minimale pour le paquet actuel n'est pas définie
 metadata-not-found: métadonnées introuvables
 mfa-enable-instruction: Veuillez scanner le code QR dans l'application d'authentification et vérifier
-mfa-enable-instruction-2: Veuillez saisir le code 2FA actuel
-mfa-enabled: 2FA activé
-mfa-fail: Impossible de modifier 2FA, veuillez vérifier la console du navigateur
-mfa-invalid-code: "Code 2FA invalide, réessayez\_!"
+mfa-enable-instruction-2: Veuillez taper le code 2FA actuel
+mfa-enabled: Activé 2FA
+mfa-fail: Impossible de modifier le 2FA, veuillez vérifier la console du navigateur
+mfa-invalid-code: Code 2FA invalide, essayez à nouveau !
 min-update-version: Version de mise à jour minimale
-minor: Mineure
+minor: Mineur
 misconfigured: Mal configuré
-misconfigured-channels: "Certaines chaînes sont mal configurées. \nLes mises à jour échoueront pour ces chaînes\_!"
-missing-email: E-mail manquant
+misconfigured-channels: >-
+  Certains canaux sont mal configurés. Les mises à jour échoueront pour ces
+  canaux!
+missing-email: Email manquant
 missing-name: Nom manquant
-mo: mo
+mo: moi
 modify-org-info: Vous pouvez modifier les informations de l'organisation ici.
 module-heading: Modules
 monthly-active-users: Utilisateurs actifs mensuels
-monthly-plan: Plan mensuel
-montly-active: Actif mensuel
-more-version-storage: Plus de version stockée
-my-notifications: mes notifications
+monthly-plan: Plan Mensuel
+montly-active: Actif mensuellement
+more-version-storage: Plus de version de stockage
+my-notifications: Mes Notifications
 name: Nom
-need-more-contact-us: |-
-  Besoin de plus ? 
-  Contactez-nous pour un plan sur mesure
-new-name-not-changed: Le nouveau nom est le même que l'ancien
-new-name-to-long: "Le nouveau nom est trop long. \nVous ne pouvez utiliser que 32\_caractères"
-new-name-to-short: "Le nom de l'apikey est trop court. \nIl doit contenir au moins 4\_caractères"
-next: Suivant
-'no': Non
+need-more-contact-us: Besoin de plus ? Contactez-nous pour un plan sur mesure
+new-name-not-changed: Le nouveau nom est le même que l'ancien.
+new-name-to-long: Le nouveau nom est trop long. Vous ne pouvez utiliser que 32 caractères.
+new-name-to-short: Le nom de l'apikey est trop court. Il doit comporter au moins 4 caractères.
+next: Prochain
+next-run: Prochaine mise à jour
+'no': non
 no-app-icon: Cette application n'a pas d'icône d'application
-no-data: Pas de données
-no-permission: Permissions insuffisantes
+no-data: Aucune Donnée
+no-permission: Autorisations insuffisantes
+no-permission-ask-super-admin: >-
+  autorisation insuffisante, veuillez demander à un super administrateur de
+  supprimer ce paquet de manière non sécurisée
 none: Aucun
-not-found: Pas trouvé
+normal: Normal
+not-found: Non trouvé
 not-paying-org-usage: >-
-  Cette organisation ne paie pas et ne peut pas montrer son utilisation pour une
-  organisation de test gratuite.
-notifications: avis
-ok: D'ACCORD
-old-onboarding-mode: ancienne intégration
-one-day-left: Reste un jour
+  Cette organisation ne paie pas, ne peut pas montrer l'utilisation pour une
+  organisation d'essai gratuite
+notifications: notifications
+ok: D'accord
+old-onboarding-mode: ancien embarquement
+one-day-left: Il reste un jour
 open: Ouvrir
 open-channel: Canal ouvert
 open-in-new-tab: Ouvrir dans un nouvel onglet
 open-sidebar: Ouvrir la barre latérale
 open-your-portal: Ouvrez votre portail
 org-changes-saved: Organisation mise à jour avec succès
-org-changes-set-email-not-unique: L'e-mail de gestion n'est pas unique, veuillez en sélectionner un autre
-org-changes-set-email-other-error: Impossible de définir l'e-mail de gestion, veuillez contacter l'assistance
-org-created-successfully: "Organisation créée avec succès\_!"
-org-deleted: Organisation supprimée avec succès
-org-invited-user: L'utilisateur a été invité avec succès dans l'organisation
-org-with-this-name-exists: "Vous avez déjà créé une organisation portant ce nom\_!"
-organization-email: E-mail de gestion de l'organisation
-organization-name: nom de l'organisation
+org-changes-set-email-not-unique: L'email de gestion n'est pas unique, veuillez en choisir un différent.
+org-changes-set-email-other-error: Impossible de définir l'email de gestion, veuillez contacter le support
+org-created-successfully: Org créée avec succès !
+org-deleted: Org supprimée avec succès
+org-invited-user: Utilisateur invité avec succès à l'org
+org-with-this-name-exists: Vous avez déjà créé une organisation avec ce nom !
+organization-email: Email de gestion de l'organisation
+organization-name: Nom de l'Organisation
 organization-settings: Paramètres de l'organisation
-os-version: Version du système d'exploitation
-pages: pages
+os-version: version du système d'exploitation
+pages: Pages
 password: Mot de passe
-password-confirmatio: Confirmation mot de passe
+password-confirmatio: Confirmation du mot de passe
 password-heading: Créer un mot de passe
-password-hint: >-
-  Entrez une combinaison d'au moins 6 chiffres, lettres et signes de
-  ponctuation.
+password-hint: Entrez une combinaison d'au moins 6 chiffres, lettres et ponctuations.
 patch: Correctif
 percent-fail: Pourcentage d'échec
-permission-changed: L'autorisation de l'utilisateur a été modifiée avec succès
-personal-information: Informations personnelles
+permission-changed: Modification réussie des autorisations de l'utilisateur
+pernament: Permanent
+personal-information: Informations Personnelles
 picture-delete-fail: >-
   Impossible de supprimer l'image de l'application, veuillez vérifier le journal
   de la console
-picture-uploaded: Photo téléchargée avec succès
-plan-bandwidth: Bande passante Go
-plan-desc: Commencez à créer gratuitement, puis ajoutez un plan pour le mettre en ligne.
-plan-free: Idéal pour MVP et les tests
-plan-inactive: Forfait inactif
-plan-maker: Idéal pour les propriétaires de petites entreprises
-plan-page-warn: >-
-  L’achat d’un forfait n’affectera pas les organisations dans lesquelles vous
-  êtes invité.
-plan-page-warn-2: Apprenez-en davantage.
-plan-payasyougo: Idéal pour les entreprises en pleine croissance
-plan-pricing-plans: Forfaits tarifaires
-plan-solo: Idéal pour les indépendants
-plan-storage: Go de stockage
-plan-team: Idéal pour les propriétaires de grandes entreprises
+picture-uploaded: Image téléchargée avec succès
+plan-bandwidth: Bande passante GB
+plan-desc: >-
+  Commencez à construire gratuitement, puis ajoutez un plan pour passer en
+  direct.
+plan-failed: Le plan a échoué, veuillez vérifier les détails de votre carte
+plan-free: Meilleur pour MVP et tests
+plan-inactive: Plan inactif
+plan-maker: Meilleur pour les petits propriétaires d'entreprises
+plan-page-warn: L'achat d'un plan affectera UNIQUEMENT l'organisation "%ORG_NAME%".
+plan-page-warn-2: En savoir plus à ce sujet.
+plan-payasyougo: Meilleur pour les entreprises en expansion
+plan-pricing-plans: Plans Tarifaires
+plan-solo: Le meilleur pour les indépendants
+plan-storage: Stockage GB
+plan-team: Meilleur pour les grands propriétaires d'entreprise
 plan-updates: Mises à jour
 plan-upgrade: S'abonner
-plan-whats-included: Ce qui est inclus
-plans: des plans
+plan-whats-included: Qu'est-ce qui est inclus
+plans: projets
 plans-super-only: >-
-  Seuls les super-administrateurs sont autorisés à consulter les forfaits et la
-  facturation.
+  Seuls les super administrateurs sont autorisés à consulter les plans et la
+  facturation
 platform: Plateforme
-please-ask-the-user-to-create-account-first: Veuillez d'abord demander à l'utilisateur de créer un compte
+please-ask-the-user-to-create-account-first: Veuillez demander à l'utilisateur de créer un compte d'abord.
 please-choose-your-p: Veuillez choisir vos préférences
 please-confirm-org-del: >-
-  Veuillez confirmer que vous souhaitez supprimer l'organisation « %1 » en
-  saisissant son nom
-plugin-version: Version du plug-in
+  Veuillez confirmer que vous souhaitez supprimer l'organisation "%1" en tapant
+  son nom
+plugin-version: Version du plugin
 prediction: Prédiction
-preview: Offre groupée d'aperçu
-preview-short: Aperçu
+preview: Aperçu du bundle
+preview-short: aperçu
 previous: Précédent
-price-per-unit-above: Prix ​​par unité au-dessus du plan
-pro-tip-you-can-copy: "Conseil de pro\_: vous pouvez copier le"
-progressive-bundle-number: Numéro de forfait progressif
+price-per-unit-above: Prix par unité au-dessus du plan
+pro-tip-you-can-copy: 'Astuce pro : vous pouvez copier le'
+progressive-bundle-number: Numéro de lot progressif
 progressive-deploy-option: Sélectionnez l'option de déploiement progressif
 progressive-deploy-set-percentage: >-
-  Vous ne pouvez pas définir le pourcentage de version secondaire lorsque le
+  Vous ne pouvez pas définir le pourcentage de la version secondaire lorsque le
   déploiement progressif est activé
 progressive-percentage: Statut de déploiement progressif
 recommended: Recommandé
 register-heading: Inscription
-register-next: Enregistrer
+register-next: Inscrivez-vous
 reload: Recharger
 removed-apikey: La clé API a été supprimée avec succès
 resend: Renvoyer
-resend-confirm: Renvoyer un courriel de confirmation
+resend-confirm: Renvoyer l'email de confirmation
 resend-email: Renvoyer l'email de confirmation
-reset-password: réinitialiser le mot de passe
-reset-your-password: réinitialisez votre mot de passe
-save: Économisez
-save-changes: Sauvegarder les modifications
-search-bundle-id: Rechercher par ID de groupe
-search-by-device-id: Rechercher par ID d'appareil ou ID personnalisé
-search-by-device-id-: Rechercher par ID d'appareil ou action
-search-by-device-id-0: Rechercher par ID d'appareil
-search-by-name: Rechercher par nom
+reset-password: Réinitialiser le mot de passe
+reset-your-password: Réinitialisez votre mot de passe
+save: Économies
+save-changes: Enregistrer les modifications
+search-bundle-id: Recherche par ID de bundle
+search-by-device-id: Recherche par ID de l'appareil ou ID personnalisé
+search-by-device-id-: Recherche par identifiant de l'appareil ou action
+search-by-device-id-0: Recherche par ID de l'appareil
+search-by-name: Recherche par nom
 see-usage: Voir l'utilisation
+select-channel: Sélectionnez la chaîne
+select-channel-msg: Veuillez sélectionner le canal que vous souhaitez utiliser dans cet écrasement
+select-default-upload-channel: Veuillez sélectionner le canal de téléchargement par défaut
+select-default-upload-channel-header: Sélection du canal par défaut
+select-style-of-deletion: Sélectionnez le style de suppression
+select-style-of-deletion-msg: |-
+  Veuillez sélectionner la manière dont vous souhaitez supprimer cette chaîne.
+  Il est recommandé d'opter pour la méthode normale.
+  Vous pouvez lire sur la différence $1
 select-user-perms: Sélectionnez les autorisations de l'utilisateur
-select-user-perms-expanded: Sélectionnez quelle autorisation l'utilisateur invité doit avoir
-session_key: Session ID
-set-bundle: Définir le groupe sur le canal
+select-user-perms-expanded: Sélectionnez quelle permission l'utilisateur invité devrait avoir
+session_key: CléDeSessionIv
+set-bundle: Définir le bundle sur la chaîne
 settings: Paramètres
-showing: Affichage
-sign-out: Se déconnecter
+showing: Montrant
+sign-out: Se Déconnecter
 size: Taille
-size-not-found: Introuvable
-something-went-wrong-try-again-later: "Quelque chose s'est mal passé\_! \nRéessayez plus tard."
-special-api-access: Accès API privilégié
-start-new-deploy: Démarrer un nouveau déploiement progressif
-start-using-capgo: "Commencez à utiliser\_:"
+size-not-found: Non trouvé
+something-went-wrong-try-again-later: Quelque chose a mal tourné! Réessayez plus tard.
+special-api-access: Accès API spécial
+start-new-deploy: Commencez un nouveau déploiement progressif
+start-using-capgo: 'Commencez à utiliser :'
 status-complete: complet
 status-failed: échoué
-storage-usage: "Utilisation du stockage\_:"
-stored-externally: stocké en externe
+storage-usage: 'Utilisation du stockage:'
+stored-externally: stocké à l'extérieur
 stripe-billing-portal-will-be-opened-in-a-new-tab: Le portail de facturation Stripe sera ouvert dans un nouvel onglet
-support: Support
+support: Soutien
 terms-of-use: Conditions d'utilisation
-tests: essais
+tests: tests
 thank-you-for-choosi: Merci d'avoir choisi Capgo !
 thank-you-for-sub: Merci de vous être abonné à Capgo
 this-page-will-self-: >-
-  Cette page s'actualisera automatiquement une fois l'intégration terminée avec
-  la CLI
-to: Au
-to-open-encrypted-bu: "Pour ouvrir le bundle chiffré, utilisez la commande\_:"
-top-apps-v2: applications
-trial-left: Jours restants
-trial-plan-expired: Essai expiré
-type-new-name: Veuillez saisir le nouveau nom de la clé API
-type-new-org-name: Veuillez saisir le nouveau nom de l'organisation
-undefined-fail: Non défini (les mises à jour échoueront)
-uninstall: Désinstaller
+  Cette page se rafraîchira automatiquement après que vous ayez terminé
+  l'intégration avec le CLI
+to: à
+to-open-encrypted-bu: 'Pour ouvrir le bundle crypté, utilisez la commande :'
+top-apps-v2: Applications
+trial-left: jours restants
+trial-plan-expired: Essai Expiré
+type-device-id: Entrez l'ID de l'appareil
+type-device-id-msg: Veuillez entrer l'ID de l'appareil que vous souhaitez écraser
+type-new-name: Veuillez taper le nouveau nom de la clé API
+type-new-org-name: Veuillez taper le nouveau nom pour l'organisation
+undefined: Non défini
+undefined-fail: Indéfini (les mises à jour échoueront)
+uninstall: Désinstallé
 unknown: inconnu
-unknown-mime: Type MIME inconnu, veuillez vérifier la console du navigateur
+unknown-mime: Type mime inconnu, veuillez vérifier la console du navigateur
 unlimited-updates: Mises à jour illimitées
-unlink-bundle: Dissocier le groupe
-unlink-channel: Dissocier le canal
-unlink-error: Erreur de dissociation, veuillez vérifier la console
+unlink-bundle: Dissocier le paquet
+unlink-channel: Dissocier la chaîne
+unlink-error: Erreur de suppression du lien, veuillez vérifier la console
 unlink-version: Dissocier la version
+unsafe: Dangereux
 update: Mise à jour
 updated-at: Mis à jour à
+updated-default-upload-channel: Mise à jour du canal de téléchargement par défaut
 updated-min-version: Version minimale mise à jour
-upgrade: Améliorer
+upgrade: Mise à niveau
 upload-img-error: Impossible de télécharger l'image, veuillez vérifier la console
 url: URL
-usage: Usage
-usage-success: Votre plan a été configuré, cette page sera mise à jour dans quelques minutes
-usage-super-only: Seuls les super-administrateurs sont autorisés à consulter l'utilisation
+usage: Utilisation
+usage-success: Votre plan a été configuré, cette page sera mise à jour dans quelques minutes.
+usage-super-only: Seuls les super administrateurs sont autorisés à voir l'utilisation
 usage-title: Total
-use-capgo: Utiliser Capgo
-used-in-period: Utilisé pendant la période
-used-to-create: Le compte avec cette adresse e-mail existait auparavant, impossible à recréer
-user-already-invited: Cet utilisateur est déjà invité dans cette organisation
+use-capgo: Utilisez Capgo
+used-in-period: Utilisé dans la période
+used-to-create: Un compte avec cet email existait déjà, impossible de le recréer.
+user-already-invited: Cet utilisateur est déjà invité à cette organisation
 validate: Valider
 verify: Vérifier
 verify-2FA: Vérifier 2FA
 version: Version
 version-builtin: Version intégrée
-version-link-fail: Impossible de définir le remplacement du bundle
-version-linked: Lien vers la version
-want-to-unlink: "Voulez-vous dissocier\_?"
+version-link-fail: Impossible de définir la substitution de bundle
+version-linked: Lien de version
+want-to-unlink: Voulez-vous dissocier?
 welcome-to: Bienvenue à
 welcome-to-your-capg: Bienvenue sur votre tableau de bord Capgo
 what-to-do-with-photo: Modifier l'image
-what-to-do-with-photo-dec: "Que souhaiteriez-vous faire avec la photo de l'application\_?"
+what-to-do-with-photo-dec: Que souhaitez-vous faire avec l'application photo?
 write-key: Écrire
-wrong-name-org-del: "Vous n'avez pas saisi le nom de l'organisation. \nVous étiez censé taper\_: %1"
-yearly: Annuel
-'yes': Oui
+wrong-name-org-del: 'Vous n''avez pas tapé le nom de l''organisation. Vous étiez censé taper : %1'
+yearly: Annuellement
+'yes': oui
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
+you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du bundle après la suppression
 you-reached-the-limi: Limite atteinte
 your-settings: Vos paramètres
-your-ussage: "Votre utilisation\_:"
+your-ussage: 'Votre utilisation :'

@@ -1,9 +1,10 @@
+import { env } from 'node:process'
 import { config } from 'dotenv'
-import keys from '../configs.json' assert {type: 'json'}
+import keys from '../configs.json'
 
 config()
 
-export const branch = process.env.ENV || process.env.BRANCH || 'main'
+export const branch = env.ENV || env.BRANCH || 'main'
 console.log('Branch', branch)
 
 export function getRightKey(keyname) {
