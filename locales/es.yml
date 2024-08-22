@@ -231,6 +231,7 @@ fast-forward: Avance rápido
 first-name: Nombre de pila
 force-version: Forzar versión
 force-version-change: Saltar implementación progresiva
+forced-devices-not-found: Este canal no tiene ningún dispositivo forzado
 forgot: Olvidó
 forgot-check-email: >-
   Revise su correo electrónico para obtener el enlace para restablecer su

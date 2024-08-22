@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AddDeviceOverwriteButton: typeof import('./components/AddDeviceOverwriteButton.vue')['default']
     ApiKeys: typeof import('./components/ApiKeys.vue')['default']
     AppCard: typeof import('./components/dashboard/AppCard.vue')['default']
     AppStat: typeof import('./components/package/AppStat.vue')['default']

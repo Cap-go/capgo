@@ -235,6 +235,7 @@ fast-forward: Avance Rapide
 first-name: Prénom
 force-version: Version forcée
 force-version-change: Sauter le déploiement progressif
+forced-devices-not-found: Ce canal n'a pas de dispositifs forcés
 forgot: Oublié
 forgot-check-email: >-
   Vérifiez votre email pour obtenir le lien de réinitialisation de votre mot de

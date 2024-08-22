@@ -219,6 +219,7 @@ fast-forward: İleri sar
 first-name: İlk adı
 force-version: Kuvvet versiyonu
 force-version-change: Aşamalı dağıtımı atla
+forced-devices-not-found: Bu kanalda herhangi bir zorunlu cihaz bulunmamaktadır
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi

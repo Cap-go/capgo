@@ -212,6 +212,7 @@ fast-forward: 早送り
 first-name: ファーストネーム
 force-version: 強制バージョン
 force-version-change: プログレッシブ展開をスキップする
+forced-devices-not-found: このチャンネルには強制装置はない
 forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました

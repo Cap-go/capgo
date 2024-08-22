@@ -221,6 +221,7 @@ fast-forward: Maju Cepat
 first-name: Nama depan
 force-version: Versi paksa
 force-version-change: Lewati penerapan progresif
+forced-devices-not-found: Saluran ini tidak memiliki perangkat yang dipaksakan
 forgot: Lupa
 forgot-check-email: >-
   Periksa email Anda untuk mendapatkan tautan untuk mengatur ulang kata sandi
