@@ -78,9 +78,9 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   const features = [
-  `${plan.mau.toLocaleString()} ${t('mau')}`,
-  `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
-  `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
+    `${plan.mau.toLocaleString()} ${t('mau')}`,
+    `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
+    `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
   ]
   if (plan.name.toLowerCase().includes('as you go')) {
     if (plan.mau_unit)
