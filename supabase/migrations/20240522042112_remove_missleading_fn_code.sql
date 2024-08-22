@@ -7,8 +7,11 @@ Begin
   WHERE app_id=appid
   AND name=name_version
   AND owner_org=(select get_user_main_org_id_by_app_id(appid))
-  AND is_app_owner(get_user_id(apikey), appid)
-  );
+  AND (
+    public.is_member_of_org(get_user_id(apikey), (SELECT get_user_main_org_id_by_app_id(appid)))
+    OR
+    public.is_owner_of_org(get_user_id(apikey), (SELECT get_user_main_org_id_by_app_id(appid)))
+  ));
 End;  
 $$;
 
