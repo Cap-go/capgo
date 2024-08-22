@@ -55,7 +55,7 @@ async function postUpdate(data: object) {
 
 // Tests
 
-Deno.test('Test no new version available', async () => {
+Deno.test('POST /updates no new version available', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -65,7 +65,7 @@ Deno.test('Test no new version available', async () => {
   assertEquals(await response.json(), { message: 'No new version available' })
 })
 
-Deno.test('Test new version available', async () => {
+Deno.test('POST /updates new version available', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -81,7 +81,7 @@ Deno.test('Test new version available', async () => {
 })
 
 // TODO: Fix this test, there should be a new device only when a new version is available
-Deno.test('Test with new device', async () => {
+Deno.test('POST /updates with new device', async () => {
   await resetAndSeedData()
 
   const uuid = crypto.randomUUID()
@@ -113,7 +113,7 @@ Deno.test('Test with new device', async () => {
   assertEquals(json, { message: 'No new version available' })
 })
 
-Deno.test('Test disable auto update to major', async () => {
+Deno.test('POST /updates disable auto update to major', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -125,7 +125,7 @@ Deno.test('Test disable auto update to major', async () => {
   assertEquals(json.error, 'disable_auto_update_to_major')
 })
 
-Deno.test('Test disable auto update to minor', async () => {
+Deno.test('POST /updates disable auto update to minor', async () => {
   await resetAndSeedData()
 
   const { error } = await supabase.from('channels')
@@ -142,7 +142,7 @@ Deno.test('Test disable auto update to minor', async () => {
   assertEquals(json.error, 'disable_auto_update_to_minor')
 })
 
-Deno.test('Test disable auto update under native', async () => {
+Deno.test('POST /updates disable auto update under native', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -155,7 +155,7 @@ Deno.test('Test disable auto update under native', async () => {
   assertEquals(json.error, 'disable_auto_update_under_native')
 })
 
-Deno.test('Test disallow emulator', async () => {
+Deno.test('POST /updates disallow emulator', async () => {
   await resetAndSeedData()
 
   const { error } = await supabase.from('channels')
@@ -173,7 +173,7 @@ Deno.test('Test disallow emulator', async () => {
   assertEquals(json.error, 'disable_emulator')
 })
 
-Deno.test('Test development build', async () => {
+Deno.test('POST /updates development build', async () => {
   await resetAndSeedData()
 
   const { error } = await supabase.from('channels')
@@ -191,7 +191,7 @@ Deno.test('Test development build', async () => {
   assertEquals(json.error, 'disable_dev_build')
 })
 
-Deno.test('Test with an app that does not exist', async () => {
+Deno.test('POST /updates with an app that does not exist', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -203,27 +203,24 @@ Deno.test('Test with an app that does not exist', async () => {
   assertEquals(json.error, 'app_not_found')
 })
 
-Deno.test({
-  name: 'Test direct channel overwrite',
-  fn: async () => {
-    await resetAndSeedData()
+Deno.test('POST /updates direct channel overwrite', async () => {
+  await resetAndSeedData()
 
-    const uuid = crypto.randomUUID()
+  const uuid = crypto.randomUUID()
 
-    const baseData = getBaseData()
-    baseData.device_id = uuid;
-    (baseData as any).defaultChannel = 'no_access'
+  const baseData = getBaseData()
+  baseData.device_id = uuid;
+  (baseData as any).defaultChannel = 'no_access'
 
-    const response = await postUpdate(baseData)
-    assertEquals(response.status, 200)
+  const response = await postUpdate(baseData)
+  assertEquals(response.status, 200)
 
-    const json = await response.json()
-    updateNewScheme.parse(json)
-    assertEquals(json.version, '1.361.0')
-  },
+  const json = await response.json()
+  updateNewScheme.parse(json)
+  assertEquals(json.version, '1.361.0')
 })
 
-Deno.test('Test channel overwrite', async () => {
+Deno.test('POST /updates channel overwrite', async () => {
   await resetAndSeedData()
 
   const uuid = crypto.randomUUID()
@@ -259,7 +256,7 @@ Deno.test('Test channel overwrite', async () => {
     .eq('device_id', uuid)
 })
 
-Deno.test('Test version overwrite', async () => {
+Deno.test('POST /updates version overwrite', async () => {
   await resetAndSeedData()
 
   const uuid = crypto.randomUUID()
@@ -295,7 +292,7 @@ Deno.test('Test version overwrite', async () => {
     .eq('device_id', uuid)
 })
 
-Deno.test('Test disallowed public channel update', async () => {
+Deno.test('POST /updates disallowed public channel update', async () => {
   await resetAndSeedData()
 
   const { error } = await supabase.from('channels')
@@ -313,7 +310,7 @@ Deno.test('Test disallowed public channel update', async () => {
   assertEquals(json.error, 'no_channel')
 })
 
-Deno.test('Test disabled progressive deployment', async () => {
+Deno.test('POST /updates disabled progressive deployment', async () => {
   await resetAndSeedData()
 
   const { error } = await supabase.from('channels')
@@ -332,7 +329,7 @@ Deno.test('Test disabled progressive deployment', async () => {
   assertEquals(json.message, 'No new version available')
 })
 
-Deno.test('Test unsupported platform', async () => {
+Deno.test('POST /updates unsupported platform', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -347,7 +344,7 @@ Deno.test('Test unsupported platform', async () => {
   // console.log('Test unsupported platform', json)
 })
 
-Deno.test('Test invalid device_id', async () => {
+Deno.test('POST /updates invalid device_id', async () => {
   await resetAndSeedData()
 
   const invalidUUID = 'invalid-uuid'
@@ -364,7 +361,7 @@ Deno.test('Test invalid device_id', async () => {
   // console.log('Test invalid device_id', json)
 })
 
-Deno.test('Test invalid plugin_version', async () => {
+Deno.test('POST /updates invalid plugin_version', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()
@@ -378,7 +375,7 @@ Deno.test('Test invalid plugin_version', async () => {
   // console.log('Test invalid plugin_version', json)
 })
 
-Deno.test('Test missing fields', async () => {
+Deno.test('POST /updates missing fields', async () => {
   await resetAndSeedData()
 
   const baseData = {} as any
@@ -391,7 +388,7 @@ Deno.test('Test missing fields', async () => {
   // console.log('Test missing fields', json)
 })
 
-Deno.test('Test only platform field', async () => {
+Deno.test('POST /updates only platform field', async () => {
   await resetAndSeedData()
 
   const baseData = { platform: 'android' } as any
@@ -404,7 +401,7 @@ Deno.test('Test only platform field', async () => {
   // console.log('Test only platform field', json)
 })
 
-Deno.test('Test device_id and app_id combination not found', async () => {
+Deno.test('POST /updates device_id and app_id combination not found', async () => {
   await resetAndSeedData()
 
   const baseData = getBaseData()

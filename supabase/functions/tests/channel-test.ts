@@ -16,133 +16,178 @@ async function resetAndSeedData() {
   if (error)
     throw error
 }
+await resetAndSeedData()
 
-Deno.test('POST /channel - Create channel', async () => {
-  await resetAndSeedData()
+Deno.test('GET /channel operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Get channels',
+      fn: async () => {
+        const params = new URLSearchParams()
+        params.append('app_id', 'com.demo.app')
 
-  const response = await fetch(`${BASE_URL}/channel`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      app_id: 'com.demo.app',
-      channel: 'test_channel',
-      public: true,
+        const response = await fetch(`${BASE_URL}/channel?${params.toString()}`, {
+          method: 'GET',
+          headers,
+        })
+
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assert(Array.isArray(data))
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
 
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
-})
+    t.step({
+      name: 'Get specific channel',
+      fn: async () => {
+        const params = new URLSearchParams()
+        params.append('app_id', 'com.demo.app')
+        params.append('channel', 'production')
 
-Deno.test('POST /channel - Update channel', async () => {
-  await resetAndSeedData()
+        const response = await fetch(`${BASE_URL}/channel?${params.toString()}`, {
+          method: 'GET',
+          headers,
+        })
 
-  const response = await fetch(`${BASE_URL}/channel`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      app_id: 'com.demo.app',
-      channel: 'production',
-      disableAutoUpdateUnderNative: false,
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.name, 'production')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
 
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
-})
+    t.step({
+      name: 'Invalid app_id',
+      fn: async () => {
+        const params = new URLSearchParams()
+        params.append('app_id', 'invalid_app')
 
-Deno.test('POST /channel - Invalid app_id', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/channel`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      app_id: 'invalid_app',
-      channel: 'test_channel',
+        const response = await fetch(`${BASE_URL}/channel?${params.toString()}`, {
+          method: 'GET',
+          headers,
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
+  ])
 })
 
-Deno.test('GET /channel - Get channels', async () => {
-  await resetAndSeedData()
+Deno.test('POST /channel operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Create channel',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/channel`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            app_id: 'com.demo.app',
+            channel: 'test_channel',
+            public: true,
+          }),
+        })
 
-  const params = new URLSearchParams()
-  params.append('app_id', 'com.demo.app')
-
-  const response = await fetch(`${BASE_URL}/channel?${params.toString()}`, {
-    method: 'GET',
-    headers,
-  })
-
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assert(Array.isArray(data))
-})
-
-Deno.test('GET /channel - Get specific channel', async () => {
-  await resetAndSeedData()
-
-  const params = new URLSearchParams()
-  params.append('app_id', 'com.demo.app')
-  params.append('channel', 'production')
-
-  const response = await fetch(`${BASE_URL}/channel?${params.toString()}`, {
-    method: 'GET',
-    headers,
-  })
-
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.name, 'production')
-})
-
-Deno.test('GET /channel - Invalid app_id', async () => {
-  await resetAndSeedData()
-
-  const params = new URLSearchParams()
-  params.append('app_id', 'invalid_app')
-
-  const response = await fetch(`${BASE_URL}/channel?${params.toString()}`, {
-    method: 'GET',
-    headers,
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
-})
-
-Deno.test('DELETE /channel - Delete channel', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/channel`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      channel: 'production',
-      app_id: 'com.demo.app',
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
 
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
+    t.step({
+      name: 'Update channel',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/channel`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            app_id: 'com.demo.app',
+            channel: 'production',
+            disableAutoUpdateUnderNative: false,
+          }),
+        })
+
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+
+    t.step({
+      name: 'Invalid app_id',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/channel`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            app_id: 'invalid_app',
+            channel: 'test_channel',
+          }),
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+  ])
 })
 
-Deno.test('DELETE /channel - Invalid channel', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/channel`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      channel: 'invalid_channel',
-      app_id: 'com.demo.app',
+Deno.test('DELETE /channel operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Invalid channel',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/channel`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            channel: 'invalid_channel',
+            app_id: 'com.demo.app',
+          }),
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
+
+    t.step({
+      name: 'Delete channel',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/channel`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            channel: 'production',
+            app_id: 'com.demo.app',
+          }),
+        })
+
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+  ])
 })
