@@ -230,6 +230,7 @@ fast-forward: Nhanh về phía trước
 first-name: Họ
 force-version: Phiên bản bắt buộc
 force-version-change: Bỏ qua triển khai lũy tiến
+forced-devices-not-found: Kênh này không có bất kỳ thiết bị bắt buộc nào
 forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công

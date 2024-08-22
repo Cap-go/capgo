@@ -212,6 +212,7 @@ fast-forward: 快进
 first-name: 名
 force-version: 强制版本
 force-version-change: 跳过渐进式部署
+forced-devices-not-found: 该通道没有任何强制设备
 forgot: 忘记
 forgot-check-email: 检查您的电子邮件以获取重置密码的链接
 forgot-success: 密码更新成功

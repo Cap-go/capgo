@@ -219,6 +219,7 @@ fast-forward: Avanço rápido
 first-name: Primeiro nome
 force-version: Forçar versão
 force-version-change: Pular implantação progressiva
+forced-devices-not-found: Este canal não dispõe de dispositivos forçados
 forgot: Esquecido
 forgot-check-email: Verifique seu e-mail para obter o link para redefinir sua senha
 forgot-success: Senha atualizada com sucesso

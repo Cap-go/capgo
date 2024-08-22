@@ -213,6 +213,7 @@ fast-forward: Fast Forward
 first-name: First name
 force-version: Force version
 force-version-change: Skip progressive deploy
+forced-devices-not-found: This channel does not have any forced devices
 forgot: Forgot
 forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully

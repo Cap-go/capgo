@@ -229,6 +229,7 @@ fast-forward: Avanti veloce
 first-name: Nome di battesimo
 force-version: Versione forzata
 force-version-change: Salta la distribuzione progressiva
+forced-devices-not-found: Questo canale non ha dispositivi forzati
 forgot: Dimenticato
 forgot-check-email: Controlla la tua email per ottenere il link per reimpostare la password
 forgot-success: Password aggiornata con successo

@@ -212,6 +212,7 @@ fast-forward: 빨리 감기
 first-name: 이름
 force-version: 포스 버전
 force-version-change: 점진적 배포 건너뛰기
+forced-devices-not-found: 이 채널에는 강제 장치가 없습니다.
 forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.

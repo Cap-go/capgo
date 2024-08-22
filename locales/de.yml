@@ -240,6 +240,7 @@ fast-forward: Schneller Vorlauf
 first-name: Vorname
 force-version: Force-Version
 force-version-change: Überspringen Sie die progressive Bereitstellung
+forced-devices-not-found: Dieser Kanal hat keine Zwangsgeräte
 forgot: Vergessen
 forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu

@@ -223,6 +223,7 @@ fast-forward: Szybkie przewijanie do przodu
 first-name: Imię
 force-version: Wersja na siłę
 force-version-change: Pomiń wdrażanie stopniowe
+forced-devices-not-found: Ten kanał nie ma żadnych wymuszonych urządzeń
 forgot: Zapomniałem
 forgot-check-email: Sprawdź swoją skrzynkę e-mail, aby otrzymać link do zresetowania hasła
 forgot-success: Hasło zostało zmienione

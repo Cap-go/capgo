@@ -222,6 +222,7 @@ fast-forward: Перемотка вперед
 first-name: Имя
 force-version: Принудительная версия
 force-version-change: Пропустить прогрессивное развертывание
+forced-devices-not-found: Этот канал не имеет принудительных устройств
 forgot: Забыл
 forgot-check-email: Проверьте свою электронную почту, чтобы получить ссылку для сброса пароля
 forgot-success: Пароль успешно обновлен
