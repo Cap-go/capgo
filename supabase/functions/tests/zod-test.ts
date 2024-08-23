@@ -428,7 +428,7 @@ Deno.test({
           sanitizeOps: false,
           sanitizeResources: false,
           sanitizeExit: false,
-        })
+        }),
       )
       index++
     }
