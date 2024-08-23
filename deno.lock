@@ -5,7 +5,6 @@
       "jsr:@hono/hono@^4.4.3": "jsr:@hono/hono@4.5.5",
       "jsr:@supabase/supabase-js@2.43.4": "jsr:@supabase/supabase-js@2.43.4",
       "npm:@clack/prompts@0.7.0": "npm:@clack/prompts@0.7.0",
-      "npm:@hono/swagger-ui@^0.4.0": "npm:@hono/swagger-ui@0.4.0_hono@4.5.3",
       "npm:@supabase/auth-js@2.64.2": "npm:@supabase/auth-js@2.64.2",
       "npm:@supabase/functions-js@2.3.1": "npm:@supabase/functions-js@2.3.1",
       "npm:@supabase/node-fetch@2.6.15": "npm:@supabase/node-fetch@2.6.15",
@@ -147,12 +146,6 @@
       "@esbuild/win32-x64@0.21.5": {
         "integrity": "sha512-tQd/1efJuzPC6rCFwEvLtci/xNFcTZknmXs98FYDfGE4wP9ClFV98nyKrzJKVPMhdDnjzLhdUyMX4PsQAPjwIw==",
         "dependencies": {}
-      },
-      "@hono/swagger-ui@0.4.0_hono@4.5.3": {
-        "integrity": "sha512-8lF+dexzgV2HRM1R/gf49E5djroq4jVMYMSwLkSF9pT0I6sYhuqirFDCRFrBtbbLCBsKzw6f2MF5rS+WY3d7Nw==",
-        "dependencies": {
-          "hono": "hono@4.5.3"
-        }
       },
       "@jridgewell/gen-mapping@0.3.5": {
         "integrity": "sha512-IzL8ZoEDIBRWEzlCcRhOaCupYyN5gdIK+Q6fbFdPDg6HqX6jpkItn7DFIpW9LQzXG6Df9sA7+OKnq0qlz/GaQg==",
@@ -514,10 +507,6 @@
         "dependencies": {
           "function-bind": "function-bind@1.1.2"
         }
-      },
-      "hono@4.5.3": {
-        "integrity": "sha512-r26WwwbKD3BAYdfB294knNnegNda7VfV1tVn66D9Kvl9WQTdrR+5eKdoeaQNHQcC3Gr0KBikzAtjd6VsRGVSaw==",
-        "dependencies": {}
       },
       "human-signals@5.0.0": {
         "integrity": "sha512-AXcZb6vzzrFAUE61HnN4mpLqd/cSIwNQjtNWR0euPm6y0iqx3G4gOXaIDdtdDwZmhwe82LA6+zinmW4UBWVePQ==",
@@ -1661,8 +1650,6 @@
         "npm:@formkit/themes@1.6.5",
         "npm:@formkit/vue@1.6.5",
         "npm:@hono/sentry@^1.2.0",
-        "npm:@hono/swagger-ui@^0.4.0",
-        "npm:@hono/zod-openapi@^0.15.1",
         "npm:@iconify-json/carbon@1.1.37",
         "npm:@iconify-json/heroicons@^1.1.21",
         "npm:@iconify-json/ion@1.1.19",
