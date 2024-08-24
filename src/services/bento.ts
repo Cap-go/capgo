@@ -104,10 +104,7 @@ export function chatLoader(cb?: () => void) {
 export function openMessenger() {
   if (isSpoofed())
     return
-  console.log('openMessenger')
   chatLoader(() => {
-    console.log('openChat')
-    window.bento.showChat()
     //  edit css woot--bubble-holder display (display: none !important;) attribute to remove it
     const bubbleHolder = document.querySelector('.woot--bubble-holder') as HTMLElement
     if (bubbleHolder) {
@@ -131,7 +128,6 @@ export function setUser(uuid: string, data: {
   email?: string
   avatar?: string
 }): void {
-  // console.log('setUser')
   if (isSpoofed())
     return
   chatLoader(() => {
