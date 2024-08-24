@@ -53,10 +53,40 @@ export function bentoLoader(cb?: () => void) {
           baseUrl: BASE_URL,
         })
         console.log('bentoChatSDK initialized')
-        window.bento.hideChat()
+        // window.bento.hideChat()
         localStorage.setItem('bento:loading', 'false')
         if (cb)
           setTimeout(cb, 300)
+        const checkAndHideBubble = () => {
+          const bubbleHolder = document.querySelector('.woot--bubble-holder') as HTMLElement
+          if (bubbleHolder) {
+            bubbleHolder.style.setProperty('display', 'none')
+          }
+          else {
+            setTimeout(checkAndHideBubble, 100) // Check again after 100ms
+          }
+        }
+        checkAndHideBubble()
+        // watch for elem with class woot-elements--right woot-widget-bubble woot--close having woot--hide if found apply checkAndHideBubble
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+              const target = mutation.target as Element
+              if (target.classList.contains('woot-elements--right')
+                && target.classList.contains('woot-widget-bubble')
+                && target.classList.contains('woot--close')
+                && target.classList.contains('woot--hide')) {
+                checkAndHideBubble()
+              }
+            }
+          })
+        })
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['class'],
+        })
       }
     }
   })
@@ -78,6 +108,11 @@ export function openMessenger() {
   chatLoader(() => {
     console.log('openChat')
     window.bento.showChat()
+    //  edit css woot--bubble-holder display (display: none !important;) attribute to remove it
+    const bubbleHolder = document.querySelector('.woot--bubble-holder') as HTMLElement
+    if (bubbleHolder) {
+      bubbleHolder.style.setProperty('display', 'block')
+    }
     window.bento.openChat()
   })
 }
