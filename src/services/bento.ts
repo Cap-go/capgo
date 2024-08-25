@@ -67,7 +67,6 @@ export function bentoLoader(cb?: () => void) {
           }
         }
         checkAndHideBubble()
-        // watch for elem with class woot-elements--right woot-widget-bubble woot--close having woot--hide if found apply checkAndHideBubble
         const observer = new MutationObserver((mutations) => {
           mutations.forEach((mutation) => {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
@@ -110,6 +109,7 @@ export function openMessenger() {
     if (bubbleHolder) {
       bubbleHolder.style.setProperty('display', 'block')
     }
+    window.bento.showChat()
     window.bento.openChat()
   })
 }
