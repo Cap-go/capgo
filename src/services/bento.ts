@@ -15,6 +15,12 @@ export function bentoLoader(cb?: () => void) {
       if (cb)
         cb()
     })
+    setTimeout(() => {
+      if (localStorage.getItem('bento:loading') === 'true') {
+        localStorage.setItem('bento:loading', 'false')
+        bentoLoader()
+      }
+    }, 5000)
     return
   }
   else if (window.bento) {
