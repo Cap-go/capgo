@@ -13,8 +13,6 @@ app.get('/', (c: Context) => {
       supaHost: getEnv(c, 'SUPABASE_URL'),
       supbaseId: getEnv(c, 'SUPABASE_URL')?.split('//')[1].split('.')[0].split(':')[0],
       supaKey: getEnv(c, 'SUPABASE_ANON_KEY'),
-      signKey: getEnv(c, 'DEFAULT_SIGN_KEY'), // deprecated todo: remove in 6 months
-      encryptionKey: getEnv(c, 'DEFAULT_SIGN_KEY'),
     })
   }
   catch (e) {

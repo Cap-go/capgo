@@ -87,6 +87,7 @@ button-remove: 削除
 by-clicking-on-them: それらをクリックして。
 canceled-delete: バンドルの削除がキャンセルされました。リンクされたバンドルは削除できません
 canceled-photo-selection: 画像の選択をキャンセルしました
+cannot-change-default-upload-channel: デフォルトのアップロードチャンネルを変更できません。
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
 cannot-create-empty-device: 空のデバイスを作成できません。ブラウザのコンソールを確認してください。
@@ -167,6 +168,7 @@ custom: カスタム
 custom-domain: カスタム ドメイン
 custom-id: カスタム ID
 dashboard: ダッシュボード
+default-upload-channel: デフォルトのアップロードチャンネル
 defined-as-private: 通常と定義
 defined-as-public: デフォルトとして定義
 delete: 消去
@@ -212,6 +214,7 @@ fast-forward: 早送り
 first-name: ファーストネーム
 force-version: 強制バージョン
 force-version-change: プログレッシブ展開をスキップする
+forced-devices-not-found: このチャンネルには強制装置はない
 forgot: 忘れた
 forgot-check-email: メールを確認して、パスワードをリセットするためのリンクを取得してください
 forgot-success: パスワードが正常に更新されました
@@ -351,6 +354,7 @@ picture-delete-fail: アプリの画像を削除できません。コンソー�
 picture-uploaded: 画像が正常にアップロードされました
 plan-bandwidth: GB帯域幅
 plan-desc: 無料で構築を開始し、ライブに移行するための計画を追加します。
+plan-failed: プランに失敗しました。
 plan-free: MVP とテストに最適
 plan-inactive: プランの非アクティブ
 plan-maker: 中小企業の経営者に最適
@@ -401,6 +405,8 @@ search-by-name: 名前で検索
 see-usage: 使い方を見る
 select-channel: チャンネル選択
 select-channel-msg: 上書きで使用するチャンネルを選択してください。
+select-default-upload-channel: デフォルトのアップロードチャンネルを選択してください。
+select-default-upload-channel-header: デフォルト・チャンネルを選択
 select-style-of-deletion: 削除スタイルの選択
 select-style-of-deletion-msg: |-
   このチャンネルを削除する方法を選択してください。
@@ -441,6 +447,7 @@ type-device-id: デバイスIDを入力
 type-device-id-msg: 上書きしたいデバイスのIDを入力してください。
 type-new-name: 新しい API キー名を入力してください
 type-new-org-name: 組織の新しい名前を入力してください
+undefined: 未定義
 undefined-fail: 未定義 (更新は失敗します)
 uninstall: アンインストール済み
 unknown: 未知
@@ -453,6 +460,7 @@ unlink-version: バージョンのリンクを解除
 unsafe: 危険
 update: アップデート
 updated-at: に更新
+updated-default-upload-channel: デフォルトのアップロードチャンネルを更新
 updated-min-version: 最小バージョンを更新しました
 upgrade: アップグレード
 upload-img-error: 画像をアップロードできません。コンソールを確認してください

@@ -19,44 +19,9 @@ async function resetAndSeedData() {
   if (error2)
     throw error2
 }
-
-Deno.test('POST /device - Link device', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/device`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      app_id: 'com.demo.app',
-      device_id: 'test_device',
-      version_id: '1.0.0',
-      channel: 'no_access',
-    }),
-  })
-
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
-})
-
-Deno.test('POST /device - Invalid app_id', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/device`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      app_id: 'invalid_app',
-      device_id: 'test_device',
-    }),
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
-})
+await resetAndSeedData()
 
 Deno.test('GET /device - Get devices', async () => {
-  await resetAndSeedData()
-
   const params = new URLSearchParams()
   params.append('app_id', 'com.demo.app')
 
@@ -70,81 +35,155 @@ Deno.test('GET /device - Get devices', async () => {
   assert(Array.isArray(data))
 })
 
-Deno.test('GET /device - Get specific device', async () => {
-  await resetAndSeedData()
+Deno.test('GET /device operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Get specific device',
+      fn: async () => {
+        const params = new URLSearchParams()
+        params.append('app_id', 'com.demo.app')
+        params.append('device_id', '00000000-0000-0000-0000-000000000000')
 
-  const params = new URLSearchParams()
-  params.append('app_id', 'com.demo.app')
-  params.append('device_id', '00000000-0000-0000-0000-000000000000')
+        const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
+          method: 'GET',
+          headers,
+        })
 
-  const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
-    method: 'GET',
-    headers,
-  })
-
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.device_id, '00000000-0000-0000-0000-000000000000')
-})
-
-Deno.test('GET /device - Invalid app_id', async () => {
-  await resetAndSeedData()
-
-  const params = new URLSearchParams()
-  params.append('app_id', 'invalid_app')
-
-  const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
-    method: 'GET',
-    headers,
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
-})
-
-Deno.test('GET /device - Invalid device_id', async () => {
-  await resetAndSeedData()
-
-  const params = new URLSearchParams()
-  params.append('app_id', 'com.demo.app')
-  params.append('device_id', 'invalid_device')
-
-  const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
-    method: 'GET',
-    headers,
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
-})
-
-Deno.test('DELETE /device - Unlink device', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/device`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      device_id: 'test_device',
-      app_id: 'com.demo.app',
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.device_id, '00000000-0000-0000-0000-000000000000')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
 
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
+    t.step({
+      name: 'Invalid app_id',
+      fn: async () => {
+        const params = new URLSearchParams()
+        params.append('app_id', 'invalid_app')
+
+        const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
+          method: 'GET',
+          headers,
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+
+    t.step({
+      name: 'Invalid device_id',
+      fn: async () => {
+        const params = new URLSearchParams()
+        params.append('app_id', 'com.demo.app')
+        params.append('device_id', 'invalid_device')
+
+        const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
+          method: 'GET',
+          headers,
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+  ])
 })
 
-Deno.test('DELETE /device - Invalid device_id', async () => {
-  await resetAndSeedData()
+Deno.test('POST /device operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Link device',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/device`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            app_id: 'com.demo.app',
+            device_id: 'test_device',
+            version_id: '1.0.0',
+            channel: 'no_access',
+          }),
+        })
 
-  const response = await fetch(`${BASE_URL}/device`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      device_id: 'invalid_device',
-      app_id: 'com.demo.app',
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
+
+    t.step({
+      name: 'Invalid app_id',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/device`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            app_id: 'invalid_app',
+            device_id: 'test_device',
+          }),
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+  ])
+})
+
+Deno.test('DELETE /device operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Unlink device',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/device`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            device_id: 'test_device',
+            app_id: 'com.demo.app',
+          }),
+        })
+
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+
+    t.step({
+      name: 'Invalid device_id',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/device`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            device_id: 'invalid_device',
+            app_id: 'com.demo.app',
+          }),
+        })
+        const data = await response.json()
+        assertEquals(response.status, 200)
+        assertEquals(data.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+  ])
 })

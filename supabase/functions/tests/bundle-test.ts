@@ -16,96 +16,118 @@ async function resetAndSeedData() {
   if (error)
     throw error
 }
-
-Deno.test('GET /bundle - Get bundles', async () => {
-  await resetAndSeedData()
-
-  const params = new URLSearchParams()
-  params.append('app_id', 'com.demo.app')
-
+async function fetchBundle(appId: string) {
+  const params = new URLSearchParams({ app_id: appId })
   const response = await fetch(`${BASE_URL}/bundle?${params.toString()}`, {
     method: 'GET',
     headers,
   })
+  return { response, data: await response.json() }
+}
+await resetAndSeedData()
 
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assert(Array.isArray(data))
-})
-
-Deno.test('GET /bundle - Invalid app_id', async () => {
-  await resetAndSeedData()
-
-  const params = new URLSearchParams()
-  params.append('app_id', 'invalid_app')
-
-  const response = await fetch(`${BASE_URL}/bundle?${params.toString()}`, {
-    method: 'GET',
-    headers,
-  })
-  await response.arrayBuffer()
-
-  assertEquals(response.status, 400)
-})
-
-Deno.test('DELETE /bundle - Delete bundle', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/bundle`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      app_id: 'com.demo.app',
-      version: '1.0.1',
+Deno.test('GET /bundle operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Valid app_id',
+      fn: async () => {
+        const { response, data } = await fetchBundle('com.demo.app')
+        assertEquals(response.status, 200)
+        assert(Array.isArray(data))
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
 
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
+    t.step({
+      name: 'Invalid app_id',
+      fn: async () => {
+        const { response } = await fetchBundle('invalid_app')
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
+    }),
+  ])
 })
 
-Deno.test('DELETE /bundle - Invalid version', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/bundle`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      app_id: 'com.demo.app',
-      version: 'invalid_version',
+Deno.test('DELETE /bundle operations', async (t) => {
+  await Promise.all([
+    t.step({
+      name: 'Invalid version',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/bundle`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            app_id: 'com.demo.app',
+            version: 'invalid_version',
+          }),
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
-})
 
-Deno.test('DELETE /bundle - Delete all bundles', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/bundle`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      app_id: 'com.demo.app',
+    t.step({
+      name: 'Invalid app_id',
+      fn: async () => {
+        const response = await fetch(`${BASE_URL}/bundle`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            app_id: 'invalid_app',
+          }),
+        })
+        await response.arrayBuffer()
+        assertEquals(response.status, 400)
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
-  })
-
-  const data = await response.json()
-  assertEquals(response.status, 200)
-  assertEquals(data.status, 'ok')
-})
-
-Deno.test('DELETE /bundle - Invalid app_id', async () => {
-  await resetAndSeedData()
-
-  const response = await fetch(`${BASE_URL}/bundle`, {
-    method: 'DELETE',
-    headers,
-    body: JSON.stringify({
-      app_id: 'invalid_app',
+    t.step({
+      name: 'Delete specific bundle',
+      fn: async () => {
+        const deleteBundle = await fetch(`${BASE_URL}/bundle`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            app_id: 'com.demo.app',
+            version: '1.0.1',
+          }),
+        })
+        const deleteBundleData = await deleteBundle.json()
+        assertEquals(deleteBundle.status, 200)
+        assertEquals(deleteBundleData.status, 'ok')
+      },
+      sanitizeOps: false,
+      sanitizeResources: false,
+      sanitizeExit: false,
     }),
+  ])
+
+  // Valid operations
+
+  await t.step({
+    name: 'Delete all bundles for an app',
+    fn: async () => {
+      const deleteAllBundles = await fetch(`${BASE_URL}/bundle`, {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({
+          app_id: 'com.demo.app',
+        }),
+      })
+
+      const deleteAllBundlesData = await deleteAllBundles.json()
+      assertEquals(deleteAllBundles.status, 200)
+      assertEquals(deleteAllBundlesData.status, 'ok')
+    },
   })
-  await response.arrayBuffer()
-  assertEquals(response.status, 400)
 })
