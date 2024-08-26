@@ -202,7 +202,7 @@
     "autoprefixer": "^10.4.20",
     "critters": "0.0.24",
     "cross-env": "^7.0.3",
-    "eslint": "9.9.0",
+    "eslint": "9.9.1",
     "http-server": "^14.1.1",
     "https-localhost": "4.7.1",
     "husky": "^9.1.4",
