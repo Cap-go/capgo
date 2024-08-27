@@ -174,7 +174,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "2.27.0",
+    "@antfu/eslint-config": "2.27.3",
     "@capacitor/cli": "^6.1.1",
     "@capacitor/core": "^6.1.2",
     "@cloudflare/workers-types": "4.20240806.0",
