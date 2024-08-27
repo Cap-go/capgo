@@ -449,3 +449,7 @@ app.delete('/', async (c: Context) => {
     return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
   }
 })
+
+app.get('/', (c: Context) => {
+  return c.json({ status: 'ok' })
+})
