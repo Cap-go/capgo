@@ -81,6 +81,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     `${plan.mau.toLocaleString()} ${t('mau')}`,
     `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
     `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
+    t('priority-support'),
   ]
   if (plan.name.toLowerCase().includes('as you go')) {
     if (plan.mau_unit)
