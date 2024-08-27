@@ -97,6 +97,9 @@ canceled-delete: >-
   Das Löschen des Bundles wurde abgebrochen. Ein verknüpftes Bundle kann nicht
   gelöscht werden
 canceled-photo-selection: Sie haben die Bildauswahl abgebrochen
+cannot-change-default-upload-channel: >-
+  Standard-Upload-Kanal kann nicht geändert werden, bitte überprüfen Sie die
+  Browser-Konsole
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
 cannot-create-empty-device: >-
@@ -191,6 +194,7 @@ custom: Brauch
 custom-domain: Benutzerdefinierten Domain
 custom-id: Benutzerdefinierte ID
 dashboard: Armaturenbrett
+default-upload-channel: Standard-Upload-Kanal
 defined-as-private: als normal definiert
 defined-as-public: als Standard definiert
 delete: Löschen
@@ -240,6 +244,7 @@ fast-forward: Schneller Vorlauf
 first-name: Vorname
 force-version: Force-Version
 force-version-change: Überspringen Sie die progressive Bereitstellung
+forced-devices-not-found: Dieser Kanal hat keine Zwangsgeräte
 forgot: Vergessen
 forgot-check-email: >-
   Überprüfen Sie Ihre E-Mail, um den Link zum Zurücksetzen Ihres Passworts zu
@@ -399,6 +404,7 @@ plan-bandwidth: GB Bandbreite
 plan-desc: >-
   Beginnen Sie kostenlos mit dem Erstellen und fügen Sie dann einen Plan hinzu,
   um live zu gehen.
+plan-failed: Plan fehlgeschlagen, bitte überprüfen Sie Ihre Kartendaten
 plan-free: Am besten für MVP und Tests geeignet
 plan-inactive: Planen Sie inaktiv
 plan-maker: Am besten für Kleinunternehmer geeignet
@@ -457,6 +463,8 @@ select-channel: Kanal auswählen
 select-channel-msg: >-
   Bitte wählen Sie den Kanal aus, den Sie für das Überschreiben verwenden
   möchten
+select-default-upload-channel: Bitte wählen Sie den Standard-Upload-Kanal
+select-default-upload-channel-header: Standard-Kanal auswählen
 select-style-of-deletion: Wählen Sie die Art der Löschung
 select-style-of-deletion-msg: |-
   Bitte wählen Sie die Art und Weise, wie Sie diesen Kanal löschen möchten.
@@ -499,6 +507,7 @@ type-device-id: Geräte-ID eingeben
 type-device-id-msg: Bitte geben Sie die ID des Gerätes ein, das Sie überschreiben möchten
 type-new-name: Bitte geben Sie den neuen API-Schlüsselnamen ein
 type-new-org-name: Bitte geben Sie den neuen Namen für die Organisation ein
+undefined: Unbestimmt
 undefined-fail: Undefiniert (Updates schlagen fehl)
 uninstall: Deinstalliert
 unknown: Unbekannt
@@ -511,6 +520,7 @@ unlink-version: Verknüpfung aufheben
 unsafe: Unsicher
 update: Aktualisieren
 updated-at: Aktualisiert am
+updated-default-upload-channel: Der Standard-Upload-Kanal wurde aktualisiert
 updated-min-version: Aktualisierte Minimalversion
 upgrade: Aktualisierung
 upload-img-error: Bild kann nicht hochgeladen werden. Bitte überprüfen Sie die Konsole

@@ -87,6 +87,9 @@ button-remove: Kaldırmak
 by-clicking-on-them: üzerlerine tıklayarak.
 canceled-delete: Paket silme işlemi iptal edildi, bağlantılı paket silinemiyor
 canceled-photo-selection: Resim seçimini iptal ettiniz
+cannot-change-default-upload-channel: >-
+  Varsayılan yükleme kanalı değiştirilemiyor, lütfen tarayıcı konsolunu kontrol
+  edin
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
 cannot-create-empty-device: Boş cihaz oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
@@ -170,6 +173,7 @@ custom: Gelenek
 custom-domain: Özel alan
 custom-id: özel kimlik
 dashboard: Gösterge Paneli
+default-upload-channel: Varsayılan yükleme kanalı
 defined-as-private: normal olarak tanımlanmış
 defined-as-public: varsayılan olarak tanımlanmış
 delete: Silmek
@@ -219,6 +223,7 @@ fast-forward: İleri sar
 first-name: İlk adı
 force-version: Kuvvet versiyonu
 force-version-change: Aşamalı dağıtımı atla
+forced-devices-not-found: Bu kanalda herhangi bir zorunlu cihaz bulunmamaktadır
 forgot: Unutmuş olmak
 forgot-check-email: Parolanızı sıfırlamak için bağlantı almak üzere e-postanızı kontrol edin
 forgot-success: şifre başarıyla güncellendi
@@ -364,6 +369,7 @@ plan-bandwidth: GB Bant Genişliği
 plan-desc: >-
   Ücretsiz olarak oluşturmaya başlayın, ardından hayata geçirmek için bir plan
   ekleyin.
+plan-failed: Plan başarısız oldu, lütfen kart bilgilerinizi doğrulayın
 plan-free: MVP ve test için en iyisi
 plan-inactive: Plan etkin değil
 plan-maker: Küçük işletme sahipleri için en iyisi
@@ -416,6 +422,8 @@ search-by-name: Ada göre ara
 see-usage: Kullanıma bakın
 select-channel: Kanal seçin
 select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
+select-default-upload-channel: Lütfen varsayılan yükleme kanalını seçin
+select-default-upload-channel-header: Varsayılan kanalı seçin
 select-style-of-deletion: Silme stilini seçin
 select-style-of-deletion-msg: |-
   Lütfen bu kanalı silmek istediğiniz yolu seçin.
@@ -456,6 +464,7 @@ type-device-id: Cihaz kimliğini girin
 type-device-id-msg: Lütfen üzerine yazmak istediğiniz cihazın kimliğini girin
 type-new-name: Lütfen yeni API anahtarı adını yazın
 type-new-org-name: Lütfen kuruluşun yeni adını yazın
+undefined: Tanımsız
 undefined-fail: Tanımsız (güncellemeler başarısız olur)
 uninstall: kaldırıldı
 unknown: Bilinmeyen
@@ -468,6 +477,7 @@ unlink-version: Sürümün bağlantısını kaldır
 unsafe: Güvensiz
 update: Güncelleme
 updated-at: 'Şurada güncellendi:'
+updated-default-upload-channel: Varsayılan yükleme kanalı güncellendi
 updated-min-version: Minimum sürüm güncellendi
 upgrade: Güncelleme
 upload-img-error: Resim yüklenemiyor, lütfen konsolu kontrol edin

@@ -89,6 +89,9 @@ button-remove: Remover
 by-clicking-on-them: clicando sobre eles.
 canceled-delete: Exclusão de pacote cancelada, não é possível excluir um pacote vinculado
 canceled-photo-selection: Você cancelou a seleção de fotos
+cannot-change-default-upload-channel: >-
+  Não é possível alterar o canal de carregamento predefinido, verifique a
+  consola do navegador
 cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
 cannot-create-empty-device: Não é possível criar um dispositivo vazio. Verifique a consola do browser
@@ -172,6 +175,7 @@ custom: Personalizado
 custom-domain: Domínio personalizado
 custom-id: ID personalizado
 dashboard: painel
+default-upload-channel: Canal de carregamento predefinido
 defined-as-private: definido como normal
 defined-as-public: definido como padrão
 delete: Excluir
@@ -219,6 +223,7 @@ fast-forward: Avanço rápido
 first-name: Primeiro nome
 force-version: Forçar versão
 force-version-change: Pular implantação progressiva
+forced-devices-not-found: Este canal não dispõe de dispositivos forçados
 forgot: Esquecido
 forgot-check-email: Verifique seu e-mail para obter o link para redefinir sua senha
 forgot-success: Senha atualizada com sucesso
@@ -366,6 +371,7 @@ picture-delete-fail: Não é possível excluir a imagem do aplicativo. Verifique
 picture-uploaded: Imagem enviada com sucesso
 plan-bandwidth: GB de largura de banda
 plan-desc: Comece a criar gratuitamente e adicione um plano para entrar no ar.
+plan-failed: O plano falhou, verifique os dados do seu cartão
 plan-free: Melhor para MVP e testes
 plan-inactive: Plano inativo
 plan-maker: Melhor para proprietários de pequenas empresas
@@ -420,6 +426,8 @@ search-by-name: Procura por nome
 see-usage: Ver uso
 select-channel: Selecionar canal
 select-channel-msg: Seleccione o canal que pretende utilizar nesta substituição
+select-default-upload-channel: Selecione o canal de carregamento predefinido
+select-default-upload-channel-header: Selecionar o canal predefinido
 select-style-of-deletion: Selecionar o estilo de eliminação
 select-style-of-deletion-msg: |-
   Seleccione a forma como pretende eliminar este canal.
@@ -462,6 +470,7 @@ type-device-id: Introduzir ID do dispositivo
 type-device-id-msg: Introduza o ID do dispositivo que pretende substituir
 type-new-name: Digite o novo nome da chave de API
 type-new-org-name: Digite o novo nome da organização
+undefined: Indefinido
 undefined-fail: Indefinido (as atualizações falharão)
 uninstall: Desinstalado
 unknown: desconhecido
@@ -474,6 +483,7 @@ unlink-version: Desvincular versão
 unsafe: Inseguro
 update: Atualizar
 updated-at: Atualizado em
+updated-default-upload-channel: Atualização do canal de carregamento predefinido
 updated-min-version: Versão mínima atualizada
 upgrade: Atualizar
 upload-img-error: Não é possível fazer upload da imagem, verifique o console

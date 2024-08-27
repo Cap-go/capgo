@@ -91,6 +91,9 @@ button-remove: Di dời
 by-clicking-on-them: bằng cách nhấp vào chúng.
 canceled-delete: Đã hủy xóa gói, không thể xóa gói được liên kết
 canceled-photo-selection: Bạn đã hủy việc chọn ảnh
+cannot-change-default-upload-channel: >-
+  Không thể thay đổi kênh tải lên mặc định, vui lòng kiểm tra bảng điều khiển
+  trình duyệt
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
 cannot-create-empty-device: |-
@@ -181,6 +184,7 @@ custom: Phong tục
 custom-domain: Tên miền tùy chọn
 custom-id: ID tùy chỉnh
 dashboard: bảng điều khiển
+default-upload-channel: Kênh tải lên mặc định
 defined-as-private: định nghĩa là bình thường
 defined-as-public: định nghĩa là mặc định
 delete: Xóa bỏ
@@ -230,6 +234,7 @@ fast-forward: Nhanh về phía trước
 first-name: Họ
 force-version: Phiên bản bắt buộc
 force-version-change: Bỏ qua triển khai lũy tiến
+forced-devices-not-found: Kênh này không có bất kỳ thiết bị bắt buộc nào
 forgot: Quên
 forgot-check-email: Kiểm tra email của bạn để nhận liên kết đặt lại mật khẩu của bạn
 forgot-success: Đã cập nhật mật khẩu thành công
@@ -377,6 +382,7 @@ picture-delete-fail: Không thể xóa ảnh ứng dụng, vui lòng kiểm tra 
 picture-uploaded: Hình ảnh được tải lên thành công
 plan-bandwidth: Băng thông GB
 plan-desc: Bắt đầu xây dựng miễn phí, sau đó thêm một kế hoạch để đưa vào hoạt động.
+plan-failed: Kế hoạch không thành công, vui lòng xác minh chi tiết thẻ của bạn
 plan-free: Tốt nhất cho MVP và thử nghiệm
 plan-inactive: Kế hoạch không hoạt động
 plan-maker: Tốt nhất cho chủ doanh nghiệp nhỏ
@@ -429,6 +435,8 @@ search-by-name: Tìm kiếm theo tên
 see-usage: xem cách sử dụng
 select-channel: Chọn kênh
 select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
+select-default-upload-channel: Vui lòng chọn kênh tải lên mặc định
+select-default-upload-channel-header: Chọn kênh mặc định
 select-style-of-deletion: Chọn kiểu xóa
 select-style-of-deletion-msg: |-
   Vui lòng chọn cách bạn muốn xóa kênh này.
@@ -471,6 +479,7 @@ type-device-id: Nhập ID thiết bị
 type-device-id-msg: Vui lòng nhập ID của thiết bị mà bạn muốn ghi đè
 type-new-name: Vui lòng nhập tên khóa api mới
 type-new-org-name: Vui lòng nhập tên mới cho tổ chức
+undefined: Không xác định
 undefined-fail: Không xác định (cập nhật sẽ thất bại)
 uninstall: Gỡ cài đặt
 unknown: không xác định
@@ -483,6 +492,7 @@ unlink-version: Hủy liên kết phiên bản
 unsafe: Không an toàn
 update: Cập nhật
 updated-at: Cập nhật tại
+updated-default-upload-channel: Đã cập nhật kênh tải lên mặc định
 updated-min-version: Đã cập nhật phiên bản tối thiểu
 upgrade: Nâng cấp
 upload-img-error: Không thể tải ảnh lên, vui lòng kiểm tra bảng điều khiển

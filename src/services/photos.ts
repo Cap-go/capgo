@@ -149,10 +149,10 @@ export async function pickPhoto(isLoading: Ref<boolean>, type: 'org' | 'user', w
       return
     await updloadPhoto(
       contents.data,
-        `${new Date().getTime()}.${photos[0].format}`,
-        contentType,
-        isLoading,
-        wentWrong,
+      `${new Date().getTime()}.${photos[0].format}`,
+      contentType,
+      isLoading,
+      wentWrong,
     )
   }
   catch (e) {

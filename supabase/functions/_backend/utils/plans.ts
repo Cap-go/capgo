@@ -159,16 +159,16 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       }
     }
     else if (!is_onboarded && is_onboarding_needed) {
-      await Promise.all([
-        logsnag(c).track({
+      const sent = await sendNotifOrg(c, 'user:need_onboarding', { }, orgId, orgId, '0 0 1 * *')
+      if (sent) {
+        await logsnag(c).track({
           channel: 'usage',
           event: 'User need onboarding',
           icon: '🥲',
           user_id: orgId,
           notify: false,
-        }).catch(),
-        trackBentoEvent(c, org.management_email, {}, 'user:need_onboarding'),
-      ])
+        }).catch()
+      }
     }
     else if (is_good_plan && is_onboarded) {
       // check if user is at more than 90%, 50% or 70% of plan usage

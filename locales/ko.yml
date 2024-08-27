@@ -87,6 +87,7 @@ button-remove: 제거하다
 by-clicking-on-them: 그들을 클릭하여.
 canceled-delete: 번들 삭제가 취소되었습니다. 연결된 번들을 삭제할 수 없습니다.
 canceled-photo-selection: 사진 선택을 취소했습니다.
+cannot-change-default-upload-channel: 기본 업로드 채널을 변경할 수 없으니 브라우저 콘솔에서 확인하세요.
 cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-create-empty-device: 빈 장치를 만들 수 없습니다. 브라우저의 콘솔을 확인하세요.
@@ -167,6 +168,7 @@ custom: 관습
 custom-domain: 맞춤 도메인
 custom-id: 맞춤 ID
 dashboard: 계기반
+default-upload-channel: 기본 업로드 채널
 defined-as-private: 정상으로 정의
 defined-as-public: 기본값으로 정의
 delete: 삭제
@@ -212,6 +214,7 @@ fast-forward: 빨리 감기
 first-name: 이름
 force-version: 포스 버전
 force-version-change: 점진적 배포 건너뛰기
+forced-devices-not-found: 이 채널에는 강제 장치가 없습니다.
 forgot: 잊어버렸다
 forgot-check-email: 비밀번호 재설정 링크를 받으려면 이메일을 확인하세요.
 forgot-success: 비밀번호가 성공적으로 업데이트되었습니다.
@@ -351,6 +354,7 @@ picture-delete-fail: 앱 사진을 삭제할 수 없습니다. 콘솔 로그를 
 picture-uploaded: 사진이 성공적으로 업로드되었습니다.
 plan-bandwidth: GB 대역폭
 plan-desc: 무료로 구축을 시작한 다음 실행 계획을 추가하세요.
+plan-failed: 요금제에 실패했습니다. 카드 정보를 확인해 주세요.
 plan-free: MVP 및 테스트에 가장 적합
 plan-inactive: 비활성 계획
 plan-maker: 중소기업 소유자에게 가장 적합
@@ -401,6 +405,8 @@ search-by-name: 이름으로 검색
 see-usage: 사용법 보기
 select-channel: 채널 선택
 select-channel-msg: 이 덮어쓰기에 사용할 채널을 선택하세요.
+select-default-upload-channel: 기본 업로드 채널을 선택하세요.
+select-default-upload-channel-header: 기본 채널 선택
 select-style-of-deletion: 삭제 스타일 선택
 select-style-of-deletion-msg: |-
   이 채널을 삭제할 방법을 선택하세요.
@@ -441,6 +447,7 @@ type-device-id: 장치 ID 입력
 type-device-id-msg: 덮어쓰려는 디바이스의 ID를 입력하세요.
 type-new-name: 새 API 키 이름을 입력하세요.
 type-new-org-name: 조직의 새 이름을 입력하세요.
+undefined: 정의되지 않음
 undefined-fail: 정의되지 않음(업데이트가 실패함)
 uninstall: 제거됨
 unknown: 알려지지 않은
@@ -453,6 +460,7 @@ unlink-version: 버전 연결 해제
 unsafe: 안전하지 않음
 update: 업데이트
 updated-at: 업데이트 시간
+updated-default-upload-channel: 기본 업로드 채널 업데이트
 updated-min-version: 업데이트된 최소 버전
 upgrade: 업그레이드
 upload-img-error: 사진을 업로드할 수 없습니다. 콘솔을 확인하세요.
