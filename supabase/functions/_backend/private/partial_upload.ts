@@ -3,8 +3,7 @@ import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { streamSSE } from 'hono/streaming'
-import { getBody, middlewareKey } from '../utils/hono.ts'
+import { middlewareKey } from '../utils/hono.ts'
 import { initS3 } from '../utils/s3.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -32,7 +31,7 @@ const bodySchema = z.object({
 
 export const app = new Hono()
 
-app.post('/v1', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
+app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
   try {
     const rawBody = await c.req.json()
     const parsedBody = bodySchema.safeParse(rawBody)
@@ -104,24 +103,6 @@ app.post('/v1', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
     }))
 
     return c.json(res)
-
-    // const uploadObjects = await Promise.all(body.manifest.map(async (manifestObj) => {
-    //   const finalPath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}/${manifestObj.hash}`
-    //   const command = new PutObjectCommand({
-    //     Bucket: getEnv(c, 'S3_BUCKET'),
-    //     Key: finalPath,
-    //   })
-    //   const url = await getSignedUrlSDK(clientS3, command, { expiresIn: 300 })
-
-    //   return {
-    //     path: manifestObj.file,
-    //     hash: manifestObj.hash,
-    //     finalPath,
-    //     uploadLink: url,
-    //   }
-    // }))
-
-    // return c.json(uploadObjects)
   }
   catch (e) {
     console.log('error', e)
