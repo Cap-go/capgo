@@ -11,7 +11,7 @@ env:
 
 jobs:
   test_base_sql:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-latest-x64-4x-spot
     name: "Run tests"
     steps:
       - name: Cache Deno dependencies 

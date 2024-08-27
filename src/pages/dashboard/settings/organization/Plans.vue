@@ -9,7 +9,7 @@ import { openCheckout } from '~/services/stripe'
 import { useMainStore } from '~/stores/main'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
 import { useLogSnag } from '~/services/logsnag'
-import { openMessenger } from '~/services/chatwoot'
+import { openMessenger } from '~/services/bento'
 import type { Database } from '~/types/supabase.types'
 import type { Stat } from '~/components/comp_def'
 import { useOrganizationStore } from '~/stores/organization'
@@ -78,9 +78,9 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   const features = [
-  `${plan.mau.toLocaleString()} ${t('mau')}`,
-  `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
-  `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
+    `${plan.mau.toLocaleString()} ${t('mau')}`,
+    `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
+    `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
   ]
   if (plan.name.toLowerCase().includes('as you go')) {
     if (plan.mau_unit)
@@ -274,9 +274,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
   }
 }
 
+const failed = computed(() => {
+  return !(!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value)
+})
+
 const hightLights = computed<Stat[]>(() => ([
   {
-    label: (!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value) ? t('Current') : t('failed'),
+    label: !failed.value ? t('Current') : t('failed'),
     value: currentPlan.value?.name,
   },
   {
@@ -315,6 +319,9 @@ const hightLights = computed<Stat[]>(() => ([
         <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
           {{ t('plan-desc') }}<br>
         </p>
+      </div>
+      <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+        {{ t('plan-failed') }}
       </div>
       <section class="px-8 pt-4 sm:px-0">
         <BlurBg :mini="true">
