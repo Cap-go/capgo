@@ -52,7 +52,7 @@ app.post('/', async (c: Context) => {
 
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
-      const statusName = status
+      let statusName: string = status || ''
       stripeData.status = 'succeeded'
       const { data: plan } = await supabaseAdmin(c)
         .from('plans')
@@ -64,8 +64,10 @@ app.post('/', async (c: Context) => {
           .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
-        if (customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id)
+        if (customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id) {
           await removeOldSubscription(c, customer.subscription_id)
+          statusName = 'upgraded'
+        }
 
         if (dbError2)
           return c.json({ error: JSON.stringify(dbError) }, 500)
