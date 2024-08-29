@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow Camera feature to try it in the sandbox app your are developing</string>
+	<key>NSMicrophoneUsageDescription</key>
+<string>Allow access to the microphone to record audio.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Allow Geolocation feature to try it in the sandbox app your are developing</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
