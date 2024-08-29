@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.3.93",
+  "version": "11.3.94",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker stop minio1 && docker rm minio1 && sudo rm -rf /tmp/minio-data/ && bun run minio:start && bun run minio:seed",
@@ -111,7 +111,7 @@
     "@formkit/i18n": "^1.6.5",
     "@formkit/themes": "1.6.5",
     "@formkit/vue": "1.6.5",
-    "@hono/hono": "npm:@jsr/hono__hono@^4.4.3",
+    "@hono/hono": "npm:@jsr/hono__hono@4.5.9",
     "@hono/sentry": "^1.2.0",
     "@iconify-json/simple-icons": "^1.1.113",
     "@intlify/unplugin-vue-i18n": "^4.0.0",
