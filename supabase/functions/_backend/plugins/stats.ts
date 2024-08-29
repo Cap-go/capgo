@@ -231,3 +231,7 @@ app.post('/', async (c: Context) => {
     return c.json({ status: 'Cannot post stats', error: JSON.stringify(e) }, 500)
   }
 })
+
+app.get('/', (c: Context) => {
+  return c.json({ status: 'ok' })
+})

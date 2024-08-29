@@ -9,7 +9,7 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
   const webhookKey = getEnv(c, 'STRIPE_WEBHOOK_SECRET')
   const stripe = new Stripe(secretKey, {
-    apiVersion: '2023-10-16',
+    apiVersion: '2024-04-10',
     httpClient: Stripe.createFetchHttpClient(),
   })
 
