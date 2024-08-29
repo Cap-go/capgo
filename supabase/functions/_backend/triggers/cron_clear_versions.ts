@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { s3 } from '../utils/s3.ts'
+import { getPath, s3 } from '../utils/s3.ts'
 import type { Database } from '../utils/supabase.types.ts'
 
 export const app = new Hono()
@@ -35,11 +35,14 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         return errorOut(c, `Cannot find user_id for app_id ${version.app_id} because of no app found`)
       version.user_id = app.user_id
     }
-    const v2Path = version.bucket_id ? `apps/${version.user_id}/${version.app_id}/versions/${version.bucket_id}` : version.r2_path
+    const v2Path = await getPath(c, version)
     console.log('v2Path', v2Path)
+    if (!v2Path) {
+      return errorOut(c, `Cannot find path for version ${version.id}`)
+    }
     let notFound = false
     try {
-      const size = await s3.getSize(c, v2Path ?? '')
+      const size = await s3.getSize(c, v2Path)
       if (!size) {
         console.log(`No size for ${v2Path}, ${size}`)
         // throw error to trigger the deletion

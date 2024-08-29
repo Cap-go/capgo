@@ -4,37 +4,20 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { s3 } from '../utils/s3.ts'
+import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
-  const record = body.record
+  const record = body.record as Database['public']['Tables']['app_versions']['Row']
 
-  if (!record.r2_path) {
-    console.log('no r2_path')
-    return c.json(BRES)
-  }
-  if (!record.app_id) {
-    console.log('no app_id')
-    return c.json(BRES)
-  }
-  if (!record.user_id) {
-    console.log('no user_id')
-    return c.json(BRES)
-  }
-  if (!record.id) {
-    console.log('no id')
-    return c.json(BRES)
-  }
-  const v2Path = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
-  const existV2 = v2Path ? await s3.checkIfExist(c, v2Path) : false
+  const v2Path = await getPath(c, record)
 
-  if (v2Path && existV2 && record.storage_provider === 'r2') {
+  if (v2Path && record.storage_provider === 'r2') {
     // pdate size and checksum
     console.log('V2', record.bucket_id, record.r2_path)
     // set checksum in s3
-    const size = await s3.getSize(c, v2Path ?? '')
+    const size = await s3.getSize(c, v2Path)
     if (size) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
@@ -58,32 +41,20 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  if (!record.bucket_id && !record.r2_path) {
-    console.log('no bucket_id')
-    return c.json(BRES)
-  }
-  if (!record.app_id || !record.user_id || !record.id) {
-    console.log('no app_id or user_id')
-    return c.json(BRES)
-  }
   console.log('Delete', record.bucket_id, record.r2_path)
 
-  const v2Path = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
+  const v2Path = await getPath(c, record)
   if (!v2Path) {
     console.log('No r2 path')
     return c.json(BRES)
   }
 
-  const existV2 = await s3.checkIfExist(c, v2Path)
-
-  if (existV2) {
-    try {
-      await s3.deleteObject(c, v2Path)
-    }
-    catch (error) {
-      console.log('Cannot delete s3 (v2)', record.bucket_id, error)
-      return c.json(BRES)
-    }
+  try {
+    await s3.deleteObject(c, v2Path)
+  }
+  catch (error) {
+    console.log('Cannot delete s3 (v2)', record.bucket_id, error)
+    return c.json(BRES)
   }
 
   const { data, error: dbError } = await supabaseAdmin(c)

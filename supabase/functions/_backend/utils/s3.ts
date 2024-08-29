@@ -3,6 +3,7 @@ import ky from 'ky'
 import type { CompletedPart } from '@aws-sdk/client-s3'
 import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
+import type { Database } from '../utils/supabase.types.ts'
 import { getEnv } from './utils.ts'
 
 export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
@@ -26,6 +27,25 @@ export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) 
   console.log('initS3', params)
 
   return new S3Client(params)
+}
+
+export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
+  if (!record.bucket_id && !record.r2_path) {
+    console.log('no bucket_id or r2_path')
+    return null
+  }
+  if (!record.r2_path && (!record.app_id || !record.user_id || !record.id)) {
+    console.log('no app_id or user_id or id')
+    return null
+  }
+  // TODO: delete bucket_id in september 2024
+  const vPath = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
+  const exist = vPath ? await checkIfExist(c, vPath) : false
+  if (!exist) {
+    console.log('not exist', vPath)
+    return null
+  }
+  return vPath
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
