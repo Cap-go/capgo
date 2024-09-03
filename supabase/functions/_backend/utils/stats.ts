@@ -102,7 +102,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   })
 
   // if any statsActions is get, then we need the device data
-  if (statsActions.some(({ action }) => action === 'get'))
+  if (statsActions.some(({ action }) => ['set', 'reset', 'app_moved_to_foreground'].includes(action))) // TODO: check if we don't fuck our billing without this
     jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
   if (getRuntimeKey() === 'workerd') {
