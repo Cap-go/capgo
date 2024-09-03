@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import { toast } from 'vue-sonner'
-import copy from 'copy-text-to-clipboard'
 import dayjs from 'dayjs'
 import { Capacitor } from '@capacitor/core'
 import { useMainStore } from '~/stores/main'
@@ -114,8 +113,27 @@ async function deleteAccount() {
 }
 
 async function copyAccountId() {
-  copy(main!.user!.id)
-  toast.success(t('copied-to-clipboard'))
+  try {
+    await navigator.clipboard.writeText(main!.user!.id)
+    console.log('displayStore.messageToast', displayStore.messageToast)
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (err) {
+    console.error('Failed to copy: ', err)
+    // Display a modal with the copied key
+    displayStore.dialogOption = {
+      header: t('cannot-copy'),
+      message: main!.user!.id,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+  }
 }
 
 const acronym = computed(() => {

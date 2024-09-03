@@ -98,6 +98,7 @@ cannot-change-default-upload-channel: >-
   consola del navegador
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
+cannot-copy: No se puede copiar en tu portapapeles, por favor copia tú mismo desde el modal
 cannot-copy-key: No se puede copiar la clave en tu portapapeles, por favor cópiala tú mismo.
 cannot-create-empty-device: >-
   No se puede crear un dispositivo vacío. Por favor, compruebe la consola del

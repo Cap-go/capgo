@@ -98,6 +98,7 @@ cannot-change-default-upload-channel: >-
   console del browser
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
+cannot-copy: Non è possibile copiare negli appunti, si prega di copiare da soli dal modal.
 cannot-copy-key: >-
   Non è possibile copiare la chiave nella tua clipboard, per favore copiala tu
   stesso.

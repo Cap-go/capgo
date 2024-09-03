@@ -90,6 +90,7 @@ canceled-photo-selection: Anda membatalkan pemilihan gambar
 cannot-change-default-upload-channel: Tidak dapat mengubah saluran unggahan default, silakan periksa konsol browser
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
+cannot-copy: Tidak dapat menyalin ke clipboard Anda, silakan salin sendiri dari modal
 cannot-copy-key: Tidak dapat menyalin kunci di clipboard Anda, silakan salin sendiri
 cannot-create-empty-device: Tidak dapat membuat perangkat kosong. Silakan periksa konsol browser
 cannot-create-org: Tidak dapat membuat organisasi, harap periksa log browser!

@@ -94,6 +94,9 @@ cannot-change-default-upload-channel: >-
   consola do navegador
 cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
+cannot-copy: >-
+  Não é possível copiar para a sua área de transferência, por favor copie você
+  mesmo do modal
 cannot-copy-key: >-
   Não é possível copiar a chave para sua área de transferência, por favor,
   copie-a você mesmo.

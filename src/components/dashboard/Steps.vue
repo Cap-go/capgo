@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
-import copy from 'copy-text-to-clipboard'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
@@ -13,7 +12,7 @@ const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done'])
-
+const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
@@ -81,8 +80,27 @@ function scrollToElement(id: string) {
 async function copyToast(allowed: boolean, id: string, text?: string) {
   if (!allowed || !text)
     return
-  copy(text)
-  toast.success(t('copied-to-clipboard'))
+  try {
+    await navigator.clipboard.writeText(text)
+    console.log('displayStore.messageToast', displayStore.messageToast)
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (err) {
+    console.error('Failed to copy: ', err)
+    // Display a modal with the copied key
+    displayStore.dialogOption = {
+      header: t('cannot-copy'),
+      message: text,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+  }
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
     setLog()

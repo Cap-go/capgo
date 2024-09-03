@@ -90,6 +90,7 @@ canceled-photo-selection: 您取消了图片选择
 cannot-change-default-upload-channel: 无法更改默认上传通道，请检查浏览器控制台
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
+cannot-copy: 无法复制到您的剪贴板，请从模态窗口中自行复制
 cannot-copy-key: 无法复制您剪贴板中的密钥，请自行复制
 cannot-create-empty-device: 无法创建空设备。请检查浏览器控制台
 cannot-create-org: 无法创建组织，请检查浏览器日志！

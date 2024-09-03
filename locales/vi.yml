@@ -96,6 +96,9 @@ cannot-change-default-upload-channel: >-
   trình duyệt
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
+cannot-copy: >-
+  Không thể sao chép vào clipboard của bạn, vui lòng tự sao chép từ cửa sổ hiện
+  ra
 cannot-copy-key: Không thể sao chép khóa vào bảng tạm của bạn, vui lòng tự sao chép nó
 cannot-create-empty-device: |-
   Không thể tạo thiết bị trống.

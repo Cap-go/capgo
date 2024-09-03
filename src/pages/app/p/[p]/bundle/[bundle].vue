@@ -3,7 +3,6 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { valid } from 'semver'
 import { useRoute, useRouter } from 'vue-router'
-import copy from 'copy-text-to-clipboard'
 import { Capacitor } from '@capacitor/core'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
@@ -51,8 +50,27 @@ watch(version, async (version) => {
 })
 
 async function copyToast(text: string) {
-  copy(text)
-  toast.success(t('copied-to-clipboard'))
+  try {
+    await navigator.clipboard.writeText(text)
+    console.log('displayStore.messageToast', displayStore.messageToast)
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (err) {
+    console.error('Failed to copy: ', err)
+    // Display a modal with the copied key
+    displayStore.dialogOption = {
+      header: t('cannot-copy'),
+      message: text,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+  }
 }
 
 const tabs: Tab[] = [

@@ -92,6 +92,9 @@ canceled-photo-selection: Anulowałeś wybór zdjęć
 cannot-change-default-upload-channel: Nie można zmienić domyślnego kanału przesyłania, sprawdź konsolę przeglądarki
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
+cannot-copy: >-
+  Nie można skopiować do schowka, proszę skopiować samodzielnie z okna
+  modalnego.
 cannot-copy-key: Nie można skopiować klucza do schowka, proszę zrobić to samodzielnie.
 cannot-create-empty-device: Nie można utworzyć pustego urządzenia. Sprawdź konsolę przeglądarki
 cannot-create-org: Nie można utworzyć organizacji. Sprawdź logi przeglądarki!
