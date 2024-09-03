@@ -59,26 +59,85 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
   return Promise.resolve()
 }
 
-export async function trackDevicesCF(c: Context, app_id: string, device_id: string, version_id: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  // TODO: fix this
+export async function trackDevicesCF(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  version_id: number,
+  platform: Database['public']['Enums']['platform_os'],
+  plugin_version: string,
+  os_version: string,
+  version_build: string,
+  custom_id: string,
+  is_prod: boolean,
+  is_emulator: boolean,
+) {
   console.log('trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
+
   try {
     const updated_at = new Date().toISOString()
-    const query = `INSERT INTO devices ( updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) ON CONFLICT ( device_id, app_id ) DO UPDATE SET updated_at = excluded.updated_at, version = excluded.version, platform = excluded.platform, plugin_version = excluded.plugin_version, os_version = excluded.os_version, version_build = excluded.version_build, custom_id = excluded.custom_id, is_prod = excluded.is_prod, is_emulator = excluded.is_emulator`
-    console.log('trackDevicesCF query', query)
-    console.log(`trackDevicesCF updated_at: ${updated_at} device_id: ${device_id}, app_id: ${app_id}, version_id: ${version_id}, platform: ${platform}, plugin_version: ${plugin_version}, os_version: ${os_version}, version_build: ${version_build}, custom_id: ${custom_id}, is_prod: ${is_prod}, is_emulator: ${is_emulator}`)
-    const insertD1 = c.env.DB_DEVICES
-      .prepare(query)
-      .bind(updated_at, device_id, version_id, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-      .run()
-    const res = await insertD1
-    console.log('trackDevicesCF res', res)
-    // backgroundTask(c, insertD1)
+
+    // First, try to select the existing row
+    const existingRow = await c.env.DB_DEVICES.prepare(`
+      SELECT * FROM devices 
+      WHERE device_id = ? AND app_id = ?
+    `).bind(device_id, app_id).first()
+
+    if (!existingRow || (
+      existingRow.version !== version_id
+      || existingRow.platform !== platform
+      || existingRow.plugin_version !== plugin_version
+      || existingRow.os_version !== os_version
+      || existingRow.version_build !== version_build
+      || existingRow.custom_id !== custom_id
+      || existingRow.is_prod !== is_prod
+      || existingRow.is_emulator !== is_emulator
+    )) {
+      // If no existing row or update needed, perform upsert
+      console.log(existingRow ? 'Updating existing device' : 'Inserting new device')
+      const upsertQuery = `
+        INSERT INTO devices (
+          updated_at, device_id, version, app_id, platform, 
+          plugin_version, os_version, version_build, custom_id, 
+          is_prod, is_emulator
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (device_id, app_id) DO UPDATE SET
+          updated_at = excluded.updated_at,
+          version = excluded.version,
+          platform = excluded.platform,
+          plugin_version = excluded.plugin_version,
+          os_version = excluded.os_version,
+          version_build = excluded.version_build,
+          custom_id = excluded.custom_id,
+          is_prod = excluded.is_prod,
+          is_emulator = excluded.is_emulator
+      `
+      const res = await c.env.DB_DEVICES.prepare(upsertQuery)
+        .bind(
+          updated_at,
+          device_id,
+          version_id,
+          app_id,
+          platform,
+          plugin_version,
+          os_version,
+          version_build,
+          custom_id,
+          is_prod,
+          is_emulator,
+        )
+        .run()
+      console.log('Upsert result:', res)
+    }
+    else {
+      console.log('No update needed')
+    }
   }
   catch (e) {
-    console.error('Error inserting device', e)
+    console.error('Error tracking device', e)
   }
 
   return Promise.resolve()
