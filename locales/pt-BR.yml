@@ -94,6 +94,9 @@ cannot-change-default-upload-channel: >-
   consola do navegador
 cannot-change-name: Não é possível alterar o nome. Verifique o console do navegador
 cannot-change-permission: Não é possível alterar as permissões, verifique o console do navegador
+cannot-copy-key: >-
+  Não é possível copiar a chave para sua área de transferência, por favor,
+  copie-a você mesmo.
 cannot-create-empty-device: Não é possível criar um dispositivo vazio. Verifique a consola do browser
 cannot-create-org: Não é possível criar uma organização. Verifique os registros do navegador!
 cannot-create-overwrite: Não é possível criar uma substituição. Verifique a consola do browser

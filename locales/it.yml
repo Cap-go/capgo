@@ -98,6 +98,9 @@ cannot-change-default-upload-channel: >-
   console del browser
 cannot-change-name: Impossibile modificare il nome, controlla la console del browser
 cannot-change-permission: Impossibile modificare le autorizzazioni, controlla la console del browser
+cannot-copy-key: >-
+  Non è possibile copiare la chiave nella tua clipboard, per favore copiala tu
+  stesso.
 cannot-create-empty-device: Impossibile creare un dispositivo vuoto. Controllare la console del browser
 cannot-create-org: Impossibile creare un'organizzazione, controlla i log del browser!
 cannot-create-overwrite: Impossibile creare una sovrascrittura. Controllare la console del browser

@@ -90,6 +90,7 @@ canceled-photo-selection: You canceled the picture selection
 cannot-change-default-upload-channel: Cannot change default upload channel, please check the browser console
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
+cannot-copy-key: Cannot copy key in your clipboard, please copy it yourself
 cannot-create-empty-device: Cannot create empty device. Please check the browser's console
 cannot-create-org: Cannot create an organization, please check the browser logs!
 cannot-create-overwrite: Cannot create overwrite. Please check the browser's console

@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import copy from 'copy-text-to-clipboard'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { useMainStore } from '~/stores/main'
@@ -263,9 +262,27 @@ async function showAddNewKeyModal() {
 }
 
 async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
-  copy(app.key)
-  console.log('displayStore.messageToast', displayStore.messageToast)
-  toast.success(t('key-copied'))
+  try {
+    await navigator.clipboard.writeText(app.key)
+    console.log('displayStore.messageToast', displayStore.messageToast)
+    toast.success(t('key-copied'))
+  }
+  catch (err) {
+    console.error('Failed to copy: ', err)
+    // Display a modal with the copied key
+    displayStore.dialogOption = {
+      header: t('cannot-copy-key'),
+      message: app.key,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+  }
 }
 displayStore.NavTitle = t('api-keys')
 displayStore.defaultBack = '/app/home'

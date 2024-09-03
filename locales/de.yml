@@ -102,6 +102,9 @@ cannot-change-default-upload-channel: >-
   Browser-Konsole
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
+cannot-copy-key: >-
+  Kann den Schlüssel nicht in Ihre Zwischenablage kopieren, bitte kopieren Sie
+  ihn selbst.
 cannot-create-empty-device: >-
   Es kann kein leeres Gerät erstellt werden. Bitte prüfen Sie die Konsole des
   Browsers

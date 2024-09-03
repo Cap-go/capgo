@@ -90,6 +90,7 @@ canceled-photo-selection: 画像の選択をキャンセルしました
 cannot-change-default-upload-channel: デフォルトのアップロードチャンネルを変更できません。
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
+cannot-copy-key: クリップボードにキーをコピーできません、自分でコピーしてください
 cannot-create-empty-device: 空のデバイスを作成できません。ブラウザのコンソールを確認してください。
 cannot-create-org: 組織を作成できません。ブラウザのログを確認してください。
 cannot-create-overwrite: 上書き作成ができません。ブラウザのコンソールを確認してください。

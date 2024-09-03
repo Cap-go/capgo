@@ -90,6 +90,7 @@ canceled-photo-selection: 사진 선택을 취소했습니다.
 cannot-change-default-upload-channel: 기본 업로드 채널을 변경할 수 없으니 브라우저 콘솔에서 확인하세요.
 cannot-change-name: 이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-change-permission: 권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.
+cannot-copy-key: 클립보드에 키를 복사할 수 없습니다, 직접 복사해 주세요.
 cannot-create-empty-device: 빈 장치를 만들 수 없습니다. 브라우저의 콘솔을 확인하세요.
 cannot-create-org: 조직을 생성할 수 없습니다. 브라우저 로그를 확인하세요!
 cannot-create-overwrite: 덮어쓰기를 생성할 수 없습니다. 브라우저의 콘솔을 확인하세요.
