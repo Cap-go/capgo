@@ -15,7 +15,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
   const res = await trackBentoEvent(c, email, eventData, eventName)
   if (!res) {
     console.log('trackEvent failed', eventName, email, eventData)
-    return
+    return false
   }
   if (past != null) {
     const { error } = await supabaseAdmin(c)
@@ -27,8 +27,10 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
       .eq('event', eventName)
       .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
-    if (error)
+    if (error) {
       console.error('update notif error', error)
+      return false
+    }
   }
   else {
     const { error } = await supabaseAdmin(c)
@@ -39,9 +41,13 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
         owner_org: orgId,
         last_send_at: dayjs().toISOString(),
       })
-    if (error)
+    if (error) {
       console.error('insert notif', error)
+      return false
+    }
   }
+  console.log('send notif done', eventName, email)
+  return true
 }
 
 function isSendable(last: string, cron: string) {
@@ -71,7 +77,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
 
   if (!org || orgError) {
     console.log('org not found', orgId)
-    return Promise.resolve(false)
+    return false
   }
   // check if notif has already been send in notifications table
   const { data: notif } = await supabaseAdmin(c)
@@ -89,7 +95,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
     console.log('notif already sent', eventName, orgId)
-    return Promise.resolve(false)
+    return false
   }
   console.log('notif ready to sent', eventName, orgId)
   return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
