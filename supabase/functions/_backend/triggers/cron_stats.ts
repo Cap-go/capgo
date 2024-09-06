@@ -23,21 +23,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     const supabase = supabaseAdmin(c)
 
-    let endDate = new Date().toISOString()
-    // startDate = yesterday
-    let startDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString()
+    // get the period of the billing of the organization
+    const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
+    const cycleInfo = cycleInfoData.data
+    if (!cycleInfo || !cycleInfo.subscription_anchor_start || !cycleInfo.subscription_anchor_end)
+      return c.json({ status: 'Cannot get cycle info' }, 400)
 
-    if (!body.todayOnly) {
-      // get the period of the billing of the organization
-      const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
-      const cycleInfo = cycleInfoData.data
-      if (!cycleInfo || !cycleInfo.subscription_anchor_start || !cycleInfo.subscription_anchor_end)
-        return c.json({ status: 'Cannot get cycle info' }, 400)
-
-      console.log('cycleInfo', cycleInfo)
-      startDate = cycleInfo.subscription_anchor_start
-      endDate = cycleInfo.subscription_anchor_end
-    }
+    console.log('cycleInfo', cycleInfo)
+    const startDate = cycleInfo.subscription_anchor_start
+    const endDate = cycleInfo.subscription_anchor_end
 
     // get mau
     const mau = await readStatsMau(c, body.appId, startDate, endDate)
@@ -46,6 +40,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     // get storage
     const storage = await readStatsStorage(c, body.appId, startDate, endDate)
     const versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
+
+    // TODO: re activate tomorrow
+    // if (body.todayOnly) {
+    //   // take only the last day
+    //   mau = mau.slice(-1)
+    //   bandwidth = bandwidth.slice(-1)
+    //   storage = storage.slice(-1)
+    //   versionUsage = versionUsage.slice(-1)
+    // }
 
     console.log('mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0), JSON.stringify(mau))
     console.log('bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), JSON.stringify(bandwidth))
