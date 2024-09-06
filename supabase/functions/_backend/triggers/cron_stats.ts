@@ -34,21 +34,20 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const endDate = cycleInfo.subscription_anchor_end
 
     // get mau
-    const mau = await readStatsMau(c, body.appId, startDate, endDate)
+    let mau = await readStatsMau(c, body.appId, startDate, endDate)
     // get bandwidth
-    const bandwidth = await readStatsBandwidth(c, body.appId, startDate, endDate)
+    let bandwidth = await readStatsBandwidth(c, body.appId, startDate, endDate)
     // get storage
-    const storage = await readStatsStorage(c, body.appId, startDate, endDate)
-    const versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
+    let storage = await readStatsStorage(c, body.appId, startDate, endDate)
+    let versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
 
-    // TODO: re activate tomorrow
-    // if (body.todayOnly) {
-    //   // take only the last day
-    //   mau = mau.slice(-1)
-    //   bandwidth = bandwidth.slice(-1)
-    //   storage = storage.slice(-1)
-    //   versionUsage = versionUsage.slice(-1)
-    // }
+    if (body.todayOnly) {
+      // take only the last day
+      mau = mau.slice(-1)
+      bandwidth = bandwidth.slice(-1)
+      storage = storage.slice(-1)
+      versionUsage = versionUsage.slice(-1)
+    }
 
     console.log('mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0), JSON.stringify(mau))
     console.log('bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), JSON.stringify(bandwidth))

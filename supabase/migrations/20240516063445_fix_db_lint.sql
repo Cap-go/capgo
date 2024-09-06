@@ -31,22 +31,29 @@ GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying
 --- 
 
 DROP FUNCTION "public"."read_device_usage";
-CREATE OR REPLACE FUNCTION "public"."read_device_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) RETURNS TABLE("date" "timestamp", "mau" bigint, "app_id" character varying)
-    LANGUAGE "plpgsql"
-    AS $$
+CREATE OR REPLACE FUNCTION "public"."read_device_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone)
+RETURNS TABLE("date" date, "mau" bigint, "app_id" character varying)
+LANGUAGE "plpgsql"
+AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    DATE_TRUNC('day', timestamp) AS date,
-    COUNT(DISTINCT device_id) AS mau,
-    device_usage.app_id
-  FROM device_usage
-  WHERE
-    device_usage.app_id = p_app_id
-    AND timestamp >= p_period_start
-    AND timestamp < p_period_end
-  GROUP BY device_usage.app_id, date
-  ORDER BY date;
+    subquery.date,
+    COUNT(DISTINCT subquery.device_id) AS mau,
+    subquery.app_id
+  FROM (
+    SELECT
+      DATE(timestamp) AS date,
+      blob1 AS device_id,
+      index1 AS app_id
+    FROM device_usage
+    WHERE
+      index1 = p_app_id
+      AND timestamp >= p_period_start
+      AND timestamp < p_period_end
+  ) AS subquery
+  GROUP BY subquery.date, subquery.app_id
+  ORDER BY subquery.date;
 END;
 $$;
 

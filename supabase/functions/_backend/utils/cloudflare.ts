@@ -191,9 +191,15 @@ async function runQueryToCF<T>(c: Context, query: string) {
   return convertDataToJsTypes<T>(res)
 }
 
-interface DeviceUsageCF {
+export interface DeviceUsageCF {
   date: string
   mau: number
+  app_id: string
+}
+
+export interface DeviceUsageAllCF {
+  date: string
+  device_id: string
   app_id: string
 }
 
@@ -201,20 +207,43 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
   if (!c.env.DEVICE_USAGE)
     return [] as DeviceUsageCF[]
   const query = `SELECT
-  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
-  count(DISTINCT blob1) AS mau,
-  index1 AS app_id
-FROM device_usage
-WHERE
-  app_id = '${app_id}'
-  AND timestamp >= toDateTime('${formatDateCF(period_start)}')
-  AND timestamp < toDateTime('${formatDateCF(period_end)}')
-GROUP BY app_id, date
-ORDER BY date, app_id`
+    formatDateTime(timestamp, '%Y-%m-%d') AS date,
+    blob1 AS device_id,
+    index1 AS app_id
+  FROM device_usage
+  WHERE
+    app_id = '${app_id}'
+    AND timestamp >= toDateTime('${formatDateCF(period_start)}')
+    AND timestamp < toDateTime('${formatDateCF(period_end)}')
+  ORDER BY date`
 
   console.log('readDeviceUsageCF query', query)
   try {
-    return await runQueryToCF<DeviceUsageCF>(c, query)
+    const res = await runQueryToCF<DeviceUsageAllCF>(c, query)
+    // First, filter to keep only the first appearance of each device_id
+    const uniqueDevices = new Map<string, DeviceUsageAllCF>()
+    res.reverse().forEach((entry) => {
+      uniqueDevices.set(entry.device_id, entry)
+    })
+    const arr = Array.from(uniqueDevices.values())
+    console.log('uniqueDevices', arr.length)
+
+    // Now calculate MAU based on the unique devices
+    const groupedByDay = arr.reduce((acc, curr) => {
+      const { date, app_id } = curr
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          mau: 0,
+          app_id,
+        }
+      }
+      acc[date].mau++
+      return acc
+    }, {} as Record<string, DeviceUsageCF>)
+
+    const result = Object.values(groupedByDay)
+    return result
   }
   catch (e) {
     console.error('Error reading device usage', e)
