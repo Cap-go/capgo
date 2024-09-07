@@ -207,7 +207,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
   if (!c.env.DEVICE_USAGE)
     return [] as DeviceUsageCF[]
   const query = `SELECT
-    formatDateTime(timestamp, '%Y-%m-%d') AS date,
+    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
     blob1 AS device_id,
     index1 AS app_id
   FROM device_usage
@@ -241,8 +241,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
       acc[date].mau++
       return acc
     }, {} as Record<string, DeviceUsageCF>)
-
-    const result = Object.values(groupedByDay)
+    const result = Object.values(groupedByDay).sort((a, b) => a.date > b.date ? 1 : -1)
     return result
   }
   catch (e) {
@@ -275,7 +274,7 @@ export async function readBandwidthUsageCF(c: Context, app_id: string, period_st
   if (!c.env.BANDWIDTH_USAGE)
     return [] as BandwidthUsageCF[]
   const query = `SELECT
-  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
   sum(double1) AS bandwidth,
   index1 AS app_id
 FROM bandwidth_usage
@@ -342,7 +341,7 @@ export async function readStatsVersionCF(c: Context, app_id: string, period_star
   const query = `SELECT
   blob1 as app_id,
   blob2 as version_id,
-  toStartOfInterval(timestamp, INTERVAL '1' DAY) AS date,
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
   sum(if(blob3 = 'get', 1, 0)) AS get,
   sum(if(blob3 = 'fail', 1, 0)) AS fail,
   sum(if(blob3 = 'install', 1, 0)) AS install,

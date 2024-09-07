@@ -57,16 +57,16 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
       supabase.from('daily_mau')
-        .upsert(mau)
+        .upsert(mau, { onConflict: 'app_id,date' })
         .eq('app_id', body.appId).throwOnError(),
       supabase.from('daily_bandwidth')
-        .upsert(bandwidth)
+        .upsert(bandwidth, { onConflict: 'app_id,date' })
         .eq('app_id', body.appId).throwOnError(),
       supabase.from('daily_storage')
-        .upsert(storage)
+        .upsert(storage, { onConflict: 'app_id,date' })
         .eq('app_id', body.appId).throwOnError(),
       supabase.from('daily_version')
-        .upsert(versionUsage)
+        .upsert(versionUsage, { onConflict: 'app_id,date,version_id' })
         .eq('app_id', body.appId).throwOnError(),
     ])
 
