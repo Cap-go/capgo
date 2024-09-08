@@ -1761,7 +1761,7 @@ BEGIN
     INSERT INTO job_queue (job_type, payload, function_type, function_name)
     VALUES (
       'TRIGGER',
-      json_build_object('appId', app_record.app_id, 'orgId', app_record.owner_org, 'todayOnly', false)::text,
+      json_build_object('appId', app_record.app_id, 'orgId', app_record.owner_org, 'todayOnly', true)::text,
       'cloudflare',
       'cron_stats'
     );
