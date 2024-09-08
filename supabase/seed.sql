@@ -6,7 +6,7 @@ select
     vault.create_secret('http://localhost:8881/.netlify/functions', 'netlify_function_url', 'Netlify function url');
 -- Cloudflare backend for specific functions using CF features
 select
-    vault.create_secret('http://host.docker.internal:7777', 'cloudflare_function_url', 'Cloudflare function url');
+    vault.create_secret('http://host.docker.internal:54321/functions/v1', 'cloudflare_function_url', 'Cloudflare function url');
 select vault.create_secret('testsecret', 'apikey', 'admin user id');
 
 -- Create cron jobs
