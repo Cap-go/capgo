@@ -93,8 +93,8 @@ export async function trackDevicesCF(
       || existingRow.os_version !== os_version
       || existingRow.version_build !== version_build
       || existingRow.custom_id !== custom_id
-      || existingRow.is_prod !== is_prod
-      || existingRow.is_emulator !== is_emulator
+      || !!existingRow.is_prod !== is_prod
+      || !!existingRow.is_emulator !== is_emulator
     )) {
       // If no existing row or update needed, perform upsert
       console.log(existingRow ? 'Updating existing device' : 'Inserting new device')
