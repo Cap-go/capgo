@@ -3,7 +3,6 @@ import * as semver from 'semver'
 import type { Context } from '@hono/hono'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { isAllowedActionOrg } from './supabase.ts'
 import type { AppInfos } from './types.ts'
 import type { Database } from './supabase.types.ts'
 import { sendNotifOrg } from './notifications.ts'
@@ -14,7 +13,7 @@ import { appIdToUrl } from './conversion.ts'
 import * as schema from './postgress_schema.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
-import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, isAllowedActionOrg } from './pg.ts'
 import { saveStoreInfoCF } from './cloudflare.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
@@ -390,7 +389,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    const planValid = await isAllowedActionOrg(c, appOwner.orgs.id)
+    const planValid = await isAllowedActionOrg(drizzleCient, appOwner.orgs.id)
     device.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {

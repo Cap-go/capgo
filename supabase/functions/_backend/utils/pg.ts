@@ -2,6 +2,7 @@
 // import { drizzle } from 'drizzle-orm/neon-http';
 import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
+import { sql } from 'drizzle-orm'
 import type { Context } from '@hono/hono'
 import { getRuntimeKey } from 'hono/adapter'
 import { existInEnv, getEnv } from './utils.ts'
@@ -31,4 +32,20 @@ export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) 
     c.executionCtx.waitUntil(client.end())
   else
     client.end()
+}
+
+export async function isAllowedActionOrg(drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
+  try {
+    // Assuming you have a way to get your database connection string
+
+    const result = await drizzleCient.execute<{ is_allowed: boolean }>(
+      sql`SELECT is_allowed_action_org(${orgId}) AS is_allowed`,
+    )
+
+    return result[0]?.is_allowed || false
+  }
+  catch (error) {
+    console.error('isAllowedActionOrg error', orgId, error)
+  }
+  return false
 }
