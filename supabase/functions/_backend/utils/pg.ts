@@ -7,18 +7,41 @@ import type { Context } from '@hono/hono'
 import { getRuntimeKey } from 'hono/adapter'
 import { existInEnv, getEnv } from './utils.ts'
 
-export function getPgClient(c: Context) {
-  // TODO: find why is not always working when we add the IF
-  // if (getRuntimeKey() === 'workerd') {
-  //   return postgres(c.env.HYPERDRIVE.connectionString, { prepare: false, idle_timeout: 2 })
-  // }
-  // else
-  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    console.log('CUSTOM_SUPABASE_DB_URL', getEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
-    return postgres(getEnv(c, 'CUSTOM_SUPABASE_DB_URL'), { prepare: false, idle_timeout: 2 })
+export function getBestDatabaseURL(c: Context): string {
+  // TODO: use it when we deployed replicate of database
+  // Use replicate i
+  const clientContinent = (c.req.raw as any)?.cf?.continent
+  console.log('clientContinent', clientContinent)
+  let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
+  if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
+    DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
+
+  if (!clientContinent)
+    return DEFAULT_DB_URL
+
+  // European countries or Africa or Antarctica
+  if ((clientContinent === 'EU' || clientContinent === 'AF' || clientContinent === 'AN')) {
+    return DEFAULT_DB_URL
   }
-  console.log('SUPABASE_DB_URL', getEnv(c, 'SUPABASE_DB_URL'))
-  return postgres(getEnv(c, 'SUPABASE_DB_URL'), { prepare: false, idle_timeout: 2 })
+
+  // Asian and Oceanian countries
+  if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
+    return getEnv(c, 'SG_SUPABASE_DB_URL')
+  }
+
+  // North and South American countries
+  if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
+    return getEnv(c, 'GK_SUPABASE_DB_URL')
+  }
+
+  // Default to Germany for any other cases
+  return DEFAULT_DB_URL
+}
+
+export function getPgClient(c: Context) {
+  const dbUrl = getBestDatabaseURL(c)
+  console.log('SUPABASE_DB_URL', dbUrl)
+  return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {

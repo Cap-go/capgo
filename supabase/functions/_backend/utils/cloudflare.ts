@@ -3,7 +3,7 @@ import ky from 'ky'
 import dayjs from 'dayjs'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
-import { existInEnv, getEnv } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
@@ -798,29 +798,4 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
   }
 
   return Promise.resolve()
-}
-
-export function getBestDatabaseURL(c: Context): string {
-  // TODO: use it when we deployed replicate of database
-  const clientContinent = c.req.header('cf-ipcontinent')
-  if (!clientContinent)
-    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
-
-  // European countries or Africa or Antarctica
-  if ((clientContinent === 'EU' || clientContinent === 'AF' || clientContinent === 'AN') && existInEnv(c, 'CUSTOM_SUPABASE_DB_URL')) {
-    return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
-  }
-
-  // Asian and Oceanian countries
-  if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
-    return getEnv(c, 'SG_SUPABASE_DB_URL')
-  }
-
-  // North and South American countries
-  if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'NY_SUPABASE_DB_URL')) {
-    return getEnv(c, 'NY_SUPABASE_DB_URL')
-  }
-
-  // Default to Germany for any other cases
-  return getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
 }
