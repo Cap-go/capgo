@@ -71,7 +71,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     ])
 
     console.log('stats saved')
-    return c.json({ status: 'Stats saved' })
+    return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
   }
   catch (e) {
     console.error('Error getting stats', e)
