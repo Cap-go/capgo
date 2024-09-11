@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { toast } from 'vue-sonner'
-import type { ComposerTranslation } from 'vue-i18n'
-import { useI18n } from 'vue-i18n'
+import type { ComposerTranslation } from 'petite-vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { useSupabase } from './supabase'
 import { useDisplayStore } from '~/stores/display'
 

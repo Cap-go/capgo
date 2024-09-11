@@ -10,7 +10,7 @@ import {
 } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import type { AnnotationOptions } from '../services/chartAnnotations'
 import { inlineAnnotationPlugin } from '../services/chartAnnotations'
 import { isDark } from '../composables/dark'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { useDisplayStore } from '~/stores/display'
 import IconAcount from '~icons/mdi/user'
 import type { Tab } from '~/components/comp_def'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { useRouter } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import { getOrgs } from '../services/supabase'

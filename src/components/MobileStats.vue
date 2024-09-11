@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { Line } from 'vue-chartjs'
 import type { ChartOptions } from 'chart.js'
 import { CategoryScale, Chart, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'

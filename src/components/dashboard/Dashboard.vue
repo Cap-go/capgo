@@ -2,7 +2,7 @@
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import WelcomeBanner from './WelcomeBanner.vue'
 import TopApps from '~/components/dashboard/TopApps.vue'
 import type { Database } from '~/types/supabase.types'

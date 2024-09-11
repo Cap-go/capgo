@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'

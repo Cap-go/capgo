@@ -14,7 +14,7 @@ import './styles/style.css'
 import { initPlausible } from './services/plausible'
 import { getRemoteConfig } from './services/supabase'
 
-const guestPath = ['/login', '/register', '/delete_account', '/forgot_password', '/resend_email', '/onboarding']
+const guestPath = ['/login', '/delete_account', '/forgot_password', '/resend_email', '/onboarding']
 
 getRemoteConfig()
 const app = createApp(App)

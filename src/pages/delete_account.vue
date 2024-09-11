@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
@@ -175,12 +175,12 @@ onMounted (() => {
 
                 <div class="text-center">
                   <p class="text-base text-gray-600">
-                    {{ t('dont-have-an-account') }} <br> <router-link
-                      to="/register"
+                    {{ t('dont-have-an-account') }} <br> <a
+                      href="https://capgo.app/register/"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}
-                    </router-link>
+                    </a>
                   </p>
                   <p class="pt-2 text-gray-300">
                     {{ version }}

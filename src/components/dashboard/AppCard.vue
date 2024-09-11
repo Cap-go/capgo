@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { formatDate } from '~/services/date'
 import type { Database } from '~/types/supabase.types'

@@ -2,7 +2,7 @@
 import type { Ref } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
 import { storeToRefs } from 'pinia'
 import type { TableColumn } from '../comp_def'

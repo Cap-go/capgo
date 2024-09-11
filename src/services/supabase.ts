@@ -38,7 +38,7 @@ export async function getRemoteConfig() {
   const data = await ky
     .get(`${defaultApiHost}/private/config`)
     .then(res => res.json<CapgoConfig>())
-    .then(data => ({ ...data, ...localConfig } as CapgoConfig))
+    .then(d => ({ ...localConfig, ...d } as CapgoConfig))
     .catch(() => {
       console.log('Local config', localConfig)
       return localConfig as CapgoConfig

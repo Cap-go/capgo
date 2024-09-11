@@ -1,7 +1,7 @@
 <!-- eslint-disable @typescript-eslint/no-use-before-define -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { useRoute } from 'vue-router'
 import { urlToAppId } from '~/services/conversion'
 import { useDisplayStore } from '~/stores/display'

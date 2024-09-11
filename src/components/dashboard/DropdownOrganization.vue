@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
 import type { Organization } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'

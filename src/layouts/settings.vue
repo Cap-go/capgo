@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useRouter } from 'vue-router'
 import { useDisplayStore } from '~/stores/display'

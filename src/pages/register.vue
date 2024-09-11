@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
@@ -9,7 +9,7 @@ import { useSupabase } from '~/services/supabase'
 import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
 import iconPassword from '~icons/ph/key?raw'
-import { reflioLoader } from '~/services/reflio'
+import { openMessenger } from '~/services/bento'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -17,7 +17,9 @@ const { t } = useI18n()
 
 const isLoading = ref(false)
 
-reflioLoader()
+function openSupport() {
+  openMessenger()
+}
 
 async function submit(form: { first_name: string, last_name: string, password: string, email: string }) {
   if (isLoading.value)
@@ -54,12 +56,6 @@ async function submit(form: { first_name: string, last_name: string, password: s
     // supabase auth config
     // http://localhost:5173/onboarding/verify_email,http://localhost:5173/forgot_password?step=2,https://capgo.app/onboarding/verify_email,https://capgo.app/forgot_password?step=2,https://capgo.app/onboarding/first_password,https://development.capgo.app/onboarding/verify_email,https://development.capgo.app/forgot_password?step=2
   )
-  try {
-    await window.Reflio.signup(form.email)
-  }
-  catch (error) {
-    console.error(error)
-  }
   isLoading.value = false
   if (error || !user) {
     setErrors('register-account', [error?.message || 'user not found'], {})
@@ -163,10 +159,13 @@ async function submit(form: { first_name: string, last_name: string, password: s
             </FormKit>
           </div>
         </div>
-        <section class="flex flex-col mt-6 md:flex-row md:items-center items-left">
+        <section class="flex flex-col items-center mt-6">
           <div class="mx-auto">
             <LangSelector />
           </div>
+          <button class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openSupport">
+            {{ t("support") }}
+          </button>
         </section>
       </div>
     </div>

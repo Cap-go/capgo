@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import debounce from 'lodash.debounce'
 import { computed, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { FormKit } from '@formkit/vue'
 import type { TableColumn } from './comp_def'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'

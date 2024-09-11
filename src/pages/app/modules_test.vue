@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { NativeMarket } from '@capgo/native-market'
 import { InAppBrowser } from '@capgo/inappbrowser'
 import { NativeAudio } from '@capgo/native-audio'

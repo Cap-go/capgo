@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import { FunctionsHttpError } from '@supabase/supabase-js'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import ky from 'ky'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'

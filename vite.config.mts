@@ -101,7 +101,6 @@ export default defineConfig({
     AutoImport({
       imports: [
         'vue',
-        'vue-i18n',
         '@vueuse/head',
         '@vueuse/core',
         VueRouterAutoImports,

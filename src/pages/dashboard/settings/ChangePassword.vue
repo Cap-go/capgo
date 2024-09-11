@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { setErrors } from '@formkit/core'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'

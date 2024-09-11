@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { toast } from 'vue-sonner'
 import Trash from '~icons/heroicons/trash'

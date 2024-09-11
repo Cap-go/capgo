@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import { onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
@@ -14,6 +14,7 @@ import { hideLoader } from '~/services/loader'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
+import { openMessenger } from '~/services/bento'
 
 const route = useRoute()
 const supabase = useSupabase()
@@ -25,6 +26,10 @@ const router = useRouter()
 const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
+
+function openSupport() {
+  openMessenger()
+}
 
 async function nextLogin() {
   router.push('/app/home')
@@ -301,12 +306,12 @@ onMounted(checkLogin)
                     </router-link>
                   </div>
                   <div class="">
-                    <router-link
-                      to="/register"
+                    <a
+                      href="https://capgo.app/register/"
                       class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}
-                    </router-link>
+                    </a>
                   </div>
                   <div class="">
                     <router-link
@@ -321,10 +326,13 @@ onMounted(checkLogin)
             </FormKit>
           </div>
         </div>
-        <section class="flex flex-col mt-6 md:flex-row md:items-center items-left">
+        <section class="flex flex-col items-center mt-6">
           <div class="mx-auto">
             <LangSelector />
           </div>
+          <button class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openSupport">
+            {{ t("support") }}
+          </button>
         </section>
       </div>
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, watchEffect } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from 'petite-vue-i18n'
 import { valid } from 'semver'
 import { useRoute, useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
