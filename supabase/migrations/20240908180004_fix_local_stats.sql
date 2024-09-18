@@ -1,3 +1,4 @@
+DROP FUNCTION "public"."read_device_usage";
 CREATE OR REPLACE FUNCTION "public"."read_device_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone)
 RETURNS TABLE("date" date, "mau" bigint, "app_id" character varying)
 LANGUAGE "plpgsql"
@@ -17,6 +18,10 @@ BEGIN
   ORDER BY date;
 END;
 $$;
+ALTER FUNCTION "public"."read_device_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."read_device_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."read_device_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) TO "service_role";
+
 
 CREATE OR REPLACE FUNCTION "public"."process_cron_stats_jobs"() RETURNS "void"
     LANGUAGE "plpgsql"
