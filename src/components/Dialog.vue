@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
-import DOMPurify from 'dompurify'
 import { FormKit } from '@formkit/vue'
+import DOMPurify from 'dompurify'
+import { onMounted, watch } from 'vue'
 import type { ActionSheetOptionButton } from '~/stores/display'
 import { useDisplayStore } from '~/stores/display'
 

@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
-import { useI18n } from 'petite-vue-i18n'
-import { Line } from 'vue-chartjs'
-import type { ChartOptions } from 'chart.js'
-import { CategoryScale, Chart, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
+import IcBaselineInfo from '~icons/ic/baseline-info'
+import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
-import type { VersionName, appUsageByVersion } from '~/services/supabase'
-import { getDailyVersion, getVersionNames } from '~/services/supabase'
+import { useI18n } from 'petite-vue-i18n'
+import { computed, ref, watchEffect } from 'vue'
+import { Line } from 'vue-chartjs'
+import { useRoute } from 'vue-router'
+import type { ChartOptions } from 'chart.js'
 import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
+import type { appUsageByVersion, VersionName } from '~/services/supabase'
+import { getDailyVersion, getVersionNames } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
-import IcBaselineInfo from '~icons/ic/baseline-info'
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 

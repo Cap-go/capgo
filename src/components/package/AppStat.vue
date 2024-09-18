@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Atropos from 'atropos/vue'
-import 'atropos/css/min'
 import { useRouter } from 'vue-router'
+import 'atropos/css/min'
 
 const props = defineProps<{
   number: number

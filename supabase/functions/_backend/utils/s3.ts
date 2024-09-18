@@ -1,10 +1,10 @@
-import type { Context } from '@hono/hono'
-import ky from 'ky'
-import type { CompletedPart } from '@aws-sdk/client-s3'
 import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
-import type { Database } from '../utils/supabase.types.ts'
+import ky from 'ky'
+import type { CompletedPart } from '@aws-sdk/client-s3'
+import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
+import type { Database } from '../utils/supabase.types.ts'
 
 export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
   const access_key_id = uploadKey ? getEnv(c, 'S3_ACCESS_KEY_ID_UPLOAD') : getEnv(c, 'S3_ACCESS_KEY_ID')

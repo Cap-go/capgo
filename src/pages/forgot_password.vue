@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { toast } from 'vue-sonner'
-import { useSupabase } from '~/services/supabase'
-import Spinner from '~/components/Spinner.vue'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
+import { useI18n } from 'petite-vue-i18n'
+import { ref, watchEffect } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import Spinner from '~/components/Spinner.vue'
+import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
 const router = useRouter()

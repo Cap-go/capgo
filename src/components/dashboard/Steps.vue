@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { useI18n } from 'petite-vue-i18n'
+import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
+import { pushEvent } from '~/services/bento'
+import { useLogSnag } from '~/services/logsnag'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
-import { useLogSnag } from '~/services/logsnag'
-import { pushEvent } from '~/services/bento'
-import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 
 const props = defineProps<{
   onboarding: boolean

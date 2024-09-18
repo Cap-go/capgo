@@ -1,5 +1,5 @@
-import type { Locale } from 'petite-vue-i18n'
 import { createI18n } from 'petite-vue-i18n'
+import type { Locale } from 'petite-vue-i18n'
 import type { UserModule } from '~/types'
 
 // Import i18n resources

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { toast } from 'vue-sonner'
-import { useRouter } from 'vue-router'
-import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
-import { hideLoader } from '~/services/loader'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
+import { useI18n } from 'petite-vue-i18n'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import { hideLoader } from '~/services/loader'
+import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 const supabase = useSupabase()

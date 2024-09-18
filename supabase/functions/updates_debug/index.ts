@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/plugins/updates.ts'
 
 const functionName = 'updates_debug'

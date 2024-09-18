@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { useDisplayStore } from '~/stores/display'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import { useI18n } from 'petite-vue-i18n'
+import { ref } from 'vue'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()

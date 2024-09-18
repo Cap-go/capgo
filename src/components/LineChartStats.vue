@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import type { ChartData, ChartOptions } from 'chart.js'
 import {
   CategoryScale,
   Chart,
-  LineElement,
   LinearScale,
+  LineElement,
   PointElement,
   Tooltip,
 } from 'chart.js'
+import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
-import { useI18n } from 'petite-vue-i18n'
-import type { AnnotationOptions } from '../services/chartAnnotations'
-import { inlineAnnotationPlugin } from '../services/chartAnnotations'
-import { isDark } from '../composables/dark'
+import type { ChartData, ChartOptions } from 'chart.js'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
+import { isDark } from '../composables/dark'
+import { inlineAnnotationPlugin } from '../services/chartAnnotations'
+import type { AnnotationOptions } from '../services/chartAnnotations'
 
 const props = defineProps({
   accumulated: {
@@ -82,7 +82,7 @@ const projectionData = computed(() => {
   const lastDay = arrWithoutUndefined[arrWithoutUndefined.length - 1]
   // create a projection of the evolution, start after the last value of the array, put undefined for the beginning of the month
   // each value is the previous value + the evolution, the first value is the last value of the array
-  let res = [...Array(getDaysInCurrentMonth()).fill(undefined)]
+  let res = new Array(getDaysInCurrentMonth()).fill(undefined)
   res = res.reduce((acc: number[], val: number, i: number) => {
     let newVal
     const last = acc[acc.length - 1] || 0
@@ -112,7 +112,7 @@ function getDayNumbers(startDate: Date, endDate: Date) {
 }
 
 function monthdays() {
-  let keys = [...(Array(getDaysInCurrentMonth() + 1).keys())]
+  let keys = [...(new Array(getDaysInCurrentMonth() + 1).keys())]
   if (cycleStart && cycleEnd)
     keys = getDayNumbers(cycleStart, cycleEnd)
 

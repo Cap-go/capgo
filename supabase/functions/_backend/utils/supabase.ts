@@ -1,10 +1,10 @@
-import type { Context } from '@hono/hono'
-
 import { createClient } from '@supabase/supabase-js'
+
+import type { Context } from '@hono/hono'
 import { createCustomer } from './stripe.ts'
-import type { Database } from './supabase.types.ts'
 import { getEnv } from './utils.ts'
 import type { Segments } from './plunk.ts'
+import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 
 const DEFAULT_LIMIT = 1000

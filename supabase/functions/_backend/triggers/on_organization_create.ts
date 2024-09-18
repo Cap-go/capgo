@@ -1,10 +1,10 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import type { InsertPayload } from '../utils/supabase.ts'
-import { createStripeCustomer } from '../utils/supabase.ts'
-import type { Database } from '../utils/supabase.types.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { createStripeCustomer } from '../utils/supabase.ts'
+import type { InsertPayload } from '../utils/supabase.ts'
+import type { Database } from '../utils/supabase.types.ts'
 
 export const app = new Hono()
 

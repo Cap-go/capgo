@@ -1,8 +1,8 @@
 import type { Context } from '@hono/hono'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
-import type { Database } from '../../utils/supabase.types.ts'
 import { readDevices } from '../../utils/stats.ts'
+import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
+import type { Database } from '../../utils/supabase.types.ts'
 
 interface GetDevice {
   app_id: string

@@ -1,11 +1,11 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
+import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { removeOldSubscription } from '../utils/stripe.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
+import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 
 export const app = new Hono()
 

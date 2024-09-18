@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { storeToRefs } from 'pinia'
-import { toast } from 'vue-sonner'
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { FormKit } from '@formkit/vue'
-import { useOrganizationStore } from '~/stores/organization'
-import { useDisplayStore } from '~/stores/display'
-import { useSupabase } from '~/services/supabase'
-import { pickPhoto, takePhoto } from '~/services/photos'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
+import { useI18n } from 'petite-vue-i18n'
+import { storeToRefs } from 'pinia'
+import { computed, onMounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
+import { pickPhoto, takePhoto } from '~/services/photos'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { ref } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { toast } from 'vue-sonner'
-import { useSupabase } from '~/services/supabase'
 import iconEmail from '~icons/oui/email?raw'
-import iconName from '~icons/ph/user?raw'
 import iconPassword from '~icons/ph/key?raw'
+import iconName from '~icons/ph/user?raw'
+import { useI18n } from 'petite-vue-i18n'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { openMessenger } from '~/services/bento'
+import { useSupabase } from '~/services/supabase'
 
 const router = useRouter()
 const supabase = useSupabase()

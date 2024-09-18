@@ -1,5 +1,5 @@
-import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
+import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
 
 const getStripe = (c: Context) => new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'))

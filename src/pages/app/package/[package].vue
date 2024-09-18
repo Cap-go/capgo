@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { useI18n } from 'petite-vue-i18n'
-import { useRoute } from 'vue-router'
 import { computed, ref, watchEffect } from 'vue'
-import { useMainStore } from '~/stores/main'
-import Spinner from '~/components/Spinner.vue'
+import { useRoute } from 'vue-router'
 import type { Stat } from '~/components/comp_def'
+import Spinner from '~/components/Spinner.vue'
+import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
-import { appIdToUrl, urlToAppId } from '~/services/conversion'
 
 const id = ref('')
 const { t } = useI18n()

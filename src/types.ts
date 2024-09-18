@@ -1,5 +1,5 @@
 import type { App } from 'vue'
-import type { RouteRecordRaw, Router } from 'vue-router'
+import type { Router, RouteRecordRaw } from 'vue-router'
 
 interface AppContext<HasRouter extends boolean = true> {
   app: App<Element>

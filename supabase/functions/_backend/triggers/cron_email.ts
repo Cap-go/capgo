@@ -1,17 +1,8 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { trackBentoEvent } from '../utils/bento.ts'
-
-// This is required propoably due to this https://github.com/supabase/postgrest-js/issues/408
-interface AppWithUser {
-  app_id: string
-  name: string | null
-  user_id: {
-    email: string
-  }
-}
 
 const thresholds = {
   // Number of updates in plain number
@@ -72,67 +63,52 @@ export const app = new Hono()
 
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
+    const { email, appId } = await c.req.json()
+
+    if (!email || !appId) {
+      return c.json({ status: 'Missing email or appId' }, 400)
+    }
+
     const supabase = await supabaseAdmin(c)
 
-    const { data: apps, error: appsError } = await supabase
-      .from('apps')
-      .select(`
-        app_id,
-        name,
-        user_id ( id, email )
-      `)
+    const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
+      app_id: appId,
+    }).single()
 
-    if (appsError) {
-      console.error('appsError', appsError)
-      // We have no error handling here, as we call this edge fn from postgress and postgress does not care
-      return c.json(BRES)
+    if (!weeklyStats || generateStatsError) {
+      console.error('Cannot send email for app', appId, generateStatsError, email)
+      return c.json({ status: 'Cannot generate stats' }, 500)
     }
 
-    // We propably do not need this, however for whatever reason supabase does not like our join
-    const mappedApps = apps as unknown as AppWithUser[]
-
-    // Set stats = all updates
-    // Sucess updates = set - failed
-    // Fail = failed
-    for (const mapApp of mappedApps) {
-      const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
-        app_id: mapApp.app_id,
-      }).single()
-
-      if (!weeklyStats || generateStatsError) {
-        console.error('Cannot send email for app', mapApp.app_id, generateStatsError, mapApp.user_id.email)
-        continue
-      }
-
-      if (weeklyStats.all_updates === 0)
-        continue
-
-      const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
-      if (sucessUpdates < 0) {
-        console.error('Cannot send email for app, sucessUpdates < 0', weeklyStats, mapApp)
-        continue
-      }
-
-      const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
-
-      const metadata = {
-        app_id: mapApp.app_id,
-        weekly_updates: (weeklyStats.all_updates).toString(),
-        fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
-        weekly_install: sucessUpdates.toString(),
-        weekly_install_success: (successPercantage * 100).toString(),
-        fun_comparison_2: getFunComparison('failRate', successPercantage),
-        weekly_fail: (weeklyStats.failed_updates).toString(),
-        weekly_open: (weeklyStats.open_app).toString(),
-        fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
-      }
-
-      await trackBentoEvent(c, mapApp.user_id.email, metadata, 'cron-stats')
+    if (weeklyStats.all_updates === 0) {
+      return c.json({ status: 'No updates this week' }, 200)
     }
+
+    const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
+    if (sucessUpdates < 0) {
+      console.error('Cannot send email for app, sucessUpdates < 0', weeklyStats, { app_id: appId, email })
+      return c.json({ status: 'Invalid stats' }, 500)
+    }
+
+    const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
+
+    const metadata = {
+      app_id: appId,
+      weekly_updates: (weeklyStats.all_updates).toString(),
+      fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
+      weekly_install: sucessUpdates.toString(),
+      weekly_install_success: (successPercantage * 100).toString(),
+      fun_comparison_2: getFunComparison('failRate', successPercantage),
+      weekly_fail: (weeklyStats.failed_updates).toString(),
+      weekly_open: (weeklyStats.open_app).toString(),
+      fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
+    }
+
+    await trackBentoEvent(c, email, metadata, 'cron-stats')
 
     return c.json(BRES)
   }
   catch (e) {
-    return c.json({ status: 'Cannot process emails', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot process email', error: JSON.stringify(e) }, 500)
   }
 })

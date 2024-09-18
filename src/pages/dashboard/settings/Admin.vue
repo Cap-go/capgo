@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import { FormKit, FormKitMessages } from '@formkit/vue'
+import iconPassword from '~icons/ph/key?raw'
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { FormKit, FormKitMessages } from '@formkit/vue'
 import { toast } from 'vue-sonner'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
-import iconPassword from '~icons/ph/key?raw'
 
 const route = useRoute()
 const isLoading = ref(false)

@@ -11,7 +11,6 @@ export default antfu(
       'dist',
       'public',
       '**/supabase.types*',
-      'supabase',
       'supabase/functions/_backend/scripts/*',
       'CHANGELOG.md',
     ],

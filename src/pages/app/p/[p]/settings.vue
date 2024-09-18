@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
 import { Camera } from '@capacitor/camera'
-import mime from 'mime'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { useSupabase } from '~/services/supabase'
-import { urlToAppId } from '~/services/conversion'
-import type { Database } from '~/types/supabase.types'
-import iconName from '~icons/ph/user?raw'
 import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
 import Pencil from '~icons/heroicons/pencil-square'
+import iconName from '~icons/ph/user?raw'
+import mime from 'mime'
+import { toast } from 'vue-sonner'
+import { urlToAppId } from '~/services/conversion'
+import { useSupabase } from '~/services/supabase'
 import type { OrganizationRole } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 
 const isLoading = ref(false)
 const isFirstLoading = ref(true)

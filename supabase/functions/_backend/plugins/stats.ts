@@ -1,10 +1,19 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
-import { z } from 'zod'
 import * as semver from 'semver'
+import { z } from 'zod'
+import type { Context } from '@hono/hono'
+import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
+import { appIdToUrl } from '../utils/conversion.ts'
+import { BRES } from '../utils/hono.ts'
+import { logsnag } from '../utils/logsnag.ts'
+import { sendNotifOrg } from '../utils/notifications.ts'
+import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import {
+  deviceIdRegex,
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,
+  isLimited,
   MISSING_STRING_APP_ID,
   MISSING_STRING_DEVICE_ID,
   MISSING_STRING_PLATFORM,
@@ -15,20 +24,11 @@ import {
   NON_STRING_PLATFORM,
   NON_STRING_VERSION_NAME,
   NON_STRING_VERSION_OS,
-  deviceIdRegex,
-  isLimited,
   reverseDomainRegex,
 } from '../utils/utils.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
-import type { AppStats } from '../utils/types.ts'
-import type { Database } from '../utils/supabase.types.ts'
-import { sendNotifOrg } from '../utils/notifications.ts'
-import { logsnag } from '../utils/logsnag.ts'
-import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
-import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
-import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
+import type { Database } from '../utils/supabase.types.ts'
+import type { AppStats } from '../utils/types.ts'
 
 const failActions = [
   'set_fail',

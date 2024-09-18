@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import ky from 'ky'
+import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'petite-vue-i18n'
-import ky from 'ky'
-import type { TableColumn } from '../comp_def'
-import type { Database } from '~/types/supabase.types'
+import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
-import { appIdToUrl } from '~/services/conversion'
+import type { Database } from '~/types/supabase.types'
+import type { TableColumn } from '../comp_def'
 
 const props = defineProps<{
   appId: string

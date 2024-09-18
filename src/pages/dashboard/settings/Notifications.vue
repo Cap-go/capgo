@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useI18n } from 'petite-vue-i18n'
+import { ref } from 'vue'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 

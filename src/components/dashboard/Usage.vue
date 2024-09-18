@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import colors from 'tailwindcss/colors'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
-import UsageCard from './UsageCard.vue'
-import { useMainStore } from '~/stores/main'
-import { getPlans, getTotalAppStorage } from '~/services/supabase'
-import { getDaysInCurrentMonth } from '~/services/date'
-import type { Database } from '~/types/supabase.types'
+import colors from 'tailwindcss/colors'
+import { computed, ref, watch } from 'vue'
 import { bytesToGb, getDaysBetweenDates, toFixed } from '~/services/conversion'
+import { getDaysInCurrentMonth } from '~/services/date'
+import { getPlans, getTotalAppStorage } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
+import type { Database } from '~/types/supabase.types'
+import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
   appId?: string

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { useDisplayStore } from '~/stores/display'
 import IconAcount from '~icons/mdi/user'
+import { useI18n } from 'petite-vue-i18n'
+import { ref, shallowRef } from 'vue'
 import type { Tab } from '~/components/comp_def'
+import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const route = useRoute()

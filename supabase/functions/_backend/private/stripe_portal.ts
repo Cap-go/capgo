@@ -1,8 +1,8 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { createPortal } from '../utils/stripe.ts'
+import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 
 interface PortalData {
   callbackUrl: string

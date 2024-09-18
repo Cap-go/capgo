@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { Ref } from 'vue'
-import ky from 'ky'
 import dayjs from 'dayjs'
-import { onMounted, ref, watch } from 'vue'
+import ky from 'ky'
 import { useI18n } from 'petite-vue-i18n'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import type { TableColumn } from '../comp_def'
+import type { Ref } from 'vue'
+import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
-import { appIdToUrl } from '~/services/conversion'
+import type { TableColumn } from '../comp_def'
 
 const props = defineProps<{
   deviceId?: string

@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
+import { BRES } from '../../utils/hono.ts'
 import { hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { BRES } from '../../utils/hono.ts'
 
 interface ChannelSet {
   app_id: string
@@ -22,10 +22,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     console.log('You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
-  const { data: org, error } = await supabaseAdmin(c).from('apps')
-    .select('owner_org')
-    .eq('app_id', body.app_id)
-    .single()
+  const { data: org, error } = await supabaseAdmin(c).from('apps').select('owner_org').eq('app_id', body.app_id).single()
   if (error || !org) {
     console.log('Cannot find app', error)
     return c.json({ status: 'Cannot find app', error: JSON.stringify(error) }, 400)

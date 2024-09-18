@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { storeToRefs } from 'pinia'
-import { toast } from 'vue-sonner'
+import Plus from '~icons/heroicons/plus'
 import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
+import { useI18n } from 'petite-vue-i18n'
+import { storeToRefs } from 'pinia'
+import { onMounted, ref, watch } from 'vue'
 
+import { toast } from 'vue-sonner'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
-import Plus from '~icons/heroicons/plus'
 import type { Database } from '~/types/supabase.types'
-import { useDisplayStore } from '~/stores/display'
-import { useSupabase } from '~/services/supabase'
-import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()

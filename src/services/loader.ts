@@ -1,5 +1,5 @@
-import { SplashScreen } from '@capacitor/splash-screen'
 import { Capacitor } from '@capacitor/core'
+import { SplashScreen } from '@capacitor/splash-screen'
 
 export async function hideLoader() {
   const appLoader = document.querySelector('#app-loader')

@@ -1,10 +1,10 @@
-import { getPlans, isAdmin } from './../services/supabase'
-import type { UserModule } from '~/types'
-import { useMainStore } from '~/stores/main'
-import { useSupabase } from '~/services/supabase'
 import { setUser } from '~/services/bento'
-import { useLogSnag } from '~/services/logsnag'
 import { hideLoader } from '~/services/loader'
+import { useLogSnag } from '~/services/logsnag'
+import { useSupabase } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
+import type { UserModule } from '~/types'
+import { getPlans, isAdmin } from './../services/supabase'
 
 async function guard(next: any, to: string, from: string) {
   const supabase = useSupabase()

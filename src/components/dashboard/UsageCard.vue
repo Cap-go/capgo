@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 import dayjs from 'dayjs'
+import { useI18n } from 'petite-vue-i18n'
+import { computed } from 'vue'
 import LineChartStats from '~/components/LineChartStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
-import IcBaselineInfo from '~icons/ic/baseline-info'
 
 const props = defineProps({
   title: { type: String, default: '' },

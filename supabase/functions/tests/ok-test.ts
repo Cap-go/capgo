@@ -1,10 +1,10 @@
 // Import required libraries and modules
+import { createClient } from '@supabase/supabase-js'
 import {
   assert,
   assertEquals,
 } from 'https://deno.land/std@0.224.0/assert/mod.ts'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createClient } from '@supabase/supabase-js'
 
 // Set up the configuration for the Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''

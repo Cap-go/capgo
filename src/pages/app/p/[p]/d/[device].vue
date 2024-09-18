@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { gt } from 'semver'
-import { toast } from 'vue-sonner'
-import ky from 'ky'
-import { formatDate } from '~/services/date'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
-import type { Database } from '~/types/supabase.types'
-import { useMainStore } from '~/stores/main'
-import { useDisplayStore } from '~/stores/display'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
+import ky from 'ky'
+import { useI18n } from 'petite-vue-i18n'
+import { gt } from 'semver'
+import { ref, watchEffect } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import type { Tab } from '~/components/comp_def'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
+import { formatDate } from '~/services/date'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
 import type { OrganizationRole } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -300,7 +300,8 @@ async function updateVersionOverride(event: Event) {
         .then(async () => {
           toast.success(t('version-linked'))
           return loadData()
-        }).catch(async (error) => {
+        })
+        .catch(async (error) => {
           console.error(error)
           toast.error(t('version-link-fail'))
         })

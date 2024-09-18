@@ -1,9 +1,9 @@
-import type { Context } from '@hono/hono'
-import ky from 'ky'
 import dayjs from 'dayjs'
+import ky from 'ky'
+import type { Context } from '@hono/hono'
+import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
-import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions

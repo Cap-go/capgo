@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
+import { ensureFile } from 'https://deno.land/std/fs/ensure_file.ts'
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.7.0/mod.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js'
-import { ensureFile } from 'https://deno.land/std/fs/ensure_file.ts'
 import type { Database } from '../_backend/utils/supabase.types.ts'
 
 const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'

@@ -1,12 +1,12 @@
-import { decode } from 'base64-arraybuffer'
-import type { Ref } from 'vue'
-import { setErrors } from '@formkit/core'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { Filesystem } from '@capacitor/filesystem'
+import { setErrors } from '@formkit/core'
+import { decode } from 'base64-arraybuffer'
 import mime from 'mime'
-import { useSupabase } from './supabase'
+import type { Ref } from 'vue'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { useSupabase } from './supabase'
 
 const supabase = useSupabase()
 const main = useMainStore()

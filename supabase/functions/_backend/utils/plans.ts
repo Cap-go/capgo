@@ -1,4 +1,7 @@
 import type { Context } from '@hono/hono'
+import { logsnag } from './logsnag.ts'
+import { sendNotifOrg } from './notifications.ts'
+import { recordUsage, setThreshold } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -9,10 +12,7 @@ import {
   isTrialOrg,
   supabaseAdmin,
 } from './supabase.ts'
-import { sendNotifOrg } from './notifications.ts'
 import type { Database } from './supabase.types.ts'
-import { recordUsage, setThreshold } from './stripe.ts'
-import { logsnag } from './logsnag.ts'
 
 function planToInt(plan: string) {
   switch (plan) {

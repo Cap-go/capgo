@@ -77,11 +77,10 @@ export async function getManifestUrl(c: Context, version: {
       file_name: entry.file_name,
       file_hash: entry.file_hash,
       download_url: signedUrl ?? null,
-    }))
-      .catch((e) => {
-        console.error(`Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}`)
-        return null
-      })
+    })).catch((e) => {
+      console.error(`Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}`)
+      return null
+    })
   }))
   return finalManifest.filter(entry => entry !== null)
 }

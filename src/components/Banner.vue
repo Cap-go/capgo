@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
 import { Capacitor } from '@capacitor/core'
+import { useI18n } from 'petite-vue-i18n'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { urlToAppId } from '~/services/conversion'
 

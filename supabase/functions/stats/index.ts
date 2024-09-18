@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
+import { Hono } from 'hono/tiny'
 import { app } from '../_backend/plugins/stats.ts'
 
 const functionName = 'stats'

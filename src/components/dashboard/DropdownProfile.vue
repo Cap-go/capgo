@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { Capacitor } from '@capacitor/core'
+import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'petite-vue-i18n'
-import { Capacitor } from '@capacitor/core'
-import { useMainStore } from '~/stores/main'
 import { openMessenger } from '~/services/bento'
-import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const dropdown = ref<HTMLElement | null>(null)

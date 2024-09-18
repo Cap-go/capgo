@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Stat } from './comp_def'
 import InformationInfo from '~icons/heroicons/information-circle'
+import type { Stat } from './comp_def'
 
 const props = defineProps<{ stats: Stat[], mini?: boolean }>()
 const refStats = toRef(() => props.stats)

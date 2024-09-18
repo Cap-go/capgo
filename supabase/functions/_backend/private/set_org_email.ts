@@ -3,8 +3,8 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import type { Context } from '@hono/hono'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
+import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
   emial: z.string().email(),

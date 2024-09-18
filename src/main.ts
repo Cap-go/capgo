@@ -1,18 +1,18 @@
 // register vue composition api globally
-import { createApp } from 'vue'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { setupLayouts } from 'virtual:generated-layouts'
 
+import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router/auto'
 import { routes } from 'vue-router/auto-routes'
-import { setupLayouts } from 'virtual:generated-layouts'
 import type { Router } from 'vue-router/auto'
 import App from './App.vue'
 
+import { initPlausible } from './services/plausible'
+
+import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
-
-import { initPlausible } from './services/plausible'
-import { getRemoteConfig } from './services/supabase'
 
 const guestPath = ['/login', '/delete_account', '/forgot_password', '/resend_email', '/onboarding']
 

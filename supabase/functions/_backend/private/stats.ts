@@ -1,9 +1,9 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { useCors } from '../utils/hono.ts'
+import { readStats } from '../utils/stats.ts'
 import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import type { Order } from '../utils/types.ts'
-import { readStats } from '../utils/stats.ts'
 
 // get_stats
 

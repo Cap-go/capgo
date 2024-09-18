@@ -1,18 +1,18 @@
 // channel self old function
 
-import * as semver from 'semver'
-
 import { Hono } from 'hono/tiny'
+
+import * as semver from 'semver'
 
 import { z } from 'zod'
 import type { Context } from '@hono/hono'
 import { BRES, getBody } from '../utils/hono.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
-import type { AppInfos } from '../utils/types.ts'
-import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, deviceIdRegex, reverseDomainRegex } from '../utils/utils.ts'
-import type { Database } from '../utils/supabase.types.ts'
-import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
+import type { Database } from '../utils/supabase.types.ts'
+import type { AppInfos } from '../utils/types.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string

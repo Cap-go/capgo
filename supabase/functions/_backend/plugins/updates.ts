@@ -1,13 +1,15 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
 import * as semver from 'semver'
 import { z } from 'zod'
+import type { Context } from '@hono/hono'
 import { update } from '../utils/update.ts'
 import {
+  deviceIdRegex,
   INVALID_STRING_APP_ID,
   INVALID_STRING_DEVICE_ID,
   INVALID_STRING_PLATFORM,
   INVALID_STRING_PLUGIN_VERSION,
+  isLimited,
   MISSING_STRING_APP_ID,
   MISSING_STRING_DEVICE_ID,
   MISSING_STRING_PLATFORM,
@@ -18,8 +20,6 @@ import {
   NON_STRING_DEVICE_ID,
   NON_STRING_VERSION_BUILD,
   NON_STRING_VERSION_NAME,
-  deviceIdRegex,
-  isLimited,
   reverseDomainRegex,
 } from '../utils/utils.ts'
 import type { AppInfos } from '../utils/types.ts'

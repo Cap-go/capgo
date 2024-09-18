@@ -1,5 +1,5 @@
-import type { FunctionalComponent, Ref, ShallowRef } from 'vue'
 import type { ComposerTranslation } from 'petite-vue-i18n'
+import type { FunctionalComponent, Ref, ShallowRef } from 'vue'
 
 export type MobileColType = 'header' | 'title' | 'footer' | 'after' | 'none'
 

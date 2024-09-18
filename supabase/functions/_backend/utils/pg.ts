@@ -1,10 +1,10 @@
 // import { neon as postgres } from '@neondatabase/serverless'
+import { sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { getRuntimeKey } from 'hono/adapter'
 // import { drizzle } from 'drizzle-orm/neon-http';
 import postgres from 'postgres'
-import { drizzle } from 'drizzle-orm/postgres-js'
-import { sql } from 'drizzle-orm'
 import type { Context } from '@hono/hono'
-import { getRuntimeKey } from 'hono/adapter'
 import { existInEnv, getEnv } from './utils.ts'
 
 export function getBestDatabaseURL(c: Context): string {

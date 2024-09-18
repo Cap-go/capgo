@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref, shallowRef, watch } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
-import type { Tab } from './comp_def'
+import IconDoc from '~icons/gg/loadbar-doc'
+import IconDiscord from '~icons/ic/round-discord'
 import IconDashboard from '~icons/ic/round-space-dashboard'
-
+import IconExpand from '~icons/mdi/arrow-expand-right'
 // import FluentLive20Filled from '~icons/fluent/live-20-filled'
 import IconApiKey from '~icons/mdi/shield-key'
-import IconDiscord from '~icons/ic/round-discord'
-import IconDoc from '~icons/gg/loadbar-doc'
-import IconExpand from '~icons/mdi/arrow-expand-right'
+
+import { useI18n } from 'petite-vue-i18n'
+import { ref, shallowRef, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { Tab } from './comp_def'
 
 const props = defineProps < {
   sidebarOpen: boolean

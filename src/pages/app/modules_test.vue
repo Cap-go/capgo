@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useI18n } from 'petite-vue-i18n'
-import { NativeMarket } from '@capgo/native-market'
-import { InAppBrowser } from '@capgo/inappbrowser'
-import { NativeAudio } from '@capgo/native-audio'
-import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { Camera } from '@capacitor/camera'
 import { Mute } from '@capgo/capacitor-mute'
-import { toast } from 'vue-sonner'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { InAppBrowser } from '@capgo/inappbrowser'
+import { NativeAudio } from '@capgo/native-audio'
+import { NativeMarket } from '@capgo/native-market'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import { useI18n } from 'petite-vue-i18n'
+import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()

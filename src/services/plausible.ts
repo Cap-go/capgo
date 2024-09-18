@@ -1,5 +1,5 @@
-import Plausible from 'plausible-tracker'
 import { Capacitor } from '@capacitor/core'
+import Plausible from 'plausible-tracker'
 import { isSpoofed } from './supabase'
 
 export function trackEvent(domain: string, eventName: string, eventData: any = {}) {

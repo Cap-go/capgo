@@ -3,10 +3,10 @@ import { Hono } from 'hono/tiny'
 
 // Scrapping API
 
-import { app as topApk } from '../_backend/scrapping/top_apk.ts'
-import { app as similarApps } from '../_backend/scrapping/similar_apps.ts'
 import { app as framework } from '../_backend/scrapping/framework.ts'
+import { app as similarApps } from '../_backend/scrapping/similar_apps.ts'
 import { app as storeInfo } from '../_backend/scrapping/store_info.ts'
+import { app as topApk } from '../_backend/scrapping/top_apk.ts'
 
 const functionName = 'scrapping'
 const appGlobal = new Hono().basePath(`/${functionName}`)

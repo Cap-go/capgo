@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
-import { useRouter } from 'vue-router'
-import { onMounted, ref } from 'vue'
-import { getOrgs } from '../services/supabase'
-import UserMenu from '../components/dashboard/DropdownProfile.vue'
-import Banner from './Banner.vue'
-import { useMainStore } from '~/stores/main'
-import { useDisplayStore } from '~/stores/display'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconMenu from '~icons/material-symbols/menu-rounded'
+import { useI18n } from 'petite-vue-i18n'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
+import UserMenu from '../components/dashboard/DropdownProfile.vue'
+import { getOrgs } from '../services/supabase'
+import Banner from './Banner.vue'
 
 const props = defineProps({
   sidebarOpen: {
