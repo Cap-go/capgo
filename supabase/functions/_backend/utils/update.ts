@@ -6,7 +6,6 @@ import type { Context } from '@hono/hono'
 import { saveStoreInfoCF } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient, isAllowedActionOrg } from './pg.ts'
 import * as schema from './postgress_schema.ts'
@@ -231,7 +230,6 @@ async function getAppOwnerPostgres(
 }
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient>) {
-  const LogSnag = logsnag(c)
   const id = cryptoRandomString({ length: 10 })
   try {
     console.log(id, 'body', body, new Date().toISOString())
@@ -274,21 +272,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     else {
       // get app owner with app_id
-      const sent = await sendNotifOrg(c, 'user:semver_issue', {
+      await sendNotifOrg(c, 'user:semver_issue', {
         app_id,
         device_id,
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1')
-      if (sent) {
-        await LogSnag.track({
-          channel: 'updates',
-          event: 'semver issue',
-          icon: '⚠️',
-          user_id: appOwner.owner_org,
-          notify: false,
-        }).catch()
-      }
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
@@ -296,21 +285,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     // if plugin_version is < 6 send notif to alert for update
     if (semver.lt(plugin_version, '6.0.0')) {
-      const sent = await sendNotifOrg(c, 'user:plugin_issue', {
+      await sendNotifOrg(c, 'user:plugin_issue', {
         app_id,
         device_id,
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1')
-      if (sent) {
-        await LogSnag.track({
-          channel: 'updates',
-          event: 'plugin issue',
-          icon: '⚠️',
-          user_id: appOwner.owner_org,
-          notify: false,
-        } as any).catch()
-      }
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {

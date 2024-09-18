@@ -5,7 +5,6 @@ import type { Context } from '@hono/hono'
 import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -178,26 +177,12 @@ async function post(c: Context, body: AppStats) {
       else if (failActions.includes(action)) {
         await createStatsVersion(c, appVersion.id, app_id, 'fail')
         console.log('FAIL!')
-        const sent = await sendNotifOrg(c, 'user:update_fail', {
+        await sendNotifOrg(c, 'user:update_fail', {
           app_id,
           device_id,
           ersion_id: appVersion.id,
           _app_id_url: appIdToUrl(app_id),
         }, appVersion.owner_org, app_id, '0 0 * * 1')
-        if (sent) {
-          await logsnag(c).track({
-            channel: 'updates',
-            event: 'update fail',
-            icon: '⚠️',
-            user_id: appVersion.owner_org ?? undefined,
-            tags: {
-              app_id,
-              device_id,
-              version_id: appVersion.id,
-            },
-            notify: false,
-          }).catch()
-        }
       }
     }
     else {
