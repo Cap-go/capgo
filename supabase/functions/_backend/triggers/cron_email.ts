@@ -105,7 +105,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
     }
 
-    await trackBentoEvent(c, email, metadata, 'cron-stats')
+    await trackBentoEvent(c, email, metadata, 'user:weekly_stats')
 
     return c.json(BRES)
   }
