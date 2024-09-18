@@ -20,7 +20,7 @@ select
     cron.schedule('Update insights', '22 1 * * *', $$SELECT http_post_helper('logsnag_insights', 'cloudflare', '{}'::jsonb)$$);
 -- SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_helper('cron_good_plan', '', '{}'::jsonb)$$);
 select
-    cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT http_post_helper('cron_email', 'cloudflare', '{}'::jsonb)$$);
+    cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT process_stats_email();$$);
 
 select reset_and_seed_data();
 select reset_and_seed_stats_data();
