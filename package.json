@@ -23,6 +23,7 @@
     "reset": "supabase db reset",
     "dev-back": "wrangler dev cloudflare_workers/index.ts",
     "netlify:dev": "bunx netlify dev --port 8881",
+    "test:backendv2": "deno test --allow-all supabase/functions/tests/* --env=supabase/.env.test --import-map=supabase/functions/import_map.json",
     "test:backend": "deno run --allow-all tests_backend/run_backend_tests.ts backend",
     "test:cli": "deno run --allow-all tests_backend/run_backend_tests.ts cli",
     "test:selectable_disallow": "deno run --allow-all tests_backend/run_backend_tests.ts selectable_disallow",
