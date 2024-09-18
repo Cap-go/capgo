@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'petite-vue-i18n'
 import type { Tab } from './comp_def'
 
 const props = defineProps<{
