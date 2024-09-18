@@ -5,15 +5,15 @@ DECLARE
   app_record RECORD;
 BEGIN
   FOR app_record IN (
-    SELECT a.id, o.management_email
+    SELECT a.app_id, o.management_email
     FROM apps a
-    JOIN orgs o ON a.org_id = o.id
+    JOIN orgs o ON a.owner_org = o.id
   )
   LOOP
     INSERT INTO job_queue (job_type, payload, function_type, function_name)
     VALUES (
       'TRIGGER',
-      json_build_object('email', app_record.management_email, 'appId', app_record.id)::text,
+      json_build_object('email', app_record.management_email, 'appId', app_record.app_id)::text,
       'cloudflare',
       'cron_email'
     );
