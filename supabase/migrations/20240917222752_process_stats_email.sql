@@ -15,7 +15,7 @@ BEGIN
       'TRIGGER',
       json_build_object('email', app_record.management_email, 'appId', app_record.id)::text,
       'cloudflare',
-      'cron_plan'
+      'cron_email'
     );
   END LOOP;
 END;
