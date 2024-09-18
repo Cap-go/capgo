@@ -24,3 +24,6 @@ $$;
 ALTER FUNCTION "public"."process_stats_email"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."process_stats_email"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."process_stats_email"() TO "service_role";
+
+ALTER TABLE app_versions 
+DROP COLUMN signature;
