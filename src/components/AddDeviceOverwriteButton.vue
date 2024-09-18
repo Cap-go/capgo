@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
+import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
 import { appIdToUrl } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'

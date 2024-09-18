@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { User } from '@supabase/supabase-js'
