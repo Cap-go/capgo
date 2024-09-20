@@ -43,3 +43,9 @@ BEGIN
     WHERE status='failed'::"public"."queue_job_status" AND retry_count < retry_limit;
 END;
 $$;
+
+SELECT cron.schedule(
+    'retry_failed_jobs',
+    '* * * * *',
+    $$SELECT retry_failed_jobs()$$
+);
