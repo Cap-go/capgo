@@ -21,8 +21,9 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log('DB_REPLICATE is not set')
       return c.json(BRES)
     }
-
+    console.log('replicate_data', table, type, record, old_record)
     const drizzleClient = getDrizzleClientD1(c)
+    console.log('drizzleClient initialized')
     // Perform the replication
     switch (type) {
       case 'INSERT':
@@ -47,15 +48,21 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
 async function insertRecord(drizzleClient: any, table: string, record: any) {
   // Implement insert logic here
-  await drizzleClient.insert(table).values(record).execute()
+  console.log('insertRecord', table, record)
+  await drizzleClient.insert(table).values(record).execute().catch((e: any) => {
+    console.error('Error in insertRecord:', e)
+    throw e
+  })
 }
 
 async function updateRecord(drizzleClient: any, table: string, record: any, old_record: any) {
   // Implement update logic here
+  console.log('updateRecord', table, record, old_record)
   await drizzleClient.update(table).set(record).where({ id: old_record.id }).execute()
 }
 
 async function deleteRecord(drizzleClient: any, table: string, old_record: any) {
   // Implement delete logic here
+  console.log('deleteRecord', table, old_record)
   await drizzleClient.delete(table).where({ id: old_record.id }).execute()
 }
