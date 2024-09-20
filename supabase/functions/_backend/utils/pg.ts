@@ -1,5 +1,6 @@
 // import { neon as postgres } from '@neondatabase/serverless'
 import { sql } from 'drizzle-orm'
+import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { getRuntimeKey } from 'hono/adapter'
 // import { drizzle } from 'drizzle-orm/neon-http';
@@ -46,6 +47,10 @@ export function getPgClient(c: Context) {
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
   return drizzle(client as any)
+}
+
+export function getDrizzleClientD1(c: Context) {
+  return drizzleD1(c.env.DB_REPLICATE)
 }
 
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {

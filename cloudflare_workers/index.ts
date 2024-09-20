@@ -1,63 +1,64 @@
-import { Hono } from 'hono/tiny'
 import { sentry } from '@hono/sentry'
-
 // Public API
 import { HTTPException } from 'hono/http-exception'
-// import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
-// import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
-import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
-import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
-import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
-import { app as device } from '../supabase/functions/_backend/public/device/index.ts'
-import { app as channel } from '../supabase/functions/_backend/public/channel/index.ts'
 
+import { Hono } from 'hono/tiny'
+// import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
+// import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
+import { version } from '../package.json'
 // Plugin API
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
-import { app as updates } from '../supabase/functions/_backend/plugins/updates.ts'
 import { app as stats } from '../supabase/functions/_backend/plugins/stats.ts'
+import { app as updates } from '../supabase/functions/_backend/plugins/updates.ts'
+import { app as config } from '../supabase/functions/_backend/private/config.ts'
 
+import { app as create_device } from '../supabase/functions/_backend/private/create_device.ts'
+import { app as deleted_failed_version } from '../supabase/functions/_backend/private/delete_failed_version.ts'
+import { app as devices_priv } from '../supabase/functions/_backend/private/devices.ts'
+
+import { app as download_link } from '../supabase/functions/_backend/private/download_link.ts'
+import { app as latency } from '../supabase/functions/_backend/private/latency.ts'
+import { app as latency_drizzle } from '../supabase/functions/_backend/private/latency_drizzle.ts'
+import { app as latency_postres } from '../supabase/functions/_backend/private/latency_postres.ts'
+import { app as log_as } from '../supabase/functions/_backend/private/log_as.ts'
+import { app as multipart } from '../supabase/functions/_backend/private/multipart.ts'
+import { app as partial_upload } from '../supabase/functions/_backend/private/partial_upload.ts'
 // Private API
 import { app as plans } from '../supabase/functions/_backend/private/plans.ts'
-import { app as storeTop } from '../supabase/functions/_backend/private/store_top.ts'
 import { app as publicStats } from '../supabase/functions/_backend/private/public_stats.ts'
-import { app as config } from '../supabase/functions/_backend/private/config.ts'
-import { app as download_link } from '../supabase/functions/_backend/private/download_link.ts'
-import { app as log_as } from '../supabase/functions/_backend/private/log_as.ts'
+import { app as stats_priv } from '../supabase/functions/_backend/private/stats.ts'
+import { app as storeTop } from '../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../supabase/functions/_backend/private/upload_link.ts'
-import { app as deleted_failed_version } from '../supabase/functions/_backend/private/delete_failed_version.ts'
-import { app as devices_priv } from '../supabase/functions/_backend/private/devices.ts'
-import { app as stats_priv } from '../supabase/functions/_backend/private/stats.ts'
-import { app as latency } from '../supabase/functions/_backend/private/latency.ts'
-import { app as latency_postres } from '../supabase/functions/_backend/private/latency_postres.ts'
-import { app as latency_drizzle } from '../supabase/functions/_backend/private/latency_drizzle.ts'
-import { app as multipart } from '../supabase/functions/_backend/private/multipart.ts'
-import { app as create_device } from '../supabase/functions/_backend/private/create_device.ts'
-import { app as partial_upload } from '../supabase/functions/_backend/private/partial_upload.ts'
+import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
+import { app as channel } from '../supabase/functions/_backend/public/channel/index.ts'
+import { app as device } from '../supabase/functions/_backend/public/device/index.ts'
+import { app as ok } from '../supabase/functions/_backend/public/ok.ts'
 
 // Triggers API
 import { app as clear_app_cache } from '../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../supabase/functions/_backend/triggers/clear_device_cache.ts'
-import { app as cron_email } from '../supabase/functions/_backend/triggers/cron_email.ts'
-import { app as cron_scrapper } from '../supabase/functions/_backend/triggers/cron_scrapper.ts'
 import { app as cron_clear_versions } from '../supabase/functions/_backend/triggers/cron_clear_versions.ts'
-import { app as logsnag_insights } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
-import { app as on_channel_update } from '../supabase/functions/_backend/triggers/on_channel_update.ts'
-import { app as on_user_create } from '../supabase/functions/_backend/triggers/on_user_create.ts'
-import { app as on_user_update } from '../supabase/functions/_backend/triggers/on_user_update.ts'
-import { app as on_user_delete } from '../supabase/functions/_backend/triggers/on_user_delete.ts'
-import { app as on_version_create } from '../supabase/functions/_backend/triggers/on_version_create.ts'
-import { app as on_version_update } from '../supabase/functions/_backend/triggers/on_version_update.ts'
-import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
-import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
+import { app as cron_email } from '../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_plan } from '../supabase/functions/_backend/triggers/cron_plan.ts'
-import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
+import { app as cron_scrapper } from '../supabase/functions/_backend/triggers/cron_scrapper.ts'
+import { app as cron_stats } from '../supabase/functions/_backend/triggers/cron_stats.ts'
+import { app as logsnag_insights } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../supabase/functions/_backend/triggers/on_app_create.ts'
+import { app as on_channel_update } from '../supabase/functions/_backend/triggers/on_channel_update.ts'
+import { app as on_organization_create } from '../supabase/functions/_backend/triggers/on_organization_create.ts'
+import { app as on_user_create } from '../supabase/functions/_backend/triggers/on_user_create.ts'
+import { app as on_user_delete } from '../supabase/functions/_backend/triggers/on_user_delete.ts'
+import { app as on_user_update } from '../supabase/functions/_backend/triggers/on_user_update.ts'
+import { app as on_version_create } from '../supabase/functions/_backend/triggers/on_version_create.ts'
+import { app as on_version_delete } from '../supabase/functions/_backend/triggers/on_version_delete.ts'
+import { app as on_version_update } from '../supabase/functions/_backend/triggers/on_version_update.ts'
+import { app as replicate_data } from '../supabase/functions/_backend/triggers/replicate_data.ts'
+import { app as stripe_event } from '../supabase/functions/_backend/triggers/stripe_event.ts'
 
-// import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
-import { version } from '../package.json'
+// import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
@@ -114,6 +115,7 @@ appTriggers.route('/on_user_update', on_user_update)
 appTriggers.route('/on_user_delete', on_user_delete)
 appTriggers.route('/on_version_create', on_version_create)
 appTriggers.route('/on_version_update', on_version_update)
+appTriggers.route('/replicate_data', replicate_data)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/on_organization_create', on_organization_create)

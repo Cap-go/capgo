@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
-import type { D1Database } from '@cloudflare/workers-types'
 import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono'
+import type { D1Database } from '@cloudflare/workers-types'
+import type { Context } from '@hono/hono'
 
 export interface DBPayload {
   type: 'INSERT' | 'UPDATE' | 'DELETE'
