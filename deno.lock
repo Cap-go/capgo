@@ -1480,6 +1480,7 @@
     "https://esm.sh/dayjs@1.11.11?target=deno": "ef9e37930e6709a2d44ab94d9097648ac02a71bffbf74aff6dc01fd17f2a9040",
     "https://esm.sh/drizzle-orm@0.31.0/d1?target=deno": "92abe95ed75ccbffb484c1b1304a894895bec63dbbe26d8097b1e72c1a1e0bf2",
     "https://esm.sh/drizzle-orm@0.31.0/postgres-js?target=deno": "1f1066b6712b4106596a2a06d177c9f59ac467cf5ec80db2e7e7e6f87b0e5b27",
+    "https://esm.sh/drizzle-orm@0.31.0/sqlite-core?target=deno": "25c312eed3abe0d93f896a3432f687ff7048ab7241292404ca9ba05a1f0da8f6",
     "https://esm.sh/drizzle-orm@0.31.0?target=deno": "02802dae68adaeae817e5288bbc66898cf8725e7f3225e453191531f41cb2697",
     "https://esm.sh/hono@4.5.4?target=deno": "13ad82b48d1f417037f9dbee6d945430ed7b4b32b4c786328c2913aa42f21fdf",
     "https://esm.sh/hono@4.5.8/adapter?target=deno": "983189324575c7ab6d8c5bb76b84f7bdbd8e645e43d7b3d23356914138e97a9f",

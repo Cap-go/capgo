@@ -59,7 +59,6 @@ export const app_versions = pgTable('app_versions', {
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
   manifest: manfiestType('manifest'),
-  signature: varchar('signature'),
 })
 
 export const channels = pgTable('channels', {

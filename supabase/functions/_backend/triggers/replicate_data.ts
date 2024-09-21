@@ -1,7 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { getDrizzleClientD1 } from '../utils/pg.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 
@@ -16,24 +15,25 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log('Invalid operation type:', type)
       return c.json({ status: 'Invalid operation type' }, 200)
     }
-    // Check if we're in production environment
+
     if (!c.env.DB_REPLICATE) {
       console.log('DB_REPLICATE is not set')
       return c.json(BRES)
     }
+
     console.log('replicate_data', table, type, record, old_record)
-    const drizzleClient = getDrizzleClientD1(c)
-    console.log('drizzleClient initialized')
-    // Perform the replication
+
+    const d1 = c.env.DB_REPLICATE as D1Database
+
     switch (type) {
       case 'INSERT':
-        await insertRecord(drizzleClient, table, record)
+        await insertRecord(d1, table, record)
         break
       case 'UPDATE':
-        await updateRecord(drizzleClient, table, record, old_record)
+        await updateRecord(d1, table, record, old_record)
         break
       case 'DELETE':
-        await deleteRecord(drizzleClient, table, old_record)
+        await deleteRecord(d1, table, old_record)
         break
     }
 
@@ -46,23 +46,27 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   }
 })
 
-async function insertRecord(drizzleClient: any, table: string, record: any) {
-  // Implement insert logic here
-  console.log('insertRecord', table, record)
-  await drizzleClient.insert(table).values(record).execute().catch((e: any) => {
-    console.error('Error in insertRecord:', e)
-    throw e
-  })
+async function insertRecord(d1: D1Database, table: string, record: any) {
+  const columns = Object.keys(record).join(', ')
+  const placeholders = Object.keys(record).map(() => '?').join(', ')
+  const values = Object.values(record)
+
+  const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`
+  console.log('insertRecord', query, values)
+  await d1.prepare(query).bind(...values).run()
 }
 
-async function updateRecord(drizzleClient: any, table: string, record: any, old_record: any) {
-  // Implement update logic here
-  console.log('updateRecord', table, record, old_record)
-  await drizzleClient.update(table).set(record).where({ id: old_record.id }).execute()
+async function updateRecord(d1: D1Database, table: string, record: any, old_record: any) {
+  const setClause = Object.keys(record).map(key => `${key} = ?`).join(', ')
+  const values = [...Object.values(record), old_record.id]
+
+  const query = `UPDATE ${table} SET ${setClause} WHERE id = ?`
+  console.log('updateRecord', query, values)
+  await d1.prepare(query).bind(...values).run()
 }
 
-async function deleteRecord(drizzleClient: any, table: string, old_record: any) {
-  // Implement delete logic here
-  console.log('deleteRecord', table, old_record)
-  await drizzleClient.delete(table).where({ id: old_record.id }).execute()
+async function deleteRecord(d1: D1Database, table: string, old_record: any) {
+  const query = `DELETE FROM ${table} WHERE id = ?`
+  console.log('deleteRecord', query, old_record.id)
+  await d1.prepare(query).bind(old_record.id).run()
 }

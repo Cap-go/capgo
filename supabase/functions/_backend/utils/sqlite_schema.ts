@@ -10,6 +10,7 @@ const boolean = customType<{ data: boolean }>({
 })
 
 export const apps = sqliteTable('apps', {
+  id: text('id').primaryKey().unique(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   app_id: text('app_id').notNull(),
   icon_url: text('icon_url').notNull(),
@@ -17,7 +18,6 @@ export const apps = sqliteTable('apps', {
   name: text('name').unique(),
   last_version: text('last_version'),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
-  id: text('id').primaryKey().unique(),
   retention: integer('retention', { mode: 'number' }).notNull().default(2592000),
 })
 export const app_versions = sqliteTable('app_versions', {
@@ -33,7 +33,8 @@ export const app_versions = sqliteTable('app_versions', {
   checksum: text('checksum'),
   session_key: text('session_key'),
   storage_provider: text('storage_provider').default('r2').notNull(),
-  minUpdateVersion: text('minUpdateVersion'),
+  min_update_version: text('min_update_version'),
+  manifest: text('manifest', { mode: 'json' }),
 })
 
 export const channels = sqliteTable('channels', {
@@ -45,12 +46,12 @@ export const channels = sqliteTable('channels', {
   created_by: text('created_by').notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
   public: boolean('public').notNull().default(false),
-  disableAutoUpdateUnderNative: boolean('disableAutoUpdateUnderNative').notNull().default(true),
-  disableAutoUpdate: text('disableAutoUpdate', { enum: ['major', 'minor', 'version_number', 'none'] }).default('major').notNull(),
-  enableAbTesting: boolean('enableAbTesting').notNull().default(false),
+  disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
+  disable_auto_update: text('disable_auto_update', { enum: ['major', 'minor', 'version_number', 'none'] }).default('major').notNull(),
+  enable_ab_testing: boolean('enable_ab_testing').notNull().default(false),
   enable_progressive_deploy: boolean('enable_progressive_deploy').default(false).notNull(),
-  secondaryVersionPercentage: real('secondaryVersionPercentage').default(0).notNull(),
-  secondVersion: integer('secondVersion', { mode: 'number' }).references(() => app_versions.id),
+  secondary_version_percentage: real('secondary_version_percentage').default(0).notNull(),
+  second_version: integer('second_version', { mode: 'number' }).references(() => app_versions.id),
   beta: boolean('beta').notNull().default(false),
   ios: boolean('ios').default(true).notNull(),
   android: boolean('android').notNull().default(true),
@@ -60,18 +61,18 @@ export const channels = sqliteTable('channels', {
 })
 
 export const devices_override = sqliteTable('devices_override', {
+  device_id: text('device_id').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
-  device_id: text('device_id').notNull(),
   version: integer('version', { mode: 'number' }).notNull().references(() => app_versions.id),
   app_id: text('app_id').notNull().references(() => apps.name),
   created_by: text('created_by'),
 })
 
 export const channel_devices = sqliteTable('channel_devices', {
+  device_id: text('device_id').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
-  device_id: text('device_id').notNull(),
   channel_id: integer('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: text('app_id').notNull().references(() => apps.name),
   created_by: text('created_by'),
