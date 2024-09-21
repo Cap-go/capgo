@@ -42,7 +42,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   }
   catch (e) {
     console.error('Error in replicate_data:', e)
-    return c.json({ status: 'Error in replication', error: JSON.stringify(e) }, 500)
+    const errorMessage = e instanceof Error ? e.message : String(e)
+    return c.json({ status: 'Error in replication', error: errorMessage }, 500)
   }
 })
 // clean fields that are not in the d1 table
