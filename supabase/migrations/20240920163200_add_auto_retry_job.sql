@@ -3,16 +3,17 @@ ALTER TABLE job_queue
 ADD COLUMN retry_count INT DEFAULT 0,
 ADD COLUMN retry_limit INT DEFAULT 10;
 
-CREATE OR REPLACE FUNCTION "public"."process_requested_jobs"() RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
+CREATE OR REPLACE FUNCTION public.process_requested_jobs()
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     requested_job RECORD;
 BEGIN
     FOR requested_job IN SELECT net._http_response.id, net._http_response.status_code, net._http_response.content, net._http_response.error_msg from job_queue  
     left join net._http_response on net._http_response.id=job_queue.request_id 
     where status='requested'::"public"."queue_job_status" AND request_id is distinct from NULL
-    limit 500
+    limit 1000
     FOR UPDATE OF "job_queue" SKIP LOCKED
     LOOP
         -- RAISE NOTICE 'Checking request: %', requested_job.id;
@@ -31,21 +32,4 @@ BEGIN
         END IF;
     END LOOP;
 END;
-$$;
-
--- Create retry_failed_jobs function
-CREATE OR REPLACE FUNCTION "public"."retry_failed_jobs"() RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    UPDATE job_queue
-    SET status='inserted'::"public"."queue_job_status"
-    WHERE status='failed'::"public"."queue_job_status" AND retry_count < retry_limit;
-END;
-$$;
-
-SELECT cron.schedule(
-    'retry_failed_jobs',
-    '* * * * *',
-    $$SELECT retry_failed_jobs()$$
-);
+$function$

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS app_versions (
     app_id TEXT NOT NULL,
     name TEXT NOT NULL,
     bucket_id TEXT,
+    r2_path TEXT,
     user_id TEXT,
     updated_at INTEGER,
     deleted BOOLEAN DEFAULT FALSE,
@@ -35,7 +36,7 @@ CREATE TABLE IF NOT EXISTS channels (
     name TEXT NOT NULL,
     app_id TEXT NOT NULL,
     version INTEGER NOT NULL,
-    created_by TEXT NOT NULL,
+    created_by TEXT,
     owner_org TEXT NOT NULL,
     updated_at INTEGER NOT NULL,
     public BOOLEAN NOT NULL DEFAULT FALSE,
@@ -75,7 +76,8 @@ CREATE TABLE IF NOT EXISTS apps (
     last_version TEXT,
     updated_at INTEGER,
     retention INTEGER DEFAULT 2592000 NOT NULL,
-    owner_org TEXT NOT NULL
+    owner_org TEXT NOT NULL,
+    default_upload_channel TEXT
 );
 
 -- Create orgs table
@@ -97,3 +99,11 @@ CREATE TABLE IF NOT EXISTS orgs (
 -- DROP TABLE IF EXISTS channel_devices;
 -- DROP TABLE IF EXISTS apps;
 -- DROP TABLE IF EXISTS orgs;
+
+-- count each
+-- SELECT COUNT(*) FROM app_versions;
+-- SELECT COUNT(*) FROM devices_override;
+-- SELECT COUNT(*) FROM channels;
+-- SELECT COUNT(*) FROM channel_devices;
+-- SELECT COUNT(*) FROM apps;
+-- SELECT COUNT(*) FROM orgs;

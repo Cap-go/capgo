@@ -45,11 +45,26 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json({ status: 'Error in replication', error: JSON.stringify(e) }, 500)
   }
 })
+// clean fields that are not in the d1 table
+function cleanFieldsAppVersions(record: any, table: string) {
+  // remove minUpdateVersion
+  if (table === 'app_versions') {
+    delete record.minUpdateVersion
+    delete record.native_packages
+  }
+  if (table === 'channels') {
+    delete record.secondVersion
+    delete record.secondaryVersionPercentage
+    delete record.disableAutoUpdate
+  }
+
+  return record
+}
 
 async function insertRecord(d1: D1Database, table: string, record: any) {
-  const columns = Object.keys(record).join(', ')
+  const columns = Object.keys(cleanFieldsAppVersions(record, table)).join(', ')
   const placeholders = Object.keys(record).map(() => '?').join(', ')
-  const values = Object.values(record)
+  const values = Object.values(cleanFieldsAppVersions(record, table))
 
   const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`
   console.log('insertRecord', query, values)
@@ -57,8 +72,8 @@ async function insertRecord(d1: D1Database, table: string, record: any) {
 }
 
 async function updateRecord(d1: D1Database, table: string, record: any, old_record: any) {
-  const setClause = Object.keys(record).map(key => `${key} = ?`).join(', ')
-  const values = [...Object.values(record), old_record.id]
+  const setClause = Object.keys(cleanFieldsAppVersions(record, table)).map(key => `${key} = ?`).join(', ')
+  const values = [...Object.values(cleanFieldsAppVersions(record, table)), old_record.id]
 
   const query = `UPDATE ${table} SET ${setClause} WHERE id = ?`
   console.log('updateRecord', query, values)
