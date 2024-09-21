@@ -34,9 +34,4 @@ CREATE TRIGGER replicate_orgs
     FOR EACH ROW
     EXECUTE FUNCTION public.trigger_http_queue_post_to_function('replicate_data', 'cloudflare');
 
--- Trigger for devices table
-CREATE TRIGGER replicate_devices
-    AFTER INSERT OR UPDATE OR DELETE ON public.devices
-    FOR EACH ROW
-    EXECUTE FUNCTION public.trigger_http_queue_post_to_function('replicate_data', 'cloudflare');
 

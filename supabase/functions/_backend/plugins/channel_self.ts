@@ -191,6 +191,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     if (dbMainChannelError || !mainChannel)
       console.error('Cannot find main channel', dbMainChannelError)
 
+    const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
     if (mainChannelName && mainChannelName === channel) {
       const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
@@ -200,12 +201,21 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       if (dbErrorDev) {
         console.error('Cannot do channel override', { dbErrorDev })
         return c.json({
-          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+          message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
           error: 'override_not_allowed',
         }, 400)
       }
+      console.log('main channel set, removing override')
     }
     else {
+      // only if dataChannelOverride is different from dataChannel or not exist
+      if (!channelId || channelId.id === dataChannel.id) {
+        // already set
+        console.log('channel already set')
+        return c.json(BRES)
+      }
+
+      console.log('setting channel')
       const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .upsert({
@@ -434,7 +444,7 @@ app.put('/', async (c: Context) => {
     return put(c, body)
   }
   catch (e) {
-    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
+    return c.json({ status: 'Cannot self get channel', error: JSON.stringify(e) }, 500)
   }
 })
 
