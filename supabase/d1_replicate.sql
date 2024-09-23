@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS apps (
     app_id TEXT NOT NULL,
     icon_url TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    name TEXT UNIQUE,
+    name TEXT NOT NULL,
     last_version TEXT,
     updated_at INTEGER,
     retention INTEGER DEFAULT 2592000 NOT NULL,

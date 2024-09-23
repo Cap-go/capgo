@@ -54,6 +54,10 @@ function cleanFieldsAppVersions(record: any, table: string) {
   if (table === 'app_versions') {
     delete record.minUpdateVersion
     delete record.native_packages
+    // in app_versions there is a colmn named manifest, but in d1 it's a JSON type convert it to make the insert work
+    if (record.manifest) {
+      record.manifest = JSON.stringify(record.manifest)
+    }
   }
   if (table === 'channels') {
     delete record.secondVersion

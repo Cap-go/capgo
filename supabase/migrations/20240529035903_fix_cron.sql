@@ -1,12 +1,12 @@
 SELECT cron.schedule(
     'process_requests_from_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_requested_jobs()$$
 );
 
 SELECT cron.schedule(
     'process_current_jobs_if_unlocked',
-    '20 seconds',
+    '5 seconds',
     $$SELECT process_current_jobs_if_unlocked();$$
 );
 
