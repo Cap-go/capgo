@@ -47,16 +47,16 @@ CREATE INDEX "idx_app_id_version_devices" ON devices ("app_id", "version");
 CREATE TABLE store_apps (
     "created_at" datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "app_id" varchar(50) NOT NULL,
-    "url" varchar(256) NOT NULL,
+    "url" varchar(256) DEFAULT '' NOT NULL,
     "title" varchar(256) DEFAULT '' NOT NULL,
     "summary" varchar(256) DEFAULT '' NOT NULL,
     "icon" varchar(256) DEFAULT '' NOT NULL,
     "free" boolean DEFAULT true NOT NULL,
-    "category" varchar(50) NOT NULL,
+    "category" varchar(50) DEFAULT '' NOT NULL,
     "capacitor" boolean DEFAULT false NOT NULL,
     "developer_email" varchar(256) DEFAULT '' NOT NULL,
     "installs" integer DEFAULT 0 NOT NULL,
-    "developer" varchar(50) NOT NULL,
+    "developer" varchar(50) DEFAULT '' NOT NULL,
     "score" real DEFAULT 0.0 NOT NULL,
     "to_get_framework" boolean DEFAULT true NOT NULL,
     "onprem" boolean DEFAULT false NOT NULL,
@@ -70,8 +70,8 @@ CREATE TABLE store_apps (
     "kotlin" boolean DEFAULT false NOT NULL,
     "flutter" boolean DEFAULT false NOT NULL,
     "native_script" boolean DEFAULT false NOT NULL,
-    "lang" varchar(50),
-    "developer_id" varchar(50),
+    "lang" varchar(50) DEFAULT '' NOT NULL,
+    "developer_id" varchar(50) DEFAULT '' NOT NULL,
     PRIMARY KEY (app_id)
 );
 

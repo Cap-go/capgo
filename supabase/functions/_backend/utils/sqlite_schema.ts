@@ -11,6 +11,7 @@ const boolean = customType<{ data: boolean }>({
 
 export const apps = sqliteTable('apps', {
   id: text('id').primaryKey().unique(),
+  owner_org: text('owner_org').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   app_id: text('app_id').notNull(),
   icon_url: text('icon_url').notNull(),
@@ -26,6 +27,7 @@ export const app_versions = sqliteTable('app_versions', {
   app_id: text('app_id').notNull().references(() => apps.name),
   name: text('name').notNull(),
   bucket_id: text('bucket_id'),
+  r2_path: text('r2_path'),
   user_id: text('user_id'),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
   deleted: boolean('deleted').default(false),
@@ -47,7 +49,7 @@ export const channels = sqliteTable('channels', {
   updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
   public: boolean('public').notNull().default(false),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
-  disable_auto_update: text('disable_auto_update', { enum: ['major', 'minor', 'version_number', 'none'] }).default('major').notNull(),
+  disable_auto_update: text('disable_auto_update', { enum: ['major', 'minor', 'patch', 'version_number', 'none'] }).default('major').notNull(),
   enable_ab_testing: boolean('enable_ab_testing').notNull().default(false),
   enable_progressive_deploy: boolean('enable_progressive_deploy').default(false).notNull(),
   secondary_version_percentage: real('secondary_version_percentage').default(0).notNull(),
@@ -76,6 +78,11 @@ export const channel_devices = sqliteTable('channel_devices', {
   channel_id: integer('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: text('app_id').notNull().references(() => apps.name),
   created_by: text('created_by'),
+})
+
+export const orgs = sqliteTable('orgs', {
+  id: text('id').notNull(),
+  created_by: text('created_by').notNull(),
 })
 
 export type AppVersionsType = typeof app_versions.$inferInsert
