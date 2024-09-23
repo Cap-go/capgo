@@ -180,7 +180,7 @@ async function post(c: Context, body: AppStats) {
         await sendNotifOrg(c, 'user:update_fail', {
           app_id,
           device_id,
-          ersion_id: appVersion.id,
+          version_id: appVersion.id,
           _app_id_url: appIdToUrl(app_id),
         }, appVersion.owner_org, app_id, '0 0 * * 1')
       }
