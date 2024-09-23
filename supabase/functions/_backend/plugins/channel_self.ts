@@ -208,8 +208,8 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       console.log('main channel set, removing override')
     }
     else {
-      // only if dataChannelOverride is different from dataChannel or not exist
-      if (!channelId || channelId.id === dataChannel.id) {
+      // if dataChannelOverride is same from dataChannel and exist then do nothing
+      if (channelId && channelId.id === dataChannel.id) {
         // already set
         console.log('channel already set')
         return c.json(BRES)
