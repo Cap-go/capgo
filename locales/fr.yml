@@ -1,6 +1,6 @@
-2fa: Gérer le 2FA
-2fa-code: code d'authentification 2FA
-2fa-disabled: Désactivé 2FA
+2fa: Gérer la double authentification (2FA)
+2fa-code: code dde double authentification (2FA)
+2fa-disabled: Double authentification (2FA) désactivée
 6-characters-minimum: 6 caractères minimum, 1 majuscule, 1 minuscule, 1 caractère spécial
 Bandwidth: Bande passante
 Current: Actuel
@@ -77,9 +77,9 @@ billed-monthly-at: Facturé mensuellement à
 billing: facturation
 bulk-upload: Téléchargement en masse
 bundle: Paquet
-bundle-deleted: Lot supprimé
-bundle-is-linked-device: Le bundle est lié à l'appareil, déliez-le d'abord
-bundle-number: Numéro de lot
+bundle-deleted: Paquet supprimé
+bundle-is-linked-device: Le paquet est lié à l'appareil, déliez-le d'abord
+bundle-number: Numéro de paquet
 bundles: Paquets
 button-back: Dos
 button-browse: Parcourir
@@ -93,7 +93,7 @@ button-join: Accepte
 button-regenerate: Régénérer
 button-remove: Retirer
 by-clicking-on-them: en cliquant sur eux.
-canceled-delete: Annulation de la suppression du bundle, impossible de supprimer un bundle lié
+canceled-delete: Annulation de la suppression du paquet, impossible de supprimer un paquet lié
 canceled-photo-selection: Vous avez annulé la sélection de l'image
 cannot-change-default-upload-channel: >-
   Impossible de changer le canal de téléchargement par défaut, veuillez vérifier
@@ -148,7 +148,7 @@ channel: Canal
 channel-ab-testing: Activer le test AB
 channel-ab-testing-percentage: Pourcentage d'utilisateurs recevant la version secondaire
 channel-bundle-linked: >-
-  Ce lot est lié à une ou plusieurs chaînes. (%) Souhaitez-vous le dissocier de
+  Ce paquet est lié à une ou plusieurs chaînes. (%) Souhaitez-vous le dissocier de
   ces chaînes?
 channel-create: Créer une chaîne
 channel-deleted: Chaîne supprimée
@@ -293,13 +293,13 @@ last-update: Dernière mise à jour
 last-upload: Dernier téléchargement
 last-version: Dernière version
 latest_version: Dernier paquet
-launch-bundle: Lancement du bundle
+launch-bundle: Lancement du paquet
 leaving: Partir
 live-reload: Rechargement en direct
 log-in: Se connecter
 login-to-your-accoun: Connectez-vous à votre compte
 logs: Bûches
-main-bundle-number: Numéro de lot principal
+main-bundle-number: Numéro de paquet principal
 major: Majeur
 make-default-android: Définir par défaut pour Android
 make-default-ios: Définir par défaut pour iOS
@@ -419,13 +419,13 @@ please-confirm-org-del: >-
   son nom
 plugin-version: Version du plugin
 prediction: Prédiction
-preview: Aperçu du bundle
+preview: Aperçu du paquet
 preview-short: aperçu
 previous: Précédent
 price-per-unit-above: Prix par unité au-dessus du plan
 priority-support: Support prioritaire pour tous les plugins Capgo +30
 pro-tip-you-can-copy: 'Astuce pro : vous pouvez copier le'
-progressive-bundle-number: Numéro de lot progressif
+progressive-bundle-number: Numéro de paquet progressif
 progressive-deploy-option: Sélectionnez l'option de déploiement progressif
 progressive-deploy-set-percentage: >-
   Vous ne pouvez pas définir le pourcentage de la version secondaire lorsque le
@@ -443,7 +443,7 @@ reset-password: Réinitialiser le mot de passe
 reset-your-password: Réinitialisez votre mot de passe
 save: Économies
 save-changes: Enregistrer les modifications
-search-bundle-id: Recherche par ID de bundle
+search-bundle-id: Recherche par ID de paquet
 search-by-device-id: Recherche par ID de l'appareil ou ID personnalisé
 search-by-device-id-: Recherche par identifiant de l'appareil ou action
 search-by-device-id-0: Recherche par ID de l'appareil
@@ -461,7 +461,7 @@ select-style-of-deletion-msg: |-
 select-user-perms: Sélectionnez les autorisations de l'utilisateur
 select-user-perms-expanded: Sélectionnez quelle permission l'utilisateur invité devrait avoir
 session_key: CléDeSessionIv
-set-bundle: Définir le bundle sur la chaîne
+set-bundle: Définir le paquet sur la chaîne
 settings: Paramètres
 showing: Montrant
 sign-out: Se Déconnecter
@@ -485,7 +485,7 @@ this-page-will-self-: >-
   Cette page se rafraîchira automatiquement après que vous ayez terminé
   l'intégration avec le CLI
 to: à
-to-open-encrypted-bu: 'Pour ouvrir le bundle crypté, utilisez la commande :'
+to-open-encrypted-bu: 'Pour ouvrir le paquet crypté, utilisez la commande :'
 top-apps-v2: Applications
 trial-left: jours restants
 trial-plan-expired: Essai Expiré
@@ -524,7 +524,7 @@ verify: Vérifier
 verify-2FA: Vérifier 2FA
 version: Version
 version-builtin: Version intégrée
-version-link-fail: Impossible de définir la substitution de bundle
+version-link-fail: Impossible de définir la substitution de paquet
 version-linked: Lien de version
 want-to-unlink: Voulez-vous dissocier?
 welcome-to: Bienvenue à
@@ -536,7 +536,7 @@ wrong-name-org-del: 'Vous n''avez pas tapé le nom de l''organisation. Vous éti
 yearly: Annuellement
 'yes': oui
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
-you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du bundle après la suppression
+you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du paquet après la suppression
 you-reached-the-limi: Limite atteinte
 your-settings: Vos paramètres
 your-ussage: 'Votre utilisation :'
