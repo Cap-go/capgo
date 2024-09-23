@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRight, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 
@@ -75,17 +75,17 @@ export async function post(c: Context, body: DeviceLink, apikey: Database['publi
       // if channel is public, we don't set channel_override
       return c.json({ status: 'Cannot set channel override for public channel' }, 400)
     }
-    const { error: dbErrorDev } = await supabaseAdmin(c)
-      .from('channel_devices')
-      .upsert({
+    try {
+      await updateOrCreateChannelDevice(c, {
         device_id: body.device_id,
         channel_id: dataChannel.id,
         app_id: body.app_id,
         owner_org: dataChannel.owner_org,
       })
-    if (dbErrorDev) {
-      console.log('Cannot save channel override', dbErrorDev)
-      return c.json({ status: 'Cannot save channel override', error: dbErrorDev }, 400)
+    }
+    catch (error) {
+      console.log('Cannot save channel override', error)
+      return c.json({ status: 'Cannot save channel override', error }, 400)
     }
   }
   return c.json(BRES)

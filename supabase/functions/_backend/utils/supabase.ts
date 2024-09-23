@@ -67,15 +67,6 @@ export function supabaseAdmin(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
-export function updateOrCreateVersion(c: Context, update: Database['public']['Tables']['app_versions']['Insert']) {
-  console.log('updateOrCreateVersion', update)
-  return supabaseAdmin(c)
-    .from('app_versions')
-    .upsert(update)
-    .eq('app_id', update.app_id)
-    .eq('name', update.name)
-}
-
 export async function getAppsFromSB(c: Context): Promise<string[]> {
   const limit = 1000
   let page = 0
@@ -102,18 +93,64 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
   return apps
 }
 
-export function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
+export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
   console.log('updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
     console.log('missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
-  return supabaseAdmin(c)
+
+  const { data: existingChannel } = await supabaseAdmin(c)
     .from('channels')
-    .upsert(update, { onConflict: 'app_id, name' })
+    .select('*')
     .eq('app_id', update.app_id)
     .eq('name', update.name)
     .eq('created_by', update.created_by)
+    .single()
+
+  if (existingChannel) {
+    const fieldsDiffer = Object.keys(update).some(key =>
+      update[key] !== existingChannel[key] && key !== 'created_at' && key !== 'updated_at',
+    )
+    if (!fieldsDiffer) {
+      console.log('No fields differ, no update needed')
+      return Promise.resolve()
+    }
+  }
+
+  return supabaseAdmin(c)
+    .from('channels')
+    .upsert(update, { onConflict: 'app_id, name' })
+}
+
+export async function updateOrCreateChannelDevice(c: Context, update: Database['public']['Tables']['channel_devices']['Insert']) {
+  console.log('updateOrCreateChannelDevice', update)
+  if (!update.device_id || !update.channel_id || !update.app_id) {
+    console.log('missing device_id, channel_id, or app_id')
+    return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
+  }
+
+  const { data: existingChannelDevice } = await supabaseAdmin(c)
+    .from('channel_devices')
+    .select('*')
+    .eq('device_id', update.device_id)
+    .eq('channel_id', update.channel_id)
+    .eq('app_id', update.app_id)
+    .single()
+
+  if (existingChannelDevice) {
+    const fieldsDiffer = Object.keys(update).some(key =>
+      update[key] !== existingChannelDevice[key] && key !== 'created_at' && key !== 'updated_at',
+    )
+    if (!fieldsDiffer) {
+      console.log('No fields differ, no update needed')
+      return Promise.resolve()
+    }
+  }
+
+  return supabaseAdmin(c)
+    .from('channel_devices')
+    .upsert(update, { onConflict: 'device_id, channel_id, app_id' })
 }
 
 export async function checkAppOwner(c: Context, userId: string | undefined, appId: string | undefined): Promise<boolean> {
