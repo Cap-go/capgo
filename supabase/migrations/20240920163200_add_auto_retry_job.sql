@@ -51,7 +51,7 @@ BEGIN
         -- Lock the worker (this is already done by the SELECT ... FOR UPDATE)
 
         -- Here let's do the logic ;-)
-        -- Limit of 200 rows, because that the limit of pg net batch by default
+        -- Limit of 200 rows, idk why but it sound good
         FOR current_job IN SELECT * FROM job_queue 
         WHERE job_queue.status = 'inserted'::"public"."queue_job_status"
         ORDER BY job_queue.created_at ASC
@@ -81,4 +81,3 @@ BEGIN
     END IF;
 END;
 $function$
-

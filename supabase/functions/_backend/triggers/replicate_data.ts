@@ -68,6 +68,10 @@ function cleanFieldsAppVersions(record: any, table: string) {
 function asyncWrap(c: Context, promise: Promise<any>, payload: any) {
   c.executionCtx.waitUntil(promise.catch((e) => {
     console.error('Error in replicateData:', e)
+    // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
+    if (e.message.includes('UNIQUE constraint failed')) {
+      return
+    }
     // insert in job_queue as failed job in supabase
     const supabase = supabaseAdmin(c)
     return supabase.from('job_queue')
