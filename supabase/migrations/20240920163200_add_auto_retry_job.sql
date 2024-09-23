@@ -13,7 +13,7 @@ BEGIN
     FOR requested_job IN SELECT net._http_response.id, net._http_response.status_code, net._http_response.content, net._http_response.error_msg from job_queue  
     left join net._http_response on net._http_response.id=job_queue.request_id 
     where status='requested'::"public"."queue_job_status" AND request_id is distinct from NULL
-    limit 10000
+    limit 200
     FOR UPDATE OF "job_queue" SKIP LOCKED
     LOOP
         -- RAISE NOTICE 'Checking request: %', requested_job.id;
@@ -51,11 +51,11 @@ BEGIN
         -- Lock the worker (this is already done by the SELECT ... FOR UPDATE)
 
         -- Here let's do the logic ;-)
-        -- Limit of 10000 rows, idk why but it sound good
+        -- Limit of 200 rows, because that the limit of pg net batch by default
         FOR current_job IN SELECT * FROM job_queue 
         WHERE job_queue.status = 'inserted'::"public"."queue_job_status"
         ORDER BY job_queue.created_at ASC
-        limit 10000
+        limit 200
         FOR UPDATE SKIP LOCKED
         LOOP
             RAISE NOTICE 'Processing job_id: %, payload: %', current_job.job_id, current_job.payload;
