@@ -10,6 +10,7 @@ import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient, isAllowedActionOrg } from './pg.ts'
 import * as schema from './postgress_schema.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
+import { backgroundTask } from './utils.ts'
 import type { ManifestEntry } from './downloadUrl.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import type { Database } from './supabase.types.ts'
@@ -253,12 +254,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const appOwner = await getAppOwnerPostgres(app_id, drizzleCient)
     if (!appOwner) {
       if (app_id) {
-        await saveStoreInfoCF(c, {
+        await backgroundTask(c, saveStoreInfoCF(c, {
           app_id,
           onprem: true,
           capacitor: true,
           capgo: true,
-        })
+        }))
       }
       console.log(id, 'App not found', app_id, new Date().toISOString())
       return c.json({

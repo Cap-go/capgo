@@ -32,6 +32,7 @@ import { app as storeTop } from '../supabase/functions/_backend/private/store_to
 import { app as stripe_checkout } from '../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../supabase/functions/_backend/private/upload_link.ts'
+import { app as verify_replication } from '../supabase/functions/_backend/private/verify_replication.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
 import { app as channel } from '../supabase/functions/_backend/public/channel/index.ts'
 import { app as device } from '../supabase/functions/_backend/public/device/index.ts'
@@ -99,6 +100,7 @@ appFront.route('/delete_failed_version', deleted_failed_version)
 appFront.route('/latency', latency)
 appFront.route('/latency_drizzle', latency_drizzle)
 appFront.route('/latency_postres', latency_postres)
+appFront.route('/verify_replication', verify_replication)
 appFront.route('/multipart', multipart)
 appFront.route('/create_device', create_device)
 appFront.route('/partial_upload', partial_upload)

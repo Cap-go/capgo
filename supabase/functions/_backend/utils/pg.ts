@@ -53,6 +53,13 @@ export function getDrizzleClientD1(c: Context) {
   return drizzleD1(c.env.DB_REPLICATE)
 }
 
+export function getDrizzleClientD1Session(c: Context) {
+  // TODO: find why it doesn't work
+  const token = c.req.raw.headers.get('x-d1-token') ?? 'first-unconditional'
+  const session = c.env.DB_REPLICATE.withSession(token)
+  return drizzleD1(session)
+}
+
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
   // c.executionCtx.waitUntil(Promise.resolve())
   // console.log('Closing client', client)

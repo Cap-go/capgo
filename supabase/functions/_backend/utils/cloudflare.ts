@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import ky from 'ky'
-import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
@@ -14,7 +14,7 @@ export type Bindings = {
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
-  HYPERDRIVE: Hyperdrive
+  DB_REPLICATE: D1Database
 }
 
 const DEFAULT_LIMIT = 1000

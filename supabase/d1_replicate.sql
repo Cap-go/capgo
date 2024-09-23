@@ -112,6 +112,32 @@ CREATE INDEX IF NOT EXISTS idx_apps_app_id ON apps(app_id);
 -- Indexes for orgs table
 CREATE INDEX IF NOT EXISTS idx_orgs_id ON orgs(id);
 
+-- Additional indexes for app_versions table
+CREATE INDEX IF NOT EXISTS idx_app_versions_owner_org ON app_versions(owner_org);
+CREATE INDEX IF NOT EXISTS idx_app_versions_bucket_id ON app_versions(bucket_id);
+CREATE INDEX IF NOT EXISTS idx_app_versions_r2_path ON app_versions(r2_path);
+CREATE INDEX IF NOT EXISTS idx_app_versions_external_url ON app_versions(external_url);
+
+-- Additional indexes for devices_override table
+CREATE INDEX IF NOT EXISTS idx_devices_override_version ON devices_override(version);
+CREATE INDEX IF NOT EXISTS idx_devices_override_owner_org ON devices_override(owner_org);
+
+-- Additional indexes for channels table
+CREATE INDEX IF NOT EXISTS idx_channels_version ON channels(version);
+CREATE INDEX IF NOT EXISTS idx_channels_second_version ON channels(second_version);
+CREATE INDEX IF NOT EXISTS idx_channels_owner_org ON channels(owner_org);
+
+-- Additional indexes for channel_devices table
+CREATE INDEX IF NOT EXISTS idx_channel_devices_channel_id ON channel_devices(channel_id);
+
+-- Additional indexes for apps table
+CREATE INDEX IF NOT EXISTS idx_apps_owner_org ON apps(owner_org);
+CREATE INDEX IF NOT EXISTS idx_apps_user_id ON apps(user_id);
+
+-- Additional indexes for orgs table
+CREATE INDEX IF NOT EXISTS idx_orgs_created_by ON orgs(created_by);
+CREATE INDEX IF NOT EXISTS idx_orgs_customer_id ON orgs(customer_id);
+
 -- -- drop all tables;
 -- DROP TABLE IF EXISTS app_versions;
 -- DROP TABLE IF EXISTS devices_override;
