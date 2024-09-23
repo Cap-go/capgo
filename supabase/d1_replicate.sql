@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS channels (
     updated_at INTEGER NOT NULL,
     public BOOLEAN NOT NULL DEFAULT FALSE,
     disable_auto_update_under_native BOOLEAN NOT NULL DEFAULT TRUE,
-    disable_auto_update TEXT NOT NULL DEFAULT 'major' CHECK(disable_auto_update IN ('major', 'minor', 'version_number', 'none')),
+    disable_auto_update TEXT NOT NULL DEFAULT 'major',
     enable_ab_testing BOOLEAN NOT NULL DEFAULT FALSE,
     enable_progressive_deploy BOOLEAN NOT NULL DEFAULT FALSE,
     secondary_version_percentage REAL NOT NULL DEFAULT 0,
