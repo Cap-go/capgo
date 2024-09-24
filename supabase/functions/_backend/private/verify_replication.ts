@@ -8,6 +8,40 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono()
 
+async function syncMissingRows(c: Context, table: string, d1Count: number, pgCount: number) {
+  if (d1Count >= pgCount)
+    return
+  if (table === 'channel_devices')
+    return
+
+  const d1 = c.env.DB_REPLICATE as D1Database
+  const supabase = supabaseAdmin(c)
+  const batchSize = 1000
+  let lastId = 0
+
+  while (true) {
+    const pgData = await supabase
+      .from(table as any)
+      .select('*')
+      .order('id', { ascending: true })
+      .gt('id', lastId)
+      .limit(batchSize)
+
+    if (pgData.error)
+      throw pgData.error
+    if (pgData.data.length === 0)
+      break
+
+    for (const row of pgData.data) {
+      const existsInD1 = await d1.prepare(`SELECT COUNT(*) as count FROM ${table} WHERE id = ?`).bind(row.id).first()
+      if (existsInD1?.count === 0) {
+        await d1.prepare(`INSERT INTO ${table} (${Object.keys(row).join(', ')}) VALUES (${Object.keys(row).map(() => '?').join(', ')})`).bind(...Object.values(row)).run()
+      }
+      lastId = row.id
+    }
+  }
+}
+
 app.get('/', async (c: Context) => {
   try {
     // const pgClient = getPgClient(c)
@@ -51,6 +85,7 @@ app.get('/', async (c: Context) => {
       const pgCount = pgCounts[index]?.count || 0
       if (d1Count !== pgCount) {
         acc[table] = { d1: d1Count, pg: pgCount }
+        c.executionCtx.waitUntil(syncMissingRows(c, table, d1Count, pgCount))
       }
       return acc
     }, {} as Record<string, { d1: number, pg: number }>)
