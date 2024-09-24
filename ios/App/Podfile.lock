@@ -58,38 +58,38 @@ PODS:
     - Capacitor
   - CapawesomeCapacitorScreenOrientation (6.0.1):
     - Capacitor
-  - CapgoCapacitorCrisp (6.0.50):
+  - CapgoCapacitorCrisp (6.0.54):
     - Capacitor
     - Crisp
-  - CapgoCapacitorFlash (6.0.2):
+  - CapgoCapacitorFlash (6.0.3):
     - Capacitor
-  - CapgoCapacitorMute (6.0.0):
+  - CapgoCapacitorMute (6.0.3):
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorScreenRecorder (8.1.49):
+  - CapgoCapacitorScreenRecorder (8.1.56):
     - Capacitor
-  - CapgoCapacitorUpdater (6.1.20):
+  - CapgoCapacitorUpdater (6.1.28):
     - Alamofire
     - Capacitor
     - SSZipArchive
     - SwiftyRSA
     - Version
-  - CapgoInappbrowser (6.0.53):
+  - CapgoInappbrowser (6.6.8):
     - Capacitor
-  - CapgoNativeAudio (6.4.11):
+  - CapgoNativeAudio (6.4.17):
     - Capacitor
   - CapgoNativeMarket (0.0.1):
     - Capacitor
-  - Crisp (2.5.5):
-    - Crisp/Crisp (= 2.5.5)
-  - Crisp/Crisp (2.5.5)
-  - PurchasesHybridCommon (13.0.0):
-    - RevenueCat (= 5.2.2)
-  - RevenueCat (5.2.2)
-  - RevenuecatPurchasesCapacitor (9.0.0):
+  - Crisp (2.6.0):
+    - Crisp/Crisp (= 2.6.0)
+  - Crisp/Crisp (2.6.0)
+  - PurchasesHybridCommon (13.0.1):
+    - RevenueCat (= 5.2.3)
+  - RevenueCat (5.2.3)
+  - RevenuecatPurchasesCapacitor (9.0.1):
     - Capacitor
-    - PurchasesHybridCommon (= 13.0.0)
+    - PurchasesHybridCommon (= 13.0.1)
   - SSZipArchive (2.4.3)
   - SwiftKeychainWrapper (4.0.1)
   - SwiftyRSA (1.7.0):
@@ -260,19 +260,19 @@ SPEC CHECKSUMS:
   CapacitorToast: cfd82cd5afdc3f027ad4a8859f909ae4a327f3c3
   CapawesomeCapacitorFilePicker: c80c30759ba48986ff34a2b51b23ac2babfd3774
   CapawesomeCapacitorScreenOrientation: 9cc68ecd085fcea2e1755475a3ed60d85e604a6c
-  CapgoCapacitorCrisp: 4e025091f9da5bf2753d903e654f3d4c5cac2c5e
-  CapgoCapacitorFlash: ec6ca7227a23a9e4cf2d21c165c76c568c9ee45c
-  CapgoCapacitorMute: 4581f843a3b79eaa1106d1ef1ee18a093b7c9907
+  CapgoCapacitorCrisp: c3909fa030e5a2b15ca9370c8c37bbb46ab93161
+  CapgoCapacitorFlash: add9502d704e3f7a412807f0b9ab8da05c4192b6
+  CapgoCapacitorMute: 6cf5b54cb19afe8f0cf9b20c0040ec65d9ecf0a0
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
-  CapgoCapacitorScreenRecorder: 9f3cc5c697b87651a8d7eeaf4c8bb0ca298eafa2
-  CapgoCapacitorUpdater: e755631dede3264eed58c968ac98c09da771bc26
-  CapgoInappbrowser: dbf98715fe3b8fe0f14e75535d35313d6d0ea489
-  CapgoNativeAudio: ce17b7cc71f292752448821c825f147a2ce1e8c1
+  CapgoCapacitorScreenRecorder: 9b566b03ced1def9cdf6a921bab6193bc5f253d0
+  CapgoCapacitorUpdater: 31fc856dcabeaf7b1fe735684e158e664e0f355e
+  CapgoInappbrowser: 9f80d98fa546693b895712b5fba6abc46f65e44a
+  CapgoNativeAudio: 4aaa363d3ad36581acaca722fc28cb0992015e89
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
-  Crisp: dcf7d9e64be6614ceee71c5582f616212ed4a881
-  PurchasesHybridCommon: ebf821766759155e09b710baa73264a37a4e62f0
-  RevenueCat: ba985d80069c1c4b9c9e0763f1852f2a0bdcc2d6
-  RevenuecatPurchasesCapacitor: 5f3cd0572ba0c58cbe18a1ec020d306c7a6d08e2
+  Crisp: 047b4e8b77f28cae5089f037cb327a9a03c9bb4d
+  PurchasesHybridCommon: 6e5772e574ce345922c42f31403cf72a0ba762bf
+  RevenueCat: 86e4486345a6f7740fecb1eeff91eeff8708eee1
+  RevenuecatPurchasesCapacitor: e8b92ba24739e2632274c765e96b25013a051b97
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   SwiftyRSA: 8c6dd1ea7db1b8dc4fb517a202f88bb1354bc2c6
