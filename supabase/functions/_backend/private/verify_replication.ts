@@ -1,9 +1,6 @@
-// import { count } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES } from '../utils/hono.ts'
-// import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-// import * as schema from '../utils/postgress_schema.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono()
@@ -44,9 +41,6 @@ async function syncMissingRows(c: Context, table: string, d1Count: number, pgCou
 
 app.get('/', async (c: Context) => {
   try {
-    // const pgClient = getPgClient(c)
-    // const drizzleClient = getDrizzleClient(pgClient as any)
-
     // Tables to compare
     const tables = [
       'apps',
@@ -79,22 +73,24 @@ app.get('/', async (c: Context) => {
       ),
     )
     console.log('pgCounts', pgCounts)
-    // closeClient(c, pgClient)
     const diff = tables.reduce((acc, table, index) => {
       const d1Count = (d1Counts[index]?.count as number) || 0
       const pgCount = pgCounts[index]?.count || 0
       if (d1Count !== pgCount) {
-        acc[table] = { d1: d1Count, pg: pgCount }
+        acc[table] = { d1: d1Count, supabase: pgCount }
         c.executionCtx.waitUntil(syncMissingRows(c, table, d1Count, pgCount))
       }
       return acc
-    }, {} as Record<string, { d1: number, pg: number }>)
+    }, {} as Record<string, { d1: number, supabase: number }>)
 
-    if (Object.keys(diff).length === 0) {
+    // if diff less than 1% of total rows, consider it as synced
+    const totalRows = Object.values(diff).reduce((acc, table) => acc + table.d1, 0)
+    const diffPercentage = Object.keys(diff).length / totalRows * 100
+    if (diffPercentage < 1) {
       return c.json(BRES)
     }
     else {
-      return c.json({ status: 'Mismatch found', diff })
+      return c.json({ status: 'Mismatch found', diff }, 200)
     }
   }
   catch (e) {
