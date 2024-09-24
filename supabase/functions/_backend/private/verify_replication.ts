@@ -1,16 +1,17 @@
-import { count } from 'drizzle-orm'
+// import { count } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES } from '../utils/hono.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import * as schema from '../utils/postgress_schema.ts'
+// import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+// import * as schema from '../utils/postgress_schema.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono()
 
 app.get('/', async (c: Context) => {
   try {
-    const pgClient = getPgClient(c)
-    const drizzleClient = getDrizzleClient(pgClient as any)
+    // const pgClient = getPgClient(c)
+    // const drizzleClient = getDrizzleClient(pgClient as any)
 
     // Tables to compare
     const tables = [
@@ -32,20 +33,22 @@ app.get('/', async (c: Context) => {
     console.log('d1Counts', d1Counts)
 
     // Count from update.ts (PostgreSQL database)
-    const pgCounts = await Promise.all([
-      drizzleClient.select({ count: count() }).from(schema.apps),
-      drizzleClient.select({ count: count() }).from(schema.app_versions),
-      drizzleClient.select({ count: count() }).from(schema.channels),
-      drizzleClient.select({ count: count() }).from(schema.devices_override),
-      drizzleClient.select({ count: count() }).from(schema.channel_devices),
-      drizzleClient.select({ count: count() }).from(schema.orgs),
-    ])
+    const pgCounts = await Promise.all(
+      tables.map(table =>
+        supabaseAdmin(c)
+          .from(table as any)
+          .select('*', { count: 'exact', head: true })
+          .then((v) => {
+            console.log('v', v)
+            return { count: v.count }
+          }),
+      ),
+    )
     console.log('pgCounts', pgCounts)
-    closeClient(c, pgClient)
-
+    // closeClient(c, pgClient)
     const diff = tables.reduce((acc, table, index) => {
-      const d1Count = d1Counts[index]?.count || 0
-      const pgCount = pgCounts[index][0]?.count || 0
+      const d1Count = (d1Counts[index]?.count as number) || 0
+      const pgCount = pgCounts[index]?.count || 0
       if (d1Count !== pgCount) {
         acc[table] = { d1: d1Count, pg: pgCount }
       }
