@@ -1,4 +1,4 @@
-name: Build source code and send to Capgo
+name: Build mobile ios
 
 on:
   workflow_dispatch:
