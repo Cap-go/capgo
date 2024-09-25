@@ -39,7 +39,7 @@ const elements = ref<Element[]>([])
 const versions = ref<Channel['version'][]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const range = ref<[Date, Date]>([dayjs().subtract(1, 'minute').toDate(), new Date()])
+const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Date()])
 const filters = ref()
 
 function findVersion(id: number, versions: { name: string, id: number }[]) {
@@ -203,7 +203,10 @@ watch(props, async () => {
 
 <template>
   <TableLog
-    v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
+    v-model:filters="filters"
+    v-model:columns="columns"
+    v-model:current-page="currentPage"
+    v-model:search="search"
     v-model:range="range"
     :element-list="elements"
     filter-text="Filters"

@@ -60,7 +60,7 @@ const isDark = useDark()
 const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
 type Minutes = 1 | 3 | 15
-const currentGeneralTime = ref<Minutes>(1)
+const currentGeneralTime = ref<Minutes>(3)
 const preciseDates = ref<[Date, Date]>()
 const thisOrganization = ref<Organization | null>(null)
 const organizationStore = useOrganizationStore()
@@ -84,6 +84,10 @@ const startTime = computed(() => {
     },
   ]
 })
+function resetTime() {
+  setTime(currentGeneralTime.value)
+  emit('reset')
+}
 
 function sortClick(key: number) {
   if (!props.columns[key].sortable)
@@ -187,7 +191,7 @@ onMounted(async () => {
   <div class="pb-4 overflow-x-auto md:pb-0 min-h-[500px]">
     <div class="flex items-start justify-between pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
+        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="resetTime">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
