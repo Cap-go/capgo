@@ -144,6 +144,7 @@
     "firebase": "10.13.1",
     "generate-password-browser": "^1.1.0",
     "google-play-scraper": "^9.2.0",
+    "itty-router": "^5.0.18",
     "json2csv": "^5.0.7",
     "ky": "^1.7.2",
     "lauqe": "^1.5.0",

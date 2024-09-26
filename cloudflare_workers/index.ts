@@ -31,6 +31,8 @@ import { app as stats_priv } from '../supabase/functions/_backend/private/stats.
 import { app as storeTop } from '../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../supabase/functions/_backend/private/stripe_portal.ts'
+import { app as upload_bundle } from '../supabase/functions/_backend/private/upload_bundle.ts'
+import { router as upload_bundle_itty } from '../supabase/functions/_backend/private/upload_bundle_itty.ts'
 import { app as upload_link } from '../supabase/functions/_backend/private/upload_link.ts'
 import { app as verify_replication } from '../supabase/functions/_backend/private/verify_replication.ts'
 import { app as bundle } from '../supabase/functions/_backend/public/bundle/index.ts'
@@ -61,6 +63,8 @@ import { app as stripe_event } from '../supabase/functions/_backend/triggers/str
 
 // import { type Bindings, rawAnalyticsQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
+
+export { AttachmentUploadHandler, BackupUploadHandler, UploadHandler } from '../supabase/functions/_backend/tus_itty/uploadHandler.ts'
 
 const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
@@ -104,6 +108,8 @@ appFront.route('/verify_replication', verify_replication)
 appFront.route('/multipart', multipart)
 appFront.route('/create_device', create_device)
 appFront.route('/partial_upload', partial_upload)
+appFront.route('/files', upload_bundle)
+appFront.mount('/files_itty', upload_bundle_itty.handle)
 
 // Triggers
 
@@ -193,7 +199,7 @@ app.onError((e, c) => {
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException)
     return e.getResponse()
-
+  console.log('app', 'onError', e)
   return c.text('Internal Server Error', 500)
 })
 

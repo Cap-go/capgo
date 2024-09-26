@@ -1,5 +1,5 @@
 name = "capgo_api-preprod"
-compatibility_date = "2024-09-02"
+compatibility_date = "2024-09-23"
 main = "./cloudflare_workers/index.ts"
 compatibility_flags = [ "nodejs_compat_v2" ]
 
@@ -31,3 +31,29 @@ database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753"
 binding = "DB_REPLICATE"
 database_name = "capgo_prod_replicate"
 database_id = "7f267d86-f4f7-49f5-9622-e44373aa00dc"
+
+[observability]
+enabled = true
+
+[[migrations]]
+tag = "v1"
+new_classes = [ "UploadHandler" ]
+
+[[migrations]]
+tag = "v2"
+renamed_classes = [ { from = "UploadHandler", to = "AttachmentUploadHandler" } ]
+new_classes = [ "BackupUploadHandler" ]
+
+[durable_objects]
+bindings = [
+  { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" },
+  { name = "BACKUP_UPLOAD_HANDLER", class_name = "BackupUploadHandler" }
+]
+
+[[r2_buckets]]
+binding = "ATTACHMENT_BUCKET"
+bucket_name = "attachments"
+
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "backups"
