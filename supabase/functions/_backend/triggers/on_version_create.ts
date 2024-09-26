@@ -12,18 +12,18 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log(`Not ${table}`)
+      console.log(c.get('requestId'), `Not ${table}`)
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log('Not INSERT')
+      console.log(c.get('requestId'), 'Not INSERT')
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log('record', record)
+    console.log(c.get('requestId'), 'record', record)
 
     if (!record.id) {
-      console.log('No id')
+      console.log(c.get('requestId'), 'No id')
       return c.json(BRES)
     }
 
@@ -35,7 +35,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       .eq('app_id', record.app_id)
       .eq('owner_org', record.owner_org)
     if (errorUpdate)
-      console.log('errorUpdate', errorUpdate)
+      console.log(c.get('requestId'), 'errorUpdate', errorUpdate)
 
     if (!record.app_id) {
       return c.json({
@@ -55,7 +55,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         size: 0,
       })
     if (dbError)
-      console.error('Cannot create app version meta', dbError)
+      console.error(c.get('requestId'), 'Cannot create app version meta', dbError)
     return c.json(BRES) // skip delete s3 and increment size in new upload
   }
   catch (e) {

@@ -23,8 +23,8 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log(body)
-      console.log(parsedBodyResult.error)
+      console.log(c.get('requestId'), 'log_as body', body)
+      console.log(c.get('requestId'), 'log_as parsedBodyResult.error', parsedBodyResult.error)
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
@@ -33,7 +33,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
     if (adminError) {
-      console.error('is_admin_error', adminError)
+      console.error(c.get('requestId'), 'is_admin_error', adminError)
       return c.json({ error: 'is_admin_error' }, 500)
     }
 
@@ -48,7 +48,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       .single()
 
     if (userError) {
-      console.error(JSON.stringify(userError))
+      console.error(c.get('requestId'), JSON.stringify(userError))
       return c.json({ error: 'user_does_not_exist' }, 400)
     }
 
@@ -60,7 +60,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     })
 
     if (magicError) {
-      console.error(JSON.stringify(magicError))
+      console.error(c.get('requestId'), JSON.stringify(magicError))
       return c.json({ error: 'generate_magic_link_error' }, 500)
     }
 
@@ -68,7 +68,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const { data: authData, error: authError } = await tmpSupabaseClient.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
     if (authError) {
-      console.error(JSON.stringify(authError))
+      console.error(c.get('requestId'), JSON.stringify(authError))
       return c.json({ error: 'auth_error' }, 500)
     }
 
@@ -76,7 +76,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const refreshToken = authData.session?.refresh_token
 
     if (!jwt) {
-      console.error('No JWT?', authData)
+      console.error(c.get('requestId'), 'No JWT?', authData)
       return c.json({ error: 'no_jwt' }, 500)
     }
 

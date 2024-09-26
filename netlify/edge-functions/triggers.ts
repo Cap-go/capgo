@@ -1,23 +1,25 @@
 import { sentry } from '@hono/sentry'
-import { handle } from 'https://deno.land/x/hono@v4.4.3/adapter/netlify/mod.ts'
+import { logger } from 'hono/logger'
+import { handle } from 'hono/netlify'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 
 // Triggers API
 import { app as clear_app_cache } from '../../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../../supabase/functions/_backend/triggers/clear_device_cache.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
+import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cron_plan.ts'
 import { app as cron_scrapper } from '../../supabase/functions/_backend/triggers/cron_scrapper.ts'
+import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
-import { app as on_user_update } from '../../supabase/functions/_backend/triggers/on_user_update.ts'
 import { app as on_user_delete } from '../../supabase/functions/_backend/triggers/on_user_delete.ts'
+import { app as on_user_update } from '../../supabase/functions/_backend/triggers/on_user_update.ts'
 import { app as on_version_create } from '../../supabase/functions/_backend/triggers/on_version_create.ts'
-import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
+import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
-import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cron_plan.ts'
 
 const functionName = 'triggers'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -28,6 +30,9 @@ if (sentryDsn) {
     dsn: sentryDsn,
   }))
 }
+
+appGlobal.use('*', logger())
+appGlobal.use('*', requestId())
 
 appGlobal.route('/clear_app_cache', clear_app_cache)
 appGlobal.route('/clear_device_cache', clear_device_cache)

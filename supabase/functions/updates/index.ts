@@ -1,4 +1,6 @@
 import { sentry } from '@hono/sentry'
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app } from '../_backend/plugins/updates.ts'
 
@@ -13,5 +15,8 @@ if (sentryDsn) {
     dsn: sentryDsn,
   }))
 }
+
+appGlobal.use('*', logger())
+appGlobal.use('*', requestId())
 
 Deno.serve(appGlobal.fetch)

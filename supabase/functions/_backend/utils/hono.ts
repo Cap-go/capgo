@@ -21,7 +21,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const key = capgkey_string || apikey_string
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(key, supabaseAdmin(c), rights)
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
     if (!apikey)
       throw new HTTPException(400, { message: 'Invalid apikey' })
     c.set('apikey', apikey)

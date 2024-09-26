@@ -46,16 +46,16 @@ async function getList(category = gplay.category.APPLICATION, collection = gplay
 
 async function getTop(category = gplay.category.APPLICATION, country = 'us', collection = gplay.collection.TOP_FREE, limit = 1000) {
   try {
-    // console.log('getTop', category, country, collection)
+    // console.log(c.get('requestId'), 'getTop', category, country, collection)
     const res = await getList(category, collection, limit, country)
     if (!res.length)
       return []
     // set to_get_similar to false
-    console.log('getTop', category, country, collection, res.length)
+    console.log(c.get('requestId'), 'getTop', category, country, collection, res.length)
     return res
   }
   catch (e) {
-    console.log('error getTop', e)
+    console.log(c.get('requestId'), 'error getTop', e)
   }
   return []
 }
@@ -64,7 +64,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<TopApk>()
     const all: Promise<(any)[]>[] = []
-    // console.log('main', url, headers, method, body)
+    // console.log(c.get('requestId'), 'main', url, headers, method, body)
     if (body.countries && body.categories) {
       // call getTop with all countries and categories
       for (const country of body.countries) {

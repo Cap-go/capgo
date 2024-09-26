@@ -35,7 +35,7 @@ export function extractDataEvent(event: Stripe.Event): Database['public']['Table
     status: undefined,
   }
 
-  console.log('event', JSON.stringify(event, null, 2))
+  console.log(c.get('requestId'), 'event', JSON.stringify(event, null, 2))
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
       const subscription = event.data.object
@@ -62,7 +62,7 @@ export function extractDataEvent(event: Stripe.Event): Database['public']['Table
       data.subscription_id = charge.id
     }
     else {
-      console.error('Other event', event.type, event)
+      console.error(c.get('requestId'), 'Other event', event.type, event)
     }
   }
   return data

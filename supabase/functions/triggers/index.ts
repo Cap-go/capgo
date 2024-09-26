@@ -1,6 +1,7 @@
 // Triggers API
 import { sentry } from '@hono/sentry'
-
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
@@ -31,6 +32,9 @@ if (sentryDsn) {
     dsn: sentryDsn,
   }))
 }
+
+appGlobal.use('*', logger())
+appGlobal.use('*', requestId())
 
 appGlobal.route('/clear_app_cache', clear_app_cache)
 appGlobal.route('/clear_device_cache', clear_device_cache)

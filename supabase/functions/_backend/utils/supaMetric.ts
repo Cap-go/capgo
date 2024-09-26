@@ -11,7 +11,7 @@ function getAllMetrics(c: Context): Promise<string[]> {
     .then(response => response.text())
     .then(data => data.split('\n'))
     .catch((err) => {
-      console.error('error', err)
+      console.error(c.get('requestId'), 'error', err)
       return [] as string[]
     })
 }
@@ -97,12 +97,12 @@ export function getCpu(c: Context) {
     .then((lines) => {
       const cpuInfo = getCpuInfo(getOneMetrics('node_cpu_seconds_total', lines))
       const cpuUsage = Math.round(cpuInfo.cpuUsage * 100) / 100
-      // console.log('CPU cores info: ', cpuInfo.cores)
-      // console.log('CPU cores: ', cpuInfo.numberOfCores)
-      // console.log('CPU total: ', cpuInfo.total)
-      // console.log('CPU used: ', cpuInfo.used)
-      // console.log('CPU idle: ', cpuInfo.idle)
-      console.log('CPU %: ', cpuUsage)
+      // console.log(c.get('requestId'), 'CPU cores info: ', cpuInfo.cores)
+      // console.log(c.get('requestId'), 'CPU cores: ', cpuInfo.numberOfCores)
+      // console.log(c.get('requestId'), 'CPU total: ', cpuInfo.total)
+      // console.log(c.get('requestId'), 'CPU used: ', cpuInfo.used)
+      // console.log(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
+      console.log(c.get('requestId'), 'CPU %: ', cpuUsage)
       return cpuUsage
     })
 }
@@ -141,9 +141,9 @@ export function getMem(c: Context) {
       const total = getMemTotal(getOneMetrics('node_memory_MemTotal_bytes', lines))
       const percentUsed = 100 - ((available * 100) / total)
       const usedPercentageRound = Math.round(percentUsed * 100) / 100
-      // console.log('Memory available: ', available)
-      // console.log('Memory free: ', total)
-      console.log('Memory %: ', usedPercentageRound)
+      // console.log(c.get('requestId'), 'Memory available: ', available)
+      // console.log(c.get('requestId'), 'Memory free: ', total)
+      console.log(c.get('requestId'), 'Memory %: ', usedPercentageRound)
       return usedPercentageRound
     })
 }

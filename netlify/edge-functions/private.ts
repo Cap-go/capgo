@@ -1,21 +1,23 @@
 import { sentry } from '@hono/sentry'
-import { handle } from 'https://deno.land/x/hono@v4.4.3/adapter/netlify/mod.ts'
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
+import { handle } from 'hono/netlify'
 
-import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
-import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
-import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
-import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
-import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
-import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
-import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
-import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
-import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
+import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../../supabase/functions/_backend/private/latency_postres.ts'
+import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
+import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
+import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
+import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
+import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
+import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
+import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
+import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -26,6 +28,10 @@ if (sentryDsn) {
     dsn: sentryDsn,
   }))
 }
+
+appGlobal.use('*', logger())
+appGlobal.use('*', requestId())
+
 // Webapps API
 
 appGlobal.route('/plans', plans)

@@ -44,22 +44,22 @@ function getStats(c: Context): GlobalStats {
     stars: getGithubStars(),
     customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log('get_customer_counts', res.error)
+        console.log(c.get('requestId'), 'get_customer_counts', res.error)
       return res.data || { total: 0, yearly: 0, monthly: 0 }
     }),
     onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log('count_all_onboarded', res.error)
+        console.log(c.get('requestId'), 'count_all_onboarded', res.error)
       return res.data || 0
     }),
     need_upgrade: supabase.rpc('count_all_need_upgrade', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log('count_all_need_upgrade', res.error)
+        console.log(c.get('requestId'), 'count_all_need_upgrade', res.error)
       return res.data || 0
     }),
     plans: supabase.rpc('count_all_plans_v2').then((res) => {
       if (res.error || !res.data)
-        console.log('count_all_plans_v2', res.error)
+        console.log(c.get('requestId'), 'count_all_plans_v2', res.error)
       return res.data || {}
     }).then((data: any) => {
       const total: PlanTotal = {}
@@ -74,7 +74,7 @@ function getStats(c: Context): GlobalStats {
         return { apps: app_ids.length, users: res2.data || 0 }
       }
       catch (e) {
-        console.error('count_active_users error', e)
+        console.error(c.get('requestId'), 'count_active_users error', e)
       }
       return { apps: app_ids.length, users: 0 }
     }),
@@ -108,8 +108,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       res.actives,
     ])
     const not_paying = users - customers.total
-    console.log('All Promises', apps, updates, users, stars, customers, onboarded, need_upgrade, plans)
-    // console.log('app', app.app_id, downloads, versions, shared, channels)
+    console.log(c.get('requestId'), 'All Promises', apps, updates, users, stars, customers, onboarded, need_upgrade, plans)
+    // console.log(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
     const newData: Database['public']['Tables']['global_stats']['Insert'] = {
@@ -128,12 +128,12 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       need_upgrade,
       not_paying,
     }
-    console.log('newData', newData)
+    console.log(c.get('requestId'), 'newData', newData)
     const { error } = await supabaseAdmin(c)
       .from('global_stats')
       .upsert(newData)
     if (error)
-      console.error('insert global_stats error', error)
+      console.error(c.get('requestId'), 'insert global_stats error', error)
     await logsnagInsights(c, [
       {
         title: 'Apps',
@@ -216,13 +216,13 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         icon: '📈',
       },
     ]).catch((e) => {
-      console.error('insights error', e)
+      console.error(c.get('requestId'), 'insights error', e)
     })
-    console.log('Sent to logsnag done')
+    console.log(c.get('requestId'), 'Sent to logsnag done')
     return c.json(BRES)
   }
   catch (e) {
-    console.error('general insights error', e)
+    console.error(c.get('requestId'), 'general insights error', e)
     return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
   }
 })

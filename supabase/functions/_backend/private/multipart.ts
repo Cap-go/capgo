@@ -42,14 +42,14 @@ app.post('/', async (c: Context) => {
 
   const parsedAction = baseZodObj.safeParse(body)
   if (!parsedAction.success) {
-    console.error('Invalid body', parsedAction.error)
+    console.error(c.get('requestId'), 'Invalid body', parsedAction.error)
     return c.json({ error: 'Invalid body', zod_error: parsedAction.error }, 400)
   }
 
   if (parsedAction.data.action === 'mpu-complete') {
     const parsedUploadId = uploadObjZod.safeParse(body)
     if (!parsedUploadId.success) {
-      console.error('Invalid upload ID', parsedUploadId.error)
+      console.error(c.get('requestId'), 'Invalid upload ID', parsedUploadId.error)
       return c.json({ error: 'Invalid upload ID', zod_error: parsedUploadId.error }, 400)
     }
 
@@ -64,7 +64,7 @@ app.post('/', async (c: Context) => {
 
     const parsedParts = partsBodyZod.safeParse(actualBody)
     if (!parsedParts.success) {
-      console.error('Invalid parts body', actualBody, parsedParts.error)
+      console.error(c.get('requestId'), 'Invalid parts body', actualBody, parsedParts.error)
       return c.json({ error: 'Invalid parts body', zod_error: parsedParts.error }, 400)
     }
 
@@ -73,7 +73,7 @@ app.post('/', async (c: Context) => {
       return c.json({ ok: true }, 200)
     }
     catch (err) {
-      console.error('Cannot compleate multipart upload', err)
+      console.error(c.get('requestId'), 'Cannot compleate multipart upload', err)
       return c.json({ error: 'Cannot compleate multipart upload' }, 500)
     }
   }
@@ -91,7 +91,7 @@ app.put('/', async (c: Context) => {
 
   const parsedBody = putDataZod.safeParse(body)
   if (!parsedBody.success) {
-    console.error('Invalid PUT body', parsedBody.error)
+    console.error(c.get('requestId'), 'Invalid PUT body', parsedBody.error)
     return c.json({ error: 'invalid body', zod_error: parsedBody.error })
   }
 
@@ -110,7 +110,7 @@ app.put('/', async (c: Context) => {
     return c.json({ error: 'Header "Content-Length" is not a number' }, 400)
   }
 
-  console.log('len', contentLengthNum)
+  console.log(c.get('requestId'), 'len', contentLengthNum)
 
   try {
     const res = await multipartUploadPart(c, parsedBody.data.key, parsedBody.data.uploadId, parsedBody.data.partNumber, contentLengthNum, new Uint8Array(uploadBody))
@@ -120,7 +120,7 @@ app.put('/', async (c: Context) => {
     })
   }
   catch (err) {
-    console.error('Cannot upload multipart part', err)
+    console.error(c.get('requestId'), 'Cannot upload multipart part', err)
     return c.json({ error: 'Cannot upload multipart part' }, 500)
   }
 })
@@ -133,7 +133,7 @@ export async function initMultipartUpload(c: Context, key: string) {
     }
   }
   catch (err) {
-    console.log('Cannot create multipart upload', err)
+    console.log(c.get('requestId'), 'Cannot create multipart upload', err)
     return { error: 'Cannot create multipart upload' }
   }
 }

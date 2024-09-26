@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     // unsafe parse the body
     const body = await c.req.json<{ version: Database['public']['Tables']['app_versions']['Row'] }>()
-    console.log('body cron_clear_versions', body)
+    console.log(c.get('requestId'), 'post body cron_clear_versions', body)
 
     // Let's start with the metadata
     const supabase = supabaseAdmin(c)
@@ -36,7 +36,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       version.user_id = app.user_id
     }
     const v2Path = await getPath(c, version)
-    console.log('v2Path', v2Path)
+    console.log(c.get('requestId'), 'v2Path', v2Path)
     if (!v2Path) {
       return errorOut(c, `Cannot find path for version ${version.id}`)
     }
@@ -44,7 +44,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     try {
       const size = await s3.getSize(c, v2Path)
       if (!size) {
-        console.log(`No size for ${v2Path}, ${size}`)
+        console.log(c.get('requestId'), `No size for ${v2Path}, ${size}`)
         // throw error to trigger the deletion
         notFound = true
         throw new Error('no_size')
@@ -61,10 +61,10 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         return errorOut(c, `Cannot find checksum for app_versions id ${version.id} because of no app_versions found`)
       const checksum = appVersion.checksum
       if (!checksum) {
-        console.log(`No checksum for ${v2Path}, ${checksum}`)
+        console.log(c.get('requestId'), `No checksum for ${v2Path}, ${checksum}`)
       }
 
-      console.log(`Upsert app_versions_meta (version id: ${version.id}) to: ${size}`)
+      console.log(c.get('requestId'), `Upsert app_versions_meta (version id: ${version.id}) to: ${size}`)
 
       await supabase.from('app_versions_meta')
         .upsert({
@@ -76,7 +76,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         })
     }
     catch (errorSize) {
-      console.error('errorSize', notFound, v2Path, errorSize)
+      console.error(c.get('requestId'), 'errorSize', notFound, v2Path, errorSize)
       // Ensure that the version is not linked anywhere
       const { count, error, data } = await supabase.from('channels')
         .select('id', { count: 'exact' })

@@ -79,7 +79,7 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
       .range(page * limit, (page + 1) * limit - 1)
 
     if (error) {
-      console.error('Error getting apps from Supabase', error)
+      console.error(c.get('requestId'), 'Error getting apps from Supabase', error)
       break
     }
 
@@ -94,9 +94,9 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
 }
 
 export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
-  console.log('updateOrCreateChannel', update)
+  console.log(c.get('requestId'), 'updateOrCreateChannel', update)
   if (!update.app_id || !update.name || !update.created_by) {
-    console.log('missing app_id, name, or created_by')
+    console.log(c.get('requestId'), 'missing app_id, name, or created_by')
     return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
 
@@ -113,7 +113,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
       update[key] !== existingChannel[key] && key !== 'created_at' && key !== 'updated_at',
     )
     if (!fieldsDiffer) {
-      console.log('No fields differ, no update needed')
+      console.log(c.get('requestId'), 'No fields differ, no update needed')
       return Promise.resolve()
     }
   }
@@ -124,9 +124,9 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
 }
 
 export async function updateOrCreateChannelDevice(c: Context, update: Database['public']['Tables']['channel_devices']['Insert']) {
-  console.log('updateOrCreateChannelDevice', update)
+  console.log(c.get('requestId'), 'updateOrCreateChannelDevice', update)
   if (!update.device_id || !update.channel_id || !update.app_id) {
-    console.log('missing device_id, channel_id, or app_id')
+    console.log(c.get('requestId'), 'missing device_id, channel_id, or app_id')
     return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
   }
 
@@ -143,7 +143,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
       update[key] !== existingChannelDevice[key] && key !== 'created_at' && key !== 'updated_at',
     )
     if (!fieldsDiffer) {
-      console.log('No fields differ, no update needed')
+      console.log(c.get('requestId'), 'No fields differ, no update needed')
       return Promise.resolve()
     }
   }
@@ -180,7 +180,7 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
     .rpc('has_app_right_userid', { appid: appId, right, userid })
 
   if (error) {
-    console.error('has_app_right_userid error', error)
+    console.error(c.get('requestId'), 'has_app_right_userid error', error)
     return false
   }
 
@@ -196,10 +196,10 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
     app_id: null as any,
   })
 
-  console.log(userRight)
+  console.log(c.get('requestId'), 'check_min_rights (hasOrgRight)', userRight)
 
   if (userRight.error || !userRight.data) {
-    console.error('check_min_rights (hasOrgRight) error', userRight.error)
+    console.error(c.get('requestId'), 'check_min_rights (hasOrgRight) error', userRight.error)
     return false
   }
 
@@ -269,7 +269,7 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
     return data || false
   }
   catch (error) {
-    console.error('isGoodPlan error', orgId, error)
+    console.error(c.get('requestId'), 'isGoodPlan error', orgId, error)
   }
   return false
 }
@@ -283,7 +283,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
     return data || false
   }
   catch (error) {
-    console.error('isOnboarded error', orgId, error)
+    console.error(c.get('requestId'), 'isOnboarded error', orgId, error)
   }
   return false
 }
@@ -297,7 +297,7 @@ export async function isOnboardingNeeded(c: Context, userId: string): Promise<bo
     return data || false
   }
   catch (error) {
-    console.error('isOnboardingNeeded error', userId, error)
+    console.error(c.get('requestId'), 'isOnboardingNeeded error', userId, error)
   }
   return false
 }
@@ -311,7 +311,7 @@ export async function isCanceledOrg(c: Context, orgId: string): Promise<boolean>
     return data || false
   }
   catch (error) {
-    console.error('isCanceled error', orgId, error)
+    console.error(c.get('requestId'), 'isCanceled error', orgId, error)
   }
   return false
 }
@@ -325,7 +325,7 @@ export async function isPayingOrg(c: Context, orgId: string): Promise<boolean> {
     return data || false
   }
   catch (error) {
-    console.error('isPayingOrg error', orgId, error)
+    console.error(c.get('requestId'), 'isPayingOrg error', orgId, error)
   }
   return false
 }
@@ -339,7 +339,7 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
     return data || 0
   }
   catch (error) {
-    console.error('isTrialOrg error', orgId, error)
+    console.error(c.get('requestId'), 'isTrialOrg error', orgId, error)
   }
   return 0
 }
@@ -363,7 +363,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
     return data || false
   }
   catch (error) {
-    console.error('isAllowedActionOrg error', orgId, error)
+    console.error(c.get('requestId'), 'isAllowedActionOrg error', orgId, error)
   }
   return false
 }
@@ -512,7 +512,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       trial_at: trial_at.toISOString(),
     })
   if (createInfoError)
-    console.log('createInfoError', createInfoError)
+    console.log(c.get('requestId'), 'createInfoError', createInfoError)
 
   const { error: updateUserError } = await supabaseAdmin(c)
     .from('orgs')
@@ -521,8 +521,8 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     })
     .eq('id', org.id)
   if (updateUserError)
-    console.log('updateUserError', updateUserError)
-  console.log('stripe_info done')
+    console.log(c.get('requestId'), 'updateUserError', updateUserError)
+  console.log(c.get('requestId'), 'stripe_info done')
 }
 
 export function trackBandwidthUsageSB(
@@ -580,7 +580,7 @@ export function trackMetaSB(
   version_id: number,
   size: number,
 ) {
-  console.log('createStatsMeta', app_id, version_id, size)
+  console.log(c.get('requestId'), 'createStatsMeta', app_id, version_id, size)
   return supabaseAdmin(c)
     .from('version_meta')
     .insert([
@@ -667,7 +667,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
     query = query.lt('created_at', new Date(period_end).toISOString())
 
   if (deviceIds && deviceIds.length) {
-    console.log('deviceIds', deviceIds)
+    console.log(c.get('requestId'), 'deviceIds', deviceIds)
     if (deviceIds.length === 1)
       query = query.eq('device_id', deviceIds[0])
     else
@@ -675,7 +675,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   }
 
   if (search) {
-    console.log('search', search)
+    console.log(c.get('requestId'), 'search', search)
     if (deviceIds && deviceIds.length)
       query = query.ilike('version_build', `${search}%`)
     else
@@ -685,7 +685,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log('order', col.key, col.sortable)
+        console.log(c.get('requestId'), 'order', col.key, col.sortable)
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
@@ -694,7 +694,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   const { data, error } = await query
 
   if (error) {
-    console.error('Error reading stats list', error)
+    console.error(c.get('requestId'), 'Error reading stats list', error)
     return []
   }
 
@@ -704,7 +704,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
 export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
-  console.log('readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search)
+  console.log(c.get('requestId'), 'readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search)
   let query = supabase
     .from('devices')
     .select('*')
@@ -713,7 +713,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
     .limit(limit)
 
   if (deviceIds && deviceIds.length) {
-    console.log('deviceIds', deviceIds)
+    console.log(c.get('requestId'), 'deviceIds', deviceIds)
     if (deviceIds.length === 1)
       query = query.eq('device_id', deviceIds[0])
     else
@@ -721,7 +721,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   }
 
   if (search) {
-    console.log('search', search)
+    console.log(c.get('requestId'), 'search', search)
     if (deviceIds && deviceIds.length)
       query = query.ilike('custom_id', `${search}%`)
     else
@@ -730,7 +730,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log('order', col.key, col.sortable)
+        console.log(c.get('requestId'), 'order', col.key, col.sortable)
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
@@ -741,7 +741,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   const { data, error } = await query
 
   if (error) {
-    console.error('Error reading device list', error)
+    console.error(c.get('requestId'), 'Error reading device list', error)
     return []
   }
 

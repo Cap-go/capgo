@@ -1,11 +1,13 @@
 import { sentry } from '@hono/sentry'
-import { handle } from 'https://deno.land/x/hono@v4.4.3/adapter/netlify/mod.ts'
+import { logger } from 'hono/logger'
+import { handle } from 'hono/netlify'
+import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 
-import { app as topApk } from '../../supabase/functions/_backend/scrapping/top_apk.ts'
-import { app as similarApps } from '../../supabase/functions/_backend/scrapping/similar_apps.ts'
 import { app as framework } from '../../supabase/functions/_backend/scrapping/framework.ts'
+import { app as similarApps } from '../../supabase/functions/_backend/scrapping/similar_apps.ts'
 import { app as storeInfo } from '../../supabase/functions/_backend/scrapping/store_info.ts'
+import { app as topApk } from '../../supabase/functions/_backend/scrapping/top_apk.ts'
 
 const functionName = 'scrapping'
 const appGlobal = new Hono().basePath(`/${functionName}`)
@@ -16,6 +18,9 @@ if (sentryDsn) {
     dsn: sentryDsn,
   }))
 }
+
+appGlobal.use('*', logger())
+appGlobal.use('*', requestId())
 
 // Scrapping API
 

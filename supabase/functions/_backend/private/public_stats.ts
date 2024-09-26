@@ -19,7 +19,7 @@ app.get('/', async (c: Context) => {
       .single()
     if (data && !error)
       return c.json(data)
-    console.log('Supabase error:', error)
+    console.log(c.get('requestId'), 'Supabase error:', error)
     return c.json({
       apps: 750,
       updates: 23500638,

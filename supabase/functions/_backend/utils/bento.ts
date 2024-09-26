@@ -52,13 +52,13 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
       json: payload,
     }).json<{ results: number, failed: number }>()
     if (res.failed > 0) {
-      console.error('trackBentoEvent failed', res)
+      console.error(c.get('requestId'), 'trackBentoEvent failed', res)
       return false
     }
     return true
   }
   catch (e) {
-    console.log('trackBentoEvent error', e)
+    console.log(c.get('requestId'), 'trackBentoEvent error', e)
     return false
   }
 }
@@ -98,11 +98,11 @@ export async function addTagBento(c: Context, email: string, segments: { segment
       }).json(),
     ))
 
-    console.log('addTagBento', email, commands, results)
+    console.log(c.get('requestId'), 'addTagBento', email, commands, results)
     return true
   }
   catch (e) {
-    console.log('addTagBento error', e)
+    console.log(c.get('requestId'), 'addTagBento error', e)
     return false
   }
 }

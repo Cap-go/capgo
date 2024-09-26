@@ -77,14 +77,14 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
       headers: getConfigHeaders(c),
     })
       .then(res => res.json())
-    console.log('trackEvent', email, event, res)
+    console.log(c.get('requestId'), 'trackEvent', email, event, res)
     return res
   }
   catch (e) {
-    console.log('trackEvent error', e)
+    console.log(c.get('requestId'), 'trackEvent error', e)
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.log('errorJson', errorJson)
+      console.log(c.get('requestId'), 'errorJson', errorJson)
     }
     return false
   }
@@ -99,28 +99,28 @@ export async function addContact(c: Context, email: string, data: any) {
     subscribed: true,
     data: shallowCleanObject(data),
   }
-  console.log('addContact', email)
+  console.log(c.get('requestId'), 'addContact', email)
   try {
     const res = await ky.post(url, {
       json: payload,
       headers: getConfigHeaders(c),
     })
       .then(res => res.json())
-    console.log('addContact', email, res)
+    console.log(c.get('requestId'), 'addContact', email, res)
     return res
   }
   catch (e) {
-    console.log('addContact error', e)
+    console.log(c.get('requestId'), 'addContact error', e)
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.log('errorJson', errorJson)
+      console.log(c.get('requestId'), 'errorJson', errorJson)
     }
     return false
   }
 }
 
 export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
-  console.log('addDataContact', email, data, segments)
+  console.log(c.get('requestId'), 'addDataContact', email, data, segments)
   return trackEvent(c, email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
 }
 
@@ -138,14 +138,14 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
       headers: getConfigHeaders(c),
     })
       .then(res => res.json())
-    console.log('sendEmail', to, subject, res)
+    console.log(c.get('requestId'), 'sendEmail', to, subject, res)
     return res
   }
   catch (e) {
-    console.log('sendEmail error', e)
+    console.log(c.get('requestId'), 'sendEmail error', e)
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.log('errorJson', errorJson)
+      console.log(c.get('requestId'), 'errorJson', errorJson)
     }
     return false
   }
