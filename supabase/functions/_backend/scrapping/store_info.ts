@@ -47,11 +47,11 @@ async function findLang(appId: string) {
   for (const country of countries) {
     try {
       const res = await getAppInfo(appId, country)
-      console.log('res', res)
+      console.log(c.get('requestId'), 'res', res)
       return res
     }
     catch (e) {
-      console.log('error getAppInfo', e)
+      console.log(c.get('requestId'), 'error getAppInfo', e)
     }
   }
   return null
@@ -59,23 +59,23 @@ async function findLang(appId: string) {
 
 async function getInfo(c: Context, appId: string) {
   try {
-    // console.log('getInfo', appId)
+    // console.log(c.get('requestId'), 'getInfo', appId)
     const data = await getStoreAppByIdCF(c, appId)
 
     const res = (!data || !data.lang) ? await findLang(appId) : await getAppInfo(appId, data.lang)
     if (!res) {
-      console.error('no lang found', appId)
+      console.error(c.get('requestId'), 'no lang found', appId)
       await saveStoreInfoCF(c, {
         app_id: appId,
         to_get_info: false,
       })
       return []
     }
-    console.log('getInfo', appId, res)
+    console.log(c.get('requestId'), 'getInfo', appId, res)
     return [res]
   }
   catch (e) {
-    console.log('error getAppInfo', e)
+    console.log(c.get('requestId'), 'error getAppInfo', e)
     await saveStoreInfoCF(c, {
       app_id: appId,
       to_get_info: false,
@@ -97,7 +97,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         all.push(getInfo(c, appId))
     }
     else {
-      console.log('cannot get apps', body)
+      console.log(c.get('requestId'), 'cannot get apps', body)
       return c.json({ status: 'Error', error: 'cannot get apps' }, 500)
     }
     const toSave = await Promise.all(all)

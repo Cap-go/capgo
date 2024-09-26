@@ -36,27 +36,27 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     const rawBody = await c.req.json()
     const parsedBody = bodySchema.safeParse(rawBody)
     if (parsedBody.error) {
-      console.error('[partial update] Cannot parse body', parsedBody.error)
+      console.error(c.get('requestId'), '[partial update] Cannot parse body', parsedBody.error)
       return c.json({ status: 'Cannot parse body', error: parsedBody.error }, 400)
     }
 
     const body = parsedBody.data
-    console.log('body', body)
+    console.log(c.get('requestId'), 'post partial upload body', body)
 
     const apikey = c.get('apikey')
     const capgkey = c.get('capgkey')
-    console.log('apikey', apikey)
-    console.log('capgkey', capgkey)
+    console.log(c.get('requestId'), 'apikey', apikey)
+    console.log(c.get('requestId'), 'capgkey', capgkey)
 
     const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
       .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
     if (_errorUserId) {
-      console.log('_errorUserId', _errorUserId)
+      console.log(c.get('requestId'), '_errorUserId', _errorUserId)
       return c.json({ status: 'Error User not found' }, 500)
     }
 
     if (!(await hasAppRight(c, body.app_id, userId, 'read'))) {
-      console.log('no read')
+      console.log(c.get('requestId'), 'no read')
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
@@ -67,11 +67,11 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       // .eq('user_id', userId)
       .single()
     if (errorApp) {
-      console.log('errorApp', errorApp)
+      console.log(c.get('requestId'), 'errorApp', errorApp)
       return c.json({ status: 'Error App not found' }, 500)
     }
 
-    // console.log(body.name ?? body.bucket_id?.split('.')[0] ?? '')
+    // console.log(c.get('requestId'), body.name ?? body.bucket_id?.split('.')[0] ?? '')
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id')
@@ -81,7 +81,7 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .eq('user_id', apikey.user_id)
       .single()
     if (errorVersion) {
-      console.log('errorVersion', errorVersion)
+      console.log(c.get('requestId'), 'errorVersion', errorVersion)
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
@@ -105,7 +105,7 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     return c.json(res)
   }
   catch (e) {
-    console.log('error', e)
+    console.log(c.get('requestId'), 'error', e)
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

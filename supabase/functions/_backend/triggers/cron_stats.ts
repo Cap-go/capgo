@@ -17,7 +17,7 @@ app.use('/', useCors)
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
     const body = await c.req.json<dataToGet>()
-    console.log('body', body)
+    console.log(c.get('requestId'), 'postcron stats body', body)
     if (!body.appId || !body.orgId)
       return c.json({ status: 'No appId' }, 400)
 
@@ -29,7 +29,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     if (!cycleInfo || !cycleInfo.subscription_anchor_start || !cycleInfo.subscription_anchor_end)
       return c.json({ status: 'Cannot get cycle info' }, 400)
 
-    console.log('cycleInfo', cycleInfo)
+    console.log(c.get('requestId'), 'cycleInfo', cycleInfo)
     const startDate = cycleInfo.subscription_anchor_start
     const endDate = cycleInfo.subscription_anchor_end
 
@@ -49,10 +49,10 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       versionUsage = versionUsage.slice(-1)
     }
 
-    console.log('mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0), JSON.stringify(mau))
-    console.log('bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), JSON.stringify(bandwidth))
-    console.log('storage', storage.length, storage.reduce((acc, curr) => acc + curr.storage, 0), JSON.stringify(storage))
-    console.log('versionUsage', versionUsage.length, versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0))
+    console.log(c.get('requestId'), 'mau', mau.length, mau.reduce((acc, curr) => acc + curr.mau, 0), JSON.stringify(mau))
+    console.log(c.get('requestId'), 'bandwidth', bandwidth.length, bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), JSON.stringify(bandwidth))
+    console.log(c.get('requestId'), 'storage', storage.length, storage.reduce((acc, curr) => acc + curr.storage, 0), JSON.stringify(storage))
+    console.log(c.get('requestId'), 'versionUsage', versionUsage.length, versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0))
 
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
@@ -74,11 +74,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         .throwOnError(),
     ])
 
-    console.log('stats saved')
+    console.log(c.get('requestId'), 'stats saved')
     return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
   }
   catch (e) {
-    console.error('Error getting stats', e)
+    console.error(c.get('requestId'), 'Error getting stats', e)
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })

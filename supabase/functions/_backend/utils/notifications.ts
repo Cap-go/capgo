@@ -11,10 +11,10 @@ interface EventData {
 }
 
 async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
-  console.log('send notif', eventName, email)
+  console.log(c.get('requestId'), 'send notif', eventName, email)
   const res = await trackBentoEvent(c, email, eventData, eventName)
   if (!res) {
-    console.log('trackEvent failed', eventName, email, eventData)
+    console.log(c.get('requestId'), 'trackEvent failed', eventName, email, eventData)
     return false
   }
   if (past != null) {
@@ -28,7 +28,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
       .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
     if (error) {
-      console.error('update notif error', error)
+      console.error(c.get('requestId'), 'update notif error', error)
       return false
     }
   }
@@ -42,11 +42,11 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
         last_send_at: dayjs().toISOString(),
       })
     if (error) {
-      console.error('insert notif', error)
+      console.error(c.get('requestId'), 'insert notif', error)
       return false
     }
   }
-  console.log('send notif done', eventName, email)
+  console.log(c.get('requestId'), 'send notif done', eventName, email)
   return true
 }
 
@@ -56,7 +56,7 @@ function isSendable(last: string, cron: string) {
   const now = new Date()
   const nextDate = interval.getNextDate(last_send_at)
   const sendable = dayjs(now).isAfter(nextDate)
-  console.log(`
+  console.log(c.get('requestId'), `
   cron ${cron}
   last_send_at ${last_send_at}
   nextDate ${nextDate}
@@ -76,7 +76,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     .single()
 
   if (!org || orgError) {
-    console.log('org not found', orgId)
+    console.log(c.get('requestId'), 'org not found', orgId)
     return false
   }
   // check if notif has already been send in notifications table
@@ -89,18 +89,18 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     .single()
   // set user data in crisp
   if (!notif) {
-    console.log('notif never sent', eventName, uniqId)
+    console.log(c.get('requestId'), 'notif never sent', eventName, uniqId)
     return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null).then(() => true)
   }
 
   if (notif && !isSendable(notif.last_send_at, cron)) {
-    console.log('notif already sent', eventName, orgId)
+    console.log(c.get('requestId'), 'notif already sent', eventName, orgId)
     return false
   }
-  console.log('notif ready to sent', eventName, orgId)
+  console.log(c.get('requestId'), 'notif ready to sent', eventName, orgId)
   return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
 }
 
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
-// console.log(isSendable(last_send_at, '0 0 1 * *'))
+// console.log(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))

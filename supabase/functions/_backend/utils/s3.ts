@@ -24,25 +24,25 @@ export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) 
     signingEscapePath: true,
   }
 
-  console.log('initS3', params)
+  console.log(c.get('requestId'), 'initS3', params)
 
   return new S3Client(params)
 }
 
 export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   if (!record.bucket_id && !record.r2_path) {
-    console.log('no bucket_id or r2_path')
+    console.log(c.get('requestId'), 'no bucket_id or r2_path')
     return null
   }
   if (!record.r2_path && (!record.app_id || !record.user_id || !record.id)) {
-    console.log('no app_id or user_id or id')
+    console.log(c.get('requestId'), 'no app_id or user_id or id')
     return null
   }
   // TODO: delete bucket_id in september 2024
   const vPath = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
   const exist = vPath ? await checkIfExist(c, vPath) : false
   if (!exist) {
-    console.log('not exist', vPath)
+    console.log(c.get('requestId'), 'not exist', vPath)
     return null
   }
   return vPath
@@ -118,7 +118,7 @@ async function checkIfExist(c: Context, fileId: string) {
     return true
   }
   catch (error) {
-    console.log('checkIfExist', fileId, error)
+    console.log(c.get('requestId'), 'checkIfExist', fileId, error)
     return false
   }
 }
@@ -147,7 +147,7 @@ async function getSize(c: Context, fileId: string) {
     return size
   }
   catch (error) {
-    console.log('getSize', error)
+    console.log(c.get('requestId'), 'getSize', error)
     return 0
   }
 }

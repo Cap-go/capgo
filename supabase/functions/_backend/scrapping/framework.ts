@@ -54,15 +54,15 @@ async function isCapacitor(id: string) {
     flutter: false,
   }
   try {
-    console.log('downloadApkPure', id)
+    console.log(c.get('requestId'), 'downloadApkPure', id)
     const buffer = await downloadApkPure(id)
-    console.log('AdmZip', id)
+    console.log(c.get('requestId'), 'AdmZip', id)
     const zip = new AdmZip(buffer)
     const zipEntries = zip.getEntries() // an array of ZipEntry records
     zipEntries.forEach((zipEntry) => {
-      // console.log('zipEntry', zipEntry.entryName)
+      // console.log(c.get('requestId'), 'zipEntry', zipEntry.entryName)
       if (zipEntry.entryName === 'assets/capacitor.config.json') {
-        console.log('capacitor', 'assets/capacitor.config.json')
+        console.log(c.get('requestId'), 'capacitor', 'assets/capacitor.config.json')
         found.capacitor = true
         // check if updateUrl is set, means on-prem
         const res = zipEntry.getData().toString('utf8')
@@ -71,43 +71,43 @@ async function isCapacitor(id: string) {
       }
       if (zipEntry.entryName === 'assets/capacitor.plugins.json') {
         const res = zipEntry.getData().toString('utf8')
-        console.log('capacitor', res)
+        console.log(c.get('requestId'), 'capacitor', res)
         found.capacitor = true
         if (res.includes('@capgo/capacitor-updater'))
           found.capgo = true
       }
       if (zipEntry.entryName === 'res/xml/config.xml') {
-        console.log('cordova', 'res/xml/config.xml')
+        console.log(c.get('requestId'), 'cordova', 'res/xml/config.xml')
         found.cordova = true
       }
       if (zipEntry.entryName === 'lib/x86_64/libreactnativejni') {
-        console.log('react_native', 'lib/x86_64/libreactnativejni')
+        console.log(c.get('requestId'), 'react_native', 'lib/x86_64/libreactnativejni')
         found.react_native = true
       }
       if (zipEntry.entryName === 'kotlin/kotlin.kotlin_builtins') {
-        console.log('kotlin', 'kotlin/kotlin.kotlin_builtins')
+        console.log(c.get('requestId'), 'kotlin', 'kotlin/kotlin.kotlin_builtins')
         found.kotlin = true
       }
       if (zipEntry.entryName === 'lib/x86_64/libflutter.so') {
-        console.log('flutter', 'lib/x86_64/libflutter.so')
+        console.log(c.get('requestId'), 'flutter', 'lib/x86_64/libflutter.so')
         found.flutter = true
       }
       if (zipEntry.entryName === 'lib/x86_64/libNativeScript.so') {
-        console.log('native_script', 'lib/x86_64/libNativeScript.so')
+        console.log(c.get('requestId'), 'native_script', 'lib/x86_64/libNativeScript.so')
         found.native_script = true
       }
     })
   }
   catch (e) {
-    console.log('error', id, e)
+    console.log(c.get('requestId'), 'error', id, e)
     throw new Error(e as any)
   }
-  console.log('found', id, found)
+  console.log(c.get('requestId'), 'found', id, found)
   return found
 }
 async function getInfoCap(c: Context, appId: string) {
   try {
-    // console.log('getInfoCap', appId)
+    // console.log(c.get('requestId'), 'getInfoCap', appId)
     // remove from list apps already in supabase
     const res = await isCapacitor(appId)
     // save in supabase
@@ -123,10 +123,10 @@ async function getInfoCap(c: Context, appId: string) {
       flutter: res.flutter,
       to_get_framework: false,
     })
-    console.log('getInfoCap', appId, res)
+    console.log(c.get('requestId'), 'getInfoCap', appId, res)
   }
   catch (e) {
-    console.log('error getInfoCap', e)
+    console.log(c.get('requestId'), 'error getInfoCap', e)
     await saveStoreInfoCF(c, {
       app_id: appId,
       to_get_framework: false,
@@ -147,7 +147,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       await Promise.all(all)
     }
     else {
-      console.log('cannot get apps', body)
+      console.log(c.get('requestId'), 'cannot get apps', body)
       return c.json({ status: 'Error', error: 'cannot get apps' }, 500)
     }
     return c.json(BRES)

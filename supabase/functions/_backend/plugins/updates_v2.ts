@@ -71,7 +71,7 @@ export const app = new Hono()
 app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<AppInfos>()
-    console.log('body', body)
+    console.log(c.get('requestId'), 'post updates v2 body', body)
     if (isLimited(c, body.app_id)) {
       return c.json({
         status: 'Too many requests',
@@ -81,7 +81,7 @@ app.post('/', async (c: Context) => {
     const parseResult = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
       const error = parseResult.error.errors[0]
-      console.log('parseResult', error.message)
+      console.log(c.get('requestId'), 'parseResult', error.message)
       return c.json({
         error: `Cannot parse json: ${error.message}`,
       }, 400)
@@ -90,7 +90,7 @@ app.post('/', async (c: Context) => {
     return update(c, body)
   }
   catch (e) {
-    console.log('error', JSON.stringify(e))
+    console.log(c.get('requestId'), 'error', JSON.stringify(e))
     return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 400)
   }
 })

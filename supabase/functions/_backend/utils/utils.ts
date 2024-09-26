@@ -49,7 +49,7 @@ export function shallowCleanObject(obj: Record<string, unknown>) {
   }, {} as Record<string, unknown>)
 }
 
-export async function checkKey(authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
   try {
@@ -64,7 +64,7 @@ export async function checkKey(authorization: string | undefined, supabase: Supa
     return data
   }
   catch (error) {
-    console.log(error)
+    console.log(c.get('requestId'), 'checkKey error', error)
     return null
   }
 }

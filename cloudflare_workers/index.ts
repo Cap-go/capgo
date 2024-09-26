@@ -1,7 +1,9 @@
+import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
+
 // Public API
 import { HTTPException } from 'hono/http-exception'
-
+import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
 // import { middlewareAPISecret } from 'supabase/functions/_backend/utils/hono.ts'
 // import { app as testAnalytics } from '../supabase/functions/_backend/private/test.ts'
@@ -73,6 +75,8 @@ const appFront = new Hono<{ Bindings: Bindings }>()
 app.use('*', sentry({
   release: version,
 }))
+app.use('*', logger())
+app.use('*', requestId())
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)

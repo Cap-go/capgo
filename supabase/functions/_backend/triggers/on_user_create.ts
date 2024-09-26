@@ -14,15 +14,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log(`Not ${table}`)
+      console.log(c.get('requestId'), `Not ${table}`)
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log('Not INSERT')
+      console.log(c.get('requestId'), 'Not INSERT')
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log('record', record)
+    console.log(c.get('requestId'), 'record', record)
     await Promise.all([
       createApiKey(c, record.id),
       addContact(c, record.email, {
@@ -32,7 +32,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         image_url: record.image_url ? record.image_url : undefined,
       }),
     ])
-    console.log('createCustomer stripe')
+    console.log(c.get('requestId'), 'createCustomer stripe')
     if (record.customer_id)
       return c.json(BRES)
     const LogSnag = logsnag(c)
