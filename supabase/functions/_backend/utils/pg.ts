@@ -11,7 +11,9 @@ import { existInEnv, getEnv } from './utils.ts'
 export function getBestDatabaseURL(c: Context): string {
   // TODO: use it when we deployed replicate of database
   // Use replicate i
-  const clientContinent = (c.req.raw as any)?.cf?.continent
+
+  const clientContinent = null
+  // const clientContinent = (c.req.raw as any)?.cf?.continent TODO: uncomment when we enable back replicate
   console.log(c.get('requestId'), 'clientContinent', clientContinent)
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
