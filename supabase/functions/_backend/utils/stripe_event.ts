@@ -22,7 +22,7 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   )
 }
 
-export function extractDataEvent(event: Stripe.Event): Database['public']['Tables']['stripe_info']['Insert'] {
+export function extractDataEvent(c: Context, event: Stripe.Event): Database['public']['Tables']['stripe_info']['Insert'] {
   const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',
@@ -39,7 +39,7 @@ export function extractDataEvent(event: Stripe.Event): Database['public']['Table
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
       const subscription = event.data.object
-      const res = parsePriceIds(subscription.items.data)
+      const res = parsePriceIds(c, subscription.items.data)
       data.price_id = res.priceId
       if (res.productId)
         data.product_id = res.productId

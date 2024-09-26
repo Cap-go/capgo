@@ -54,7 +54,7 @@ export interface MeteredData {
   [key: string]: string
 }
 
-export function parsePriceIds(prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
+export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
   let priceId: string | null = null
   let productId: string | null = null
   const meteredData: { [key: string]: string } = {}

@@ -46,11 +46,11 @@ export function getPgClient(c: Context) {
 }
 
 export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
-  return drizzle(client as any)
+  return drizzle(client as any, { logger: true })
 }
 
 export function getDrizzleClientD1(c: Context) {
-  return drizzleD1(c.env.DB_REPLICATE)
+  return drizzleD1(c.env.DB_REPLICATE, { logger: true })
 }
 
 export function getDrizzleClientD1Session(c: Context) {
@@ -69,7 +69,7 @@ export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) 
     client.end()
 }
 
-export async function isAllowedActionOrg(drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
+export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
   try {
     // Assuming you have a way to get your database connection string
 

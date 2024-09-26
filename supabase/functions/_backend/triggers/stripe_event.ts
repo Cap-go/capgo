@@ -21,7 +21,7 @@ app.post('/', async (c: Context) => {
     // event.headers
     const body = await c.req.text()
     const stripeEvent = await parseStripeEvent(c, body, signature!)
-    const stripeData = await extractDataEvent(stripeEvent)
+    const stripeData = await extractDataEvent(c, stripeEvent)
     if (stripeData.customer_id === '')
       return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
 

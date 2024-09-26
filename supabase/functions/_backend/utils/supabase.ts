@@ -110,7 +110,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
 
   if (existingChannel) {
     const fieldsDiffer = Object.keys(update).some(key =>
-      update[key] !== existingChannel[key] && key !== 'created_at' && key !== 'updated_at',
+      (update as any)[key] !== (existingChannel as any)[key] && key !== 'created_at' && key !== 'updated_at',
     )
     if (!fieldsDiffer) {
       console.log(c.get('requestId'), 'No fields differ, no update needed')
@@ -140,7 +140,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
 
   if (existingChannelDevice) {
     const fieldsDiffer = Object.keys(update).some(key =>
-      update[key] !== existingChannelDevice[key] && key !== 'created_at' && key !== 'updated_at',
+      (update as any)[key] !== (existingChannelDevice as any)[key] && key !== 'created_at' && key !== 'updated_at',
     )
     if (!fieldsDiffer) {
       console.log(c.get('requestId'), 'No fields differ, no update needed')
