@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.3.159",
+  "version": "11.3.160",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker stop minio1 && docker rm minio1 && sudo rm -rf /tmp/minio-data/ && bun run minio:start && bun run minio:seed",
