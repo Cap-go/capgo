@@ -6,7 +6,7 @@ import { saveStoreInfoCF } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getDrizzleClient, getPgClient, isAllowedActionOrg } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, isAllowedActionOrgPg } from './pg.ts'
 import * as schema from './postgress_schema.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask } from './utils.ts'
@@ -361,7 +361,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    const planValid = await isAllowedActionOrg(drizzleCient, appOwner.orgs.id)
+    const planValid = await isAllowedActionOrgPg(c, drizzleCient, appOwner.orgs.id)
     device.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {

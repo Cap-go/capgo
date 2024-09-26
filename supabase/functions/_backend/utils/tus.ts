@@ -3,6 +3,17 @@ import type { Context } from '@hono/hono'
 import { initS3 } from './s3.ts'
 import { getEnv } from './utils.ts'
 
+const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB
+
+function generateUniqueKey() {
+  return crypto.randomUUID()
+}
+
+async function fetchUploadedParts(c: Context, uploadId: string) {
+  console.log('fetchUploadedParts', uploadId)
+  return null // TODO: implement
+}
+
 export async function createTusUpload(c: Context, uploadLength: number, metadata?: string) {
   const s3Client = initS3(c)
   const key = generateUniqueKey() // Implement this function
@@ -30,6 +41,7 @@ export async function appendToTusUpload(c: Context, uploadId: string, offset: nu
   })
 
   const response = await s3Client.send(command)
+  console.log('appendToTusUpload', response)
   return offset + chunk.length
 }
 

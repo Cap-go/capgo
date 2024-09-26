@@ -360,7 +360,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    // const planValid = await isAllowedActionOrg(drizzleCient, appOwner.orgs.id)
+    // const planValid = await isAllowedActionOrgPg(c, drizzleCient, appOwner.orgs.id)
     device.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
@@ -572,7 +572,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         await createStatsBandwidth(c, device_id, app_id, res.size)
       }
       if (semver.gte(plugin_version, '6.2.0')) {
-        manifest = await getManifestUrl(c, { app_id, ...version })
+        manifest = await getManifestUrl(c, { app_id, ...(version as any) })
       }
     }
     //  check signedURL and if it's url
@@ -599,7 +599,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   }
 }
 
-export async function update(c: Context, body: AppInfos) {
+export async function updateV2(c: Context, body: AppInfos) {
   let res
   try {
     res = await updateWithPG(c, body, getDrizzleClientD1(c))

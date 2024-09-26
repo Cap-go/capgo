@@ -50,7 +50,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
   return true
 }
 
-function isSendable(last: string, cron: string) {
+function isSendable(c: Context, last: string, cron: string) {
   const interval = parseCronExpression(cron)
   const last_send_at = new Date(last)
   const now = new Date()
@@ -93,7 +93,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null).then(() => true)
   }
 
-  if (notif && !isSendable(notif.last_send_at, cron)) {
+  if (notif && !isSendable(c, notif.last_send_at, cron)) {
     console.log(c.get('requestId'), 'notif already sent', eventName, orgId)
     return false
   }

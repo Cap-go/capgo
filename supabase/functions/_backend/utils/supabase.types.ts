@@ -66,7 +66,6 @@ export type Database = {
           owner_org: string
           r2_path: string | null
           session_key: string | null
-          signature: string | null
           storage_provider: string
           updated_at: string | null
           user_id: string | null
@@ -89,7 +88,6 @@ export type Database = {
           owner_org: string
           r2_path?: string | null
           session_key?: string | null
-          signature?: string | null
           storage_provider?: string
           updated_at?: string | null
           user_id?: string | null
@@ -112,7 +110,6 @@ export type Database = {
           owner_org?: string
           r2_path?: string | null
           session_key?: string | null
-          signature?: string | null
           storage_provider?: string
           updated_at?: string | null
           user_id?: string | null
@@ -202,6 +199,7 @@ export type Database = {
         Row: {
           app_id: string
           created_at: string | null
+          default_upload_channel: string
           icon_url: string
           id: string | null
           last_version: string | null
@@ -214,6 +212,7 @@ export type Database = {
         Insert: {
           app_id: string
           created_at?: string | null
+          default_upload_channel?: string
           icon_url: string
           id?: string | null
           last_version?: string | null
@@ -226,6 +225,7 @@ export type Database = {
         Update: {
           app_id?: string
           created_at?: string | null
+          default_upload_channel?: string
           icon_url?: string
           id?: string | null
           last_version?: string | null
@@ -734,6 +734,8 @@ export type Database = {
           job_type: string
           payload: string
           request_id: number | null
+          retry_count: number | null
+          retry_limit: number | null
           status: Database["public"]["Enums"]["queue_job_status"]
         }
         Insert: {
@@ -745,6 +747,8 @@ export type Database = {
           job_type: string
           payload: string
           request_id?: number | null
+          retry_count?: number | null
+          retry_limit?: number | null
           status?: Database["public"]["Enums"]["queue_job_status"]
         }
         Update: {
@@ -756,6 +760,8 @@ export type Database = {
           job_type?: string
           payload?: string
           request_id?: number | null
+          retry_count?: number | null
+          retry_limit?: number | null
           status?: Database["public"]["Enums"]["queue_job_status"]
         }
         Relationships: []
@@ -1419,6 +1425,19 @@ export type Database = {
           subscription_anchor_end: string
         }[]
       }
+      get_daily_version: {
+        Args: {
+          app_id_param: string
+          start_date_param?: string
+          end_date_param?: string
+        }
+        Returns: {
+          date: string
+          app_id: string
+          version_id: number
+          percent: number
+        }[]
+      }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1631,6 +1650,13 @@ export type Database = {
               storage_percent: number
             }[]
           }
+      get_process_cron_stats_job_info: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          last_run: string
+          next_run: string
+        }[]
+      }
       get_total_app_storage_size_orgs: {
         Args: {
           org_id: string
@@ -1735,7 +1761,6 @@ export type Database = {
           owner_org: string
           r2_path: string | null
           session_key: string | null
-          signature: string | null
           storage_provider: string
           updated_at: string | null
           user_id: string | null
@@ -1932,6 +1957,10 @@ export type Database = {
         Returns: undefined
       }
       process_requested_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      process_stats_email: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }

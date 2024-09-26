@@ -50,6 +50,9 @@ export function getDrizzleClient(client: ReturnType<typeof getPgClient>) {
 }
 
 export function getDrizzleClientD1(c: Context) {
+  if (!existInEnv(c, 'DB_REPLICATE')) {
+    throw new Error('DB_REPLICATE is not set')
+  }
   return drizzleD1(c.env.DB_REPLICATE)
 }
 
@@ -69,7 +72,7 @@ export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) 
     client.end()
 }
 
-export async function isAllowedActionOrg(drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
+export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
   try {
     // Assuming you have a way to get your database connection string
 

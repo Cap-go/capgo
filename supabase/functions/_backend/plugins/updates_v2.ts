@@ -2,7 +2,7 @@ import { Hono } from 'hono/tiny'
 import * as semver from 'semver'
 import { z } from 'zod'
 import type { Context } from '@hono/hono'
-import { update } from '../utils/update_v2.ts'
+import { updateV2 } from '../utils/update_v2.ts'
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,
@@ -87,7 +87,7 @@ app.post('/', async (c: Context) => {
       }, 400)
     }
 
-    return update(c, body)
+    return updateV2(c, body)
   }
   catch (e) {
     console.log(c.get('requestId'), 'error', JSON.stringify(e))
