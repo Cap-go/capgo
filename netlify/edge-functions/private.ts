@@ -1,8 +1,8 @@
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
+import { handle } from 'hono/netlify'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
-import { handle } from 'hono/netlify'
 
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'

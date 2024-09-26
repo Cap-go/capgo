@@ -68,11 +68,11 @@ const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
 const appFront = new Hono<{ Bindings: Bindings }>()
 
-app.use(logger())
-app.use('*', requestId())
 app.use('*', sentry({
   release: version,
 }))
+app.use('*', logger())
+app.use('*', requestId())
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)

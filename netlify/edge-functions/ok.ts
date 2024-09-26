@@ -1,7 +1,7 @@
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
-import { requestId } from 'hono/request-id'
 import { handle } from 'hono/netlify'
+import { requestId } from 'hono/request-id'
 import { app } from '../../supabase/functions/_backend/public/ok.ts'
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_NETLIFY')

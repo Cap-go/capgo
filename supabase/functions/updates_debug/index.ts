@@ -8,15 +8,16 @@ const functionName = 'updates_debug'
 const appGlobal = new Hono().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
+
 if (sentryDsn) {
   appGlobal.use('*', sentry({
     dsn: sentryDsn,
   }))
 }
 
-appGlobal.route('/', app)
-
 appGlobal.use('*', logger())
 appGlobal.use('*', requestId())
+
+appGlobal.route('/', app)
 
 Deno.serve(appGlobal.fetch)
