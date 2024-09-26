@@ -12,32 +12,33 @@ export function getBestDatabaseURL(c: Context): string {
   // TODO: use it when we deployed replicate of database
   // Use replicate i
 
-  const clientContinent = null
-  // const clientContinent = (c.req.raw as any)?.cf?.continent TODO: uncomment when we enable back replicate
+  // const clientContinent = null
+  const clientContinent = (c.req.raw as any)?.cf?.continent
   console.log(c.get('requestId'), 'clientContinent', clientContinent)
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
 
-  if (!clientContinent)
-    return DEFAULT_DB_URL
+  // TODO: uncomment when we enable back replicate
+  // if (!clientContinent)
+  //   return DEFAULT_DB_URL
 
-  // European countries or Africa or Antarctica
-  if ((clientContinent === 'EU' || clientContinent === 'AF' || clientContinent === 'AN')) {
-    return DEFAULT_DB_URL
-  }
+  // // European countries or Africa or Antarctica
+  // if ((clientContinent === 'EU' || clientContinent === 'AF' || clientContinent === 'AN')) {
+  //   return DEFAULT_DB_URL
+  // }
 
-  // Asian and Oceanian countries
-  if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
-    return getEnv(c, 'SG_SUPABASE_DB_URL')
-  }
+  // // Asian and Oceanian countries
+  // if ((clientContinent === 'AS' || clientContinent === 'OC') && existInEnv(c, 'SG_SUPABASE_DB_URL')) {
+  //   return getEnv(c, 'SG_SUPABASE_DB_URL')
+  // }
 
-  // North and South American countries
-  if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
-    return getEnv(c, 'GK_SUPABASE_DB_URL')
-  }
+  // // North and South American countries
+  // if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
+  //   return getEnv(c, 'GK_SUPABASE_DB_URL')
+  // }
 
-  // Default to Germany for any other cases
+  // // Default to Germany for any other cases
   return DEFAULT_DB_URL
 }
 
