@@ -286,7 +286,7 @@ WHERE
 GROUP BY date, app_id
 ORDER BY date, app_id`
 
-  console.log({ requestId: c.get('requestId'), context: 'readBandwidthUsageCF query', query } )
+  console.log({ requestId: c.get('requestId'), context: 'readBandwidthUsageCF query', query })
   try {
     return await runQueryToCF<BandwidthUsageCF>(c, query)
   }
@@ -559,7 +559,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
       .all()
     const res = await readD1
     if (res.error || !res.results || !res.success)
-      console.error({ requestId: c.get('requestId'), context: 'getAppsFromCF error', error: res.error })  
+      console.error({ requestId: c.get('requestId'), context: 'getAppsFromCF error', error: res.error })
     return res.results as { app_id: string }[]
   }
   catch (e) {
@@ -735,7 +735,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting store app by id', error: e } )
+    console.error({ requestId: c.get('requestId'), context: 'Error getting store app by id', error: e })
   }
   return {} as StoreApp
 }
