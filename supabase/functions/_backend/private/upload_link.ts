@@ -60,7 +60,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .eq('user_id', apikey.user_id)
       .single()
     if (errorVersion) {
-      console.log({ requestId: c.get('requestId'), context: 'errorVersion', error: errorVersion } )
+      console.log({ requestId: c.get('requestId'), context: 'errorVersion', error: errorVersion })
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
@@ -121,7 +121,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     return c.json(response)
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: 'error', error: e } )
+    console.log({ requestId: c.get('requestId'), context: 'error', error: e })
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

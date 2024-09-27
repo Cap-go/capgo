@@ -410,7 +410,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     if (!version.bucket_id && !version.external_url && !version.r2_path) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version }  )
+      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
         message: 'Cannot get bundle',
