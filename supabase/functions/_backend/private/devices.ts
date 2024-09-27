@@ -24,7 +24,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c: Context) => {
   try {
     const body = await c.req.json<dataDevice>()
-    console.log(c.get('requestId'), 'post devices body', body)
+    console.log({ requestId: c.get('requestId'), context: 'post devices body', body })
     const devicesIds = body.devicesId || body.deviceIds || []
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')

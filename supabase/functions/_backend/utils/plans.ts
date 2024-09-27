@@ -38,7 +38,7 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
     })
     .single()
   if (error) {
-    console.error(c.get('requestId'), 'error.message', error.message)
+    console.error({ requestId: c.get('requestId'), context: 'findBestPlan', error })
     throw new Error(error.message)
   }
 
@@ -51,7 +51,7 @@ export async function getMeterdUsage(c: Context, orgId: string): Promise<Databas
     .single()
 
   if (error) {
-    console.error(c.get('requestId'), 'error.message', error.message)
+    console.error({ requestId: c.get('requestId'), context: 'getMeterdUsage', error })
     throw new Error(error.message)
   }
 
@@ -70,7 +70,7 @@ interface Prices {
 async function setMetered(c: Context, customer_id: string | null, orgId: string) {
   if (customer_id === null)
     return Promise.resolve()
-  console.log(c.get('requestId'), 'setMetered', customer_id, orgId)
+  console.log({ requestId: c.get('requestId'), context: 'setMetered', customer_id, orgId })
   // return await Promise.resolve({} as Prices)
   const { data } = await supabaseAdmin(c)
     .from('stripe_info')
@@ -82,7 +82,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
       await setThreshold(c, customer_id)
     }
     catch (error) {
-      console.log(c.get('requestId'), 'error setTreshold', error)
+      console.log({ requestId: c.get('requestId'), context: 'error setTreshold', error })
     }
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(c, orgId)
@@ -112,7 +112,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         .eq('customer_id', org.customer_id!)
         .then()
       if (error)
-        console.error(c.get('requestId'), 'error.message', error.message)
+        console.error({ requestId: c.get('requestId'), context: 'update stripe info', error })
       return Promise.resolve()
     }
     const is_good_plan = await isGoodPlanOrg(c, orgId)
@@ -120,7 +120,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
     const percentUsage = await getPlanUsagePercent(c, orgId)
     if (!is_good_plan && is_onboarded) {
-      console.log(c.get('requestId'), 'is_good_plan_v5', orgId, is_good_plan)
+      console.log({ requestId: c.get('requestId'), context: 'is_good_plan_v5', orgId, is_good_plan })
       // create dateid var with yyyy-mm with dayjs
       const get_total_stats = await getTotalStats(c, orgId)
       const current_plan = await getCurrentPlanNameOrg(c, orgId)
@@ -145,7 +145,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
           const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { best_plan: bestPlanKey, plan_name: current_plan }, orgId, orgId, '0 0 * * 1')
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
-            console.log(c.get('requestId'), `user:upgrade_to_${bestPlanKey}`, orgId)
+            console.log({ requestId: c.get('requestId'), context: `user:upgrade_to_${bestPlanKey}`, orgId })
             await logsnag(c).track({
               channel: 'usage',
               event: `User need upgrade to ${bestPlanKey}`,
@@ -225,7 +225,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       .then()
   }
   catch (e) {
-    console.log(c.get('requestId'), 'Error checkPlan', e)
+    console.log({ requestId: c.get('requestId'), context: 'Error checkPlan', error: e })
     return Promise.resolve()
   }
 }

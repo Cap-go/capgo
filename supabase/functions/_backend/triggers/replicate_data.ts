@@ -13,16 +13,16 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const { table, type, record, old_record } = body
 
     if (!['INSERT', 'UPDATE', 'DELETE'].includes(type)) {
-      console.log(c.get('requestId'), 'Invalid operation type:', type)
+      console.log({ requestId: c.get('requestId'), context: 'Invalid operation type:', type })
       return c.json({ status: 'Invalid operation type' }, 200)
     }
 
     if (!c.env.DB_REPLICATE) {
-      console.log(c.get('requestId'), 'DB_REPLICATE is not set')
+      console.log({ requestId: c.get('requestId'), context: 'DB_REPLICATE is not set' })
       return c.json(BRES)
     }
 
-    console.log(c.get('requestId'), 'replicate_data', table, type, record, old_record)
+    console.log({ requestId: c.get('requestId'), context: 'replicate_data', table, type, record, old_record })
 
     const d1 = c.env.DB_REPLICATE as D1Database
 
@@ -38,11 +38,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         break
     }
 
-    console.log(c.get('requestId'), `Replicated ${type} operation for table ${table}`)
+    console.log({ requestId: c.get('requestId'), context: `Replicated ${type} operation for table ${table}` })
     return c.json(BRES)
   }
   catch (e) {
-    console.error(c.get('requestId'), 'Error in replicate_data:', e)
+    console.error({ requestId: c.get('requestId'), context: 'Error in replicate_data', error: e })
     const errorMessage = e instanceof Error ? e.message : String(e)
     return c.json({ status: 'Error in replication', error: errorMessage }, 500)
   }
@@ -71,7 +71,7 @@ function cleanFieldsAppVersions(record: any, table: string) {
 // function to c.executionCtx.waitUntil the db operation and catch issue who insert in job_queue as failed job
 function asyncWrap(c: Context, promise: Promise<any>, payload: any) {
   c.executionCtx.waitUntil(promise.catch((e) => {
-    console.error(c.get('requestId'), 'Error in replicateData:', e)
+    console.error({ requestId: c.get('requestId'), context: 'Error in replicateData', error: e })
     // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
     if (e.message.includes('UNIQUE constraint failed')) {
       return
@@ -96,7 +96,7 @@ function insertRecord(c: Context, d1: D1Database, table: string, record: any, pa
   const values = Object.values(cleanFieldsAppVersions(record, table))
 
   const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`
-  console.log(c.get('requestId'), 'insertRecord', query, values)
+  console.log({ requestId: c.get('requestId'), context: 'insertRecord', query, values })
   asyncWrap(c, d1.prepare(query).bind(...values).run(), payload)
 }
 
@@ -105,12 +105,12 @@ function updateRecord(c: Context, d1: D1Database, table: string, record: any, ol
   const values = [...Object.values(cleanFieldsAppVersions(record, table)), old_record.id]
 
   const query = `UPDATE ${table} SET ${setClause} WHERE id = ?`
-  console.log(c.get('requestId'), 'updateRecord', query, values)
+  console.log({ requestId: c.get('requestId'), context: 'updateRecord', query, values })
   asyncWrap(c, d1.prepare(query).bind(...values).run(), payload)
 }
 
 function deleteRecord(c: Context, d1: D1Database, table: string, old_record: any, payload: any) {
   const query = `DELETE FROM ${table} WHERE id = ?`
-  console.log(c.get('requestId'), 'deleteRecord', query, old_record.id)
+  console.log({ requestId: c.get('requestId'), context: 'deleteRecord', query, old_record: old_record.id })
   asyncWrap(c, d1.prepare(query).bind(old_record.id).run(), payload)
 }

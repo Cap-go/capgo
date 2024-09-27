@@ -22,7 +22,7 @@ export async function getBundleUrl(
     app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
   },
 ) {
-  console.log(c.get('requestId'), 'getBundleUrl version', version)
+  console.log({ requestId: c.get('requestId'), context: 'getBundleUrl version', version })
 
   let path: string | null = null
   let size: number | null = null
@@ -40,13 +40,13 @@ export async function getBundleUrl(
   else if (version.storage_provider === 'r2' && version.bucket_id && version.bucket_id?.endsWith('.zip'))
     path = `apps/${ownerOrg}/${version.app_id}/versions/${version.bucket_id}`
 
-  console.log(c.get('requestId'), 'path', path)
+  console.log({ requestId: c.get('requestId'), context: 'path', path })
   if (!path)
     return null
 
   try {
     const signedUrl = await s3.getSignedUrl(c, path, EXPIRATION_SECONDS)
-    console.log(c.get('requestId'), 'getBundleUrl', signedUrl, bundleMeta?.size)
+    console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
 
     url = signedUrl
     size = bundleMeta?.size ?? 0
@@ -54,7 +54,7 @@ export async function getBundleUrl(
     return { url, size }
   }
   catch (error) {
-    console.error(c.get('requestId'), 'getBundleUrl', error)
+    console.error({ requestId: c.get('requestId'), context: 'getBundleUrl', error })
   }
   return null
 }
@@ -78,7 +78,7 @@ export async function getManifestUrl(c: Context, version: {
       file_hash: entry.file_hash,
       download_url: signedUrl ?? null,
     })).catch((e) => {
-      console.error(c.get('requestId'), `Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}`)
+      console.error({ requestId: c.get('requestId'), context: 'getManifestUrl', error: `Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}` })
       return null
     })
   }))

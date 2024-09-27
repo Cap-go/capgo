@@ -47,7 +47,7 @@ export function createStatsDevices(c: Context, app_id: string, device_id: string
 export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
   if (size === 0)
     return { error: 'size is 0' }
-  console.log(c.get('requestId'), 'createStatsMeta', app_id, version_id, size)
+  console.log({ requestId: c.get('requestId'), context: 'createStatsMeta', app_id, version_id, size })
   return trackMetaSB(c, app_id, version_id, size)
 }
 
@@ -112,7 +112,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   else {
     return Promise.all(jobs)
       .catch((error) => {
-        console.log(c.get('requestId'), `[sendStatsAndDevice] rejected with error: ${error}`)
+        console.log({ requestId: c.get('requestId'), context: '[sendStatsAndDevice] rejected with error', error })
       })
   }
 }

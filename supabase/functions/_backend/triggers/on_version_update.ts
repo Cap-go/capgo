@@ -15,7 +15,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 
   if (v2Path && record.storage_provider === 'r2') {
     // pdate size and checksum
-    console.log(c.get('requestId'), 'V2', record.bucket_id, record.r2_path)
+    console.log({ requestId: c.get('requestId'), context: 'V2', bucket_id: record.bucket_id, r2_path: record.r2_path })
     // set checksum in s3
     const size = await s3.getSize(c, v2Path)
     if (size) {
@@ -28,24 +28,24 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
         })
         .eq('id', record.id)
       if (errorUpdate)
-        console.log(c.get('requestId'), 'errorUpdate', errorUpdate)
+        console.log({ requestId: c.get('requestId'), context: 'errorUpdate', error: errorUpdate })
       const { error } = await createStatsMeta(c, record.app_id, record.id, size)
       if (error)
-        console.log(c.get('requestId'), 'error createStatsMeta', error)
+        console.log({ requestId: c.get('requestId'), context: 'error createStatsMeta', error })
     }
   }
   else {
-    console.log(c.get('requestId'), 'no v2 path')
+    console.log({ requestId: c.get('requestId'), context: 'no v2 path' })
   }
   return c.json(BRES)
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  console.log(c.get('requestId'), 'Delete', record.bucket_id, record.r2_path)
+  console.log({ requestId: c.get('requestId'), context: 'Delete', bucket_id: record.bucket_id, r2_path: record.r2_path })
 
   const v2Path = await getPath(c, record)
   if (!v2Path) {
-    console.log(c.get('requestId'), 'No r2 path')
+    console.log({ requestId: c.get('requestId'), context: 'No r2 path' })
     return c.json(BRES)
   }
 
@@ -53,7 +53,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     await s3.deleteObject(c, v2Path)
   }
   catch (error) {
-    console.log(c.get('requestId'), 'Cannot delete s3 (v2)', record.bucket_id, error)
+    console.log({ requestId: c.get('requestId'), context: 'Cannot delete s3 (v2)', bucket_id: record.bucket_id, error })
     return c.json(BRES)
   }
 
@@ -63,7 +63,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .eq('id', record.id)
     .single()
   if (dbError || !data) {
-    console.log(c.get('requestId'), 'Cannot find version meta', record.id)
+    console.log({ requestId: c.get('requestId'), context: 'Cannot find version meta', id: record.id })
     return c.json(BRES)
   }
   await createStatsMeta(c, record.app_id, record.id, -data.size)
@@ -73,7 +73,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .update({ size: 0 })
     .eq('id', record.id)
   if (errorUpdate)
-    console.log(c.get('requestId'), 'error', errorUpdate)
+    console.log({ requestId: c.get('requestId'), context: 'error', error: errorUpdate })
 
   if (record.bucket_id) {
     const { error: errorDelete } = await supabaseAdmin(c)
@@ -82,7 +82,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
       .remove([record.bucket_id])
 
     if (errorDelete)
-      console.log(c.get('requestId'), 'errorDelete from supabase storage', record.bucket_id, errorDelete)
+      console.log({ requestId: c.get('requestId'), context: 'errorDelete from supabase storage', bucket_id: record.bucket_id, error: errorDelete })
   }
 
   return c.json(BRES)
@@ -95,29 +95,29 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<UpdatePayload<typeof table>>()
     if (body.table !== table) {
-      console.log(c.get('requestId'), `Not ${table}`)
+      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'UPDATE') {
-      console.log(c.get('requestId'), 'Not UPDATE')
+      console.log({ requestId: c.get('requestId'), context: 'Not UPDATE' })
       return c.json({ status: 'Not UPDATE' }, 200)
     }
     const record = body.record
-    console.log(c.get('requestId'), 'record', record)
+    console.log({ requestId: c.get('requestId'), context: 'record', record })
 
     if (!record.app_id || !record.user_id) {
-      console.log(c.get('requestId'), 'no app_id or user_id')
+      console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id' })
       return c.json(BRES)
     }
     if (!record.bucket_id && !record.r2_path) {
-      console.log(c.get('requestId'), 'no bucket_id')
+      console.log({ requestId: c.get('requestId'), context: 'no bucket_id' })
       return c.json(BRES)
     }
     // // check if not deleted it's present in s3 storage
     if (record.deleted && record.deleted !== body.old_record.deleted)
       return deleteIt(c, body.record as any)
 
-    console.log(c.get('requestId'), 'Update but not deleted')
+    console.log({ requestId: c.get('requestId'), context: 'Update but not deleted' })
     return updateIt(c, body)
   }
   catch (e) {

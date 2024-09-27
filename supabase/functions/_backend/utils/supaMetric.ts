@@ -11,7 +11,7 @@ function getAllMetrics(c: Context): Promise<string[]> {
     .then(response => response.text())
     .then(data => data.split('\n'))
     .catch((err) => {
-      console.error(c.get('requestId'), 'error', err)
+      console.error({ requestId: c.get('requestId'), context: 'getAllMetrics', error: err })
       return [] as string[]
     })
 }
@@ -102,7 +102,7 @@ export function getCpu(c: Context) {
       // console.log(c.get('requestId'), 'CPU total: ', cpuInfo.total)
       // console.log(c.get('requestId'), 'CPU used: ', cpuInfo.used)
       // console.log(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
-      console.log(c.get('requestId'), 'CPU %: ', cpuUsage)
+      console.log({ requestId: c.get('requestId'), context: 'CPU %', cpu: cpuUsage })
       return cpuUsage
     })
 }
@@ -143,7 +143,7 @@ export function getMem(c: Context) {
       const usedPercentageRound = Math.round(percentUsed * 100) / 100
       // console.log(c.get('requestId'), 'Memory available: ', available)
       // console.log(c.get('requestId'), 'Memory free: ', total)
-      console.log(c.get('requestId'), 'Memory %: ', usedPercentageRound)
+      console.log({ requestId: c.get('requestId'), context: 'Memory %', memory: usedPercentageRound })
       return usedPercentageRound
     })
 }

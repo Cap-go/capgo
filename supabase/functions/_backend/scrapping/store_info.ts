@@ -42,16 +42,16 @@ async function getAppInfo(appId: string, country = 'en') {
   return insert
 }
 
-async function findLang(appId: string) {
+async function findLang(c: Context, appId: string) {
   // loop on all countries with getAppInfo until answer
   for (const country of countries) {
     try {
       const res = await getAppInfo(appId, country)
-      console.log(c.get('requestId'), 'res', res)
+      console.log({ requestId: c.get('requestId'), context: 'res', res })
       return res
     }
     catch (e) {
-      console.log(c.get('requestId'), 'error getAppInfo', e)
+      console.log({ requestId: c.get('requestId'), context: 'error getAppInfo', error: e })
     }
   }
   return null
@@ -62,20 +62,20 @@ async function getInfo(c: Context, appId: string) {
     // console.log(c.get('requestId'), 'getInfo', appId)
     const data = await getStoreAppByIdCF(c, appId)
 
-    const res = (!data || !data.lang) ? await findLang(appId) : await getAppInfo(appId, data.lang)
+    const res = (!data || !data.lang) ? await findLang(c, appId) : await getAppInfo(appId, data.lang)
     if (!res) {
-      console.error(c.get('requestId'), 'no lang found', appId)
+      console.error({ requestId: c.get('requestId'), context: 'no lang found', appId })
       await saveStoreInfoCF(c, {
         app_id: appId,
         to_get_info: false,
       })
       return []
     }
-    console.log(c.get('requestId'), 'getInfo', appId, res)
+    console.log({ requestId: c.get('requestId'), context: 'getInfo', appId, res })
     return [res]
   }
   catch (e) {
-    console.log(c.get('requestId'), 'error getAppInfo', e)
+    console.error({ requestId: c.get('requestId'), context: 'error getAppInfo', error: e })
     await saveStoreInfoCF(c, {
       app_id: appId,
       to_get_info: false,
@@ -97,7 +97,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         all.push(getInfo(c, appId))
     }
     else {
-      console.log(c.get('requestId'), 'cannot get apps', body)
+      console.log({ requestId: c.get('requestId'), context: 'cannot get apps', body })
       return c.json({ status: 'Error', error: 'cannot get apps' }, 500)
     }
     const toSave = await Promise.all(all)

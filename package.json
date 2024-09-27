@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.3.160",
+  "version": "11.3.163",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker stop minio1 && docker rm minio1 && sudo rm -rf /tmp/minio-data/ && bun run minio:start && bun run minio:seed",
@@ -54,6 +54,8 @@
     "deploy:cloudflare_env": "npm run deploy:cloudflare_env:preprod",
     "deploy:cloudflare_env:prod": "node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.prod capgo_api",
     "deploy:cloudflare_env:preprod": "node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.preprod capgo_api-preprod",
+    "deploy:cloudflare_env:preprod2": "node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.preprod capgo_api-preprod2",
+    "deploy:cloudflare:preprod2": "bunx wrangler deploy --name capgo_api-preprod2",
     "deploy:supabase:prod": "bunx supabase functions deploy",
     "deploy:supabase:preprod": "bunx supabase functions deploy",
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",

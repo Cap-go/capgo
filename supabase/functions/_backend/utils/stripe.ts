@@ -25,7 +25,7 @@ export async function cancelSubscription(c: Context, customerId: string) {
   return Promise.all(
     allSubscriptions.data.map(sub => stripe.subscriptions.cancel(sub.id)),
   ).catch((err) => {
-    console.error(c.get('requestId'), 'Cannot cancle stripe subscription', err)
+    console.error({ requestId: c.get('requestId'), context: 'cancelSubscription', error: err })
   })
 }
 
@@ -36,7 +36,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     const prices = await getStripe(c).prices.search({
       query: `product:"${planId}"`,
     })
-    console.log(c.get('requestId'), 'prices stripe', prices)
+    console.log({ requestId: c.get('requestId'), context: 'prices stripe', prices })
     prices.data.forEach((price) => {
       if (price.recurring && price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
@@ -45,7 +45,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     })
   }
   catch (err) {
-    console.log(c.get('requestId'), 'search err', err)
+    console.log({ requestId: c.get('requestId'), context: 'search err', error: err })
   }
   return { priceId, meteredIds }
 }
@@ -59,7 +59,7 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   let productId: string | null = null
   const meteredData: { [key: string]: string } = {}
   try {
-    console.log(c.get('requestId'), 'prices stripe', prices)
+    console.log({ requestId: c.get('requestId'), context: 'prices stripe', prices })
     prices.forEach((price) => {
       if (price.plan.usage_type === 'licensed') {
         priceId = price.plan.id
@@ -67,19 +67,19 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
       }
       if (price.plan.billing_scheme === 'per_unit' && price?.plan?.usage_type !== 'licensed' && price.plan.nickname) {
         meteredData[price.plan.nickname.toLocaleLowerCase()] = price.plan.id
-        console.log(c.get('requestId'), 'metered price', price)
+        console.log({ requestId: c.get('requestId'), context: 'metered price', price })
       }
     })
   }
   catch (err) {
-    console.log(c.get('requestId'), 'search err', err)
+    console.log({ requestId: c.get('requestId'), context: 'search err', error: err })
   }
   return { priceId, productId, meteredData }
 }
 
 export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
   const prices = await getPriceIds(c, planId, reccurence)
-  console.log(c.get('requestId'), 'prices', prices)
+  console.log({ requestId: c.get('requestId'), context: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const session = await getStripe(c).checkout.sessions.create({
@@ -172,7 +172,7 @@ export async function recordUsage(c: Context, subscriptionItemId: string, quanti
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
-  console.log(c.get('requestId'), 'removeOldSubscription', subscriptionId)
+  console.log({ requestId: c.get('requestId'), context: 'removeOldSubscription', id: subscriptionId })
   const deletedSubscription = await getStripe(c).subscriptions.cancel(subscriptionId)
   return deletedSubscription
 }

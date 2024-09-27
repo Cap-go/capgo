@@ -27,8 +27,8 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log(c.get('requestId'), 'post create device body', body)
-      console.log(c.get('requestId'), 'post create device error', parsedBodyResult.error)
+      console.log({ requestId: c.get('requestId'), context: 'post create device body', body })
+      console.log({ requestId: c.get('requestId'), context: 'post create device error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
@@ -39,7 +39,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData || !clientData.data || clientData.error) {
-      console.error(c.get('requestId'), 'Cannot get supabase user', clientData.error)
+      console.error({ requestId: c.get('requestId'), context: 'Cannot get supabase user', error: clientData.error })
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }
 
@@ -49,7 +49,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       .single()
 
     if (appError) {
-      console.error(c.get('requestId'), 'app error', appError)
+      console.error({ requestId: c.get('requestId'), context: 'app error', error: appError })
       return c.json({ status: 'app_not_found' }, 400)
     }
 
@@ -64,12 +64,12 @@ app.post('/', middlewareAuth, async (c: Context) => {
     })
 
     if (userRight.error) {
-      console.error(c.get('requestId'), 'Cannot get user right', userRight.error)
+      console.error({ requestId: c.get('requestId'), context: 'Cannot get user right', error: userRight.error })
       return c.json({ status: 'internal_auth_error' }, 500)
     }
 
     if (!userRight.data) {
-      console.error(c.get('requestId'), 'No user right', userId, safeBody.app_id)
+      console.error({ requestId: c.get('requestId'), context: 'No user right', userId, appId: safeBody.app_id })
       return c.json({ status: 'not_authorized' }, 403)
     }
 

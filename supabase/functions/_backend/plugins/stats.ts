@@ -133,7 +133,7 @@ async function post(c: Context, body: AppStats) {
 
     if (coerce)
       version_build = coerce.version
-    console.log(c.get('requestId'), `VERSION NAME: ${version_name}`)
+    console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
       platform: platform as Database['public']['Enums']['platform_os'],
@@ -155,7 +155,7 @@ async function post(c: Context, body: AppStats) {
       .eq('app_id', app_id)
       .or(`name.eq.${version_name}`)
       .single()
-    console.log(c.get('requestId'), `appVersion ${JSON.stringify(appVersion)}`)
+    console.log({ requestId: c.get('requestId'), context: `appVersion ${JSON.stringify(appVersion)}` })
     if (appVersion) {
       device.version = appVersion.id
       if (action === 'set' && !device.is_emulator && device.is_prod) {
@@ -175,7 +175,7 @@ async function post(c: Context, body: AppStats) {
       }
       else if (failActions.includes(action)) {
         await createStatsVersion(c, appVersion.id, app_id, 'fail')
-        console.log(c.get('requestId'), 'FAIL!')
+        console.log({ requestId: c.get('requestId'), context: 'FAIL!' })
         await sendNotifOrg(c, 'user:update_fail', {
           app_id,
           device_id,
@@ -185,7 +185,7 @@ async function post(c: Context, body: AppStats) {
       }
     }
     else {
-      console.error(c.get('requestId'), 'switch to onprem', app_id)
+      console.error({ requestId: c.get('requestId'), context: 'switch to onprem', app_id })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
@@ -208,7 +208,7 @@ export const app = new Hono()
 app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<AppStats>()
-    console.log(c.get('requestId'), 'post plugin/stats body', body)
+    console.log({ requestId: c.get('requestId'), context: 'post plugin/stats body', body })
     return post(c, body)
   }
   catch (e) {

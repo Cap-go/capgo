@@ -11,15 +11,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<DeletePayload<typeof table>>()
     if (body.table !== table) {
-      console.log(c.get('requestId'), `Not ${table}`)
+      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'DELETE') {
-      console.log(c.get('requestId'), 'Not DELETE')
+      console.log({ requestId: c.get('requestId'), context: 'Not DELETE' })
       return c.json({ status: 'Not DELETE' }, 200)
     }
     const record = body.record
-    console.log(c.get('requestId'), 'record', record)
+    console.log({ requestId: c.get('requestId'), context: 'record', record })
     // delete all user org
     // delete all apps from org
     // delete stripe customer
