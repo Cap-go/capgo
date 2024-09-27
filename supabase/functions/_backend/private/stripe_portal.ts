@@ -16,7 +16,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c: Context) => {
   try {
     const body = await c.req.json<PortalData>()
-    console.log(c.get('requestId'), 'post stripe portal body', body)
+    console.log({ requestId: c.get('requestId'), context: 'post stripe portal body', body })
     const authorization = c.get('authorization')
     const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
       authorization?.split('Bearer ')[1],
@@ -25,7 +25,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (error || !auth || !auth.user || !auth.user.id)
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
-    console.log(c.get('requestId'), 'auth', auth.user.id)
+    console.log({ requestId: c.get('requestId'), context: 'auth', auth: auth.user.id })
     const { data: org, error: dbError } = await supabaseAdmin(c)
       .from('orgs')
       .select('customer_id')
@@ -39,7 +39,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 
-    console.log(c.get('requestId'), 'org', org)
+    console.log({ requestId: c.get('requestId'), context: 'org', org })
     const link = await createPortal(c, org.customer_id, body.callbackUrl)
     return c.json({ url: link.url })
   }

@@ -12,21 +12,21 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<UpdatePayload<typeof table>>()
     if (body.table !== table) {
-      console.log(c.get('requestId'), `Not ${table}`)
+      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'UPDATE') {
-      console.log(c.get('requestId'), 'Not UPDATE')
+      console.log({ requestId: c.get('requestId'), context: 'Not UPDATE' })
       return c.json({ status: 'Not UPDATE' }, 200)
     }
     const record = body.record
-    console.log(c.get('requestId'), 'record', record)
+    console.log({ requestId: c.get('requestId'), context: 'record', record })
     if (!record.email) {
-      console.log(c.get('requestId'), 'No email')
+      console.log({ requestId: c.get('requestId'), context: 'No email' })
       return c.json(BRES)
     }
     if (!record.id) {
-      console.log(c.get('requestId'), 'No id')
+      console.log({ requestId: c.get('requestId'), context: 'No id' })
       return c.json(BRES)
     }
     await createApiKey(c, record.id)

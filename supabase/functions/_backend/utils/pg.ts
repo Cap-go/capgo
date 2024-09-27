@@ -14,7 +14,7 @@ export function getBestDatabaseURL(c: Context): string {
 
   // const clientContinent = null
   const clientContinent = (c.req.raw as any)?.cf?.continent
-  console.log(c.get('requestId'), 'clientContinent', clientContinent)
+  console.log({ requestId: c.get('requestId'), context: 'clientContinent', clientContinent })
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
@@ -44,7 +44,7 @@ export function getBestDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getBestDatabaseURL(c)
-  console.log(c.get('requestId'), 'SUPABASE_DB_URL', dbUrl)
+  console.log({ requestId: c.get('requestId'), context: 'SUPABASE_DB_URL', dbUrl })
   return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
 
@@ -83,7 +83,7 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error(c.get('requestId'), 'isAllowedActionOrg error', orgId, error)
+    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
   }
   return false
 }

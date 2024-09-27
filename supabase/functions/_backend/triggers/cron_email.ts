@@ -76,7 +76,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }).single()
 
     if (!weeklyStats || generateStatsError) {
-      console.error(c.get('requestId'), 'Cannot send email for app', appId, generateStatsError, email)
+      console.error({ requestId: c.get('requestId'), context: 'Cannot send email for app', appId, error: generateStatsError, email })
       return c.json({ status: 'Cannot generate stats' }, 500)
     }
 

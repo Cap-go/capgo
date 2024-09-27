@@ -64,7 +64,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
     return data
   }
   catch (error) {
-    console.log(c.get('requestId'), 'checkKey error', error)
+    console.log({ requestId: c.get('requestId'), context: 'checkKey error', error })
     return null
   }
 }

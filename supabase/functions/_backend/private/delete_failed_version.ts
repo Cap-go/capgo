@@ -15,20 +15,20 @@ export const app = new Hono()
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
   try {
     const body = await c.req.json<dataUpload>()
-    console.log(c.get('requestId'), 'delete failed version body', body)
+    console.log({ requestId: c.get('requestId'), context: 'delete failed version body', body })
     const apikey = c.get('apikey')
     const capgkey = c.get('capgkey')
-    console.log(c.get('requestId'), 'apikey', apikey)
-    console.log(c.get('requestId'), 'capgkey', capgkey)
+    console.log({ requestId: c.get('requestId'), context: 'apikey', apikey })
+    console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
     const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
       .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
     if (_errorUserId) {
-      console.log(c.get('requestId'), '_errorUserId', _errorUserId)
+      console.log({ requestId: c.get('requestId'), context: '_errorUserId', error: _errorUserId })
       return c.json({ status: 'Error User not found' }, 500)
     }
 
     if (!(await hasAppRight(c, body.app_id, userId, 'read'))) {
-      console.log(c.get('requestId'), 'not has app right', userId, body.app_id)
+      console.log({ requestId: c.get('requestId'), context: 'not has app right', userId, app_id: body.app_id })
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
@@ -38,12 +38,12 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .eq('app_id', body.app_id)
       .single()
     if (errorApp) {
-      console.log(c.get('requestId'), 'errorApp', errorApp)
+      console.log({ requestId: c.get('requestId'), context: 'errorApp', error: errorApp })
       return c.json({ status: 'Error App not found' }, 500)
     }
 
     if (!body.app_id || !body.name) {
-      console.log(c.get('requestId'), 'Error app_id or bundle name missing', body)
+      console.log({ requestId: c.get('requestId'), context: 'Error app_id or bundle name missing', body })
       return c.json({ status: 'Error app_id or bundle name missing' }, 500)
     }
 
@@ -57,19 +57,19 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .eq('deleted', false)
       .single()
     if (errorVersion || version.external_url || !version.r2_path) {
-      console.log(c.get('requestId'), 'errorVersion', errorVersion)
+      console.log({ requestId: c.get('requestId'), context: 'errorVersion', error: errorVersion })
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
-    console.log(c.get('requestId'), 'r2_path', version.r2_path)
+    console.log({ requestId: c.get('requestId'), context: 'r2_path', r2_path: version.r2_path })
     // check if app version exist
 
-    console.log(c.get('requestId'), 's3.checkIfExist', version.r2_path)
+    console.log({ requestId: c.get('requestId'), context: 's3.checkIfExist', r2_path: version.r2_path })
 
     // check if object exist in r2
     const exist = await s3.checkIfExist(c, version.r2_path)
     if (exist) {
-      console.log(c.get('requestId'), 'exist', exist)
+      console.log({ requestId: c.get('requestId'), context: 'exist', exist })
       return c.json({ status: 'Error already exist' }, 500)
     }
 
@@ -80,7 +80,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .eq('id', version.id)
       .single()
     if (errorDelete) {
-      console.log(c.get('requestId'), 'errorDelete', errorDelete)
+      console.log({ requestId: c.get('requestId'), context: 'errorDelete', error: errorDelete })
       return c.json({ status: 'Error deleting version' }, 500)
     }
 
@@ -92,11 +92,11 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       icon: '💀',
     })
 
-    console.log(c.get('requestId'), 'delete version', version.id)
+    console.log({ requestId: c.get('requestId'), context: 'delete version', id: version.id })
     return c.json({ status: 'Version deleted' })
   }
   catch (e) {
-    console.log(c.get('requestId'), 'error', e)
+    console.log({ requestId: c.get('requestId'), context: 'error', error: e })
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

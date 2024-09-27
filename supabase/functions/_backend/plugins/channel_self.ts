@@ -53,10 +53,10 @@ export const jsonRequestSchema = z.object({
 })
 
 async function post(c: Context, body: DeviceLink): Promise<Response> {
-  console.log(c.get('requestId'), 'post channel self body', body)
+  console.log({ requestId: c.get('requestId'), context: 'post channel self body', body })
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
-    console.error(c.get('requestId'), 'Cannot parse json', { error: parseResult.error })
+    console.error({ requestId: c.get('requestId'), context: 'post channel self', error: parseResult.error })
     return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
   }
 
@@ -80,7 +80,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     version_build = coerce.version
   }
   else {
-    console.error(c.get('requestId'), 'Cannot find version', { version_build })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_build })
     return c.json({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
@@ -98,7 +98,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .single()
 
   if (!version) {
-    console.error(c.get('requestId'), 'Cannot find version', { version_name, body })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_name, body })
     return c.json({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
@@ -135,7 +135,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
-    console.error(c.get('requestId'), 'Cannot change device override current channel don\t allow it', { channel, dataChannelOverride })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot change device override current channel don\t allow it', channel, dataChannelOverride })
     return c.json({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
@@ -151,8 +151,8 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .eq('name', channel)
       .single()
     if (dbError || !dataChannel) {
-      console.log(c.get('requestId'), 'Cannot find channel', channel, app_id)
-      console.error(c.get('requestId'), 'Cannot find channel', { dbError, dataChannel })
+      console.log({ requestId: c.get('requestId'), context: 'Cannot find channel', channel, app_id })
+      console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dbError, dataChannel })
       return c.json({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
         error: 'channel_not_found',
@@ -160,7 +160,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     }
 
     if (!dataChannel.allow_device_self_set) {
-      console.error(c.get('requestId'), 'Channel does not permit self set', { dbError, dataChannel })
+      console.error({ requestId: c.get('requestId'), context: 'Channel does not permit self set', dbError, dataChannel })
       return c.json({
         message: `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`,
         error: 'channel_set_from_plugin_not_allowed',
@@ -189,7 +189,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 
     // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
     if (dbMainChannelError || !mainChannel)
-      console.error(c.get('requestId'), 'Cannot find main channel', dbMainChannelError)
+      console.error({ requestId: c.get('requestId'), context: 'Cannot find main channel', dbMainChannelError })
 
     const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
     if (mainChannelName && mainChannelName === channel) {
@@ -199,23 +199,23 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
         .eq('app_id', app_id)
         .eq('device_id', device_id)
       if (dbErrorDev) {
-        console.error(c.get('requestId'), 'Cannot do channel override', { dbErrorDev })
+        console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
         return c.json({
           message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
           error: 'override_not_allowed',
         }, 400)
       }
-      console.log(c.get('requestId'), 'main channel set, removing override')
+      console.log({ requestId: c.get('requestId'), context: 'main channel set, removing override' })
     }
     else {
       // if dataChannelOverride is same from dataChannel and exist then do nothing
       if (channelId && channelId.id === dataChannel.id) {
         // already set
-        console.log(c.get('requestId'), 'channel already set')
+        console.log({ requestId: c.get('requestId'), context: 'channel already set' })
         return c.json(BRES)
       }
 
-      console.log(c.get('requestId'), 'setting channel')
+      console.log({ requestId: c.get('requestId'), context: 'setting channel' })
       const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .upsert({
@@ -225,7 +225,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           owner_org: dataChannel.owner_org,
         })
       if (dbErrorDev) {
-        console.error(c.get('requestId'), 'Cannot do channel override', { dbErrorDev })
+        console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
         return c.json({
           message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
           error: 'override_not_allowed',
@@ -238,7 +238,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function put(c: Context, body: DeviceLink): Promise<Response> {
-  console.log(c.get('requestId'), 'put channel self body', body)
+  console.log({ requestId: c.get('requestId'), context: 'put channel self body', body })
   let {
     version_name,
     version_build,
@@ -258,7 +258,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     version_build = coerce.version
   }
   else {
-    console.error(c.get('requestId'), 'Cannot find version', { version_build })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_build })
     return c.json({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
@@ -266,7 +266,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!device_id || !app_id) {
-    console.error(c.get('requestId'), 'Cannot find device_id or appi_id', { device_id, app_id, body })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find device_id or appi_id', device_id, app_id, body })
     return c.json({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
 
@@ -280,7 +280,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .single()
 
   if (!version) {
-    console.error(c.get('requestId'), 'Cannot find version', { version_name })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_name })
     return c.json({
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
@@ -329,7 +329,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     })
   }
   if (errorChannel)
-    console.error(c.get('requestId'), 'Cannot find channel default', { errorChannel })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find channel default', errorChannel })
   if (dataChannel) {
     await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
 
@@ -344,7 +344,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     const finalChannel = dataChannel.find(channel => channel[devicePlatform.data] === true)
 
     if (!finalChannel) {
-      console.error(c.get('requestId'), 'Cannot find channel', { dataChannel, errorChannel })
+      console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
       return c.json({
         message: 'Cannot find channel',
         error: 'channel_not_found',
@@ -356,7 +356,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
       status: 'default',
     })
   }
-  console.error(c.get('requestId'), 'Cannot find channel', { dataChannel, errorChannel })
+  console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
   return c.json({
     message: 'Cannot find channel',
     error: 'channel_not_found',
@@ -364,7 +364,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
-  console.log(c.get('requestId'), 'delete channel self body', body)
+  console.log({ requestId: c.get('requestId'), context: 'delete channel self body', body })
   let {
     version_build,
   } = body
@@ -377,7 +377,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     version_build = coerce.version
   }
   else {
-    console.error(c.get('requestId'), 'Cannot find version', { version_build })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_build })
     return c.json({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
@@ -385,7 +385,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   }
 
   if (!device_id || !app_id) {
-    console.error(c.get('requestId'), 'Cannot find device_id or appi_id', { device_id, app_id, body })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find device_id or appi_id', device_id, app_id, body })
     return c.json({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
   const { data: dataChannelOverride } = await supabaseAdmin(c)
@@ -403,7 +403,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id)
     .single()
   if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
-    console.error(c.get('requestId'), 'Cannot change device override current channel don\t allow it', { dataChannelOverride })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot change device override current channel don\t allow it', dataChannelOverride })
     return c.json({
       message: 'Cannot change device override current channel don\t allow it',
       error: 'cannot_override',
@@ -415,7 +415,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id)
   if (error) {
-    console.error(c.get('requestId'), 'Cannot delete channel override', { error })
+    console.error({ requestId: c.get('requestId'), context: 'Cannot delete channel override', error })
     return c.json({
       message: `Cannot delete channel override ${JSON.stringify(error)}`,
       error: 'override_not_allowed',
@@ -429,7 +429,7 @@ export const app = new Hono()
 app.post('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log(c.get('requestId'), 'post body', body)
+    console.log({ requestId: c.get('requestId'), context: 'post body', body })
     return post(c, body)
   }
   catch (e) {
@@ -440,7 +440,7 @@ app.post('/', async (c: Context) => {
 app.put('/', async (c: Context) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log(c.get('requestId'), 'put body', body)
+    console.log({ requestId: c.get('requestId'), context: 'put body', body })
     return put(c, body)
   }
   catch (e) {
@@ -452,7 +452,7 @@ app.delete('/', async (c: Context) => {
   try {
     const body = await getBody<DeviceLink>(c)
     // const body = await c.req.json<DeviceLink>()
-    console.log(c.get('requestId'), 'delete body', body)
+    console.log({ requestId: c.get('requestId'), context: 'delete body', body })
     return deleteOverride(c, body)
   }
   catch (e) {

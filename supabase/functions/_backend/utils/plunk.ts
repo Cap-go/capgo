@@ -77,14 +77,14 @@ export async function trackEvent(c: Context, email: string, data: any, event: st
       headers: getConfigHeaders(c),
     })
       .then(res => res.json())
-    console.log(c.get('requestId'), 'trackEvent', email, event, res)
+    console.log({ requestId: c.get('requestId'), context: 'trackEvent', email, event, res })
     return res
   }
   catch (e) {
-    console.log(c.get('requestId'), 'trackEvent error', e)
+    console.log({ requestId: c.get('requestId'), context: 'trackEvent error', error: e })
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.log(c.get('requestId'), 'errorJson', errorJson)
+      console.log({ requestId: c.get('requestId'), context: 'errorJson', errorJson })
     }
     return false
   }
@@ -99,28 +99,28 @@ export async function addContact(c: Context, email: string, data: any) {
     subscribed: true,
     data: shallowCleanObject(data),
   }
-  console.log(c.get('requestId'), 'addContact', email)
+  console.log({ requestId: c.get('requestId'), context: 'addContact', email })
   try {
     const res = await ky.post(url, {
       json: payload,
       headers: getConfigHeaders(c),
     })
       .then(res => res.json())
-    console.log(c.get('requestId'), 'addContact', email, res)
+    console.log({ requestId: c.get('requestId'), context: 'addContact', email, res })
     return res
   }
   catch (e) {
-    console.log(c.get('requestId'), 'addContact error', e)
+    console.log({ requestId: c.get('requestId'), context: 'addContact error', error: e })
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.log(c.get('requestId'), 'errorJson', errorJson)
+      console.log({ requestId: c.get('requestId'), context: 'errorJson', errorJson })
     }
     return false
   }
 }
 
 export function addDataContact(c: Context, email: string, data: Person, segments?: Segments) {
-  console.log(c.get('requestId'), 'addDataContact', email, data, segments)
+  console.log({ requestId: c.get('requestId'), context: 'addDataContact', email, data, segments })
   return trackEvent(c, email, shallowCleanObject({ ...data, ...segments }), 'user:addData')
 }
 
@@ -138,14 +138,14 @@ export async function sendEmail(c: Context, to: string, subject: string, body: s
       headers: getConfigHeaders(c),
     })
       .then(res => res.json())
-    console.log(c.get('requestId'), 'sendEmail', to, subject, res)
+    console.log({ requestId: c.get('requestId'), context: 'sendEmail', to, subject, res })
     return res
   }
   catch (e) {
-    console.log(c.get('requestId'), 'sendEmail error', e)
+    console.log({ requestId: c.get('requestId'), context: 'sendEmail error', error: e })
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.log(c.get('requestId'), 'errorJson', errorJson)
+      console.log({ requestId: c.get('requestId'), context: 'errorJson', errorJson })
     }
     return false
   }

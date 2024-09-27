@@ -51,11 +51,11 @@ async function getTop(category = gplay.category.APPLICATION, country = 'us', col
     if (!res.length)
       return []
     // set to_get_similar to false
-    console.log(c.get('requestId'), 'getTop', category, country, collection, res.length)
+    console.log({ requestId: c.get('requestId'), context: 'getTop', category, country, collection, length: res.length })
     return res
   }
   catch (e) {
-    console.log(c.get('requestId'), 'error getTop', e)
+    console.log({ requestId: c.get('requestId'), context: 'error getTop', error: e })
   }
   return []
 }

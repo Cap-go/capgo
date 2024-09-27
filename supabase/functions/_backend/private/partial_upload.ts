@@ -36,27 +36,27 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     const rawBody = await c.req.json()
     const parsedBody = bodySchema.safeParse(rawBody)
     if (parsedBody.error) {
-      console.error(c.get('requestId'), '[partial update] Cannot parse body', parsedBody.error)
+      console.error({ requestId: c.get('requestId'), context: '[partial update] Cannot parse body', error: parsedBody.error })
       return c.json({ status: 'Cannot parse body', error: parsedBody.error }, 400)
     }
 
     const body = parsedBody.data
-    console.log(c.get('requestId'), 'post partial upload body', body)
+    console.log({ requestId: c.get('requestId'), context: 'post partial upload body', body })
 
     const apikey = c.get('apikey')
     const capgkey = c.get('capgkey')
-    console.log(c.get('requestId'), 'apikey', apikey)
-    console.log(c.get('requestId'), 'capgkey', capgkey)
+    console.log({ requestId: c.get('requestId'), context: 'apikey', apikey })
+    console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
 
     const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
       .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
     if (_errorUserId) {
-      console.log(c.get('requestId'), '_errorUserId', _errorUserId)
+      console.log({ requestId: c.get('requestId'), context: '_errorUserId', error: _errorUserId })
       return c.json({ status: 'Error User not found' }, 500)
     }
 
     if (!(await hasAppRight(c, body.app_id, userId, 'read'))) {
-      console.log(c.get('requestId'), 'no read')
+      console.log({ requestId: c.get('requestId'), context: 'no read' })
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
@@ -67,7 +67,7 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       // .eq('user_id', userId)
       .single()
     if (errorApp) {
-      console.log(c.get('requestId'), 'errorApp', errorApp)
+      console.log({ requestId: c.get('requestId'), context: 'errorApp', error: errorApp })
       return c.json({ status: 'Error App not found' }, 500)
     }
 
@@ -81,7 +81,7 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       .eq('user_id', apikey.user_id)
       .single()
     if (errorVersion) {
-      console.log(c.get('requestId'), 'errorVersion', errorVersion)
+      console.log({ requestId: c.get('requestId'), context: 'errorVersion', error: errorVersion })
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
@@ -105,7 +105,7 @@ app.post(middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     return c.json(res)
   }
   catch (e) {
-    console.log(c.get('requestId'), 'error', e)
+    console.log({ requestId: c.get('requestId'), context: 'error', error: e })
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })

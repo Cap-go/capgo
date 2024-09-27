@@ -29,15 +29,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const all = []
     const pageSize = 10
     const pageSizeLittle = 2
-    console.log(c.get('requestId'), 'appsToGetFramework', appsToGetFramework?.length || 0)
-    console.log(c.get('requestId'), 'appsToGetInfo', appsToGetInfo?.length || 0)
-    console.log(c.get('requestId'), 'appsToGetSimilar', appsToGetSimilar?.length || 0)
-    console.log(c.get('requestId'), 'appsToGetTop categories', categories?.length || 0)
-    console.log(c.get('requestId'), 'appsToGetTop total', (categories?.length || 0))
-    console.log(c.get('requestId'), 'appsToGetTop total result', (categories?.length || 0) * 500)
+    console.log({ requestId: c.get('requestId'), context: 'appsToGetFramework', appsToGetFramework: appsToGetFramework?.length || 0 })
+    console.log({ requestId: c.get('requestId'), context: 'appsToGetInfo', appsToGetInfo: appsToGetInfo?.length || 0 })
+    console.log({ requestId: c.get('requestId'), context: 'appsToGetSimilar', appsToGetSimilar: appsToGetSimilar?.length || 0 })
+    console.log({ requestId: c.get('requestId'), context: 'appsToGetTop categories', categories: categories?.length || 0 })
+    console.log({ requestId: c.get('requestId'), context: 'appsToGetTop total', total: (categories?.length || 0) })
+    console.log({ requestId: c.get('requestId'), context: 'appsToGetTop total result', total: (categories?.length || 0) * 500 })
     // split countries by 10 to batch send to netlify
     for (let i = 0; i < categories.length; i++) {
-      console.log(c.get('requestId'), 'category', categories[i])
+      console.log({ requestId: c.get('requestId'), context: 'category', category: categories[i] })
       all.push(ky.post(`${baseApi}/get_top_apk-background`, {
         json: {
           category: categories[i],
@@ -72,7 +72,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         // all.push(ky.post('https://netlify.capgo.app/get_framework-background', {
         //   appIds: appsSimilarBatch.map(app => app.app_id),
         // }))
-        console.log(c.get('requestId'), 'appsSimilarBatch', appsSimilarBatch.length)
+        console.log({ requestId: c.get('requestId'), context: 'appsSimilarBatch', appsSimilarBatch: appsSimilarBatch.length })
         all.push(ky.post(`${baseApi}/get_similar_app-background`, {
           json: {
             appIds: appsSimilarBatch.map(app => app.app_id),

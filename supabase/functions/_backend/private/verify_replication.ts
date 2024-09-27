@@ -58,7 +58,7 @@ app.get('/', async (c: Context) => {
         d1.prepare(`SELECT COUNT(*) as count FROM ${table}`).first(),
       ),
     )
-    console.log(c.get('requestId'), 'd1Counts', d1Counts)
+    console.log({ requestId: c.get('requestId'), context: 'd1Counts', d1Counts })
 
     // Count from update.ts (PostgreSQL database)
     const pgCounts = await Promise.all(
@@ -67,12 +67,12 @@ app.get('/', async (c: Context) => {
           .from(table as any)
           .select('*', { count: 'exact', head: true })
           .then((v) => {
-            console.log(c.get('requestId'), 'v', v)
+            console.log({ requestId: c.get('requestId'), context: 'v', v })
             return { count: v.count }
           }),
       ),
     )
-    console.log(c.get('requestId'), 'pgCounts', pgCounts)
+    console.log({ requestId: c.get('requestId'), context: 'pgCounts', pgCounts })
     const diff = tables.reduce((acc, table, index) => {
       const d1Count = (d1Counts[index]?.count as number) || 0
       const pgCount = pgCounts[index]?.count || 0
@@ -94,7 +94,7 @@ app.get('/', async (c: Context) => {
     }
   }
   catch (e) {
-    console.error(c.get('requestId'), 'Error in db_comparison:', e)
+    console.error({ requestId: c.get('requestId'), context: 'Error in db_comparison:', e })
     return c.json({ status: 'Error in db comparison', error: JSON.stringify(e) }, 500)
   }
 })

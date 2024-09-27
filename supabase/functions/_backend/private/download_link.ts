@@ -18,7 +18,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c: Context) => {
   try {
     const body = await c.req.json<DataDownload>()
-    console.log(c.get('requestId'), 'post download link body', body)
+    console.log({ requestId: c.get('requestId'), context: 'post download link body', body })
     const authorization = c.req.header('authorization')
     if (!authorization)
       return c.json({ status: 'Cannot find authorization' }, 400)
@@ -44,12 +44,12 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const ownerOrg = (bundle?.owner_org as any).created_by
 
     if (getBundleError) {
-      console.error(c.get('requestId'), 'getBundleError', getBundleError)
+      console.error({ requestId: c.get('requestId'), context: 'getBundleError', error: getBundleError })
       return c.json({ status: 'Error unknow' }, 500)
     }
 
     if (!ownerOrg) {
-      console.error(c.get('requestId'), 'cannotGetOwnerOrg', bundle)
+      console.error({ requestId: c.get('requestId'), context: 'cannotGetOwnerOrg', bundle })
       return c.json({ status: 'Error unknow' }, 500)
     }
 
