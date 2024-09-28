@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@cloudflare/workers-types": "https://esm.sh/@cloudflare/workers-types@4.20240820.0?target=deno",
+    "@cloudflare/workers-types": "npm:@cloudflare/workers-types",
     "@hono/sentry": "npm:@hono/sentry@1.1.0",
     "@hono/hono": "jsr:@hono/hono@^4.4.3",
     "hono/netlify": "jsr:@hono/hono@^4.4.3/netlify",

@@ -5,7 +5,9 @@
       "jsr:@hono/hono@^4.4.3": "jsr:@hono/hono@4.5.5",
       "jsr:@supabase/supabase-js@2.43.4": "jsr:@supabase/supabase-js@2.43.4",
       "npm:@clack/prompts@0.7.0": "npm:@clack/prompts@0.7.0",
+      "npm:@cloudflare/workers-types": "npm:@cloudflare/workers-types@4.20240925.0",
       "npm:@hono/sentry@1.1.0": "npm:@hono/sentry@1.1.0_hono@4.6.2",
+      "npm:@jsr/hono__hono@4.5.9": "npm:@jsr/hono__hono@4.5.9",
       "npm:@supabase/auth-js@2.64.2": "npm:@supabase/auth-js@2.64.2",
       "npm:@supabase/functions-js@2.3.1": "npm:@supabase/functions-js@2.3.1",
       "npm:@supabase/node-fetch@2.6.15": "npm:@supabase/node-fetch@2.6.15",
@@ -55,6 +57,10 @@
           "picocolors": "picocolors@1.0.1",
           "sisteransi": "sisteransi@1.0.5"
         }
+      },
+      "@cloudflare/workers-types@4.20240925.0": {
+        "integrity": "sha512-KpqyRWvanEuXgBTKYFzRp4NsWOEcswxjsPRSre1zYQcODmc8PUrraVHQUmgvkJgv3FzB+vI9xm7J6oE4MmZHCA==",
+        "dependencies": {}
       },
       "@esbuild/aix-ppc64@0.21.5": {
         "integrity": "sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==",
@@ -181,6 +187,10 @@
           "@jridgewell/resolve-uri": "@jridgewell/resolve-uri@3.1.2",
           "@jridgewell/sourcemap-codec": "@jridgewell/sourcemap-codec@1.5.0"
         }
+      },
+      "@jsr/hono__hono@4.5.9": {
+        "integrity": "sha512-pYSa2vfQz18kOXpoWSsl78MumP2eWmvnC1a3CLktKsvY95fRAw7wqzWulmQ3Ar65W644FDZwPI72EKd/oPORwg==",
+        "dependencies": {}
       },
       "@rollup/rollup-android-arm-eabi@4.20.0": {
         "integrity": "sha512-TSpWzflCc4VGAUJZlPpgAJE1+V60MePDQnBd7PPkpuEmOy8i87aL6tinFGKBFKuEDikYpig72QzdT3QPYIi+oA==",

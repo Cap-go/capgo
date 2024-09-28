@@ -8,15 +8,6 @@ import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
-export interface EnvUpload {
-  SHARED_AUTH_SECRET: string
-
-  ATTACHMENT_BUCKET: R2Bucket
-
-  ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
-
-}
-
 const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono()

@@ -7,7 +7,7 @@ import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
-import type { R2UploadedPart } from '@cloudflare/workers-types'
+import type { Env, R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
@@ -18,7 +18,6 @@ import {
   RetryBucket,
 } from './retry.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, AsyncLock, EXPOSED_HEADERS, generateParts, readIntFromHeader, toBase64, WritableStreamBuffer } from './util.ts'
-import type { EnvUpload } from '../private/upload_bundle.ts'
 import type { Digester } from './digest.ts'
 import type {
   RetryMultipartUpload,
@@ -102,7 +101,7 @@ function optionsHandler(c: Context): Response {
 
 export class UploadHandler {
   state: DurableObjectState
-  env: EnvUpload
+  env: Env
   router: Hono
   parts: StoredR2Part[]
   multipart: RetryMultipartUpload | undefined
@@ -111,7 +110,8 @@ export class UploadHandler {
   // only allow a single request to operate at a time
   requestGate: AsyncLock
 
-  constructor(state: DurableObjectState, env: EnvUpload, bucket: R2Bucket) {
+  constructor(state: DurableObjectState, env: Env) {
+    const bucket = env.ATTACHMENT_BUCKET
     this.state = state
     this.env = env
     this.parts = []
@@ -655,11 +655,17 @@ export class UploadHandler {
     return new Date(expiration)
   }
 }
-export class AttachmentUploadHandler extends UploadHandler {
-  constructor(state: DurableObjectState, env: EnvUpload) {
-    super(state, env, env.ATTACHMENT_BUCKET)
-  }
-}
+// export class AttachmentUploadHandler extends UploadHandler {
+//   constructor(state: DurableObjectState, env: Env) {
+//     super(state, env, env.ATTACHMENT_BUCKET)
+//   }
+// }
+
+// export class BackupUploadHandler extends UploadHandler {
+//   constructor(state: DurableObjectState, env: Env) {
+//     super(state, env, env.BACKUP_BUCKET)
+//   }
+// }
 
 class UnrecoverableError extends Error {
   r2Key: string
