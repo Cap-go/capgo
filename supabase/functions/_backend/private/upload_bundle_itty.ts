@@ -181,7 +181,9 @@ async function optionsHandler(_request: IRequest, _env: EnvTus): Promise<Respons
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(request: IRequest, env: EnvTus): Promise<Response> {
   const requestId: string = request.key
+  console.log('upload_bundle_itty', 'uploadHandler', requestId)
 
+  // The id of the DurableObject is derived from the authenticated upload id provided by the requester
   // The id of the DurableObject is derived from the authenticated upload id provided by the requester
   const durableObjNs: DurableObjectNamespace = request.namespace.doNamespace
   if (durableObjNs == null) {
@@ -195,6 +197,11 @@ async function uploadHandler(request: IRequest, env: EnvTus): Promise<Response> 
     method: request.method,
     headers: request.headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
+  }).then((res) => {
+    console.log('upload_bundle_itty', 'uploadHandler', res)
+    // res.headers.set('Access-Control-Allow-Origin', '*')
+    // res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset')
+    return res
   })
 }
 

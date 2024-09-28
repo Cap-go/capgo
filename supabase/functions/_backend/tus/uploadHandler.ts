@@ -1,9 +1,12 @@
 // Copyright 2023 Signal Messenger, LLC
 import { Buffer } from 'node:buffer'
-import { Hono } from '@hono/hono'
+// import { requestId } from '@hono/hono/adapter/requestId'
+// import { requestId } from '@hono/hono/request-id'
 // SPDX-License-Identifier: AGPL-3.0-only
-import { cors } from 'hono/cors'
+// import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
+import { logger } from 'hono/logger'
+import { Hono } from 'hono/tiny'
 import type { R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
 import { noopDigester, sha256Digester } from './digest.ts'
@@ -77,24 +80,26 @@ interface StoredUploadInfo {
 // or because the request is broken into multiple patches), the remainder after
 // the last 5MB boundary is saved in a temporary R2 object, which is then read
 // on a subsequent PATCH.
-const corsRes = cors({
-  origin: '*',
-  allowHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Signal-Checksum-SHA256', 'tus-resumable', 'tus-version', 'tus-max-size', 'tus-extension', 'tus-checksum-sha256', 'upload-metadata', 'upload-length', 'upload-offset'],
-  allowMethods: ['POST', 'GET', 'OPTIONS', 'PATCH'],
-  exposeHeaders: ['Content-Length', 'X-Kuma-Revision', 'Content-Range'],
-  maxAge: 600,
-  credentials: true,
-})
+// const corsRes = cors({
+//   origin: '*',
+//   allowHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Signal-Checksum-SHA256', 'tus-resumable', 'tus-version', 'tus-max-size', 'tus-extension', 'tus-checksum-sha256', 'upload-metadata', 'upload-length', 'upload-offset'],
+//   allowMethods: ['POST', 'GET', 'OPTIONS', 'PATCH'],
+//   exposeHeaders: ['Content-Length', 'X-Kuma-Revision', 'Content-Range'],
+//   maxAge: 600,
+//   credentials: true,
+// })
 function optionsHandler(c: Context): Response {
-  //  allow cors TODO: remove this in production
-  c.header('Access-Control-Allow-Origin', '*')
-  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset')
-  c.header('Tus-Resumable', TUS_VERSION)
-  c.header('Tus-Version', TUS_VERSION)
-  c.header('Tus-Max-Size', MAX_UPLOAD_LENGTH_BYTES.toString())
-  c.header('Tus-Extension', 'creation,creation-defer-length,creation-with-upload,expiration')
-  return c.text('', 204)
+  console.log('in DO', 'optionsHandler')
+  return c.newResponse(null, 204, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset',
+    'Tus-Resumable': TUS_VERSION,
+    'Tus-Version': TUS_VERSION,
+    'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
+    'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
+  })
 }
+
 export class UploadHandler {
   state: DurableObjectState
   env: EnvUpload
@@ -113,17 +118,30 @@ export class UploadHandler {
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
     this.router = new Hono()
-    this.router.options('/upload/:bucket', optionsHandler)
-    this.router.post('/upload/:bucket', corsRes, this.exclusive(this.create))
-    this.router.options('/upload/:bucket/:id', optionsHandler)
-    this.router.patch('/upload/:bucket/:id', corsRes, this.exclusive(this.patch))
-    this.router.get('/upload/:bucket/:id', corsRes, this.exclusive(this.head))
+    this.router.use('*', logger())
+    // this.router.use('*', requestId())
+    // this.router = new Hono().basePath(`/private/files`)
+
+    this.router.options('/private/files/upload/:bucket', optionsHandler)
+    this.router.post('/private/files/upload/:bucket', this.exclusive(this.create))
+    this.router.options('/private/files/upload/:bucket/:id', optionsHandler)
+    this.router.patch('/private/files/upload/:bucket/:id', this.exclusive(this.patch))
+    // this.router
+    this.router.get('/private/files/upload/:bucket/:id', this.exclusive(this.head))
+
+    // this.router.options('/upload/:bucket', optionsHandler)
+    // this.router.post('/upload/:bucket', corsRes, this.exclusive(this.create))
+    // this.router.options('/upload/:bucket/:id', optionsHandler)
+    // this.router.patch('/upload/:bucket/:id', corsRes, this.exclusive(this.patch))
+    // this.router.get('/upload/:bucket/:id', corsRes, this.exclusive(this.head))
+
     this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
+      console.log('in DO', 'onError', e)
       if (e instanceof HTTPException) {
         return e.getResponse()
       }
-      console.log('upload_bundle', 'error', e)
+      console.log('in DO', 'UploadHandler', 'error', e)
       return c.text('Internal Server Error', 500)
     })
   }
@@ -166,42 +184,43 @@ export class UploadHandler {
 
   // create a new TUS upload
   async create(c: Context): Promise<Response> {
+    console.log('in DO', 'create')
     const uploadMetadata = parseUploadMetadata(c.req.raw.headers)
     const checksum = parseChecksum(c.req.raw.headers)
 
     const r2Key = uploadMetadata.filename
     if (r2Key == null) {
-      console.log('upload_bundle', 'r2Key is null')
+      console.log('in DO', 'upload_bundle', 'r2Key is null')
       return c.text('bad filename metadata', 400)
     }
 
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
-      console.log('upload_bundle', 'duplicate object creation')
+      console.log('in DO', 'upload_bundle', 'duplicate object creation')
       await this.cleanup(r2Key)
       return c.text('object already exists', 409)
     }
 
     const contentType = c.req.header('Content-Type')
     if (contentType != null && contentType !== 'application/offset+octet-stream') {
-      console.log('upload_bundle', 'create only supports application/offset+octet-stream content-type')
+      console.log('in DO', 'upload_bundle', 'create only supports application/offset+octet-stream content-type')
       return c.text('create only supports application/offset+octet-stream content-type', 415)
     }
     const contentLength = readIntFromHeader(c.req.raw.headers, 'Content-Length')
     if (!Number.isNaN(contentLength) && contentLength > 0 && contentType == null) {
-      console.log('upload_bundle', 'body requires application/offset+octet-stream content-type')
+      console.log('in DO', 'upload_bundle', 'body requires application/offset+octet-stream content-type')
       return c.text('body requires application/offset+octet-stream content-type', 415)
     }
     const hasContent = c.req.raw.body != null && contentType != null
     const uploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     const uploadDeferLength = readIntFromHeader(c.req.raw.headers, 'Upload-Defer-Length')
     if (Number.isNaN(uploadLength) && Number.isNaN(uploadDeferLength)) {
-      console.log('upload_bundle', 'must contain Upload-Length or Upload-Defer-Length header')
+      console.log('in DO', 'upload_bundle', 'must contain Upload-Length or Upload-Defer-Length header')
       return c.text('must contain Upload-Length or Upload-Defer-Length header', 400)
     }
 
     if (!Number.isNaN(uploadDeferLength) && uploadDeferLength !== 1) {
-      console.log('upload_bundle', 'bad Upload-Defer-Length')
+      console.log('in DO', 'upload_bundle', 'bad Upload-Defer-Length')
       return c.text('bad Upload-Defer-Length', 400)
     }
 
@@ -240,6 +259,7 @@ export class UploadHandler {
 
   // get the current upload offset to resume an upload
   async head(c: Context): Promise<Response> {
+    console.log('in DO', 'head detected')
     const r2Key = c.req.param('id')
 
     let offset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
@@ -247,7 +267,7 @@ export class UploadHandler {
     if (offset == null) {
       const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
-        console.log('upload_bundle', 'headResponse is null')
+        console.log('in DO', 'upload_bundle', 'headResponse is null')
         return c.text('Not Found', 404)
       }
       offset = headResponse.size
@@ -276,17 +296,18 @@ export class UploadHandler {
 
   // append to the upload at the current upload offset
   async patch(c: Context): Promise<Response> {
+    console.log('in DO', 'path')
     const r2Key = c.req.param('id')
 
     let uploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (uploadOffset == null) {
-      console.log('upload_bundle', 'uploadOffset is null')
+      console.log('in DO', 'upload_bundle', 'uploadOffset is null')
       return c.text('Not Found', 404)
     }
 
     const headerOffset = readIntFromHeader(c.req.raw.headers, 'Upload-Offset')
     if (uploadOffset !== headerOffset) {
-      console.log('upload_bundle', 'incorrect upload offset')
+      console.log('in DO', 'upload_bundle', 'incorrect upload offset')
       return c.text('incorrect upload offset', 409)
     }
 
@@ -296,7 +317,7 @@ export class UploadHandler {
     }
     const headerUploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     if (uploadInfo.uploadLength != null && !Number.isNaN(headerUploadLength) && uploadInfo.uploadLength !== headerUploadLength) {
-      console.log('upload_bundle', 'upload length cannot change')
+      console.log('in DO', 'upload_bundle', 'upload length cannot change')
       return c.text('upload length cannot change', 400)
     }
 
@@ -306,7 +327,7 @@ export class UploadHandler {
     }
 
     if (c.req.raw.body == null) {
-      console.log('upload_bundle', 'must provide request body')
+      console.log('in DO', 'upload_bundle', 'must provide request body')
       return c.text('Must provide request body', 400)
     }
 
@@ -319,9 +340,9 @@ export class UploadHandler {
         'Upload-Expires': (await this.expirationTime()).toString(),
         'Tus-Resumable': TUS_VERSION,
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset',
-        'Access-Control-Allow-Methods': 'POST, GET, PATCH, OPTIONS',
-        'Access-Control-Expose-Headers': 'Content-Length, X-Kuma-Revision, Content-Range',
+        'Access-Control-Allow-Methods': ALLOWED_METHODS,
+        'Access-Control-Allow-Headers': ALLOWED_HEADERS,
+        'Access-Control-Expose-Headers': EXPOSED_HEADERS,
       }),
     })
   }
@@ -639,7 +660,7 @@ export class AttachmentUploadHandler extends UploadHandler {
 }
 
 export class BackupUploadHandler extends UploadHandler {
-  constructor(state: DurableObjectState, env: Env) {
+  constructor(state: DurableObjectState, env: EnvUpload) {
     super(state, env, env.BACKUP_BUCKET)
   }
 }
