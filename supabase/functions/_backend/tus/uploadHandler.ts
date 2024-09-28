@@ -655,11 +655,12 @@ export class UploadHandler {
     return new Date(expiration)
   }
 }
-// export class AttachmentUploadHandler extends UploadHandler {
-//   constructor(state: DurableObjectState, env: Env) {
-//     super(state, env, env.ATTACHMENT_BUCKET)
-//   }
-// }
+
+export class AttachmentUploadHandler extends UploadHandler {
+  constructor(state: DurableObjectState, env: Env) {
+    super(state, env)
+  }
+}
 
 // export class BackupUploadHandler extends UploadHandler {
 //   constructor(state: DurableObjectState, env: Env) {
