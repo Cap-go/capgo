@@ -13,6 +13,7 @@ export interface UploadMetadata {
 // https://tus.io/protocols/resumable-upload#upload-metadata
 export function parseUploadMetadata(headers: Headers): UploadMetadata {
   const uploadMetadata: string | null = headers.get('Upload-Metadata')
+  console.log('parseUploadMetadata', uploadMetadata)
   if (uploadMetadata == null) {
     return {}
   }

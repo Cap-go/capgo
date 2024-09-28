@@ -36,24 +36,12 @@ database_id = "7f267d86-f4f7-49f5-9622-e44373aa00dc"
 enabled = true
 
 [[migrations]]
-tag = "v1"
+tag = "v1" # Should be unique for each entry
 new_classes = [ "UploadHandler" ]
 
-[[migrations]]
-tag = "v2"
-renamed_classes = [ { from = "UploadHandler", to = "AttachmentUploadHandler" } ]
-new_classes = [ "BackupUploadHandler" ]
-
 [durable_objects]
-bindings = [
-  { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" },
-  { name = "BACKUP_UPLOAD_HANDLER", class_name = "BackupUploadHandler" }
-]
+bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
 
 [[r2_buckets]]
 binding = "ATTACHMENT_BUCKET"
 bucket_name = "attachments"
-
-[[r2_buckets]]
-binding = "BACKUP_BUCKET"
-bucket_name = "backups"

@@ -1,6 +1,7 @@
 // import { cors } from 'hono/cors'
 import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
+import type { Context, Next } from '@hono/hono'
+import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_SIGNAL_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
@@ -11,8 +12,6 @@ export interface EnvUpload {
   SHARED_AUTH_SECRET: string
 
   ATTACHMENT_BUCKET: R2Bucket
-
-  BACKUP_BUCKET: R2Bucket
 
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 
@@ -30,11 +29,11 @@ export const app = new Hono()
 //   credentials: true,
 // })
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, uploadHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, setKeyFromMetadata, uploadHandler)
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id`, optionsHandler)
 app.get(`/upload/${ATTACHMENT_PREFIX}/:id`, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id`, uploadHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id`, setKeyFromIdParam, uploadHandler)
 
 app.all('*', (c) => {
   console.log('all upload_bundle', c.req.url)
@@ -43,7 +42,8 @@ app.all('*', (c) => {
 
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.req.param('id')
-  console.log('getHandler', requestId)
+  const safeRequestId = requestId.replace(/\//g, '_')
+  console.log('getHandler', safeRequestId, c.req.method, c.req.url)
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
 
   if (bucket == null) {
@@ -58,7 +58,7 @@ async function getHandler(c: Context): Promise<Response> {
     return response
   }
 
-  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
+  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(safeRequestId, {
     range: c.req.raw.headers,
   })
   if (object == null) {
@@ -134,8 +134,10 @@ function optionsHandler(c: Context): Response {
 
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context): Promise<Response> {
-  const requestId: string = c.req.param('id')
-  console.log('upload_bundle req', 'uploadHandler', requestId)
+  const requestId: string = c.get('fileId')
+  // make requestId  safe
+  const safeRequestId = requestId.replace(/\//g, '_')
+  console.log('upload_bundle req', 'uploadHandler', safeRequestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
   // c.header('Access-Control-Allow-Origin', '*')
   // allow headersfor tus protocol
@@ -146,7 +148,7 @@ async function uploadHandler(c: Context): Promise<Response> {
     return c.json({ error: 'Invalid bucket configuration' }, 500)
   }
 
-  const handler = durableObjNs.get(durableObjNs.idFromName(requestId))
+  const handler = durableObjNs.get(durableObjNs.idFromName(safeRequestId))
   console.log('can handler')
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
@@ -154,9 +156,19 @@ async function uploadHandler(c: Context): Promise<Response> {
     headers: c.req.raw.headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   }).then((res) => {
-    console.log('upload_bundle res', 'uploadHandler', res)
+    // console.log('upload_bundle res', 'uploadHandler', res)
     // res.headers.set('Access-Control-Allow-Origin', '*')
     // res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset')
     return res
   })
+}
+
+async function setKeyFromMetadata(c: Context, next: Next) {
+  c.set('fileId', parseUploadMetadata(c.req.raw.headers).filename)
+  await next()
+}
+
+async function setKeyFromIdParam(c: Context, next: Next) {
+  c.set('fileId', c.req.param('id'))
+  await next()
 }
