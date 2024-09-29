@@ -112,8 +112,6 @@ export class UploadHandler {
     this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler)
     this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch))
     this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head))
-
-
     this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
       console.log('in DO', 'onError', e)
@@ -167,8 +165,8 @@ export class UploadHandler {
     const uploadMetadata = parseUploadMetadata(c.req.raw.headers)
     const checksum = parseChecksum(c.req.raw.headers)
 
-    const safeR2Key = uploadMetadata.filename || ''
-    if (safeR2Key == null) {
+    const r2Key = uploadMetadata.filename || ''
+    if (r2Key == null) {
       console.log('in DO', 'upload_bundle', 'r2Key is null')
       return c.text('bad filename metadata', 400)
     }
@@ -176,7 +174,7 @@ export class UploadHandler {
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
       console.log('in DO', 'upload_bundle', 'duplicate object creation')
-      await this.cleanup(safeR2Key)
+      await this.cleanup(r2Key)
       return c.text('object already exists', 409)
     }
 
@@ -216,10 +214,10 @@ export class UploadHandler {
     await this.state.storage.put(UPLOAD_OFFSET_KEY, 0)
     await this.state.storage.put(UPLOAD_INFO_KEY, uploadInfo)
 
-    const uploadLocation = new URL(safeR2Key, c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
+    const uploadLocation = new URL(r2Key, c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
 
     const uploadOffset = hasContent
-      ? await this.appendBody(safeR2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)
+      ? await this.appendBody(r2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)
       : 0
     return new Response(null, {
       status: 201,
@@ -239,12 +237,12 @@ export class UploadHandler {
   // get the current upload offset to resume an upload
   async head(c: Context): Promise<Response> {
     console.log('in DO', 'head detected')
-    const safeR2Key = c.req.param('id')
+    const r2Key = c.req.param('id')
 
     let offset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     let uploadLength: number | undefined
     if (offset == null) {
-      const headResponse = await this.retryBucket.head(safeR2Key)
+      const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
         console.log('in DO', 'upload_bundle', 'headResponse is null')
         return c.text('Not Found', 404)
@@ -275,8 +273,8 @@ export class UploadHandler {
 
   // append to the upload at the current upload offset
   async patch(c: Context): Promise<Response> {
-    const safeR2Key = c.req.param('id')
-    console.log('in DO', 'patch', safeR2Key)
+    const r2Key = c.req.param('id')
+    console.log('in DO', 'patch', r2Key)
 
     let uploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (uploadOffset == null) {
@@ -292,7 +290,7 @@ export class UploadHandler {
 
     const uploadInfo: StoredUploadInfo | undefined = await this.state.storage.get(UPLOAD_INFO_KEY)
     if (uploadInfo == null) {
-      throw new UnrecoverableError('existing upload should have had uploadInfo', safeR2Key)
+      throw new UnrecoverableError('existing upload should have had uploadInfo', r2Key)
     }
     const headerUploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     if (uploadInfo.uploadLength != null && !Number.isNaN(headerUploadLength) && uploadInfo.uploadLength !== headerUploadLength) {
@@ -310,7 +308,7 @@ export class UploadHandler {
       return c.text('Must provide request body', 400)
     }
 
-    uploadOffset = await this.appendBody(safeR2Key, c.req.raw.body, uploadOffset, uploadInfo)
+    uploadOffset = await this.appendBody(r2Key, c.req.raw.body, uploadOffset, uploadInfo)
 
     return new Response(null, {
       status: 204,

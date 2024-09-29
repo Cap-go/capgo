@@ -58,11 +58,25 @@ async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
   }
 }
 
+function validateRequestId(requestId: string) {
+  const [orgs, , apps, , versions, versionID] = requestId.split('/')
+  if (orgs !== 'orgs' || apps !== 'apps' || versions !== 'versions') {
+    throw new Error('Invalid requestId')
+  }
+  if (requestId.split('/').length !== 6) {
+    throw new Error('Invalid requestId')
+  }
+  if (versionID == null || !versionID.endsWith('.zip')) {
+    throw new Error('Invalid requestId')
+  }
+  return true
+}
+
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
-  const [, owner_org, , app_id, version_id] = requestId.split('/')
-  const safeRequestId = `orgs/${owner_org}/apps/${app_id}/versions/${version_id}.zip`
+  const [, owner_org, , app_id] = requestId.split('/')
   try {
+    validateRequestId(requestId)
     await checkAppAccess(c, app_id, owner_org)
   }
   catch (error) {
@@ -77,6 +91,7 @@ async function getHandler(c: Context): Promise<Response> {
     return c.json({ error: 'Not Found' }, 404)
   }
 
+  // @ts-expect-error-next-line
   const cache = caches.default
   const cacheKey = new Request(new URL(c.req.url), c.req)
   let response = await cache.match(cacheKey)
@@ -84,7 +99,7 @@ async function getHandler(c: Context): Promise<Response> {
     return response
   }
 
-  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(safeRequestId, {
+  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
     range: c.req.raw.headers,
   })
   if (object == null) {
@@ -161,9 +176,9 @@ function optionsHandler(c: Context): Response {
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
-  const [, owner_org, , app_id, version_id] = requestId.split('/')
-  const safeRequestId = `orgs/${owner_org}/apps/${app_id}/versions/${version_id}.zip`
+  const [, owner_org, , app_id] = requestId.split('/')
   try {
+    validateRequestId(requestId)
     await checkAppAccess(c, app_id, owner_org)
   }
   catch (error) {
@@ -171,7 +186,7 @@ async function uploadHandler(c: Context): Promise<Response> {
     return c.json({ error: error.message }, 400)
   }
   // make requestId  safe
-  console.log('upload_bundle req', 'uploadHandler', safeRequestId, c.req.method, c.req.url)
+  console.log('upload_bundle req', 'uploadHandler', requestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
   // c.header('Access-Control-Allow-Origin', '*')
   // allow headersfor tus protocol
@@ -182,7 +197,7 @@ async function uploadHandler(c: Context): Promise<Response> {
     return c.json({ error: 'Invalid bucket configuration' }, 500)
   }
 
-  const handler = durableObjNs.get(durableObjNs.idFromName(safeRequestId))
+  const handler = durableObjNs.get(durableObjNs.idFromName(requestId))
   console.log('can handler')
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
