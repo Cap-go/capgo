@@ -5,36 +5,71 @@ import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_SIGNAL_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
+import { middlewareKey } from '../utils/hono.ts'
+import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
 const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono()
-// const corsRes = cors({
-//   origin: '*',
-//   allowHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Signal-Checksum-SHA256', 'tus-resumable', 'tus-version', 'tus-max-size', 'tus-extension', 'tus-checksum-sha256', 'upload-metadata', 'upload-length', 'upload-offset'],
-//   allowMethods: ['POST', 'GET', 'OPTIONS', 'PATCH'],
-//   exposeHeaders: ['Content-Length', 'X-Kuma-Revision', 'Content-Range'],
-//   maxAge: 600,
-//   credentials: true,
-// })
-app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, setKeyFromMetadata, uploadHandler)
 
-app.options(`/upload/${ATTACHMENT_PREFIX}/:id`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id`, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id`, setKeyFromIdParam, uploadHandler)
+app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, uploadHandler)
+
+app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, getHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, uploadHandler)
 
 app.all('*', (c) => {
   console.log('all upload_bundle', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
 
+async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
+  console.log('checkAppAccess', app_id, owner_org)
+  const capgkey = c.get('capgkey')
+  console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
+  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+    .rpc('get_user_id', { apikey: capgkey, app_id })
+  if (_errorUserId) {
+    console.log({ requestId: c.get('requestId'), context: '_errorUserId', error: _errorUserId })
+    throw new Error('Error User not found')
+  }
+
+  if (!(await hasAppRight(c, app_id, userId, 'read'))) {
+    console.log({ requestId: c.get('requestId'), context: 'no read' })
+    throw new Error('You can\'t access this app')
+  }
+
+  const { data: app, error: errorApp } = await supabaseAdmin(c)
+    .from('apps')
+    .select('app_id, owner_org')
+    .eq('app_id', app_id)
+    // .eq('user_id', userId)
+    .single()
+  if (errorApp) {
+    console.log({ requestId: c.get('requestId'), context: 'errorApp', error: errorApp })
+    throw new Error('Error App not found')
+  }
+  if (app.owner_org !== owner_org) {
+    console.log({ requestId: c.get('requestId'), context: 'owner_org' })
+    throw new Error('You can\'t access this app')
+  }
+}
+
 async function getHandler(c: Context): Promise<Response> {
-  const requestId = c.req.param('id')
-  const safeRequestId = requestId.replace(/\//g, '_')
-  console.log('getHandler', safeRequestId, c.req.method, c.req.url)
+  const requestId = c.get('fileId')
+  const [, owner_org, , app_id, version_id] = requestId.split('/')
+  const safeRequestId = `orgs/${owner_org}/apps/${app_id}/versions/${version_id}.zip`
+  try {
+    await checkAppAccess(c, app_id, owner_org)
+  }
+  catch (error) {
+    console.log({ requestId: c.get('requestId'), context: 'checkAppAccess', error })
+    return c.json({ error: error.message }, 400)
+  }
+
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
 
   if (bucket == null) {
@@ -125,9 +160,17 @@ function optionsHandler(c: Context): Response {
 
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context): Promise<Response> {
-  const requestId: string = c.get('fileId')
+  const requestId = c.get('fileId')
+  const [, owner_org, , app_id, version_id] = requestId.split('/')
+  const safeRequestId = `orgs/${owner_org}/apps/${app_id}/versions/${version_id}.zip`
+  try {
+    await checkAppAccess(c, app_id, owner_org)
+  }
+  catch (error) {
+    console.log({ requestId: c.get('requestId'), context: 'checkAppAccess', error })
+    return c.json({ error: error.message }, 400)
+  }
   // make requestId  safe
-  const safeRequestId = requestId.replace(/\//g, '_')
   console.log('upload_bundle req', 'uploadHandler', safeRequestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
   // c.header('Access-Control-Allow-Origin', '*')
@@ -155,11 +198,21 @@ async function uploadHandler(c: Context): Promise<Response> {
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
-  c.set('fileId', parseUploadMetadata(c.req.raw.headers).filename)
+  const fileId = parseUploadMetadata(c.req.raw.headers).filename
+  if (fileId == null) {
+    console.log('upload_bundle', 'fileId is null')
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  c.set('fileId', fileId)
   await next()
 }
 
 async function setKeyFromIdParam(c: Context, next: Next) {
-  c.set('fileId', c.req.param('id'))
+  const fileId = c.req.param('id')
+  if (fileId == null) {
+    console.log('upload_bundle', 'fileId is null')
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  c.set('fileId', fileId)
   await next()
 }

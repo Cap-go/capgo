@@ -1,9 +1,4 @@
-// Copyright 2023 Signal Messenger, LLC
 import { Buffer } from 'node:buffer'
-// import { requestId } from '@hono/hono/adapter/requestId'
-// import { requestId } from '@hono/hono/request-id'
-// SPDX-License-Identifier: AGPL-3.0-only
-// import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
@@ -79,14 +74,7 @@ interface StoredUploadInfo {
 // or because the request is broken into multiple patches), the remainder after
 // the last 5MB boundary is saved in a temporary R2 object, which is then read
 // on a subsequent PATCH.
-// const corsRes = cors({
-//   origin: '*',
-//   allowHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Signal-Checksum-SHA256', 'tus-resumable', 'tus-version', 'tus-max-size', 'tus-extension', 'tus-checksum-sha256', 'upload-metadata', 'upload-length', 'upload-offset'],
-//   allowMethods: ['POST', 'GET', 'OPTIONS', 'PATCH'],
-//   exposeHeaders: ['Content-Length', 'X-Kuma-Revision', 'Content-Range'],
-//   maxAge: 600,
-//   credentials: true,
-// })
+
 function optionsHandler(c: Context): Response {
   console.log('in DO', 'optionsHandler')
   return c.newResponse(null, 204, {
@@ -119,21 +107,12 @@ export class UploadHandler {
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
     this.router = new Hono()
     this.router.use('*', logger())
-    // this.router.use('*', requestId())
-    // this.router = new Hono().basePath(`/private/files`)
-
     this.router.options('/private/files/upload/:bucket', optionsHandler)
     this.router.post('/private/files/upload/:bucket', this.exclusive(this.create))
-    this.router.options('/private/files/upload/:bucket/:id', optionsHandler)
-    this.router.patch('/private/files/upload/:bucket/:id', this.exclusive(this.patch))
-    // this.router
-    this.router.get('/private/files/upload/:bucket/:id', this.exclusive(this.head))
+    this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler)
+    this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch))
+    this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head))
 
-    // this.router.options('/upload/:bucket', optionsHandler)
-    // this.router.post('/upload/:bucket', corsRes, this.exclusive(this.create))
-    // this.router.options('/upload/:bucket/:id', optionsHandler)
-    // this.router.patch('/upload/:bucket/:id', corsRes, this.exclusive(this.patch))
-    // this.router.get('/upload/:bucket/:id', corsRes, this.exclusive(this.head))
 
     this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
@@ -188,9 +167,8 @@ export class UploadHandler {
     const uploadMetadata = parseUploadMetadata(c.req.raw.headers)
     const checksum = parseChecksum(c.req.raw.headers)
 
-    const r2Key = uploadMetadata.filename || ''
-    const safeR2Key = r2Key.replace(/\//g, '_')
-    if (r2Key == null) {
+    const safeR2Key = uploadMetadata.filename || ''
+    if (safeR2Key == null) {
       console.log('in DO', 'upload_bundle', 'r2Key is null')
       return c.text('bad filename metadata', 400)
     }
@@ -198,7 +176,7 @@ export class UploadHandler {
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
       console.log('in DO', 'upload_bundle', 'duplicate object creation')
-      await this.cleanup(r2Key)
+      await this.cleanup(safeR2Key)
       return c.text('object already exists', 409)
     }
 
@@ -261,8 +239,7 @@ export class UploadHandler {
   // get the current upload offset to resume an upload
   async head(c: Context): Promise<Response> {
     console.log('in DO', 'head detected')
-    const r2Key = c.req.param('id')
-    const safeR2Key = r2Key.replace(/\//g, '_')
+    const safeR2Key = c.req.param('id')
 
     let offset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     let uploadLength: number | undefined
@@ -298,8 +275,7 @@ export class UploadHandler {
 
   // append to the upload at the current upload offset
   async patch(c: Context): Promise<Response> {
-    const r2Key = c.req.param('id')
-    const safeR2Key = r2Key.replace(/\//g, '_')
+    const safeR2Key = c.req.param('id')
     console.log('in DO', 'patch', safeR2Key)
 
     let uploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
@@ -464,6 +440,7 @@ export class UploadHandler {
     if (body == null) {
       throw new UnrecoverableError(`Object ${r2Key} not found directly after uploading`, r2Key)
     }
+    // @ts-expect-error-next-line
     const digest = new crypto.DigestStream('SHA-256')
     await body.body.pipeTo(digest)
     return await digest.digest
@@ -559,6 +536,7 @@ export class UploadHandler {
 
   async r2Put(r2Key: string, bytes: Uint8Array, checksum?: Uint8Array) {
     try {
+      // @ts-expect-error-next-line
       await this.retryBucket.put(r2Key, bytes, checksum)
     }
     catch (e) {

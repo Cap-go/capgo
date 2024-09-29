@@ -106,7 +106,7 @@ export interface FinalPart {
 
 export interface ErrorPart {
   kind: 'error'
-  error: StatusError
+  error: HTTPException
   bytes: Uint8Array
 }
 
