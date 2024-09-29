@@ -8,6 +8,7 @@ export const REQUEST_METHODS = ['POST', 'HEAD', 'PATCH', 'OPTIONS', 'DELETE'] as
 
 export const HEADERS = [
   'Authorization',
+  'capgkey',
   'Content-Type',
   'Location',
   'Tus-Extension',
