@@ -59,11 +59,11 @@ async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
 }
 
 function validateRequestId(requestId: string) {
-  const [orgs, , apps, , versions, versionID] = requestId.split('/')
-  if (orgs !== 'orgs' || apps !== 'apps' || versions !== 'versions') {
+  const [orgs, , apps, , versionID] = requestId.split('/')
+  if (orgs !== 'orgs' || apps !== 'apps') {
     throw new Error('Invalid requestId')
   }
-  if (requestId.split('/').length !== 6) {
+  if (requestId.split('/').length !== 5) {
     throw new Error('Invalid requestId')
   }
   if (versionID == null || !versionID.endsWith('.zip')) {
