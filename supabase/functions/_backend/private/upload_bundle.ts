@@ -20,7 +20,7 @@ app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, getHandler)
 // TODO: create a key system with DO to allow read only after a get returned it
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setBypassAuth, setKeyFromIdParam, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, uploadHandler)
 
 app.all('*', (c) => {
@@ -80,7 +80,9 @@ async function getHandler(c: Context): Promise<Response> {
   const [, owner_org, , app_id] = requestId.split('/')
   try {
     validateRequestId(requestId)
-    await checkAppAccess(c, app_id, owner_org)
+    if (c.get('bypassAuth') !== 'true') {
+      await checkAppAccess(c, app_id, owner_org)
+    }
   }
   catch (error) {
     console.log({ requestId: c.get('requestId'), context: 'checkAppAccess', error })
@@ -222,6 +224,11 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     return c.json({ error: 'Not Found' }, 404)
   }
   c.set('fileId', fileId)
+  await next()
+}
+
+async function setBypassAuth(c: Context, next: Next) {
+  c.set('bypassAuth', 'true')
   await next()
 }
 
