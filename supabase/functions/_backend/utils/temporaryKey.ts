@@ -23,33 +23,56 @@ export class TemporaryKeyHandler {
   }
 
   private async createKey(c: Context) {
-    const { paths } = await c.req.json<{ paths: string[] }>()
-    if (!paths || !Array.isArray(paths) || paths.length === 0) {
-      console.error({ context: 'createKey', error: 'Invalid paths' })
-      return c.json({ error: 'Invalid paths' }, 400)
+    const { versionID, paths } = await c.req.json<{ versionID: string, paths: string[] }>()
+    if (!versionID || !paths || !Array.isArray(paths) || paths.length === 0) {
+      console.error({ context: 'createKey', error: 'Invalid versionID or paths' })
+      return c.json({ error: 'Invalid versionID or paths' }, 400)
     }
 
-    const key = crypto.randomUUID()
-    await this.state.storage.put(key, {
-      expiration: Date.now() + KEY_EXPIRATION_TIME,
-      paths,
-    })
-
+    const now = Date.now()
+    const expiration = now + KEY_EXPIRATION_TIME
     // Set an alarm to clean up the key after it expires
-    await this.state.storage.setAlarm(Date.now() + KEY_EXPIRATION_TIME)
+    await this.state.storage.setAlarm(expiration)
 
-    return c.json({ key })
+    // Check if a key already exists for this versionID
+    const existingData = await this.state.storage.get<{ signKey: string, expiration: number, paths: string[] }>(versionID)
+
+    if (existingData) {
+      // If a key exists, update the expiration and paths, but keep the existing signKey
+      await this.state.storage.put(versionID, {
+        signKey: existingData.signKey,
+        expiration,
+        paths: [...new Set([...existingData.paths, ...paths])],
+      })
+      return c.json({ key: existingData.signKey })
+    }
+    else {
+      // If no key exists, create a new one
+      const signKey = crypto.randomUUID()
+      await this.state.storage.put(versionID, { signKey, expiration, paths })
+      return c.json({ key: signKey })
+    }
   }
 
   private async validateKey(c: Context) {
-    const key = c.req.query('key')
+    const signKey = c.req.query('key')
     const path = c.req.query('path')
-    if (!key || !path) {
-      return c.json({ valid: false, error: 'Missing key or path' })
+    const versionID = c.req.query('versionID')
+    if (!signKey || !path || !versionID) {
+      return c.json({ valid: false, error: 'Missing key, path, or versionID' })
     }
 
-    const keyData = await this.state.storage.get(key)
-    if (!keyData || Date.now() > keyData.expiration || !keyData.paths.includes(path)) {
+    const keyData = await this.state.storage.get<{ signKey: string, expiration: number, paths: string[] }>(versionID)
+    if (!keyData) {
+      return c.json({ valid: false, error: 'Invalid versionID' })
+    }
+
+    if (keyData.signKey !== signKey) {
+      return c.json({ valid: false, error: 'Invalid key' })
+    }
+
+    if (Date.now() > keyData.expiration || !keyData.paths.includes(path)) {
+      await this.state.storage.delete(versionID)
       return c.json({ valid: false, error: 'Invalid or expired key' })
     }
 
@@ -57,12 +80,11 @@ export class TemporaryKeyHandler {
   }
 
   async alarm() {
-    // Clean up expired keys
-    const keys = await this.state.storage.list()
+    const keys = await this.state.storage.list<{ expiration: number }>()
     const now = Date.now()
-    for (const [key, value] of keys) {
+    for (const [versionID, value] of keys) {
       if (value.expiration < now) {
-        await this.state.storage.delete(key)
+        await this.state.storage.delete(versionID)
       }
     }
   }

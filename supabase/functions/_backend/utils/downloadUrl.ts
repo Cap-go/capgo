@@ -63,16 +63,16 @@ export async function getBundleUrl(
     const response = await handler.fetch(`${url.protocol}//${url.host}/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paths: [path] }),
+      body: JSON.stringify({ versionID: version.id, paths: [path] }),
     })
-    const { key } = await response.json<{ key: string }>()
+    const { key: signKey } = await response.json<{ key: string }>()
 
-    if (!key) {
+    if (!signKey) {
       console.error({ requestId: c.get('requestId'), context: 'getBundleUrlV2', error: 'Failed to create temporary key' })
       return null
     }
 
-    const downloadUrl = `${url.protocol}//${url.host}/private/files/read/attachments/${path}?key=${key}`
+    const downloadUrl = `${url.protocol}//${url.host}/private/files/read/attachments/${path}?key=${signKey}&versionID=${version.id}`
     size = bundleMeta?.size ?? 0
 
     return { url: downloadUrl, size }
@@ -105,11 +105,11 @@ export async function getManifestUrl(c: Context, version: {
     const response = await handler.fetch(`${url.protocol}//${url.host}/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paths }),
+      body: JSON.stringify({ versionID: version.id, paths }),
     })
-    const { key } = await response.json<{ key: string }>()
+    const { key: signKey } = await response.json<{ key: string }>()
 
-    if (!key) {
+    if (!signKey) {
       console.error({ requestId: c.get('requestId'), context: 'getManifestUrl', error: 'Failed to create temporary key' })
       return []
     }
@@ -121,7 +121,7 @@ export async function getManifestUrl(c: Context, version: {
       return {
         file_name: entry.file_name,
         file_hash: entry.file_hash,
-        download_url: `${url.protocol}//${url.host}/${basePath}/${entry.s3_path}?key=${key}`,
+        download_url: `${url.protocol}//${url.host}/${basePath}/${entry.s3_path}?key=${signKey}&version_id=${version.id}`,
       }
     }).filter(entry => entry !== null) as ManifestEntry[]
   }

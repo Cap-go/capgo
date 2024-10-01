@@ -95,13 +95,15 @@ async function getHandler(c: Context): Promise<Response> {
     return c.json({ error: 'Not Found' }, 404)
   }
 
+  let response = null
+  // disable cache for now TODO: add it back when we understand why it doesn't give file tto download but text
   // @ts-expect-error-next-line
-  const cache = caches.default
-  const cacheKey = new Request(new URL(c.req.url), c.req)
-  let response = await cache.match(cacheKey)
-  if (response != null) {
-    return response
-  }
+  // const cache = caches.default
+  // const cacheKey = new Request(new URL(c.req.url), c.req)
+  // let response = await cache.match(cacheKey)
+  // if (response != null) {
+  //   return response
+  // }
 
   const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
     range: c.req.raw.headers,
@@ -118,7 +120,7 @@ async function getHandler(c: Context): Promise<Response> {
   }
   else {
     response = new Response(object.body, { headers })
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    // c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
     return response
   }
 }
@@ -226,22 +228,23 @@ async function setKeyFromIdParam(c: Context, next: Next) {
 }
 
 async function validateTemporaryKey(c: Context, next: Next) {
-  const key = c.req.query('key')
+  const signKey = c.req.query('key')
+  const versionID = c.req.query('versionID')
   const path = c.get('fileId')
-  if (!key || !path) {
-    console.log({ requestId: c.get('requestId'), context: 'Missing temporary key or path' })
-    return c.json({ error: 'Missing temporary key or path' }, 400)
+  if (!signKey || !path) {
+    console.log({ requestId: c.get('requestId'), context: 'Missing key or path' })
+    return c.json({ error: 'Missing key or path' }, 400)
   }
 
   const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
   const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
 
   const url = new URL(c.req.url)
-  const response = await handler.fetch(`${url.protocol}//${url.host}/validate?key=${key}&path=${path}`)
+  const response = await handler.fetch(`${url.protocol}//${url.host}/validate?key=${signKey}&versionID=${versionID}&path=${path}`)
   const { valid, error } = await response.json<{ valid: boolean, error?: string }>()
 
   if (!valid) {
-    return c.json({ error: error || 'Invalid or expired temporary key' }, 403)
+    return c.json({ error: error || 'Invalid or expired key' }, 403)
   }
 
   await next()
