@@ -25,7 +25,6 @@ import { app as latency_drizzle } from '../supabase/functions/_backend/private/l
 import { app as latency_postres } from '../supabase/functions/_backend/private/latency_postres.ts'
 import { app as log_as } from '../supabase/functions/_backend/private/log_as.ts'
 import { app as multipart } from '../supabase/functions/_backend/private/multipart.ts'
-import { app as partial_upload } from '../supabase/functions/_backend/private/partial_upload.ts'
 // Private API
 import { app as plans } from '../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../supabase/functions/_backend/private/public_stats.ts'
@@ -110,7 +109,6 @@ appFront.route('/latency_postres', latency_postres)
 appFront.route('/verify_replication', verify_replication)
 appFront.route('/multipart', multipart)
 appFront.route('/create_device', create_device)
-appFront.route('/partial_upload', partial_upload)
 appFront.route('/files', upload_bundle)
 
 // Triggers
