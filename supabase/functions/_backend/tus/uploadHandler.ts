@@ -53,28 +53,6 @@ interface StoredUploadInfo {
   multipartUploadId?: string
 }
 
-// UploadHandlers represent an in-progress resumable upload to cloudflare R2.
-//
-// This class is a 'template' for a cloudflare durable object, which are
-// created by upstream workers for each unique object upload. See
-// https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-//
-// Uploads use the TUS protocol https://tus.io/protocols/resumable-upload.
-// When a client interacts with a particular upload name, all requests are
-// routed to the durable object id derived from that name (or a new durable
-// object is created if it doesn't already exist). POSTs initialize the
-// upload, and subsequent PATCH requests append to  it. If a client gets
-// disconnected, a HEAD returns the current upload offset for the upload so
-// the upload can be resumed.
-//
-// Uploads are staged via R2 multipart upload, which is completed when the
-// client uploads the last byte. Multipart upload only supports 5MB boundaries,
-// which is more than we'd like clients to have to reupload. If a client does
-// not complete the upload in a single request (either because of a disconnect
-// or because the request is broken into multiple patches), the remainder after
-// the last 5MB boundary is saved in a temporary R2 object, which is then read
-// on a subsequent PATCH.
-
 function optionsHandler(c: Context): Response {
   console.log('in DO', 'optionsHandler')
   return c.newResponse(null, 204, {

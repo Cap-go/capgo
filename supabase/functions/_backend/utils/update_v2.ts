@@ -572,7 +572,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         await createStatsBandwidth(c, device_id, app_id, res.size)
       }
       if (semver.gte(plugin_version, '6.2.0')) {
-        manifest = await getManifestUrl(c, { app_id, ...(version as any) })
+        manifest = await getManifestUrl(c, { app_id, ...(version as any) }, appOwner.orgs.id)
       }
     }
     //  check signedURL and if it's url

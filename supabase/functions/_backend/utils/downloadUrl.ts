@@ -66,19 +66,43 @@ export async function getManifestUrl(c: Context, version: {
   bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
   app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
   manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null
-}): Promise<ManifestEntry[]> {
+}, ownerOrg: string): Promise<ManifestEntry[]> {
   if (!version.manifest) {
     return []
   }
-  const basePath = 'https://api.capgo.app/private/files/read/attachments/'
-  const finalManifest = version.manifest.map((entry) => {
-    if (!entry.s3_path)
-      return null
-    return {
-      file_name: entry.file_name,
-      file_hash: entry.file_hash,
-      download_url: `${basePath}${entry.s3_path}`,
+  const basePath = 'private/files/read/attachments'
+  const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
+  const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
+
+  const paths = version.manifest.map(entry => entry.s3_path).filter(Boolean) as string[]
+
+  try {
+    const url = new URL(c.req.url)
+    const response = await handler.fetch(`${url.protocol}//${url.host}/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths }),
+    })
+    const { key } = await response.json<{ key: string }>()
+
+    if (!key) {
+      console.error({ requestId: c.get('requestId'), context: 'getManifestUrl', error: 'Failed to create temporary key' })
+      return []
     }
-  })
-  return finalManifest.filter(entry => entry !== null)
+
+    return version.manifest.map((entry) => {
+      if (!entry.s3_path)
+        return null
+
+      return {
+        file_name: entry.file_name,
+        file_hash: entry.file_hash,
+        download_url: `${url.protocol}//${url.host}/${basePath}/${entry.s3_path}?key=${key}`,
+      }
+    }).filter(entry => entry !== null) as ManifestEntry[]
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'getManifestUrl', error })
+    return []
+  }
 }

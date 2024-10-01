@@ -3,7 +3,10 @@ compatibility_date = "2024-09-23"
 main = "./cloudflare_workers/index.ts"
 compatibility_flags = [ "nodejs_compat_v2" ]
 
-durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
+durable_objects.bindings = [
+  { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" },
+  { name = "TEMPORARY_KEY_HANDLER", class_name = "TemporaryKeyHandler" }
+]
 
 r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo", preview_bucket_name = "capgo" } ]
 
@@ -15,6 +18,10 @@ new_classes = [ "UploadHandler" ]
 tag = "v2"
 renamed_classes = [ { from = "UploadHandler", to = "AttachmentUploadHandler" } ]
 # new_classes = ["BackupUploadHandler"] // TOOD: to use if we change the DO
+
+[[migrations]]
+tag = "v3"
+new_classes = [ "TemporaryKeyHandler" ]
 
 [placement]
 mode = "smart"

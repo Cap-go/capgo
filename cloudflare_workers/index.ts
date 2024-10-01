@@ -65,6 +65,7 @@ import { app as stripe_event } from '../supabase/functions/_backend/triggers/str
 import type { Bindings } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../supabase/functions/_backend/tus/uploadHandler.ts'
+export { TemporaryKeyHandler } from '../supabase/functions/_backend/utils/temporaryKey.ts'
 
 const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()

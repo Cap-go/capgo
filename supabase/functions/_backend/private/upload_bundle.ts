@@ -20,7 +20,7 @@ app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, getHandler)
 // TODO: create a key system with DO to allow read only after a get returned it
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setBypassAuth, setKeyFromIdParam, getHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setBypassAuth, setKeyFromIdParam, validateTemporaryKey, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, uploadHandler)
 
 app.all('*', (c) => {
@@ -48,7 +48,6 @@ async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
     .from('apps')
     .select('app_id, owner_org')
     .eq('app_id', app_id)
-    // .eq('user_id', userId)
     .single()
   if (errorApp) {
     console.log({ requestId: c.get('requestId'), context: 'errorApp', error: errorApp })
@@ -156,13 +155,10 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
-// function corsHandler(c: Context): Response {
-//   //  allow cors TODO: remove this in production
-//   c.header('Access-Control-Allow-Origin', '*')
-//   // allow headersfor tus protocol
-//   c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset')
-//   return c.text('', 204)
-// }
+async function setBypassAuth(c: Context, next: Next) {
+  c.set('bypassAuth', 'true')
+  await next()
+}
 
 function optionsHandler(c: Context): Response {
   console.log('optionsHandler upload_bundle', 'optionsHandler')
@@ -193,9 +189,6 @@ async function uploadHandler(c: Context): Promise<Response> {
   // make requestId  safe
   console.log('upload_bundle req', 'uploadHandler', requestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
-  // c.header('Access-Control-Allow-Origin', '*')
-  // allow headersfor tus protocol
-  // c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset')
 
   if (durableObjNs == null) {
     console.log('upload_bundle', 'durableObjNs is null')
@@ -203,41 +196,53 @@ async function uploadHandler(c: Context): Promise<Response> {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(requestId))
-  console.log('can handler')
+  console.log({ requestId: c.get('requestId'), context: 'can handler' })
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
     method: c.req.method,
     headers: c.req.raw.headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
-  }).then((res) => {
-    // console.log('upload_bundle res', 'uploadHandler', res)
-    // res.headers.set('Access-Control-Allow-Origin', '*')
-    // res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Signal-Checksum-SHA256, tus-resumable, tus-version, tus-max-size, tus-extension, tus-checksum-sha256, upload-metadata, upload-length, upload-offset')
-    return res
   })
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
   const fileId = parseUploadMetadata(c.req.raw.headers).filename
   if (fileId == null) {
-    console.log('upload_bundle', 'fileId is null')
+    console.log({ requestId: c.get('requestId'), context: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
   c.set('fileId', fileId)
-  await next()
-}
-
-async function setBypassAuth(c: Context, next: Next) {
-  c.set('bypassAuth', 'true')
   await next()
 }
 
 async function setKeyFromIdParam(c: Context, next: Next) {
   const fileId = c.req.param('id')
   if (fileId == null) {
-    console.log('upload_bundle', 'fileId is null')
+    console.log({ requestId: c.get('requestId'), context: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
   c.set('fileId', fileId)
+  await next()
+}
+
+async function validateTemporaryKey(c: Context, next: Next) {
+  const key = c.req.query('key')
+  const path = c.get('fileId')
+  if (!key || !path) {
+    console.log({ requestId: c.get('requestId'), context: 'Missing temporary key or path' })
+    return c.json({ error: 'Missing temporary key or path' }, 400)
+  }
+
+  const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
+  const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
+
+  const url = new URL(c.req.url)
+  const response = await handler.fetch(`${url.protocol}//${url.host}/validate?key=${key}&path=${path}`)
+  const { valid, error } = await response.json<{ valid: boolean, error?: string }>()
+
+  if (!valid) {
+    return c.json({ error: error || 'Invalid or expired temporary key' }, 403)
+  }
+
   await next()
 }

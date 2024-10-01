@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { getBundleUrl } from '../utils/downloadUrl.ts'
+import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -9,6 +9,7 @@ interface DataDownload {
   storage_provider: string
   user_id?: string
   id: number
+  isManifest?: boolean
 }
 
 export const app = new Hono()
@@ -45,18 +46,38 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     if (getBundleError) {
       console.error({ requestId: c.get('requestId'), context: 'getBundleError', error: getBundleError })
-      return c.json({ status: 'Error unknow' }, 500)
+      return c.json({ status: 'Error unknown' }, 500)
     }
 
     if (!ownerOrg) {
       console.error({ requestId: c.get('requestId'), context: 'cannotGetOwnerOrg', bundle })
-      return c.json({ status: 'Error unknow' }, 500)
+      return c.json({ status: 'Error unknown' }, 500)
     }
 
-    const data = await getBundleUrl(c, ownerOrg, bundle)
-    if (!data)
-      return c.json({ status: 'Error unknow' }, 500)
-    return c.json({ url: data.url })
+    if (body.isManifest) {
+      const manifestEntries = await getManifestUrl(c, bundle, ownerOrg)
+      return c.json({ manifest: manifestEntries })
+    } else {
+      const data = await getBundleUrl(c, ownerOrg, bundle)
+      if (!data)
+        return c.json({ status: 'Error unknown' }, 500)
+
+      const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
+      const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
+
+      const requestId = `orgs/${ownerOrg}/apps/${body.app_id}/versions/${body.id}`
+      const response = await handler.fetch(`/create?requestId=${requestId}`, { method: 'POST' })
+      const { key } = await response.json()
+
+      if (!key) {
+        return c.json({ status: 'Error creating temporary key' }, 500)
+      }
+
+      const url = new URL(data.url)
+      url.searchParams.append('key', key)
+
+      return c.json({ url: url.toString() })
+    }
   }
   catch (e) {
     return c.json({ status: 'Cannot get download link', error: JSON.stringify(e) }, 500)
