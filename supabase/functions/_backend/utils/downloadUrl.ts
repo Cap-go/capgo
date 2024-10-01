@@ -4,7 +4,7 @@ import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
-// const EXPIRATION_SECONDS = 120
+
 export interface ManifestEntry {
   file_name: string | null
   file_hash: string | null
@@ -70,17 +70,15 @@ export async function getManifestUrl(c: Context, version: {
   if (!version.manifest) {
     return []
   }
-  const finalManifest = await Promise.all(version.manifest.map((entry) => {
+  const basePath = 'https://api.capgo.app/private/files/read/attachments/'
+  const finalManifest = version.manifest.map((entry) => {
     if (!entry.s3_path)
       return null
-    return s3.getSignedUrl(c, entry.s3_path, EXPIRATION_SECONDS).then(signedUrl => ({
+    return {
       file_name: entry.file_name,
       file_hash: entry.file_hash,
-      download_url: signedUrl ?? null,
-    })).catch((e) => {
-      console.error({ requestId: c.get('requestId'), context: 'getManifestUrl', error: `Error while getting the download url for manifest entry ${entry.s3_path}. Error: ${e}` })
-      return null
-    })
-  }))
+      download_url: `${basePath}${entry.s3_path}`,
+    }
+  })
   return finalManifest.filter(entry => entry !== null)
 }
