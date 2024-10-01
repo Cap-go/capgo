@@ -374,7 +374,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       if (res) {
         signedURL = res.url
         // only count the size of the bundle if it's not external
-        await createStatsBandwidth(c, device_id, app_id, res.size)
+        await createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
       }
       if (semver.gte(plugin_version, '6.2.0')) {
         manifest = await getManifestUrl(c, { app_id, ...version })
