@@ -12,7 +12,6 @@ import { version } from '../package.json'
 import { app as channel_self } from '../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../supabase/functions/_backend/plugins/updates.ts'
-import { app as updates_v2 } from '../supabase/functions/_backend/plugins/updates_v2.ts'
 import { app as config } from '../supabase/functions/_backend/private/config.ts'
 
 import { app as create_device } from '../supabase/functions/_backend/private/create_device.ts'
@@ -87,7 +86,7 @@ app.route('/on_app_create', on_app_create)
 // Plugin API
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
-app.route('/updates_v2', updates_v2)
+app.route('/updates_v2', updates)
 app.route('/updates_debug', updates)
 app.route('/stats', stats)
 

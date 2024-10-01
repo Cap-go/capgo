@@ -55,28 +55,15 @@ app.post('/', middlewareAuth, async (c: Context) => {
     }
 
     if (body.isManifest) {
-      const manifestEntries = await getManifestUrl(c, bundle, ownerOrg)
+      const manifestEntries = await getManifestUrl(c, bundle)
       return c.json({ manifest: manifestEntries })
-    } else {
+    }
+    else {
       const data = await getBundleUrl(c, ownerOrg, bundle)
       if (!data)
         return c.json({ status: 'Error unknown' }, 500)
 
-      const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
-      const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
-
-      const requestId = `orgs/${ownerOrg}/apps/${body.app_id}/versions/${body.id}`
-      const response = await handler.fetch(`/create?requestId=${requestId}`, { method: 'POST' })
-      const { key } = await response.json()
-
-      if (!key) {
-        return c.json({ status: 'Error creating temporary key' }, 500)
-      }
-
-      const url = new URL(data.url)
-      url.searchParams.append('key', key)
-
-      return c.json({ url: url.toString() })
+      return c.json({ url: data.url })
     }
   }
   catch (e) {

@@ -22,13 +22,11 @@ export async function getBundleUrl(
     app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
   },
 ) {
-  console.log({ requestId: c.get('requestId'), context: 'getBundleUrl version', version })
+  console.log({ requestId: c.get('requestId'), context: 'getBundleUrlV2 version', version })
 
   let path: string | null = null
   let size: number | null = null
-  let url: string | null = null
 
-  // get app_versions_meta to get the size
   const { data: bundleMeta } = await supabaseAdmin(c)
     .from('app_versions_meta')
     .select('size')
@@ -44,17 +42,43 @@ export async function getBundleUrl(
   if (!path)
     return null
 
-  try {
-    const signedUrl = await s3.getSignedUrl(c, path, EXPIRATION_SECONDS)
-    console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
+  const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
+  if (!durableObjNs) {
+    try {
+      const signedUrl = await s3.getSignedUrl(c, path, EXPIRATION_SECONDS)
+      console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
 
-    url = signedUrl
+      const url = signedUrl
+
+      return { url }
+    }
+    catch (error) {
+      console.error({ requestId: c.get('requestId'), context: 'getBundleUrl', error })
+    }
+  }
+  const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
+
+  try {
+    const url = new URL(c.req.url)
+    const response = await handler.fetch(`${url.protocol}//${url.host}/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths: [path] }),
+    })
+    const { key } = await response.json<{ key: string }>()
+
+    if (!key) {
+      console.error({ requestId: c.get('requestId'), context: 'getBundleUrlV2', error: 'Failed to create temporary key' })
+      return null
+    }
+
+    const downloadUrl = `${url.protocol}//${url.host}/private/files/read/attachments/${path}?key=${key}`
     size = bundleMeta?.size ?? 0
 
-    return { url, size }
+    return { url: downloadUrl, size }
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'getBundleUrl', error })
+    console.error({ requestId: c.get('requestId'), context: 'getBundleUrlV2', error })
   }
   return null
 }
@@ -66,7 +90,7 @@ export async function getManifestUrl(c: Context, version: {
   bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
   app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
   manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null
-}, ownerOrg: string): Promise<ManifestEntry[]> {
+}): Promise<ManifestEntry[]> {
   if (!version.manifest) {
     return []
   }

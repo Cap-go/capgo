@@ -113,8 +113,18 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     storage_provider: provider,
     id,
   }
-  const res = await useSupabase().functions.invoke('private/download_link', { body: JSON.stringify(data) })
-  return res.data.url
+  const { data: currentSession } = await useSupabase().auth.getSession()!
+  if (!currentSession.session)
+    return ''
+
+  const currentJwt = currentSession.session.access_token
+  const res = await ky.post(`${defaultApiHost}/private/download_link`, {
+    json: data,
+    headers: {
+      Authorization: `Bearer ${currentJwt}`,
+    },
+  }).json<{ url: string }>()
+  return res.url
 }
 
 // do a function to get get_process_cron_stats_job_info for supabase
