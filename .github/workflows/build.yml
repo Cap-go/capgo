@@ -96,11 +96,11 @@ jobs:
       - name: Create Release ALPHA
         if: ${{ contains(github.ref, '-alpha.') }}
         id: create_release_alpha
-        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha
+        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c alpha --partial
       - name: Create Release PROD
         if: ${{ !contains(github.ref, '-alpha.') }}
         id: create_release_prod
-        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production
+        run: bun x @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} -c production --partial
 
       - name: Create Sourcemap Sentry
         run: bun run cf-build
