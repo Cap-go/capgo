@@ -23,7 +23,7 @@ export const TUS_VERSION = '1.0.0'
 // uploads larger than this will be rejected
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 100
 
-export const X_CHECKSUM_SHA256 = 'X-Signal-Checksum-Sha256'
+export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
 
 // how long an unfinished upload lives in ms
 const UPLOAD_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000
