@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { HTTPException } from 'hono/http-exception'
-import { X_SIGNAL_CHECKSUM_SHA256 } from './uploadHandler.ts'
+import { X_CHECKSUM_SHA256 } from './uploadHandler.ts'
 import { fromBase64 } from './util.ts'
 
 export interface UploadMetadata {
@@ -43,7 +43,7 @@ export function parseUploadMetadata(headers: Headers): UploadMetadata {
 }
 
 export function parseChecksum(headers: Headers): Uint8Array | undefined {
-  const checksum = headers.get(X_SIGNAL_CHECKSUM_SHA256)
+  const checksum = headers.get(X_CHECKSUM_SHA256)
   if (checksum == null) {
     return
   }

@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import type { Context, Next } from '@hono/hono'
 import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
-import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_SIGNAL_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
+import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -126,12 +126,12 @@ function objectHeaders(object: R2Object): Headers {
 
   // the sha256 checksum was provided to R2 in the upload
   if (object.checksums.sha256 != null) {
-    headers.set(X_SIGNAL_CHECKSUM_SHA256, toBase64(object.checksums.sha256))
+    headers.set(X_CHECKSUM_SHA256, toBase64(object.checksums.sha256))
   }
 
   // it was a multipart upload, so we were forced to write a sha256 checksum as a custom header
-  if (object.customMetadata?.[X_SIGNAL_CHECKSUM_SHA256] != null) {
-    headers.set(X_SIGNAL_CHECKSUM_SHA256, object.customMetadata[X_SIGNAL_CHECKSUM_SHA256])
+  if (object.customMetadata?.[X_CHECKSUM_SHA256] != null) {
+    headers.set(X_CHECKSUM_SHA256, object.customMetadata[X_CHECKSUM_SHA256])
   }
   return headers
 }

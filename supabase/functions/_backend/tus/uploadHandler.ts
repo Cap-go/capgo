@@ -23,7 +23,7 @@ export const TUS_VERSION = '1.0.0'
 // uploads larger than this will be rejected
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 100
 
-export const X_SIGNAL_CHECKSUM_SHA256 = 'X-Signal-Checksum-Sha256'
+export const X_CHECKSUM_SHA256 = 'X-Signal-Checksum-Sha256'
 
 // how long an unfinished upload lives in ms
 const UPLOAD_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000
@@ -520,7 +520,7 @@ export class UploadHandler {
   async r2CreateMultipartUpload(r2Key: string, uploadInfo: StoredUploadInfo): Promise<RetryMultipartUpload> {
     const customMetadata: Record<string, string> = {}
     if (uploadInfo.checksum != null) {
-      customMetadata[X_SIGNAL_CHECKSUM_SHA256] = toBase64(uploadInfo.checksum)
+      customMetadata[X_CHECKSUM_SHA256] = toBase64(uploadInfo.checksum)
     }
     const upload = await this.retryBucket.createMultipartUpload(r2Key, { customMetadata })
     uploadInfo.multipartUploadId = upload.r2MultipartUpload.uploadId
