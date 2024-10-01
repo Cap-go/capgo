@@ -63,12 +63,13 @@ function validateRequestId(requestId: string) {
   if (orgs !== 'orgs' || apps !== 'apps') {
     throw new Error('Invalid requestId')
   }
-  if (requestId.split('/').length !== 5) {
+  if (requestId.split('/').length < 5) {
     throw new Error('Invalid requestId')
   }
-  if (versionID == null || !versionID.endsWith('.zip')) {
-    throw new Error('Invalid requestId')
-  }
+  // Cannot be done for manifest
+  // if (versionID == null || !versionID.endsWith('.zip')) {
+  //   throw new Error('Invalid requestId')
+  // }
   return true
 }
 
