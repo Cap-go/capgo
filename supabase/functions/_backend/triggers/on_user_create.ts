@@ -2,7 +2,6 @@ import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { addContact } from '../utils/plunk.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -25,12 +24,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     console.log({ requestId: c.get('requestId'), context: 'record', record })
     await Promise.all([
       createApiKey(c, record.id),
-      addContact(c, record.email, {
-        first_name: record.first_name || '',
-        last_name: record.last_name || '',
-        nickname: `${record.first_name || ''} ${record.last_name || ''}`,
-        image_url: record.image_url ? record.image_url : undefined,
-      }),
     ])
     console.log({ requestId: c.get('requestId'), context: 'createCustomer stripe' })
     if (record.customer_id)
