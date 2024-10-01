@@ -61,7 +61,7 @@ async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
 }
 
 function validateRequestId(requestId: string) {
-  const [orgs, , apps, , versionID] = requestId.split('/')
+  const [orgs, , apps] = requestId.split('/')
   if (orgs !== 'orgs' || apps !== 'apps') {
     throw new Error('Invalid requestId')
   }

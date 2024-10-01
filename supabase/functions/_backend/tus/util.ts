@@ -55,7 +55,7 @@ export function fromBase64(s: string): Uint8Array | undefined {
   try {
     return Buffer.from(s, 'base64')
   }
-  catch (err) {
+  catch {
     return undefined
   }
 }
