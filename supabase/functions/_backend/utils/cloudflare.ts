@@ -85,7 +85,7 @@ export async function trackDevicesCF(
     const existingRow = await c.env.DB_DEVICES.prepare(`
       SELECT * FROM devices 
       WHERE device_id = ? AND app_id = ?
-    `).bind(device_id, app_id).first()
+    `).bind(device_id.toLocaleLowerCase(), app_id).first()
 
     if (!existingRow || (
       existingRow.version !== version_id
@@ -119,7 +119,7 @@ export async function trackDevicesCF(
       const res = await c.env.DB_DEVICES.prepare(upsertQuery)
         .bind(
           updated_at,
-          device_id,
+          device_id.toLocaleLowerCase(),
           version_id,
           app_id,
           platform,
