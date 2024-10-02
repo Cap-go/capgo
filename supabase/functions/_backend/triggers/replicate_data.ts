@@ -64,6 +64,13 @@ function cleanFieldsAppVersions(record: any, table: string) {
     delete record.secondaryVersionPercentage
     delete record.disableAutoUpdate
   }
+  // device_id_lower when fucked the migration
+  if (table === 'channel_devices') {
+    delete record.device_id_lower
+  }
+  if (table === 'devices_override') {
+    delete record.device_id_lower
+  }
 
   return record
 }
