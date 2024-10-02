@@ -87,7 +87,7 @@ Deno.test('POST /updates parallel tests', async (t) => {
     t.step({
       name: 'with new device',
       fn: async () => {
-        const uuid = crypto.randomUUID()
+        const uuid = crypto.randomUUID().toLocaleLowerCase()
 
         const baseData = getBaseData()
         baseData.version_name = '1.1.0'
@@ -155,7 +155,7 @@ Deno.test('POST /updates parallel tests', async (t) => {
     t.step({
       name: 'direct channel overwrite',
       fn: async () => {
-        const uuid = crypto.randomUUID()
+        const uuid = crypto.randomUUID().toLocaleLowerCase()
 
         const baseData = getBaseData()
         baseData.device_id = uuid;
@@ -313,7 +313,7 @@ Deno.test('Update scenarios', async (t) => {
 
   await t.step('channel overwrite', async () => {
     await resetAndSeedData()
-    const uuid = crypto.randomUUID()
+    const uuid = crypto.randomUUID().toLocaleLowerCase()
 
     await supabase.from('channel_devices')
       .insert({
@@ -346,7 +346,7 @@ Deno.test('Update scenarios', async (t) => {
 
   await t.step('version overwrite', async () => {
     await resetAndSeedData()
-    const uuid = crypto.randomUUID()
+    const uuid = crypto.randomUUID().toLocaleLowerCase()
 
     await supabase.from('devices_override')
       .insert({

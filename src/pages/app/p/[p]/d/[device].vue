@@ -118,7 +118,7 @@ async function getChannelOverride() {
         updated_at
       `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value!)
+      .eq('device_id', id.value!.toLocaleLowerCase())
       .single()
       .throwOnError()
     if (error) {
@@ -143,7 +143,7 @@ async function getDeviceOverride() {
       updated_at
     `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value!)
+      .eq('device_id', id.value!.toLocaleLowerCase())
       .single()
       .throwOnError()
 
@@ -239,7 +239,7 @@ async function upsertDevVersion(device: string, versionId: number) {
   return supabase
     .from('devices_override')
     .upsert({
-      device_id: device,
+      device_id: device.toLocaleLowerCase(),
       version: versionId,
       app_id: packageId.value,
       owner_org: currentGid,
@@ -272,7 +272,7 @@ async function delDevVersion(device: string) {
   return supabase
     .from('devices_override')
     .delete()
-    .eq('device_id', device)
+    .eq('device_id', device.toLocaleLowerCase())
     .eq('app_id', packageId.value)
 }
 async function updateVersionOverride(event: Event) {
@@ -323,7 +323,7 @@ async function upsertDevChannel(device: string, channelId: number) {
   return supabase
     .from('channel_devices')
     .upsert({
-      device_id: device,
+      device_id: device.toLocaleLowerCase(),
       channel_id: channelId,
       app_id: packageId.value,
       owner_org: currentGid,
@@ -337,7 +337,7 @@ async function delDevChannel(device: string) {
   return supabase
     .from('channel_devices')
     .delete()
-    .eq('device_id', device)
+    .eq('device_id', device.toLocaleLowerCase())
     .eq('app_id', packageId.value)
 }
 

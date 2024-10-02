@@ -204,7 +204,7 @@ async function customDeviceOverwritePart5(
     .insert({
       app_id: props.appId,
       channel_id: chan.id,
-      device_id: deviceId,
+      device_id: deviceId.toLocaleLowerCase(),
       owner_org: chan.owner_org,
     })
 

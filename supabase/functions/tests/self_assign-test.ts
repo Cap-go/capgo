@@ -381,7 +381,7 @@ Deno.test('POST /channel_self with default channel', async () => {
   await resetAndSeedData()
 
   const data = getBaseData()
-  data.device_id = crypto.randomUUID()
+  data.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const { error: channelUpdateError, data: noAccessData } = await supabase.from('channels')
     .update({ allow_device_self_set: true })
@@ -431,7 +431,7 @@ Deno.test('PUT /channel_self (no overwrite)', async () => {
   await resetAndSeedData()
 
   const data = getBaseData()
-  data.device_id = crypto.randomUUID()
+  data.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const response = await fetchEndpoint('PUT', data)
   assertEquals(response.ok, true)
@@ -451,7 +451,7 @@ Deno.test('PUT /channel_self (with overwrite)', async () => {
   await resetAndSeedData()
 
   const data = getBaseData()
-  data.device_id = crypto.randomUUID()
+  data.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const { data: noAccessChannel, error: noAccessChannelError } = await supabase.from('channels')
     .select('id, owner_org')
@@ -505,7 +505,7 @@ Deno.test('POST /channel_self ok', async () => {
   await resetAndSeedData()
 
   const data = getBaseData()
-  data.device_id = crypto.randomUUID()
+  data.device_id = crypto.randomUUID().toLocaleLowerCase()
   data.channel = 'no_access'
 
   const { error: channelUpdateError } = await supabase.from('channels')
@@ -553,7 +553,7 @@ Deno.test('DELETE /channel_self (no overwrite)', async () => {
   await resetAndSeedData()
 
   const data = getBaseData()
-  data.device_id = crypto.randomUUID()
+  data.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const response = await fetchEndpoint('DELETE', data)
   assertEquals(response.status, 400)
@@ -566,7 +566,7 @@ Deno.test('DELETE /channel_self (with overwrite)', async () => {
   await resetAndSeedData()
 
   const data = getBaseData()
-  data.device_id = crypto.randomUUID()
+  data.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const { data: productionChannel, error: productionChannelError } = await supabase.from('channels')
     .select('id, owner_org')

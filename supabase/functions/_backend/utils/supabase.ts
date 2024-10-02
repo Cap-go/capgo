@@ -129,6 +129,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
     console.log({ requestId: c.get('requestId'), context: 'missing device_id, channel_id, or app_id' })
     return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
   }
+  update.device_id = update.device_id.toLocaleLowerCase()
 
   const { data: existingChannelDevice } = await supabaseAdmin(c)
     .from('channel_devices')

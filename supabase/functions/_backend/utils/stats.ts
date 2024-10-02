@@ -12,17 +12,19 @@ export interface StatsActions {
 }
 
 export function createStatsMau(c: Context, device_id: string, app_id: string) {
+  const lowerDeviceId = device_id.toLocaleLowerCase()
   if (!c.env.DEVICE_USAGE)
-    return trackDeviceUsageSB(c, device_id, app_id)
-  return trackDeviceUsageCF(c, device_id, app_id)
+    return trackDeviceUsageSB(c, lowerDeviceId, app_id)
+  return trackDeviceUsageCF(c, lowerDeviceId, app_id)
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {
+  const lowerDeviceId = device_id.toLocaleLowerCase()
   if (file_size === 0)
     return
   if (!c.env.BANDWIDTH_USAGE)
-    return trackBandwidthUsageSB(c, device_id, app_id, file_size)
-  return trackBandwidthUsageCF(c, device_id, app_id, file_size)
+    return trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size)
+  return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
@@ -33,15 +35,18 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
 }
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+  const lowerDeviceId = device_id.toLocaleLowerCase()
+  // This is super important until every device get the version of plugin 6.2.5
   if (!c.env.APP_LOG)
-    return trackLogsSB(c, app_id, device_id, action, version_id)
-  return trackLogsCF(c, app_id, device_id, action, version_id)
+    return trackLogsSB(c, app_id, lowerDeviceId, action, version_id)
+  return trackLogsCF(c, app_id, lowerDeviceId, action, version_id)
 }
 
 export function createStatsDevices(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  const lowerDeviceId = device_id.toLocaleLowerCase()
   if (!c.env.DB_DEVICES)
-    return trackDevicesSB(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
-  return trackDevicesCF(c, app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+    return trackDevicesSB(c, app_id, lowerDeviceId, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
+  return trackDevicesCF(c, app_id, lowerDeviceId, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator)
 }
 
 export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
@@ -95,6 +100,7 @@ export function readDevices(c: Context, app_id: string, range_start: number, ran
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[]) {
   // Prepare the device data for insertion
 
+  device.device_id = device.device_id.toLocaleLowerCase()
   const jobs = []
   // Prepare the stats data for insertion
   statsActions.forEach(({ action, versionId }) => {

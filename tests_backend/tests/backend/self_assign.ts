@@ -282,7 +282,7 @@ async function testPostWithChannelDisabledUpdate(backendBaseUrl: URL, supabase: 
 
 async function testOkPost(backendBaseUrl: URL, supabase: SupabaseType) {
   const baseData = getBaseData()
-  baseData.device_id = crypto.randomUUID()
+  basedata.device_id = crypto.randomUUID().toLocaleLowerCase()
   baseData.channel = 'no_access'
 
   const { error: channelUpdateError } = await supabase.from('channels')
@@ -326,7 +326,7 @@ async function testOkPost(backendBaseUrl: URL, supabase: SupabaseType) {
 // Do not ask me why whe fuck is the PUT request here to retrive the current overwrite
 async function testPutNoOverwrite(backendBaseUrl: URL, _supabase: SupabaseType) {
   const baseData = getBaseData()
-  baseData.device_id = crypto.randomUUID()
+  basedata.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const response = await fetchEndpoint(backendBaseUrl, 'PUT', baseData)
   responseOk(response, 'Test PUT (no overwrite)')
@@ -344,7 +344,7 @@ async function testPutNoOverwrite(backendBaseUrl: URL, _supabase: SupabaseType) 
 
 async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType) {
   const baseData = getBaseData()
-  baseData.device_id = crypto.randomUUID()
+  basedata.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const { data: noAccessChannel, error: noAccessChannelError } = await supabase.from('channels')
     .select('id, owner_org')
@@ -395,7 +395,7 @@ async function testPutWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType)
 
 async function testDeleteNoOverwrite(backendBaseUrl: URL, _supabase: SupabaseType) {
   const baseData = getBaseData()
-  baseData.device_id = crypto.randomUUID()
+  basedata.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const response = await fetchEndpoint(backendBaseUrl, 'DELETE', baseData)
   await responseStatusCode(response, 400, 'Test DELETE (no overwrite)')
@@ -406,7 +406,7 @@ async function testDeleteNoOverwrite(backendBaseUrl: URL, _supabase: SupabaseTyp
 
 async function testDeleteWithOverwrite(backendBaseUrl: URL, supabase: SupabaseType) {
   const baseData = getBaseData()
-  baseData.device_id = crypto.randomUUID()
+  basedata.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   const { data: productionChannel, error: productionChannelError } = await supabase.from('channels')
     .select('id, owner_org')
@@ -462,7 +462,7 @@ async function testPostWithDefaultChannel(backendBaseUrl: URL, supabase: Supabas
   // 4. Check if the device was removed from the DB
 
   const baseData = getBaseData()
-  baseData.device_id = crypto.randomUUID()
+  basedata.device_id = crypto.randomUUID().toLocaleLowerCase()
 
   // Step 1
   const { error: channelUpdateError, data: noAccessData } = await supabase.from('channels')
