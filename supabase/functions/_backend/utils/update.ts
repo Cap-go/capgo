@@ -124,6 +124,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
+    console.log({ requestId: c.get('requestId'), context: 'requestedInto', message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, devicesOverride exists ? ${devicesOverride !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
 
     if (!versionData) {
       console.log({ requestId: c.get('requestId'), context: 'No version data found' })

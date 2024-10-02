@@ -1,4 +1,4 @@
-// import { cors } from 'hono/cors'
+import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import type { Context, Next } from '@hono/hono'
 import { parseUploadMetadata } from '../tus/parse.ts'
@@ -15,20 +15,28 @@ const ATTACHMENT_PREFIX = 'attachments'
 export const app = new Hono()
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, uploadHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkAppAccess, uploadHandler)
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, getHandler)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, getHandler)
 // TODO: create a key system with DO to allow read only after a get returned it
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setBypassAuth, setKeyFromIdParam, validateTemporaryKey, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, uploadHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, validateTemporaryKey, getHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, uploadHandler)
 
 app.all('*', (c) => {
   console.log('all upload_bundle', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
 
-async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
+async function checkAppAccess(c: Context) {
+  const requestId = c.get('fileId')
+  const [orgs, owner_org, apps, app_id] = requestId.split('/')
+  if (orgs !== 'orgs' || apps !== 'apps') {
+    throw new HTTPException(400, { message: 'Invalid requestId' })
+  }
+  if (requestId.split('/').length < 5) {
+    throw new HTTPException(400, { message: 'Invalid requestId' })
+  }
   console.log('checkAppAccess', app_id, owner_org)
   const capgkey = c.get('capgkey')
   console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
@@ -36,12 +44,12 @@ async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
     .rpc('get_user_id', { apikey: capgkey, app_id })
   if (_errorUserId) {
     console.log({ requestId: c.get('requestId'), context: '_errorUserId', error: _errorUserId })
-    throw new Error('Error User not found')
+    throw new HTTPException(400, { message: 'Error User not found' })
   }
 
   if (!(await hasAppRight(c, app_id, userId, 'read'))) {
     console.log({ requestId: c.get('requestId'), context: 'no read' })
-    throw new Error('You can\'t access this app')
+    throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
 
   const { data: app, error: errorApp } = await supabaseAdmin(c)
@@ -51,42 +59,16 @@ async function checkAppAccess(c: Context, app_id: string, owner_org: string) {
     .single()
   if (errorApp) {
     console.log({ requestId: c.get('requestId'), context: 'errorApp', error: errorApp })
-    throw new Error('Error App not found')
+    throw new HTTPException(400, { message: 'Error App not found' })
   }
   if (app.owner_org !== owner_org) {
     console.log({ requestId: c.get('requestId'), context: 'owner_org' })
-    throw new Error('You can\'t access this app')
+    throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
-}
-
-function validateRequestId(requestId: string) {
-  const [orgs, , apps] = requestId.split('/')
-  if (orgs !== 'orgs' || apps !== 'apps') {
-    throw new Error('Invalid requestId')
-  }
-  if (requestId.split('/').length < 5) {
-    throw new Error('Invalid requestId')
-  }
-  // Cannot be done for manifest
-  // if (versionID == null || !versionID.endsWith('.zip')) {
-  //   throw new Error('Invalid requestId')
-  // }
-  return true
 }
 
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
-  const [, owner_org, , app_id] = requestId.split('/')
-  try {
-    validateRequestId(requestId)
-    if (c.get('bypassAuth') !== 'true') {
-      await checkAppAccess(c, app_id, owner_org)
-    }
-  }
-  catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'checkAppAccess', error })
-    return c.json({ error: error.message }, 400)
-  }
 
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
 
@@ -97,7 +79,7 @@ async function getHandler(c: Context): Promise<Response> {
 
   let response = null
   // disable cache for now TODO: add it back when we understand why it doesn't give file tto download but text
-  // @ts-expect-error-next-line
+  // // @ts-expect-error-next-line
   // const cache = caches.default
   // const cacheKey = new Request(new URL(c.req.url), c.req)
   // let response = await cache.match(cacheKey)
@@ -157,11 +139,6 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
-async function setBypassAuth(c: Context, next: Next) {
-  c.set('bypassAuth', 'true')
-  await next()
-}
-
 function optionsHandler(c: Context): Response {
   console.log('optionsHandler upload_bundle', 'optionsHandler')
   return c.newResponse(null, 204, {
@@ -179,15 +156,6 @@ function optionsHandler(c: Context): Response {
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
-  const [, owner_org, , app_id] = requestId.split('/')
-  try {
-    validateRequestId(requestId)
-    await checkAppAccess(c, app_id, owner_org)
-  }
-  catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'checkAppAccess', error })
-    return c.json({ error: error.message }, 400)
-  }
   // make requestId  safe
   console.log('upload_bundle req', 'uploadHandler', requestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
