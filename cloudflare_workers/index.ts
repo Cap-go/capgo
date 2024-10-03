@@ -198,9 +198,9 @@ app.get('/test_sentry', (c) => {
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException)
-    return e.getResponse()
+    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
   console.log('app', 'onError', e)
-  return c.text('Internal Server Error', 500)
+  return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 
 export default {

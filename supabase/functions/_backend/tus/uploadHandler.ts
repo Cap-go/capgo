@@ -93,11 +93,10 @@ export class UploadHandler {
     this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
       console.log('in DO', 'onError', e)
-      if (e instanceof HTTPException) {
-        return e.getResponse()
-      }
-      console.log('in DO', 'UploadHandler', 'error', e)
-      return c.text('Internal Server Error', 500)
+      if (e instanceof HTTPException)
+        return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
+      console.log('app', 'onError', e)
+      return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
     })
   }
 
