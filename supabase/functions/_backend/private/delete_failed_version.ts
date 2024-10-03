@@ -56,9 +56,9 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       .eq('storage_provider', 'r2-direct')
       .eq('deleted', false)
       .single()
-    if (errorVersion || version.external_url || !version.r2_path) {
+    if (errorVersion) {
       console.log({ requestId: c.get('requestId'), context: 'errorVersion', error: errorVersion })
-      return c.json({ status: 'Error App or Version not found' }, 500)
+      return c.json({ status: 'Already deleted' })
     }
 
     console.log({ requestId: c.get('requestId'), context: 'r2_path', r2_path: version.r2_path })
@@ -67,10 +67,12 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
     console.log({ requestId: c.get('requestId'), context: 's3.checkIfExist', r2_path: version.r2_path })
 
     // check if object exist in r2
-    const exist = await s3.checkIfExist(c, version.r2_path)
-    if (exist) {
-      console.log({ requestId: c.get('requestId'), context: 'exist', exist })
-      return c.json({ status: 'Error already exist' }, 500)
+    if (version.r2_path) {
+      const exist = await s3.checkIfExist(c, version.r2_path)
+      if (exist) {
+        console.log({ requestId: c.get('requestId'), context: 'exist', exist })
+        return c.json({ status: 'Error already uploaded to S3, delete is unsafe use the webapp to delete it' }, 500)
+      }
     }
 
     // delete the version
