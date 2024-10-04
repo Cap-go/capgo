@@ -67,13 +67,12 @@ PODS:
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorScreenRecorder (8.1.56):
+  - CapgoCapacitorScreenRecorder (8.1.64):
     - Capacitor
-  - CapgoCapacitorUpdater (6.1.28):
+  - CapgoCapacitorUpdater (6.2.5):
     - Alamofire
     - Capacitor
     - SSZipArchive
-    - SwiftyRSA
     - Version
   - CapgoInappbrowser (6.6.8):
     - Capacitor
@@ -92,9 +91,6 @@ PODS:
     - PurchasesHybridCommon (= 13.0.1)
   - SSZipArchive (2.4.3)
   - SwiftKeychainWrapper (4.0.1)
-  - SwiftyRSA (1.7.0):
-    - SwiftyRSA/ObjC (= 1.7.0)
-  - SwiftyRSA/ObjC (1.7.0)
   - Version (0.8.0)
 
 DEPENDENCIES:
@@ -146,7 +142,6 @@ SPEC REPOS:
     - RevenueCat
     - SSZipArchive
     - SwiftKeychainWrapper
-    - SwiftyRSA
     - Version
 
 EXTERNAL SOURCES:
@@ -264,8 +259,8 @@ SPEC CHECKSUMS:
   CapgoCapacitorFlash: add9502d704e3f7a412807f0b9ab8da05c4192b6
   CapgoCapacitorMute: 6cf5b54cb19afe8f0cf9b20c0040ec65d9ecf0a0
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
-  CapgoCapacitorScreenRecorder: 9b566b03ced1def9cdf6a921bab6193bc5f253d0
-  CapgoCapacitorUpdater: 31fc856dcabeaf7b1fe735684e158e664e0f355e
+  CapgoCapacitorScreenRecorder: b0bed728740691e8a0993f4cfacf985c88d9a18a
+  CapgoCapacitorUpdater: 5cf2afb1f57842d2075a7f114e9de447e132298f
   CapgoInappbrowser: 9f80d98fa546693b895712b5fba6abc46f65e44a
   CapgoNativeAudio: 4aaa363d3ad36581acaca722fc28cb0992015e89
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
@@ -275,7 +270,6 @@ SPEC CHECKSUMS:
   RevenuecatPurchasesCapacitor: e8b92ba24739e2632274c765e96b25013a051b97
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
-  SwiftyRSA: 8c6dd1ea7db1b8dc4fb517a202f88bb1354bc2c6
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
 PODFILE CHECKSUM: 37a97bf6083aae73e13d61d5c09d9d23bda6b0ad
