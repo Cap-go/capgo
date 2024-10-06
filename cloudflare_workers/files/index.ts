@@ -20,11 +20,12 @@ app.use('*', logger())
 app.use('*', requestId())
 
 // Files API
-app.route('/private/files', files)
+app.route('/files', files)
 
 // TODO: remove deprecated path when all users have been migrated
 app.route('/private/download_link', download_link)
 app.route('/private/upload_link', upload_link)
+app.route('/private/files', files)
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)

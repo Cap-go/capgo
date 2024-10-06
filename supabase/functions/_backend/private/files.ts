@@ -7,7 +7,6 @@ import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
 import { middlewareKey } from '../utils/hono.ts'
-import { validateSignKey } from '../utils/stats.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 import { app as download_link } from './download_link.ts'
 import { app as files_config } from './files_config.ts'
@@ -25,7 +24,7 @@ app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, getHandler)
 // TODO: create a key system with DO to allow read only after a get returned it
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, validateSignKeyMiddleware, getHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, uploadHandler)
 
 app.route('/config', files_config)
@@ -48,15 +47,16 @@ async function getHandler(c: Context): Promise<Response> {
     return c.json({ error: 'Not Found' }, 404)
   }
 
-  let response = null
+  // let response = null
   // disable cache for now TODO: add it back when we understand why it doesn't give file tto download but text
-  // // @ts-expect-error-next-line
-  // const cache = caches.default
-  // const cacheKey = new Request(new URL(c.req.url), c.req)
-  // let response = await cache.match(cacheKey)
-  // if (response != null) {
-  //   return response
-  // }
+  // @ts-expect-error-next-line
+  const cache = caches.default
+  const cacheKey = new Request(new URL(c.req.url), c.req)
+  let response = await cache.match(cacheKey)
+  if (response != null) {
+    console.log('getHandler files', 'cache hit')
+    return response
+  }
 
   const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
     range: c.req.raw.headers,
@@ -72,8 +72,9 @@ async function getHandler(c: Context): Promise<Response> {
     return response
   }
   else {
+    headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
     response = new Response(object.body, { headers })
-    // c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
     return response
   }
 }
@@ -164,18 +165,6 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   }
   c.set('fileId', fileId)
   await next()
-}
-
-async function validateSignKeyMiddleware(c: Context, next: Next) {
-  const signKey = c.req.query('key') || ''
-  const path = c.get('fileId')
-
-  if (await validateSignKey(c, signKey, path)) {
-    await next()
-  }
-  else {
-    return c.json({ error: 'Invalid key or path' }, 403)
-  }
 }
 
 async function checkAppAccess(c: Context, next: Next) {

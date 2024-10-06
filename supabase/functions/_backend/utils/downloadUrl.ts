@@ -5,6 +5,7 @@ import { supabaseAdmin } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
+const BASE_PATH = 'files/read/attachments'
 
 export interface ManifestEntry {
   file_name: string | null
@@ -36,13 +37,18 @@ export async function getBundleUrl(
 
   const { data: bundleMeta } = await supabaseAdmin(c)
     .from('app_versions_meta')
-    .select('size')
+    .select('size, checksum')
     .eq('id', version.id)
     .single()
 
   console.log({ requestId: c.get('requestId'), context: 'path', path })
   if (!path)
     return null
+
+  if (!bundleMeta?.checksum || !bundleMeta?.size) {
+    console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', error: 'Cannot get checksum or size' })
+    return null
+  }
 
   if (getRuntimeKey() !== 'workerd') {
     try {
@@ -59,7 +65,7 @@ export async function getBundleUrl(
   }
 
   const url = new URL(c.req.url)
-  const downloadUrl = `${url.protocol}//${url.host}/private/files/read/attachments/${path}?key=${version.id}`
+  const downloadUrl = `${url.protocol}//${url.host}/${BASE_PATH}/${path}?key=${bundleMeta?.checksum}`
   return { url: downloadUrl, size: bundleMeta?.size }
 }
 
@@ -74,7 +80,6 @@ export async function getManifestUrl(c: Context, version: {
   if (!version.manifest) {
     return []
   }
-  const basePath = 'private/files/read/attachments'
 
   try {
     const url = new URL(c.req.url)
@@ -87,7 +92,7 @@ export async function getManifestUrl(c: Context, version: {
       return {
         file_name: entry.file_name,
         file_hash: entry.file_hash,
-        download_url: `${url.protocol}//${url.host}/${basePath}/${entry.s3_path}?key=${signKey}`,
+        download_url: `${url.protocol}//${url.host}/${BASE_PATH}/${entry.s3_path}?key=${signKey}`,
       }
     }).filter(entry => entry !== null) as ManifestEntry[]
   }

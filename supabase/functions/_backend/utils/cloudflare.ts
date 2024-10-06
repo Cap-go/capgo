@@ -847,39 +847,3 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     }
   }
 }
-
-// Add this new function
-export async function validateSignKey(c: Context, signKey: string, path: string): Promise<boolean> {
-  if (!signKey || !path) {
-    console.log({ requestId: c.get('requestId'), context: 'Missing key or path' })
-    return false
-  }
-
-  const db = c.env.DB_REPLICATE as D1Database
-
-  const version = await db.prepare(
-    'SELECT * FROM app_versions WHERE id = ? AND deleted = false',
-  ).bind(signKey).first()
-
-  if (!version) {
-    console.log({ requestId: c.get('requestId'), context: 'Invalid or expired key' })
-    return false
-  }
-
-  const validPath = getPathFromVersion(version.owner_org, version.app_id, version.bucket_id, version.storage_provider, version.r2_path)
-
-  if (validPath && path.includes(validPath)) {
-    return true
-  }
-
-  // Check manifest paths if needed
-  if (version.manifest) {
-    const isValidPath = version.manifest.some((entry: { s3_path: string }) => entry.s3_path === path)
-    if (isValidPath) {
-      return true
-    }
-  }
-
-  console.log({ requestId: c.get('requestId'), context: 'Invalid path for the given key' })
-  return false
-}

@@ -85,6 +85,12 @@ export class UploadHandler {
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
     this.router = new Hono()
     this.router.use('*', logger())
+    this.router.options('/files/upload/:bucket', optionsHandler)
+    this.router.post('/files/upload/:bucket', this.exclusive(this.create))
+    this.router.options('/files/upload/:bucket/:id{.+}', optionsHandler)
+    this.router.patch('/files/upload/:bucket/:id{.+}', this.exclusive(this.patch))
+    this.router.get('/files/upload/:bucket/:id{.+}', this.exclusive(this.head))
+    // TODO: remove this when all users have been migrated
     this.router.options('/private/files/upload/:bucket', optionsHandler)
     this.router.post('/private/files/upload/:bucket', this.exclusive(this.create))
     this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler)

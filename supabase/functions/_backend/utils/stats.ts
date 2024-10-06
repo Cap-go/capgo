@@ -1,7 +1,7 @@
 import { getRuntimeKey } from 'hono/adapter'
 import type { Context } from '@hono/hono'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF, validateSignKey as validateSignKeyCF } from './cloudflare.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB, validateSignKey as validateSignKeySB } from './supabase.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 
@@ -149,11 +149,4 @@ export async function getUpdateStats(c: Context) {
     return getUpdateStatsCF(c)
   else
     return getUpdateStatsSB(c)
-}
-
-export function validateSignKey(c: Context, signKey: string, path: string): Promise<boolean> {
-  if (getRuntimeKey() === 'workerd')
-    return validateSignKeyCF(c, signKey, path)
-  else
-    return validateSignKeySB(c, signKey, path)
 }
