@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
 import type { Context } from '@hono/hono'
+import { getPathFromVersion } from './downloadUrl.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
-import type { Segments } from './plunk.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 
@@ -411,7 +411,7 @@ export async function customerToSegmentOrg(
   price_id: string,
   plan?: Database['public']['Tables']['plans']['Row'] | null,
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
-  const segmentsObj: Segments = {
+  const segmentsObj = {
     capgo: true,
     onboarded: await isOnboardedOrg(c, orgId),
     trial: false,
@@ -460,7 +460,7 @@ export async function customerToSegmentOrg(
   return processSegments(segmentsObj)
 }
 
-function processSegments(segmentsObj: Segments): { segments: string[], deleteSegments: string[] } {
+function processSegments(segmentsObj: any): { segments: string[], deleteSegments: string[] } {
   const segments: string[] = []
   const deleteSegments: string[] = []
 
@@ -769,4 +769,60 @@ export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise
     throw new Error(error.message)
 
   return data || DEFAUL_PLAN_NAME
+}
+
+export async function getUpdateStatsSB(c: Context) {
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_update_stats')
+    .single()
+
+  if (error) {
+    console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error })
+    return {
+      failed: 0,
+      install: 0,
+      get: 0,
+      successrate: 100,
+      healthy: true,
+    }
+  }
+
+  return data
+}
+
+// Add this new function
+export async function validateSignKey(c: Context, signKey: string, path: string): Promise<boolean> {
+  if (!signKey || !path) {
+    console.log({ requestId: c.get('requestId'), context: 'Missing key or path' })
+    return false
+  }
+
+  const { data: version, error } = await supabaseAdmin(c)
+    .from('app_versions')
+    .select('*')
+    .eq('id', signKey)
+    .eq('deleted', false)
+    .single()
+
+  if (error || !version) {
+    console.log({ requestId: c.get('requestId'), context: 'Invalid or expired key' })
+    return false
+  }
+
+  const validPath = getPathFromVersion(version.owner_org, version.app_id, version.bucket_id, version.storage_provider, version.r2_path)
+
+  if (validPath && path === validPath) {
+    return true
+  }
+
+  // Check manifest paths if needed
+  if (version.manifest) {
+    const isValidPath = version.manifest.some(entry => entry.s3_path === path)
+    if (isValidPath) {
+      return true
+    }
+  }
+
+  console.log({ requestId: c.get('requestId'), context: 'Invalid path for the given key' })
+  return false
 }

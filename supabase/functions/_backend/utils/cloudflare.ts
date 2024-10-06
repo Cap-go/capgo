@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import ky from 'ky'
 import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
+import { getPathFromVersion } from './downloadUrl.ts'
 import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
@@ -799,4 +800,86 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
   }
 
   return Promise.resolve()
+}
+
+// Add this new interface
+interface UpdateStats {
+  failed: number
+  set: number
+  get: number
+  success_rate: number
+  healthy: boolean
+}
+
+// Add this new function
+export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
+  const query = `
+    SELECT
+      sum(if(blob3 = 'fail', 1, 0)) AS failed,
+      sum(if(blob3 = 'install', 1, 0)) AS set,
+      sum(if(blob3 = 'get', 1, 0)) AS get
+    FROM version_usage
+    WHERE timestamp >= date_sub(date_trunc('minute', now()), INTERVAL 10 MINUTE)
+      AND timestamp < date_sub(date_trunc('minute', now()), INTERVAL 9 MINUTE)
+  `
+
+  console.log({ requestId: c.get('requestId'), context: 'getUpdateStatsCF query', query })
+  try {
+    const result = await runQueryToCF<UpdateStats>(c, query)
+    const stats = result[0]
+    const totalEvents = stats.failed + stats.set + stats.get
+    const successRate = totalEvents > 0 ? ((stats.set + stats.get) / totalEvents) * 100 : 100
+
+    return {
+      ...stats,
+      success_rate: Number(successRate.toFixed(2)),
+      healthy: successRate >= 70,
+    }
+  }
+  catch (e) {
+    console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error: e })
+    return {
+      failed: 0,
+      set: 0,
+      get: 0,
+      success_rate: 100,
+      healthy: true,
+    }
+  }
+}
+
+// Add this new function
+export async function validateSignKey(c: Context, signKey: string, path: string): Promise<boolean> {
+  if (!signKey || !path) {
+    console.log({ requestId: c.get('requestId'), context: 'Missing key or path' })
+    return false
+  }
+
+  const db = c.env.DB_REPLICATE as D1Database
+
+  const version = await db.prepare(
+    'SELECT * FROM app_versions WHERE id = ? AND deleted = false',
+  ).bind(signKey).first()
+
+  if (!version) {
+    console.log({ requestId: c.get('requestId'), context: 'Invalid or expired key' })
+    return false
+  }
+
+  const validPath = getPathFromVersion(version.owner_org, version.app_id, version.bucket_id, version.storage_provider, version.r2_path)
+
+  if (validPath && path.includes(validPath)) {
+    return true
+  }
+
+  // Check manifest paths if needed
+  if (version.manifest) {
+    const isValidPath = version.manifest.some((entry: { s3_path: string }) => entry.s3_path === path)
+    if (isValidPath) {
+      return true
+    }
+  }
+
+  console.log({ requestId: c.get('requestId'), context: 'Invalid path for the given key' })
+  return false
 }

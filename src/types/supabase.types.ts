@@ -1715,6 +1715,16 @@ export type Database = {
         }
         Returns: number
       }
+      get_update_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          failed: number
+          install: number
+          get: number
+          success_rate: number
+          healthy: boolean
+        }[]
+      }
       get_user_id:
         | {
             Args: {

@@ -1,4 +1,4 @@
-import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3'
+import { CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3'
 import type { Context } from '@hono/hono'
 import { initS3 } from './s3.ts'
 import { getEnv } from './utils.ts'
@@ -7,11 +7,6 @@ const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB
 
 function generateUniqueKey() {
   return crypto.randomUUID()
-}
-
-async function fetchUploadedParts(c: Context, uploadId: string) {
-  console.log('fetchUploadedParts', uploadId)
-  return null // TODO: implement
 }
 
 export async function createTusUpload(c: Context, uploadLength: number, metadata?: string) {
@@ -45,17 +40,23 @@ export async function appendToTusUpload(c: Context, uploadId: string, offset: nu
   return offset + chunk.length
 }
 
-export async function completeTusUpload(c: Context, uploadId: string) {
-  const s3Client = initS3(c)
-  // Fetch all parts information
-  const parts = await fetchUploadedParts(c, uploadId) // Implement this function
+// import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3'
+// async function fetchUploadedParts(c: Context, uploadId: string) {
+//   console.log('fetchUploadedParts', uploadId)
+//   return null // TODO: implement
+// }
 
-  const command = new CompleteMultipartUploadCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: uploadId,
-    UploadId: uploadId,
-    MultipartUpload: { Parts: parts },
-  })
+// export async function completeTusUpload(c: Context, uploadId: string) {
+//   const s3Client = initS3(c)
+//   // Fetch all parts information
+//   const parts = await fetchUploadedParts(c, uploadId) // Implement this function
 
-  await s3Client.send(command)
-}
+//   const command = new CompleteMultipartUploadCommand({
+//     Bucket: getEnv(c, 'S3_BUCKET'),
+//     Key: uploadId,
+//     UploadId: uploadId,
+//     MultipartUpload: { Parts: parts },
+//   })
+
+//   await s3Client.send(command)
+// }

@@ -1,12 +1,17 @@
 import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import type { Context, Next } from '@hono/hono'
+import { app as ok } from '../public/ok.ts'
 import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
 import { middlewareKey } from '../utils/hono.ts'
+import { validateSignKey } from '../utils/stats.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { app as download_link } from './download_link.ts'
+import { app as files_config } from './files_config.ts'
+import { app as upload_link } from './upload_link.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
@@ -20,11 +25,16 @@ app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, getHandler)
 // TODO: create a key system with DO to allow read only after a get returned it
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, validateTemporaryKey, getHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, validateSignKeyMiddleware, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, uploadHandler)
 
+app.route('/config', files_config)
+app.route('/download_link', download_link)
+app.route('/upload_link', upload_link)
+app.route('/ok', ok)
+
 app.all('*', (c) => {
-  console.log('all upload_bundle', c.req.url)
+  console.log('all files', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
 
@@ -34,7 +44,7 @@ async function getHandler(c: Context): Promise<Response> {
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
 
   if (bucket == null) {
-    console.log('getHandler upload_bundle', 'bucket is null')
+    console.log('getHandler files', 'bucket is null')
     return c.json({ error: 'Not Found' }, 404)
   }
 
@@ -52,7 +62,7 @@ async function getHandler(c: Context): Promise<Response> {
     range: c.req.raw.headers,
   })
   if (object == null) {
-    console.log('getHandler upload_bundle', 'object is null')
+    console.log('getHandler files', 'object is null')
     return c.json({ error: 'Not Found' }, 404)
   }
   const headers = objectHeaders(object)
@@ -101,7 +111,7 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
 }
 
 function optionsHandler(c: Context): Response {
-  console.log('optionsHandler upload_bundle', 'optionsHandler')
+  console.log('optionsHandler files', 'optionsHandler')
   return c.newResponse(null, 204, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': ALLOWED_METHODS,
@@ -118,11 +128,11 @@ function optionsHandler(c: Context): Response {
 async function uploadHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
   // make requestId  safe
-  console.log('upload_bundle req', 'uploadHandler', requestId, c.req.method, c.req.url)
+  console.log('files req', 'uploadHandler', requestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
 
   if (durableObjNs == null) {
-    console.log('upload_bundle', 'durableObjNs is null')
+    console.log('files', 'durableObjNs is null')
     return c.json({ error: 'Invalid bucket configuration' }, 500)
   }
 
@@ -156,27 +166,16 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   await next()
 }
 
-async function validateTemporaryKey(c: Context, next: Next) {
-  const signKey = c.req.query('key')
-  const versionID = c.req.query('versionID')
+async function validateSignKeyMiddleware(c: Context, next: Next) {
+  const signKey = c.req.query('key') || ''
   const path = c.get('fileId')
-  if (!signKey || !path) {
-    console.log({ requestId: c.get('requestId'), context: 'Missing key or path' })
-    return c.json({ error: 'Missing key or path' }, 400)
+
+  if (await validateSignKey(c, signKey, path)) {
+    await next()
   }
-
-  const durableObjNs: DurableObjectNamespace = c.env.TEMPORARY_KEY_HANDLER
-  const handler = durableObjNs.get(durableObjNs.idFromName('temporary-keys'))
-
-  const url = new URL(c.req.url)
-  const response = await handler.fetch(`${url.protocol}//${url.host}/validate?key=${signKey}&versionID=${versionID}&path=${path}`)
-  const { valid, error } = await response.json<{ valid: boolean, error?: string }>()
-
-  if (!valid) {
-    return c.json({ error: error || 'Invalid or expired key' }, 403)
+  else {
+    return c.json({ error: 'Invalid key or path' }, 403)
   }
-
-  await next()
 }
 
 async function checkAppAccess(c: Context, next: Next) {

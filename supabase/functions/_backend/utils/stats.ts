@@ -1,7 +1,7 @@
 import { getRuntimeKey } from 'hono/adapter'
 import type { Context } from '@hono/hono'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
-import { countDevicesSB, getAppsFromSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF, validateSignKey as validateSignKeyCF } from './cloudflare.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB, validateSignKey as validateSignKeySB } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 
@@ -142,4 +142,18 @@ export async function countAllUpdates(c: Context): Promise<number> {
   const res = storeAppsCount + logsCount
   // TODO: fix this count undestand why it return 0 sometimes
   return res || 14593631
+}
+
+export async function getUpdateStats(c: Context) {
+  if (c.env.VERSION_USAGE)
+    return getUpdateStatsCF(c)
+  else
+    return getUpdateStatsSB(c)
+}
+
+export function validateSignKey(c: Context, signKey: string, path: string): Promise<boolean> {
+  if (getRuntimeKey() === 'workerd')
+    return validateSignKeyCF(c, signKey, path)
+  else
+    return validateSignKeySB(c, signKey, path)
 }

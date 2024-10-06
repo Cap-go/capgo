@@ -144,37 +144,37 @@ export class UploadHandler {
 
     const r2Key = uploadMetadata.filename || ''
     if (r2Key == null) {
-      console.log('in DO', 'upload_bundle', 'r2Key is null')
+      console.log('in DO', 'files create', 'r2Key is null')
       return c.text('bad filename metadata', 400)
     }
 
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
-      console.log('in DO', 'upload_bundle', 'duplicate object creation')
+      console.log('in DO', 'files create', 'duplicate object creation')
       await this.cleanup(r2Key)
       return c.text('object already exists', 409)
     }
 
     const contentType = c.req.header('Content-Type')
     if (contentType != null && contentType !== 'application/offset+octet-stream') {
-      console.log('in DO', 'upload_bundle', 'create only supports application/offset+octet-stream content-type')
+      console.log('in DO', 'files create', 'create only supports application/offset+octet-stream content-type')
       return c.text('create only supports application/offset+octet-stream content-type', 415)
     }
     const contentLength = readIntFromHeader(c.req.raw.headers, 'Content-Length')
     if (!Number.isNaN(contentLength) && contentLength > 0 && contentType == null) {
-      console.log('in DO', 'upload_bundle', 'body requires application/offset+octet-stream content-type')
+      console.log('in DO', 'files create', 'body requires application/offset+octet-stream content-type')
       return c.text('body requires application/offset+octet-stream content-type', 415)
     }
     const hasContent = c.req.raw.body != null && contentType != null
     const uploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     const uploadDeferLength = readIntFromHeader(c.req.raw.headers, 'Upload-Defer-Length')
     if (Number.isNaN(uploadLength) && Number.isNaN(uploadDeferLength)) {
-      console.log('in DO', 'upload_bundle', 'must contain Upload-Length or Upload-Defer-Length header')
+      console.log('in DO', 'files create', 'must contain Upload-Length or Upload-Defer-Length header')
       return c.text('must contain Upload-Length or Upload-Defer-Length header', 400)
     }
 
     if (!Number.isNaN(uploadDeferLength) && uploadDeferLength !== 1) {
-      console.log('in DO', 'upload_bundle', 'bad Upload-Defer-Length')
+      console.log('in DO', 'files create', 'bad Upload-Defer-Length')
       return c.text('bad Upload-Defer-Length', 400)
     }
 
@@ -221,7 +221,7 @@ export class UploadHandler {
     if (offset == null) {
       const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
-        console.log('in DO', 'upload_bundle', 'headResponse is null')
+        console.log('in DO', 'files head', 'headResponse is null')
         return c.text('Not Found', 404)
       }
       offset = headResponse.size
@@ -255,13 +255,13 @@ export class UploadHandler {
 
     let uploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (uploadOffset == null) {
-      console.log('in DO', 'upload_bundle', 'uploadOffset is null')
+      console.log('in DO', 'files patch', 'uploadOffset is null')
       return c.text('Not Found', 404)
     }
 
     const headerOffset = readIntFromHeader(c.req.raw.headers, 'Upload-Offset')
     if (uploadOffset !== headerOffset) {
-      console.log('in DO', 'upload_bundle', 'incorrect upload offset')
+      console.log('in DO', 'files patch', 'incorrect upload offset')
       return c.text('incorrect upload offset', 409)
     }
 
@@ -271,7 +271,7 @@ export class UploadHandler {
     }
     const headerUploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     if (uploadInfo.uploadLength != null && !Number.isNaN(headerUploadLength) && uploadInfo.uploadLength !== headerUploadLength) {
-      console.log('in DO', 'upload_bundle', 'upload length cannot change')
+      console.log('in DO', 'files patch', 'upload length cannot change')
       return c.text('upload length cannot change', 400)
     }
 
@@ -281,7 +281,7 @@ export class UploadHandler {
     }
 
     if (c.req.raw.body == null) {
-      console.log('in DO', 'upload_bundle', 'must provide request body')
+      console.log('in DO', 'files patch', 'must provide request body')
       return c.text('Must provide request body', 400)
     }
 
@@ -324,7 +324,7 @@ export class UploadHandler {
     const uploadLength = uploadInfo.uploadLength
     if ((uploadLength || 0) > MAX_UPLOAD_LENGTH_BYTES) {
       await this.cleanup(r2Key)
-      console.log('upload_bundle', 'Upload-Length exceeds maximum upload size')
+      console.log('files append body', 'Upload-Length exceeds maximum upload size')
       throw new HTTPException(413, { message: 'Upload-Length exceeds maximum upload size' })
     }
 
@@ -342,12 +342,12 @@ export class UploadHandler {
       const newLength = uploadOffset + part.bytes.byteLength
       if (uploadLength != null && newLength > uploadLength) {
         await this.cleanup(r2Key)
-        console.log('upload_bundle', 'body exceeds Upload-Length')
+        console.log('files append body', 'body exceeds Upload-Length')
         throw new HTTPException(413, { message: 'body exceeds Upload-Length' })
       }
       if (newLength > MAX_UPLOAD_LENGTH_BYTES) {
         await this.cleanup(r2Key)
-        console.log('upload_bundle', 'body exceeds maximum upload size')
+        console.log('files append body', 'body exceeds maximum upload size')
         throw new HTTPException(413, { message: 'body exceeds maximum upload size' })
       }
 
@@ -404,7 +404,7 @@ export class UploadHandler {
   async checkChecksum(r2Key: string, expected: Uint8Array, actual: ArrayBuffer) {
     if (!Buffer.from(actual).equals(expected)) {
       await this.cleanup(r2Key)
-      console.log('upload_bundle', 'checksum does not match')
+      console.log('files checksum', 'checksum does not match')
       throw new HTTPException(415, { message: `The SHA-256 checksum you specified ${toBase64(actual)} did not match what we received ${toBase64(expected)}.` })
     }
   }
@@ -518,7 +518,7 @@ export class UploadHandler {
       if (isR2ChecksumError(e)) {
         console.error(`checksum failure: ${e}`)
         await this.cleanup()
-        console.log('upload_bundle', 'checksum failure')
+        console.log('files put', 'checksum failure')
         throw new HTTPException(415)
       }
       throw e

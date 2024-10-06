@@ -4,8 +4,6 @@ import { middlewareKey } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
-import { getEnv } from '../utils/utils.ts'
-import { initMultipartUpload } from './multipart.ts'
 
 interface dataUpload {
   name?: string
@@ -80,33 +78,24 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     }
     console.log({ requestId: c.get('requestId'), context: 's3.getUploadUrl', filePath })
 
-    let response: any
-    if (body.version && body.version === 1) {
-      console.log({ requestId: c.get('requestId'), context: `Multipart upload for ${JSON.stringify(body)}` })
-      const uploadId = await createMultipartRequest(c, filePath, app.owner_org)
-
-      response = { uploadId, key: filePath, url: getMultipartServerUrl(c, true) }
+    const url = await s3.getUploadUrl(c, filePath)
+    console.log({ requestId: c.get('requestId'), context: 'url', url })
+    if (!url) {
+      console.log({ requestId: c.get('requestId'), context: 'no url found' })
+      return c.json({ status: 'Error unknow' }, 500)
     }
-    else {
-      const url = await s3.getUploadUrl(c, filePath)
-      console.log({ requestId: c.get('requestId'), context: 'url', url })
-      if (!url) {
-        console.log({ requestId: c.get('requestId'), context: 'no url found' })
-        return c.json({ status: 'Error unknow' }, 500)
-      }
 
-      const LogSnag = logsnag(c)
-      await LogSnag.track({
-        channel: 'upload-get-link',
-        event: 'Upload via single file',
-        icon: '🏛️',
-        user_id: app.owner_org,
-        notify: false,
-      })
+    const LogSnag = logsnag(c)
+    await LogSnag.track({
+      channel: 'upload-get-link',
+      event: 'Upload via single file',
+      icon: '🏛️',
+      user_id: app.owner_org,
+      notify: false,
+    })
 
-      console.log({ requestId: c.get('requestId'), context: 'url', filePath, url })
-      response = { url }
-    }
+    console.log({ requestId: c.get('requestId'), context: 'url', filePath, url })
+    const response = { url }
 
     const { error: changeError } = await supabaseAdmin(c)
       .from('app_versions')
@@ -125,30 +114,3 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     return c.json({ status: 'Cannot get upload link', error: JSON.stringify(e) }, 500)
   }
 })
-
-function getMultipartServerUrl(c: Context, external = false) {
-  const raw = !external ? getEnv(c, 'MULTIPART_SERVER') : getEnv(c, 'MULTIPART_SERVER').replace('host.docker.internal', '127.0.0.1')
-  return new URL(raw)
-}
-
-async function createMultipartRequest(c: Context, path: string, orgid: string): Promise<string | null> {
-  const multipart = await initMultipartUpload(c, path)
-  if (multipart.error)
-    return null
-
-  if (!multipart.uploadId) {
-    console.error({ requestId: c.get('requestId'), context: 'No upload id (?) for multipart' })
-    return null
-  }
-
-  const LogSnag = logsnag(c)
-  await LogSnag.track({
-    channel: 'upload-get-link',
-    event: 'Upload via multipart',
-    icon: '🏗️',
-    user_id: orgid,
-    notify: false,
-  })
-
-  return multipart.uploadId
-}

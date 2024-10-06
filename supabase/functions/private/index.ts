@@ -12,7 +12,6 @@ import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../_backend/private/latency_postres.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
-import { app as multipart } from '../_backend/private/multipart.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
@@ -55,6 +54,5 @@ appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
-appGlobal.route('/multipart', multipart)
 
 Deno.serve(appGlobal.fetch)

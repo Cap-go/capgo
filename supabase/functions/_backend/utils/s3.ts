@@ -1,7 +1,6 @@
-import { CompleteMultipartUploadCommand, CreateMultipartUploadCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, UploadPartCommand } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 import ky from 'ky'
-import type { CompletedPart } from '@aws-sdk/client-s3'
 import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -67,43 +66,6 @@ async function deleteObject(c: Context, fileId: string) {
   })
   await client.send(command)
   return true
-}
-
-export function createMultipartUpload(c: Context, key: string) {
-  const client = initS3(c)
-  const command = new CreateMultipartUploadCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: key,
-  })
-
-  return client.send(command)
-}
-
-export function compleateMultipartUpload(c: Context, key: string, uploadId: string, parts: CompletedPart[]) {
-  const client = initS3(c)
-  const command = new CompleteMultipartUploadCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: key,
-    UploadId: uploadId,
-    MultipartUpload: { Parts: parts },
-  })
-
-  return client.send(command)
-}
-
-export function multipartUploadPart(c: Context, key: string, uploadId: string, partNumber: number, contentLength: number, chunk: Uint8Array) {
-  const client = initS3(c)
-
-  const command = new UploadPartCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: key,
-    UploadId: uploadId,
-    PartNumber: partNumber,
-    Body: chunk,
-    ContentLength: contentLength,
-  })
-
-  return client.send(command)
 }
 
 async function checkIfExist(c: Context, fileId: string) {
