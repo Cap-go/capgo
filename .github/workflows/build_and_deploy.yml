@@ -65,6 +65,12 @@ jobs:
     needs: supabase_deploy
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
       - name: Publish CF webapp
         run: bunx wrangler@latest pages deploy dist --project-name capgo-webapp-${{ env.ENV }} --branch main
         env:
@@ -75,6 +81,12 @@ jobs:
     needs: supabase_deploy
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
       - name: Deploy CF Worker API
         run: bun run deploy:cloudflare:api:${{ env.ENV }}
         env:
@@ -85,6 +97,12 @@ jobs:
     needs: supabase_deploy
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
       - name: Deploy CF Worker Files
         run: bun run deploy:cloudflare:files:${{ env.ENV }}
         env:
@@ -95,6 +113,12 @@ jobs:
     needs: supabase_deploy
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v1.1.1
+        with:
+          bun-version: latest
       - name: Deploy CF Worker Plugin
         run: bun run deploy:cloudflare:plugin:${{ env.ENV }}
         env:
