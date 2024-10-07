@@ -58,11 +58,6 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install
-      - name: Build
-        run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
-        env:
-          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
-          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
@@ -72,6 +67,11 @@ jobs:
             echo "ENV=prod" >> $GITHUB_ENV
             echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
           fi
+      - name: Build
+        run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
+        env:
+          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       - name: Publish CF webapp
         run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
         env:
