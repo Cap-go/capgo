@@ -70,9 +70,11 @@ jobs:
           if [[ ${{ github.ref }} == *-alpha* ]]; then
             echo "ENV=alpha" >> $GITHUB_ENV
             echo "PROJECT_NAME=capgo-webapp-preprod" >> $GITHUB_ENV
+            echo "CHANNEL=alpha" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
             echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
+            echo "CHANNEL=production" >> $GITHUB_ENV
           fi
       - name: Build
         run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
@@ -84,6 +86,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy to Capgo
+        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
+        env:
+          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
 
   deploy_api:
     needs: supabase_deploy
@@ -159,27 +165,3 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-  deploy_to_capgo:
-    needs: supabase_deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install
-      - name: Set environment variable
-        run: |
-          if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "CHANNEL=alpha" >> $GITHUB_ENV
-          else
-            echo "CHANNEL=prod" >> $GITHUB_ENV
-          fi
-      - name: Deploy to Capgo
-        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
-        env:
-          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
