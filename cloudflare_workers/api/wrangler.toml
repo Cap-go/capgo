@@ -1,4 +1,4 @@
-name = "capgo_api"
+name = "capgo_api-prod"
 route = { pattern = "api.capgo.app", custom_domain = true }
 compatibility_date = "2024-09-23"
 main = "./index.ts"

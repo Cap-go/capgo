@@ -24,10 +24,10 @@ app.get('/', (c: Context) => {
     const forcePartialUpload = randomPU < 0.2
     const forceTUSUpload = randomTUS < 0.2
     return c.json({
-      partialUpload: forcePartialUpload,
-      partialUploadForced: true,
-      TUSUpload: forceTUSUpload,
-      TUSUploadForced: true,
+      partialUpload: true,
+      partialUploadForced: forcePartialUpload,
+      TUSUpload: true,
+      TUSUploadForced: forceTUSUpload,
     })
   }
   catch (e) {

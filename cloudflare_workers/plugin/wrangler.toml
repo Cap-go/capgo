@@ -1,4 +1,4 @@
-name = "capgo_plugin"
+name = "capgo_plugin-prod"
 routes = [
   { pattern = "plugin.capgo.app", custom_domain = true },
   { pattern = "api.capgo.app/plugin/*", zone_name = "capgo.app" },

@@ -138,7 +138,7 @@ async function uploadHandler(c: Context): Promise<Response> {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(requestId))
-  console.log({ requestId: c.get('requestId'), context: 'can handler' })
+  console.log({ requestId: c.get('requestId'), context: 'upload handler' })
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
     method: c.req.method,
