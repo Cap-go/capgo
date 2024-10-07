@@ -3,6 +3,7 @@ import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
+import type { Context } from '@hono/hono'
 import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
@@ -56,5 +57,9 @@ appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
+appGlobal.post('/replicate_data', (c: Context) => {
+  // for self deploy allow to make job success
+  return c.json({ status: 'ok' })
+})
 
 Deno.serve(appGlobal.fetch)
