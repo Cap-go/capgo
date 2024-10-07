@@ -50,6 +50,11 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: supabase functions deploy
+      - name: Upload node_modules
+        uses: actions/upload-artifact@v3
+        with:
+          name: node_modules
+          path: node_modules
 
   deploy_webapp:
     needs: supabase_deploy
@@ -61,6 +66,11 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+      - name: Download node_modules
+        uses: actions/download-artifact@v3
+        with:
+          name: node_modules
+          path: node_modules
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
@@ -86,6 +96,11 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+      - name: Download node_modules
+        uses: actions/download-artifact@v3
+        with:
+          name: node_modules
+          path: node_modules
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
@@ -109,6 +124,11 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+      - name: Download node_modules
+        uses: actions/download-artifact@v3
+        with:
+          name: node_modules
+          path: node_modules
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
@@ -132,6 +152,11 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+      - name: Download node_modules
+        uses: actions/download-artifact@v3
+        with:
+          name: node_modules
+          path: node_modules
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
