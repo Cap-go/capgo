@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
 import type { Context } from '@hono/hono'
-import { getPathFromVersion } from './downloadUrl.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
