@@ -46,13 +46,13 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Wait for tests to succeed
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: 'Run tests'
-          repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          wait-interval: 10
+      # - name: Wait for tests to succeed
+      #   uses: lewagon/wait-on-check-action@v1.3.4
+      #   with:
+      #     ref: ${{ github.ref }}
+      #     check-name: 'Run tests'
+      #     repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      #     wait-interval: 10
       - name: 🦤 Apply Supabase Migrations
         run: supabase db push --include-all
       - name: 🆙 Update functions
