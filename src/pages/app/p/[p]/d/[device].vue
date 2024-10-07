@@ -318,7 +318,7 @@ async function updateVersionOverride(event: Event) {
 
 async function upsertDevChannel(device: string, channelId: number) {
   const currentGid = organizationStore.currentOrganization?.gid
-  if (!main?.user?.id)
+  if (!main?.user?.id || !currentGid)
     return
   return supabase
     .from('channel_devices')
