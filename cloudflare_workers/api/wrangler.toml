@@ -17,10 +17,6 @@ d1_databases = [
   { binding = "DB_REPLICATE", database_name = "capgo_prod_replicate", database_id = "7f267d86-f4f7-49f5-9622-e44373aa00dc" },
 ]
 
-[[migrations]]
-tag = "v3"
-deleted_classes = [ "TemporaryKeyHandler" ]
-
 [env.preprod]
 name = "capgo_api-preprod"
 route = { pattern = "api-preprod.capgo.app", custom_domain = true }
