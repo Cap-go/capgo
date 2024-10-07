@@ -65,11 +65,13 @@ jobs:
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
             echo "ENV=alpha" >> $GITHUB_ENV
+            echo "PROJECT_NAME=capgo-webapp-preprod" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV
+            echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
           fi
       - name: Publish CF webapp
-        run: bunx wrangler@latest pages deploy dist --project-name capgo-webapp-${{ env.ENV }} --branch main
+        run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
