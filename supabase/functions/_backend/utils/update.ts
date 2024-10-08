@@ -408,11 +408,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
 export async function update(c: Context, body: AppInfos) {
   let pgClient
-  let isV2 = c.req.url.endsWith('/updates_v2')
-  if (!isV2) {
-    // make 20% chance to be v2
-    isV2 = Math.random() < 0.2
-  }
+  const isV2 = c.req.url.endsWith('/updates_v2')
+  // re enable when understand why the endpoint do not respond properly
+  // if (!isV2) {
+  //   // make 20% chance to be v2
+  //   isV2 = Math.random() < 0.2
+  // }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
     console.log({ requestId: c.get('requestId'), context: 'update2', isV2 })
