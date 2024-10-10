@@ -127,6 +127,24 @@ async function submit(form: { email: string, password: string, code: string }) {
 }
 
 async function checkLogin() {
+  const parsedUrl = new URL(route.fullPath, window.location.origin)
+  const params = new URLSearchParams(parsedUrl.search)
+  const accessToken = params.get('access_token')
+  const refreshToken = params.get('refresh_token')
+
+  if (!!accessToken && !!refreshToken) {
+    const res = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    })
+    if (res.error) {
+      console.error('Cannot set auth', res.error)
+      return
+    }
+    nextLogin()
+    return
+  }
+
   isLoading.value = true
   const resUser = await supabase.auth.getUser()
   const user = resUser?.data.user
