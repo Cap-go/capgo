@@ -818,8 +818,8 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
       sum(if(blob3 = 'install', 1, 0)) AS set,
       sum(if(blob3 = 'get', 1, 0)) AS get
     FROM version_usage
-    WHERE timestamp >= date_sub(date_trunc('minute', now()), INTERVAL 10 MINUTE)
-      AND timestamp < date_sub(date_trunc('minute', now()), INTERVAL 9 MINUTE)
+    WHERE timestamp >= toDateTime(toUnixTimestamp(now()) - 600)
+      AND timestamp < toDateTime(toUnixTimestamp(now()) - 540)
   `
 
   console.log({ requestId: c.get('requestId'), context: 'getUpdateStatsCF query', query })
