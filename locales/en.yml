@@ -116,6 +116,7 @@ cannot-test-app-some: Cannot test app something wrong happened
 cannot-view-plans: Cannot view the plans page
 cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
+captcha-fail: Captcha validation failed
 change: Change
 change-api-key-name: Change the apikey's name
 change-your-picture: Change your picture

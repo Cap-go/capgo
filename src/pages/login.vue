@@ -27,11 +27,6 @@ const mfaChallangeId: Ref<string> = ref('')
 const router = useRouter()
 const { t } = useI18n()
 
-const captchaForm = {
-  type: 'input',
-  schema: ['Captcha'],
-}
-
 const version = import.meta.env.VITE_APP_VERSION
 
 function openSupport() {
