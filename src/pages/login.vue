@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
-import { FormKit, FormKitMessages } from '@formkit/vue'
+import { createInput, FormKit, FormKitMessages } from '@formkit/vue'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
@@ -10,6 +10,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import type { Factor } from '@supabase/supabase-js'
 import type { Ref } from 'vue'
 import { openMessenger } from '~/services/bento'
@@ -19,11 +20,17 @@ import { autoAuth, useSupabase } from '~/services/supabase'
 const route = useRoute()
 const supabase = useSupabase()
 const isLoading = ref(false)
+const turnstileToken = ref('')
 const stauts: Ref<'login' | '2fa'> = ref('login')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallangeId: Ref<string> = ref('')
 const router = useRouter()
 const { t } = useI18n()
+
+const captchaForm = {
+  type: 'input',
+  schema: ['Captcha'],
+}
 
 const version = import.meta.env.VITE_APP_VERSION
 
@@ -44,12 +51,21 @@ async function submit(form: { email: string, password: string, code: string }) {
     const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
+      options: {
+        captchaToken: turnstileToken.value,
+      },
     })
     if (error) {
       isLoading.value = false
       console.error('error', error)
       setErrors('login-account', [error.message], {})
-      toast.error(t('invalid-auth'))
+      if (error.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+      }
+      else {
+        toast.error(t('invalid-auth'))
+      }
+
       return
     }
 
@@ -288,6 +304,12 @@ onMounted(checkLogin)
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
+                </div>
+                <div>
+                  <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
+                    Captcha
+                  </h1>
+                  <VueTurnstile v-model="turnstileToken" size="flexible" site-key="1x00000000000000000000AA" />
                 </div>
                 <FormKitMessages />
                 <div>

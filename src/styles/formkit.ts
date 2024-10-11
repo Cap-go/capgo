@@ -49,7 +49,7 @@ export default {
   },
   'family:text': {
     inner: 'flex items-center ring-1 ring-gray-400 focus-within:ring-blue-500 focus-within:ring-2 [&>label:first-child]:focus-within:text-blue-500 rounded mb-1',
-    input: 'w-full px-3 py-2 border-none text-base dark:text-gray-300 text-gray-700 placeholder-gray-400',
+    input: 'w-full px-3 py-2 border-none text-base text-gray-700 placeholder-gray-400',
   },
   'family:date': {
     inner: 'flex items-center max-w-md ring-1 ring-gray-400 focus-within:ring-blue-500 focus-within:ring-2 [&>label:first-child]:focus-within:text-blue-500 rounded mb-1',
