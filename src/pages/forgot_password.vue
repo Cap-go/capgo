@@ -7,6 +7,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 
@@ -15,6 +16,9 @@ const router = useRouter()
 const route = useRoute()
 const supabase = useSupabase()
 const step = ref(1)
+const turnstileToken = ref('')
+
+const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
@@ -24,13 +28,20 @@ async function submit(form: { email: string, password: string }) {
   if (step.value === 1) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
     // console.log('redirect', redirectTo)
-    const { error } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo })
+    const { error } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo, captchaToken: turnstileToken.value })
     setTimeout(() => {
       isLoading.value = false
     }, 5000)
-    if (error)
+    if (error) {
+      if (error.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+      }
       setErrors('forgot-password', [error.message], {})
-    else toast.success(t('forgot-check-email'))
+      console.error('error reset', error)
+    }
+    else {
+      toast.success(t('forgot-check-email'))
+    }
   }
   else if (step.value === 2 && route.hash) {
     const queryString = route.hash.replace('#', '')
@@ -108,6 +119,11 @@ watchEffect(() => {
                       autocomplete="email"
                       validation="required:trim"
                     />
+                    <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
+                      {{ t('captcha') }}
+                    </h1>
+                    <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                    <FormKitMessages />
                   </div>
 
                   <div v-if="step === 2">
@@ -139,7 +155,6 @@ watchEffect(() => {
                       :validation-label="t('password-confirmatio')"
                     />
                   </div>
-                  <FormKitMessages />
 
                   <div>
                     <button type="submit" class="inline-flex items-center justify-center w-full">

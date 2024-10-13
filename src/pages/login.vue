@@ -28,6 +28,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
+const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
 
 function openSupport() {
   openMessenger()
@@ -302,9 +303,9 @@ onMounted(checkLogin)
                 </div>
                 <div>
                   <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
-                    Captcha
+                    {{ t('captcha') }}
                   </h1>
-                  <VueTurnstile v-model="turnstileToken" size="flexible" site-key="1x00000000000000000000AA" />
+                  <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
                 <FormKitMessages />
                 <div>

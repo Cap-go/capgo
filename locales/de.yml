@@ -140,6 +140,8 @@ cannot-test-app-some: App kann nicht getestet werden, es ist ein Fehler aufgetre
 cannot-view-plans: Die Seite mit den Plänen kann nicht angezeigt werden
 cannot-view-usage: Die Nutzungsseite kann nicht angezeigt werden
 cannots-sign-off: Protokollierung nicht möglich
+captcha: Captcha
+captcha-fail: Captcha-Validierung fehlgeschlagen
 change: Ändern
 change-api-key-name: Ändern Sie den Namen des Apikeys
 change-your-picture: Ändere dein Bild

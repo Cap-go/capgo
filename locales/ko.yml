@@ -114,6 +114,8 @@ cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했�
 cannot-view-plans: 계획 페이지를 볼 수 없습니다
 cannot-view-usage: 사용량 페이지를 볼 수 없습니다
 cannots-sign-off: 로그할 수 없습니다.
+captcha: 캡차
+captcha-fail: 캡차 유효성 검사 실패
 change: 변화
 change-api-key-name: apikey 이름 변경
 change-your-picture: 사진을 바꿔보세요

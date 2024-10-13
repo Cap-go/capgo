@@ -126,6 +126,8 @@ cannot-test-app-some: Impossibile testare l'app, è successo qualcosa di sbaglia
 cannot-view-plans: Impossibile visualizzare la pagina dei piani
 cannot-view-usage: Impossibile visualizzare la pagina di utilizzo
 cannots-sign-off: Impossibile accedere
+captcha: Captcha
+captcha-fail: Convalida Captcha fallita
 change: Modifica
 change-api-key-name: Cambia il nome dell'apikey
 change-your-picture: Cambia la tua immagine

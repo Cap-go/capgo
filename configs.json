@@ -22,5 +22,11 @@
     "preprod": "api-preprod.capgo.app",
     "development": "api-dev.capgo.app",
     "local": "localhost:54321/functions/v1"
+  },
+  "captcha_key": {
+    "prod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
+    "preprod": "3x00000000000000000000FF",
+    "development": "3x00000000000000000000FF",
+    "local": "3x00000000000000000000FF"
   }
 }

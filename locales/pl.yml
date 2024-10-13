@@ -122,6 +122,8 @@ cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
 cannot-view-plans: Nie można wyświetlić strony planów
 cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
+captcha: Captcha
+captcha-fail: Weryfikacja Captcha nie powiodła się
 change: Zmiana
 change-api-key-name: Zmień nazwę apikey
 change-your-picture: Zmień swoje zdjęcie

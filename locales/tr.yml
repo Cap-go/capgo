@@ -118,6 +118,8 @@ cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
 cannot-view-plans: Planlar sayfası görüntülenemiyor
 cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
+captcha: Captcha
+captcha-fail: Captcha doğrulaması başarısız oldu
 change: Değiştirmek
 change-api-key-name: Apikey'in adını değiştirin
 change-your-picture: Resmini değiştir

@@ -114,6 +114,8 @@ cannot-test-app-some: アプリをテストできません
 cannot-view-plans: プランページが表示されない
 cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
+captcha: キャプチャ
+captcha-fail: Captcha バリデーションに失敗しました。
 change: 変化
 change-api-key-name: apikey の名前を変更する
 change-your-picture: 写真を変更する
