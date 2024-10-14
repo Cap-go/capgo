@@ -369,7 +369,7 @@ BEGIN
       'Trial' AS product_name, 
       COUNT(*) AS count
     FROM stripe_info si
-    WHERE si.trial_at > NOW()
+    WHERE si.trial_at > NOW() AND si.status is NULL
   )
   SELECT
     ap.product_name,

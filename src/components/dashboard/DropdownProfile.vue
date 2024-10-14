@@ -8,7 +8,7 @@ import { openMessenger } from '~/services/bento'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
-const dropdown = ref<HTMLElement | null>(null)
+const dropdown = useTemplateRef('dropdown')
 const router = useRouter()
 const main = useMainStore()
 const isMobile = Capacitor.isNativePlatform()

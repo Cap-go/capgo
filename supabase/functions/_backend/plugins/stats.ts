@@ -7,7 +7,7 @@ import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,
@@ -156,40 +156,44 @@ async function post(c: Context, body: AppStats) {
       .or(`name.eq.${version_name}`)
       .single()
     console.log({ requestId: c.get('requestId'), context: `appVersion ${JSON.stringify(appVersion)}` })
-    if (appVersion) {
-      device.version = appVersion.id
-      if (action === 'set' && !device.is_emulator && device.is_prod) {
-        await createStatsVersion(c, device.version, app_id, 'install')
-        if (old_version_name) {
-          const { data: oldVersion } = await supabaseAdmin(c)
-            .from('app_versions')
-            .select('id')
-            .eq('app_id', app_id)
-            .eq('name', old_version_name)
-            .single()
-          if (oldVersion && oldVersion.id !== appVersion.id) {
-            await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
-            statsActions.push({ action: 'uninstall', versionId: oldVersion.id })
-          }
-        }
-      }
-      else if (failActions.includes(action)) {
-        await createStatsVersion(c, appVersion.id, app_id, 'fail')
-        console.log({ requestId: c.get('requestId'), context: 'FAIL!' })
-        await sendNotifOrg(c, 'user:update_fail', {
-          app_id,
-          device_id,
-          version_id: appVersion.id,
-          app_id_url: appIdToUrl(app_id),
-        }, appVersion.owner_org, app_id, '0 0 * * 1')
-      }
-    }
-    else {
+    if (!appVersion) {
       console.error({ requestId: c.get('requestId'), context: 'switch to onprem', app_id })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
       }, 200)
+    }
+    if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
+      return c.json({
+        message: 'Action not allowed',
+        error: 'action_not_allowed',
+      }, 200)
+    }
+    device.version = appVersion.id
+    if (action === 'set' && !device.is_emulator && device.is_prod) {
+      await createStatsVersion(c, device.version, app_id, 'install')
+      if (old_version_name) {
+        const { data: oldVersion } = await supabaseAdmin(c)
+          .from('app_versions')
+          .select('id')
+          .eq('app_id', app_id)
+          .eq('name', old_version_name)
+          .single()
+        if (oldVersion && oldVersion.id !== appVersion.id) {
+          await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
+          statsActions.push({ action: 'uninstall', versionId: oldVersion.id })
+        }
+      }
+    }
+    else if (failActions.includes(action)) {
+      await createStatsVersion(c, appVersion.id, app_id, 'fail')
+      console.log({ requestId: c.get('requestId'), context: 'FAIL!' })
+      await sendNotifOrg(c, 'user:update_fail', {
+        app_id,
+        device_id,
+        version_id: appVersion.id,
+        app_id_url: appIdToUrl(app_id),
+      }, appVersion.owner_org, app_id, '0 0 * * 1')
     }
     statsActions.push({ action })
     await sendStatsAndDevice(c, device, statsActions)

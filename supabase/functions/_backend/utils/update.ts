@@ -69,7 +69,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'app_not_found',
       }, 200)
     }
-    await createStatsMau(c, device_id, app_id) // TODO: see if anaylytics got too expensive or not. Then keep it or move it back to same place as createStatsBandwidth
     if (coerce) {
       version_build = coerce.version
     }
@@ -102,9 +101,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'missing_info',
       }, 400)
     }
-
-    console.log({ requestId: c.get('requestId'), context: 'vals', platform, id: app_id, device_id, custom_id, version_build, is_emulator, is_prod, plugin_version, version_name, date: new Date().toISOString() })
-
     const device: DeviceWithoutCreatedAt = {
       app_id,
       device_id,
@@ -118,6 +114,18 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       platform: platform as Database['public']['Enums']['platform_os'],
       updated_at: new Date().toISOString(),
     }
+    const planValid = isV2 ? true : await isAllowedActionOrgPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id)
+    if (!planValid) {
+      console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
+      await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+      return c.json({
+        message: 'Cannot update, upgrade plan to continue to update',
+        error: 'need_plan_upgrade',
+      }, 200)
+    }
+    await createStatsMau(c, device_id, app_id) // TODO: see if anaylytics got too expensive or not. Then keep it or move it back to same place as createStatsBandwidth
+
+    console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
 
     const requestedInto = isV2
       ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
@@ -167,7 +175,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
     // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
 
-    const planValid = isV2 ? true : await isAllowedActionOrgPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id)
     device.version = versionData ? versionData.id : version.id
 
     if (enableAbTesting || enableProgressiveDeploy) {
@@ -205,15 +212,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //     error: 'invalid_ip',
     //   }, 400)
     // }
-
-    if (!planValid) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
-      await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-      return c.json({
-        message: 'Cannot update, upgrade plan to continue to update',
-        error: 'need_plan_upgrade',
-      }, 200)
-    }
 
     if (!version.bucket_id && !version.external_url && !version.r2_path) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
