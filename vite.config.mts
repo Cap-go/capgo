@@ -1,26 +1,26 @@
-import path from 'node:path'
 import { readdirSync } from 'node:fs'
-import AutoImport from 'unplugin-auto-import/vite'
-import VueMacros from 'unplugin-vue-macros/vite'
+import path from 'node:path'
 import VueI18n from '@intlify/unplugin-vue-i18n/vite'
-import VueDevTools from 'vite-plugin-vue-devtools'
-import WebfontDownload from 'vite-plugin-webfont-dl'
-import { VueRouterAutoImports } from 'unplugin-vue-router'
 import Vue from '@vitejs/plugin-vue'
+import AutoImport from 'unplugin-auto-import/vite'
+import formkit from 'unplugin-formkit/vite'
+import IconsResolver from 'unplugin-icons/resolver'
+import Icons from 'unplugin-icons/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
+import Components from 'unplugin-vue-components/vite'
+import VueMacros from 'unplugin-vue-macros/vite'
+import { VueRouterAutoImports } from 'unplugin-vue-router'
+import VueRouter from 'unplugin-vue-router/vite'
 // import veauryVitePlugins from 'veaury/vite/index'
 import { defineConfig } from 'vite'
-import VueRouter from 'unplugin-vue-router/vite'
-import Layouts from 'vite-plugin-vue-layouts'
-import Icons from 'unplugin-icons/vite'
-import IconsResolver from 'unplugin-icons/resolver'
-import Components from 'unplugin-vue-components/vite'
-import { VitePWA } from 'vite-plugin-pwa'
 import EnvironmentPlugin from 'vite-plugin-environment'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
-import formkit from 'unplugin-formkit/vite'
-import { branch, getRightKey } from './scripts/utils.mjs'
+import { VitePWA } from 'vite-plugin-pwa'
+import VueDevTools from 'vite-plugin-vue-devtools'
+import Layouts from 'vite-plugin-vue-layouts'
+import WebfontDownload from 'vite-plugin-webfont-dl'
 import pack from './package.json'
+import { branch, getRightKey } from './scripts/utils.mjs'
 
 function getUrl(key = 'base_domain'): string {
   if (branch === 'local')
@@ -75,6 +75,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: getRightKey('supa_url'),
       VITE_APP_URL: `${getUrl()}`,
       VITE_API_HOST: `${getUrl('api_domain')}`,
+      VITE_CAPTCHA_KEY: getRightKey('captcha_key'),
       VITE_BRANCH: branch,
       package_dependencies: JSON.stringify(pack.dependencies),
       domain: getUrl(),
