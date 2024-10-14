@@ -49,7 +49,7 @@ const emit = defineEmits([
   'rowClick',
   'sortClick',
 ])
-const dropdown = ref<HTMLElement | null>(null)
+const dropdown = useTemplateRef('dropdown')
 function closeDropdown() {
   if (dropdown.value) {
     dropdown.value.removeAttribute('open')

@@ -770,21 +770,71 @@ export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise
   return data || DEFAUL_PLAN_NAME
 }
 
-export async function getUpdateStatsSB(c: Context) {
+interface UpdateStats {
+  apps: {
+    app_id: string
+    failed: number
+    set: number
+    get: number
+    success_rate: number
+    healthy: boolean
+  }[]
+  total: {
+    failed: number
+    set: number
+    get: number
+    success_rate: number
+    healthy: boolean
+  }
+}
+
+export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_update_stats')
-    .single()
 
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error })
     return {
-      failed: 0,
-      install: 0,
-      get: 0,
-      successrate: 100,
-      healthy: true,
+      apps: [],
+      total: {
+        failed: 0,
+        set: 0,
+        get: 0,
+        success_rate: 100,
+        healthy: true,
+      },
     }
   }
 
-  return data
+  const apps = data.map((app: any) => {
+    const totalEvents = app.failed + app.install + app.get
+    const successRate = totalEvents > 0 ? ((app.install + app.get) / totalEvents) * 100 : 100
+    return {
+      app_id: app.app_id,
+      failed: Number(app.failed),
+      set: Number(app.install),
+      get: Number(app.get),
+      success_rate: Number(successRate.toFixed(2)),
+      healthy: successRate >= 70,
+    }
+  })
+
+  const total = apps.reduce((acc, app) => {
+    acc.failed += app.failed
+    acc.set += app.set
+    acc.get += app.get
+    return acc
+  }, { failed: 0, set: 0, get: 0 })
+
+  const totalEvents = total.failed + total.set + total.get
+  const totalSuccessRate = totalEvents > 0 ? ((total.set + total.get) / totalEvents) * 100 : 100
+
+  return {
+    apps,
+    total: {
+      ...total,
+      success_rate: Number(totalSuccessRate.toFixed(2)),
+      healthy: totalSuccessRate >= 70,
+    },
+  }
 }

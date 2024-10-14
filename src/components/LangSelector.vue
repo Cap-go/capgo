@@ -2,7 +2,7 @@
 import { availableLocales, i18n, languages } from '~/modules/i18n'
 import { changeLanguage, getEmoji } from '~/services/i18n'
 
-const dropdown = ref<HTMLElement | null>(null)
+const dropdown = useTemplateRef('dropdown')
 onClickOutside(dropdown, () => closeDropdown())
 function closeDropdown() {
   if (dropdown.value) {

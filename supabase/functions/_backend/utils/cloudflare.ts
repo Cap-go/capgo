@@ -801,48 +801,85 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
   return Promise.resolve()
 }
 
-// Add this new interface
+// Update the interface
 interface UpdateStats {
-  failed: number
-  set: number
-  get: number
-  success_rate: number
-  healthy: boolean
+  apps: {
+    app_id: string
+    failed: number
+    set: number
+    get: number
+    success_rate: number
+    healthy: boolean
+  }[]
+  total: {
+    failed: number
+    set: number
+    get: number
+    success_rate: number
+    healthy: boolean
+  }
 }
 
-// Add this new function
+// Update the function
 export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
   const query = `
     SELECT
+      blob1 AS app_id,
       sum(if(blob3 = 'fail', 1, 0)) AS failed,
       sum(if(blob3 = 'install', 1, 0)) AS set,
       sum(if(blob3 = 'get', 1, 0)) AS get
     FROM version_usage
-    WHERE timestamp >= date_sub(date_trunc('minute', now()), INTERVAL 10 MINUTE)
-      AND timestamp < date_sub(date_trunc('minute', now()), INTERVAL 9 MINUTE)
+    WHERE timestamp >= toDateTime(toUnixTimestamp(now()) - 600)
+      AND timestamp < toDateTime(toUnixTimestamp(now()) - 540)
+    GROUP BY blob1
   `
 
   console.log({ requestId: c.get('requestId'), context: 'getUpdateStatsCF query', query })
   try {
-    const result = await runQueryToCF<UpdateStats>(c, query)
-    const stats = result[0]
-    const totalEvents = stats.failed + stats.set + stats.get
-    const successRate = totalEvents > 0 ? ((stats.set + stats.get) / totalEvents) * 100 : 100
+    const result = await runQueryToCF<{ app_id: string, failed: number, set: number, get: number }>(c, query)
+
+    const apps = result
+      .filter(app => app.get > 0)
+      .map((app) => {
+        const totalEvents = app.set + app.get
+        const successRate = totalEvents > 0 ? (app.get / totalEvents) * 100 : 100
+        return {
+          ...app,
+          success_rate: Number(successRate.toFixed(2)),
+          healthy: successRate >= 70,
+        }
+      })
+
+    const total = apps.reduce((acc, app) => {
+      acc.failed += app.failed
+      acc.set += app.set
+      acc.get += app.get
+      return acc
+    }, { failed: 0, set: 0, get: 0 })
+
+    const totalEvents = total.set + total.get
+    const totalSuccessRate = totalEvents > 0 ? (total.get / totalEvents) * 100 : 100
 
     return {
-      ...stats,
-      success_rate: Number(successRate.toFixed(2)),
-      healthy: successRate >= 70,
+      apps,
+      total: {
+        ...total,
+        success_rate: Number(totalSuccessRate.toFixed(2)),
+        healthy: totalSuccessRate >= 70,
+      },
     }
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error: e })
     return {
-      failed: 0,
-      set: 0,
-      get: 0,
-      success_rate: 100,
-      healthy: true,
+      apps: [],
+      total: {
+        failed: 0,
+        set: 0,
+        get: 0,
+        success_rate: 100,
+        healthy: true,
+      },
     }
   }
 }

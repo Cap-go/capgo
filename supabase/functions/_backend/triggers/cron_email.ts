@@ -86,11 +86,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
     // TODO: uncomment this when better stats are available and enabled back betetr email
-    // if (sucessUpdates < 0) {
-    //   console.error(c.get('requestId'), 'Cannot send email for app, sucessUpdates < 0', weeklyStats, { app_id: appId, email })
-    //   console.error(c.get('requestId'), 'Invalid stats detected', weeklyStats, { app_id: appId, email })
-    //   return c.json({ status: 'No valid stats available' }, 200)
-    // }
+    if (sucessUpdates < 0) {
+      console.error(c.get('requestId'), 'Cannot send email for app, sucessUpdates < 0', weeklyStats, { app_id: appId, email })
+      console.error(c.get('requestId'), 'Invalid stats detected', weeklyStats, { app_id: appId, email })
+      return c.json({ status: 'No valid stats available' }, 200)
+    }
 
     const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
 

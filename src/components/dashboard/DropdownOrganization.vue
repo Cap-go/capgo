@@ -18,7 +18,7 @@ const displayStore = useDisplayStore()
 const { t } = useI18n()
 const supabase = useSupabase()
 const main = useMainStore()
-const dropdown = ref<HTMLElement | null>(null)
+const dropdown = useTemplateRef('dropdown')
 
 onClickOutside(dropdown, () => closeDropdown())
 

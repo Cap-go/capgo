@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.3.211",
+  "version": "11.3.222",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset && docker stop minio1 && docker rm minio1 && sudo rm -rf /tmp/minio-data/ && bun run minio:start && bun run minio:seed",
@@ -117,7 +117,7 @@
     "@capgo/capacitor-mute": "^6.0.3",
     "@capgo/capacitor-native-biometric": "^6.0.3",
     "@capgo/capacitor-screen-recorder": "8.1.64",
-    "@capgo/capacitor-updater": "^6.2.5",
+    "@capgo/capacitor-updater": "^6.3.0",
     "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^6.6.8",
     "@capgo/native-audio": "^6.4.17",

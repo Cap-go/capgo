@@ -8,7 +8,7 @@ import { z } from 'zod'
 import type { Context } from '@hono/hono'
 import { BRES, getBody } from '../utils/hono.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -90,7 +90,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 
   const { data: version } = await supabaseAdmin(c)
     .from('app_versions')
-    .select('id')
+    .select('id, owner_org')
     .eq('app_id', app_id)
     .or(`name.eq.${version_name},name.eq.builtin`)
     .order('id', { ascending: false })
@@ -103,6 +103,12 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
     }, 400)
+  }
+  if (!(await isAllowedActionOrg(c, version.owner_org))) {
+    return c.json({
+      message: 'Action not allowed',
+      error: 'action_not_allowed',
+    }, 200)
   }
   // find device
 
@@ -286,7 +292,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
 
   const { data: version } = await supabaseAdmin(c)
     .from('app_versions')
-    .select('id')
+    .select('id, owner_org')
     .eq('app_id', app_id)
     .or(`name.eq.${version_name},name.eq.builtin`)
     .order('id', { ascending: false })
@@ -299,6 +305,12 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
       message: `Version ${version_name} doesn't exist`,
       error: 'version_error',
     }, 400)
+  }
+  if (!(await isAllowedActionOrg(c, version.owner_org))) {
+    return c.json({
+      message: 'Action not allowed',
+      error: 'action_not_allowed',
+    }, 200)
   }
   const device: DeviceWithoutCreatedAt = {
     app_id,
