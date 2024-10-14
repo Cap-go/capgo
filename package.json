@@ -214,7 +214,7 @@
     "@vue/server-renderer": "3.5.11",
     "adm-zip": "^0.5.16",
     "autoprefixer": "^10.4.20",
-    "critters": "0.0.24",
+    "critters": "0.0.25",
     "cross-env": "^7.0.3",
     "eslint": "9.10.0",
     "http-server": "^14.1.1",
