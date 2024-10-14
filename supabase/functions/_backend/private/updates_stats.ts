@@ -17,7 +17,6 @@ app.get('/', async (c: Context) => {
       event: 'Updates Stats',
       icon: '📈',
       user_id: 'admin',
-      notify: true,
       tags: {
         success_rate: updateStats.total.success_rate,
       },

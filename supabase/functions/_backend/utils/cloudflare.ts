@@ -877,8 +877,8 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
         failed: 0,
         set: 0,
         get: 0,
-        success_rate: 100,
-        healthy: true,
+        success_rate: 0,
+        healthy: false,
       },
     }
   }

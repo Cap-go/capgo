@@ -72,7 +72,7 @@ async function getVersion() {
       .eq('deleted', false)
       .order('created_at', { ascending: false })
       .throwOnError()
-    versions.value = data || versions.value
+    versions.value = data || []
   }
   catch (error) {
     console.error(error)
@@ -118,7 +118,7 @@ async function getChannelOverride() {
         updated_at
       `)
       .eq('app_id', packageId.value)
-      .eq('device_id', id.value!.toLocaleLowerCase())
+      .eq('device_id', id.value as string)
       .single()
       .throwOnError()
     if (error) {
@@ -146,6 +146,9 @@ async function getDeviceOverride() {
       .eq('device_id', id.value!.toLocaleLowerCase())
       .single()
       .throwOnError()
+    if (!data?.version) {
+      return
+    }
 
     const { data: dataVersion } = await supabase
       .from('app_versions')
@@ -191,6 +194,9 @@ async function getDevice() {
       })
 
     const data = dataD[0]
+    if (!data?.version) {
+      return
+    }
     const { data: dataVersion } = await supabase
       .from('app_versions')
       .select(`
@@ -242,7 +248,7 @@ async function upsertDevVersion(device: string, versionId: number) {
       device_id: device.toLocaleLowerCase(),
       version: versionId,
       app_id: packageId.value,
-      owner_org: currentGid,
+      owner_org: currentGid as string,
     })
     .throwOnError()
 }
@@ -389,6 +395,7 @@ watchEffect(async () => {
     packageId.value = route.params.p as string
     packageId.value = urlToAppId(packageId.value)
     id.value = route.params.device as string
+    id.value = id.value!.toLocaleLowerCase()
     await loadData()
     displayStore.NavTitle = t('device')
     displayStore.defaultBack = `/app/package/${route.params.p}/devices`
