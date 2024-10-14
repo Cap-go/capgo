@@ -838,15 +838,17 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
   try {
     const result = await runQueryToCF<{ app_id: string, failed: number, set: number, get: number }>(c, query)
 
-    const apps = result.map((app) => {
-      const totalEvents = app.failed + app.set + app.get
-      const successRate = totalEvents > 0 ? ((app.set + app.get) / totalEvents) * 100 : 100
-      return {
-        ...app,
-        success_rate: Number(successRate.toFixed(2)),
-        healthy: successRate >= 70,
-      }
-    })
+    const apps = result
+      .filter(app => app.get > 0)
+      .map((app) => {
+        const totalEvents = app.set + app.get
+        const successRate = totalEvents > 0 ? (app.get / totalEvents) * 100 : 100
+        return {
+          ...app,
+          success_rate: Number(successRate.toFixed(2)),
+          healthy: successRate >= 70,
+        }
+      })
 
     const total = apps.reduce((acc, app) => {
       acc.failed += app.failed
@@ -855,8 +857,8 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
       return acc
     }, { failed: 0, set: 0, get: 0 })
 
-    const totalEvents = total.failed + total.set + total.get
-    const totalSuccessRate = totalEvents > 0 ? ((total.set + total.get) / totalEvents) * 100 : 100
+    const totalEvents = total.set + total.get
+    const totalSuccessRate = totalEvents > 0 ? (total.get / totalEvents) * 100 : 100
 
     return {
       apps,

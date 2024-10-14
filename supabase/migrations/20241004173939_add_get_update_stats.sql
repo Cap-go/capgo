@@ -32,17 +32,19 @@ BEGIN
         stats.install,
         stats.get,
         CASE
-            WHEN (stats.failed + stats.install + stats.get) > 0 THEN
-                ROUND(((stats.install + stats.get)::numeric / (stats.failed + stats.install + stats.get)) * 100, 2)
+            WHEN (stats.install + stats.get) > 0 THEN
+                ROUND((stats.get::numeric / (stats.install + stats.get)) * 100, 2)
             ELSE 100
         END AS success_rate,
         CASE
-            WHEN (stats.failed + stats.install + stats.get) > 0 THEN
-                (((stats.install + stats.get)::numeric / (stats.failed + stats.install + stats.get)) * 100 >= 70)
+            WHEN (stats.install + stats.get) > 0 THEN
+                ((stats.get::numeric / (stats.install + stats.get)) * 100 >= 70)
             ELSE true
         END AS healthy
     FROM
-        stats;
+        stats
+    WHERE
+        stats.get > 0;
 END;
 $$;
 
