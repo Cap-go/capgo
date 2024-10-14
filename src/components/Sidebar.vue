@@ -20,7 +20,7 @@ const emit = defineEmits(['closeSidebar'])
 
 const router = useRouter()
 const { t } = useI18n()
-const sidebar = ref(null)
+const sidebar = useTemplateRef('sidebar')
 const route = useRoute()
 
 onClickOutside(sidebar, () => emit('closeSidebar'))
