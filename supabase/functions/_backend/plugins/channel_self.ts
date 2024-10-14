@@ -222,6 +222,20 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       }
 
       console.log({ requestId: c.get('requestId'), context: 'setting channel' })
+      if (dataChannelOverride) {
+        const { error: dbErrorDev } = await supabaseAdmin(c)
+          .from('channel_devices')
+          .delete()
+          .eq('app_id', app_id)
+          .eq('device_id', device_id.toLocaleLowerCase())
+        if (dbErrorDev) {
+          console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
+          return c.json({
+            message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
+            error: 'override_not_allowed',
+          }, 400)
+        }
+      }
       const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .upsert({
