@@ -1,6 +1,6 @@
 CREATE OR REPLACE FUNCTION public.get_update_stats()
 RETURNS TABLE (
-    app_id uuid,
+    app_id character varying(50),
     failed bigint,
     install bigint,
     get bigint,
@@ -14,7 +14,7 @@ BEGIN
     RETURN QUERY
     WITH stats AS (
         SELECT
-            app_id,
+            version_usage.app_id,
             COALESCE(SUM(CASE WHEN action = 'fail' THEN 1 ELSE 0 END), 0) AS failed,
             COALESCE(SUM(CASE WHEN action = 'install' THEN 1 ELSE 0 END), 0) AS install,
             COALESCE(SUM(CASE WHEN action = 'get' THEN 1 ELSE 0 END), 0) AS get
@@ -24,7 +24,7 @@ BEGIN
             timestamp >= (date_trunc('minute', now()) - INTERVAL '10 minutes')
             AND timestamp < (date_trunc('minute', now()) - INTERVAL '9 minutes')
         GROUP BY
-            app_id
+            version_usage.app_id
     )
     SELECT
         stats.app_id,
