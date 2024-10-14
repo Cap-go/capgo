@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
-import { createInput, FormKit, FormKitMessages } from '@formkit/vue'
+import { FormKit, FormKitMessages } from '@formkit/vue'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
