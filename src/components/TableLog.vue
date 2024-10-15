@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import { useDark } from '@vueuse/core'
@@ -15,7 +16,6 @@ import debounce from 'lodash.debounce'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { Organization } from '~/stores/organization'
-import type { TableColumn } from './comp_def'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 interface Props {

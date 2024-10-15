@@ -1,6 +1,6 @@
+import type { ComputedRef, Ref } from 'vue'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { ComputedRef, Ref } from 'vue'
 import { getProcessCronStatsJobInfo, useSupabase } from '~/services/supabase'
 import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'

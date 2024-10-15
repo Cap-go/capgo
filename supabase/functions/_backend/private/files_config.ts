@@ -1,6 +1,6 @@
+import type { Context } from '@hono/hono'
 import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
 import { useCors } from '../utils/hono.ts'
 
 export const app = new Hono()

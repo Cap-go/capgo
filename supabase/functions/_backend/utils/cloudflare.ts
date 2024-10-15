@@ -1,10 +1,10 @@
-import dayjs from 'dayjs'
-import ky from 'ky'
 import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
-import { getEnv } from './utils.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
+import dayjs from 'dayjs'
+import ky from 'ky'
+import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions

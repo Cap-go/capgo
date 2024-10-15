@@ -1,5 +1,9 @@
-import * as semver from 'semver'
 import type { Context } from '@hono/hono'
+import type { ManifestEntry } from './downloadUrl.ts'
+import type { DeviceWithoutCreatedAt } from './stats.ts'
+import type { Database } from './supabase.types.ts'
+import type { AppInfos } from './types.ts'
+import * as semver from 'semver'
 import { saveStoreInfoCF } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
@@ -7,10 +11,6 @@ import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1, getPgClient, isAllowedActionOrgPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask } from './utils.ts'
-import type { ManifestEntry } from './downloadUrl.ts'
-import type { DeviceWithoutCreatedAt } from './stats.ts'
-import type { Database } from './supabase.types.ts'
-import type { AppInfos } from './types.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ChartData, ChartOptions } from 'chart.js'
+import type { AnnotationOptions } from '../services/chartAnnotations'
 import {
   CategoryScale,
   Chart,
@@ -10,11 +12,9 @@ import {
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
-import type { ChartData, ChartOptions } from 'chart.js'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
 import { isDark } from '../composables/dark'
 import { inlineAnnotationPlugin } from '../services/chartAnnotations'
-import type { AnnotationOptions } from '../services/chartAnnotations'
 
 const props = defineProps({
   accumulated: {

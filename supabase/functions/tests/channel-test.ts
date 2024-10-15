@@ -1,5 +1,5 @@
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
+import { assert, assertEquals } from '@std/assert'
+import { createClient } from '@supabase/supabase-js'
 
 const BASE_URL = 'http://localhost:54321/functions/v1'
 const headers = {
@@ -16,6 +16,7 @@ async function resetAndSeedData() {
   if (error)
     throw error
 }
+// eslint-disable-next-line antfu/no-top-level-await
 await resetAndSeedData()
 
 Deno.test('GET /channel operations', async (t) => {

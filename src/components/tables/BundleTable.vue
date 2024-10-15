@@ -1,17 +1,17 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
+import type { TableColumn } from '../comp_def'
 import IconTrash from '~icons/heroicons/trash?raw'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import type { Ref } from 'vue'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
-import type { TableColumn } from '../comp_def'
 
 const props = defineProps<{
   appId: string

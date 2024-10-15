@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '../comp_def'
 import ky from 'ky'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref } from 'vue'
@@ -7,7 +8,6 @@ import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
-import type { TableColumn } from '../comp_def'
 
 const props = defineProps<{
   appId: string

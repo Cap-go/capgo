@@ -1,4 +1,5 @@
 import type { Context } from '@hono/hono'
+import type { Database } from './supabase.types.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { recordUsage, setThreshold } from './stripe.ts'
@@ -12,7 +13,6 @@ import {
   isTrialOrg,
   supabaseAdmin,
 } from './supabase.ts'
-import type { Database } from './supabase.types.ts'
 
 function planToInt(plan: string) {
   switch (plan) {

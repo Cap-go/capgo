@@ -1,6 +1,6 @@
-import { Hono } from 'hono/tiny'
 import type { Env } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
+import { Hono } from 'hono/tiny'
 
 const KEY_EXPIRATION_TIME = 20 * 60 * 1000 // 20 minutes
 

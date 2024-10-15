@@ -1,5 +1,5 @@
-import { bigint, boolean, customType, doublePrecision, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 import type { Database } from './supabase.types.ts'
+import { bigint, boolean, customType, doublePrecision, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 

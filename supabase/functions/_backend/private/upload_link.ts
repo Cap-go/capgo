@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import { Hono } from 'hono/tiny'
 import { middlewareKey } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'

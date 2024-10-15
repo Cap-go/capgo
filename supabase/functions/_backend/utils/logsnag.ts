@@ -1,7 +1,7 @@
-import { LogSnag } from '@logsnag/node'
-import ky from 'ky'
-
 import type { Context } from '@hono/hono'
+import { LogSnag } from '@logsnag/node'
+
+import ky from 'ky'
 import { getEnv } from './utils.ts'
 
 function logsnag(c: Context) {

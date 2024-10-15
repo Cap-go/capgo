@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import type { Tab } from './comp_def'
 import { useI18n } from 'petite-vue-i18n'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
-import type { Tab } from './comp_def'
 
 const props = defineProps<{
   tabs: Tab[]

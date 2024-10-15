@@ -1,10 +1,10 @@
+import type { Context, MiddlewareHandler, Next } from '@hono/hono'
+import type { Database } from './supabase.types.ts'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { timingSafeEqual } from 'hono/utils/buffer'
-import type { Context, MiddlewareHandler, Next } from '@hono/hono'
 import { supabaseAdmin } from './supabase.ts'
 import { checkKey, getEnv } from './utils.ts'
-import type { Database } from './supabase.types.ts'
 
 export const useCors = cors({
   origin: '*',

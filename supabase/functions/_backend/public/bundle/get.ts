@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
+import type { Database } from '../../utils/supabase.types.ts'
 import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
-import type { Database } from '../../utils/supabase.types.ts'
 
 export interface GetLatest {
   app_id?: string

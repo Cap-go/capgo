@@ -1,8 +1,8 @@
-import { getRuntimeKey } from 'hono/adapter'
 import type { Context } from '@hono/hono'
+import type { Database } from './supabase.types.ts'
+import { getRuntimeKey } from 'hono/adapter'
 import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
-import type { Database } from './supabase.types.ts'
 
 const EXPIRATION_SECONDS = 604800
 const BASE_PATH = 'files/read/attachments'

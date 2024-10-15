@@ -1,9 +1,9 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import type { GetLatest } from './get.ts'
+import { Hono } from 'hono/tiny'
 import { getBody, middlewareKey } from '../../utils/hono.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
-import type { GetLatest } from './get.ts'
 
 export const app = new Hono()
 

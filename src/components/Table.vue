@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
@@ -14,7 +15,6 @@ import IconReload from '~icons/tabler/reload'
 import debounce from 'lodash.debounce'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
-import type { TableColumn } from './comp_def'
 
 interface Props {
   rowClick?: boolean

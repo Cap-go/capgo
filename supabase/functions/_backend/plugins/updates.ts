@@ -1,7 +1,8 @@
+import type { Context } from '@hono/hono'
+import type { AppInfos } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import * as semver from 'semver'
 import { z } from 'zod'
-import type { Context } from '@hono/hono'
 import { update } from '../utils/update.ts'
 import {
   deviceIdRegex,
@@ -22,7 +23,6 @@ import {
   NON_STRING_VERSION_NAME,
   reverseDomainRegex,
 } from '../utils/utils.ts'
-import type { AppInfos } from '../utils/types.ts'
 
 const jsonRequestSchema = z.object({
   app_id: z.string({
