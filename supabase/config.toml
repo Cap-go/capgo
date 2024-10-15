@@ -163,3 +163,6 @@ verify_jwt = false
 
 [functions.scrapping]
 verify_jwt = false
+
+[functions.files]
+verify_jwt = false
