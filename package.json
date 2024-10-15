@@ -187,7 +187,7 @@
     "@cloudflare/workers-types": "4.20240909.0",
     "@iconify-json/carbon": "1.2.1",
     "@iconify-json/heroicons": "^1.2.0",
-    "@iconify-json/ion": "1.2.0",
+    "@iconify-json/ion": "1.2.1",
     "@iconify-json/ls": "1.2.0",
     "@iconify/json": "^2.2.246",
     "@playwright/test": "1.47.2",
