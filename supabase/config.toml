@@ -139,11 +139,6 @@ verify_jwt = false
 [functions.stats]
 verify_jwt = false
 
-# DEPRECATED TODO: to remove when all user got the latest CLI
-
-[functions.upload_link]
-verify_jwt = false
-
 [functions.get_stats]
 verify_jwt = false
 

@@ -59,9 +59,9 @@ app.use('*', requestId())
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
-app.route('/channels', channel) // TODO: deprecated remove when everyone use the new endpoint
 app.route('/channel', channel)
 app.route('/device', device)
+
 app.route('/on_app_create', on_app_create)
 
 // Private API
