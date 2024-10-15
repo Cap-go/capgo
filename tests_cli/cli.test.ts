@@ -32,7 +32,7 @@ describe('tests CLI upload', () => {
   it('should upload bundle successfully', async () => {
     await resetAndSeedData()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], true)
-    expect(output).toContain('Bundle Uploaded')
+    expect(output).toContain('Bundle uploaded')
   })
   it('should download and verify uploaded bundle', async () => {
     const baseData = getUpdateBaseData()
@@ -163,7 +163,7 @@ describe('tests CLI for organization', () => {
         try {
           increaseSemver()
           const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false, testApiKey)
-          expect(output).toContain('Bundle Uploaded')
+          expect(output).toContain('Bundle uploaded')
         }
         finally {
           await supabase.from('org_users')
@@ -194,7 +194,7 @@ describe('tests CLI for organization', () => {
 //   it.only('should test compatibility table', async () => {
 //     await resetAndSeedData()
 //     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
-//     expect(output).toContain('Bundle Uploaded')
+//     expect(output).toContain('Bundle uploaded')
 
 //     const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
 //       const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
