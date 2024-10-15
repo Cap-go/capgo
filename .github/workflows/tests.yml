@@ -31,13 +31,13 @@ jobs:
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
-      - name: "Start minio"
-        run: bun run minio:start && bun run minio:seed
-      - run: bun run test:backend
       - name: Setup bun
         uses: oven-sh/setup-bun@v1.1.1
         with:
           bun-version: latest
+      - name: "Start minio"
+        run: bun run minio:start && bun run minio:seed
+      - run: bun run test:backend
       - name: Setup node
         uses: actions/setup-node@v4
         with:
