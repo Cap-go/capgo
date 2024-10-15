@@ -301,7 +301,7 @@ onMounted(checkLogin)
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
                 </div>
-                <div>
+                <div v-if="!!turnstileToken">
                   <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
                     {{ t('captcha') }}
                   </h1>

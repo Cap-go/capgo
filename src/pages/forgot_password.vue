@@ -119,10 +119,12 @@ watchEffect(() => {
                       autocomplete="email"
                       validation="required:trim"
                     />
-                    <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
-                      {{ t('captcha') }}
-                    </h1>
-                    <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                    <template v-if="!!turnstileToken">
+                      <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
+                        {{ t('captcha') }}
+                      </h1>
+                      <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                    </template>
                     <FormKitMessages />
                   </div>
 
