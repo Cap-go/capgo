@@ -1,6 +1,6 @@
+import type { RouteRecordNormalized } from 'vue-router'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
-import type { RouteRecordNormalized } from 'vue-router'
 
 export interface Frontmatter {
   title: string

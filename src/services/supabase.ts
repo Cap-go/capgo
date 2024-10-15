@@ -1,8 +1,8 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import ky from 'ky'
 import { coerce as semverCoerce } from 'semver'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
