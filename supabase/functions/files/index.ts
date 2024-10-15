@@ -4,7 +4,7 @@ import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app as files_config } from '../_backend/private/files_config.ts'
 
-const functionName = 'updates'
+const functionName = 'files'
 const appGlobal = new Hono().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
