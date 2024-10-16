@@ -25,7 +25,7 @@ async function guard(next: any, to: string, from: string) {
   }
 
   if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2' && !isAdminForced)
-    return next('/login')
+    return next(`/login?to=${to}`)
 
   if (auth.user && !main.auth) {
     main.auth = auth.user
@@ -79,7 +79,7 @@ async function guard(next: any, to: string, from: string) {
   }
   else if (from !== 'login' && !auth.user) {
     main.auth = undefined
-    next('/login')
+    next(`/login?to=${to}`)
   }
   else {
     hideLoader()
