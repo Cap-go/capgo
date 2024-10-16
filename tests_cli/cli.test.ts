@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 // import { prepareCli, runCli, setDependencies } from './cliUtils'
 import type { Database } from '~/types/supabase.types'
 import { prepareCli, runCli } from './cliUtils'
-import { getUpdateBaseData, responseOk, sendUpdate } from './utils'
+import { getUpdate, getUpdateBaseData, responseOk } from './utils'
 
 const BASE_URL = new URL('http://localhost:54321/functions/v1')
 const SERVICE_ROLE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
@@ -36,10 +36,11 @@ describe('tests CLI upload', () => {
   })
   it('should download and verify uploaded bundle', async () => {
     const baseData = getUpdateBaseData()
-    const response = await sendUpdate(BASE_URL, baseData)
+    const response = await getUpdate(BASE_URL, baseData)
     await responseOk(response, 'Update new bundle')
 
     const responseJson = await response.json<{ url: string, version: string }>()
+    console.log(responseJson)
     expect(responseJson.url).toBeDefined()
     expect(responseJson.version).toBe(semver)
 

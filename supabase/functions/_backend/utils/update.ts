@@ -385,8 +385,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
-        message: 'Cannot get bundle',
-        error: 'no_bundle',
+        message: 'Cannot get bundle url',
+        error: 'no_bundle_url',
       }, 200)
     }
     // console.log(c.get('requestId'), 'save stats', device_id)

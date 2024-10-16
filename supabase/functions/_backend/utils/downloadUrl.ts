@@ -45,11 +45,6 @@ export async function getBundleUrl(
   if (!path)
     return null
 
-  if (!bundleMeta?.checksum || !bundleMeta?.size) {
-    console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', error: 'Cannot get checksum or size' })
-    return null
-  }
-
   if (getRuntimeKey() !== 'workerd') {
     try {
       const signedUrl = await s3.getSignedUrl(c, path, EXPIRATION_SECONDS)

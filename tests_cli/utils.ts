@@ -21,7 +21,7 @@ export async function responseOk(response: Response, requestName: string): Promi
   }
 }
 
-export async function sendUpdate(baseUrl: URL, data: typeof updateAndroidBaseData): Promise<Response> {
+export async function getUpdate(baseUrl: URL, data: typeof updateAndroidBaseData): Promise<Response> {
   const url = new URL(`${baseUrl.href}/updates`, baseUrl)
   return await fetch(url, {
     method: 'POST',
