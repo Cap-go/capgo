@@ -24,6 +24,7 @@
     "test:front": "playwright test",
     "test:backend": "deno test --allow-all supabase/functions/tests/* --env=supabase/.env.test --import-map=supabase/functions/import_map.json",
     "test:cli": "vitest --bail=1",
+    "test:cli:local": "USE_LOCAL_CLI=true vitest --bail=1",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
     "dev-build": "BRANCH=development vite build",
     "dev-serve": "BRANCH=development vite",

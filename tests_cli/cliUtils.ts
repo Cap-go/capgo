@@ -92,11 +92,14 @@ function npmInstall() {
 }
 
 export function runCli(params: string[], logOutput = false, overwriteApiKey?: string): string {
-  const useLocalCli = process.env.USE_LOCAL_CLI === 'true'
-  console.log('useLocalCli', useLocalCli)
+  let localCliPath = process.env.LOCAL_CLI_PATH
+  if (localCliPath === 'true') {
+    localCliPath = '../../CLI/dist/index.js'
+  }
+  console.log('localCliPath', localCliPath)
   const command = [
-    useLocalCli ? 'node' : 'npx',
-    useLocalCli ? '../../CLI/dist/index.js' : '@capgo/cli',
+    localCliPath ? 'node' : 'npx',
+    localCliPath || '@capgo/cli',
     ...params,
     '--apikey',
     overwriteApiKey ?? defaultApiKey,
