@@ -32,7 +32,12 @@ function openSupport() {
 }
 
 async function nextLogin() {
-  router.push('/app/home')
+  if (route.query.to && typeof route.query.to === 'string') {
+    router.push(route.query.to)
+  }
+  else {
+    router.push('/app/home')
+  }
   setTimeout(async () => {
     isLoading.value = false
   }, 500)
