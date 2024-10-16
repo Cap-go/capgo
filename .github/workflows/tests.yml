@@ -2,6 +2,8 @@ name: Run tests
 
 on:
   push:
+    branches:
+      - renovate/**
     tags:
       - '*'
   pull_request:

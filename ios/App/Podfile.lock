@@ -1,5 +1,5 @@
 PODS:
-  - Alamofire (5.9.1)
+  - Alamofire (5.10.0)
   - Capacitor (6.1.2):
     - CapacitorCordova
   - CapacitorActionSheet (6.0.2):
@@ -69,7 +69,7 @@ PODS:
     - Capacitor
   - CapgoCapacitorScreenRecorder (8.1.64):
     - Capacitor
-  - CapgoCapacitorUpdater (6.2.5):
+  - CapgoCapacitorUpdater (6.3.3):
     - Alamofire
     - Capacitor
     - SSZipArchive
@@ -83,12 +83,12 @@ PODS:
   - Crisp (2.6.0):
     - Crisp/Crisp (= 2.6.0)
   - Crisp/Crisp (2.6.0)
-  - PurchasesHybridCommon (13.0.1):
-    - RevenueCat (= 5.2.3)
-  - RevenueCat (5.2.3)
-  - RevenuecatPurchasesCapacitor (9.0.1):
+  - PurchasesHybridCommon (13.3.0):
+    - RevenueCat (= 5.3.4)
+  - RevenueCat (5.3.4)
+  - RevenuecatPurchasesCapacitor (9.0.3):
     - Capacitor
-    - PurchasesHybridCommon (= 13.0.1)
+    - PurchasesHybridCommon (= 13.3.0)
   - SSZipArchive (2.4.3)
   - SwiftKeychainWrapper (4.0.1)
   - Version (0.8.0)
@@ -225,7 +225,7 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@revenuecat/purchases-capacitor"
 
 SPEC CHECKSUMS:
-  Alamofire: f36a35757af4587d8e4f4bfa223ad10be2422b8c
+  Alamofire: cd0b98508df05796dd2ff278f3bb055a631b5390
   Capacitor: 679f9673fdf30597493a6362a5d5bf233d46abc2
   CapacitorActionSheet: 66633b06ada3a8f98f8f3f4a61c8f7171695ab8d
   CapacitorApp: 0bc633b4eae40a1f32cd2834788fad3bc42da6a1
@@ -260,14 +260,14 @@ SPEC CHECKSUMS:
   CapgoCapacitorMute: 6cf5b54cb19afe8f0cf9b20c0040ec65d9ecf0a0
   CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
   CapgoCapacitorScreenRecorder: b0bed728740691e8a0993f4cfacf985c88d9a18a
-  CapgoCapacitorUpdater: 5cf2afb1f57842d2075a7f114e9de447e132298f
+  CapgoCapacitorUpdater: d956101ef568210f577213b7659843c148a5e674
   CapgoInappbrowser: 9f80d98fa546693b895712b5fba6abc46f65e44a
   CapgoNativeAudio: 4aaa363d3ad36581acaca722fc28cb0992015e89
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
   Crisp: 047b4e8b77f28cae5089f037cb327a9a03c9bb4d
-  PurchasesHybridCommon: 6e5772e574ce345922c42f31403cf72a0ba762bf
-  RevenueCat: 86e4486345a6f7740fecb1eeff91eeff8708eee1
-  RevenuecatPurchasesCapacitor: e8b92ba24739e2632274c765e96b25013a051b97
+  PurchasesHybridCommon: 801f03c7dde7acd35c4655247a992858c4ef6cdc
+  RevenueCat: 4ba0e585d42cdfc3fafce631c51ea9088053fae2
+  RevenuecatPurchasesCapacitor: ab0a5ecf3790125f800e57f73c57504abd6813fd
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486

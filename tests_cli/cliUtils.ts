@@ -122,7 +122,7 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   }
   catch (error) {
     const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
-    console.error(useLocalCli ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput)
+    console.error(localCliPath ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput)
 
     if (logOutput)
       console.log(errorOutput)
