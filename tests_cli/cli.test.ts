@@ -148,7 +148,7 @@ describe('tests CLI for organization', () => {
     const supabase = createSupabase()
     await resetAndSeedData()
     await supabase.from('apikeys')
-      .insert({ key: testApiKey, user_id: testUserId, mode: 'upload' })
+      .insert({ key: testApiKey, user_id: testUserId, mode: 'upload', name: 'test' })
 
     try {
       const { data: orgMembers } = await supabase.from('org_users')

@@ -17,20 +17,15 @@ app.get('/', (c: Context) => {
       TUSUploadForced: false,
     })
   }
-  try {
-    // force partial and tus for 20% of the requests
-    const randomPU = Math.random()
-    const randomTUS = Math.random()
-    const forcePartialUpload = randomPU < 0.5
-    const forceTUSUpload = randomTUS < 0.3
-    return c.json({
-      partialUpload: true,
-      partialUploadForced: forcePartialUpload,
-      TUSUpload: true,
-      TUSUploadForced: forceTUSUpload,
-    })
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot get files config', error: JSON.stringify(e) }, 500)
-  }
+  // force partial and tus for 20% of the requests
+  const randomPU = Math.random()
+  const randomTUS = Math.random()
+  const forcePartialUpload = randomPU < 0.5
+  const forceTUSUpload = randomTUS < 0.3
+  return c.json({
+    partialUpload: true,
+    partialUploadForced: forcePartialUpload,
+    TUSUpload: true,
+    TUSUploadForced: forceTUSUpload,
+  })
 })

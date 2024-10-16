@@ -1,4 +1,5 @@
 import type { ExecSyncOptions } from 'node:child_process'
+import type { Readable } from 'node:stream'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -58,7 +59,6 @@ export function setDependencies(dependencies: Record<string, string>) {
   // write package.json
   const pathPack = path.join(tempFileFolder, 'package.json')
   const res = BASE_PACKAGE_JSON.replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
-  console.log('setDependencies', pathPack, res)
   writeFileSync(pathPack, res)
 }
 
@@ -92,11 +92,11 @@ function npmInstall() {
 }
 
 export function runCli(params: string[], logOutput = false, overwriteApiKey?: string): string {
+  const useLocalCli = process.env.USE_LOCAL_CLI === 'true'
+  console.log('useLocalCli', useLocalCli)
   const command = [
-    'npx',
-    '@capgo/cli',
-    // 'node',
-    // '../../CLI/dist/index.js',
+    useLocalCli ? 'node' : 'npx',
+    useLocalCli ? '../../CLI/dist/index.js' : '@capgo/cli',
     ...params,
     '--apikey',
     overwriteApiKey ?? defaultApiKey,
@@ -112,19 +112,17 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   try {
     const output = execSync(command, options)
 
-    if (logOutput) {
+    if (logOutput)
       console.log(output)
-    }
 
-    return output
+    return output.toString()
   }
   catch (error) {
-    const errorOutput = error.stdout ?? JSON.stringify(error)
-    console.error('CLI execution failed', errorOutput)
+    const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
+    console.error(useLocalCli ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput)
 
-    if (logOutput) {
+    if (logOutput)
       console.log(errorOutput)
-    }
 
     return errorOutput
   }
