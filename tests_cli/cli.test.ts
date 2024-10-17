@@ -2,9 +2,8 @@ import { Buffer } from 'node:buffer'
 import { createClient } from '@supabase/supabase-js'
 import AdmZip from 'adm-zip'
 import { beforeAll, describe, expect, it } from 'vitest'
-// import { prepareCli, runCli, setDependencies } from './cliUtils'
 import type { Database } from '~/types/supabase.types'
-import { prepareCli, runCli } from './cliUtils'
+import { prepareCli, runCli, setDependencies } from './cliUtils'
 import { getUpdate, getUpdateBaseData, responseOk } from './utils'
 
 const BASE_URL = new URL('http://localhost:54321/functions/v1')
@@ -104,43 +103,45 @@ describe('tests CLI for organization', () => {
   })
 
   // todo: fix this test
-  // it.only('should test auto min version flag', async () => {
-  //   await resetAndSeedData()
-  //   // const { error } = await supabase.from('channels').update({  }).eq('id', 22)
-  //   const uploadWithAutoFlagWithAssert = async (expected: string) => {
-  //     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version'])
-  //     console.log(output)
-  //     const minUpdateVersion = output.split('\n').find(l => l.includes('Auto set min-update-version'))
-  //     expect(minUpdateVersion).toBeDefined()
-  //     expect(minUpdateVersion).toContain(expected)
-  //     return output
-  //   }
+  it.only('should test auto min version flag', async () => {
+    await resetAndSeedData()
+    const supabase = createSupabase()
+    const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('id', 9654)
+    expect(error).toBeNull()
+    const uploadWithAutoFlagWithAssert = async (expected: string) => {
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'])
+      console.log(output)
+      const min_update_version = output.split('\n').find(l => l.includes('Auto set min-update-version'))
+      expect(min_update_version).toBeDefined()
+      expect(min_update_version).toContain(expected)
+      return output
+    }
 
-  //   increaseSemver()
-  //   await uploadWithAutoFlagWithAssert(semver)
+    increaseSemver()
+    await uploadWithAutoFlagWithAssert(semver)
 
-  //   const expected = semver
-  //   increaseSemver()
-  //   await uploadWithAutoFlagWithAssert(expected)
-  //   const supabase = createSupabase()
-  //   await supabase
-  //     .from('app_versions')
-  //     .update({ minUpdateVersion: null })
-  //     .eq('name', semver)
+    const expected = semver
+    increaseSemver()
+    await uploadWithAutoFlagWithAssert(expected)
+    await supabase
+      .from('app_versions')
+      .update({ min_update_version: null })
+      .eq('name', semver)
 
-  //   increaseSemver()
-  //   const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'])
-  //   expect(output).toContain('skipping auto setting compatibility')
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'])
+    expect(output).toContain('skipping auto setting compatibility')
 
-  //   await supabase
-  //     .from('app_versions')
-  //     .update({ minUpdateVersion: '1.0.0', native_packages: null })
-  //     .eq('name', semver)
+    const { error: error2 } = await supabase
+      .from('app_versions')
+      .update({ min_update_version: '1.0.0', native_packages: [] })
+      .eq('name', semver)
+    expect(error2).toBeNull()
 
-  //   increaseSemver()
-  //   const output2 = await uploadWithAutoFlagWithAssert(semver)
-  //   expect(output2).toContain('it\'s your first upload with compatibility check')
-  // })
+    increaseSemver()
+    const output2 = await uploadWithAutoFlagWithAssert(semver)
+    expect(output2).toContain('it\'s your first upload with compatibility check')
+  })
 
   it('should test upload with organization', async () => {
     const testApiKey = crypto.randomUUID()
@@ -186,38 +187,38 @@ describe('tests CLI for organization', () => {
   })
 })
 
-// describe('tests CLI metadata', () => {
-//   beforeAll(async () => {
-//     await prepareCli(BASE_URL)
-//   })
+describe('tests CLI metadata', () => {
+  beforeAll(async () => {
+    await prepareCli(BASE_URL)
+  })
 
-//   it.only('should test compatibility table', async () => {
-//     await resetAndSeedData()
-//     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
-//     expect(output).toContain('Bundle uploaded')
+  it.only('should test compatibility table', async () => {
+    await resetAndSeedData()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
+    expect(output).toContain('Bundle uploaded')
 
-//     const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-//       const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
-//       const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
-//       expect(androidPackage).toBeDefined()
+    const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
+      const output = await runCli(['bundle', 'compatibility', '-c', 'production'])
+      const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
+      expect(androidPackage).toBeDefined()
 
-//       const columns = androidPackage!.split('│').slice(2, -1)
-//       expect(columns.length).toBe(4)
-//       expect(columns[0]).toContain(column1)
-//       expect(columns[1]).toContain(column2)
-//       expect(columns[2]).toContain(column3)
-//       expect(columns[3]).toContain(column4)
-//     }
+      const columns = androidPackage!.split('│').slice(2, -1)
+      expect(columns.length).toBe(4)
+      expect(columns[0]).toContain(column1)
+      expect(columns[1]).toContain(column2)
+      expect(columns[2]).toContain(column3)
+      expect(columns[3]).toContain(column4)
+    }
 
-//     await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
+    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
 
-//     increaseSemver()
-//     await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
+    increaseSemver()
+    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
 
-//     await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
+    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
 
-//     setDependencies({})
+    setDependencies({})
 
-//     await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
-//   })
-// })
+    await assertCompatibilityTableColumns('@capacitor/android', 'None', '4.5.0', '❌')
+  })
+})
