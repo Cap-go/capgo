@@ -40,7 +40,6 @@ describe('tests CLI upload', () => {
     await responseOk(response, 'Update new bundle')
 
     const responseJson = await response.json<{ url: string, version: string }>()
-    console.log(responseJson)
     expect(responseJson.url).toBeDefined()
     expect(responseJson.version).toBe(semver)
 
