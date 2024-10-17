@@ -218,7 +218,7 @@
     "husky": "^9.1.6",
     "miniflare": "^3.20240925.0",
     "postcss": "^8.4.47",
-    "sass": "1.79.5",
+    "sass": "1.80.1",
     "tailwindcss": "^3.4.13",
     "typescript": "5.6.2",
     "unplugin-icons": "0.19.3",
