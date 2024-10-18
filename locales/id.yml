@@ -116,6 +116,8 @@ cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
 cannot-view-plans: Tidak dapat melihat halaman rencana
 cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
+captcha: Captcha
+captcha-fail: Validasi captcha gagal
 change: Mengubah
 change-api-key-name: Ubah nama apikey
 change-your-picture: Ubah gambar Anda

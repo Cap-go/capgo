@@ -75,6 +75,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: getRightKey('supa_url'),
       VITE_APP_URL: `${getUrl()}`,
       VITE_API_HOST: `${getUrl('api_domain')}`,
+      VITE_CAPTCHA_KEY: getRightKey('captcha_key'),
       VITE_BRANCH: branch,
       package_dependencies: JSON.stringify(pack.dependencies),
       domain: getUrl(),

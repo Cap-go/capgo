@@ -130,6 +130,8 @@ cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự c�
 cannot-view-plans: Không thể xem trang kế hoạch
 cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
+captcha: hình ảnh xác thực
+captcha-fail: Xác thực hình ảnh xác thực không thành công
 change: Thay đổi
 change-api-key-name: Thay đổi tên của apikey
 change-your-picture: Thay đổi hình ảnh của bạn

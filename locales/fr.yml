@@ -138,6 +138,8 @@ cannot-test-app-some: Impossible de tester l'application, quelque chose s'est ma
 cannot-view-plans: Impossible de voir la page des plans
 cannot-view-usage: Impossible de voir la page d'utilisation
 cannots-sign-off: Impossible de se déconnecter
+captcha: Captcha
+captcha-fail: Échec de la validation du Captcha
 change: Changement
 change-api-key-name: Changer le nom de l'apikey
 change-your-picture: Changez votre photo
@@ -148,8 +150,8 @@ channel: Canal
 channel-ab-testing: Activer le test AB
 channel-ab-testing-percentage: Pourcentage d'utilisateurs recevant la version secondaire
 channel-bundle-linked: >-
-  Ce paquet est lié à une ou plusieurs chaînes. (%) Souhaitez-vous le dissocier de
-  ces chaînes?
+  Ce paquet est lié à une ou plusieurs chaînes. (%) Souhaitez-vous le dissocier
+  de ces chaînes?
 channel-create: Créer une chaîne
 channel-deleted: Chaîne supprimée
 channel-forced-devices: Appareils forcés

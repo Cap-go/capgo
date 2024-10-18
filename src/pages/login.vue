@@ -12,6 +12,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import { openMessenger } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
@@ -19,6 +20,7 @@ import { autoAuth, useSupabase } from '~/services/supabase'
 const route = useRoute()
 const supabase = useSupabase()
 const isLoading = ref(false)
+const turnstileToken = ref('')
 const stauts: Ref<'login' | '2fa'> = ref('login')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallangeId: Ref<string> = ref('')
@@ -26,6 +28,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
+const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
 
 function openSupport() {
   openMessenger()
@@ -49,12 +52,21 @@ async function submit(form: { email: string, password: string, code: string }) {
     const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
+      options: {
+        captchaToken: turnstileToken.value,
+      },
     })
     if (error) {
       isLoading.value = false
       console.error('error', error)
       setErrors('login-account', [error.message], {})
-      toast.error(t('invalid-auth'))
+      if (error.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+      }
+      else {
+        toast.error(t('invalid-auth'))
+      }
+
       return
     }
 
@@ -293,6 +305,12 @@ onMounted(checkLogin)
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
+                </div>
+                <div v-if="!!turnstileToken">
+                  <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
+                    {{ t('captcha') }}
+                  </h1>
+                  <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
                 <FormKitMessages />
                 <div>

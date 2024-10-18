@@ -128,6 +128,8 @@ cannot-test-app-some: No se puede probar la aplicación. Ocurrió algo incorrect
 cannot-view-plans: No puedo ver la página de planes
 cannot-view-usage: No se puede ver la página de uso
 cannots-sign-off: No se puede iniciar sesión
+captcha: Captcha
+captcha-fail: Fallo en la validación del captcha
 change: Cambiar
 change-api-key-name: Cambiar el nombre del apikey
 change-your-picture: Cambia tu fotografía

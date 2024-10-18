@@ -114,6 +114,8 @@ cannot-test-app-some: 无法测试应用程序发生错误
 cannot-view-plans: 无法查看计划页面
 cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
+captcha: 验证码
+captcha-fail: 验证码验证失败
 change: 改变
 change-api-key-name: 更改 apikey 的名称
 change-your-picture: 改变你的图片

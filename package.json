@@ -180,6 +180,7 @@
     "vue-i18n": "10.0.3",
     "vue-router": "4.4.5",
     "vue-sonner": "^1.2.1",
+    "vue-turnstile": "^1.0.11",
     "zod": "^3.23.8"
   },
   "devDependencies": {
