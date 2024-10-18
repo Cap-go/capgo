@@ -43,10 +43,13 @@ async function submit() {
     },
   })
   isLoading.value = false
-  if (error)
+  if (error) {
     errorMessage.value = error.message
-  else
+  }
+  else {
     router.push('/app/home')
+    window.location.href = '/app/home'
+  }
 }
 </script>
 
