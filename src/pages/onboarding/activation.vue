@@ -48,7 +48,7 @@ async function submit() {
   }
   else {
     router.push('/app/home')
-    window.location.reload()
+    window.location.href = '/app/home'
   }
 }
 </script>
