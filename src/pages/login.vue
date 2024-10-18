@@ -21,6 +21,7 @@ const route = useRoute()
 const supabase = useSupabase()
 const isLoading = ref(false)
 const turnstileToken = ref('')
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const stauts: Ref<'login' | '2fa'> = ref('login')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallangeId: Ref<string> = ref('')
@@ -28,7 +29,6 @@ const router = useRouter()
 const { t } = useI18n()
 
 const version = import.meta.env.VITE_APP_VERSION
-const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
 
 function openSupport() {
   openMessenger()
@@ -306,7 +306,7 @@ onMounted(checkLogin)
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
                 </div>
-                <div v-if="!!turnstileToken">
+                <div v-if="!!captchaKey">
                   <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
                     {{ t('captcha') }}
                   </h1>

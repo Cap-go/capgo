@@ -18,7 +18,7 @@ const supabase = useSupabase()
 const step = ref(1)
 const turnstileToken = ref('')
 
-const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
@@ -119,7 +119,7 @@ watchEffect(() => {
                       autocomplete="email"
                       validation="required:trim"
                     />
-                    <template v-if="!!turnstileToken">
+                    <template v-if="!!captchaKey">
                       <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
                         {{ t('captcha') }}
                       </h1>
