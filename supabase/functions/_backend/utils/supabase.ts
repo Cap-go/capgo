@@ -1,10 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
-
 import type { Context } from '@hono/hono'
-import { createCustomer } from './stripe.ts'
-import { getEnv } from './utils.ts'
+
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
+import { createClient } from '@supabase/supabase-js'
+import { createCustomer } from './stripe.ts'
+import { getEnv } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client

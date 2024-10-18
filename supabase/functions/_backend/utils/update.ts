@@ -1,5 +1,9 @@
-import * as semver from 'semver'
 import type { Context } from '@hono/hono'
+import type { ManifestEntry } from './downloadUrl.ts'
+import type { DeviceWithoutCreatedAt } from './stats.ts'
+import type { Database } from './supabase.types.ts'
+import type { AppInfos } from './types.ts'
+import * as semver from 'semver'
 import { saveStoreInfoCF } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
@@ -7,10 +11,6 @@ import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1, getPgClient, isAllowedActionOrgPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask } from './utils.ts'
-import type { ManifestEntry } from './downloadUrl.ts'
-import type { DeviceWithoutCreatedAt } from './stats.ts'
-import type { Database } from './supabase.types.ts'
-import type { AppInfos } from './types.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
@@ -385,8 +385,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
-        message: 'Cannot get bundle',
-        error: 'no_bundle',
+        message: 'Cannot get bundle url',
+        error: 'no_bundle_url',
       }, 200)
     }
     // console.log(c.get('requestId'), 'save stats', device_id)

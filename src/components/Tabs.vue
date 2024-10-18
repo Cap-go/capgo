@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useI18n } from 'petite-vue-i18n'
 import type { Tab } from './comp_def'
+import { useI18n } from 'petite-vue-i18n'
 
 const props = defineProps<{
   tabs: Tab[]

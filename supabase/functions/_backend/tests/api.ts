@@ -1,5 +1,5 @@
-import ky from 'ky'
 import type { Context } from '@hono/hono'
+import ky from 'ky'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 

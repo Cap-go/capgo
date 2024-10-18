@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Factor } from '@supabase/supabase-js'
+import type { Ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
@@ -11,8 +13,6 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
-import type { Factor } from '@supabase/supabase-js'
-import type { Ref } from 'vue'
 import { openMessenger } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
@@ -35,7 +35,12 @@ function openSupport() {
 }
 
 async function nextLogin() {
-  router.push('/app/home')
+  if (route.query.to && typeof route.query.to === 'string') {
+    router.push(route.query.to)
+  }
+  else {
+    router.push('/app/home')
+  }
   setTimeout(async () => {
     isLoading.value = false
   }, 500)

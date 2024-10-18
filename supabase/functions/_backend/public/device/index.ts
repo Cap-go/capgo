@@ -1,10 +1,10 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import type { DeviceLink } from './delete.ts'
+import { Hono } from 'hono/tiny'
 import { getBody, middlewareKey } from '../../utils/hono.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
-import type { DeviceLink } from './delete.ts'
 
 export const app = new Hono()
 

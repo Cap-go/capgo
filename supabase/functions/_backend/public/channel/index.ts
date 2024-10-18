@@ -1,10 +1,10 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import type { ChannelSet } from './delete.ts'
+import { Hono } from 'hono/tiny'
 import { getBody, middlewareKey } from '../../utils/hono.ts'
 import { deleteChannel } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
-import type { ChannelSet } from './delete.ts'
 
 export const app = new Hono()
 

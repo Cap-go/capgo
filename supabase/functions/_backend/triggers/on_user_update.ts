@@ -1,9 +1,9 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { createApiKey } from '../utils/supabase.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { Hono } from 'hono/tiny'
+import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { createApiKey } from '../utils/supabase.ts'
 
 export const app = new Hono()
 

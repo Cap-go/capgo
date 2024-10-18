@@ -1,8 +1,8 @@
 import type { Context } from '@hono/hono'
-import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
+import { BRES } from '../../utils/hono.ts'
+import { hasAppRight, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
 export async function post(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.device_id || !body.app_id) {

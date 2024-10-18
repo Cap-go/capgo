@@ -1,9 +1,9 @@
+import type { Context } from '@hono/hono'
 // Triggers API
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
-import type { Context } from '@hono/hono'
 import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'

@@ -1,9 +1,10 @@
+import type { ExecSyncOptions } from 'node:child_process'
+import type { Readable } from 'node:stream'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import rimraf from 'rimraf'
-import type { ExecSyncOptions } from 'node:child_process'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -40,6 +41,7 @@ function generateDefaultJsonCliConfig(baseUrl: URL) {
         localWebHost: 'http://localhost:5173',
         localSupa: 'http://localhost:54321',
         localSupaAnon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+        localApiFiles: 'http://localhost:54321/functions/v1',
       },
     },
   }
@@ -57,7 +59,6 @@ export function setDependencies(dependencies: Record<string, string>) {
   // write package.json
   const pathPack = path.join(tempFileFolder, 'package.json')
   const res = BASE_PACKAGE_JSON.replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
-  console.log('setDependencies', pathPack, res)
   writeFileSync(pathPack, res)
 }
 
@@ -91,11 +92,14 @@ function npmInstall() {
 }
 
 export function runCli(params: string[], logOutput = false, overwriteApiKey?: string): string {
+  let localCliPath = process.env.LOCAL_CLI_PATH
+  if (localCliPath === 'true') {
+    localCliPath = '../../CLI/dist/index.js'
+  }
+  console.log('localCliPath', localCliPath)
   const command = [
-    'npx',
-    '@capgo/cli',
-    // 'node',
-    // '../../CLI/dist/index.js',
+    localCliPath ? 'node' : 'npx',
+    localCliPath || '@capgo/cli',
     ...params,
     '--apikey',
     overwriteApiKey ?? defaultApiKey,
@@ -111,19 +115,17 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   try {
     const output = execSync(command, options)
 
-    if (logOutput) {
+    if (logOutput)
       console.log(output)
-    }
 
-    return output
+    return output.toString()
   }
   catch (error) {
-    const errorOutput = error.stdout ?? JSON.stringify(error)
-    console.error('CLI execution failed', errorOutput)
+    const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
+    console.error(localCliPath ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput)
 
-    if (logOutput) {
+    if (logOutput)
       console.log(errorOutput)
-    }
 
     return errorOutput
   }

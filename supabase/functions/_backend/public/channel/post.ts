@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
+import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
 import { hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
-import type { Database } from '../../utils/supabase.types.ts'
 
 interface ChannelSet {
   app_id: string

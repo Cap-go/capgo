@@ -1,9 +1,9 @@
-import Stripe from 'stripe'
 import type { Context } from '@hono/hono'
-import { parsePriceIds } from './stripe.ts'
-import { getEnv } from './utils.ts'
 import type { MeteredData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
+import Stripe from 'stripe'
+import { parsePriceIds } from './stripe.ts'
+import { getEnv } from './utils.ts'
 
 export function parseStripeEvent(c: Context, body: string, signature: string) {
   const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')

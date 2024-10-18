@@ -1,7 +1,7 @@
-import { env, getRuntimeKey } from 'hono/adapter'
 import type { Context } from '@hono/hono'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './supabase.types.ts'
+import { env, getRuntimeKey } from 'hono/adapter'
 
 export const fetchLimit = 50
 

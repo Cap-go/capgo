@@ -1,9 +1,9 @@
+import type { ActionPerformed, PushNotificationSchema, Token } from '@capacitor/push-notifications'
+import type { Router } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { initializeApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage } from 'firebase/messaging'
-import type { ActionPerformed, PushNotificationSchema, Token } from '@capacitor/push-notifications'
-import type { Router } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 
 // TODO: Add SDKs for Firebase products that you want to use

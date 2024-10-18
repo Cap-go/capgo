@@ -1,5 +1,5 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
+import { Hono } from 'hono/tiny'
 import { useCors } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { getUpdateStats } from '../utils/stats.ts'
@@ -17,7 +17,6 @@ app.get('/', async (c: Context) => {
       event: 'Updates Stats',
       icon: '📈',
       user_id: 'admin',
-      notify: true,
       tags: {
         success_rate: updateStats.total.success_rate,
       },

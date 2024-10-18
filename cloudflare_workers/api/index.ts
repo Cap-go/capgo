@@ -1,3 +1,4 @@
+import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -8,6 +9,7 @@ import { app as config } from '../../supabase/functions/_backend/private/config.
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as deleted_failed_version } from '../../supabase/functions/_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
+import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as latency_postres } from '../../supabase/functions/_backend/private/latency_postres.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
@@ -41,7 +43,6 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 
 export { AttachmentUploadHandler, UploadHandler, UploadHandler as TemporaryKeyHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
@@ -58,9 +59,9 @@ app.use('*', requestId())
 // Public API
 app.route('/ok', ok)
 app.route('/bundle', bundle)
-app.route('/channels', channel) // TODO: deprecated remove when everyone use the new endpoint
 app.route('/channel', channel)
 app.route('/device', device)
+
 app.route('/on_app_create', on_app_create)
 
 // Private API
@@ -78,6 +79,7 @@ appFront.route('/latency', latency)
 appFront.route('/latency_postres', latency_postres)
 appFront.route('/verify_replication', verify_replication)
 appFront.route('/create_device', create_device)
+appFront.route('/events', events)
 
 // Triggers
 

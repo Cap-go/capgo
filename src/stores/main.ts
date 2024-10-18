@@ -1,6 +1,7 @@
+import type { User } from '@supabase/supabase-js'
+import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { User } from '@supabase/supabase-js'
 import { reset } from '~/services/bento'
 import { useSupabase } from '~/services/supabase'
 import type { Database } from '~/types/supabase.types'
@@ -10,7 +11,6 @@ import {
   getTotalStorage,
   unspoofUser,
 } from './../services/supabase'
-import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
 
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()

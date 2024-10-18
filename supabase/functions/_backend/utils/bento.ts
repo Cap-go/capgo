@@ -1,5 +1,5 @@
-import ky from 'ky'
 import type { Context } from '@hono/hono'
+import ky from 'ky'
 import { getEnv } from './utils.ts'
 
 function hasBento(c: Context) {
