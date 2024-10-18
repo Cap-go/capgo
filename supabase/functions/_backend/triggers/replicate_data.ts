@@ -9,8 +9,8 @@ export const app = new Hono()
 
 app.post('/', middlewareAPISecret, async (c: Context) => {
   try {
-    const body = await c.req.json<InsertPayload<keyof Database['public']['Tables']> | UpdatePayload<keyof Database['public']['Tables']> | DeletePayload<keyof Database['public']['Tables']>>()
-    const { table, type, record, old_record } = body
+    const body = await c.req.json<(InsertPayload<keyof Database['public']['Tables']> | UpdatePayload<keyof Database['public']['Tables']> | DeletePayload<keyof Database['public']['Tables']>) & { retry_count: number }>()
+    const { table, type, record, old_record, retry_count } = body
 
     if (!['INSERT', 'UPDATE', 'DELETE'].includes(type)) {
       console.log({ requestId: c.get('requestId'), context: 'Invalid operation type:', type })
@@ -24,17 +24,17 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     console.log({ requestId: c.get('requestId'), context: 'replicate_data', table, type, record, old_record })
 
-    const d1 = c.env.DB_REPLICATE as D1Database
+    const d1 = null// c.env.DB_REPLICATE as D1Database
 
     switch (type) {
       case 'INSERT':
-        insertRecord(c, d1, table, record, body)
+        insertRecord(c, retry_count, d1, table, record, body)
         break
       case 'UPDATE':
-        updateRecord(c, d1, table, record, old_record, body)
+        updateRecord(c, retry_count, d1, table, record, old_record, body)
         break
       case 'DELETE':
-        deleteRecord(c, d1, table, old_record, body)
+        deleteRecord(c, retry_count, d1, table, old_record, body)
         break
     }
 
@@ -76,12 +76,15 @@ function cleanFieldsAppVersions(record: any, table: string) {
 }
 
 // function to c.executionCtx.waitUntil the db operation and catch issue who insert in job_queue as failed job
-function asyncWrap(c: Context, promise: Promise<any>, payload: any) {
+function asyncWrap(c: Context, promise: Promise<any>, payload: any, retry_count: number) {
   c.executionCtx.waitUntil(promise.catch((e) => {
     console.error({ requestId: c.get('requestId'), context: 'Error in replicateData', error: e })
     // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
     if (e.message.includes('UNIQUE constraint failed')) {
       return
+    }
+    if (payload.retry_count != null) {
+      payload.retry_count = retry_count + 1
     }
     // insert in job_queue as failed job in supabase
     const supabase = supabaseAdmin(c)
@@ -91,33 +94,34 @@ function asyncWrap(c: Context, promise: Promise<any>, payload: any) {
         status: 'failed' as Database['public']['Enums']['queue_job_status'],
         function_type: 'cloudflare',
         function_name: 'replicate_data',
+        retry_count: retry_count + 1,
         payload: JSON.stringify(payload),
         extra_info: { error: e.message },
       })
   }))
 }
 
-function insertRecord(c: Context, d1: D1Database, table: string, record: any, payload: any) {
+function insertRecord(c: Context, retry_count: number, d1: D1Database, table: string, record: any, payload: any) {
   const columns = Object.keys(cleanFieldsAppVersions(record, table)).join(', ')
   const placeholders = Object.keys(record).map(() => '?').join(', ')
   const values = Object.values(cleanFieldsAppVersions(record, table))
 
   const query = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`
   console.log({ requestId: c.get('requestId'), context: 'insertRecord', query, values })
-  asyncWrap(c, d1.prepare(query).bind(...values).run(), payload)
+  asyncWrap(c, d1.prepare(query).bind(...values).run(), payload, retry_count)
 }
 
-function updateRecord(c: Context, d1: D1Database, table: string, record: any, old_record: any, payload: any) {
+function updateRecord(c: Context, retry_count: number, d1: D1Database, table: string, record: any, old_record: any, payload: any) {
   const setClause = Object.keys(cleanFieldsAppVersions(record, table)).map(key => `${key} = ?`).join(', ')
   const values = [...Object.values(cleanFieldsAppVersions(record, table)), old_record.id]
 
   const query = `UPDATE ${table} SET ${setClause} WHERE id = ?`
   console.log({ requestId: c.get('requestId'), context: 'updateRecord', query, values })
-  asyncWrap(c, d1.prepare(query).bind(...values).run(), payload)
+  asyncWrap(c, Promise.reject(new Error('rejected :)')), payload, retry_count)
 }
 
-function deleteRecord(c: Context, d1: D1Database, table: string, old_record: any, payload: any) {
+function deleteRecord(c: Context, retry_count: number, d1: D1Database, table: string, old_record: any, payload: any) {
   const query = `DELETE FROM ${table} WHERE id = ?`
   console.log({ requestId: c.get('requestId'), context: 'deleteRecord', query, old_record: old_record.id })
-  asyncWrap(c, d1.prepare(query).bind(old_record.id).run(), payload)
+  asyncWrap(c, d1.prepare(query).bind(old_record.id).run(), payload, retry_count)
 }
