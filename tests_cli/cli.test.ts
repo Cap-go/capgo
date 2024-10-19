@@ -1,9 +1,11 @@
 import { Buffer } from 'node:buffer'
+import fs from 'node:fs'
+import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import AdmZip from 'adm-zip'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { Database } from '~/types/supabase.types'
-import { prepareCli, runCli, setDependencies } from './cliUtils'
+import { prepareCli, runCli, runCliWithStdIn, setDependencies, tempFileFolder } from './cliUtils'
 import { getUpdate, getUpdateBaseData, responseOk } from './utils'
 
 const BASE_URL = new URL('http://localhost:54321/functions/v1')
@@ -23,6 +25,55 @@ function resetAndSeedData() {
   const supabase = createSupabase()
   return supabase.rpc('reset_and_seed_data')
 }
+
+describe('test key generation', () => {
+  beforeEach(async () => {
+    await prepareCli(BASE_URL)
+  })
+  it('test old key generation', async () => {
+  // set the key to an empty string. Otherwise runCli will not work
+    const output = await runCli(['key_old', 'create', '--force'], true, '')
+    expect(output).toContain('Private key saved in')
+    const publicKeyPath = output.split('\n').find(val => val.includes('Public key saved in'))?.split(' ').at(-1)
+    expect(publicKeyPath).toBeDefined()
+
+    const publicKeyFinalPath = path.join(tempFileFolder, publicKeyPath!)
+    expect(fs.existsSync(publicKeyFinalPath!)).toBe(true)
+    const keyData = fs.readFileSync(publicKeyFinalPath, 'utf-8')
+    expect(keyData).toBeTruthy()
+    expect(keyData.length).toBeGreaterThan(1)
+    expect(keyData).include('PUBLIC KEY')
+
+    const privateKeyFinalPath = path.join(tempFileFolder, publicKeyPath!).replace('.pub', '')
+    expect(fs.existsSync(privateKeyFinalPath!)).toBe(true)
+    const privateKeyData = fs.readFileSync(privateKeyFinalPath, 'utf-8')
+    expect(privateKeyData).toBeTruthy()
+    expect(privateKeyData.length).toBeGreaterThan(1)
+    expect(privateKeyData).include('PRIVATE KEY')
+  })
+
+  it('test new key generation', async () => {
+    // set the key to an empty string. Otherwise runCli will not work
+    const output = await runCli(['key', 'create', '--force'], true, '')
+    expect(output).toContain('Private key saved in')
+    const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
+    expect(privateKeyPath).toBeDefined()
+
+    const privateKeyFinalPath = path.join(tempFileFolder, privateKeyPath!)
+    expect(fs.existsSync(privateKeyFinalPath!)).toBe(true)
+    const keyData = fs.readFileSync(privateKeyFinalPath, 'utf-8')
+    expect(keyData).toBeTruthy()
+    expect(keyData.length).toBeGreaterThan(1)
+    expect(keyData).include('PRIVATE KEY')
+
+    const publicKeyFinalPath = `${privateKeyFinalPath}.pub`
+    expect(fs.existsSync(publicKeyFinalPath!)).toBe(true)
+    const publicKeyData = fs.readFileSync(publicKeyFinalPath, 'utf-8')
+    expect(publicKeyData).toBeTruthy()
+    expect(publicKeyData.length).toBeGreaterThan(1)
+    expect(publicKeyData).include('PUBLIC KEY')
+  })
+})
 
 describe('tests CLI upload', () => {
   beforeAll(async () => {
@@ -61,6 +112,95 @@ describe('tests CLI upload', () => {
     increaseSemver()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
     expect(output).toContain('Cannot upload the same bundle content')
+  })
+  it ('should not upload same hash twice', async () => {
+    await resetAndSeedData()
+    increaseSemver()
+    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], false)
+    increaseSemver()
+
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], false)
+    expect(output).toContain('Cannot upload the same bundle content')
+  })
+  it ('should upload an external bundle', async () => {
+    await resetAndSeedData()
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--external', 'https://example.com'], false)
+    expect(output).toContain('Time to share your update to the world')
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.external_url).toBe('https://example.com')
+  })
+  it('test --iv-session-key with cloud upload', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb'], false)
+    expect(output).toContain('Time to share your update to the world')
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.session_key).toBeNull()
+  })
+  it('test --iv-session-key with external upload', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb', '--external', 'https://example.com'], false)
+    expect(output).toContain('Time to share your update to the world')
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.session_key).toBe('aaa:bbb')
+  })
+  it('test --encrypted-checksum with cloud upload', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa'], false)
+    expect(output).toContain('Time to share your update to the world')
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.checksum).not.toBe('aaaa')
+  })
+  it('test --encrypted-checksum with external upload', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa', '--external', 'https://example.com'], false)
+    expect(output).toContain('Time to share your update to the world')
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.checksum).toBe('aaaa')
+  })
+
+  it('test custom key (old)', async () => {
+
   })
 })
 

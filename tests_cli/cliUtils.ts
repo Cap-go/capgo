@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -21,7 +21,7 @@ export const BASE_PACKAGE_JSON = `{
 export const BASE_DEPENDENCIES = {
   '@capacitor/android': '^4.5.0',
 }
-const tempFileFolder = path.join(process.cwd(), TEMP_DIR_NAME)
+export const tempFileFolder = path.join(process.cwd(), TEMP_DIR_NAME)
 
 const defaultApiKey = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
 
@@ -91,6 +91,47 @@ function npmInstall() {
   }
 }
 
+export async function runCliWithStdIn(params: string[], handleOutput: (dataIn: string) => string) {
+  let localCliPath = process.env.LOCAL_CLI_PATH
+  if (localCliPath === 'true') {
+    localCliPath = '../../CLI/dist/index.js'
+  }
+  const toResolve = Promise.withResolvers<string>()
+  let outData = ''
+  const child = spawn(localCliPath ? (process.env.NODE_PATH ?? 'node') : 'npx', [localCliPath || '@capgo/cli', ...params], {
+    stdio: ['pipe', 'pipe', 'pipe'], // Ensure you have access to stdin, stdout, stderr
+  })
+
+  // Collect data from stdout
+  child.stdout.on('data', (data) => {
+    outData += data.toString()
+    const inData = handleOutput(data.toString())
+    if (inData) {
+      child.stdin.write(inData)
+    }
+  })
+
+  // Collect data from stderr
+  child.stderr.on('data', (data) => {
+    outData += data.toString()
+    const inData = handleOutput(data.toString())
+    if (inData) {
+      child.stdin.write(inData)
+    }
+  })
+
+  child.on('close', (code) => {
+    if (code === 0) {
+      toResolve.resolve(outData)
+    }
+    else {
+      toResolve.reject(outData)
+    }
+  })
+
+  return toResolve.promise
+}
+
 export function runCli(params: string[], logOutput = false, overwriteApiKey?: string): string {
   // console.log(params)
   let localCliPath = process.env.LOCAL_CLI_PATH
@@ -102,9 +143,10 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
     localCliPath ? (process.env.NODE_PATH ?? 'node') : 'npx',
     localCliPath || '@capgo/cli',
     ...params,
-    '--apikey',
-    overwriteApiKey ?? defaultApiKey,
+    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? defaultApiKey] : []),
   ].join(' ')
+
+  console.log(command)
 
   const options: ExecSyncOptions = {
     cwd: tempFileFolder!,
@@ -121,7 +163,6 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
     return output.toString()
   }
   catch (error) {
-    // console.log(error)
     const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
     console.error(localCliPath ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput)
 
