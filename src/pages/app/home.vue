@@ -52,11 +52,11 @@ watch(currentOrganization, async () => {
 
 watchEffect(async () => {
   if (route.path === '/app/home') {
+    displayStore.NavTitle = ''
     isLoading.value = true
     // await organizationStore.dedupFetchOrganizations()
     await getMyApps()
     isLoading.value = false
-    displayStore.NavTitle = ''
   }
 })
 </script>
