@@ -290,6 +290,108 @@ describe('tests CLI upload', () => {
     const indexJsContent = indexJsEntry!.getData().toString('utf8')
     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
   })
+
+  it('test custom key upload and download (new)', async () => {
+    await prepareCli(BASE_URL)
+
+    const output = await runCli(['key', 'create', '--force'], true, '')
+    expect(output).toContain('Private key saved in')
+    const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
+    expect(privateKeyPath).toBeDefined()
+
+    const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2.pub'), 'utf-8')
+    expect(publicKeyFile).toBeTruthy()
+    expect(publicKeyFile).toContain('PUBLIC KEY')
+
+    increaseSemver()
+    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+    expect(output2).toContain('Time to share your update to the world')
+    expect(output2).toContain('Encrypting your bundle')
+
+    const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+    expect(checksum).toBeDefined()
+    expect(checksum?.length).toBe(64)
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.checksum).not.toBe(checksum)
+
+    // the checksum check will be done indirectly later, after the download.
+
+    expect(data?.session_key).toBeTruthy()
+    expect(data?.session_key?.split(':').length).toBe(2)
+
+    // let's not download the bundle
+    const baseData = getUpdateBaseData()
+    const response = await getUpdate(BASE_URL, baseData)
+    await responseOk(response, 'Update new bundle')
+
+    const responseJson = await response.json<{ url: string, version: string }>()
+    expect(responseJson.url).toBeDefined()
+    expect(responseJson.version).toBe(semver)
+
+    const downloadResponse = await fetch(responseJson.url)
+    await responseOk(downloadResponse, 'Download new bundle')
+    const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
+    expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
+
+    const encryptedBufferStr = data?.session_key?.split(':').at(1)
+    expect(encryptedBufferStr).toBeTruthy()
+
+    const ivStr = data?.session_key?.split(':').at(0)
+    expect(ivStr).toBeTruthy()
+
+    const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
+    const aesKey = crypto.publicDecrypt(publicKeyFile, new Uint8Array(encryptedBuffer))
+    expect(aesKey.length).toBe(16)
+
+    // The Initialization Vector (IV) used during encryption (16 bytes for AES)
+    const iv = Buffer.from(ivStr!, 'base64')
+    expect(iv.length).greaterThan(0)
+
+    const decipher = crypto.createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
+    // Decrypt without specifying output encoding to get Buffers
+    const decryptedChunks = []
+    decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
+    decryptedChunks.push(decipher.final())
+
+    // Concatenate all Buffer chunks
+    const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
+
+    expect(decrypted.length).toBeGreaterThan(0)
+
+    const zip = new AdmZip(Buffer.from(decrypted))
+    const zipEntries = zip.getEntries()
+
+    expect(zipEntries.length).toBe(2)
+
+    const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
+    expect(indexJsEntry).toBeDefined()
+
+    const indexJsContent = indexJsEntry!.getData().toString('utf8')
+    expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
+
+    // now, let's verify the checksum
+    const hash = crypto.createHash('sha256')
+
+    // Update the hash with your buffer data
+    hash.update(new Uint8Array(decrypted))
+
+    // Compute the hash digest in hexadecimal format
+    const calculatedSha256Hash = hash.digest('hex')
+    expect(calculatedSha256Hash).toBe(checksum)
+
+    const decryptedChecksum = crypto.publicDecrypt(publicKeyFile, new Uint8Array(Buffer.from(data!.checksum!, 'base64')))
+    const decryptedChecksumStr = decryptedChecksum.toString('base64')
+    expect(decryptedChecksumStr).toBe(calculatedSha256Hash)
+    expect(decryptedChecksumStr).toBe(checksum) // redundent, but I will keep it
+  })
 })
 
 describe('tests Wrong cases', () => {
