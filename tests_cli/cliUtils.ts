@@ -1,10 +1,10 @@
-import type { ExecSyncOptions } from 'node:child_process'
-import type { Readable } from 'node:stream'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import rimraf from 'rimraf'
+import type { ExecSyncOptions } from 'node:child_process'
+import type { Readable } from 'node:stream'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -78,12 +78,12 @@ export async function prepareCli(backendBaseUrl: URL) {
   writeFileSync(path.join(tempFileFolder, 'dist', 'index.html'), '')
   setDependencies(BASE_DEPENDENCIES)
 
-  await npmInstall()
+  npmInstall()
 }
 
 function npmInstall() {
   try {
-    execSync('bun install', { cwd: tempFileFolder, stdio: 'inherit' })
+    execSync(`${process.env.BUN_PATH ?? 'bun'} install`, { cwd: tempFileFolder, stdio: 'inherit' })
   }
   catch (error) {
     console.error('bun install failed', error)
@@ -92,13 +92,14 @@ function npmInstall() {
 }
 
 export function runCli(params: string[], logOutput = false, overwriteApiKey?: string): string {
+  // console.log(params)
   let localCliPath = process.env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
     localCliPath = '../../CLI/dist/index.js'
   }
-  console.log('localCliPath', localCliPath)
+  // console.log('localCliPath', localCliPath)
   const command = [
-    localCliPath ? 'node' : 'npx',
+    localCliPath ? (process.env.NODE_PATH ?? 'node') : 'npx',
     localCliPath || '@capgo/cli',
     ...params,
     '--apikey',
@@ -114,13 +115,13 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
 
   try {
     const output = execSync(command, options)
-
     if (logOutput)
       console.log(output)
 
     return output.toString()
   }
   catch (error) {
+    // console.log(error)
     const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
     console.error(localCliPath ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput)
 
