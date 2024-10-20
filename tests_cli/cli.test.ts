@@ -392,6 +392,98 @@ describe('tests CLI upload', () => {
     expect(decryptedChecksumStr).toBe(calculatedSha256Hash)
     expect(decryptedChecksumStr).toBe(checksum) // redundent, but I will keep it
   })
+
+  it('test upload without encryption (new)', async () => {
+    await prepareCli(BASE_URL)
+
+    const output = await runCli(['key', 'create', '--force'], true, '')
+    expect(output).toContain('Private key saved in')
+    const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
+    expect(privateKeyPath).toBeDefined()
+
+    const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2.pub'), 'utf-8')
+    expect(publicKeyFile).toBeTruthy()
+    expect(publicKeyFile).toContain('PUBLIC KEY')
+
+    increaseSemver()
+    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], false)
+    expect(output2).toContain('Time to share your update to the world')
+    expect(output2).not.toContain('Encrypting your bundle')
+
+    const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+    expect(checksum).toBeDefined()
+    expect(checksum?.length).toBe(8)
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.checksum).toBe(checksum)
+
+    const baseData = getUpdateBaseData()
+    const response = await getUpdate(BASE_URL, baseData)
+    await responseOk(response, 'Update new bundle')
+
+    const responseJson = await response.json<{ url: string, version: string }>()
+    expect(responseJson.url).toBeDefined()
+    expect(responseJson.version).toBe(semver)
+
+    const downloadResponse = await fetch(responseJson.url)
+    await responseOk(downloadResponse, 'Download new bundle')
+    const arrayBuffer = await downloadResponse.arrayBuffer()
+
+    const zip = new AdmZip(Buffer.from(arrayBuffer))
+    const zipEntries = zip.getEntries()
+
+    expect(zipEntries.length).toBe(2)
+  })
+
+  it('test upload without encryption (old)', async () => {
+    await prepareCli(BASE_URL)
+
+    const output = await runCli(['key_old', 'create', '--force'], true, '')
+    expect(output).toContain('Public key saved in')
+
+    increaseSemver()
+    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], false)
+    expect(output2).toContain('Time to share your update to the world')
+    expect(output2).not.toContain('Encrypting your bundle')
+
+    const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+    expect(checksum).toBeDefined()
+    expect(checksum?.length).toBe(8)
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.checksum).toBe(checksum)
+
+    const baseData = getUpdateBaseData()
+    const response = await getUpdate(BASE_URL, baseData)
+    await responseOk(response, 'Update new bundle')
+
+    const responseJson = await response.json<{ url: string, version: string }>()
+    expect(responseJson.url).toBeDefined()
+    expect(responseJson.version).toBe(semver)
+
+    const downloadResponse = await fetch(responseJson.url)
+    await responseOk(downloadResponse, 'Download new bundle')
+    const arrayBuffer = await downloadResponse.arrayBuffer()
+
+    const zip = new AdmZip(Buffer.from(arrayBuffer))
+    const zipEntries = zip.getEntries()
+
+    expect(zipEntries.length).toBe(2)
+  })
 })
 
 describe('tests Wrong cases', () => {
