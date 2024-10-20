@@ -184,6 +184,21 @@ describe('tests CLI upload', () => {
     expect(error).toBeNull()
     expect(data?.checksum).not.toBe('aaaa')
   })
+  it('test --min-update-version', async () => {
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0'], false)
+    expect(output).toContain('Time to share your update to the world')
+
+    const supabase = createSupabase()
+    const { data, error } = await supabase
+      .from('app_versions')
+      .select('*')
+      .eq('name', semver)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.minUpdateVersion).not.toBe('1.0.0')
+  })
   it('test --encrypted-checksum with external upload', async () => {
     increaseSemver()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa', '--external', 'https://example.com'], false)
@@ -533,6 +548,26 @@ describe('tests CLI upload', () => {
     const zipEntries = zip.getEntries()
 
     expect(zipEntries.length).toBe(2)
+  })
+
+  it('test code check (missing notifyAppReady)', async () => {
+    await prepareCli(BASE_URL)
+    fs.writeFileSync(path.join(tempFileFolder, 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+    expect(output).toContain('notifyAppReady() is missing in')
+  })
+  it('test code check (missing index.html)', async () => {
+    await prepareCli(BASE_URL)
+    fs.rmSync(path.join(tempFileFolder, 'dist', 'index.html'))
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+    expect(output).toContain('index.html is missing')
+  })
+  it('test --no-code-check', async () => {
+    await prepareCli(BASE_URL)
+    fs.rmSync(path.join(tempFileFolder, 'dist', 'index.html'))
+    increaseSemver()
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-code-check'], false)
+    expect(output).toContain('Time to share your update to the world')
   })
 })
 
