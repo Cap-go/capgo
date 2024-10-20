@@ -186,7 +186,7 @@ describe('tests CLI upload', () => {
   })
   it('test --min-update-version', async () => {
     increaseSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0'], false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0', '--ignore-checksum-check'], false)
     expect(output).toContain('Time to share your update to the world')
 
     const supabase = createSupabase()
