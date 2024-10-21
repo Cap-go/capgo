@@ -2051,13 +2051,13 @@ BEGIN
     (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
 
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org") VALUES
+    (1884, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (1883, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
     (9655, now(), 'com.demo.app', '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
     (9654, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
     (9653, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
     (9652, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (1884, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (1883, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+    (9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
 
     INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
     (now(), 'com.demo.app', now(), '', 0, 9655, 10),
@@ -2077,6 +2077,48 @@ END;
 $_$;
 
 ALTER FUNCTION "public"."reset_and_seed_data"() OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character varying) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
+    user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097';
+BEGIN
+
+    -- Delete existing data for the specified app_id
+    DELETE FROM channels WHERE app_id = p_app_id;
+    DELETE FROM app_versions WHERE app_id = p_app_id;
+    DELETE FROM apps WHERE app_id = p_app_id;
+
+    -- Insert new app data
+    INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id")
+    VALUES (now(), p_app_id, '', 'Seeded App', '1.0.0', now(), org_id, user_id);
+
+    -- Insert app versions
+    INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org")
+    VALUES
+    (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
+    (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
+    (now(), p_app_id, '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', 'r2-direct', org_id),
+    (now(), p_app_id, '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', 'r2', org_id),
+    (now(), p_app_id, '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', 'r2', org_id),
+    (now(), p_app_id, '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id),
+    (now(), p_app_id, '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id);
+
+    -- Insert channels
+    INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
+    VALUES
+    (now(), 'production', p_app_id, (SELECT id FROM app_versions WHERE app_id = p_app_id AND name = '1.0.0'), now(), 't', 't', 'major', 'f', 'f', 't', 't', 't', 't'),
+    (now(), 'no_access', p_app_id, (SELECT id FROM app_versions WHERE app_id = p_app_id AND name = '1.361.0'), now(), 'f', 't', 'major', 'f', 't', 't', 't', 't', 't'),
+    (now(), 'two_default', p_app_id, (SELECT id FROM app_versions WHERE app_id = p_app_id AND name = '1.0.0'), now(), 't', 't', 'major', 'f', 't', 'f', 't', 't', 't');
+
+END;
+$$;
+
+ALTER FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character varying) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character varying) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."reset_and_seed_stats_data"() RETURNS "void"
     LANGUAGE "plpgsql"
@@ -2162,6 +2204,102 @@ END;
 $$;
 
 ALTER FUNCTION "public"."reset_and_seed_stats_data"() OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_stats_data"("p_app_id" character varying) RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  start_date TIMESTAMP := CURRENT_DATE - INTERVAL '15 days';
+  end_date TIMESTAMP := CURRENT_DATE;
+  curr_date DATE;
+  random_mau INTEGER;
+  random_bandwidth BIGINT;
+  random_storage BIGINT;
+  random_file_size BIGINT;
+  random_uuid UUID;
+  random_version_id BIGINT := 9654;
+  random_action VARCHAR(20);
+  random_timestamp TIMESTAMP;
+BEGIN
+  -- Delete existing data for the specified app_id
+  DELETE FROM daily_mau WHERE app_id = p_app_id;
+  DELETE FROM daily_bandwidth WHERE app_id = p_app_id;
+  DELETE FROM daily_storage WHERE app_id = p_app_id;
+  DELETE FROM daily_version WHERE app_id = p_app_id;
+  DELETE FROM storage_usage WHERE app_id = p_app_id;
+  DELETE FROM version_usage WHERE app_id = p_app_id;
+  DELETE FROM device_usage WHERE app_id = p_app_id;
+  DELETE FROM bandwidth_usage WHERE app_id = p_app_id;
+  DELETE FROM devices WHERE app_id = p_app_id;
+  DELETE FROM stats WHERE app_id = p_app_id;
+
+  -- Generate a random UUID
+  random_uuid := gen_random_uuid();
+
+  -- Insert device data
+  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+    (now(), random_uuid, random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't'),
+    (now(), '00000000-0000-0000-0000-000000000000', random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
+
+  -- Insert stats data
+  INSERT INTO stats (created_at, action, device_id, version, app_id) VALUES
+    (now(), 'get'::"public"."stats_action", random_uuid, random_version_id, p_app_id),
+    (now(), 'set'::"public"."stats_action", random_uuid, random_version_id, p_app_id);
+
+  -- Seed data for daily_mau, daily_bandwidth, and daily_storage
+  curr_date := start_date::DATE;
+  WHILE curr_date <= end_date::DATE LOOP
+    random_mau := FLOOR(RANDOM() * 1000) + 1;
+    random_bandwidth := FLOOR(RANDOM() * 1000000000) + 1;
+    random_storage := FLOOR(RANDOM() * 1000000000) + 1;
+    
+    INSERT INTO daily_mau (app_id, date, mau) VALUES (p_app_id, curr_date, random_mau);
+    INSERT INTO daily_bandwidth (app_id, date, bandwidth) VALUES (p_app_id, curr_date, random_bandwidth);
+    INSERT INTO daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
+    
+    curr_date := curr_date + INTERVAL '1 day';
+  END LOOP;
+
+  -- Seed data for daily_version
+  curr_date := start_date::DATE;
+  WHILE curr_date <= end_date::DATE LOOP
+    INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+    VALUES (curr_date, p_app_id, random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
+    
+    curr_date := curr_date + INTERVAL '1 day';
+  END LOOP;
+
+  -- Seed data for storage_usage
+  FOR i IN 1..20 LOOP
+    random_file_size := FLOOR(RANDOM() * 10485760) - 5242880; -- Random size between -5MB and 5MB
+    INSERT INTO storage_usage (device_id, app_id, file_size) VALUES (random_uuid, p_app_id, random_file_size);
+  END LOOP;
+
+  -- Seed data for version_usage
+  FOR i IN 1..30 LOOP
+    random_timestamp := start_date + (RANDOM() * (end_date - start_date));
+    random_action := (ARRAY['get', 'fail', 'install', 'uninstall'])[FLOOR(RANDOM() * 4) + 1];
+    INSERT INTO version_usage (timestamp, app_id, version_id, action)
+    VALUES (random_timestamp, p_app_id, random_version_id, random_action::"public"."version_action");
+  END LOOP;
+
+  -- Seed data for device_usage
+  FOR i IN 1..50 LOOP
+    INSERT INTO device_usage (device_id, app_id) VALUES (random_uuid, p_app_id);
+  END LOOP;
+
+  -- Seed data for bandwidth_usage
+  FOR i IN 1..40 LOOP
+    random_file_size := FLOOR(RANDOM() * 10485760) + 1; -- Random size between 1 byte and 10MB
+    INSERT INTO bandwidth_usage (device_id, app_id, file_size) VALUES (random_uuid, p_app_id, random_file_size);
+  END LOOP;
+END;
+$$;
+
+ALTER FUNCTION "public"."reset_and_seed_app_stats_data"("p_app_id" character varying) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_stats_data"("p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reset_and_seed_app_stats_data"("p_app_id" character varying) TO "service_role";
+
 
 CREATE OR REPLACE FUNCTION "public"."retry_failed_jobs"() RETURNS "void"
     LANGUAGE "plpgsql"

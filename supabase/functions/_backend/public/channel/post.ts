@@ -53,7 +53,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       .eq('deleted', false)
       .single()
     if (vError || !data) {
-      console.log('Cannot find unknown version', vError)
+      console.log('Cannot find version', body, org, vError)
       return c.json({ status: 'Cannot find version', error: JSON.stringify(vError) }, 400)
     }
 
@@ -70,7 +70,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       .eq('deleted', true)
       .single()
     if (dbError || !dataVersion) {
-      console.log('Cannot find unknown version', dbError)
+      console.log('Cannot find unknown version', body, org, dbError)
       return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
     }
 

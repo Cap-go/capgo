@@ -1,10 +1,11 @@
+import type { ExecSyncOptions } from 'node:child_process'
+import type { Readable } from 'node:stream'
 import { execSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import rimraf from 'rimraf'
-import type { ExecSyncOptions } from 'node:child_process'
-import type { Readable } from 'node:stream'
+import { APIKEY_TEST, BASE_URL } from './test-utils'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -23,34 +24,32 @@ export const BASE_DEPENDENCIES = {
 }
 export const tempFileFolder = path.join(process.cwd(), TEMP_DIR_NAME)
 
-const defaultApiKey = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
-
-function generateDefaultJsonCliConfig(baseUrl: URL) {
+function generateDefaultJsonCliConfig(appId: string) {
   return {
-    appId: 'com.demo.app',
+    appId,
     appName: 'demoApp',
     webDir: 'dist',
     plugins: {
       CapacitorUpdater: {
         autoUpdate: true,
-        statsUrl: new URL(`${baseUrl.href}/stats`, baseUrl).toString(),
-        channelUrl: new URL(`${baseUrl.href}/channel_self`, baseUrl).toString(),
-        updateUrl: new URL(`${baseUrl.href}/updates`, baseUrl).toString(),
+        statsUrl: `${BASE_URL}/stats`,
+        channelUrl: `${BASE_URL}/channel_self`,
+        updateUrl: `${BASE_URL}/updates`,
         localS3: true,
         localHost: 'http://localhost:5173',
         localWebHost: 'http://localhost:5173',
-        localSupa: 'http://localhost:54321',
-        localSupaAnon: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
-        localApiFiles: 'http://localhost:54321/functions/v1',
+        localSupa: process.env.SUPABASE_URL,
+        localSupaAnon: process.env.SUPABASE_ANON_KEY,
+        localApiFiles: BASE_URL,
       },
     },
   }
 }
 
-function generateCliConfig(baseUrl: URL): string {
+function generateCliConfig(appId: string): string {
   return `import { CapacitorConfig } from '@capacitor/cli';
 
-const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(baseUrl), null, 2)};
+const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(appId), null, 2)};
 
 export default config;\n`
 }
@@ -62,8 +61,8 @@ export function setDependencies(dependencies: Record<string, string>) {
   writeFileSync(pathPack, res)
 }
 
-export async function prepareCli(backendBaseUrl: URL) {
-  const defaultConfig = generateCliConfig(backendBaseUrl)
+export async function prepareCli(appId: string) {
+  const defaultConfig = generateCliConfig(appId)
   // clean up temp folder
   if (existsSync(tempFileFolder)) {
     rimraf.sync(tempFileFolder)
@@ -143,10 +142,8 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
     localCliPath ? (process.env.NODE_PATH ?? 'node') : 'npx',
     localCliPath || '@capgo/cli',
     ...params,
-    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? defaultApiKey] : []),
+    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
   ].join(' ')
-
-  console.log(command)
 
   const options: ExecSyncOptions = {
     cwd: tempFileFolder!,

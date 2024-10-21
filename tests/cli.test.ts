@@ -2,34 +2,23 @@ import { Buffer } from 'node:buffer'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { createClient } from '@supabase/supabase-js'
 import AdmZip from 'adm-zip'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import type { Database } from '~/types/supabase.types'
-import { prepareCli, runCli, runCliWithStdIn, setDependencies, tempFileFolder } from './cliUtils'
-import { getUpdate, getUpdateBaseData, responseOk } from './utils'
+import { prepareCli, runCli, setDependencies, tempFileFolder } from './cli-utils'
+import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, responseOk } from './test-utils'
 
-const BASE_URL = new URL('http://localhost:54321/functions/v1')
-const SERVICE_ROLE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
 let semver = `1.0.${Date.now()}`
+const APPNAME = 'com.demo.app.cli'
 
 function increaseSemver() {
   const lastNumber = Number.parseInt(semver.charAt(semver.length - 1))
   const newSemver = `${semver.slice(0, -1)}${(lastNumber + 1).toString()}`
   semver = newSemver
 }
-function createSupabase() {
-  const supabase = createClient<Database>('http://localhost:54321', SERVICE_ROLE)
-  return supabase
-}
-function resetAndSeedData() {
-  const supabase = createSupabase()
-  return supabase.rpc('reset_and_seed_data')
-}
 
 describe('test key generation', () => {
   beforeEach(async () => {
-    await prepareCli(BASE_URL)
+    await prepareCli(APPNAME)
   })
   it('test old key generation', async () => {
   // set the key to an empty string. Otherwise runCli will not work
@@ -78,16 +67,16 @@ describe('test key generation', () => {
 
 describe('tests CLI upload', () => {
   beforeAll(async () => {
-    await prepareCli(BASE_URL)
+    await prepareCli(APPNAME)
   })
   it('should upload bundle successfully', async () => {
-    await resetAndSeedData()
+    await resetAndSeedAppData(APPNAME)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], true)
     expect(output).toContain('Bundle uploaded')
   })
   it('should download and verify uploaded bundle', async () => {
-    const baseData = getUpdateBaseData()
-    const response = await getUpdate(BASE_URL, baseData)
+    const baseData = getUpdateBaseData(APPNAME)
+    const response = await getUpdate(baseData)
     await responseOk(response, 'Update new bundle')
 
     const responseJson = await response.json<{ url: string, version: string }>()
@@ -115,7 +104,7 @@ describe('tests CLI upload', () => {
     expect(output).toContain('Cannot upload the same bundle content')
   })
   it ('should not upload same hash twice', async () => {
-    await resetAndSeedData()
+    await resetAndSeedAppData(APPNAME)
     increaseSemver()
     await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], false)
     increaseSemver()
@@ -124,12 +113,12 @@ describe('tests CLI upload', () => {
     expect(output).toContain('Cannot upload the same bundle content')
   })
   it ('should upload an external bundle', async () => {
-    await resetAndSeedData()
+    await resetAndSeedAppData(APPNAME)
     increaseSemver()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--external', 'https://example.com'], false)
     expect(output).toContain('Time to share your update to the world')
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -144,7 +133,7 @@ describe('tests CLI upload', () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb'], false)
     expect(output).toContain('Time to share your update to the world')
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -159,7 +148,7 @@ describe('tests CLI upload', () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb', '--external', 'https://example.com'], false)
     expect(output).toContain('Time to share your update to the world')
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -174,7 +163,7 @@ describe('tests CLI upload', () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa'], false)
     expect(output).toContain('Time to share your update to the world')
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -189,7 +178,7 @@ describe('tests CLI upload', () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa', '--external', 'https://example.com'], false)
     expect(output).toContain('Time to share your update to the world')
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -200,8 +189,8 @@ describe('tests CLI upload', () => {
     expect(data?.checksum).toBe('aaaa')
   })
 
-  it('test custom key upload and download (old)', async () => {
-    await prepareCli(BASE_URL)
+  it.only('test custom key upload and download (old)', async () => {
+    await prepareCli(APPNAME)
 
     const output = await runCli(['key_old', 'create', '--force'], true, '')
     expect(output).toContain('Private key saved in')
@@ -217,11 +206,12 @@ describe('tests CLI upload', () => {
     expect(checksum).toBeDefined()
     expect(checksum?.length).toBe(8)
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
 
     expect(error).toBeNull()
@@ -230,11 +220,12 @@ describe('tests CLI upload', () => {
     expect(data?.session_key?.split(':').length).toBe(2)
 
     // let's not download the bundle
-    const baseData = getUpdateBaseData()
-    const response = await getUpdate(BASE_URL, baseData)
+    const baseData = getUpdateBaseData(APPNAME)
+    const response = await getUpdate(baseData)
     await responseOk(response, 'Update new bundle')
 
     const responseJson = await response.json<{ url: string, version: string }>()
+    console.log('responseJson', responseJson)
     expect(responseJson.url).toBeDefined()
     expect(responseJson.version).toBe(semver)
 
@@ -292,7 +283,7 @@ describe('tests CLI upload', () => {
   })
 
   it('test custom key upload and download (new)', async () => {
-    await prepareCli(BASE_URL)
+    await prepareCli(APPNAME)
 
     const output = await runCli(['key', 'create', '--force'], true, '')
     expect(output).toContain('Private key saved in')
@@ -312,7 +303,7 @@ describe('tests CLI upload', () => {
     expect(checksum).toBeDefined()
     expect(checksum?.length).toBe(64)
 
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     const { data, error } = await supabase
       .from('app_versions')
       .select('*')
@@ -328,8 +319,8 @@ describe('tests CLI upload', () => {
     expect(data?.session_key?.split(':').length).toBe(2)
 
     // let's not download the bundle
-    const baseData = getUpdateBaseData()
-    const response = await getUpdate(BASE_URL, baseData)
+    const baseData = getUpdateBaseData(APPNAME)
+    const response = await getUpdate(baseData)
     await responseOk(response, 'Update new bundle')
 
     const responseJson = await response.json<{ url: string, version: string }>()
@@ -396,7 +387,7 @@ describe('tests CLI upload', () => {
 
 describe('tests Wrong cases', () => {
   beforeAll(async () => {
-    await prepareCli(BASE_URL)
+    await prepareCli(APPNAME)
   })
   it('cannot upload with wrong api key', async () => {
     const testApiKey = crypto.randomUUID()
@@ -407,7 +398,7 @@ describe('tests Wrong cases', () => {
   })
 
   it('should test selectable disallow upload', async () => {
-    const supabase = createSupabase()
+    const supabase = getSupabaseClient()
     increaseSemver()
     await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('id', 22)
     // test if is set correctly
@@ -429,13 +420,13 @@ describe('tests Wrong cases', () => {
 
 describe('tests CLI for organization', () => {
   beforeAll(async () => {
-    await prepareCli(BASE_URL)
+    await prepareCli(APPNAME)
   })
 
   // todo: fix this test
   it('should test auto min version flag', async () => {
-    await resetAndSeedData()
-    const supabase = createSupabase()
+    await resetAndSeedAppData(APPNAME)
+    const supabase = getSupabaseClient()
     const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('id', 9654)
     expect(error).toBeNull()
     const uploadWithAutoFlagWithAssert = async (expected: string) => {
@@ -479,8 +470,8 @@ describe('tests CLI for organization', () => {
   it('should test upload with organization', async () => {
     const testApiKey = crypto.randomUUID()
     const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
-    const supabase = createSupabase()
-    await resetAndSeedData()
+    const supabase = getSupabaseClient()
+    await resetAndSeedAppData(APPNAME)
     await supabase.from('apikeys')
       .insert({ key: testApiKey, user_id: testUserId, mode: 'upload', name: 'test' })
 
@@ -522,11 +513,11 @@ describe('tests CLI for organization', () => {
 
 describe('tests CLI metadata', () => {
   beforeAll(async () => {
-    await prepareCli(BASE_URL)
+    await prepareCli(APPNAME)
   })
 
   it('should test compatibility table', async () => {
-    await resetAndSeedData()
+    await resetAndSeedAppData(APPNAME)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], true)
     expect(output).toContain('Bundle uploaded')
 

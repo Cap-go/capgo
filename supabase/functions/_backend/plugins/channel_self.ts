@@ -88,23 +88,27 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   }
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
-  const { data: version } = await supabaseAdmin(c)
+  const { data: versions } = await supabaseAdmin(c)
     .from('app_versions')
-    .select('id, owner_org')
+    .select('id, owner_org, name')
     .eq('app_id', app_id)
     .or(`name.eq.${version_name},name.eq.builtin`)
-    .order('id', { ascending: false })
-    .limit(1)
-    .single()
+    .limit(2)
 
-  if (!version) {
+  if (!versions || versions.length === 0) {
     console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_name, body })
     return c.json({
-      message: `Version ${version_name} doesn't exist`,
+      message: `Version ${version_name} doesn't exist, and no builtin version`,
       error: 'version_error',
     }, 400)
   }
-  if (!(await isAllowedActionOrg(c, version.owner_org))) {
+  const owner_org = versions[0].owner_org
+
+  const version = versions.length === 2
+    ? versions.find(v => v.name !== 'builtin')
+    : versions[0]
+
+  if (!(await isAllowedActionOrg(c, owner_org))) {
     return c.json({
       message: 'Action not allowed',
       error: 'action_not_allowed',
@@ -290,23 +294,27 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     return c.json({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
   }
 
-  const { data: version } = await supabaseAdmin(c)
+  const { data: versions } = await supabaseAdmin(c)
     .from('app_versions')
-    .select('id, owner_org')
+    .select('id, owner_org, name')
     .eq('app_id', app_id)
     .or(`name.eq.${version_name},name.eq.builtin`)
-    .order('id', { ascending: false })
-    .limit(1)
-    .single()
+    .limit(2)
 
-  if (!version) {
-    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_name })
+  if (!versions || versions.length === 0) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_name, body })
     return c.json({
-      message: `Version ${version_name} doesn't exist`,
+      message: `Version ${version_name} doesn't exist, and no builtin version`,
       error: 'version_error',
     }, 400)
   }
-  if (!(await isAllowedActionOrg(c, version.owner_org))) {
+  const owner_org = versions[0].owner_org
+
+  const version = versions.length === 2
+    ? versions.find(v => v.name !== 'builtin')
+    : versions[0]
+
+  if (!(await isAllowedActionOrg(c, owner_org))) {
     return c.json({
       message: 'Action not allowed',
       error: 'action_not_allowed',
@@ -464,6 +472,7 @@ app.post('/', async (c: Context) => {
 })
 
 app.put('/', async (c: Context) => {
+  // Used as get, should be refactor with query param instead
   try {
     const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'put body', body })
