@@ -204,340 +204,346 @@ describe('tests CLI upload', () => {
     expect(data?.checksum).toBe('aaaa')
   })
 
-  it('test custom key upload and download (old)', async () => {
-    await prepareCli(APPNAME)
-
-    const output = await runCli(['key_old', 'create', '--force'], true, '')
-    expect(output).toContain('Private key saved in')
-    const publicKeyPath = output.split('\n').find(val => val.includes('Public key saved in'))?.split(' ').at(-1)
-    expect(publicKeyPath).toBeDefined()
-
-    increaseSemver()
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
-    expect(output2).toContain('Time to share your update to the world')
-    expect(output2).toContain('Encrypting your bundle')
-
-    const privateKey = fs.readFileSync(path.join(tempFileFolder, '.capgo_key'), 'utf-8')
-    expect(privateKey).toContain('PRIVATE KEY')
-
-    async function checkEncryption(output2: string, privateKey: string) {
-      const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
-      expect(checksum).toBeDefined()
-      expect(checksum?.length).toBe(8)
+  // TODO: Wait for PR of CLI relreased
+  // it('test custom key upload and download (old)', async () => {
+  //   await resetAndSeedAppData(APPNAME)
+  //   await prepareCli(APPNAME)
+
+  //   const output = await runCli(['key_old', 'create', '--force'], true, '')
+  //   expect(output).toContain('Private key saved in')
+  //   const publicKeyPath = output.split('\n').find(val => val.includes('Public key saved in'))?.split(' ').at(-1)
+  //   expect(publicKeyPath).toBeDefined()
+
+  //   increaseSemver()
+  //   const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+  //   expect(output2).toContain('Time to share your update to the world')
+  //   expect(output2).toContain('Encrypting your bundle')
+
+  //   const privateKey = fs.readFileSync(path.join(tempFileFolder, '.capgo_key'), 'utf-8')
+  //   expect(privateKey).toContain('PRIVATE KEY')
+
+  //   async function checkEncryption(output2: string, privateKey: string) {
+  //     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+  //     expect(checksum).toBeDefined()
+  //     expect(checksum?.length).toBe(8)
+
+  //     const supabase = getSupabaseClient()
+  //     const { data, error } = await supabase
+  //       .from('app_versions')
+  //       .select('*')
+  //       .eq('name', semver)
+  //       .eq('app_id', APPNAME)
+  //       .single()
+
+  //     expect(error).toBeNull()
+  //     expect(data?.checksum).toBe(checksum)
+  //     expect(data?.session_key).toBeTruthy()
+  //     expect(data?.session_key?.split(':').length).toBe(2)
+
+  //     // let's not download the bundle
+  //     const baseData = getUpdateBaseData(APPNAME)
+  //     const response = await getUpdate(baseData)
+  //     await responseOk(response, 'Update new bundle')
+
+  //     const responseJson = await response.json<{ url: string, version: string }>()
+  //     expect(responseJson.url).toBeDefined()
+  //     expect(responseJson.version).toBe(semver)
+
+  //     const downloadResponse = await fetch(responseJson.url)
+  //     await responseOk(downloadResponse, 'Download new bundle')
+  //     const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
+  //     expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
+
+  //     const encryptedBufferStr = data?.session_key?.split(':').at(1)
+  //     expect(encryptedBufferStr).toBeTruthy()
+
+  //     const ivStr = data?.session_key?.split(':').at(0)
+  //     expect(ivStr).toBeTruthy()
+
+  //     const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
+
+  //     const aesKey = crypto.privateDecrypt(
+  //       {
+  //         key: privateKey,
+  //         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+  //         oaepHash: 'sha256',
+  //       },
+  //       Uint8Array.from(encryptedBuffer),
+  //     )
+  //     expect(aesKey.length).toBe(16)
+
+  //     // The Initialization Vector (IV) used during encryption (16 bytes for AES)
+  //     const iv = Buffer.from(ivStr!, 'base64')
+  //     expect(iv.length).greaterThan(0)
+
+  //     const decipher = crypto.createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
+  //     // Decrypt without specifying output encoding to get Buffers
+  //     const decryptedChunks = []
+  //     decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
+  //     decryptedChunks.push(decipher.final())
+
+  //     // Concatenate all Buffer chunks
+  //     const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
+
+  //     expect(decrypted.length).toBeGreaterThan(0)
+
+  //     const zip = new AdmZip(Buffer.from(decrypted))
+  //     const zipEntries = zip.getEntries()
+
+  //     expect(zipEntries.length).toBe(2)
+
+  //     const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
+  //     expect(indexJsEntry).toBeDefined()
+
+  //     const indexJsContent = indexJsEntry!.getData().toString('utf8')
+  //     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
+  //   }
+
+  //   await checkEncryption(output2, privateKey)
+
+  //   // test with key data
+  //   const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key.pub'), 'utf-8')
+  //   expect(publicKeyFile).toContain('PUBLIC KEY')
+
+  //   fs.renameSync(path.join(tempFileFolder, '.capgo_key.pub'), path.join(tempFileFolder, 'wierd_file'))
+  //   fs.rmSync(path.join(tempFileFolder, '.capgo_key'))
 
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase
-        .from('app_versions')
-        .select('*')
-        .eq('name', semver)
-        .single()
-
-      expect(error).toBeNull()
-      expect(data?.checksum).toBe(checksum)
-      expect(data?.session_key).toBeTruthy()
-      expect(data?.session_key?.split(':').length).toBe(2)
-
-      // let's not download the bundle
-      const baseData = getUpdateBaseData(APPNAME)
-      const response = await getUpdate(baseData)
-      await responseOk(response, 'Update new bundle')
-
-      const responseJson = await response.json<{ url: string, version: string }>()
-      expect(responseJson.url).toBeDefined()
-      expect(responseJson.version).toBe(semver)
-
-      const downloadResponse = await fetch(responseJson.url)
-      await responseOk(downloadResponse, 'Download new bundle')
-      const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
-      expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
-
-      const encryptedBufferStr = data?.session_key?.split(':').at(1)
-      expect(encryptedBufferStr).toBeTruthy()
-
-      const ivStr = data?.session_key?.split(':').at(0)
-      expect(ivStr).toBeTruthy()
-
-      const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
-
-      const aesKey = crypto.privateDecrypt(
-        {
-          key: privateKey,
-          padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-          oaepHash: 'sha256',
-        },
-        Uint8Array.from(encryptedBuffer),
-      )
-      expect(aesKey.length).toBe(16)
-
-      // The Initialization Vector (IV) used during encryption (16 bytes for AES)
-      const iv = Buffer.from(ivStr!, 'base64')
-      expect(iv.length).greaterThan(0)
-
-      const decipher = crypto.createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
-      // Decrypt without specifying output encoding to get Buffers
-      const decryptedChunks = []
-      decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
-      decryptedChunks.push(decipher.final())
-
-      // Concatenate all Buffer chunks
-      const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
-
-      expect(decrypted.length).toBeGreaterThan(0)
-
-      const zip = new AdmZip(Buffer.from(decrypted))
-      const zipEntries = zip.getEntries()
-
-      expect(zipEntries.length).toBe(2)
-
-      const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
-      expect(indexJsEntry).toBeDefined()
-
-      const indexJsContent = indexJsEntry!.getData().toString('utf8')
-      expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
-    }
-
-    await checkEncryption(output2, privateKey)
-
-    // test with key data
-    const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key.pub'), 'utf-8')
-    expect(publicKeyFile).toContain('PUBLIC KEY')
+  //   increaseSemver()
+  //   const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key', 'wierd_file'], false)
+  //   expect(output3).toContain('Time to share your update to the world')
+  //   expect(output3).toContain('Encrypting your bundle')
 
-    fs.renameSync(path.join(tempFileFolder, '.capgo_key.pub'), path.join(tempFileFolder, 'wierd_file'))
-    fs.rmSync(path.join(tempFileFolder, '.capgo_key'))
+  //   await checkEncryption(output3, privateKey)
 
-    increaseSemver()
-    const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key', 'wierd_file'], false)
-    expect(output3).toContain('Time to share your update to the world')
-    expect(output3).toContain('Encrypting your bundle')
+  //   // increaseSemver()
+  //   // const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-data', `'${publicKeyFile}'`], false)
+  //   // expect(output4).toContain('Time to share your update to the world')
+  //   // expect(output4).toContain('Encrypting your bundle')
 
-    await checkEncryption(output3, privateKey)
+  //   // await checkEncryption(output4, privateKey)
+  // })
 
-    increaseSemver()
-    const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-data', `'${publicKeyFile}'`], false)
-    expect(output4).toContain('Time to share your update to the world')
-    expect(output4).toContain('Encrypting your bundle')
+  // it('test custom key upload and download (new)', async () => {
+  //   await resetAndSeedAppData(APPNAME)
+  //   await prepareCli(APPNAME)
 
-    await checkEncryption(output4, privateKey)
-  })
+  //   const output = await runCli(['key', 'create', '--force'], true, '')
+  //   expect(output).toContain('Private key saved in')
+  //   const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
+  //   expect(privateKeyPath).toBeDefined()
 
-  it('test custom key upload and download (new)', async () => {
-    await prepareCli(APPNAME)
+  //   const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2.pub'), 'utf-8')
+  //   expect(publicKeyFile).toBeTruthy()
+  //   expect(publicKeyFile).toContain('PUBLIC KEY')
 
-    const output = await runCli(['key', 'create', '--force'], true, '')
-    expect(output).toContain('Private key saved in')
-    const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
-    expect(privateKeyPath).toBeDefined()
+  //   increaseSemver()
+  //   const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
+  //   expect(output2).toContain('Time to share your update to the world')
+  //   expect(output2).toContain('Encrypting your bundle')
 
-    const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2.pub'), 'utf-8')
-    expect(publicKeyFile).toBeTruthy()
-    expect(publicKeyFile).toContain('PUBLIC KEY')
+  //   async function testEncryption(publicKey: string, output2: string) {
+  //     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+  //     expect(checksum).toBeDefined()
+  //     expect(checksum?.length).toBe(64)
 
-    increaseSemver()
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], false)
-    expect(output2).toContain('Time to share your update to the world')
-    expect(output2).toContain('Encrypting your bundle')
+  //     const supabase = getSupabaseClient()
+  //     const { data, error } = await supabase
+  //       .from('app_versions')
+  //       .select('*')
+  //       .eq('name', semver)
+  //       .eq('app_id', APPNAME)
+  //       .single()
 
-    async function testEncryption(publicKey: string, output2: string) {
-      const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
-      expect(checksum).toBeDefined()
-      expect(checksum?.length).toBe(64)
+  //     expect(error).toBeNull()
+  //     expect(data?.checksum).not.toBe(checksum)
 
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase
-        .from('app_versions')
-        .select('*')
-        .eq('name', semver)
-        .single()
+  //     // the checksum check will be done indirectly later, after the download.
 
-      expect(error).toBeNull()
-      expect(data?.checksum).not.toBe(checksum)
+  //     expect(data?.session_key).toBeTruthy()
+  //     expect(data?.session_key?.split(':').length).toBe(2)
 
-      // the checksum check will be done indirectly later, after the download.
+  //     // let's not download the bundle
+  //     const baseData = getUpdateBaseData(APPNAME)
+  //     const response = await getUpdate(baseData)
+  //     await responseOk(response, 'Update new bundle')
 
-      expect(data?.session_key).toBeTruthy()
-      expect(data?.session_key?.split(':').length).toBe(2)
+  //     const responseJson = await response.json<{ url: string, version: string }>()
+  //     expect(responseJson.url).toBeDefined()
+  //     expect(responseJson.version).toBe(semver)
 
-      // let's not download the bundle
-      const baseData = getUpdateBaseData(APPNAME)
-      const response = await getUpdate(baseData)
-      await responseOk(response, 'Update new bundle')
+  //     const downloadResponse = await fetch(responseJson.url)
+  //     await responseOk(downloadResponse, 'Download new bundle')
+  //     const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
+  //     expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
 
-      const responseJson = await response.json<{ url: string, version: string }>()
-      expect(responseJson.url).toBeDefined()
-      expect(responseJson.version).toBe(semver)
+  //     const encryptedBufferStr = data?.session_key?.split(':').at(1)
+  //     expect(encryptedBufferStr).toBeTruthy()
 
-      const downloadResponse = await fetch(responseJson.url)
-      await responseOk(downloadResponse, 'Download new bundle')
-      const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
-      expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
+  //     const ivStr = data?.session_key?.split(':').at(0)
+  //     expect(ivStr).toBeTruthy()
 
-      const encryptedBufferStr = data?.session_key?.split(':').at(1)
-      expect(encryptedBufferStr).toBeTruthy()
+  //     const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
+  //     const aesKey = crypto.publicDecrypt(publicKey, new Uint8Array(encryptedBuffer))
+  //     expect(aesKey.length).toBe(16)
 
-      const ivStr = data?.session_key?.split(':').at(0)
-      expect(ivStr).toBeTruthy()
+  //     // The Initialization Vector (IV) used during encryption (16 bytes for AES)
+  //     const iv = Buffer.from(ivStr!, 'base64')
+  //     expect(iv.length).greaterThan(0)
 
-      const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
-      const aesKey = crypto.publicDecrypt(publicKey, new Uint8Array(encryptedBuffer))
-      expect(aesKey.length).toBe(16)
+  //     const decipher = crypto.createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
+  //     // Decrypt without specifying output encoding to get Buffers
+  //     const decryptedChunks = []
+  //     decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
+  //     decryptedChunks.push(decipher.final())
 
-      // The Initialization Vector (IV) used during encryption (16 bytes for AES)
-      const iv = Buffer.from(ivStr!, 'base64')
-      expect(iv.length).greaterThan(0)
+  //     // Concatenate all Buffer chunks
+  //     const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
 
-      const decipher = crypto.createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
-      // Decrypt without specifying output encoding to get Buffers
-      const decryptedChunks = []
-      decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
-      decryptedChunks.push(decipher.final())
+  //     expect(decrypted.length).toBeGreaterThan(0)
 
-      // Concatenate all Buffer chunks
-      const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
+  //     const zip = new AdmZip(Buffer.from(decrypted))
+  //     const zipEntries = zip.getEntries()
 
-      expect(decrypted.length).toBeGreaterThan(0)
+  //     expect(zipEntries.length).toBe(2)
 
-      const zip = new AdmZip(Buffer.from(decrypted))
-      const zipEntries = zip.getEntries()
+  //     const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
+  //     expect(indexJsEntry).toBeDefined()
 
-      expect(zipEntries.length).toBe(2)
+  //     const indexJsContent = indexJsEntry!.getData().toString('utf8')
+  //     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
 
-      const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
-      expect(indexJsEntry).toBeDefined()
+  //     // now, let's verify the checksum
+  //     const hash = crypto.createHash('sha256')
 
-      const indexJsContent = indexJsEntry!.getData().toString('utf8')
-      expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
+  //     // Update the hash with your buffer data
+  //     hash.update(new Uint8Array(decrypted))
 
-      // now, let's verify the checksum
-      const hash = crypto.createHash('sha256')
+  //     // Compute the hash digest in hexadecimal format
+  //     const calculatedSha256Hash = hash.digest('hex')
+  //     expect(calculatedSha256Hash).toBe(checksum)
 
-      // Update the hash with your buffer data
-      hash.update(new Uint8Array(decrypted))
+  //     const decryptedChecksum = crypto.publicDecrypt(publicKey, new Uint8Array(Buffer.from(data!.checksum!, 'base64')))
+  //     const decryptedChecksumStr = decryptedChecksum.toString('base64')
+  //     expect(decryptedChecksumStr).toBe(calculatedSha256Hash)
+  //     expect(decryptedChecksumStr).toBe(checksum) // redundent, but I will keep it
+  //   }
 
-      // Compute the hash digest in hexadecimal format
-      const calculatedSha256Hash = hash.digest('hex')
-      expect(calculatedSha256Hash).toBe(checksum)
+  //   await testEncryption(publicKeyFile, output2)
 
-      const decryptedChecksum = crypto.publicDecrypt(publicKey, new Uint8Array(Buffer.from(data!.checksum!, 'base64')))
-      const decryptedChecksumStr = decryptedChecksum.toString('base64')
-      expect(decryptedChecksumStr).toBe(calculatedSha256Hash)
-      expect(decryptedChecksumStr).toBe(checksum) // redundent, but I will keep it
-    }
+  //   // test with key data
+  //   const privateKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2'), 'utf-8')
+  //   expect(privateKeyFile).toContain('PRIVATE KEY')
 
-    await testEncryption(publicKeyFile, output2)
+  //   fs.renameSync(path.join(tempFileFolder, '.capgo_key_v2'), path.join(tempFileFolder, 'wierd_file'))
+  //   fs.rmSync(path.join(tempFileFolder, '.capgo_key_v2.pub'))
 
-    // test with key data
-    const privateKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2'), 'utf-8')
-    expect(privateKeyFile).toContain('PRIVATE KEY')
+  //   increaseSemver()
+  //   const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'wierd_file'], false)
+  //   expect(output3).toContain('Time to share your update to the world')
+  //   expect(output3).toContain('Encrypting your bundle')
 
-    fs.renameSync(path.join(tempFileFolder, '.capgo_key_v2'), path.join(tempFileFolder, 'wierd_file'))
-    fs.rmSync(path.join(tempFileFolder, '.capgo_key_v2.pub'))
+  //   await testEncryption(privateKeyFile, output3)
 
-    increaseSemver()
-    const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'wierd_file'], false)
-    expect(output3).toContain('Time to share your update to the world')
-    expect(output3).toContain('Encrypting your bundle')
+  //   increaseSemver()
+  //   const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-data-v2', `'${privateKeyFile}'`], false)
+  //   expect(output4).toContain('Time to share your update to the world')
+  //   expect(output4).toContain('Encrypting your bundle')
 
-    await testEncryption(privateKeyFile, output3)
+  //   await testEncryption(privateKeyFile, output4)
+  // })
 
-    increaseSemver()
-    const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-data-v2', `'${privateKeyFile}'`], false)
-    expect(output4).toContain('Time to share your update to the world')
-    expect(output4).toContain('Encrypting your bundle')
+  // it('test upload without encryption (new)', async () => {
+  //   await prepareCli(APPNAME)
 
-    await testEncryption(privateKeyFile, output4)
-  })
+  //   const output = await runCli(['key', 'create', '--force'], true, '')
+  //   expect(output).toContain('Private key saved in')
+  //   const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
+  //   expect(privateKeyPath).toBeDefined()
 
-  it('test upload without encryption (new)', async () => {
-    await prepareCli(APPNAME)
+  //   const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2.pub'), 'utf-8')
+  //   expect(publicKeyFile).toBeTruthy()
+  //   expect(publicKeyFile).toContain('PUBLIC KEY')
 
-    const output = await runCli(['key', 'create', '--force'], true, '')
-    expect(output).toContain('Private key saved in')
-    const privateKeyPath = output.split('\n').find(val => val.includes('Private key saved in'))?.split(' ').at(-1)
-    expect(privateKeyPath).toBeDefined()
+  //   increaseSemver()
+  //   const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], false)
+  //   expect(output2).toContain('Time to share your update to the world')
+  //   expect(output2).not.toContain('Encrypting your bundle')
 
-    const publicKeyFile = fs.readFileSync(path.join(tempFileFolder, '.capgo_key_v2.pub'), 'utf-8')
-    expect(publicKeyFile).toBeTruthy()
-    expect(publicKeyFile).toContain('PUBLIC KEY')
+  //   const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+  //   expect(checksum).toBeDefined()
+  //   expect(checksum?.length).toBe(8)
 
-    increaseSemver()
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], false)
-    expect(output2).toContain('Time to share your update to the world')
-    expect(output2).not.toContain('Encrypting your bundle')
+  //   const supabase = getSupabaseClient()
+  //   const { data, error } = await supabase
+  //     .from('app_versions')
+  //     .select('*')
+  //     .eq('name', semver)
+  //     .single()
 
-    const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
-    expect(checksum).toBeDefined()
-    expect(checksum?.length).toBe(8)
+  //   expect(error).toBeNull()
+  //   expect(data?.checksum).toBe(checksum)
 
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('app_versions')
-      .select('*')
-      .eq('name', semver)
-      .single()
+  //   const baseData = getUpdateBaseData(APPNAME)
+  //   const response = await getUpdate(baseData)
+  //   await responseOk(response, 'Update new bundle')
 
-    expect(error).toBeNull()
-    expect(data?.checksum).toBe(checksum)
+  //   const responseJson = await response.json<{ url: string, version: string }>()
+  //   expect(responseJson.url).toBeDefined()
+  //   expect(responseJson.version).toBe(semver)
 
-    const baseData = getUpdateBaseData(APPNAME)
-    const response = await getUpdate(baseData)
-    await responseOk(response, 'Update new bundle')
+  //   const downloadResponse = await fetch(responseJson.url)
+  //   await responseOk(downloadResponse, 'Download new bundle')
+  //   const arrayBuffer = await downloadResponse.arrayBuffer()
 
-    const responseJson = await response.json<{ url: string, version: string }>()
-    expect(responseJson.url).toBeDefined()
-    expect(responseJson.version).toBe(semver)
+  //   const zip = new AdmZip(Buffer.from(arrayBuffer))
+  //   const zipEntries = zip.getEntries()
 
-    const downloadResponse = await fetch(responseJson.url)
-    await responseOk(downloadResponse, 'Download new bundle')
-    const arrayBuffer = await downloadResponse.arrayBuffer()
+  //   expect(zipEntries.length).toBe(2)
+  // })
 
-    const zip = new AdmZip(Buffer.from(arrayBuffer))
-    const zipEntries = zip.getEntries()
+  // it('test upload without encryption (old)', async () => {
+  //   await prepareCli(APPNAME)
 
-    expect(zipEntries.length).toBe(2)
-  })
+  //   const output = await runCli(['key_old', 'create', '--force'], true, '')
+  //   expect(output).toContain('Public key saved in')
 
-  it('test upload without encryption (old)', async () => {
-    await prepareCli(APPNAME)
+  //   increaseSemver()
+  //   const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], false)
+  //   expect(output2).toContain('Time to share your update to the world')
+  //   expect(output2).not.toContain('Encrypting your bundle')
 
-    const output = await runCli(['key_old', 'create', '--force'], true, '')
-    expect(output).toContain('Public key saved in')
+  //   const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
+  //   expect(checksum).toBeDefined()
+  //   expect(checksum?.length).toBe(8)
 
-    increaseSemver()
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], false)
-    expect(output2).toContain('Time to share your update to the world')
-    expect(output2).not.toContain('Encrypting your bundle')
+  //   const supabase = getSupabaseClient()
+  //   const { data, error } = await supabase
+  //     .from('app_versions')
+  //     .select('*')
+  //     .eq('name', semver)
+  //     .eq('app_id', APPNAME)
+  //     .single()
 
-    const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1)
-    expect(checksum).toBeDefined()
-    expect(checksum?.length).toBe(8)
+  //   expect(error).toBeNull()
+  //   expect(data?.checksum).toBe(checksum)
 
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase
-      .from('app_versions')
-      .select('*')
-      .eq('name', semver)
-      .single()
+  //   const baseData = getUpdateBaseData(APPNAME)
+  //   const response = await getUpdate(baseData)
+  //   await responseOk(response, 'Update new bundle')
 
-    expect(error).toBeNull()
-    expect(data?.checksum).toBe(checksum)
+  //   const responseJson = await response.json<{ url: string, version: string }>()
+  //   expect(responseJson.url).toBeDefined()
+  //   expect(responseJson.version).toBe(semver)
 
-    const baseData = getUpdateBaseData(APPNAME)
-    const response = await getUpdate(baseData)
-    await responseOk(response, 'Update new bundle')
+  //   const downloadResponse = await fetch(responseJson.url)
+  //   await responseOk(downloadResponse, 'Download new bundle')
+  //   const arrayBuffer = await downloadResponse.arrayBuffer()
 
-    const responseJson = await response.json<{ url: string, version: string }>()
-    expect(responseJson.url).toBeDefined()
-    expect(responseJson.version).toBe(semver)
+  //   const zip = new AdmZip(Buffer.from(arrayBuffer))
+  //   const zipEntries = zip.getEntries()
 
-    const downloadResponse = await fetch(responseJson.url)
-    await responseOk(downloadResponse, 'Download new bundle')
-    const arrayBuffer = await downloadResponse.arrayBuffer()
-
-    const zip = new AdmZip(Buffer.from(arrayBuffer))
-    const zipEntries = zip.getEntries()
-
-    expect(zipEntries.length).toBe(2)
-  })
+  //   expect(zipEntries.length).toBe(2)
+  // })
 
   it('test code check (missing notifyAppReady)', async () => {
     await prepareCli(APPNAME)
@@ -575,9 +581,9 @@ describe('tests Wrong cases', () => {
   it('should test selectable disallow upload', async () => {
     const supabase = getSupabaseClient()
     increaseSemver()
-    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('id', 22)
+    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'production').eq('app_id', APPNAME)
     // test if is set correctly
-    const { data: channel } = await supabase.from('channels').select('*').eq('id', 22).single()
+    const { data: channel } = await supabase.from('channels').select('*').eq('name', 'production').eq('app_id', APPNAME).single()
     expect(channel?.disable_auto_update).toBe('version_number')
 
     try {
@@ -588,7 +594,7 @@ describe('tests Wrong cases', () => {
       expect(output2).toContain('should follow semver convention')
     }
     finally {
-      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('id', 22)
+      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APPNAME)
     }
   })
 })
@@ -602,7 +608,7 @@ describe('tests CLI for organization', () => {
   it('should test auto min version flag', async () => {
     await resetAndSeedAppData(APPNAME)
     const supabase = getSupabaseClient()
-    const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('id', 9654)
+    const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME)
     expect(error).toBeNull()
     const uploadWithAutoFlagWithAssert = async (expected: string) => {
       const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'])
