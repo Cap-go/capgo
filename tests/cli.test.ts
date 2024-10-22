@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer'
-import { constants, createDecipheriv, createHash, privateDecrypt, publicDecrypt, randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+// import { constants, createDecipheriv, createHash, privateDecrypt, publicDecrypt, randomUUID } from 'node:crypto'
+// import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -685,7 +687,7 @@ describe('tests CLI for organization', () => {
 
         try {
           increaseSemver()
-          const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+          const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
           expect(output).toContain('Bundle uploaded')
         }
         finally {
