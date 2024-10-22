@@ -97,7 +97,7 @@ export async function runCliWithStdIn(params: string[], handleOutput: (dataIn: s
   }
   const toResolve = Promise.withResolvers<string>()
   let outData = ''
-  const child = spawn(localCliPath ? (process.env.NODE_PATH ?? 'node') : 'npx', [localCliPath || '@capgo/cli', ...params], {
+  const child = spawn(localCliPath ? (process.env.NODE_PATH ?? 'node') : 'bunx', [localCliPath || '@capgo/cli', ...params], {
     stdio: ['pipe', 'pipe', 'pipe'], // Ensure you have access to stdin, stdout, stderr
   })
 
@@ -139,7 +139,7 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   }
   // console.log('localCliPath', localCliPath)
   const command = [
-    localCliPath ? (process.env.NODE_PATH ?? 'node') : 'npx',
+    localCliPath ? (process.env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath || '@capgo/cli',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
