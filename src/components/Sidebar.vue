@@ -8,7 +8,7 @@ import IconDashboard from '~icons/ic/round-space-dashboard'
 // import FluentLive20Filled from '~icons/fluent/live-20-filled'
 import IconApiKey from '~icons/mdi/shield-key'
 import { useI18n } from 'petite-vue-i18n'
-import { ref, shallowRef, watch } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 
