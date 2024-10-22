@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import process from 'node:process'
+import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 
-export const BASE_URL = `${process.env.SUPABASE_URL}/functions/v1`
+export const BASE_URL = `${env.SUPABASE_URL}/functions/v1`
 export const APIKEY_TEST = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
 export const headers = {
   'Content-Type': 'application/json',
@@ -53,8 +53,8 @@ export async function resetAndSeedAppDataStats(appId: string) {
 }
 
 export function getSupabaseClient(): SupabaseClient {
-  const supabaseUrl = process.env.SUPABASE_URL ?? ''
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY ?? ''
+  const supabaseUrl = env.SUPABASE_URL ?? ''
+  const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
   return createClient(supabaseUrl, supabaseServiceKey)
 }
 

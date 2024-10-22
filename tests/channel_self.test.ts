@@ -1,4 +1,5 @@
 import type { HttpMethod } from './test-utils.ts'
+import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData } from './test-utils.ts'
 
@@ -229,7 +230,7 @@ it('[POST] /channel_self with default channel', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = crypto.randomUUID().toLowerCase()
+  data.device_id = randomUUID().toLowerCase()
 
   const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', 'no_access').eq('app_id', APPNAME).select('id, owner_org, public').single()
 
@@ -269,7 +270,7 @@ it('[PUT] /channel_self (no overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = crypto.randomUUID().toLowerCase()
+  data.device_id = randomUUID().toLowerCase()
 
   const response = await fetchEndpoint('PUT', data)
   expect(response.ok).toBe(true)
@@ -289,7 +290,7 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = crypto.randomUUID().toLowerCase()
+  data.device_id = randomUUID().toLowerCase()
 
   const { data: noAccessChannel, error: noAccessChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'no_access').eq('app_id', APPNAME).single()
 
@@ -333,7 +334,7 @@ it('[POST] /channel_self ok', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = crypto.randomUUID().toLowerCase()
+  data.device_id = randomUUID().toLowerCase()
   data.channel = 'no_access'
 
   const { error: channelUpdateError } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', 'no_access').eq('app_id', APPNAME)
@@ -368,7 +369,7 @@ it('[DELETE] /channel_self (no overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = crypto.randomUUID().toLowerCase()
+  data.device_id = randomUUID().toLowerCase()
 
   const response = await fetchEndpoint('DELETE', data)
   expect(response.status).toBe(400)
@@ -381,7 +382,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = crypto.randomUUID().toLowerCase()
+  data.device_id = randomUUID().toLowerCase()
 
   const { data: productionChannel, error: productionChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'production').eq('app_id', APPNAME).single()
 
