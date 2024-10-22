@@ -69,6 +69,6 @@ internal/cloudflare/.prod.env
 internal/cloudflare/.env.preprod
 internal/cloudflare/.env.prod
 scripts/local_cf_backend/spawn
-temp_cli_test
+temp_cli_test*
 internal/netlify/.env.prod
 internal/supabase/.env.prod

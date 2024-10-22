@@ -4,7 +4,7 @@ import { execSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
-import { sync } from 'rimraf'
+import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST, BASE_URL } from './test-utils'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
@@ -22,7 +22,7 @@ export const BASE_PACKAGE_JSON = `{
 export const BASE_DEPENDENCIES = {
   '@capacitor/android': '^6.0.0',
 }
-export const tempFileFolder = join(cwd(), TEMP_DIR_NAME)
+export const tempFileFolder = (id: string) => join(cwd(), `${TEMP_DIR_NAME}_${id}`)
 
 function generateDefaultJsonCliConfig(appId: string) {
   return {
@@ -54,35 +54,35 @@ const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(ap
 export default config;\n`
 }
 
-export function setDependencies(dependencies: Record<string, string>) {
+export function setDependencies(dependencies: Record<string, string>, id: string) {
   // write package.json
-  const pathPack = join(tempFileFolder, 'package.json')
+  const pathPack = join(tempFileFolder(id), 'package.json')
   const res = BASE_PACKAGE_JSON.replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
   writeFileSync(pathPack, res)
 }
 
-export async function prepareCli(appId: string) {
+export async function prepareCli(appId: string, id: string) {
   const defaultConfig = generateCliConfig(appId)
   // clean up temp folder
-  if (existsSync(tempFileFolder)) {
-    sync(tempFileFolder)
+  if (existsSync(tempFileFolder(id))) {
+    rimrafSync(tempFileFolder(id))
   }
-  mkdirSync(tempFileFolder, { recursive: true })
+  mkdirSync(tempFileFolder(id), { recursive: true })
 
-  const capacitorConfigPath = join(tempFileFolder, 'capacitor.config.ts')
+  const capacitorConfigPath = join(tempFileFolder(id), 'capacitor.config.ts')
   writeFileSync(capacitorConfigPath, defaultConfig)
 
-  mkdirSync(join(tempFileFolder, 'dist'), { recursive: true })
-  writeFileSync(join(tempFileFolder, 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
-  writeFileSync(join(tempFileFolder, 'dist', 'index.html'), '')
-  setDependencies(BASE_DEPENDENCIES)
+  mkdirSync(join(tempFileFolder(id), 'dist'), { recursive: true })
+  writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
+  writeFileSync(join(tempFileFolder(id), 'dist', 'index.html'), '')
+  setDependencies(BASE_DEPENDENCIES, id)
 
-  npmInstall()
+  npmInstall(id)
 }
 
-function npmInstall() {
+function npmInstall(id: string) {
   try {
-    execSync(`${env.BUN_PATH ?? 'bun'} install`, { cwd: tempFileFolder, stdio: 'inherit' })
+    execSync(`${env.BUN_PATH ?? 'bun'} install`, { cwd: tempFileFolder(id), stdio: 'inherit' })
   }
   catch (error) {
     console.error('bun install failed', error)
@@ -131,7 +131,7 @@ export async function runCliWithStdIn(params: string[], handleOutput: (dataIn: s
   return toResolve.promise
 }
 
-export function runCli(params: string[], logOutput = false, overwriteApiKey?: string): string {
+export function runCli(params: string[], id: string, logOutput = false, overwriteApiKey?: string): string {
   // console.log(params)
   let localCliPath = env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
@@ -146,7 +146,7 @@ export function runCli(params: string[], logOutput = false, overwriteApiKey?: st
   ].join(' ')
 
   const options: ExecSyncOptions = {
-    cwd: tempFileFolder!,
+    cwd: tempFileFolder(id),
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...env, FORCE_COLOR: '1' },
