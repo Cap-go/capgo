@@ -562,7 +562,7 @@ describe('tests CLI upload', () => {
 describe('tests Code check', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
-  beforeAll(async () => {
+  beforeEach(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
   })
