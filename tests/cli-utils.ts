@@ -20,7 +20,7 @@ export const BASE_PACKAGE_JSON = `{
   "author": ""
 }`
 export const BASE_DEPENDENCIES = {
-  '@capacitor/android': '^4.5.0',
+  '@capacitor/android': '^6.0.0',
 }
 export const tempFileFolder = path.join(process.cwd(), TEMP_DIR_NAME)
 

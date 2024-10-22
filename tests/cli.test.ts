@@ -715,16 +715,16 @@ describe('tests CLI metadata', () => {
       expect(columns[3]).toContain(column4)
     }
 
-    // await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', 'None', '❌')
+    // await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', 'None', '❌')
 
     // increaseSemver()
     await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'])
 
-    await assertCompatibilityTableColumns('@capacitor/android', '4.5.0', '4.5.0', '✅')
+    await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', '6.0.0', '✅')
 
     setDependencies({})
 
     // well, the local version doesn't exist, so I expect an empty string ???
-    await assertCompatibilityTableColumns('@capacitor/android', '', '4.5.0', '❌')
+    await assertCompatibilityTableColumns('@capacitor/android', '', '6.0.0', '❌')
   })
 })
