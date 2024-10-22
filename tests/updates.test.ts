@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
@@ -56,7 +57,7 @@ describe('[POST] /updates', () => {
 
 describe('[POST] /updates parallel tests', () => {
   it('with new device', async () => {
-    const uuid = crypto.randomUUID().toLowerCase()
+    const uuid = randomUUID().toLowerCase()
 
     const baseData = getBaseData(APPNAME)
     baseData.version_name = '1.1.0'
@@ -101,7 +102,7 @@ describe('[POST] /updates parallel tests', () => {
   })
 
   it('direct channel overwrite', async () => {
-    const uuid = crypto.randomUUID().toLowerCase()
+    const uuid = randomUUID().toLowerCase()
 
     const baseData = getBaseData(APPNAME)
     baseData.device_id = uuid;
@@ -238,7 +239,7 @@ describe('update scenarios', () => {
   })
 
   it('channel overwrite', async () => {
-    const uuid = crypto.randomUUID().toLowerCase()
+    const uuid = randomUUID().toLowerCase()
 
     // get the channel id
     const { data, error } = await getSupabaseClient().from('channels').select('id').eq('name', 'no_access').eq('app_id', APPNAME).single()
@@ -271,7 +272,7 @@ describe('update scenarios', () => {
   })
 
   it('version overwrite', async () => {
-    const uuid = crypto.randomUUID().toLowerCase()
+    const uuid = randomUUID().toLowerCase()
 
     // get the version id
     const { data, error } = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.359.0').eq('app_id', APPNAME).single()
