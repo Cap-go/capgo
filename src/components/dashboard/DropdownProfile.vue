@@ -2,7 +2,7 @@
 import { Capacitor } from '@capacitor/core'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useI18n } from 'petite-vue-i18n'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { openMessenger } from '~/services/bento'
 import { useMainStore } from '~/stores/main'
@@ -11,10 +11,10 @@ const { t } = useI18n()
 const dropdown = useTemplateRef('dropdown')
 const router = useRouter()
 const main = useMainStore()
-const isMobile = Capacitor.isNativePlatform()
+const isMobile = ref(Capacitor.isNativePlatform())
 const acronym = computed(() => {
   let res = 'MD'
-  if (main.user?.first_name && main.user.last_name)
+  if (main.user?.first_name && main.user?.last_name)
     res = main.user?.first_name[0] + main.user?.last_name[0]
   else if (main.user?.first_name)
     res = main.user?.first_name[0]
@@ -38,21 +38,20 @@ function logOut() {
 </script>
 
 <template>
-  <div>
-    <details ref="dropdown" class="dropdown dropdown-end">
+  <div class="relative">
+    <details ref="dropdown" class="dropdown dropdown-top lg:hidden">
       <summary class="m-1 btn btn-outline btn-sm text-slate-800 dark:text-white">
         <img v-if="main.user?.image_url" class="w-6 h-6 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
         <div v-else class="flex items-center justify-center w-6 h-6 border border-black rounded-full dark:border-white">
           <p>{{ acronym }}</p>
         </div>
         <div class="flex items-center truncate">
-          <span class="hidden ml-2 text-sm font-medium truncate md:block dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
+          <span class="ml-2 text-sm font-medium truncate dark:text-white group-hover:text-slate-800 dark:group-hover:text-slate-100">{{ `${main.user?.first_name} ${main.user?.last_name}` }}</span>
           <IconDown class="w-6 h-6 ml-1 fill-current text-slate-400" />
         </div>
       </summary>
       <ul class="dropdown-content dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow" @click="closeDropdown()">
         <li class="text-sm text-gray-900 border-b border-gray-200 dark:text-white">
-          <div>{{ `${main.user?.first_name} ${main.user?.last_name}` }}</div>
           <div class="font-medium truncate">
             {{ main.user?.email }}
           </div>
@@ -62,13 +61,13 @@ function logOut() {
             {{ t('settings') }}
           </router-link>
         </li>
-        <li v-if="isMobile">
-          <router-link to="/app/modules" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <li>
+          <router-link v-if="isMobile" to="/app/modules" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
             {{ t('module-heading') }}
           </router-link>
         </li>
-        <li v-if="isMobile">
-          <router-link to="/app/modules_test" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <li>
+          <router-link v-if="isMobile" to="/app/modules_test" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
             {{ t('module-heading') }} {{ t('tests') }}
           </router-link>
         </li>
@@ -84,5 +83,37 @@ function logOut() {
         </li>
       </ul>
     </details>
+
+    <div class="hidden lg:flex lg:flex-col lg:space-y-2 lg:p-4 lg:bg-white lg:dark:bg-base-100 lg:rounded-box lg:shadow">
+      <div class="flex items-center mb-4">
+        <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 mask mask-squircle" :src="main.user?.image_url" alt="User">
+        <div v-else class="flex items-center justify-center w-10 h-10 mr-3 border border-black rounded-full dark:border-white">
+          <p>{{ acronym }}</p>
+        </div>
+        <div class="min-w-0">
+          <p class="font-medium truncate">
+            {{ `${main.user?.first_name} ${main.user?.last_name}` }}
+          </p>
+          <p class="text-sm text-gray-600 truncate dark:text-gray-400">
+            {{ main.user?.email }}
+          </p>
+        </div>
+      </div>
+      <router-link to="/dashboard/settings/account" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        {{ t('settings') }}
+      </router-link>
+      <router-link v-if="isMobile" to="/app/modules" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        {{ t('module-heading') }}
+      </router-link>
+      <router-link v-if="isMobile" to="/app/modules_test" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        {{ t('module-heading') }} {{ t('tests') }}
+      </router-link>
+      <div class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="openSupport">
+        {{ t('support') }}
+      </div>
+      <div class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="logOut">
+        {{ t('sign-out') }}
+      </div>
+    </div>
   </div>
 </template>

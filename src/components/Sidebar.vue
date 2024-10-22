@@ -4,20 +4,20 @@ import { onClickOutside } from '@vueuse/core'
 import IconDoc from '~icons/gg/loadbar-doc'
 import IconDiscord from '~icons/ic/round-discord'
 import IconDashboard from '~icons/ic/round-space-dashboard'
-import IconExpand from '~icons/mdi/arrow-expand-right'
 
 // import FluentLive20Filled from '~icons/fluent/live-20-filled'
 import IconApiKey from '~icons/mdi/shield-key'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import UserMenu from '../components/dashboard/DropdownProfile.vue'
 
 const props = defineProps < {
   sidebarOpen: boolean
 }>()
 
 const emit = defineEmits(['closeSidebar'])
-
+const main = useMainStore()
 const router = useRouter()
 const { t } = useI18n()
 const sidebar = useTemplateRef('sidebar')
@@ -25,16 +25,6 @@ const route = useRoute()
 
 onClickOutside(sidebar, () => emit('closeSidebar'))
 
-const storedSidebarExpanded = localStorage.getItem('sidebar-expanded')
-const sidebarExpanded = ref(storedSidebarExpanded === null ? false : storedSidebarExpanded === 'true')
-
-watch(sidebarExpanded, () => {
-  localStorage.setItem('sidebar-expanded', sidebarExpanded.value.toString())
-  if (sidebarExpanded.value)
-    document.querySelector('body')!.classList.add('sidebar-expanded')
-  else
-    document.querySelector('body')!.classList.remove('sidebar-expanded')
-})
 function isTabActive(tab: string) {
   return route.path.includes(tab)
 }
@@ -81,54 +71,65 @@ const tabs = ref<Tab[]>([
 <template>
   <div>
     <!-- Sidebar backdrop (mobile only) -->
-    <div class="fixed z-40 transition-opacity duration-200 inset-0-safe bg-slate-900 bg-opacity-30 lg:z-auto lg:hidden" :class="props.sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'" aria-hidden="true" />
+    <div
+      class="fixed inset-0 z-40 transition-opacity duration-200 bg-slate-900 bg-opacity-30 lg:hidden"
+      :class="props.sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+      aria-hidden="true"
+      @click="emit('closeSidebar')"
+    />
 
     <!-- Sidebar -->
     <div
       id="sidebar"
       ref="sidebar"
-      class="left-0-safe top-0-safe no-scrollbar lg:sidebar-expanded:!w-64 absolute z-40 h-full min-h-screen w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out lg:static lg:left-auto lg:top-auto lg:w-14 lg:translate-x-0 lg:overflow-y-auto 2xl:!w-64"
-      :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-64'"
+      class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:h-full lg:w-14 lg:translate-x-0 lg:overflow-y-auto lg:rounded-none lg:shadow-none lg:rounded-r-xl 2xl:!w-64"
+      :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-[120%]'"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between px-3 mt-4 mb-10 sidebar-expanded:mx-10 sm:px-2">
-        <!-- Logo -->
-        <router-link class="flex flex-row items-center space-x-2" to="/app/home">
-          <img src="/capgo.webp" alt="logo" class="h-[32px] w-[32px]">
-          <span class="text-xl font-medium truncate transition duration-150 lg:sidebar-expanded:block font-prompt text-slate-200 2xl:block lg:hidden hover:text-white">Capgo</span>
+      <div class="flex justify-between px-3 py-4 border-b border-slate-800">
+        <router-link class="flex items-center space-x-2" to="/app/home">
+          <img src="/capgo.webp" alt="logo" class="w-8 h-8">
+          <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 2xl:block lg:hidden hover:text-white">Capgo</span>
         </router-link>
       </div>
 
-      <!-- Links -->
-      <div class="space-y-8">
-        <!-- Pages group -->
+      <!-- Organization dropdown -->
+      <div class="px-3 py-4">
+        <dropdown-organization v-if="main.user" />
+      </div>
+
+      <!-- Navigation -->
+      <div class="px-3 py-4 space-y-4">
         <div>
-          <h3 class="pl-3 text-xs font-semibold uppercase text-slate-500">
-            <span class="hidden w-6 text-center lg:sidebar-expanded:hidden lg:block 2xl:hidden" aria-hidden="true">•••</span>
-            <span class="lg:sidebar-expanded:block 2xl:block lg:hidden">{{ t('pages') }}</span>
+          <h3 class="mb-3 text-xs font-semibold uppercase text-slate-500">
+            <span class="hidden w-6 text-center lg:block 2xl:hidden" aria-hidden="true">•••</span>
+            <span class="2xl:block lg:hidden">{{ t('pages') }}</span>
           </h3>
-          <ul class="mt-3">
-            <li v-for="tab, i in tabs" :key="i" class="mb-0.5 rounded-sm px-3 py-2 last:mb-0">
-              <button class="block w-full p-2 truncate transition duration-150 rounded text-slate-200" :class="{ 'hover:bg-slate-700': !isTabActive(tab.key), 'pointer-events-none': isTabActive(tab.key) }" @click="openTab(tab)">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center">
-                    <component :is="tab.icon" class="w-6 h-6 fill-current" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
-                    <span class="ml-3 text-sm font-medium duration-200 lg:sidebar-expanded:opacity-100 2xl:opacity-100 lg:opacity-0" :class="{ 'text-blue-600': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">{{ t(tab.label) }}</span>
-                  </div>
-                </div>
+          <ul class="space-y-1">
+            <li v-for="tab, i in tabs" :key="i">
+              <button
+                class="flex items-center w-full p-2 transition duration-150 rounded-md text-slate-200"
+                :class="{
+                  'hover:bg-slate-800': !isTabActive(tab.key),
+                  'bg-slate-800 text-white': isTabActive(tab.key),
+                  'pointer-events-none': isTabActive(tab.key),
+                }"
+                @click="openTab(tab)"
+              >
+                <component :is="tab.icon" class="w-5 h-5 shrink-0" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
+                <span class="ml-3 text-sm font-medium duration-200 2xl:opacity-100 lg:opacity-0" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">
+                  {{ t(tab.label) }}
+                </span>
               </button>
             </li>
           </ul>
         </div>
       </div>
 
-      <!-- Expand / collapse button -->
-      <div class="justify-end hidden pt-3 mt-auto 2xl:hidden lg:inline-flex">
-        <div class="px-3 py-2">
-          <button @click.prevent="sidebarExpanded = !sidebarExpanded">
-            <span class="sr-only">Expand / collapse sidebar</span>
-            <IconExpand class="w-6 h-6 fill-current sidebar-expanded:rotate-180" />
-          </button>
+      <!-- User menu -->
+      <div class="px-3 py-4 mt-auto border-t border-slate-800">
+        <div v-if="main.user" class="flex items-center">
+          <UserMenu class="w-full" />
         </div>
       </div>
     </div>
