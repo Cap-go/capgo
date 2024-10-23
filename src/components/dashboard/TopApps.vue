@@ -53,7 +53,7 @@ const { t } = useI18n()
                   {{ t('app-perm') }}
                 </div>
               </th>
-              <th class="hidden w-1/5 p-2 md:table-cell">
+              <th class="w-1/5 p-2 md:table-cell">
                 <div class="font-semibold text-left" />
               </th>
             </tr>
