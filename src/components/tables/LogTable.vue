@@ -202,18 +202,20 @@ watch(props, async () => {
 </script>
 
 <template>
-  <TableLog
-    v-model:filters="filters"
-    v-model:columns="columns"
-    v-model:current-page="currentPage"
-    v-model:search="search"
-    v-model:range="range"
-    :element-list="elements"
-    filter-text="Filters"
-    :is-loading="isLoading"
-    :app-id="props.appId ?? ''"
-    :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
-    @reload="reload()" @reset="refreshData()"
-    @row-click="openOne"
-  />
+  <div>
+    <TableLog
+      v-model:filters="filters"
+      v-model:columns="columns"
+      v-model:current-page="currentPage"
+      v-model:search="search"
+      v-model:range="range"
+      :element-list="elements"
+      filter-text="Filters"
+      :is-loading="isLoading"
+      :app-id="props.appId ?? ''"
+      :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
+      @reload="reload()" @reset="refreshData()"
+      @row-click="openOne"
+    />
+  </div>
 </template>

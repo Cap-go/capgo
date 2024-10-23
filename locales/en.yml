@@ -310,7 +310,7 @@ new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 next-run: Next update
-'no': 'no'
+no: no
 no-app-icon: This app does not have any app icon
 no-data: No Data
 no-permission: Insufficient permissions
@@ -490,7 +490,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-'yes': 'yes'
+yes: yes
 you-can-change-your-: You can change your personal informations here.
 you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached

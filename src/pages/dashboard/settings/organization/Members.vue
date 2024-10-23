@@ -270,7 +270,7 @@ function canDelete(member: ExtendedOrganizationMember) {
       </button>
     </div>
     <div class="flex flex-col overflow-y-auto md:mx-auto md:mt-5 md:w-full ">
-      <dl id="members-div" class="divide-y divide-gray-500">
+      <dl id="members-div" class="divide-y dark:divide-slate-200 dark:divide-slate-500">
         <div v-for="member in members" :key="member.id">
           <div id="member-card" class="flex justify-between my-2 ml-2 md:my-6">
             <div class="hidden md:flex">
@@ -278,7 +278,7 @@ function canDelete(member: ExtendedOrganizationMember) {
                 v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
                 width="80" height="80" alt="profile"
               >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
                 <p>{{ acronym(member.email) }}</p>
               </div>
             </div>

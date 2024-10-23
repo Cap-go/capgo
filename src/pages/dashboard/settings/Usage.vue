@@ -200,159 +200,161 @@ function lastRunDate() {
 </script>
 
 <template>
-  <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
-    <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
-      <div class="sm:align-center sm:flex sm:flex-col">
-        <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip-bottom tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
-          {{ t('usage') }}
-          <IcBaselineInfo class="w-4 h-4 cursor-pointer text-slate-400 dark:text-white" />
-        </h1>
+  <div>
+    <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
+      <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
+        <div class="sm:align-center sm:flex sm:flex-col">
+          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip-bottom tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
+            {{ t('usage') }}
+            <IcBaselineInfo class="w-4 h-4 cursor-pointer text-slate-400 dark:text-white" />
+          </h1>
 
-        <div class="my-2">
-          <div class="flex justify-between mt-2 row">
-            <div class="text-lg font-bold">
-              {{ t('monthly-active-users') }}
-            </div>
-            <div>
-              <span class="font-semibold">{{ planUsage?.cycle.subscription_anchor_start
-              }}</span> {{ t('to') }} <span class="font-semibold">{{
-                planUsage?.cycle.subscription_anchor_end }}</span>
-            </div>
-          </div>
-          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex justify-between mt-2 row">
-            <div>
-              {{ t('included-in-plan') }}
-            </div>
-            <div class="font-semibold">
-              {{ planUsage?.currentPlan?.mau.toLocaleString() }}
-            </div>
-          </div>
-
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('used-in-period') }}
-            </div>
-            <div class="font-semibold">
-              {{ planUsage?.totalMau.toLocaleString() }}
-            </div>
-          </div>
-          <div v-if="planUsage?.isPayAsYouGo">
-            <hr class="my-1 border-t border-gray-300 opacity-50">
-            <div class="flex justify-between row">
+          <div class="my-2">
+            <div class="flex justify-between mt-2 row">
+              <div class="text-lg font-bold">
+                {{ t('monthly-active-users') }}
+              </div>
               <div>
-                {{ t('price-per-unit-above') }}
+                <span class="font-semibold">{{ planUsage?.cycle.subscription_anchor_start
+                }}</span> {{ t('to') }} <span class="font-semibold">{{
+                  planUsage?.cycle.subscription_anchor_end }}</span>
+              </div>
+            </div>
+            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+            <div class="flex justify-between mt-2 row">
+              <div>
+                {{ t('included-in-plan') }}
               </div>
               <div class="font-semibold">
-                $ {{ planUsage?.payg_units?.mau?.toLocaleString() }}
+                {{ planUsage?.currentPlan?.mau.toLocaleString() }}
               </div>
             </div>
-          </div>
-        </div>
 
-        <div class="my-2">
-          <div class="text-lg font-bold">
-            {{ t('Storage') }}
-          </div>
-          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex justify-between mt-2 row">
-            <div>
-              {{ t('included-in-plan') }}
-            </div>
-            <div class="font-semibold">
-              {{ planUsage?.currentPlan?.storage.toLocaleString() }} GB
-            </div>
-          </div>
-
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('used-in-period') }}
-            </div>
-            <div class="font-semibold">
-              {{ planUsage?.totalStorage.toLocaleString() }} GB
-            </div>
-          </div>
-          <div v-if="planUsage?.isPayAsYouGo">
-            <hr class="my-1 border-t border-gray-300 opacity-50">
-            <div class="flex justify-between row">
-              <div>
-                {{ t('price-per-unit-above') }}
-              </div>
-              <div class="font-semibold">
-                $ {{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="my-2">
-          <div class="text-lg font-bold">
-            {{ t('Bandwidth') }}
-          </div>
-          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex justify-between mt-2 row">
-            <div>
-              {{ t('included-in-plan') }}
-            </div>
-            <div class="font-semibold">
-              {{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB
-            </div>
-          </div>
-
-          <hr class="my-1 border-t border-gray-300 opacity-50">
-          <div class="flex justify-between row">
-            <div>
-              {{ t('used-in-period') }}
-            </div>
-            <div class="font-semibold">
-              {{ planUsage?.totalBandwidth.toLocaleString() }} GB
-            </div>
-          </div>
-          <div v-if="planUsage?.isPayAsYouGo">
-            <hr class="my-1 border-t border-gray-300 opacity-50">
-            <div class="flex justify-between row">
-              <div>
-                {{ t('price-per-unit-above') }}
-              </div>
-              <div class="font-semibold">
-                $ {{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="my-2">
-          <div class="text-lg font-bold">
-            {{ t('usage-title') }}
-          </div>
-          <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-          <div class="flex justify-between mt-2 row">
-            <div>
-              {{ t('base') }}
-            </div>
-            <div class="font-semibold">
-              $ {{ planUsage?.currentPlan?.price_m.toLocaleString() }}
-            </div>
-          </div>
-
-          <div v-if="planUsage?.isPayAsYouGo">
             <hr class="my-1 border-t border-gray-300 opacity-50">
             <div class="flex justify-between row">
               <div>
                 {{ t('used-in-period') }}
               </div>
               <div class="font-semibold">
-                $ {{ planUsage?.totalUsagePrice.toLocaleString() }}
+                {{ planUsage?.totalMau.toLocaleString() }}
               </div>
             </div>
+            <div v-if="planUsage?.isPayAsYouGo">
+              <hr class="my-1 border-t border-gray-300 opacity-50">
+              <div class="flex justify-between row">
+                <div>
+                  {{ t('price-per-unit-above') }}
+                </div>
+                <div class="font-semibold">
+                  $ {{ planUsage?.payg_units?.mau?.toLocaleString() }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="my-2">
+            <div class="text-lg font-bold">
+              {{ t('Storage') }}
+            </div>
+            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+            <div class="flex justify-between mt-2 row">
+              <div>
+                {{ t('included-in-plan') }}
+              </div>
+              <div class="font-semibold">
+                {{ planUsage?.currentPlan?.storage.toLocaleString() }} GB
+              </div>
+            </div>
+
             <hr class="my-1 border-t border-gray-300 opacity-50">
             <div class="flex justify-between row">
               <div>
-                {{ t('usage-title') }}
+                {{ t('used-in-period') }}
               </div>
               <div class="font-semibold">
-                $ {{ planUsage?.totalPrice.toLocaleString() }}
+                {{ planUsage?.totalStorage.toLocaleString() }} GB
+              </div>
+            </div>
+            <div v-if="planUsage?.isPayAsYouGo">
+              <hr class="my-1 border-t border-gray-300 opacity-50">
+              <div class="flex justify-between row">
+                <div>
+                  {{ t('price-per-unit-above') }}
+                </div>
+                <div class="font-semibold">
+                  $ {{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="my-2">
+            <div class="text-lg font-bold">
+              {{ t('Bandwidth') }}
+            </div>
+            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+            <div class="flex justify-between mt-2 row">
+              <div>
+                {{ t('included-in-plan') }}
+              </div>
+              <div class="font-semibold">
+                {{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB
+              </div>
+            </div>
+
+            <hr class="my-1 border-t border-gray-300 opacity-50">
+            <div class="flex justify-between row">
+              <div>
+                {{ t('used-in-period') }}
+              </div>
+              <div class="font-semibold">
+                {{ planUsage?.totalBandwidth.toLocaleString() }} GB
+              </div>
+            </div>
+            <div v-if="planUsage?.isPayAsYouGo">
+              <hr class="my-1 border-t border-gray-300 opacity-50">
+              <div class="flex justify-between row">
+                <div>
+                  {{ t('price-per-unit-above') }}
+                </div>
+                <div class="font-semibold">
+                  $ {{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="my-2">
+            <div class="text-lg font-bold">
+              {{ t('usage-title') }}
+            </div>
+            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
+            <div class="flex justify-between mt-2 row">
+              <div>
+                {{ t('base') }}
+              </div>
+              <div class="font-semibold">
+                $ {{ planUsage?.currentPlan?.price_m.toLocaleString() }}
+              </div>
+            </div>
+
+            <div v-if="planUsage?.isPayAsYouGo">
+              <hr class="my-1 border-t border-gray-300 opacity-50">
+              <div class="flex justify-between row">
+                <div>
+                  {{ t('used-in-period') }}
+                </div>
+                <div class="font-semibold">
+                  $ {{ planUsage?.totalUsagePrice.toLocaleString() }}
+                </div>
+              </div>
+              <hr class="my-1 border-t border-gray-300 opacity-50">
+              <div class="flex justify-between row">
+                <div>
+                  {{ t('usage-title') }}
+                </div>
+                <div class="font-semibold">
+                  $ {{ planUsage?.totalPrice.toLocaleString() }}
+                </div>
               </div>
             </div>
           </div>

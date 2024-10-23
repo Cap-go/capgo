@@ -500,8 +500,8 @@ async function onChangeAutoUpdate(event: Event) {
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-        <dl class="divide-y divide-gray-500">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+        <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
           <InfoRow :label="t('name')" :value="channel.name" />
           <!-- Bundle Number -->
           <template v-if="!channel.enable_ab_testing && !channel.enable_progressive_deploy">
@@ -540,8 +540,8 @@ async function onChangeAutoUpdate(event: Event) {
       </div>
     </div>
     <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-        <dl class="divide-y divide-gray-500">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+        <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
           <!-- <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
             </InfoRow> -->
           <InfoRow :label="t('channel-is-public')">
@@ -642,7 +642,7 @@ async function onChangeAutoUpdate(event: Event) {
       }"
     >
       <div
-        class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+        class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
         :class="{
           'md:mt-5 md:w-2/3': deviceIds.length !== 0,
           'my-auto w-fit': deviceIds.length === 0,

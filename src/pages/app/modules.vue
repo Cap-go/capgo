@@ -35,8 +35,8 @@ displayStore.defaultBack = '/app/home'
 
 <template>
   <div>
-    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-      <dl class="divide-y divide-gray-500">
+    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
         <InfoRow :label="t('discover-module-in-a')" :is-link="true" @click="openLink('https://github.com/riderx/awesome-capacitor')">
           <button class="ml-auto bg-transparent w-7 h-7">
             <IconNext />

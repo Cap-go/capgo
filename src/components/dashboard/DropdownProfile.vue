@@ -42,7 +42,7 @@ function logOut() {
     <details ref="dropdown" class="dropdown dropdown-top lg:hidden">
       <summary class="m-1 btn btn-outline btn-sm text-slate-800 dark:text-white">
         <img v-if="main.user?.image_url" class="w-6 h-6 mask mask-squircle" :src="main.user?.image_url" width="32" height="32" alt="User">
-        <div v-else class="flex items-center justify-center w-6 h-6 border border-black rounded-full dark:border-white">
+        <div v-else class="flex items-center justify-center w-6 h-6 border rounded-full border-slate-900 dark:border-slate-500">
           <p>{{ acronym }}</p>
         </div>
         <div class="flex items-center truncate">
@@ -87,7 +87,7 @@ function logOut() {
     <div class="hidden lg:flex lg:flex-col lg:space-y-2 lg:p-4 lg:bg-white lg:dark:bg-base-100 lg:rounded-box lg:shadow">
       <div class="flex items-center mb-4">
         <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 mask mask-squircle" :src="main.user?.image_url" alt="User">
-        <div v-else class="flex items-center justify-center w-10 h-10 mr-3 border border-black rounded-full dark:border-white">
+        <div v-else class="flex items-center justify-center w-10 h-10 mr-3 border rounded-full border-slate-900 dark:border-slate-500">
           <p>{{ acronym }}</p>
         </div>
         <div class="min-w-0">

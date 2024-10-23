@@ -421,8 +421,8 @@ function openChannel() {
         <br>
         {{ t('device-injected-2') }}
       </div>
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <dl :key="reloadCount" class="divide-y divide-gray-500">
+      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+        <dl :key="reloadCount" class="divide-y dark:divide-slate-200 dark:divide-slate-500">
           <InfoRow :label="t('device-id')" :value="device.device_id" />
           <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
           <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
@@ -457,7 +457,7 @@ function openChannel() {
       </div>
     </div>
     <div v-else-if="ActiveTab === 'logs'" id="devices" class="h-full md:py-4">
-      <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+      <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
         <LogTable
           class="p-3"
           :device-id="id"

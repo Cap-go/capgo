@@ -230,11 +230,11 @@ async function deleteOrganization() {
                 id="org-avatar" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded-full dark:border-white">
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
                 <p>{{ acronym }}</p>
               </div>
             </div>
-            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
               {{ t('change') }}
             </button>
           </div>
@@ -268,7 +268,7 @@ async function deleteOrganization() {
         </div>
       </div>
       <footer style="margin-top: auto">
-        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+        <div class="flex flex-col px-6 py-5 border-t border-slate-300">
           <div class="flex self-end">
             <button
               class="p-2 mb-2 mr-4 text-white border border-red-400 rounded-lg btn hover:bg-red-600"

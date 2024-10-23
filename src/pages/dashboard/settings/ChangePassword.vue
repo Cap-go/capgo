@@ -69,7 +69,7 @@ async function submit(form: { password: string, password_confirm: string }) {
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+        <div class="flex flex-col px-6 py-5 border-t border-slate-300">
           <div class="flex self-end">
             <button
               class="p-2 ml-3 text-white bg-blue-500 rounded btn hover:bg-blue-600"

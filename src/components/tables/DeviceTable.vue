@@ -223,16 +223,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Table
-    v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-    :total="total" row-click :element-list="elements"
-    filter-text="Filters"
-    :plus-button="true"
-    :is-loading="isLoading"
-    :search-placeholder="t('search-by-device-id')"
-    class="p-3" @reload="reload()"
-    @reset="refreshData()"
-    @row-click="openOne"
-  />
-  <AddDeviceOverwriteButton :app-id="props.appId" />
+  <div>
+    <Table
+      v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
+      :total="total" row-click :element-list="elements"
+      filter-text="Filters"
+      :plus-button="true"
+      :is-loading="isLoading"
+      :search-placeholder="t('search-by-device-id')"
+      @reload="reload()"
+      @reset="refreshData()"
+      @row-click="openOne"
+    />
+    <AddDeviceOverwriteButton :app-id="props.appId" />
+  </div>
 </template>

@@ -589,9 +589,9 @@ function preventInputChangePerm(event: Event) {
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
         <div
-          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
+          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
         >
-          <dl class="divide-y divide-gray-500">
+          <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
             <InfoRow v-if="version.created_at" :label="t('created-at')" :value="formatDate(version.created_at)" />
@@ -667,7 +667,7 @@ function preventInputChangePerm(event: Event) {
       </div>
       <div v-else-if="ActiveTab === 'devices'" id="devices" class="flex flex-col">
         <div
-          class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-200 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+          class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
         >
           <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
         </div>

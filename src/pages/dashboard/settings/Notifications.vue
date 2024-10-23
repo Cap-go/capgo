@@ -68,7 +68,7 @@ async function submitDoi() {
       </h2>
 
       <div class="w-full mx-auto dark:text-white">
-        <dl class="divide-y divide-gray-500">
+        <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
           <InfoRow :label="t('activation-notification')" :editable="false" :value="t('activation-notification-desc')">
             <Toggle
               :value="enableNotifications"

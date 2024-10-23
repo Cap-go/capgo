@@ -136,7 +136,7 @@ function reset() {
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col px-6 py-5 border-t border-slate-200">
+        <div class="flex flex-col px-6 py-5 border-t border-slate-300">
           <div class="flex self-end">
             <button
               v-if="oldId"

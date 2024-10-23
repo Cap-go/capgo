@@ -348,11 +348,11 @@ async function editPhoto() {
                 v-if="appRef?.icon_url" class="object-cover w-20 h-20 rounded" :src="appRef?.icon_url"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border border-black rounded dark:border-white">
+              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded border-slate-900 dark:border-slate-500">
                 <p>{{ acronym }}</p>
               </div>
             </div>
-            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-grey focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="editPhoto">
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="editPhoto">
               {{ t('change') }}
             </button>
           </div>
@@ -399,7 +399,7 @@ async function editPhoto() {
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col px-6 py-5 border-t dark:border-slate-200">
+        <div class="flex flex-col px-6 py-5 border-t dark:border-slate-600">
           <div class="flex self-end">
             <button v-if="isSuperAdmin" type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteApp()">
               {{ t('delete-app') }}

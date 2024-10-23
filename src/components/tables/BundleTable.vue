@@ -331,13 +331,15 @@ watch(props, async () => {
 </script>
 
 <template>
-  <Table
-    v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-    :total="total" row-click :element-list="elements"
-    filter-text="filters"
-    :is-loading="isLoading"
-    :search-placeholder="t('search-bundle-id')"
-    @reload="reload()" @reset="refreshData()"
-    @row-click="openOne"
-  />
+  <div>
+    <Table
+      v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
+      :total="total" row-click :element-list="elements"
+      filter-text="filters"
+      :is-loading="isLoading"
+      :search-placeholder="t('search-bundle-id')"
+      @reload="reload()" @reset="refreshData()"
+      @row-click="openOne"
+    />
+  </div>
 </template>

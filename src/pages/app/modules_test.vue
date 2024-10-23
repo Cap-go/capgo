@@ -164,8 +164,8 @@ displayStore.defaultBack = '/app/home'
 
 <template>
   <div>
-    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-200 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-      <dl class="divide-y divide-gray-500">
+    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
+      <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
         <InfoRow :label="t('available-in-the-san')" />
         <InfoRow v-for="(module, index) in modules" :key="index" :value="`with ${JSON.stringify(module.option)}`" :label="`${module.name}@${module.method}`" :is-link="true" @click="runMethod(module)">
           <button class="ml-auto bg-transparent w-7 h-7">

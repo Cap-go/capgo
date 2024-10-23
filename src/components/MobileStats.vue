@@ -98,7 +98,7 @@ function lastRunDate() {
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-200 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
+  <div class="flex flex-col bg-white border rounded-lg shadow-lg col-span-full border-slate-300 sm:col-span-6 xl:col-span-4 dark:border-slate-900 dark:bg-gray-800 h-[460px]">
     <div class="px-5 pt-3">
       <div class="flex flex-row items-center">
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
