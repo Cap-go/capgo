@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -8,7 +7,6 @@ import { openMessenger } from '~/services/bento'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
-const dropdown = useTemplateRef('dropdown')
 const router = useRouter()
 const main = useMainStore()
 const isMobile = ref(Capacitor.isNativePlatform())
@@ -22,14 +20,8 @@ const acronym = computed(() => {
     res = main.user?.last_name[0]
   return res.toUpperCase()
 })
-onClickOutside(dropdown, () => closeDropdown())
 function openSupport() {
   openMessenger()
-}
-function closeDropdown() {
-  if (dropdown.value) {
-    dropdown.value.removeAttribute('open')
-  }
 }
 
 function logOut() {
