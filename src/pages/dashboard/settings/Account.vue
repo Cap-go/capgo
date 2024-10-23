@@ -384,156 +384,158 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full pb-8 max-h-fit grow md:pb-0">
-    <FormKit id="update-account" type="form" :actions="false" @submit="submit">
-      <!-- Panel body -->
-      <div class="p-6 space-y-6">
-        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-          {{ t('personal-information') }}
-        </h2>
-        <div class="dark:text-gray-100">
-          {{ t('you-can-change-your-') }}
-        </div>
-        <!-- Picture -->
-        <section>
-          <div class="flex items-center">
-            <div class="mr-4">
-              <img
-                v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
-                width="80" height="80" alt="User upload"
-              >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
-                <p>{{ acronym }}</p>
+  <div>
+    <div class="h-full pb-8 max-h-fit grow md:pb-0">
+      <FormKit id="update-account" type="form" :actions="false" @submit="submit">
+        <!-- Panel body -->
+        <div class="p-6 space-y-6">
+          <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+            {{ t('personal-information') }}
+          </h2>
+          <div class="dark:text-gray-100">
+            {{ t('you-can-change-your-') }}
+          </div>
+          <!-- Picture -->
+          <section>
+            <div class="flex items-center">
+              <div class="mr-4">
+                <img
+                  v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
+                  width="80" height="80" alt="User upload"
+                >
+                <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
+                  <p>{{ acronym }}</p>
+                </div>
+              </div>
+              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+                {{ t('change') }}
+              </button>
+            </div>
+          </section>
+
+          <!-- Personal Info -->
+          <section>
+            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="text"
+                  name="first_name"
+                  autocomplete="given-name"
+                  :prefix-icon="iconName"
+                  :disabled="isLoading"
+                  :value="main.user?.first_name || ''"
+                  validation="required:trim"
+                  enterkeyhint="next"
+                  autofocus
+                  :label="t('first-name')"
+                />
+              </div>
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="text"
+                  name="last_name"
+                  autocomplete="family-name"
+                  :prefix-icon="iconName"
+                  :disabled="isLoading"
+                  enterkeyhint="next"
+                  :value="main.user?.last_name || ''"
+                  validation="required:trim"
+                  :label="t('last-name')"
+                />
               </div>
             </div>
-            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
-              {{ t('change') }}
-            </button>
-          </div>
-        </section>
+            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="email"
+                  name="email"
+                  :prefix-icon="iconEmail"
+                  :value="main.user?.email"
+                  enterkeyhint="next"
+                  validation="required:trim|email"
+                  :label="t('email')"
+                />
+              </div>
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="text"
+                  name="country"
+                  :prefix-icon="iconFlag"
+                  :disabled="isLoading"
+                  :value="main.user?.country || ''"
+                  enterkeyhint="send"
+                  validation="required:trim"
+                  :label="t('country')"
+                />
+              </div>
+            </div>
+            <FormKitMessages />
+          </section>
+          <h3 class="mt-2 mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+            {{ t('settings') }}
+          </h3>
+          <!-- Language Info -->
+          <section class="flex flex-col text-slate-800 dark:text-white md:flex-row md:items-center items-left">
+            <p class="">
+              {{ t('language') }}:
+            </p>
+            <div class="md:ml-6">
+              <LangSelector />
+            </div>
+          </section>
 
-        <!-- Personal Info -->
-        <section>
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
-            <div class="sm:w-1/2">
-              <FormKit
-                type="text"
-                name="first_name"
-                autocomplete="given-name"
-                :prefix-icon="iconName"
-                :disabled="isLoading"
-                :value="main.user?.first_name || ''"
-                validation="required:trim"
-                enterkeyhint="next"
-                autofocus
-                :label="t('first-name')"
-              />
+          <section class="flex flex-col md:flex-row md:items-center items-left">
+            <p class="text-slate-800 dark:text-white">
+              {{ t('2fa') }}:
+            </p>
+            <div class="md:ml-6">
+              <button
+                type="button"
+                class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
+                :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
+                @click="handleMfa"
+              >
+                {{ !mfaEnabled ? t('enable') : t('disable') }}
+              </button>
             </div>
-            <div class="sm:w-1/2">
-              <FormKit
-                type="text"
-                name="last_name"
-                autocomplete="family-name"
-                :prefix-icon="iconName"
-                :disabled="isLoading"
-                enterkeyhint="next"
-                :value="main.user?.last_name || ''"
-                validation="required:trim"
-                :label="t('last-name')"
-              />
+          </section>
+          <div class="flex flex-col md:flex-row md:items-center items-left">
+            <p class="text-slate-800 dark:text-white">
+              {{ t('account-id') }}:
+            </p>
+            <div class="md:ml-6">
+              <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
+                {{ t('copy-account-id') }}
+              </button>
             </div>
           </div>
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
-            <div class="sm:w-1/2">
-              <FormKit
-                type="email"
-                name="email"
-                :prefix-icon="iconEmail"
-                :value="main.user?.email"
-                enterkeyhint="next"
-                validation="required:trim|email"
-                :label="t('email')"
-              />
-            </div>
-            <div class="sm:w-1/2">
-              <FormKit
-                type="text"
-                name="country"
-                :prefix-icon="iconFlag"
-                :disabled="isLoading"
-                :value="main.user?.country || ''"
-                enterkeyhint="send"
-                validation="required:trim"
-                :label="t('country')"
-              />
-            </div>
-          </div>
-          <FormKitMessages />
-        </section>
-        <h3 class="mt-2 mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-          {{ t('settings') }}
-        </h3>
-        <!-- Language Info -->
-        <section class="flex flex-col text-slate-800 dark:text-white md:flex-row md:items-center items-left">
-          <p class="">
-            {{ t('language') }}:
-          </p>
-          <div class="md:ml-6">
-            <LangSelector />
-          </div>
-        </section>
-
-        <section class="flex flex-col md:flex-row md:items-center items-left">
-          <p class="text-slate-800 dark:text-white">
-            {{ t('2fa') }}:
-          </p>
-          <div class="md:ml-6">
-            <button
-              type="button"
-              class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800"
-              :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
-              @click="handleMfa"
-            >
-              {{ !mfaEnabled ? t('enable') : t('disable') }}
-            </button>
-          </div>
-        </section>
-        <div class="flex flex-col md:flex-row md:items-center items-left">
-          <p class="text-slate-800 dark:text-white">
-            {{ t('account-id') }}:
-          </p>
-          <div class="md:ml-6">
-            <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
-              {{ t('copy-account-id') }}
-            </button>
+          <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
+            <IconVersion /> <span class="pl-2"> {{ version }}</span>
           </div>
         </div>
-        <div class="flex mb-3 text-xs font-semibold uppercase text-slate-400 dark:text-white">
-          <IconVersion /> <span class="pl-2"> {{ version }}</span>
-        </div>
-      </div>
-      <!-- Panel footer -->
-      <footer>
-        <div class="flex flex-col px-6 py-5 border-t border-slate-300">
-          <div class="flex self-end">
-            <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
-              {{ t('delete-account') }}
-            </button>
-            <button
-              class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
-              type="submit"
-              color="secondary"
-              shape="round"
-            >
-              <span v-if="!isLoading" class="rounded-4xl">
-                {{ t('update') }}
-              </span>
-              <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-            </button>
+        <!-- Panel footer -->
+        <footer>
+          <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+            <div class="flex self-end">
+              <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
+                {{ t('delete-account') }}
+              </button>
+              <button
+                class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+                type="submit"
+                color="secondary"
+                shape="round"
+              >
+                <span v-if="!isLoading" class="rounded-4xl">
+                  {{ t('update') }}
+                </span>
+                <Spinner v-else size="w-8 h-8" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+              </button>
+            </div>
           </div>
-        </div>
-      </footer>
-    </FormKit>
+        </footer>
+      </FormKit>
+    </div>
   </div>
 </template>
 

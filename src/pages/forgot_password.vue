@@ -104,7 +104,7 @@ watchEffect(() => {
         </div>
 
         <div class="relative max-w-md mx-auto mt-8 md:mt-4">
-          <div class="overflow-hidden bg-white rounded-md shadow-md">
+          <div class="overflow-hidden rounded-md shadow-md bg-slate-800">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
               <FormKit id="forgot-pass" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5 text-gray-500">
@@ -120,9 +120,6 @@ watchEffect(() => {
                       validation="required:trim"
                     />
                     <template v-if="!!captchaKey">
-                      <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
-                        {{ t('captcha') }}
-                      </h1>
                       <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                     </template>
                     <FormKitMessages />
@@ -179,7 +176,7 @@ watchEffect(() => {
                 </div>
               </FormKit>
               <div class="flex flex-row justify-center w-full mt-5">
-                <router-link to="/login" class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline">
+                <router-link to="/login" class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline">
                   {{ t('back-to-login-page') }}
                 </router-link>
               </div>

@@ -591,7 +591,7 @@ function preventInputChangePerm(event: Event) {
         <div
           class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
         >
-          <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
+          <dl class="divide-y dark:divide-slate-200 divide-slate-500">
             <InfoRow :label="t('bundle-number')" :value="version.name" />
             <InfoRow :label="t('id')" :value="version.id.toString()" />
             <InfoRow v-if="version.created_at" :label="t('created-at')" :value="formatDate(version.created_at)" />

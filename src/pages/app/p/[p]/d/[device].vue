@@ -413,56 +413,58 @@ function openChannel() {
 </script>
 
 <template>
-  <div v-if="device" class="h-full md:py-4">
-    <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-    <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
-      <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
-        {{ t('device-injected') }}
-        <br>
-        {{ t('device-injected-2') }}
+  <div>
+    <div v-if="device" class="h-full md:py-4">
+      <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
+      <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
+        <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+          {{ t('device-injected') }}
+          <br>
+          {{ t('device-injected-2') }}
+        </div>
+        <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+          <dl :key="reloadCount" class="divide-y dark:divide-slate-200 divide-slate-500">
+            <InfoRow :label="t('device-id')" :value="device.device_id" />
+            <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
+            <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
+            <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
+            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
+            <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
+            <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
+            <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
+            <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click="openVersion()">
+              <select :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateVersionOverride">
+                <option value="none">
+                  {{ t('none') }}
+                </option>
+                <option v-for="vs in versions" :key="vs.id" :value="vs.id">
+                  {{ vs.name }}
+                </option>
+              </select>
+            </InfoRow>
+            <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name || ''" @click="openChannel()">
+              <select :value="channelDevice?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateChannelOverride">
+                <option value="none">
+                  {{ t('none') }}
+                </option>
+                <option v-for="ch in channels" :key="ch.id" :value="ch.id">
+                  {{ ch.name }}
+                </option>
+              </select>
+            </InfoRow>
+          </dl>
+        </div>
       </div>
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <dl :key="reloadCount" class="divide-y dark:divide-slate-200 dark:divide-slate-500">
-          <InfoRow :label="t('device-id')" :value="device.device_id" />
-          <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
-          <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
-          <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
-          <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
-          <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
-          <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
-          <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
-          <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
-          <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-          <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click="openVersion()">
-            <select :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateVersionOverride">
-              <option value="none">
-                {{ t('none') }}
-              </option>
-              <option v-for="vs in versions" :key="vs.id" :value="vs.id">
-                {{ vs.name }}
-              </option>
-            </select>
-          </InfoRow>
-          <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name || ''" @click="openChannel()">
-            <select :value="channelDevice?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateChannelOverride">
-              <option value="none">
-                {{ t('none') }}
-              </option>
-              <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-                {{ ch.name }}
-              </option>
-            </select>
-          </InfoRow>
-        </dl>
-      </div>
-    </div>
-    <div v-else-if="ActiveTab === 'logs'" id="devices" class="h-full md:py-4">
-      <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
-        <LogTable
-          class="p-3"
-          :device-id="id"
-          :app-id="packageId"
-        />
+      <div v-else-if="ActiveTab === 'logs'" id="devices" class="h-full md:py-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+          <LogTable
+            class="p-3"
+            :device-id="id"
+            :app-id="packageId"
+          />
+        </div>
       </div>
     </div>
   </div>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import IconSettings from '~icons/heroicons/cog-6-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -59,11 +58,6 @@ const tabs: Tab[] = [
     label: t('channel-forced-devices'),
     icon: IconDevice,
     key: 'devices',
-  },
-  {
-    label: t('settings'),
-    icon: IconSettings,
-    key: 'settings',
   },
 ]
 function openBundle() {
@@ -494,6 +488,22 @@ async function onChangeAutoUpdate(event: Event) {
   if (channel.value?.disable_auto_update)
     channel.value.disable_auto_update = value
 }
+
+function getBundleNumber() {
+  if (!channel.value?.enable_ab_testing && !channel.value?.enable_progressive_deploy)
+    return channel.value?.version.name
+  if (channel.value?.enable_ab_testing && !channel.value?.enable_progressive_deploy)
+    return `${channel.value?.version.name} / ${channel.value?.second_version.name}`
+  return (channel.value?.secondary_version_percentage !== 1) ? channel.value?.version.name : channel.value?.second_version.name
+}
+
+function getProgressivePercentage() {
+  if (channel.value?.secondary_version_percentage === 1)
+    return t('status-complete')
+  if (channel.value?.secondary_version_percentage)
+    return `${((channel.value?.secondary_version_percentage * 100) | 0)}%`
+  return t('status-failed')
+}
 </script>
 
 <template>
@@ -501,49 +511,79 @@ async function onChangeAutoUpdate(event: Event) {
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
     <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-        <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
-          <InfoRow :label="t('name')" :value="channel.name" />
+        <dl class="divide-y dark:divide-slate-200 divide-slate-500">
+          <InfoRow :label="t('name')">
+            {{ channel.name }}
+          </InfoRow>
           <!-- Bundle Number -->
           <template v-if="!channel.enable_ab_testing && !channel.enable_progressive_deploy">
-            <InfoRow :label="t('bundle-number')" :value="channel.version.name" :is-link="true" @click="openBundle()" />
-            <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')" :value="channel.version.min_update_version ?? t('undefined-fail')" />
+            <InfoRow :label="t('bundle-number')" :is-link="true" @click="openBundle()">
+              {{ channel.version.name }}
+            </InfoRow>
+            <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
+              {{ channel.version.min_update_version ?? t('undefined-fail') }}
+            </InfoRow>
           </template>
           <template v-else-if="channel.enable_ab_testing && !channel.enable_progressive_deploy">
-            <InfoRow :label="`${t('bundle-number')} A`" :value="channel.version.name" :is-link="true" @click="openBundle()" />
-            <InfoRow :label="`${t('bundle-number')} B`" :value="channel.second_version.name" :is-link="true" @click="openSecondBundle" />
+            <InfoRow :label="`${t('bundle-number')} A`" :is-link="true" @click="openBundle()">
+              {{ channel.version.name }}
+            </InfoRow>
+            <InfoRow :label="`${t('bundle-number')} B`" :is-link="true" @click="openSecondBundle">
+              {{ channel.second_version.name }}
+            </InfoRow>
             <template v-if="channel.disable_auto_update === 'version_number'">
-              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.min_update_version ?? t('undefined-fail')" />
-              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.second_version.min_update_version ?? t('undefined-fail')" />
+              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`">
+                {{ channel.version.min_update_version ?? t('undefined-fail') }}
+              </InfoRow>
+              <InfoRow :label="`${t('min-update-version')} B`">
+                {{ channel.second_version.min_update_version ?? t('undefined-fail') }}
+              </InfoRow>
             </template>
           </template>
           <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :value="(channel.secondary_version_percentage !== 1) ? channel.version.name : channel.second_version.name" :is-link="true" @click="openBundle()" />
-            <InfoRow :label="`${t('progressive-bundle-number')}`" :value="(channel.secondary_version_percentage !== 1) ? channel.second_version.name : channel.version.name" :is-link="true" @click="openSecondBundle" />
-            <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="(channel.secondary_version_percentage === 1) ? t('status-complete') : (channel.secondary_version_percentage !== 0 ? `${((channel.secondary_version_percentage * 100) | 0)}%` : t('status-failed'))" />
+            <InfoRow :label="`${t('main-bundle-number')}`" :is-link="true" @click="openBundle()">
+              {{ getBundleNumber() }}
+            </InfoRow>
+            <InfoRow :label="`${t('progressive-bundle-number')}`" :is-link="true" @click="openSecondBundle">
+              {{ getBundleNumber() }}
+            </InfoRow>
+            <InfoRow v-if="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`">
+              {{ getProgressivePercentage() }}
+            </InfoRow>
             <template v-if="channel.disable_auto_update === 'version_number'">
-              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.min_update_version ?? t('undefined-fail')" />
-              <InfoRow :label="`${t('min-update-version')} B`" :value="channel.second_version.min_update_version ?? t('undefined-fail')" />
-              <InfoRow :label="`${t('main-bundle-number')}`" :value="getVersion.name" :is-link="true" @click="openBundle()" />
-              <InfoRow :label="`${t('progressive-bundle-number')}`" :value="getVersion.name" :is-link="true" @click="openSecondBundle" />
-              <InfoRow v-id="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`" :value="getVersion.label" />
+              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`">
+                {{ channel.version.min_update_version ?? t('undefined-fail') }}
+              </InfoRow>
+              <InfoRow :label="`${t('min-update-version')} B`">
+                {{ channel.second_version.min_update_version ?? t('undefined-fail') }}
+              </InfoRow>
+              <InfoRow :label="`${t('main-bundle-number')}`" :is-link="true" @click="openBundle()">
+                {{ getVersion.name }}
+              </InfoRow>
+              <InfoRow :label="`${t('progressive-bundle-number')}`" :is-link="true" @click="openSecondBundle">
+                {{ getVersion.name }}
+              </InfoRow>
+              <InfoRow v-if="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`">
+                {{ getVersion.label }}
+              </InfoRow>
               <template v-if="channel.disable_auto_update === 'version_number'">
-                <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`" :value="channel.version.min_update_version ?? t('undefined-fail')" />
-                <InfoRow :label="`${t('min-update-version')} B`" :value="channel.second_version.min_update_version ?? t('undefined-fail')" />
+                <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`">
+                  {{ channel.version.min_update_version ?? t('undefined-fail') }}
+                </InfoRow>
+                <InfoRow :label="`${t('min-update-version')} B`">
+                  {{ channel.second_version.min_update_version ?? t('undefined-fail') }}
+                </InfoRow>
               </template>
             </template>
-            <!-- Created At -->
-            <InfoRow :label="t('created-at')" :value="formatDate(channel.created_at)" />
-            <!-- Last Update -->
-            <InfoRow :label="t('last-update')" :value="formatDate(channel.updated_at)" />
           </template>
-        </dl>
-      </div>
-    </div>
-    <div v-if="channel && ActiveTab === 'settings'" class="flex flex-col">
-      <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
-        <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
-          <!-- <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
-            </InfoRow> -->
+          <!-- Created At -->
+          <InfoRow :label="t('created-at')">
+            {{ formatDate(channel.created_at) }}
+          </InfoRow>
+          <!-- Last Update -->
+          <InfoRow :label="t('last-update')">
+            {{ formatDate(channel.updated_at) }}
+          </InfoRow>
           <InfoRow :label="t('channel-is-public')">
             <Toggle
               :value="channel?.public"

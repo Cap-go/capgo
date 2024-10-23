@@ -257,45 +257,47 @@ function canDelete(member: ExtendedOrganizationMember) {
 </script>
 
 <template>
-  <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0">
-    <div class="flex justify-between w-full">
-      <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-        {{ t('members') }}
-      </h2>
-      <button type="button" class="btn btn-outline btn-secondary" @click="showInviteModal">
-        <Plus />
-        <p class="hidden ml-2 md:block">
-          {{ t('add-member') }}
-        </p>
-      </button>
-    </div>
-    <div class="flex flex-col overflow-y-auto md:mx-auto md:mt-5 md:w-full ">
-      <dl id="members-div" class="divide-y dark:divide-slate-200 dark:divide-slate-500">
-        <div v-for="member in members" :key="member.id">
-          <div id="member-card" class="flex justify-between my-2 ml-2 md:my-6">
-            <div class="hidden md:flex">
-              <img
-                v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
-                width="80" height="80" alt="profile"
-              >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
-                <p>{{ acronym(member.email) }}</p>
+  <div>
+    <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0">
+      <div class="flex justify-between w-full">
+        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('members') }}
+        </h2>
+        <button type="button" class="btn btn-outline btn-secondary" @click="showInviteModal">
+          <Plus />
+          <p class="hidden ml-2 md:block">
+            {{ t('add-member') }}
+          </p>
+        </button>
+      </div>
+      <div class="flex flex-col overflow-y-auto md:mx-auto md:mt-5 md:w-full ">
+        <dl id="members-div" class="divide-y dark:divide-slate-200 divide-slate-500">
+          <div v-for="member in members" :key="member.id">
+            <div id="member-card" class="flex justify-between my-2 ml-2 md:my-6">
+              <div class="hidden md:flex">
+                <img
+                  v-if="member?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="member.image_url"
+                  width="80" height="80" alt="profile"
+                >
+                <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
+                  <p>{{ acronym(member.email) }}</p>
+                </div>
+              </div>
+              <div id="user-email" class="mt-auto mb-auto text-center ml-1/3 mr-1/3">
+                {{ `${member.email} (${member.role.replaceAll('_', ' ')})` }}
+              </div>
+              <div class="mt-auto mb-auto mr-4">
+                <button id="wrench-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canEdit(member), invisible: !canEdit(member) }" @click="changeMemberPermission(member)">
+                  <Wrench class="mr-4 text-lg text-[#397cea]" />
+                </button>
+                <button id="trash-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canDelete(member), invisible: !canDelete(member) }" @click="deleteMember(member)">
+                  <Trash class="mr-4 text-lg text-red-600" />
+                </button>
               </div>
             </div>
-            <div id="user-email" class="mt-auto mb-auto text-center ml-1/3 mr-1/3">
-              {{ `${member.email} (${member.role.replaceAll('_', ' ')})` }}
-            </div>
-            <div class="mt-auto mb-auto mr-4">
-              <button id="wrench-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canEdit(member), invisible: !canEdit(member) }" @click="changeMemberPermission(member)">
-                <Wrench class="mr-4 text-lg text-[#397cea]" />
-              </button>
-              <button id="trash-button" class="ml-4 bg-transparent w-7 h-7" :class="{ visible: canDelete(member), invisible: !canDelete(member) }" @click="deleteMember(member)">
-                <Trash class="mr-4 text-lg text-red-600" />
-              </button>
-            </div>
           </div>
-        </div>
-      </dl>
+        </dl>
+      </div>
     </div>
   </div>
 </template>

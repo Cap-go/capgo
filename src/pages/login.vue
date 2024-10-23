@@ -289,7 +289,7 @@ onMounted(checkLogin)
       </div>
 
       <div v-if="stauts === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
-        <div class="overflow-hidden bg-white rounded-md shadow-md">
+        <div class="overflow-hidden rounded-md shadow-md bg-slate-800">
           <div class="px-4 py-6 text-gray-500 sm:px-8 sm:py-7">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
@@ -307,9 +307,6 @@ onMounted(checkLogin)
                   />
                 </div>
                 <div v-if="!!captchaKey">
-                  <h1 class="text-neutral-700 text-sm font-bold !inline-flex mb-1">
-                    {{ t('captcha') }}
-                  </h1>
                   <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
                 <FormKitMessages />
@@ -341,7 +338,7 @@ onMounted(checkLogin)
                   <div class="">
                     <router-link
                       to="/resend_email"
-                      class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
+                      class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
                       {{ t('resend-confirm') }}
                     </router-link>
@@ -349,7 +346,7 @@ onMounted(checkLogin)
                   <div class="">
                     <a
                       href="https://capgo.app/register/"
-                      class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
+                      class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}
                     </a>
@@ -357,7 +354,7 @@ onMounted(checkLogin)
                   <div class="">
                     <router-link
                       to="/forgot_password"
-                      class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline"
+                      class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
                       {{ t('forgot') }} {{ t('password') }} ?
                     </router-link>

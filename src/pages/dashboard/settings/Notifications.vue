@@ -60,28 +60,30 @@ async function submitDoi() {
 </script>
 
 <template>
-  <div class="grow">
-    <!-- Panel body -->
-    <div class="p-6 space-y-6">
-      <h2 class="text-2xl font-bold text-slate-800 dark:text-white">
-        {{ t('my-notifications') }}
-      </h2>
+  <div>
+    <div class="grow">
+      <!-- Panel body -->
+      <div class="p-6 space-y-6">
+        <h2 class="text-2xl font-bold text-slate-800 dark:text-white">
+          {{ t('my-notifications') }}
+        </h2>
 
-      <div class="w-full mx-auto dark:text-white">
-        <dl class="divide-y dark:divide-slate-200 dark:divide-slate-500">
-          <InfoRow :label="t('activation-notification')" :editable="false" :value="t('activation-notification-desc')">
-            <Toggle
-              :value="enableNotifications"
-              @change="submitNotif()"
-            />
-          </InfoRow>
-          <InfoRow :label="t('activation-doi')" :editable="false" :value="t('activation-doi-desc')">
-            <Toggle
-              :value="optForNewsletters"
-              @change="submitDoi()"
-            />
-          </InfoRow>
-        </dl>
+        <div class="w-full mx-auto dark:text-white">
+          <dl class="divide-y dark:divide-slate-200 divide-slate-500">
+            <InfoRow :label="t('activation-notification')" :editable="false" :value="t('activation-notification-desc')">
+              <Toggle
+                :value="enableNotifications"
+                @change="submitNotif()"
+              />
+            </InfoRow>
+            <InfoRow :label="t('activation-doi')" :editable="false" :value="t('activation-doi-desc')">
+              <Toggle
+                :value="optForNewsletters"
+                @change="submitDoi()"
+              />
+            </InfoRow>
+          </dl>
+        </div>
       </div>
     </div>
   </div>

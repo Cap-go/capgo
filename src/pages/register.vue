@@ -77,7 +77,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
       </div>
 
       <div class="relative max-w-2xl mx-auto mt-4 md:mt-8">
-        <div class="overflow-hidden bg-white rounded-md shadow-md">
+        <div class="overflow-hidden rounded-md shadow-md bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages />
@@ -152,7 +152,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
 
                 <div class="col-span-2 text-center">
                   <p class="text-base text-gray-600">
-                    <a href="/login" title="" class="text-sm font-medium text-orange-400 transition-all duration-200 focus:text-orange-500 hover:text-orange-500 hover:underline">{{ t("already-account") }}</a>
+                    <a href="/login" title="" class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline">{{ t("already-account") }}</a>
                   </p>
                 </div>
               </div>

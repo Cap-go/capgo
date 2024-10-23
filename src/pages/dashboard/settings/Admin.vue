@@ -104,67 +104,69 @@ function reset() {
 </script>
 
 <template>
-  <div class="grow">
-    <FormKit id="set-uuid" type="form" :actions="false" @submit="submit">
-      <!-- Panel body -->
-      <div class="p-6 space-y-6">
-        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
-          Admin
-        </h2>
-        <!-- Personal Info -->
-        <section>
-          <h3 class="mb-1 text-xl font-bold leading-snug text-slate-800 dark:text-white">
-            Use the UUID of user you want to spoof
-          </h3>
+  <div>
+    <div class="grow">
+      <FormKit id="set-uuid" type="form" :actions="false" @submit="submit">
+        <!-- Panel body -->
+        <div class="p-6 space-y-6">
+          <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+            Admin
+          </h2>
+          <!-- Personal Info -->
+          <section>
+            <h3 class="mb-1 text-xl font-bold leading-snug text-slate-800 dark:text-white">
+              Use the UUID of user you want to spoof
+            </h3>
 
-          <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
-            <div class="sm:w-1/2">
-              <FormKit
-                type="text"
-                name="uuid"
-                :prefix-icon="iconPassword"
-                :disabled="isLoading"
-                enterkeyhint="send"
-                autofocus
-                validation="required:trim"
-                label="UUID"
-              />
+            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-x-4 sm:space-y-0">
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="text"
+                  name="uuid"
+                  :prefix-icon="iconPassword"
+                  :disabled="isLoading"
+                  enterkeyhint="send"
+                  autofocus
+                  validation="required:trim"
+                  label="UUID"
+                />
+              </div>
+            </div>
+          </section>
+          <FormKitMessages />
+        </div>
+        <!-- Panel footer -->
+        <footer>
+          <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+            <div class="flex self-end">
+              <button
+                v-if="oldId"
+                class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
+                color="secondary"
+                shape="round"
+                @click="reset()"
+              >
+                <span v-if="!isLoading" class="rounded-4xl">
+                  Reset
+                </span>
+                <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+              </button>
+              <button
+                class="p-2 text-blue-600 border border-blue-400 rounded-lg hover:bg-blue-600 hover:text-white"
+                type="submit"
+                color="secondary"
+                shape="round"
+              >
+                <span v-if="!isLoading" class="rounded-4xl">
+                  Spoof
+                </span>
+                <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+              </button>
             </div>
           </div>
-        </section>
-        <FormKitMessages />
-      </div>
-      <!-- Panel footer -->
-      <footer>
-        <div class="flex flex-col px-6 py-5 border-t border-slate-300">
-          <div class="flex self-end">
-            <button
-              v-if="oldId"
-              class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
-              color="secondary"
-              shape="round"
-              @click="reset()"
-            >
-              <span v-if="!isLoading" class="rounded-4xl">
-                Reset
-              </span>
-              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-            </button>
-            <button
-              class="p-2 text-blue-600 border border-blue-400 rounded-lg hover:bg-blue-600 hover:text-white"
-              type="submit"
-              color="secondary"
-              shape="round"
-            >
-              <span v-if="!isLoading" class="rounded-4xl">
-                Spoof
-              </span>
-              <Spinner v-else size="w-4 h-4" class="px-4" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-            </button>
-          </div>
-        </div>
-      </footer>
-    </FormKit>
+        </footer>
+      </FormKit>
+    </div>
   </div>
 </template>
 
