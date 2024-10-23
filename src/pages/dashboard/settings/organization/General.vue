@@ -214,15 +214,16 @@ async function deleteOrganization() {
 </script>
 
 <template>
-  <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0">
-    <!-- TODO Classes are not working -->
-    <FormKit id="update-org" type="form" :actions="false" class="min-h-[100%] flex flex-col justify-between" style="min-height: 100%; display: flex; flex-direction: column;" @submit="saveChanges">
-      <div>
-        <h2 class="mt-2 mb-5 text-2xl font-bold text-slate-800 dark:text-white">
+  <div class="h-full pb-8 max-h-fit grow md:pb-0">
+    <FormKit id="update-org" type="form" :actions="false" @submit="saveChanges">
+      <div class="p-6 space-y-6">
+        <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
           {{ t('general-information') }}
         </h2>
-        <div>{{ t('modify-org-info') }}</div>
-        <section class="mt-4">
+        <div clas="dark:text-gray-100">
+          {{ t('modify-org-info') }}
+        </div>
+        <section>
           <div class="flex items-center">
             <div class="mr-4">
               <img

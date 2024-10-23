@@ -391,7 +391,7 @@ onMounted(async () => {
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
           {{ t('personal-information') }}
         </h2>
-        <div class="text-sm dark:text-gray-100">
+        <div class="dark:text-gray-100">
           {{ t('you-can-change-your-') }}
         </div>
         <!-- Picture -->

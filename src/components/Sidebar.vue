@@ -72,8 +72,11 @@ const tabs = ref<Tab[]>([
   <div>
     <!-- Sidebar backdrop (mobile only) -->
     <div
-      class="fixed inset-0 z-40 transition-opacity duration-200 bg-slate-900 bg-opacity-30 lg:hidden"
-      :class="props.sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+      class="fixed inset-0 z-40 transition-opacity duration-200 bg-opacity-50 bg-slate-900 lg:hidden"
+      :class="{
+        'opacity-100': props.sidebarOpen,
+        'opacity-0 pointer-events-none': !props.sidebarOpen
+      }"
       aria-hidden="true"
       @click="emit('closeSidebar')"
     />
@@ -83,7 +86,10 @@ const tabs = ref<Tab[]>([
       id="sidebar"
       ref="sidebar"
       class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:mt-4 lg:h-[calc(100%-2rem)] lg:w-14 lg:translate-x-0 lg:overflow-y-auto lg:shadow-none 2xl:!w-64"
-      :class="props.sidebarOpen ? 'translate-x-0' : '-translate-x-[120%]'"
+      :class="{
+        'translate-x-0': props.sidebarOpen,
+        '-translate-x-[120%]': !props.sidebarOpen
+      }"
     >
       <!-- Sidebar header -->
       <div class="flex justify-between px-3 py-4 border-b border-slate-800">

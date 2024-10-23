@@ -146,20 +146,20 @@ displayStore.NavTitle = t('settings')
 
 <template>
   <div class="flex flex-col flex-1 h-full overflow-hidden">
-    <div class="text-sm font-medium text-center text-gray-500 bg-gray-200 dark:bg-gray-800 dark:text-gray-400">
+    <div class="text-center text-gray-500 bg-gray-200 dark:bg-gray-800 dark:text-gray-400">
       <ul class="flex flex-wrap -mb-px">
         <li class="mr-2">
           <a
-            class="inline-block p-4 border-b-2 rounded-t-lg cursor-pointer"
-            :class="type === 'user' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
+            class="inline-block p-4 rounded-t-lg cursor-pointer"
+            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'user', 'dark:hover:text-gray-300': type !== 'user' }"
             aria-current="page"
             @click="gotoMainSettings"
           >{{ t('your-settings') }}</a>
         </li>
         <li class="mr-2">
           <a
-            class="inline-block p-4 border-b-2 rounded-t-lg cursor-pointer"
-            :class="type === 'organization' ? 'text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500' : 'dark:hover:text-gray-300'"
+            class="inline-block p-4 rounded-t-lg cursor-pointer"
+            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'organization', 'dark:hover:text-gray-300': type !== 'organization' }"
             aria-current="page"
             @click="gotoOrgSettings"
           >{{ t('organization-settings') }} </a>
