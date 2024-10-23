@@ -77,7 +77,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
       </div>
 
       <div class="relative max-w-2xl mx-auto mt-4 md:mt-8">
-        <div class="overflow-hidden rounded-md shadow-md bg-slate-800">
+        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
               <FormKitMessages />

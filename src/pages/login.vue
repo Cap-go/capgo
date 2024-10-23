@@ -289,7 +289,7 @@ onMounted(checkLogin)
       </div>
 
       <div v-if="stauts === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
-        <div class="overflow-hidden rounded-md shadow-md bg-slate-800">
+        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 text-gray-500 sm:px-8 sm:py-7">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
@@ -374,7 +374,7 @@ onMounted(checkLogin)
         </section>
       </div>
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">
-        <div class="overflow-hidden rounded-md shadow-md bg-slate-800">
+        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
               <div class="space-y-5 text-gray-500">
