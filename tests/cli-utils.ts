@@ -9,12 +9,12 @@ import { APIKEY_TEST, BASE_URL } from './test-utils'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
-  "name": "test-cli-app",
+  "name": "%APPID%",
   "version": "1.0.0",
   "description": "An Amazing Test App",
   "dependencies": %DEPENDENCIES%,
   "devDependencies": {
-    "@capacitor/cli": "^5.4.1",
+    "@capacitor/cli": "^6.1.2",
     "typescript": "^5.2.2"
   },
   "author": ""
@@ -22,7 +22,7 @@ export const BASE_PACKAGE_JSON = `{
 export const BASE_DEPENDENCIES = {
   '@capacitor/android': '^6.0.0',
 }
-export const tempFileFolder = (id: string) => join(cwd(), `${TEMP_DIR_NAME}_${id}`)
+export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
 
 function generateDefaultJsonCliConfig(appId: string) {
   return {
@@ -54,11 +54,17 @@ const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(ap
 export default config;\n`
 }
 
-export function setDependencies(dependencies: Record<string, string>, id: string) {
+export function setDependencies(dependencies: Record<string, string>, id: string, appId: string) {
   // write package.json
   const pathPack = join(tempFileFolder(id), 'package.json')
-  const res = BASE_PACKAGE_JSON.replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
+  const res = BASE_PACKAGE_JSON.replace('%APPID%', appId).replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
   writeFileSync(pathPack, res)
+}
+
+// make a function to delete all temp folders
+export function deleteAllTempFolders() {
+  console.log('Deleting all temp folders')
+  rimrafSync(TEMP_DIR_NAME)
 }
 
 export async function prepareCli(appId: string, id: string) {
@@ -75,7 +81,7 @@ export async function prepareCli(appId: string, id: string) {
   mkdirSync(join(tempFileFolder(id), 'dist'), { recursive: true })
   writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(join(tempFileFolder(id), 'dist', 'index.html'), '')
-  setDependencies(BASE_DEPENDENCIES, id)
+  setDependencies(BASE_DEPENDENCIES, id, appId)
 
   npmInstall(id)
 }

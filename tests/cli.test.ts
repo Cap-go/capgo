@@ -5,18 +5,17 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 // import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { prepareCli, runCli, setDependencies, tempFileFolder } from './cli-utils'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { deleteAllTempFolders, prepareCli, runCli, setDependencies, tempFileFolder } from './cli-utils'
 import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, responseOk } from './test-utils'
 
-let semver = `1.0.${Date.now()}`
-
-function increaseSemver() {
+function getSemver(semver = `1.0.${Date.now()}`) {
   const lastNumber = Number.parseInt(semver.charAt(semver.length - 1))
   const newSemver = `${semver.slice(0, -1)}${(lastNumber + 1).toString()}`
-  semver = newSemver
+  return newSemver
 }
 
+// describe.concurrent('test CLI', () => {
 describe('test key generation', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
@@ -25,7 +24,7 @@ describe('test key generation', () => {
     await prepareCli(APPNAME, id)
   })
   it('test old key generation', async () => {
-  // set the key to an empty string. Otherwise runCli will not work
+    // set the key to an empty string. Otherwise runCli will not work
     const output = await runCli(['key_old', 'create', '--force'], id, true, '')
     expect(output).toContain('Private key saved in')
     const publicKeyPath = output.split('\n').find(val => val.includes('Public key saved in'))?.split(' ').at(-1)
@@ -76,6 +75,7 @@ describe('tests CLI upload', () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
   })
+  let semver = getSemver()
   it('should upload bundle successfully', async () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, true)
     expect(output).toContain('Bundle uploaded')
@@ -105,20 +105,20 @@ describe('tests CLI upload', () => {
     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
   })
   it('should not upload same twice', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
     expect(output).toContain('Cannot upload the same bundle content')
   })
   it ('should not upload same hash twice', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id, false)
-    increaseSemver()
+    semver = getSemver(semver)
 
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id, false)
     expect(output).toContain('Cannot upload the same bundle content')
   })
   it ('should upload an external bundle', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--external', 'https://example.com'], id, false)
     expect(output).toContain('Time to share your update to the world')
 
@@ -133,7 +133,7 @@ describe('tests CLI upload', () => {
     expect(data?.external_url).toBe('https://example.com')
   })
   it('test --iv-session-key with cloud upload', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb'], id, false)
     expect(output).toContain('Time to share your update to the world')
 
@@ -148,7 +148,7 @@ describe('tests CLI upload', () => {
     expect(data?.session_key).toBeNull()
   })
   it('test --iv-session-key with external upload', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb', '--external', 'https://example.com'], id, false)
     expect(output).toContain('Time to share your update to the world')
 
@@ -163,7 +163,7 @@ describe('tests CLI upload', () => {
     expect(data?.session_key).toBe('aaa:bbb')
   })
   it('test --encrypted-checksum with cloud upload', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa'], id, false)
     expect(output).toContain('Time to share your update to the world')
 
@@ -178,7 +178,7 @@ describe('tests CLI upload', () => {
     expect(data?.checksum).not.toBe('aaaa')
   })
   it('test --min-update-version', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0', '--ignore-checksum-check'], id, false)
     expect(output).toContain('Time to share your update to the world')
 
@@ -193,7 +193,7 @@ describe('tests CLI upload', () => {
     expect(data?.minUpdateVersion).not.toBe('1.0.0')
   })
   it('test --encrypted-checksum with external upload', async () => {
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa', '--external', 'https://example.com'], id, false)
     expect(output).toContain('Time to share your update to the world')
 
@@ -564,6 +564,7 @@ describe('tests CLI upload', () => {
 describe('tests Code check', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
+  let semver = getSemver()
   beforeEach(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
@@ -575,7 +576,7 @@ describe('tests Code check', () => {
   })
   it('test --no-code-check', async () => {
     rmSync(join(tempFileFolder(id), 'dist', 'index.html'))
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-code-check'], id, false)
     expect(output).toContain('Time to share your update to the world')
   })
@@ -584,6 +585,7 @@ describe('tests Code check', () => {
 describe('tests Wrong cases', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
+  let semver = getSemver()
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
@@ -591,14 +593,14 @@ describe('tests Wrong cases', () => {
   it('cannot upload with wrong api key', async () => {
     const testApiKey = randomUUID()
 
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
     expect(output).toContain('Invalid API key or insufficient permissions.')
   })
 
   it('should test selectable disallow upload', async () => {
     const supabase = getSupabaseClient()
-    increaseSemver()
+    semver = getSemver(semver)
     await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'production').eq('app_id', APPNAME)
     // test if is set correctly
     const { data: channel } = await supabase.from('channels').select('*').eq('name', 'production').eq('app_id', APPNAME).single()
@@ -620,6 +622,7 @@ describe('tests Wrong cases', () => {
 describe('tests CLI for organization', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
+  let semver = getSemver()
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
@@ -639,11 +642,11 @@ describe('tests CLI for organization', () => {
       return output
     }
 
-    increaseSemver()
+    semver = getSemver(semver)
     await uploadWithAutoFlagWithAssert(semver)
 
     const expected = semver
-    increaseSemver()
+    semver = getSemver(semver)
     await uploadWithAutoFlagWithAssert(expected)
     await supabase
       .from('app_versions')
@@ -653,7 +656,7 @@ describe('tests CLI for organization', () => {
     // this CLI uplaod won't actually succeed.
     // After increaseSemver, setting the min_update_version and native_packages will required the previous semver
     const prevSemver = semver
-    increaseSemver()
+    semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
     expect(output).toContain('skipping auto setting compatibility')
 
@@ -663,7 +666,7 @@ describe('tests CLI for organization', () => {
       .eq('name', prevSemver)
     expect(error2).toBeNull()
 
-    increaseSemver()
+    semver = getSemver(semver)
     const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
     expect(output2).toContain('it\'s your first upload with compatibility check')
   })
@@ -686,7 +689,7 @@ describe('tests CLI for organization', () => {
           .insert({ user_id: testUserId, org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', user_right: 'upload' })
 
         try {
-          increaseSemver()
+          semver = getSemver(semver)
           const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
           expect(output).toContain('Bundle uploaded')
         }
@@ -714,6 +717,7 @@ describe('tests CLI for organization', () => {
 describe('tests CLI metadata', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
+  const semver = getSemver()
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
@@ -738,14 +742,20 @@ describe('tests CLI metadata', () => {
 
     // await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', 'None', '❌')
 
-    // increaseSemver()
+    // semver = getSemver()
     await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id)
 
     await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', '6.0.0', '✅')
 
-    setDependencies({}, id)
+    setDependencies({}, id, APPNAME)
 
     // well, the local version doesn't exist, so I expect an empty string ???
     await assertCompatibilityTableColumns('@capacitor/android', '', '6.0.0', '❌')
   })
+})
+
+// })
+
+afterAll(() => {
+  deleteAllTempFolders()
 })
