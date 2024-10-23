@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
