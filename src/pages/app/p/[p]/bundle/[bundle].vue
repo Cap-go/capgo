@@ -591,33 +591,52 @@ function preventInputChangePerm(event: Event) {
         <div
           class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800"
         >
-          <dl class="divide-y dark:divide-slate-200 divide-slate-500">
-            <InfoRow :label="t('bundle-number')" :value="version.name" />
-            <InfoRow :label="t('id')" :value="version.id.toString()" />
-            <InfoRow v-if="version.created_at" :label="t('created-at')" :value="formatDate(version.created_at)" />
-            <InfoRow v-if="version.updated_at" :label="t('updated-at')" :value="formatDate(version.updated_at)" />
+          <dl class="divide-y dark:divide-slate-500 divide-slate-200">
+            <InfoRow :label="t('bundle-number')">
+              {{ version.name }}
+            </InfoRow>
+            <InfoRow :label="t('id')">
+              {{ version.id.toString() }}
+            </InfoRow>
+            <InfoRow v-if="version.created_at" :label="t('created-at')">
+              {{ formatDate(version.created_at) }}
+            </InfoRow>
+            <InfoRow v-if="version.updated_at" :label="t('updated-at')">
+              {{ formatDate(version.updated_at) }}
+            </InfoRow>
             <!-- Checksum -->
-            <InfoRow v-if="version.checksum" :label="t('checksum')" :value="version.checksum" />
+            <InfoRow v-if="version.checksum" :label="t('checksum')">
+              {{ version.checksum }}
+            </InfoRow>
             <!-- Min update version -->
             <InfoRow
               v-if="showBundleMetadataInput" id="metadata-bundle"
-              :label="t('min-update-version')" editable :value="version.min_update_version ?? ''"
+              :label="t('min-update-version')" editable
               :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
               @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
-            />
+            >
+              {{ version.min_update_version }}
+            </InfoRow>
+
             <!-- meta devices -->
-            <InfoRow v-if="version_meta?.devices" :label="t('devices')" :value="version_meta.devices.toLocaleString()" />
+            <InfoRow v-if="version_meta?.devices" :label="t('devices')">
+              {{ version_meta.devices.toLocaleString() }}
+            </InfoRow>
             <InfoRow
               v-if="version_meta?.installs" :label="t('install')"
-              :value="version_meta.installs.toLocaleString()"
-            />
+            >
+              {{ version_meta.installs.toLocaleString() }}
+            </InfoRow>
             <InfoRow
               v-if="version_meta?.uninstalls" :label="t('uninstall')"
-              :value="version_meta.uninstalls.toLocaleString()"
-            />
-            <InfoRow v-if="version_meta?.fails" :label="t('fail')" :value="version_meta.fails.toLocaleString()" />
+            >
+              {{ version_meta.uninstalls.toLocaleString() }}
+            </InfoRow>
+            <InfoRow v-if="version_meta?.fails" :label="t('fail')">
+              {{ version_meta.fails.toLocaleString() }}
+            </InfoRow>
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')" value="">
+            <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')">
               <template #start>
                 <span v-for="chn in bundleChannels" id="open-channel" :key="chn.id">
                   <span
@@ -646,21 +665,29 @@ function preventInputChangePerm(event: Event) {
               </template>
             </InfoRow>
             <InfoRow
-              v-else id="open-channel" :label="t('channel')" :value="t('set-bundle')" :is-link="true"
+              v-else id="open-channel" :label="t('channel')" :is-link="true"
               @click="openChannel(channel!, false)"
-            />
+            >
+              {{ t('set-bundle') }}
+            </InfoRow>
             <!-- session_key -->
             <InfoRow
-              v-if="version.session_key" :label="t('session_key')" :value="hideString(version.session_key)"
-              :is-link="true" @click="copyToast(version?.session_key || '')"
-            />
+              v-if="version.session_key" :label="t('session_key')" :is-link="true"
+              @click="copyToast(version?.session_key || '')"
+            >
+              {{ hideString(version.session_key) }}
+            </InfoRow>
             <!-- version.external_url -->
             <InfoRow
-              v-if="version.external_url" :label="t('url')" :value="version.external_url" :is-link="true"
+              v-if="version.external_url" :label="t('url')" :is-link="true"
               @click="copyToast(version?.external_url || '')"
-            />
+            >
+              {{ version.external_url }}
+            </InfoRow>
             <!-- size -->
-            <InfoRow :label="t('size')" :value="showSize" :is-link="true" @click="openDownload()" />
+            <InfoRow :label="t('size')" :is-link="true" @click="openDownload()">
+              {{ showSize }}
+            </InfoRow>
             <!-- <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" /> -->
           </dl>
         </div>
