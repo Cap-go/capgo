@@ -159,7 +159,7 @@ async function createNewOrg() {
 <template>
   <div>
     <details v-show="currentOrganization" ref="dropdown" class="w-full dropdown dropdown-end">
-      <summary class="justify-between w-full btn btn-outline btn-sm text-slate-800 dark:text-white">
+      <summary class="justify-between w-full btn btn-outline btn-sm text-slate-300 dark:text-white">
         <div class="w-4/5 text-left truncate">
           {{ currentOrganization?.name }}
         </div>

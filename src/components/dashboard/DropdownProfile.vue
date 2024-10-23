@@ -84,7 +84,7 @@ function logOut() {
       </ul>
     </details>
 
-    <div class="hidden lg:flex lg:flex-col lg:space-y-2 lg:p-4 lg:bg-white lg:dark:bg-base-100 lg:rounded-box lg:shadow">
+    <div class="hidden bg-gray-300 lg:flex lg:flex-col lg:space-y-2 lg:p-4 dark:bg-base-100 lg:rounded-box lg:shadow">
       <div class="flex items-center mb-4">
         <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 mask mask-squircle" :src="main.user?.image_url" alt="User">
         <div v-else class="flex items-center justify-center w-10 h-10 mr-3 border rounded-full border-slate-900 dark:border-slate-500">
