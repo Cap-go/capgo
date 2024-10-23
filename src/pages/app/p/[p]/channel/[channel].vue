@@ -509,7 +509,7 @@ function getProgressivePercentage() {
 <template>
   <div>
     <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
-    <div v-if="channel && ActiveTab === 'info'" class="flex flex-col">
+    <div v-if="channel && ActiveTab === 'info'" class="flex flex-col overflow-y-auto h-[calc(100vh-200px)]">
       <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800">
         <dl class="divide-y dark:divide-slate-500 divide-slate-200">
           <InfoRow :label="t('name')">
