@@ -47,8 +47,8 @@ async function nextLogin() {
 }
 
 async function submit(form: { email: string, password: string, code: string }) {
+  isLoading.value = true
   if (stauts.value === 'login') {
-    isLoading.value = true
     const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
@@ -136,9 +136,11 @@ async function submit(form: { email: string, password: string, code: string }) {
     if (verify.error) {
       toast.error(t('invalid-mfa-code'))
       console.error('verify error', verify.error)
+      isLoading.value = false
     }
     else {
       await nextLogin()
+      isLoading.value = false
     }
   }
 }
@@ -313,7 +315,7 @@ onMounted(checkLogin)
                 <div>
                   <div class="inline-flex items-center justify-center w-full">
                     <svg
-                      v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin"
+                      v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle dark:text-white animate-spin"
                       xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                     >
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -394,7 +396,7 @@ onMounted(checkLogin)
                 <div>
                   <div class="inline-flex items-center justify-center w-full">
                     <svg
-                      v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle animate-spin"
+                      v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle dark:text-white animate-spin"
                       xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                     >
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
