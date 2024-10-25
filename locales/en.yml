@@ -312,7 +312,7 @@ new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 next-run: Next update
-'no': 'no'
+no: no
 no-app-icon: This app does not have any app icon
 no-data: No Data
 no-permission: Insufficient permissions
@@ -416,7 +416,7 @@ select-default-upload-channel: Please select the default upload channel
 select-default-upload-channel-header: Select default channel
 select-style-of-deletion: Select the style of deletion
 select-style-of-deletion-msg: |-
-  Please select the way that you would like to delete this channel.
+  Please select the way that you would like to delete this bundle.
   It is recomended to go with the normal one.
   You can read about the difference $1
 select-user-perms: Select user's permissions
@@ -493,7 +493,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-'yes': 'yes'
+yes: yes
 you-can-change-your-: You can change your personal informations here.
 you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached
