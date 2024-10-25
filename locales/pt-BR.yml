@@ -278,8 +278,10 @@ latest_version: Pacote mais recente
 launch-bundle: Lançar pacote
 leaving: Saindo
 live-reload: Recarregamento ao vivo
+log-as: Comece a falsificar
 log-in: Conecte-se
 login-to-your-accoun: Faça login na sua conta
+logout: sair
 logs: Histórico
 main-bundle-number: Número do pacote principal
 major: Principal
@@ -424,6 +426,7 @@ resend: Reenviar
 resend-confirm: Reenviar e-mail de confirmação
 resend-email: Reenviar Email de Confirmação
 reset-password: Redefinir senha
+reset-spoofed-user: Pare de falsificar
 reset-your-password: Redefina sua senha
 save: Economizar
 save-changes: Salvar alterações

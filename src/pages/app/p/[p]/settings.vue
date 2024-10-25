@@ -345,11 +345,13 @@ async function editPhoto() {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="appRef?.icon_url" class="object-cover w-20 h-20 rounded" :src="appRef?.icon_url"
+                v-if="appRef?.icon_url" class="object-cover w-20 h-20 mask mask-squircle" :src="appRef?.icon_url"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded border-slate-900 dark:border-slate-500">
-                <p>{{ acronym }}</p>
+              <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                <span class="font-medium text-gray-300">
+                  {{ acronym }}
+                </span>
               </div>
             </div>
             <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="editPhoto">

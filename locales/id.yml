@@ -276,8 +276,10 @@ latest_version: Paket terbaru
 launch-bundle: Luncurkan bundel
 leaving: Meninggalkan
 live-reload: Muat ulang langsung
+log-as: Mulai melakukan spoofing
 log-in: Gabung
 login-to-your-accoun: masuk ke akun Anda
+logout: keluar
 logs: Log
 main-bundle-number: Nomor bundel utama
 major: Besar
@@ -420,6 +422,7 @@ resend: Kirim ulang
 resend-confirm: Kirim ulang email konfirmasi
 resend-email: Kirim Ulang Email Konfirmasi
 reset-password: Atur Ulang Kata Sandi
+reset-spoofed-user: Berhenti melakukan spoofing
 reset-your-password: Mereset password Anda
 save: Menghemat
 save-changes: Simpan perubahan

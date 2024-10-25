@@ -33,7 +33,6 @@ declare module 'vue-router/auto-routes' {
     '/app/package/[package]': RouteRecordInfo<'/app/package/[package]', '/app/package/:package', { package: ParamValue<true> }, { package: ParamValue<false> }>,
     '/dashboard/ApiKeys': RouteRecordInfo<'/dashboard/ApiKeys', '/dashboard/ApiKeys', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/Account': RouteRecordInfo<'/dashboard/settings/Account', '/dashboard/settings/Account', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/Admin': RouteRecordInfo<'/dashboard/settings/Admin', '/dashboard/settings/Admin', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/ChangePassword': RouteRecordInfo<'/dashboard/settings/ChangePassword', '/dashboard/settings/ChangePassword', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/Notifications': RouteRecordInfo<'/dashboard/settings/Notifications', '/dashboard/settings/Notifications', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/organization/General': RouteRecordInfo<'/dashboard/settings/organization/General', '/dashboard/settings/organization/General', Record<never, never>, Record<never, never>>,

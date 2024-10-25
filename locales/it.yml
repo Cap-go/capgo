@@ -286,8 +286,10 @@ latest_version: Ultimo pacchetto
 launch-bundle: Pacchetto di lancio
 leaving: In partenza
 live-reload: Ricarica dal vivo
+log-as: Inizia lo spoofing
 log-in: Login
 login-to-your-accoun: Accedi al tuo account
+logout: disconnetti
 logs: Registri
 main-bundle-number: Numero del pacchetto principale
 major: Maggiore
@@ -432,6 +434,7 @@ resend: >-
 resend-confirm: Reinvia email di conferma
 resend-email: Reenviar correo electrónico de confirmación
 reset-password: Resetta la password
+reset-spoofed-user: Smetti di falsificare
 reset-your-password: reimposta la tua password
 save: Salva
 save-changes: Salvare le modifiche

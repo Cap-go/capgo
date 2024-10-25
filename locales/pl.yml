@@ -278,8 +278,10 @@ latest_version: Najnowszy pakiet
 launch-bundle: Uruchom pakiet
 leaving: Odjazd
 live-reload: Przeładowanie na żywo
+log-as: Zacznij podszywać się
 log-in: Zaloguj sie
 login-to-your-accoun: Zaloguj się na swoje konto
+logout: wyloguj się
 logs: Logi
 main-bundle-number: Główny numer pakietu
 major: Główny
@@ -424,6 +426,7 @@ resend: Ponownie wyślij
 resend-confirm: Wyślij ponownie email potwierdzający
 resend-email: Wyślij ponownie email z potwierdzeniem
 reset-password: Zresetuj hasło
+reset-spoofed-user: Przestań podszywać się
 reset-your-password: Zresetuj swoje hasło
 save: Zapisuje
 save-changes: Zapisz zmiany

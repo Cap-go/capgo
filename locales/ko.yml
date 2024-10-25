@@ -265,8 +265,10 @@ latest_version: 최신 번들
 launch-bundle: 번들 실행
 leaving: 퇴거
 live-reload: 라이브 리로드
+log-as: 스푸핑 시작
 log-in: 로그인
 login-to-your-accoun: 계정에 로그인
+logout: 로그아웃
 logs: 로그
 main-bundle-number: 주요 번들 번호
 major: 주요한
@@ -399,6 +401,7 @@ resend: 재전송
 resend-confirm: 확인 이메일 다시 보내기
 resend-email: 확인 이메일 재전송
 reset-password: 암호를 재설정
+reset-spoofed-user: 스푸핑을 중단하십시오
 reset-your-password: 비밀번호를 재설정
 save: 저장
 save-changes: 변경 사항을 저장하다

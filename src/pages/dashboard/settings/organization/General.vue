@@ -232,8 +232,10 @@ async function deleteOrganization() {
                   id="org-avatar" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
                   width="80" height="80" alt="User upload"
                 >
-                <div v-else class="flex items-center justify-center w-20 h-20 text-4xl border rounded-full border-slate-900 dark:border-slate-500">
-                  <p>{{ acronym }}</p>
+                <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                  <span class="font-medium text-gray-300">
+                    {{ acronym }}
+                  </span>
                 </div>
               </div>
               <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">

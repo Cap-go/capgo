@@ -301,8 +301,10 @@ latest_version: Neuestes Paket
 launch-bundle: Bündel starten
 leaving: Verlassen
 live-reload: Live-Neuladen
+log-as: Beginnen Sie mit dem Spoofing
 log-in: Anmeldung
 login-to-your-accoun: Melde dich in deinem Konto an
+logout: Abmelden
 logs: Protokolle
 main-bundle-number: Hauptbündelnummer
 major: Wesentlich
@@ -459,6 +461,7 @@ resend: Erneut senden
 resend-confirm: Bestätigungsmail erneut senden
 resend-email: Bestätigungs-E-Mail erneut senden
 reset-password: Passwort zurücksetzen
+reset-spoofed-user: Hör auf zu fälschen
 reset-your-password: Setze dein Passwort zurück
 save: Speichert
 save-changes: Änderungen speichern

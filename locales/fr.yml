@@ -298,8 +298,10 @@ latest_version: Dernier paquet
 launch-bundle: Lancement du paquet
 leaving: Partir
 live-reload: Rechargement en direct
+log-as: Commencez le spoofing
 log-in: Se connecter
 login-to-your-accoun: Connectez-vous à votre compte
+logout: déconnexion
 logs: Bûches
 main-bundle-number: Numéro de paquet principal
 major: Majeur
@@ -442,6 +444,7 @@ resend: Renvoyer
 resend-confirm: Renvoyer l'email de confirmation
 resend-email: Renvoyer l'email de confirmation
 reset-password: Réinitialiser le mot de passe
+reset-spoofed-user: Arrêtez le spoofing
 reset-your-password: Réinitialisez votre mot de passe
 save: Économies
 save-changes: Enregistrer les modifications

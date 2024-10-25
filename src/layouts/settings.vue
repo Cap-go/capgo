@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
-import IconAdmin from '~icons/eos-icons/admin'
 import IconPlans from '~icons/material-symbols/price-change'
 import IconNotification from '~icons/mdi/message-notification'
 import IconPassword from '~icons/mdi/password'
@@ -120,16 +119,6 @@ watchEffect(() => {
   }
   else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
-  }
-  if ((main.isAdmin || isSpoofed()) && !tabs.value.find(tab => tab.label === 'admin')) {
-    tabs.value.push({
-      label: 'admin',
-      icon: shallowRef(IconAdmin) as any,
-      key: '/dashboard/settings/admin',
-    })
-  }
-  else if (!main.isAdmin && tabs.value.find(tab => tab.label === 'admin')) {
-    tabs.value = tabs.value.filter(tab => tab.label !== 'admin')
   }
 })
 

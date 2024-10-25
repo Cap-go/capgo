@@ -289,8 +289,10 @@ latest_version: Gói mới nhất
 launch-bundle: Khởi chạy gói
 leaving: Rời đi
 live-reload: tải lại trực tiếp
+log-as: Bắt đầu giả mạo
 log-in: Đăng nhập
 login-to-your-accoun: đăng nhập vào tài khoản của bạn
+logout: ''
 logs: Nhật ký
 main-bundle-number: Số gói chính
 major: Lớn lao
@@ -431,6 +433,7 @@ resend: Gửi lại
 resend-confirm: Gửi lại email xác nhận
 resend-email: Gửi lại email xác nhận
 reset-password: Đặt lại mật khẩu
+reset-spoofed-user: Dừng giả mạo
 reset-your-password: Đặt lại mật khẩu của bạn
 save: tiết kiệm
 save-changes: Lưu thay đổi
@@ -537,3 +540,4 @@ you-cannot-reuse: Bạn không thể sử dụng lại phiên bản gói này sa
 you-reached-the-limi: Đạt tới giới hạn
 your-settings: Cài đặt của bạn
 your-ussage: 'Cách sử dụng của bạn:'
+�a bạn:'

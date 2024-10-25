@@ -281,8 +281,10 @@ latest_version: Последний пакет
 launch-bundle: Пакет запуска
 leaving: Уход
 live-reload: Живая перезагрузка
+log-as: Начать подделку
 log-in: Авторизоваться
 login-to-your-accoun: Войдите в свой аккаунт
+logout: выход
 logs: Журналы
 main-bundle-number: Основной номер пакета
 major: Главный
@@ -425,6 +427,7 @@ resend: Повторно отправить
 resend-confirm: Повторно отправить подтверждение по электронной почте
 resend-email: Отправить письмо подтверждения еще раз
 reset-password: Сброс пароля
+reset-spoofed-user: Прекратите подделку
 reset-your-password: Сбросить пароль
 save: Сохраняет
 save-changes: Сохранить изменения

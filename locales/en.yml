@@ -266,8 +266,10 @@ latest_version: Latest bundle
 launch-bundle: Launch bundle
 leaving: Leaving
 live-reload: Live reload
+log-as: Start spoofing
 log-in: Log in
 login-to-your-accoun: Login to your account
+logout: logout
 logs: Logs
 main-bundle-number: Main bundle number
 major: Major
@@ -310,7 +312,7 @@ new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 next-run: Next update
-no: no
+'no': 'no'
 no-app-icon: This app does not have any app icon
 no-data: No Data
 no-permission: Insufficient permissions
@@ -398,6 +400,7 @@ resend: Resend
 resend-confirm: Resend confirmation email
 resend-email: Resend Confirmation Email
 reset-password: Reset Password
+reset-spoofed-user: Stop spoofing
 reset-your-password: Reset your password
 save: Saves
 save-changes: Save Changes
@@ -490,7 +493,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-yes: yes
+'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.
 you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached

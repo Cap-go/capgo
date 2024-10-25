@@ -274,8 +274,10 @@ latest_version: En son paket
 launch-bundle: Paketi başlat
 leaving: Ayrılıyorum
 live-reload: Canlı yeniden yükleme
+log-as: Sahtelemeye başla
 log-in: Giriş yapmak
 login-to-your-accoun: hesabınıza giriş yapın
+logout: ''
 logs: Kütükler
 main-bundle-number: Ana paket numarası
 major: Ana
@@ -416,6 +418,7 @@ resend: Tekrar gönder
 resend-confirm: Doğrulama epostasını yeniden gönder
 resend-email: Yeniden Onay E-postası Gönder
 reset-password: Şifreyi yenile
+reset-spoofed-user: Sahte yapmayı durdur
 reset-your-password: şifrenizi sıfırlayın
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
@@ -518,3 +521,4 @@ you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanam
 you-reached-the-limi: Sınıra ulaşıldı
 your-settings: Ayarlarınız
 your-ussage: 'Kullanımınız:'
+�mınız:'

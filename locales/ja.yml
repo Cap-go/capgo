@@ -265,8 +265,10 @@ latest_version: 最新バンドル
 launch-bundle: バンドルを起動
 leaving: 出発
 live-reload: ライブリロード
+log-as: スプーフィングを開始する
 log-in: ログイン
 login-to-your-accoun: あなたのアカウントにログイン
+logout: ログアウト
 logs: ログ
 main-bundle-number: メインバンドル番号
 major: 選考科目
@@ -399,6 +401,7 @@ resend: 再送信してください
 resend-confirm: 確認メールを再送信
 resend-email: 確認メールを再送してください
 reset-password: パスワードを再設定する
+reset-spoofed-user: スプーフィングをやめてください
 reset-your-password: あなたのパスワードをリセット
 save: セーブ
 save-changes: 変更内容を保存
