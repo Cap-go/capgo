@@ -24,7 +24,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     console.log({ requestId: c.get('requestId'), context: 'replicate_data', table, type, record, old_record })
 
-    const d1 = null// c.env.DB_REPLICATE as D1Database
+    const d1 = c.env.DB_REPLICATE as D1Database
 
     switch (type) {
       case 'INSERT':
