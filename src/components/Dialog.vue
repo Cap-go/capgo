@@ -128,6 +128,6 @@ onMounted(() => {
         </div>
       </div>
     </dialog>
-    <div v-if="displayStore.showDialog" class="fixed inset-0 z-40 bg-black bg-opacity-50" @click="close()"></div>
+    <div v-if="displayStore.showDialog" class="fixed inset-0 z-40 bg-black bg-opacity-50" @click="close()" />
   </div>
 </template>

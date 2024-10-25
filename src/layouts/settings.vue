@@ -10,13 +10,10 @@ import { ref, shallowRef, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Tab } from '~/components/comp_def'
 import { openPortal } from '~/services/stripe'
-import { isSpoofed } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
-import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const main = useMainStore()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
