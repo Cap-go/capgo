@@ -756,6 +756,6 @@ describe('tests CLI metadata', () => {
 
 // })
 
-afterAll(() => {
-  deleteAllTempFolders()
-})
+// afterAll(() => {
+//   deleteAllTempFolders()
+// })

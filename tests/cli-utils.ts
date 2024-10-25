@@ -60,13 +60,10 @@ export function setDependencies(dependencies: Record<string, string>, id: string
   const res = BASE_PACKAGE_JSON.replace('%APPID%', appId).replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
   writeFileSync(pathPack, res)
 }
-
-// make a function to delete all temp folders
 export function deleteAllTempFolders() {
   console.log('Deleting all temp folders')
   rimrafSync(TEMP_DIR_NAME)
 }
-
 export async function prepareCli(appId: string, id: string) {
   const defaultConfig = generateCliConfig(appId)
   // clean up temp folder
@@ -88,7 +85,7 @@ export async function prepareCli(appId: string, id: string) {
 
 function npmInstall(id: string) {
   try {
-    execSync(`${env.BUN_PATH ?? 'bun'} install`, { cwd: tempFileFolder(id), stdio: 'inherit' })
+    execSync('bun install', { cwd: tempFileFolder(id), stdio: 'inherit' })
   }
   catch (error) {
     console.error('bun install failed', error)
@@ -96,60 +93,19 @@ function npmInstall(id: string) {
   }
 }
 
-export async function runCliWithStdIn(params: string[], handleOutput: (dataIn: string) => string) {
-  let localCliPath = env.LOCAL_CLI_PATH
-  if (localCliPath === 'true') {
-    localCliPath = '../../CLI/dist/index.js'
-  }
-  const toResolve = Promise.withResolvers<string>()
-  let outData = ''
-  const child = spawn(localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx', [localCliPath || '\'@capgo/cli\'', ...params], {
-    stdio: ['pipe', 'pipe', 'pipe'], // Ensure you have access to stdin, stdout, stderr
-  })
-
-  // Collect data from stdout
-  child.stdout.on('data', (data) => {
-    outData += data.toString()
-    const inData = handleOutput(data.toString())
-    if (inData) {
-      child.stdin.write(inData)
-    }
-  })
-
-  // Collect data from stderr
-  child.stderr.on('data', (data) => {
-    outData += data.toString()
-    const inData = handleOutput(data.toString())
-    if (inData) {
-      child.stdin.write(inData)
-    }
-  })
-
-  child.on('close', (code) => {
-    if (code === 0) {
-      toResolve.resolve(outData)
-    }
-    else {
-      toResolve.reject(outData)
-    }
-  })
-
-  return toResolve.promise
-}
-
 export function runCli(params: string[], id: string, logOutput = false, overwriteApiKey?: string): string {
-  // console.log(params)
   let localCliPath = env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
     localCliPath = '../../CLI/dist/index.js'
   }
-  // console.log('localCliPath', localCliPath)
+  console.log('localCliPath', localCliPath)
   const command = [
     localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath || '\'@capgo/cli\'',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
   ].join(' ')
+  console.log('command', command)
 
   const options: ExecSyncOptions = {
     cwd: tempFileFolder(id),
@@ -160,6 +116,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
 
   try {
     const output = execSync(command, options)
+
     if (logOutput)
       console.log(output)
 
