@@ -112,40 +112,6 @@ app.get('/test_sentry', (c) => {
   throw new Error('Failed!')
 })
 
-// app.post('/test_d1', middlewareAPISecret, async (c) => {
-//   try {
-//     const body = await c.req.json()
-//     if (body.request) {
-//       const requestD1 = c.env.DB_DEVICES
-//         .prepare(body.request)
-//         .all()
-
-//       const res = await requestD1
-//       console.log('test d1 res', res)
-//       return c.json({ res })
-//     }
-//     else if (body.query && body.bind) {
-//       console.log('test d1 query', body.query)
-//       console.log('test d1 bind', body.bind, body.bind.length)
-//       const requestD1 = c.env.DB_DEVICES
-//         .prepare(body.query)
-//         .bind(...body.bind)
-//         .run()
-
-//       const res = await requestD1
-//       console.log('test d1 res', res)
-//       return c.json({ res })
-//     }
-//     else {
-//       return c.json({ error: 'Missing request' })
-//     }
-//   }
-//   catch (e) {
-//     console.error('Error d1', e)
-//     return c.json({ error: 'Error', e: JSON.stringify(e) })
-//   }
-// })
-
 // app.post('/test_analytics', middlewareAPISecret, async (c) => {
 //   try {
 //     const body = await c.req.json()

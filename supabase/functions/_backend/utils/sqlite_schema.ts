@@ -4,8 +4,8 @@ const boolean = customType<{ data: boolean }>({
   dataType() {
     return 'boolean'
   },
-  toDriver(value: boolean): string {
-    return value ? 'true' : 'false'
+  toDriver(value: boolean): boolean {
+    return value
   },
 })
 
@@ -20,9 +20,11 @@ export const apps = sqliteTable('apps', {
   last_version: text('last_version'),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
   retention: integer('retention', { mode: 'number' }).notNull().default(2592000),
+  default_upload_channel: text('default_upload_channel'),
 })
 export const app_versions = sqliteTable('app_versions', {
   id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: text('owner_org').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   app_id: text('app_id').notNull().references(() => apps.name),
   name: text('name').notNull(),
@@ -41,11 +43,12 @@ export const app_versions = sqliteTable('app_versions', {
 
 export const channels = sqliteTable('channels', {
   id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: text('owner_org').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   name: text('name').notNull(),
   app_id: text('app_id').notNull().references(() => apps.name),
   version: integer('version', { mode: 'number' }).notNull().references(() => app_versions.id),
-  created_by: text('created_by').notNull(),
+  created_by: text('created_by'),
   updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
   public: boolean('public').notNull().default(false),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
@@ -63,26 +66,34 @@ export const channels = sqliteTable('channels', {
 })
 
 export const devices_override = sqliteTable('devices_override', {
+  id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: text('owner_org').notNull(),
   device_id: text('device_id').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updated_at: integer('updated_at', { mode: 'timestamp' }),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
   version: integer('version', { mode: 'number' }).notNull().references(() => app_versions.id),
   app_id: text('app_id').notNull().references(() => apps.name),
-  created_by: text('created_by'),
 })
 
 export const channel_devices = sqliteTable('channel_devices', {
+  id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: text('owner_org').notNull(),
   device_id: text('device_id').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updated_at: integer('updated_at', { mode: 'timestamp' }),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
   channel_id: integer('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: text('app_id').notNull().references(() => apps.name),
-  created_by: text('created_by'),
 })
 
 export const orgs = sqliteTable('orgs', {
-  id: text('id').notNull(),
+  id: text('id').primaryKey().notNull(),
   created_by: text('created_by').notNull(),
+  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  logo: text('logo'),
+  name: text('name').notNull(),
+  management_email: text('management_email').notNull(),
+  customer_id: text('customer_id'),
 })
 
 export type AppVersionsType = typeof app_versions.$inferInsert

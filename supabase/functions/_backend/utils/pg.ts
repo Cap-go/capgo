@@ -59,7 +59,7 @@ export function getDrizzleClientD1(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     throw new Error('DB_REPLICATE is not set')
   }
-  return drizzleD1(c.env.DB_REPLICATE, { logger: true })
+  return drizzleD1(c.env.DB_REPLICATE)
 }
 
 export function getDrizzleClientD1Session(c: Context) {
@@ -94,6 +94,22 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
   return false
 }
 
+function getAlias() {
+  const versionAlias = alias(schema.app_versions, 'version')
+  const secondVersionAlias = alias(schema.app_versions, 'second_version')
+  const devicesOverrideAlias = alias(schema.devices_override, 'devices_override')
+  const channelDevicesAlias = alias(schema.channel_devices, 'channel_devices')
+  const channelAlias = alias(schema.channels, 'channels')
+  return { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias }
+}
+function getAliasV2() {
+  const versionAlias = aliasV2(schemaV2.app_versions, 'version')
+  const secondVersionAlias = aliasV2(schemaV2.app_versions, 'second_version')
+  const devicesOverrideAlias = aliasV2(schemaV2.devices_override, 'devices_override')
+  const channelDevicesAlias = aliasV2(schemaV2.channel_devices, 'channel_devices')
+  const channelAlias = aliasV2(schemaV2.channels, 'channels')
+  return { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias }
+}
 export async function requestInfosPostgres(
   platform: string,
   app_id: string,
@@ -102,22 +118,21 @@ export async function requestInfosPostgres(
   defaultChannel: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
 ) {
+  const { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias } = getAlias()
+
   const appVersions = drizzleCient
     .select({
-      id: schema.app_versions.id,
+      id: versionAlias.id,
     })
-    .from(schema.app_versions)
-    .where(or(eq(schema.app_versions.name, version_name), eq(schema.app_versions.app_id, app_id)))
+    .from(versionAlias)
+    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
-  const versionAlias = alias(schema.app_versions, 'version')
-  const secondVersionAlias = alias(schema.app_versions, 'second_version')
-
   const deviceOverwrite = drizzleCient
     .select({
-      device_id: schema.devices_override.device_id,
-      app_id: schema.devices_override.app_id,
+      device_id: devicesOverrideAlias.device_id,
+      app_id: devicesOverrideAlias.app_id,
       version: {
         id: versionAlias.id,
         name: versionAlias.name,
@@ -131,17 +146,17 @@ export async function requestInfosPostgres(
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
     })
-    .from(schema.devices_override)
-    .innerJoin(versionAlias, eq(schema.devices_override.version, versionAlias.id))
-    .where(and(eq(schema.devices_override.device_id, device_id), eq(schema.devices_override.app_id, app_id)))
+    .from(devicesOverrideAlias)
+    .innerJoin(versionAlias, eq(devicesOverrideAlias.version, versionAlias.id))
+    .where(and(eq(devicesOverrideAlias.device_id, device_id), eq(devicesOverrideAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
-  const channelDeviceReq = drizzleCient
+  const channelDevice = drizzleCient
     .select({
       channel_devices: {
-        device_id: schema.channel_devices.device_id,
-        app_id: sql<string>`${schema.channel_devices.app_id}`.as('cd_app_id'),
+        device_id: channelDevicesAlias.device_id,
+        app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
       },
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -168,29 +183,28 @@ export async function requestInfosPostgres(
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
       },
       channels: {
-        id: schema.channels.id,
-        name: schema.channels.name,
-        app_id: schema.channels.app_id,
-        allow_dev: schema.channels.allow_dev,
-        allow_emulator: schema.channels.allow_emulator,
-        disable_auto_update_under_native: schema.channels.disable_auto_update_under_native,
-        disable_auto_update: schema.channels.disable_auto_update,
-        ios: schema.channels.ios,
-        android: schema.channels.android,
-        secondary_version_percentage: schema.channels.secondary_version_percentage,
-        enable_progressive_deploy: schema.channels.enable_progressive_deploy,
-        enable_ab_testing: schema.channels.enable_ab_testing,
-        allow_device_self_set: schema.channels.allow_device_self_set,
-        public: schema.channels.public,
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        allow_dev: channelAlias.allow_dev,
+        allow_emulator: channelAlias.allow_emulator,
+        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
+        disable_auto_update: channelAlias.disable_auto_update,
+        ios: channelAlias.ios,
+        android: channelAlias.android,
+        secondary_version_percentage: channelAlias.secondary_version_percentage,
+        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
+        enable_ab_testing: channelAlias.enable_ab_testing,
+        allow_device_self_set: channelAlias.allow_device_self_set,
+        public: channelAlias.public,
       },
     },
     )
-    .from(schema.channel_devices)
-    .innerJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
-    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schema.channels.second_version, secondVersionAlias.id))
-    .where(and(eq(schema.channel_devices.device_id, device_id), eq(schema.channel_devices.app_id, app_id)))
-  const channelDevice = channelDeviceReq
+    .from(channelDevicesAlias)
+    .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
+    .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
@@ -223,34 +237,34 @@ export async function requestInfosPostgres(
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
       },
       channels: {
-        id: schema.channels.id,
-        name: schema.channels.name,
-        app_id: schema.channels.app_id,
-        allow_dev: schema.channels.allow_dev,
-        allow_emulator: schema.channels.allow_emulator,
-        disable_auto_update_under_native: schema.channels.disable_auto_update_under_native,
-        disable_auto_update: schema.channels.disable_auto_update,
-        ios: schema.channels.ios,
-        android: schema.channels.android,
-        secondary_version_percentage: schema.channels.secondary_version_percentage,
-        enable_progressive_deploy: schema.channels.enable_progressive_deploy,
-        enable_ab_testing: schema.channels.enable_ab_testing,
-        allow_device_self_set: schema.channels.allow_device_self_set,
-        public: schema.channels.public,
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        allow_dev: channelAlias.allow_dev,
+        allow_emulator: channelAlias.allow_emulator,
+        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
+        disable_auto_update: channelAlias.disable_auto_update,
+        ios: channelAlias.ios,
+        android: channelAlias.android,
+        secondary_version_percentage: channelAlias.secondary_version_percentage,
+        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
+        enable_ab_testing: channelAlias.enable_ab_testing,
+        allow_device_self_set: channelAlias.allow_device_self_set,
+        public: channelAlias.public,
       },
     })
-    .from(schema.channels)
-    .innerJoin(versionAlias, eq(schema.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schema.channels.second_version, secondVersionAlias.id))
+    .from(channelAlias)
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
     .where(!defaultChannel
       ? and(
-        eq(schema.channels.public, true),
-        eq(schema.channels.app_id, app_id),
-        eq(platform === 'android' ? schema.channels.android : schema.channels.ios, true),
+        eq(channelAlias.public, true),
+        eq(channelAlias.app_id, app_id),
+        eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
       )
       : and (
-        eq(schema.channels.app_id, app_id),
-        eq(schema.channels.name, defaultChannel),
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
       ),
     )
     .limit(1)
@@ -269,22 +283,22 @@ export async function requestInfosPostgresV2(
   defaultChannel: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ) {
+  const { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias } = getAliasV2()
+
   const appVersions = drizzleCient
     .select({
-      id: schemaV2.app_versions.id,
+      id: versionAlias.id,
     })
-    .from(schemaV2.app_versions)
-    .where(or(eq(schemaV2.app_versions.name, version_name), eq(schemaV2.app_versions.app_id, app_id)))
+    .from(versionAlias)
+    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
-
-  const versionAlias = aliasV2(schemaV2.app_versions, 'version')
-  const secondVersionAlias = aliasV2(schemaV2.app_versions, 'second_version')
+  console.error({ context: 'requestInfosPostgresV2 appVersions', appVersions })
 
   const deviceOverwrite = drizzleCient
     .select({
-      device_id: schemaV2.devices_override.device_id,
-      app_id: schemaV2.devices_override.app_id,
+      device_id: devicesOverrideAlias.device_id,
+      app_id: devicesOverrideAlias.app_id,
       version: {
         id: versionAlias.id,
         name: versionAlias.name,
@@ -298,17 +312,17 @@ export async function requestInfosPostgresV2(
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
     })
-    .from(schemaV2.devices_override)
-    .innerJoin(versionAlias, eq(schemaV2.devices_override.version, versionAlias.id))
-    .where(and(eq(schemaV2.devices_override.device_id, device_id), eq(schemaV2.devices_override.app_id, app_id)))
+    .from(devicesOverrideAlias)
+    .innerJoin(versionAlias, eq(devicesOverrideAlias.version, versionAlias.id))
+    .where(and(eq(devicesOverrideAlias.device_id, device_id), eq(devicesOverrideAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
-  const channelDeviceReq = drizzleCient
+  const channelDevice = drizzleCient
     .select({
       channel_devices: {
-        device_id: schemaV2.channel_devices.device_id,
-        app_id: sql<string>`${schemaV2.channel_devices.app_id}`.as('cd_app_id'),
+        device_id: channelDevicesAlias.device_id,
+        app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
       },
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -335,29 +349,28 @@ export async function requestInfosPostgresV2(
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
       },
       channels: {
-        id: schemaV2.channels.id,
-        name: schemaV2.channels.name,
-        app_id: schemaV2.channels.app_id,
-        allow_dev: schemaV2.channels.allow_dev,
-        allow_emulator: schemaV2.channels.allow_emulator,
-        disable_auto_update_under_native: schemaV2.channels.disable_auto_update_under_native,
-        disable_auto_update: schemaV2.channels.disable_auto_update,
-        ios: schemaV2.channels.ios,
-        android: schemaV2.channels.android,
-        secondary_version_percentage: schemaV2.channels.secondary_version_percentage,
-        enable_progressive_deploy: schemaV2.channels.enable_progressive_deploy,
-        enable_ab_testing: schemaV2.channels.enable_ab_testing,
-        allow_device_self_set: schemaV2.channels.allow_device_self_set,
-        public: schemaV2.channels.public,
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        allow_dev: channelAlias.allow_dev,
+        allow_emulator: channelAlias.allow_emulator,
+        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
+        disable_auto_update: channelAlias.disable_auto_update,
+        ios: channelAlias.ios,
+        android: channelAlias.android,
+        secondary_version_percentage: channelAlias.secondary_version_percentage,
+        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
+        enable_ab_testing: channelAlias.enable_ab_testing,
+        allow_device_self_set: channelAlias.allow_device_self_set,
+        public: channelAlias.public,
       },
     },
     )
-    .from(schemaV2.channel_devices)
-    .innerJoin(schemaV2.channels, eq(schemaV2.channel_devices.channel_id, schemaV2.channels.id))
-    .innerJoin(versionAlias, eq(schemaV2.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schemaV2.channels.second_version, secondVersionAlias.id))
-    .where(and(eq(schemaV2.channel_devices.device_id, device_id), eq(schemaV2.channel_devices.app_id, app_id)))
-  const channelDevice = channelDeviceReq
+    .from(channelDevicesAlias)
+    .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
+    .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
@@ -390,34 +403,34 @@ export async function requestInfosPostgresV2(
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
       },
       channels: {
-        id: schemaV2.channels.id,
-        name: schemaV2.channels.name,
-        app_id: schemaV2.channels.app_id,
-        allow_dev: schemaV2.channels.allow_dev,
-        allow_emulator: schemaV2.channels.allow_emulator,
-        disable_auto_update_under_native: schemaV2.channels.disable_auto_update_under_native,
-        disable_auto_update: schemaV2.channels.disable_auto_update,
-        ios: schemaV2.channels.ios,
-        android: schemaV2.channels.android,
-        secondary_version_percentage: schemaV2.channels.secondary_version_percentage,
-        enable_progressive_deploy: schemaV2.channels.enable_progressive_deploy,
-        enable_ab_testing: schemaV2.channels.enable_ab_testing,
-        allow_device_self_set: schemaV2.channels.allow_device_self_set,
-        public: schemaV2.channels.public,
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        allow_dev: channelAlias.allow_dev,
+        allow_emulator: channelAlias.allow_emulator,
+        disable_auto_update_under_native: channelAlias.disable_auto_update_under_native,
+        disable_auto_update: channelAlias.disable_auto_update,
+        ios: channelAlias.ios,
+        android: channelAlias.android,
+        secondary_version_percentage: channelAlias.secondary_version_percentage,
+        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
+        enable_ab_testing: channelAlias.enable_ab_testing,
+        allow_device_self_set: channelAlias.allow_device_self_set,
+        public: channelAlias.public,
       },
     })
-    .from(schemaV2.channels)
-    .innerJoin(versionAlias, eq(schemaV2.channels.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(schemaV2.channels.second_version, secondVersionAlias.id))
+    .from(channelAlias)
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
     .where(!defaultChannel
       ? and(
-        eq(schemaV2.channels.public, true),
-        eq(schemaV2.channels.app_id, app_id),
-        eq(platform === 'android' ? schemaV2.channels.android : schemaV2.channels.ios, true),
+        eq(channelAlias.public, true),
+        eq(channelAlias.app_id, app_id),
+        eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
       )
       : and (
-        eq(schemaV2.channels.app_id, app_id),
-        eq(schemaV2.channels.name, defaultChannel),
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
       ),
     )
     .limit(1)
@@ -425,7 +438,8 @@ export async function requestInfosPostgresV2(
 
   // promise all
   const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
-  return { versionData, channelData, channelOverride, devicesOverride } as any as ReturnType<typeof requestInfosPostgres>
+  console.error({ context: 'requestInfosPostgresV2 rres', devicesOverride, channelOverride, channelData, versionData })
+  return { versionData, channelData, channelOverride, devicesOverride }
 }
 
 export async function getAppOwnerPostgresV2(
