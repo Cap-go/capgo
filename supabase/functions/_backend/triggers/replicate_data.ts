@@ -50,7 +50,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
 // clean fields that are not in the d1 table
 function cleanFieldsAppVersions(record: any, table: string) {
-  // remove minUpdateVersion
+  // remove old fields
   if (table === 'app_versions') {
     delete record.minUpdateVersion
     delete record.native_packages
@@ -117,7 +117,7 @@ function updateRecord(c: Context, retry_count: number, d1: D1Database, table: st
 
   const query = `UPDATE ${table} SET ${setClause} WHERE id = ?`
   console.log({ requestId: c.get('requestId'), context: 'updateRecord', query, values })
-  asyncWrap(c, Promise.reject(new Error('rejected :)')), payload, retry_count)
+  asyncWrap(c, d1.prepare(query).bind(...values).run(), payload, retry_count)
 }
 
 function deleteRecord(c: Context, retry_count: number, d1: D1Database, table: string, old_record: any, payload: any) {

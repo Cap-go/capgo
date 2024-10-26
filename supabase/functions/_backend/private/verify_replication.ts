@@ -1,6 +1,5 @@
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
-import { BRES } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono()
@@ -30,9 +29,18 @@ async function syncMissingRows(c: Context, table: string, d1Count: number, pgCou
       break
 
     for (const row of pgData.data) {
-      const existsInD1 = await d1.prepare(`SELECT COUNT(*) as count FROM ${table} WHERE id = ?`).bind(row.id).first()
-      if (existsInD1?.count === 0) {
+      const existingRow = await d1.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first()
+      if (!existingRow) {
         await d1.prepare(`INSERT INTO ${table} (${Object.keys(row).join(', ')}) VALUES (${Object.keys(row).map(() => '?').join(', ')})`).bind(...Object.values(row)).run()
+      }
+      else if (table !== 'channel_devices') {
+        const updates = Object.entries(row)
+          .filter(([key, value]) => existingRow[key] !== value)
+          .map(([key, value]) => `${key} = ?`)
+        if (updates.length > 0) {
+          const updateQuery = `UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`
+          await d1.prepare(updateQuery).bind(...updates.map(([_, value]) => value), row.id).run()
+        }
       }
       lastId = row.id
     }
