@@ -20,32 +20,33 @@ async function deleteExtraRows(c: Context, table: string) {
 
   while (true) {
     try {
-      console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} from id ${lastId}` })
+      console.log({ requestId: c.get('requestId'), context: `Checking for extra rows in D1 for table ${table} from id ${lastId}` })
       const d1Data = await d1.prepare(`SELECT id FROM ${table} WHERE id > ? ORDER BY id ASC LIMIT ?`).bind(lastId, batchSize).all()
-      console.log({ requestId: c.get('requestId'), context: `Found ${d1Data.results.length} extra rows for table ${table} from id ${lastId}` })
+
       if (d1Data.error) {
-        console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: d1Data.error })
+        console.error({ requestId: c.get('requestId'), context: `Error fetching D1 data for table ${table}:`, error: d1Data.error })
         break
       }
       if (d1Data.results.length === 0) {
-        console.log({ requestId: c.get('requestId'), context: `No extra rows found for table ${table}` })
+        console.log({ requestId: c.get('requestId'), context: `No more rows to check in D1 for table ${table}` })
         break
       }
-      console.log({ requestId: c.get('requestId'), context: `Looping through ${d1Data.results.length} extra rows for table ${table}` })
+
       for (const row of d1Data.results) {
-        // search in supabase and delete in d1 if not found
-        try {
-          const supabaseData = await supabase.from(table as any).select('id').eq('id', row.id).single()
-          if (!supabaseData.data) {
-            console.log({ requestId: c.get('requestId'), context: `Deleting row for table ${table}`, id: row.id })
-            await d1.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(row.id).run()
-          }
+        const { data: supabaseData } = await supabase.from(table as any).select('id').eq('id', row.id).single()
+
+        if (!supabaseData) {
+          console.log({ requestId: c.get('requestId'), context: `Deleting extra row from D1 for table ${table}`, id: row.id })
+          await d1.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(row.id).run()
         }
-        catch (e) {
-          console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
-        }
+
+        lastId = row.id
       }
-      lastId = d1Data.results[d1Data.results.length - 1].id as any
+
+      if (d1Data.results.length < batchSize) {
+        console.log({ requestId: c.get('requestId'), context: `Finished checking all rows in D1 for table ${table}` })
+        break
+      }
     }
     catch (e) {
       console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
@@ -106,6 +107,10 @@ async function syncMissingRows(c: Context, table: string) {
           break
         }
       }
+      if (pgData.data.length < batchSize) {
+        console.log({ requestId: c.get('requestId'), context: `Finished syncing all missing rows for table ${table}` })
+        break
+      }
     }
     catch (e) {
       console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
@@ -164,6 +169,7 @@ app.get('/', async (c: Context) => {
         diffChannelDevices.d1 = d1Count
         diffChannelDevices.supabase = pgCount
         diffChannelDevices.percent = percent
+        return acc
       }
       if (d1Count <= pgCount) {
         console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table}` })
