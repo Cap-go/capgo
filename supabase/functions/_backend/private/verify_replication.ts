@@ -5,18 +5,53 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono()
 
-async function syncMissingRows(c: Context, table: string, d1Count: number, pgCount: number) {
-  if (d1Count >= pgCount)
-    return
-  // if (table === 'channel_devices')
-    // return
+// function to generate lastID for all table is 0 but for apps and orgs it's uuid 00000000-0000-0000-0000-000000000000
+function generateLastId(table: string) {
+  if (table === 'apps' || table === 'orgs')
+    return '00000000-0000-0000-0000-000000000000'
+  return 0
+}
 
+async function deleteExtraRows(c: Context, table: string) {
   const d1 = c.env.DB_REPLICATE as D1Database
   const supabase = supabaseAdmin(c)
   const batchSize = 1000
-  let lastId = 0
+  let lastId = generateLastId(table)
 
+  console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} starting from id ${lastId}` })
   while (true) {
+    console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} from id ${lastId}` })
+    const pgData = await d1.prepare(`SELECT id FROM ${table} WHERE id > ? ORDER BY id ASC LIMIT ?`).bind(lastId, batchSize).all()
+    console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} from id ${lastId}`, length: pgData.results.length })
+    if (pgData.error) {
+      console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: pgData.error })
+      break
+    }
+    if (pgData.results.length === 0) {
+      console.log({ requestId: c.get('requestId'), context: `No extra rows found for table ${table}` })
+      break
+    }
+    for (const row of pgData.results) {
+      // search in supabase and delete in d1 if not found
+      const supabaseData = await supabase.from(table as any).select('*').eq('id', row.id).single()
+      if (!supabaseData.data) {
+        console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table}`, id: row.id })
+        await d1.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(row.id).run()
+      }
+    }
+    lastId = pgData.results[pgData.results.length - 1].id as any
+  }
+}
+
+async function syncMissingRows(c: Context, table: string) {
+  const d1 = c.env.DB_REPLICATE as D1Database
+  const supabase = supabaseAdmin(c)
+  const batchSize = 1000
+  let lastId = generateLastId(table)
+
+  console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} starting from id ${lastId}` })
+  while (true) {
+    console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} from id ${lastId}` })
     const pgData = await supabase
       .from(table as any)
       .select('*')
@@ -24,15 +59,22 @@ async function syncMissingRows(c: Context, table: string, d1Count: number, pgCou
       .gt('id', lastId)
       .limit(batchSize)
 
-    if (pgData.error)
-      throw pgData.error
-    if (pgData.data.length === 0)
+    console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} from id ${lastId}`, length: pgData.data?.length })
+    if (pgData.error) {
+      console.error({ requestId: c.get('requestId'), context: `Error in syncMissingRows for table ${table}:`, error: pgData.error })
       break
+    }
+    if (pgData.data.length === 0) {
+      console.log({ requestId: c.get('requestId'), context: `No missing rows found for table ${table}` })
+      break
+    }
 
     for (const row of pgData.data) {
+      console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} starting from id ${lastId}` })
       const existingRow = await d1.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first()
       const cleanRow = cleanFieldsAppVersions(row, table)
       if (!existingRow) {
+        console.log({ requestId: c.get('requestId'), context: `inserting row for table ${table}`, id: row.id })
         await d1.prepare(`INSERT INTO ${table} (${Object.keys(cleanRow).join(', ')}) VALUES (${Object.keys(cleanRow).map(() => '?').join(', ')})`).bind(...Object.values(cleanRow)).run()
       }
       else {
@@ -41,6 +83,7 @@ async function syncMissingRows(c: Context, table: string, d1Count: number, pgCou
           .map(([key, value]) => `${key} = ?`)
         if (updates.length > 0) {
           const updateQuery = `UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`
+          console.log({ requestId: c.get('requestId'), context: `updating row for table ${table}`, id: row.id })
           await d1.prepare(updateQuery).bind(...updates.map(([_, value]) => value), row.id).run()
         }
       }
@@ -100,8 +143,13 @@ app.get('/', async (c: Context) => {
         diffChannelDevices.supabase = pgCount
         diffChannelDevices.percent = percent
       }
-      if (d1Count !== pgCount) {
-        c.executionCtx.waitUntil(syncMissingRows(c, table, d1Count, pgCount))
+      if (d1Count <= pgCount) {
+        console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table}` })
+        c.executionCtx.waitUntil(syncMissingRows(c, table))
+      }
+      else if (d1Count > pgCount) {
+        console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table}` })
+        c.executionCtx.waitUntil(deleteExtraRows(c, table))
       }
       return acc
     }, {} as Record<string, { d1: number, supabase: number, percent: number }>)
