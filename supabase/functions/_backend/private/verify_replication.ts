@@ -18,28 +18,39 @@ async function deleteExtraRows(c: Context, table: string) {
   const batchSize = 1000
   let lastId = generateLastId(table)
 
-  console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} starting from id ${lastId}` })
   while (true) {
-    console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} from id ${lastId}` })
-    const pgData = await d1.prepare(`SELECT id FROM ${table} WHERE id > ? ORDER BY id ASC LIMIT ?`).bind(lastId, batchSize).all()
-    console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} from id ${lastId}`, length: pgData.results.length })
-    if (pgData.error) {
-      console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: pgData.error })
-      break
-    }
-    if (pgData.results.length === 0) {
-      console.log({ requestId: c.get('requestId'), context: `No extra rows found for table ${table}` })
-      break
-    }
-    for (const row of pgData.results) {
-      // search in supabase and delete in d1 if not found
-      const supabaseData = await supabase.from(table as any).select('*').eq('id', row.id).single()
-      if (!supabaseData.data) {
-        console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table}`, id: row.id })
-        await d1.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(row.id).run()
+    try {
+      console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table} from id ${lastId}` })
+      const d1Data = await d1.prepare(`SELECT id FROM ${table} WHERE id > ? ORDER BY id ASC LIMIT ?`).bind(lastId, batchSize).all()
+      console.log({ requestId: c.get('requestId'), context: `Found ${d1Data.results.length} extra rows for table ${table} from id ${lastId}` })
+      if (d1Data.error) {
+        console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: d1Data.error })
+        break
       }
+      if (d1Data.results.length === 0) {
+        console.log({ requestId: c.get('requestId'), context: `No extra rows found for table ${table}` })
+        break
+      }
+      console.log({ requestId: c.get('requestId'), context: `Looping through ${d1Data.results.length} extra rows for table ${table}` })
+      for (const row of d1Data.results) {
+        // search in supabase and delete in d1 if not found
+        try {
+          const supabaseData = await supabase.from(table as any).select('id').eq('id', row.id).single()
+          if (!supabaseData.data) {
+            console.log({ requestId: c.get('requestId'), context: `Deleting row for table ${table}`, id: row.id })
+            await d1.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(row.id).run()
+          }
+        }
+        catch (e) {
+          console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
+        }
+      }
+      lastId = d1Data.results[d1Data.results.length - 1].id as any
     }
-    lastId = pgData.results[pgData.results.length - 1].id as any
+    catch (e) {
+      console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
+      break
+    }
   }
 }
 
@@ -49,45 +60,56 @@ async function syncMissingRows(c: Context, table: string) {
   const batchSize = 1000
   let lastId = generateLastId(table)
 
-  console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} starting from id ${lastId}` })
   while (true) {
-    console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} from id ${lastId}` })
-    const pgData = await supabase
-      .from(table as any)
-      .select('*')
-      .order('id', { ascending: true })
-      .gt('id', lastId)
-      .limit(batchSize)
+    try {
+      console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} from id ${lastId}` })
+      const pgData = await supabase
+        .from(table as any)
+        .select('*')
+        .order('id', { ascending: true })
+        .gt('id', lastId)
+        .limit(batchSize)
 
-    console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} from id ${lastId}`, length: pgData.data?.length })
-    if (pgData.error) {
-      console.error({ requestId: c.get('requestId'), context: `Error in syncMissingRows for table ${table}:`, error: pgData.error })
-      break
-    }
-    if (pgData.data.length === 0) {
-      console.log({ requestId: c.get('requestId'), context: `No missing rows found for table ${table}` })
-      break
-    }
-
-    for (const row of pgData.data) {
-      console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} starting from id ${lastId}` })
-      const existingRow = await d1.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first()
-      const cleanRow = cleanFieldsAppVersions(row, table)
-      if (!existingRow) {
-        console.log({ requestId: c.get('requestId'), context: `inserting row for table ${table}`, id: row.id })
-        await d1.prepare(`INSERT INTO ${table} (${Object.keys(cleanRow).join(', ')}) VALUES (${Object.keys(cleanRow).map(() => '?').join(', ')})`).bind(...Object.values(cleanRow)).run()
+      console.log({ requestId: c.get('requestId'), context: `Found ${pgData.data?.length} missing rows for table ${table} from id ${lastId}` })
+      if (pgData.error) {
+        console.error({ requestId: c.get('requestId'), context: `Error in syncMissingRows for table ${table}:`, error: pgData.error })
+        break
       }
-      else {
-        const updates = Object.entries(row)
-          .filter(([key, value]) => existingRow[key] !== value)
-          .map(([key, value]) => `${key} = ?`)
-        if (updates.length > 0) {
-          const updateQuery = `UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`
-          console.log({ requestId: c.get('requestId'), context: `updating row for table ${table}`, id: row.id })
-          await d1.prepare(updateQuery).bind(...updates.map(([_, value]) => value), row.id).run()
+      if (pgData.data.length === 0) {
+        console.log({ requestId: c.get('requestId'), context: `No missing rows found for table ${table}` })
+        break
+      }
+      console.log({ requestId: c.get('requestId'), context: `Looping through ${pgData.data.length} missing rows for table ${table}` })
+      for (const row of pgData.data) {
+        try {
+          console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} starting from id ${lastId}` })
+          const existingRow = await d1.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first()
+          const cleanRow = cleanFieldsAppVersions(row, table)
+          if (!existingRow) {
+            console.log({ requestId: c.get('requestId'), context: `inserting row for table ${table}`, id: row.id })
+            await d1.prepare(`INSERT INTO ${table} (${Object.keys(cleanRow).join(', ')}) VALUES (${Object.keys(cleanRow).map(() => '?').join(', ')})`).bind(...Object.values(cleanRow)).run()
+          }
+          else {
+            const updates = Object.entries(row)
+              .filter(([key, value]) => existingRow[key] !== value)
+              .map(([key, value]) => `${key} = ?`)
+            if (updates.length > 0) {
+              const updateQuery = `UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`
+              console.log({ requestId: c.get('requestId'), context: `updating row for table ${table}`, id: row.id })
+              await d1.prepare(updateQuery).bind(...updates.map(([_, value]) => value), row.id).run()
+            }
+          }
+          lastId = row.id
+        }
+        catch (e) {
+          console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
+          break
         }
       }
-      lastId = row.id
+    }
+    catch (e) {
+      console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
+      break
     }
   }
 }
