@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
+import { cleanFieldsAppVersions } from '../triggers/replicate_data.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono()
@@ -7,8 +8,8 @@ export const app = new Hono()
 async function syncMissingRows(c: Context, table: string, d1Count: number, pgCount: number) {
   if (d1Count >= pgCount)
     return
-  if (table === 'channel_devices')
-    return
+  // if (table === 'channel_devices')
+    // return
 
   const d1 = c.env.DB_REPLICATE as D1Database
   const supabase = supabaseAdmin(c)
@@ -30,10 +31,11 @@ async function syncMissingRows(c: Context, table: string, d1Count: number, pgCou
 
     for (const row of pgData.data) {
       const existingRow = await d1.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first()
+      const cleanRow = cleanFieldsAppVersions(row, table)
       if (!existingRow) {
-        await d1.prepare(`INSERT INTO ${table} (${Object.keys(row).join(', ')}) VALUES (${Object.keys(row).map(() => '?').join(', ')})`).bind(...Object.values(row)).run()
+        await d1.prepare(`INSERT INTO ${table} (${Object.keys(cleanRow).join(', ')}) VALUES (${Object.keys(cleanRow).map(() => '?').join(', ')})`).bind(...Object.values(cleanRow)).run()
       }
-      else if (table !== 'channel_devices') {
+      else {
         const updates = Object.entries(row)
           .filter(([key, value]) => existingRow[key] !== value)
           .map(([key, value]) => `${key} = ?`)
@@ -89,13 +91,14 @@ app.get('/', async (c: Context) => {
     const diff = tables.reduce((acc, table, index) => {
       const d1Count = (d1Counts[index]?.count as number) || 0
       const pgCount = pgCounts[index]?.count || 0
+      const percent = (pgCount - d1Count) / d1Count
       if (table !== 'channel_devices') {
-        acc[table] = { d1: d1Count, supabase: pgCount, percent: pgCount / d1Count }
+        acc[table] = { d1: d1Count, supabase: pgCount, percent }
       }
       else {
         diffChannelDevices.d1 = d1Count
         diffChannelDevices.supabase = pgCount
-        diffChannelDevices.percent = pgCount / d1Count
+        diffChannelDevices.percent = percent
       }
       if (d1Count !== pgCount) {
         c.executionCtx.waitUntil(syncMissingRows(c, table, d1Count, pgCount))

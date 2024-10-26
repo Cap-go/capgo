@@ -49,7 +49,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 })
 
 // clean fields that are not in the d1 table
-function cleanFieldsAppVersions(record: any, table: string) {
+export function cleanFieldsAppVersions(record: any, table: string) {
   // remove old fields
   if (table === 'app_versions') {
     delete record.minUpdateVersion
