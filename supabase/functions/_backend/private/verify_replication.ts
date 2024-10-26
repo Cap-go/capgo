@@ -87,7 +87,11 @@ app.get('/', async (c: Context) => {
     const totalRows = Object.values(diff).reduce((acc, table) => acc + table.d1, 0)
     const diffPercentage = Object.keys(diff).length / totalRows * 100
     if (diffPercentage < 1) {
-      return c.json(BRES)
+      return c.json({
+        status: 'ok',
+        diff,
+        diffPercentage,
+      })
     }
     else {
       return c.json({ status: 'Mismatch found', diff }, 200)
