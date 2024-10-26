@@ -81,28 +81,40 @@ app.get('/', async (c: Context) => {
       ),
     )
     console.log({ requestId: c.get('requestId'), context: 'pgCounts', pgCounts })
+    const diffChannelDevices = {
+      d1: 0,
+      supabase: 0,
+      percent: 0,
+    }
     const diff = tables.reduce((acc, table, index) => {
       const d1Count = (d1Counts[index]?.count as number) || 0
       const pgCount = pgCounts[index]?.count || 0
+      if (table !== 'channel_devices') {
+        acc[table] = { d1: d1Count, supabase: pgCount, percent: pgCount / d1Count }
+      }
+      else {
+        diffChannelDevices.d1 = d1Count
+        diffChannelDevices.supabase = pgCount
+        diffChannelDevices.percent = pgCount / d1Count
+      }
       if (d1Count !== pgCount) {
-        acc[table] = { d1: d1Count, supabase: pgCount }
         c.executionCtx.waitUntil(syncMissingRows(c, table, d1Count, pgCount))
       }
       return acc
-    }, {} as Record<string, { d1: number, supabase: number }>)
-
+    }, {} as Record<string, { d1: number, supabase: number, percent: number }>)
     // if diff less than 1% of total rows, consider it as synced
-    const totalRows = Object.values(diff).reduce((acc, table) => acc + table.d1, 0)
-    const diffPercentage = Object.keys(diff).length / totalRows * 100
-    if (diffPercentage < 1) {
+    const totalPercent = Object.values(diff).reduce((acc, table) => acc + table.percent, 0)
+    const diffPercentage = Object.keys(diff).length / totalPercent
+    if (diffPercentage < 2) {
       return c.json({
         status: 'ok',
         diff,
         diffPercentage,
+        diffChannelDevices,
       })
     }
     else {
-      return c.json({ status: 'Mismatch found', diff }, 200)
+      return c.json({ status: 'Mismatch found', diff, diffChannelDevices, diffPercentage }, 200)
     }
   }
   catch (e) {
