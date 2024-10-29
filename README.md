@@ -86,7 +86,7 @@ All official plugin are install and preconfigured
 - [TypeScript](https://www.typescriptlang.org/)
 - [bun](https://bun.sh/) - fast javascipt runtime, package manager, bundler, test runner an all-in-one toolkit
 - [critters](https://github.com/GoogleChromeLabs/critters) - Critical CSS
-- [Netlify](https://www.netlify.com/) - zero-config deployment
+- [Cloudflare](https://www.cloudflare.com/) - zero-config deployment
 - [VS Code Extensions](./.vscode/extensions.json)
   - [Vite](https://marketplace.visualstudio.com/items?itemName=antfu.vite) - Fire up Vite server automatically
   - [Volar](https://marketplace.visualstudio.com/items?itemName=johnsoncodehk.volar) - Vue 3 `<script setup>` IDE support
@@ -96,17 +96,6 @@ All official plugin are install and preconfigured
   - [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
 
 ## Usage
-
-### Build
-
-To build the App in mobile, run
-
-```bash
-bun install
-bun mobile
-```
-
-And you will see the generated file in `dist` that ready to be served.
 
 ### Deploy on Cloudflare Pages
 
@@ -205,3 +194,45 @@ This will seed the DB with demo data again.
 ```bash
 bun reset
 ```
+
+### Deploy Supabase self hosted
+
+To deploy the supabase instance self hosted, use the [Supabase offical guide](https://supabase.com/docs/guides/self-hosting).
+
+### Deploy Supabase cloud 
+
+To deploy the supabase instance on cloud, you need a paid account at $25/month.
+
+Link the project to the cloud with the following command:
+
+```bash
+supabase link
+```
+https://supabase.com/docs/reference/cli/supabase-link
+
+Then you need to push the migrations to the cloud with the following command:
+
+
+```bash
+supabase db push --linked
+```
+https://supabase.com/docs/reference/cli/supabase-migration-up
+
+And seed the DB with demo data:
+
+```bash
+supabase db seed
+```
+https://supabase.com/docs/reference/cli/supabase-seed-buckets
+
+
+### Build
+
+To build the webApp in mobile, to push to store, run
+
+```bash
+bun install
+bun mobile
+```
+
+And you will see the generated file in `dist` that ready to be served.
