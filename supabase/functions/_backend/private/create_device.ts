@@ -50,7 +50,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     if (appError) {
       console.error({ requestId: c.get('requestId'), context: 'app error', error: appError })
-      return c.json({ status: 'app_not_found' }, 400)
+      return c.json({ status: 'app_not_found', app_id: safeBody.app_id }, 400)
     }
 
     const userId = clientData.data.user.id

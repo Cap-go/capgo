@@ -67,6 +67,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
+        app_id,
       }, 200)
     }
     if (coerce) {

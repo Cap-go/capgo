@@ -19,7 +19,7 @@
     "@logsnag/node": "https://esm.sh/@logsnag/node@1.0.1?target=deno",
     "cron-schedule": "https://esm.sh/cron-schedule@5.0.1?target=deno",
     "drizzle-orm": "https://esm.sh/drizzle-orm@0.35.3?target=deno",
-    "drizzle-orm/d1": "https://esm.sh/drizzle-orm@0./d1?target=deno",
+    "drizzle-orm/d1": "https://esm.sh/drizzle-orm@0.35.3/d1?target=deno",
     "drizzle-orm/pg-core": "https://esm.sh/drizzle-orm@0.35.3/pg-core?target=deno",
     "drizzle-orm/sqlite-core": "https://esm.sh/drizzle-orm@0.35.3/sqlite-core?target=deno",
     "drizzle-orm/postgres-js": "https://esm.sh/drizzle-orm@0.35.3/postgres-js?target=deno",
