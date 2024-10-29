@@ -1144,13 +1144,6 @@ export type Database = {
             referencedRelation: "stripe_info"
             referencedColumns: ["customer_id"]
           },
-          {
-            foreignKeyName: "users_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
         ]
       }
       version_meta: {
@@ -1212,7 +1205,76 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      pg_stat_monitor: {
+        Row: {
+          application_name: string | null
+          blk_read_time: number | null
+          blk_write_time: number | null
+          bucket: number | null
+          bucket_done: boolean | null
+          bucket_start_time: string | null
+          calls: number | null
+          client_ip: unknown | null
+          cmd_type: number | null
+          cmd_type_text: string | null
+          comments: string | null
+          cpu_sys_time: number | null
+          cpu_user_time: number | null
+          datname: string | null
+          dbid: unknown | null
+          elevel: number | null
+          jit_emission_count: number | null
+          jit_emission_time: number | null
+          jit_functions: number | null
+          jit_generation_time: number | null
+          jit_inlining_count: number | null
+          jit_inlining_time: number | null
+          jit_optimization_count: number | null
+          jit_optimization_time: number | null
+          local_blks_dirtied: number | null
+          local_blks_hit: number | null
+          local_blks_read: number | null
+          local_blks_written: number | null
+          max_exec_time: number | null
+          max_plan_time: number | null
+          mean_exec_time: number | null
+          mean_plan_time: number | null
+          message: string | null
+          min_exec_time: number | null
+          min_plan_time: number | null
+          pgsm_query_id: number | null
+          planid: number | null
+          plans: number | null
+          query: string | null
+          query_plan: string | null
+          queryid: number | null
+          relations: string[] | null
+          resp_calls: string[] | null
+          rows: number | null
+          shared_blks_dirtied: number | null
+          shared_blks_hit: number | null
+          shared_blks_read: number | null
+          shared_blks_written: number | null
+          sqlcode: string | null
+          stddev_exec_time: number | null
+          stddev_plan_time: number | null
+          temp_blk_read_time: number | null
+          temp_blk_write_time: number | null
+          temp_blks_read: number | null
+          temp_blks_written: number | null
+          top_query: string | null
+          top_queryid: number | null
+          toplevel: boolean | null
+          total_exec_time: number | null
+          total_plan_time: number | null
+          userid: unknown | null
+          username: string | null
+          wal_bytes: number | null
+          wal_fpi: number | null
+          wal_records: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation_to_org: {
@@ -1300,6 +1362,12 @@ export type Database = {
           plan_name: string
           count: number
         }[]
+      }
+      decode_error_level: {
+        Args: {
+          elevel: number
+        }
+        Returns: string
       }
       delete_failed_jobs: {
         Args: Record<PropertyKey, never>
@@ -1392,6 +1460,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_cmd_type: {
+        Args: {
+          cmd_type: number
+        }
+        Returns: string
+      }
       get_current_plan_max_org: {
         Args: {
           orgid: string
@@ -1475,6 +1549,10 @@ export type Database = {
               uninstall: number
             }[]
           }
+      get_histogram_timings: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_identity:
         | {
             Args: Record<PropertyKey, never>
@@ -1718,6 +1796,7 @@ export type Database = {
       get_update_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
+          app_id: string
           failed: number
           install: number
           get: number
@@ -1800,6 +1879,13 @@ export type Database = {
           userid: string
         }
         Returns: boolean
+      }
+      histogram: {
+        Args: {
+          _bucket: number
+          _quryid: number
+        }
+        Returns: Record<string, unknown>[]
       }
       http_post_helper: {
         Args: {
@@ -1950,6 +2036,44 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      pg_stat_monitor_internal: {
+        Args: {
+          showtext: boolean
+        }
+        Returns: Record<string, unknown>[]
+      }
+      pg_stat_monitor_reset: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      pg_stat_monitor_version: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      pgsm_create_11_view: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pgsm_create_13_view: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pgsm_create_14_view: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pgsm_create_15_view: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pgsm_create_17_view: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      pgsm_create_view: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       process_cron_stats_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1977,6 +2101,10 @@ export type Database = {
       process_subscribed_orgs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      range: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
       }
       read_bandwidth_usage: {
         Args: {
@@ -2262,4 +2390,19 @@ export type Enums<
   ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
     ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof PublicSchema["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never

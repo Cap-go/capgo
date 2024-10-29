@@ -44,7 +44,6 @@
 
 https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
 
-
 - [Changing supabase](supabase/migration_guide.md)
 
 ## Plugins
@@ -52,7 +51,7 @@ https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
 All official plugin are install and preconfigured
 
 - [Action Sheet](https://github.com/ionic-team/capacitor-plugins/tree/main/action-sheet) - Provides access to native Action Sheets.
-- [App](https://github.com/ionic-team/capacitor-plugins/tree/main/app) - Handles high level App state and events. 
+- [App](https://github.com/ionic-team/capacitor-plugins/tree/main/app) - Handles high level App state and events.
 - [App Launcher](https://github.com/ionic-team/capacitor-plugins/tree/main/app-launcher) - Allows to check if an app can be opened and open it.
 - [Browser](https://github.com/ionic-team/capacitor-plugins/tree/main/browser) - Provides the ability to open an in-app browser and subscribe to browser events.
 - [Camera](https://github.com/ionic-team/capacitor-plugins/tree/main/camera) - Provides the ability to take a photo with the camera or choose an existing one from the photo album.
@@ -109,10 +108,23 @@ bun mobile
 
 And you will see the generated file in `dist` that ready to be served.
 
-### Deploy on Netlify
+### Deploy on Cloudflare Pages
 
-Go to [Netlify](https://app.netlify.com/start) and select your clone, `OK` along the way, and your App will be live in a minute.
+use the CLI to deploy preprod
 
+```bash
+bun run dev-build
+# then deploy
+bun run deploy:cloudflare_frontend:preprod
+```
+
+or Prod
+
+```bash
+bun run build
+# then deploy
+bun run deploy:cloudflare_frontend:prod
+```
 
 ### Development
 
@@ -128,7 +140,6 @@ You can install the `supabase` CLI globally with `bun install supabase -g` and y
 Alternatively, you can install the CLI inside this repo with `bun install supabase --save-dev` but to invoke it use: `./node_modules/supabase/bin/supabase`.
 
 The rest of this guide assumes that you installed the `supabase` CLI globally.
-
 
 #### Start Supabase DB Locally
 
@@ -151,8 +162,6 @@ Started supabase local development setup.
 service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
 ```
 
-
-
 #### Start Supabase DB and Functions Locally
 
 You need make sure Docker is running.
@@ -163,8 +172,7 @@ bun backend
 
 #### Start Frontend Locally
 
-Before starting the frontend, make sure you replace the value of `supa_anon.local` inside the file `configs.json` with the value of `anon key`. If `supabase` is already running, you can also obtain `anon key` from the output of `supabase status`.  
-
+Before starting the frontend, make sure you replace the value of `supa_anon.local` inside the file `configs.json` with the value of `anon key`. If `supabase` is already running, you can also obtain `anon key` from the output of `supabase status`.
 
 In another terminal, run the server with the necessary Netlify functions:
 
@@ -188,7 +196,6 @@ If the data is not fresh just reset the db with `supabase db reset`. The seed ha
 
 The *admin user* has admininstrative rights so he can impersonate other users.
 You can find the menu for that in the account section.
-
 
 #### Supabase DB Reset
 
