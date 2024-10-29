@@ -1,4 +1,3 @@
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -2037,43 +2036,46 @@ BEGIN
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'upload'::"user_min_right", null, null);
 
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
-    (901, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', now()),
-    (902, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', '67eeaff4-ae4c-49a6-8eb1-0875f5369de1', 'read', now()),
-    (903, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb', 'all', now()),
-    (911, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061b', 'upload', now()),
-    (912, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', now()),
-    (913, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', now()),
-    (916, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', now()),
-    (915, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now()),
-    (917, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now());
+    (1, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', now()),
+    (2, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', '67eeaff4-ae4c-49a6-8eb1-0875f5369de1', 'read', now()),
+    (3, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb', 'all', now()),
+    (4, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'c591b04e-cf29-4945-b9a0-776d0672061b', 'upload', now()),
+    (5, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '67eeaff4-ae4c-49a6-8eb1-0875f5369de0', 'read', now()),
+    (6, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'all', now()),
+    (7, now(), '6aa76066-55ef-4238-ade6-0b32334a4097', '985640ce-4031-4cfd-8095-d1d1066b6b3b', 'write', now()),
+    (8, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now()),
+    (9, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now());
 
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
     (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
 
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org") VALUES
-    (1884, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (1883, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (9655, now(), 'com.demo.app', '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (9654, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (9653, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (9652, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (9601, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+    (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (2, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (3, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (4, now(), 'com.demo.app', '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (5, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (6, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (7, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
 
-    INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-    (now(), 'com.demo.app', now(), '', 0, 9655, 10),
-    (now(), 'com.demo.app', now(), '3885ee49', 1012506, 9654, 10),
-    (now(), 'com.demo.app', now(), '9d4f798a', 1012529, 9653, 20),
-    (now(), 'com.demo.app', now(), '44913a9f', 1012541, 9652, 30),
-    (now(), 'com.demo.app', now(), '9f74e70a', 1012548, 9601, 40);
+    INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size", "devices") VALUES
+    (4,now(), 'com.demo.app', now(), '', 0, 10),
+    (3, now(), 'com.demo.app', now(), '3885ee49', 1012506, 10),
+    (5, now(), 'com.demo.app', now(), '9d4f798a', 1012529, 20),
+    (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
+    (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40);
 
     INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-    (22, now(), 'production', 'com.demo.app', 9654, now(), 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
-    (23, now(), 'no_access', 'com.demo.app', 9653, now(), 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
-    (24, now(), 'two_default', 'com.demo.app', 9654, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
+    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
+    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
+    PERFORM setval('apikeys_id_seq', 10, false);
+    PERFORM setval('app_versions_id_seq', 8, false);
+    PERFORM setval('channel_id_seq', 4, false);
 END;
 $_$;
 
@@ -2085,34 +2087,66 @@ CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data"("p_app_id" charact
 DECLARE
     org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
     user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097';
+    max_version_id bigint;
+    max_channel_id bigint;
 BEGIN
-
+    -- Lock the tables to prevent concurrent inserts
+    LOCK TABLE app_versions, channels IN EXCLUSIVE MODE;
+    
     -- Delete existing data for the specified app_id
     DELETE FROM channels WHERE app_id = p_app_id;
     DELETE FROM app_versions WHERE app_id = p_app_id;
     DELETE FROM apps WHERE app_id = p_app_id;
 
+    -- Get the current max ids and reset the sequences
+    SELECT COALESCE(MAX(id), 0) + 1 INTO max_version_id FROM app_versions;
+    SELECT COALESCE(MAX(id), 0) + 1 INTO max_channel_id FROM channels;
+    
+    -- Reset both sequences
+    PERFORM setval('app_versions_id_seq', max_version_id, false);
+    PERFORM setval('channel_id_seq', max_channel_id, false);
+
     -- Insert new app data
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id")
     VALUES (now(), p_app_id, '', 'Seeded App', '1.0.0', now(), org_id, user_id);
 
-    -- Insert app versions
-    INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org")
-    VALUES
-    (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
-    (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
-    (now(), p_app_id, '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', 'r2-direct', org_id),
-    (now(), p_app_id, '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', 'r2', org_id),
-    (now(), p_app_id, '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', 'r2', org_id),
-    (now(), p_app_id, '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id),
-    (now(), p_app_id, '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id);
-
-    -- Insert channels
+    -- Insert app versions in a single statement
+    WITH inserted_versions AS (
+        INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org")
+        VALUES 
+            (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
+            (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
+            (now(), p_app_id, '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', 'r2-direct', org_id),
+            (now(), p_app_id, '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', 'r2', org_id),
+            (now(), p_app_id, '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', 'r2', org_id),
+            (now(), p_app_id, '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id),
+            (now(), p_app_id, '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id)
+        RETURNING id, name
+    )
+    -- Insert channels using the version IDs from the CTE
     INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
-    VALUES
-    (now(), 'production', p_app_id, (SELECT id FROM app_versions WHERE app_id = p_app_id AND name = '1.0.0'), now(), 't', 't', 'major', 'f', 'f', 't', 't', 't', 't'),
-    (now(), 'no_access', p_app_id, (SELECT id FROM app_versions WHERE app_id = p_app_id AND name = '1.361.0'), now(), 'f', 't', 'major', 'f', 't', 't', 't', 't', 't'),
-    (now(), 'two_default', p_app_id, (SELECT id FROM app_versions WHERE app_id = p_app_id AND name = '1.0.0'), now(), 't', 't', 'major', 'f', 't', 'f', 't', 't', 't');
+    SELECT 
+        now(),
+        c.name,
+        p_app_id,
+        v.id,
+        now(),
+        c.is_public,
+        't',
+        'major',
+        'f',
+        c.ios,
+        c.android,
+        't',
+        't',
+        't'
+    FROM (
+        VALUES 
+            ('production', '1.0.0', true, false, true),
+            ('no_access', '1.361.0', false, true, true),
+            ('two_default', '1.0.0', true, true, false)
+    ) as c(name, version_name, is_public, ios, android)
+    JOIN inserted_versions v ON v.name = c.version_name;
 
 END;
 $$;
@@ -2133,7 +2167,7 @@ DECLARE
   random_storage BIGINT;
   random_file_size BIGINT;
   random_uuid UUID;
-  random_version_id BIGINT := 9654;
+  random_version_id BIGINT := 3;
   random_action VARCHAR(20);
   random_timestamp TIMESTAMP;
 BEGIN
@@ -2218,7 +2252,7 @@ DECLARE
   random_storage BIGINT;
   random_file_size BIGINT;
   random_uuid UUID;
-  random_version_id BIGINT := 9654;
+  random_version_id BIGINT := 3;
   random_action VARCHAR(20);
   random_timestamp TIMESTAMP;
 BEGIN
@@ -4008,46 +4042,46 @@ Requires:
   - pg_tle: https://github.com/aws/pg_tle
   - pgsql-http: https://github.com/pramsey/pgsql-http
 -- */
--- create extension if not exists http with schema extensions;
--- create extension if not exists pg_tle;
--- drop extension if exists "supabase-dbdev";
--- select pgtle.uninstall_extension_if_exists('supabase-dbdev');
--- select
---     pgtle.install_extension(
---         'supabase-dbdev',
---         resp.contents ->> 'version',
---         'PostgreSQL package manager',
---         resp.contents ->> 'sql'
---     )
--- from http(
---     (
---         'GET',
---         'https://api.database.dev/rest/v1/'
---         || 'package_versions?select=sql,version'
---         || '&package_name=eq.supabase-dbdev'
---         || '&order=version.desc'
---         || '&limit=1',
---         array[
---             (
---                 'apiKey',
---                 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJp'
---                 || 'c3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyY'
---                 || 'ndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzI'
---                 || 'sImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJ'
---                 || 'rzM0AQKsu_5k134s'
---             )::http_header
---         ],
---         null,
---         null
---     )
--- ) x,
--- lateral (
---     select
---         ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
--- ) resp(contents);
--- create extension "supabase-dbdev";
--- select dbdev.install('supabase-dbdev');
--- drop extension if exists "supabase-dbdev";
--- create extension "supabase-dbdev";
+create extension if not exists http with schema extensions;
+create extension if not exists pg_tle;
+drop extension if exists "supabase-dbdev";
+select pgtle.uninstall_extension_if_exists('supabase-dbdev');
+select
+    pgtle.install_extension(
+        'supabase-dbdev',
+        resp.contents ->> 'version',
+        'PostgreSQL package manager',
+        resp.contents ->> 'sql'
+    )
+from http(
+    (
+        'GET',
+        'https://api.database.dev/rest/v1/'
+        || 'package_versions?select=sql,version'
+        || '&package_name=eq.supabase-dbdev'
+        || '&order=version.desc'
+        || '&limit=1',
+        array[
+            (
+                'apiKey',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJp'
+                || 'c3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyY'
+                || 'ndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzI'
+                || 'sImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJ'
+                || 'rzM0AQKsu_5k134s'
+            )::http_header
+        ],
+        null,
+        null
+    )
+) x,
+lateral (
+    select
+        ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
+) resp(contents);
+create extension "supabase-dbdev";
+select dbdev.install('supabase-dbdev');
+drop extension if exists "supabase-dbdev";
+create extension "supabase-dbdev";
 
--- select dbdev.install('basejump-supabase_test_helpers');
+select dbdev.install('basejump-supabase_test_helpers');

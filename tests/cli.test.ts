@@ -86,6 +86,7 @@ describe('tests CLI upload', () => {
     await responseOk(response, 'Update new bundle')
 
     const responseJson = await response.json<{ url: string, version: string }>()
+    console.log('responseJson', responseJson)
     expect(responseJson.url).toBeDefined()
     expect(responseJson.version).toBe(semver)
 
@@ -128,6 +129,7 @@ describe('tests CLI upload', () => {
       .select('*')
       .eq('name', semver)
       .single()
+      .throwOnError()
 
     expect(error).toBeNull()
     expect(data?.external_url).toBe('https://example.com')
@@ -143,6 +145,7 @@ describe('tests CLI upload', () => {
       .select('*')
       .eq('name', semver)
       .single()
+      .throwOnError()
 
     expect(error).toBeNull()
     expect(data?.session_key).toBeNull()
@@ -158,6 +161,7 @@ describe('tests CLI upload', () => {
       .select('*')
       .eq('name', semver)
       .single()
+      .throwOnError()
 
     expect(error).toBeNull()
     expect(data?.session_key).toBe('aaa:bbb')
@@ -173,6 +177,7 @@ describe('tests CLI upload', () => {
       .select('*')
       .eq('name', semver)
       .single()
+      .throwOnError()
 
     expect(error).toBeNull()
     expect(data?.checksum).not.toBe('aaaa')
@@ -188,6 +193,7 @@ describe('tests CLI upload', () => {
       .select('*')
       .eq('name', semver)
       .single()
+      .throwOnError()
 
     expect(error).toBeNull()
     expect(data?.minUpdateVersion).not.toBe('1.0.0')
@@ -203,6 +209,7 @@ describe('tests CLI upload', () => {
       .select('*')
       .eq('name', semver)
       .single()
+      .throwOnError()
 
     expect(error).toBeNull()
     expect(data?.checksum).toBe('aaaa')
@@ -248,6 +255,7 @@ describe('tests CLI upload', () => {
 //         .eq('name', semver)
 //         .eq('app_id', APPNAME)
 //         .single()
+// .throwOnError()
 
 //       expect(error).toBeNull()
 //       expect(data?.checksum).toBe(checksum)
@@ -371,6 +379,7 @@ describe('tests CLI upload', () => {
 //         .eq('name', semver)
 //         .eq('app_id', APPNAME)
 //         .single()
+// .throwOnError()
 
 //       expect(error).toBeNull()
 //       expect(data?.checksum).not.toBe(checksum)
@@ -496,6 +505,7 @@ describe('tests CLI upload', () => {
 //       .select('*')
 //       .eq('name', semver)
 //       .single()
+// .throwOnError()
 
 //     expect(error).toBeNull()
 //     expect(data?.checksum).toBe(checksum)
@@ -538,6 +548,7 @@ describe('tests CLI upload', () => {
 //       .eq('name', semver)
 //       .eq('app_id', APPNAME)
 //       .single()
+// .throwOnError()
 
 //     expect(error).toBeNull()
 //     expect(data?.checksum).toBe(checksum)
@@ -601,9 +612,10 @@ describe('tests Wrong cases', () => {
   it('should test selectable disallow upload', async () => {
     const supabase = getSupabaseClient()
     semver = getSemver(semver)
-    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'production').eq('app_id', APPNAME)
+    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'production').eq('app_id', APPNAME).throwOnError()
+
     // test if is set correctly
-    const { data: channel } = await supabase.from('channels').select('*').eq('name', 'production').eq('app_id', APPNAME).single()
+    const { data: channel } = await supabase.from('channels').select('*').eq('name', 'production').eq('app_id', APPNAME).single().throwOnError()
     expect(channel?.disable_auto_update).toBe('version_number')
 
     try {
@@ -614,7 +626,7 @@ describe('tests Wrong cases', () => {
       expect(output2).toContain('should follow semver convention')
     }
     finally {
-      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APPNAME)
+      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APPNAME).throwOnError()
     }
   })
 })
@@ -631,7 +643,7 @@ describe('tests CLI for organization', () => {
   // todo: fix this test
   it('should test auto min version flag', async () => {
     const supabase = getSupabaseClient()
-    const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME)
+    const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()
     expect(error).toBeNull()
     const uploadWithAutoFlagWithAssert = async (expected: string) => {
       const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
@@ -652,6 +664,7 @@ describe('tests CLI for organization', () => {
       .from('app_versions')
       .update({ min_update_version: null })
       .eq('name', semver)
+      .throwOnError()
 
     // this CLI uplaod won't actually succeed.
     // After increaseSemver, setting the min_update_version and native_packages will required the previous semver
@@ -664,6 +677,7 @@ describe('tests CLI for organization', () => {
       .from('app_versions')
       .update({ min_update_version: null, native_packages: null })
       .eq('name', prevSemver)
+      .throwOnError()
     expect(error2).toBeNull()
 
     semver = getSemver(semver)
@@ -675,18 +689,21 @@ describe('tests CLI for organization', () => {
     const testApiKey = randomUUID()
     const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
     const supabase = getSupabaseClient()
-    await supabase.from('apikeys')
-      .insert({ key: testApiKey, user_id: testUserId, mode: 'upload', name: 'test' })
 
     try {
+      await supabase.from('apikeys')
+        .insert({ key: testApiKey, user_id: testUserId, mode: 'upload', name: 'test' })
+        .throwOnError()
       const { data: orgMembers } = await supabase.from('org_users')
         .delete()
         .eq('user_id', testUserId)
         .select('*')
+        .throwOnError()
 
       try {
         await supabase.from('org_users')
           .insert({ user_id: testUserId, org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', user_right: 'upload' })
+          .throwOnError()
 
         try {
           semver = getSemver(semver)
@@ -699,6 +716,7 @@ describe('tests CLI for organization', () => {
             .eq('user_id', testUserId)
             .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
             .eq('user_right', 'upload')
+            .throwOnError()
         }
       }
       finally {
@@ -710,6 +728,7 @@ describe('tests CLI for organization', () => {
         .delete()
         .eq('key', testApiKey)
         .eq('user_id', testUserId)
+        .throwOnError()
     }
   })
 })
@@ -753,7 +772,6 @@ describe('tests CLI metadata', () => {
     await assertCompatibilityTableColumns('@capacitor/android', '', '6.0.0', '❌')
   })
 })
-
 // })
 
 // afterAll(() => {

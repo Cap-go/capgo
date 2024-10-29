@@ -96,7 +96,7 @@ function npmInstall(id: string) {
 export function runCli(params: string[], id: string, logOutput = false, overwriteApiKey?: string): string {
   let localCliPath = env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
-    localCliPath = '../../CLI/dist/index.js'
+    localCliPath = '../../../CLI/dist/index.js'
   }
   console.log('localCliPath', localCliPath)
   const command = [

@@ -5,10 +5,10 @@ import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
 import ky from 'ky'
 import { getEnv } from './utils.ts'
 
-export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) {
-  const access_key_id = uploadKey ? getEnv(c, 'S3_ACCESS_KEY_ID_UPLOAD') : getEnv(c, 'S3_ACCESS_KEY_ID')
-  const access_key_secret = uploadKey ? getEnv(c, 'S3_SECRET_ACCESS_KEY_UPLOAD') : getEnv(c, 'S3_SECRET_ACCESS_KEY')
-  const storageEndpoint = !clientSideOnly ? getEnv(c, 'S3_ENDPOINT') : getEnv(c, 'S3_ENDPOINT').replace('host.docker.internal', '0.0.0.0')
+export function initS3(c: Context) {
+  const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
+  const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
+  const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const useSsl = getEnv(c, 'S3_SSL') !== 'false'
 
   const storageRegion = getEnv(c, 'S3_REGION')
@@ -19,8 +19,9 @@ export function initS3(c: Context, uploadKey = false, clientSideOnly?: boolean) 
     },
     endpoint: `${useSsl ? 'https' : 'http'}://${storageEndpoint}`,
     region: storageRegion ?? 'us-east-1',
-    forcePathStyle: true,
-    signingEscapePath: true,
+    // not apply in supabase local
+    forcePathStyle: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
+    signingEscapePath: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
   }
 
   console.log({ requestId: c.get('requestId'), context: 'initS3', params })
@@ -48,7 +49,7 @@ export async function getPath(c: Context, record: Database['public']['Tables']['
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
-  const client = initS3(c, true, true)
+  const client = initS3(c)
 
   const command = new PutObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
@@ -86,7 +87,7 @@ async function checkIfExist(c: Context, fileId: string) {
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initS3(c, false, true)
+  const client = initS3(c)
   const command = new GetObjectCommand({
     Bucket: getEnv(c, 'S3_BUCKET'),
     Key: fileId,

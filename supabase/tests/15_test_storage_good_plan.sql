@@ -25,7 +25,7 @@ BEGIN
 
     -- let's devide the plan storage by half and put it. 
     INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-    (now(), 'com.demo.app', now(), '3885ee49', FLOOR(plan.storage / 2), 9654, 10);
+    (now(), 'com.demo.app', now(), '3885ee49', FLOOR(plan.storage / 2), 3, 10);
 
     SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
     RETURN NEXT IS(usage.storage_percent, (SELECT CAST ('50' AS DOUBLE PRECISION)), format('Storage usage = 50%% for "%s" plan', plan.name));
@@ -34,10 +34,10 @@ BEGIN
     -- let's now set the storage to 200% and see if it's blocked
     TRUNCATE TABLE "public"."app_versions_meta" CASCADE;
     INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-    (now(), 'com.demo.app', now(), '3885ee49', FLOOR(plan.storage * 2), 9654, 10);
+    (now(), 'com.demo.app', now(), '3885ee49', FLOOR(plan.storage * 2), 3, 10);
 
     SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
-    raise notice '%s %s', plan.name, usage;
+    -- raise notice '%s %s', plan.name, usage;
     RETURN NEXT IS(usage.storage_percent, (SELECT CAST ('200' AS DOUBLE PRECISION)), format('Storage usage = 200%% for "%s" plan', plan.name));
 
     IF plan.name IS DISTINCT FROM 'Pay as you go' THEN

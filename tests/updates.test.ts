@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
 
+import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
 import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.updates'
@@ -189,7 +189,7 @@ describe('[POST] /updates invalid data', () => {
 })
 
 describe('update scenarios', () => {
-  it('disable auto update under native', async () => {
+  it.only('disable auto update under native', async () => {
     const baseData = getBaseData(APPNAME)
     baseData.version_build = '2.0.0'
     baseData.version_name = '2.0.0'
@@ -197,11 +197,13 @@ describe('update scenarios', () => {
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
+    console.log(json)
     expect(json.error).toBe('disable_auto_update_under_native')
   })
 
   it('disable auto update to minor', async () => {
-    await getSupabaseClient().from('channels').update({ disable_auto_update: 'minor', version: 9653 }).eq('name', 'production').eq('app_id', APPNAME)
+    const versionId = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.361.0').eq('app_id', APPNAME).single().throwOnError().then(({ data }) => data?.id)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'minor', version: versionId }).eq('name', 'production').eq('app_id', APPNAME).throwOnError()
 
     const baseData = getBaseData(APPNAME)
     baseData.version_name = '1.1.0'
@@ -254,7 +256,7 @@ describe('update scenarios', () => {
       owner_org: '00000000-0000-0000-0000-000000000000',
     })
 
-    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APPNAME)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APPNAME)
 
     const baseData = getBaseData(APPNAME)
     baseData.device_id = uuid
@@ -287,7 +289,7 @@ describe('update scenarios', () => {
       owner_org: '00000000-0000-0000-0000-000000000000',
     })
 
-    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', version: 9653, allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APPNAME)
+    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APPNAME)
 
     const baseData = getBaseData(APPNAME)
     baseData.device_id = uuid

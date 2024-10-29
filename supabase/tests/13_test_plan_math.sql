@@ -19,7 +19,7 @@ BEGIN
 
   -- solo has 1 gb of storage, fake a 0.3 gb bundle
   INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-  (now(), 'com.demo.app', now(), '3885ee49', convert_gb_to_bytes(0.3), 9654, 10);
+  (now(), 'com.demo.app', now(), '3885ee49', convert_gb_to_bytes(0.3), 3, 10);
 
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 
   ('com.demo.app', 10, now()::date);
@@ -43,12 +43,12 @@ BEGIN
 
   UPDATE apps set owner_org='046a36ac-e03c-4590-9257-bd6c9dba9ee8' where app_id='com.demoadmin.app';
 
-  UPDATE app_versions set app_id='com.demoadmin.app' where id=9601;
+  UPDATE app_versions set app_id='com.demoadmin.app' where id=7;
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 
   ('com.demoadmin.app', 10, (now() - interval '1 day')::date);
 
   INSERT INTO "public"."app_versions_meta" ("created_at", "app_id", "updated_at", "checksum", "size", "id", "devices") VALUES
-  (now(), 'com.demoadmin.app', now(), '3885ee49', convert_gb_to_bytes(0.1), 9601, 10);
+  (now(), 'com.demoadmin.app', now(), '3885ee49', convert_gb_to_bytes(0.1), 7, 10);
 
   INSERT INTO "public"."daily_bandwidth" ("app_id", "bandwidth", "date") VALUES 
   ('com.demoadmin.app', convert_gb_to_bytes(0.13), now()::date);

@@ -47,7 +47,7 @@ BEGIN
   INTO cycle_start, cycle_end
   FROM get_cycle_info_org('046a36ac-e03c-4590-9257-bd6c9dba9ee8');
 
-  RAISE NOTICE 'Cycle Start: %, Cycle End: % Now: %', cycle_start, cycle_end, now();
+  -- RAISE NOTICE 'Cycle Start: %, Cycle End: % Now: %', cycle_start, cycle_end, now();
   RETURN NEXT ok(cycle_start IS DISTINCT FROM NULL, 'Has cycle start');
   RETURN NEXT ok(cycle_end IS DISTINCT FROM NULL, 'Has cycle end');
   RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '29 days', 'Interval (base) greater than 29 days');
