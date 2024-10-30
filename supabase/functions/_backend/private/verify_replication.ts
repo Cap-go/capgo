@@ -40,7 +40,7 @@ async function deleteExtraRows(c: Context, table: string) {
           await d1.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(row.id).run()
         }
 
-        lastId = row.id
+        lastId = row.id as number
       }
 
       if (d1Data.results.length < batchSize) {
@@ -93,7 +93,7 @@ async function syncMissingRows(c: Context, table: string) {
           else {
             const updates = Object.entries(row)
               .filter(([key, value]) => existingRow[key] !== value)
-              .map(([key, value]) => `${key} = ?`)
+              .map(([key]) => `${key} = ?`)
             if (updates.length > 0) {
               const updateQuery = `UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`
               console.log({ requestId: c.get('requestId'), context: `updating row for table ${table}`, id: row.id })
