@@ -1,18 +1,15 @@
 // channel self old function
-
 import type { Context } from '@hono/hono'
-
 import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
-
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
+import { format, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import * as semver from 'semver'
 import { z } from 'zod'
 import { BRES, getBody } from '../utils/hono.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 interface DeviceLink extends AppInfos {
   channel?: string
@@ -75,9 +72,9 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     is_emulator = false,
     is_prod = true,
   } = body
-  const coerce = semver.coerce(version_build)
+  const coerce = tryParse(fixSemver(version_build))
   if (coerce) {
-    version_build = coerce.version
+    version_build = format(coerce)
   }
   else {
     console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_build })
@@ -107,6 +104,13 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   const version = versions.length === 2
     ? versions.find(v => v.name !== 'builtin')
     : versions[0]
+  if (!version) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', versions })
+    return c.json({
+      message: `Version ${version_name} doesn't exist, and no builtin version`,
+      error: 'version_error',
+    }, 400)
+  }
 
   if (!(await isAllowedActionOrg(c, owner_org))) {
     return c.json({
@@ -277,9 +281,9 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     is_prod = true,
     version_os,
   } = body
-  const coerce = semver.coerce(version_build)
+  const coerce = tryParse(fixSemver(version_build))
   if (coerce) {
-    version_build = coerce.version
+    version_build = format(coerce)
   }
   else {
     console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_build })
@@ -313,6 +317,13 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   const version = versions.length === 2
     ? versions.find(v => v.name !== 'builtin')
     : versions[0]
+  if (!version) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find version', versions })
+    return c.json({
+      message: `Version ${version_name} doesn't exist, and no builtin version`,
+      error: 'version_error',
+    }, 400)
+  }
 
   if (!(await isAllowedActionOrg(c, owner_org))) {
     return c.json({
@@ -406,9 +417,9 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     app_id,
     device_id,
   } = body
-  const coerce = semver.coerce(version_build)
+  const coerce = tryParse(fixSemver(version_build))
   if (coerce) {
-    version_build = coerce.version
+    version_build = format(coerce)
   }
   else {
     console.error({ requestId: c.get('requestId'), context: 'Cannot find version', version_build })

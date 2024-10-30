@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { AppInfos } from '../utils/types.ts'
+import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import * as semver from 'semver'
 import { z } from 'zod'
 import { update } from '../utils/update.ts'
 import {
@@ -55,7 +55,7 @@ const jsonRequestSchema = z.object({
   plugin_version: z.string({
     required_error: MISSING_STRING_PLUGIN_VERSION,
     invalid_type_error: INVALID_STRING_PLUGIN_VERSION,
-  }).refine(version => semver.valid(version) !== null, {
+  }).refine(version => canParse(version), {
     message: INVALID_STRING_PLUGIN_VERSION,
   }),
 }).refine(data => reverseDomainRegex.test(data.app_id), {

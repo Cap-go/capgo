@@ -3,14 +3,20 @@ import type { ManifestEntry } from './downloadUrl.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos } from './types.ts'
-import * as semver from 'semver'
+import {
+  format,
+  greaterThan,
+  lessThan,
+  parse,
+  tryParse,
+} from '@std/semver'
 import { saveStoreInfoCF } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1, getPgClient, isAllowedActionOrgPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask } from './utils.ts'
+import { backgroundTask, fixSemver } from './utils.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
@@ -23,11 +29,12 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
     version: version.name,
     url: signedURL,
   }
-  if (semver.gte(plugin_version, '4.13.0'))
+  const pluginVersion = parse(plugin_version)
+  if (greaterThan(pluginVersion, parse('4.13.0')))
     res.session_key = version.session_key || ''
-  if (semver.gte(plugin_version, '4.4.0'))
+  if (greaterThan(pluginVersion, parse('4.4.0')))
     res.checksum = version.checksum
-  if (semver.gte(plugin_version, '6.2.0') && manifest.length > 0)
+  if (greaterThan(pluginVersion, parse('6.2.0')) && manifest.length > 0)
     res.manifest = manifest
   return res
 }
@@ -52,7 +59,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     } = body
     device_id = device_id.toLowerCase()
     // if version_build is not semver, then make it semver
-    const coerce = semver.coerce(version_build, { includePrerelease: true })
+    const coerce = tryParse(fixSemver(version_build))
     const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
     if (!appOwner) {
       if (app_id) {
@@ -71,7 +78,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
     if (coerce) {
-      version_build = coerce.version
+      version_build = format(coerce)
     }
     else {
       // get app owner with app_id
@@ -81,13 +88,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1')
+      console.log({ requestId: c.get('requestId'), context: 'semver_issue', app_id, version_build })
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
       }, 400)
     }
     // if plugin_version is < 6 send notif to alert for update
-    if (semver.lt(plugin_version, '6.0.0')) {
+    if (lessThan(parse(plugin_version), parse('6.0.0'))) {
       await sendNotifOrg(c, 'user:plugin_issue', {
         app_id,
         device_id,
@@ -97,6 +105,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
+      console.log({ requestId: c.get('requestId'), context: 'missing_info', app_id, device_id, version_build, version_name, platform })
       return c.json({
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
@@ -255,7 +264,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           old: version_name,
         }, 200)
       }
-      if (channelData.channels.disable_auto_update === 'major' && semver.major(version.name) > semver.major(version_name)) {
+      if (channelData.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_name).major) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
@@ -276,7 +285,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (channelData.channels.disable_auto_update === 'minor' && semver.minor(version.name) > semver.minor(version_name)) {
+      if (channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_name).minor) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
@@ -290,9 +299,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
       console.log({ requestId: c.get('requestId'), context: 'version', version: version.name, old: version_name })
       if (channelData.channels.disable_auto_update === 'patch' && !(
-        semver.patch(version.name) > semver.patch(version_name)
-        && semver.major(version.name) === semver.major(version_name)
-        && semver.minor(version.name) === semver.minor(version_name)
+        parse(version.name).patch > parse(version_name).patch
+        && parse(version.name).major === parse(version_name).major
+        && parse(version.name).minor === parse(version_name).minor
       )) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch' }])
@@ -302,7 +311,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           error: 'disable_auto_update_to_patch',
           version: version.name,
           old: version_name,
-          aaa: `${semver.patch(version.name)}, ${semver.patch(version_name)}`,
         }, 200)
       }
 
@@ -322,7 +330,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }
 
         // Check if the minVersion is greater then the current version
-        if (semver.gt(minUpdateVersion, version_name)) {
+        if (greaterThan(parse(minUpdateVersion), parse(version_name))) {
           console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
           await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata' }])
           return c.json({
@@ -336,7 +344,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       // console.log(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
-      if (channelData.channels.disable_auto_update_under_native && semver.lt(version.name, version_build)) {
+      if (channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
         return c.json({
@@ -377,7 +385,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         // only count the size of the bundle if it's not external
         await createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
       }
-      if (semver.gte(plugin_version, '6.2.0')) {
+      if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
         manifest = await getManifestUrl(c, { app_id, ...version })
       }
     }

@@ -7,15 +7,14 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { bytesToGb } from '~/services/conversion'
-import { useLogSnag } from '~/services/logsnag'
 import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
+import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
 
-const snag = useLogSnag()
 const isLoading = ref(false)
 const initialLoad = ref(true)
 const route = useRoute()
@@ -33,7 +32,7 @@ watchEffect(async () => {
       toast.success(t('usage-success'))
     }
     else if (main.user?.id) {
-      snag.track({
+      sendEvent({
         channel: 'usage',
         event: 'User visit',
         icon: '💳',

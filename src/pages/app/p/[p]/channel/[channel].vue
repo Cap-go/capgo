@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { useDebounceFn } from '@vueuse/core'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
-import debounce from 'lodash.debounce'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -395,7 +395,7 @@ async function enableProgressiveDeploy() {
   await reload()
 }
 
-const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: number) => {
+const debouncedSetSecondaryVersionPercentage = useDebounceFn(async (percentage: number) => {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
@@ -407,7 +407,7 @@ const debouncedSetSecondaryVersionPercentage = debounce (async (percentage: numb
 
   if (error)
     console.error(error)
-}, 500, { leading: true, trailing: true, maxWait: 500 })
+}, 500)
 
 async function setSecondaryVersionPercentage(percentage: number) {
   if (channel.value?.enable_progressive_deploy)

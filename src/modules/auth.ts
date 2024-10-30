@@ -1,7 +1,7 @@
 import { setUser } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
-import { useLogSnag } from '~/services/logsnag'
 import { useSupabase } from '~/services/supabase'
+import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import type { UserModule } from '~/types'
 import { getPlans, isAdmin } from './../services/supabase'
@@ -9,8 +9,6 @@ import { getPlans, isAdmin } from './../services/supabase'
 async function guard(next: any, to: string, from: string) {
   const supabase = useSupabase()
   const { data: auth } = await supabase.auth.getUser()
-
-  const snag = useLogSnag()
 
   const main = useMainStore()
 
@@ -58,7 +56,7 @@ async function guard(next: any, to: string, from: string) {
       main.isAdmin = res
     })
 
-    snag.track({
+    sendEvent({
       channel: 'user-login',
       event: 'User Login',
       icon: '✅',

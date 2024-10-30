@@ -2,8 +2,8 @@ import type { Context } from '@hono/hono'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats } from '../utils/types.ts'
+import { format, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import * as semver from 'semver'
 import { z } from 'zod'
 import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
@@ -11,23 +11,7 @@ import { BRES } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
-import {
-  deviceIdRegex,
-  INVALID_STRING_APP_ID,
-  INVALID_STRING_DEVICE_ID,
-  isLimited,
-  MISSING_STRING_APP_ID,
-  MISSING_STRING_DEVICE_ID,
-  MISSING_STRING_PLATFORM,
-  MISSING_STRING_VERSION_NAME,
-  MISSING_STRING_VERSION_OS,
-  NON_STRING_APP_ID,
-  NON_STRING_DEVICE_ID,
-  NON_STRING_PLATFORM,
-  NON_STRING_VERSION_NAME,
-  NON_STRING_VERSION_OS,
-  reverseDomainRegex,
-} from '../utils/utils.ts'
+import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 
 const failActions = [
   'set_fail',
@@ -106,7 +90,7 @@ async function post(c: Context, body: AppStats) {
       is_prod = true,
     } = body
 
-    const coerce = semver.coerce(version_build)
+    const coerce = tryParse(fixSemver(version_build))
 
     const { data: appOwner } = await supabaseAdmin(c)
       .from('apps')
@@ -132,7 +116,7 @@ async function post(c: Context, body: AppStats) {
     }
 
     if (coerce)
-      version_build = coerce.version
+      version_build = format(coerce)
     console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
@@ -195,7 +179,7 @@ async function post(c: Context, body: AppStats) {
         app_id_url: appIdToUrl(app_id),
       }, appVersion.owner_org, app_id, '0 0 * * 1')
     }
-    statsActions.push({ action })
+    statsActions.push({ action: action as unknown as StatsActions })
     await sendStatsAndDevice(c, device, statsActions)
     return c.json(BRES)
   }

@@ -36,7 +36,5 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install   
-      - name: "Start minio"
-        run: bun run minio:start && bun run minio:seed
       - run: bun run test:all
 

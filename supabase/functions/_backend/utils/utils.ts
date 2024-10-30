@@ -49,6 +49,16 @@ export function shallowCleanObject(obj: Record<string, unknown>) {
   }, {} as Record<string, unknown>)
 }
 
+// function to fix semver 1.0 to 1.0.0 any verssion missing . should add .0 also should work for 1
+export function fixSemver(version: string) {
+  const nbPoint = (version.match(/\./g) || []).length
+  if (nbPoint === 0)
+    return `${version}.0.0`
+  if (nbPoint === 1)
+    return `${version}.0`
+  return version
+}
+
 export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null

@@ -9,7 +9,6 @@ All types of contributions are encouraged and valued. Please make sure to read t
 
 This project uses a custom test runner located in [tests_backend](https://github.com/Cap-go/capgo/tree/main/tests_backend).
 There exists some requirements to run the tests:
- * Have minio running (see `tests_backend/gh_actions` for referance)
  * Having `bun` installed (Only for CLI tests)
  * Having the [supabase cli](https://supabase.com/docs/guides/cli) installed
  * Having a running supabase (`supabase start`)

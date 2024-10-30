@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
+import { parse } from '@std/semver'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/material-symbols/info-rounded'
 import { useI18n } from 'petite-vue-i18n'
-import { valid } from 'semver'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -540,7 +540,7 @@ async function saveCustomId(input: string) {
     return
   }
 
-  if (!valid(input)) {
+  if (!parse(input)) {
     toast.error(t('invalid-version'))
     return
   }

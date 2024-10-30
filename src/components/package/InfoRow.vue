@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import debounce from 'lodash.debounce'
+import { useDebounceFn } from '@vueuse/core'
 import { reactive, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -11,13 +11,13 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (event: 'update:value', value: string): void
+  (event: 'update:value', value: string | undefined): void
   (event: 'delete', key: string): void
 }>()
 
 const computedValue = reactive({ value: props.value })
 const rowInput = ref(props.value)
-watch(rowInput, debounce(() => {
+watch(rowInput, useDebounceFn(() => {
   emit('update:value', rowInput.value)
 }, 500))
 </script>

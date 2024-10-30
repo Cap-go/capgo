@@ -2,7 +2,7 @@
 import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import VueDatePicker from '@vuepic/vue-datepicker'
-import { useDark } from '@vueuse/core'
+import { useDark, useDebounceFn } from '@vueuse/core'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClock from '~icons/heroicons/clock'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
@@ -12,7 +12,6 @@ import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconReload from '~icons/tabler/reload'
 import dayjs from 'dayjs'
-import debounce from 'lodash.debounce'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { Organization } from '~/stores/organization'
@@ -118,7 +117,7 @@ watch(preciseDates, () => {
   emit('reload')
 })
 
-watch(searchVal, debounce(() => {
+watch(searchVal, useDebounceFn(() => {
   emit('update:search', searchVal.value)
   emit('reload')
 }, 500))

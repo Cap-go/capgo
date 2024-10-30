@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
+import { useDebounceFn } from '@vueuse/core'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -12,7 +13,6 @@ import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
-import debounce from 'lodash.debounce'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 
@@ -96,7 +96,7 @@ if (props.filters) {
   })
 }
 
-watch(searchVal, debounce(() => {
+watch(searchVal, useDebounceFn(() => {
   emit('update:search', searchVal.value)
   emit('reload')
 }, 500))

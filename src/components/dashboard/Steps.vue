@@ -4,8 +4,8 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
 import { pushEvent } from '~/services/bento'
-import { useLogSnag } from '~/services/logsnag'
 import { useSupabase } from '~/services/supabase'
+import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
@@ -22,7 +22,6 @@ const mySubscription = ref()
 const supabase = useSupabase()
 const main = useMainStore()
 const { t } = useI18n()
-const snag = useLogSnag()
 const organizationStore = useOrganizationStore()
 
 interface Step {
@@ -48,7 +47,7 @@ const simpleStep: Step[] = [
 const steps = ref(simpleStep)
 function setLog() {
   if (props.onboarding && main.user?.id) {
-    snag.track({
+    sendEvent({
       channel: 'onboarding-v2',
       event: `onboarding-step-${step.value}`,
       icon: '👶',

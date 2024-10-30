@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import ky from 'ky'
-import { coerce as semverCoerce } from 'semver'
 
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
@@ -280,7 +280,7 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
   const nativePackages: NativePackage[] = (data?.native_packages || []) as any as NativePackage[]
   for (const pkg of nativePackages) {
     if (pkg && pkg.name === '@capgo/capacitor-updater') {
-      return semverCoerce(pkg.version)?.version ?? ''
+      return format(parse(pkg.version))
     }
   }
   return ''

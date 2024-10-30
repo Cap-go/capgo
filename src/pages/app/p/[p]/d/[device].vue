@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { greaterThan, parse } from '@std/semver'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import ky from 'ky'
 import { useI18n } from 'petite-vue-i18n'
-import { gt } from 'semver'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -222,7 +222,7 @@ async function getOrgRole() {
 }
 
 function minVersion(val: string, min = '4.6.99') {
-  return gt(val, min)
+  return greaterThan(parse(val), parse(min))
 }
 
 async function loadData() {

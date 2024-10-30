@@ -7,9 +7,9 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Stat } from '~/components/comp_def'
 import { openMessenger } from '~/services/bento'
-import { useLogSnag } from '~/services/logsnag'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
+import { sendEvent } from '~/services/tracking'
 import type { ArrayElement } from '~/services/types'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -61,7 +61,6 @@ function defaultPlanOrgData(): PlansOrgData {
 
 const orgsHashmap = ref(new Map<string, PlansOrgData>())
 
-const snag = useLogSnag()
 // const isUsageLoading = ref(false)
 const initialLoad = ref(false)
 const thankYouPage = ref(false)
@@ -240,7 +239,7 @@ watchEffect(async () => {
       }
 
       loadData(true)
-      snag.track({
+      sendEvent({
         channel: 'usage',
         event: 'User visit',
         icon: '💳',
