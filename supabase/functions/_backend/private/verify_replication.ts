@@ -183,7 +183,7 @@ app.get('/', async (c: Context) => {
     }, {} as Record<string, { d1: number, supabase: number, percent: number }>)
     // if diff less than 1% of total rows, consider it as synced
     const totalPercent = Object.values(diff).reduce((acc, table) => acc + table.percent, 0)
-    const diffPercentage = Object.keys(diff).length / totalPercent
+    const diffPercentage = totalPercent / Object.keys(diff).length
     if (diffPercentage < 2) {
       return c.json({
         status: 'ok',
