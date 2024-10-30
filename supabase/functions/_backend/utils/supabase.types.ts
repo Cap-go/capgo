@@ -2158,6 +2158,18 @@ export type Database = {
           uninstall: number
         }[]
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
