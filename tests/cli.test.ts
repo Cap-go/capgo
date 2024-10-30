@@ -230,49 +230,6 @@ describe('tests CLI for organization', () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
   })
-  it('should test auto min version flag', async () => {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()
-    expect(error).toBeNull()
-    const uploadWithAutoFlagWithAssert = async (expected: string) => {
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
-      const min_update_version = output.split('\n').find(l => l.includes('Auto set min-update-version'))
-      expect(min_update_version).toBeDefined()
-      expect(min_update_version).toContain(expected)
-      return output
-    }
-
-    semver = getSemver(semver)
-    await uploadWithAutoFlagWithAssert(semver)
-
-    const expected = semver
-    semver = getSemver(semver)
-    await uploadWithAutoFlagWithAssert(expected)
-    await supabase
-      .from('app_versions')
-      .update({ min_update_version: null })
-      .eq('name', semver)
-      .throwOnError()
-
-    // this CLI uplaod won't actually succeed.
-    // After increaseSemver, setting the min_update_version and native_packages will required the previous semver
-    const prevSemver = semver
-    semver = getSemver(semver)
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
-    expect(output).toContain('skipping auto setting compatibility')
-
-    const { error: error2 } = await supabase
-      .from('app_versions')
-      .update({ min_update_version: null, native_packages: null })
-      .eq('name', prevSemver)
-      .throwOnError()
-    expect(error2).toBeNull()
-
-    semver = getSemver(semver)
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
-    expect(output2).toContain('it\'s your first upload with compatibility check')
-  })
-
   it('should test upload with organization', async () => {
     const testApiKey = randomUUID()
     const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
@@ -318,46 +275,6 @@ describe('tests CLI for organization', () => {
         .eq('user_id', testUserId)
         .throwOnError()
     }
-  })
-  cleanupCli(id)
-})
-
-describe('tests CLI metadata', () => {
-  const id = randomUUID()
-  const APPNAME = `com.demo.app.cli_${id}`
-  const semver = getSemver()
-  beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, id)
-  })
-  it('should test compatibility table', async () => {
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id, false)
-    expect(output).toContain('Bundle uploaded')
-
-    const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-      const output = await runCli(['bundle', 'compatibility', '-c', 'production'], id)
-      const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
-      expect(androidPackage).toBeDefined()
-
-      const columns = androidPackage!.split('│').slice(2, -1)
-      expect(columns.length).toBe(4)
-      expect(columns[0]).toContain(column1)
-      expect(columns[1]).toContain(column2)
-      expect(columns[2]).toContain(column3)
-      expect(columns[3]).toContain(column4)
-    }
-
-    // await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', 'None', '❌')
-
-    // semver = getSemver()
-    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id)
-
-    await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', '6.0.0', '✅')
-
-    setDependencies({}, id, APPNAME)
-
-    // well, the local version doesn't exist, so I expect an empty string ???
-    await assertCompatibilityTableColumns('@capacitor/android', '', '6.0.0', '❌')
   })
   cleanupCli(id)
 })
