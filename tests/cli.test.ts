@@ -15,7 +15,7 @@ function getSemver(semver = `1.0.${Date.now()}`) {
   return newSemver
 }
 
-// describe.concurrent('test CLI', () => {
+// describe.concurrent('test CLI concurrent', () => {
 describe('test key generation', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
@@ -68,19 +68,17 @@ describe('test key generation', () => {
   })
 })
 
-describe('tests CLI upload', () => {
+describe('tests CLI upload and download', () => {
   const id = randomUUID()
   const APPNAME = `com.demo.app.cli_${id}`
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
   })
-  let semver = getSemver()
-  it('should upload bundle successfully', async () => {
+  const semver = getSemver()
+  it('should upload anddownload and verify uploaded bundle', async () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, true)
     expect(output).toContain('Bundle uploaded')
-  })
-  it('should download and verify uploaded bundle', async () => {
     const baseData = getUpdateBaseData(APPNAME)
     const response = await getUpdate(baseData)
     await responseOk(response, 'Update new bundle')
@@ -105,6 +103,15 @@ describe('tests CLI upload', () => {
     const indexJsContent = indexJsEntry!.getData().toString('utf8')
     expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
   })
+})
+describe('tests CLI upload', () => {
+  const id = randomUUID()
+  const APPNAME = `com.demo.app.cli_${id}`
+  beforeAll(async () => {
+    await resetAndSeedAppData(APPNAME)
+    await prepareCli(APPNAME, id)
+  })
+  let semver = getSemver()
   it('should not upload same twice', async () => {
     semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)

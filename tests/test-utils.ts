@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 
@@ -52,10 +53,10 @@ export async function resetAndSeedAppDataStats(appId: string) {
     throw error
 }
 
-export function getSupabaseClient(): SupabaseClient {
+export function getSupabaseClient(): SupabaseClient<Database> {
   const supabaseUrl = env.SUPABASE_URL ?? ''
   const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
-  return createClient(supabaseUrl, supabaseServiceKey)
+  return createClient<Database>(supabaseUrl, supabaseServiceKey)
 }
 
 export async function seedTestData(supabase: SupabaseClient, appId: string) {
