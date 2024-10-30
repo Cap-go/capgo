@@ -64,12 +64,22 @@ export function deleteAllTempFolders() {
   console.log('Deleting all temp folders')
   rimrafSync(TEMP_DIR_NAME)
 }
-export async function prepareCli(appId: string, id: string) {
-  const defaultConfig = generateCliConfig(appId)
-  // clean up temp folder
+
+export function deleteTempFolders(id: string) {
   if (existsSync(tempFileFolder(id))) {
     rimrafSync(tempFileFolder(id))
   }
+}
+
+export function getSemver(semver = `1.0.${Date.now()}`) {
+  const lastNumber = Number.parseInt(semver.charAt(semver.length - 1))
+  const newSemver = `${semver.slice(0, -1)}${(lastNumber + 1).toString()}`
+  return newSemver
+}
+
+export async function prepareCli(appId: string, id: string) {
+  const defaultConfig = generateCliConfig(appId)
+  deleteTempFolders(id)
   mkdirSync(tempFileFolder(id), { recursive: true })
 
   const capacitorConfigPath = join(tempFileFolder(id), 'capacitor.config.ts')
@@ -83,9 +93,14 @@ export async function prepareCli(appId: string, id: string) {
   npmInstall(id)
 }
 
+// cleanup CLI
+export function cleanupCli(id: string) {
+  deleteTempFolders(id)
+}
+
 function npmInstall(id: string) {
   try {
-    execSync('bun install', { cwd: tempFileFolder(id), stdio: 'inherit' })
+    execSync('bun install', { cwd: tempFileFolder(id), stdio: 'ignore' })
   }
   catch (error) {
     console.error('bun install failed', error)
@@ -121,7 +136,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
     return output.toString()
   }
   catch (error) {
-    const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
+    const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? error
 
     if (logOutput)
       console.error('CLI execution failed', errorOutput, error)

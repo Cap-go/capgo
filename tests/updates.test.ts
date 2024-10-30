@@ -197,7 +197,6 @@ describe('update scenarios', () => {
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
-    console.log(json)
     expect(json.error).toBe('disable_auto_update_under_native')
   })
 
