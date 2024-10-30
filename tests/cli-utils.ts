@@ -98,14 +98,12 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
   if (localCliPath === 'true') {
     localCliPath = '../../../CLI/dist/index.js'
   }
-  console.log('localCliPath', localCliPath)
   const command = [
     localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath || '\'@capgo/cli\'',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
   ].join(' ')
-  console.log('command', command)
 
   const options: ExecSyncOptions = {
     cwd: tempFileFolder(id),
@@ -124,10 +122,8 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
   }
   catch (error) {
     const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
-    console.error(localCliPath ? 'Local CLI execution failed' : 'CLI execution failed', errorOutput, error)
-
     if (logOutput)
-      console.log(errorOutput)
+      console.error(errorOutput)
 
     return errorOutput
   }
