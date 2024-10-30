@@ -99,7 +99,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
     localCliPath = '../../../CLI/dist/index.js'
   }
   const command = [
-    localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
+    localCliPath ? (env.NODE_PATH ?? 'node') : 'bun x',
     localCliPath || '@capgo/cli',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
