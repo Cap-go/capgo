@@ -33,6 +33,7 @@ describe('tests min version', () => {
       .from('app_versions')
       .update({ min_update_version: null })
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .throwOnError()
 
     // this CLI uplaod won't actually succeed.

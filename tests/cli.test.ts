@@ -67,6 +67,7 @@ describe('tests CLI upload', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
       .throwOnError()
 
@@ -83,6 +84,7 @@ describe('tests CLI upload', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
       .throwOnError()
 
@@ -99,6 +101,7 @@ describe('tests CLI upload', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
       .throwOnError()
 
@@ -115,6 +118,7 @@ describe('tests CLI upload', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
       .throwOnError()
 
@@ -131,6 +135,7 @@ describe('tests CLI upload', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
       .throwOnError()
 
@@ -147,6 +152,7 @@ describe('tests CLI upload', () => {
       .from('app_versions')
       .select('*')
       .eq('name', semver)
+      .eq('app_id', APPNAME)
       .single()
       .throwOnError()
 
