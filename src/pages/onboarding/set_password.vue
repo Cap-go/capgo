@@ -14,7 +14,7 @@ const supabase = useSupabase()
 const { t } = useI18n()
 
 const router = useRouter()
-const route = useRoute()
+const route = useRoute('/onboarding/set_password')
 
 async function signInUser() {
   if (!route.hash) {

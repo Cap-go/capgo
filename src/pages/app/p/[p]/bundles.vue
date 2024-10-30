@@ -7,7 +7,7 @@ import { urlToAppId } from '~/services/conversion'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
-const route = useRoute()
+const route = useRoute('/app/p/[p]/bundles')
 const appId = ref('')
 const displayStore = useDisplayStore()
 

@@ -16,7 +16,7 @@ const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 
-const route = useRoute()
+const route = useRoute('/app/package/[package]')
 const appId = ref('')
 const organization = ref(null as null | Organization)
 const isOrgOwner = ref(false)

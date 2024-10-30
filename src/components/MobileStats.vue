@@ -16,7 +16,7 @@ import { useMainStore } from '~/stores/main'
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 const { t } = useI18n()
-const route = useRoute()
+const route = useRoute('/app/package/[package]')
 const main = useMainStore()
 
 const appId = ref('')

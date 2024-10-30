@@ -19,7 +19,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
-const route = useRoute()
+const route = useRoute('/app/p/[p]/bundle/[bundle]')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()

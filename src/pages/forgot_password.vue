@@ -13,7 +13,7 @@ import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
 const router = useRouter()
-const route = useRoute()
+const route = useRoute('/forgot_password')
 const supabase = useSupabase()
 const step = ref(1)
 const turnstileToken = ref('')

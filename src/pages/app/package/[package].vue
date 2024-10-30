@@ -12,7 +12,7 @@ import type { Database } from '~/types/supabase.types'
 
 const id = ref('')
 const { t } = useI18n()
-const route = useRoute()
+const route = useRoute('/app/package/[package]')
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
 const updatesNb = ref(0)

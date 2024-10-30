@@ -17,7 +17,7 @@ import { openMessenger } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
 
-const route = useRoute()
+const route = useRoute('/login')
 const supabase = useSupabase()
 const isLoading = ref(false)
 const turnstileToken = ref('')

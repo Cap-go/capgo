@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { urlToAppId } from '~/services/conversion'
 import { useDisplayStore } from '~/stores/display'
 
-const route = useRoute()
+const route = useRoute('/app/p/[p]/channels')
 const displayStore = useDisplayStore()
 const appId = ref('')
 const misconfiguredRef = ref(false)

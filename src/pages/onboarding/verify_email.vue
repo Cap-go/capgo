@@ -11,7 +11,7 @@ import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const supabase = useSupabase()
-const route = useRoute()
+const route = useRoute('/onboarding/verify_email')
 const router = useRouter()
 const main = useMainStore()
 

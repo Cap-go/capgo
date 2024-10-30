@@ -10,7 +10,7 @@ import type { Database } from '~/types/supabase.types'
 import Dashboard from '../../components/dashboard/Dashboard.vue'
 import Steps from '../../components/dashboard/Steps.vue'
 
-const route = useRoute()
+const route = useRoute('/app/home')
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
 const supabase = useSupabase()

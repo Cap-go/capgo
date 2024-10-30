@@ -7,7 +7,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
-const route = useRoute()
+const route = useRoute('/onboarding/confirm_email')
 const supabase = useSupabase()
 
 const email = route.query.email as string
