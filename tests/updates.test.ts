@@ -189,7 +189,7 @@ describe('[POST] /updates invalid data', () => {
 })
 
 describe('update scenarios', () => {
-  it.only('disable auto update under native', async () => {
+  it('disable auto update under native', async () => {
     const baseData = getBaseData(APPNAME)
     baseData.version_build = '2.0.0'
     baseData.version_name = '2.0.0'
