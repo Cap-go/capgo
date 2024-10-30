@@ -116,14 +116,15 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
     const output = execSync(command, options)
 
     if (logOutput)
-      console.log(output)
+      console.log('CLI execution successful', output)
 
     return output.toString()
   }
   catch (error) {
     const errorOutput = (error as { stdout: Readable }).stdout?.toString() ?? JSON.stringify(error)
+
     if (logOutput)
-      console.error(errorOutput)
+      console.error('CLI execution failed', errorOutput, error)
 
     return errorOutput
   }
