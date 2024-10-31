@@ -192,14 +192,14 @@ Make sure you have Docker running.
 
 This will seed the DB with demo data again.
 ```bash
-bun reset
+supabase db reset
 ```
 
 ### Deploy Supabase self hosted
 
 To deploy the supabase instance self hosted, use the [Supabase offical guide](https://supabase.com/docs/guides/self-hosting).
 
-### Deploy Supabase cloud 
+### Deploy Supabase cloud
 
 To deploy the supabase instance on cloud, you need a paid account at $25/month.
 
@@ -212,7 +212,6 @@ https://supabase.com/docs/reference/cli/supabase-link
 
 Then you need to push the migrations to the cloud with the following command:
 
-
 ```bash
 supabase db push --linked
 ```
@@ -221,10 +220,9 @@ https://supabase.com/docs/reference/cli/supabase-migration-up
 And seed the DB with demo data:
 
 ```bash
-supabase db seed
+supabase seed buckets
 ```
 https://supabase.com/docs/reference/cli/supabase-seed-buckets
-
 
 ### Build
 
