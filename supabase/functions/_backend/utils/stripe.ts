@@ -1,10 +1,12 @@
 import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
-import { getEnv } from './utils.ts'
+import { existInEnv, getEnv } from './utils.ts'
 
 const getStripe = (c: Context) => new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'))
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { url: '' }
   const session = await getStripe(c).billingPortal.sessions.create({
     customer: customerId,
     return_url: callbackUrl,
@@ -12,12 +14,16 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
   return { url: session.url }
 }
 
-export async function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
+export function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   return getStripe(c).customers.update(customerId, { email: newEmail, name: newEmail, metadata: { email: newEmail } },
   )
 }
 
 export async function cancelSubscription(c: Context, customerId: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   const stripe = new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'))
   const allSubscriptions = await stripe.subscriptions.list({
     customer: customerId,
@@ -32,6 +38,8 @@ export async function cancelSubscription(c: Context, customerId: string) {
 async function getPriceIds(c: Context, planId: string, reccurence: string): Promise<{ priceId: string | null, meteredIds: string[] }> {
   let priceId = null
   const meteredIds: string[] = []
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { priceId, meteredIds }
   try {
     const prices = await getStripe(c).prices.search({
       query: `product:"${planId}"`,
@@ -58,6 +66,8 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   let priceId: string | null = null
   let productId: string | null = null
   const meteredData: { [key: string]: string } = {}
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { priceId, productId, meteredData }
   try {
     console.log({ requestId: c.get('requestId'), context: 'prices stripe', prices })
     prices.forEach((price) => {
@@ -78,6 +88,8 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
 }
 
 export async function createCheckout(c: Context, customerId: string, reccurence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { url: '' }
   const prices = await getPriceIds(c, planId, reccurence)
   console.log({ requestId: c.get('requestId'), context: 'prices', prices })
   if (!prices.priceId)
@@ -123,6 +135,8 @@ export interface StripeCustomer {
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, name: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { id: '', email, name, metadata: { user_id: userId } }
   const customer = await getStripe(c).customers.create({
     email,
     name,
@@ -134,6 +148,8 @@ export async function createCustomer(c: Context, email: string, userId: string, 
 }
 
 export async function setThreshold(c: Context, subscriptionId: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   const subscription = await getStripe(c).subscriptions.update(subscriptionId, {
     billing_thresholds: {
       amount_gte: 5000,
@@ -144,6 +160,8 @@ export async function setThreshold(c: Context, subscriptionId: string) {
 }
 
 export async function setBillingPeriod(c: Context, subscriptionId: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   const subscription = await getStripe(c).subscriptions.update(subscriptionId, {
     billing_cycle_anchor: 'now',
     proration_behavior: 'create_prorations',
@@ -152,6 +170,8 @@ export async function setBillingPeriod(c: Context, subscriptionId: string) {
 }
 
 export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   const customer = await getStripe(c).customers.update(customerId, {
     email: billing_email || email,
     name,
@@ -164,6 +184,8 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
 }
 
 export async function recordUsage(c: Context, subscriptionItemId: string, quantity: number) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   const usageRecord = await getStripe(c).subscriptionItems.createUsageRecord(subscriptionItemId, {
     quantity,
     action: 'set',
@@ -172,6 +194,8 @@ export async function recordUsage(c: Context, subscriptionItemId: string, quanti
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return Promise.resolve()
   console.log({ requestId: c.get('requestId'), context: 'removeOldSubscription', id: subscriptionId })
   const deletedSubscription = await getStripe(c).subscriptions.cancel(subscriptionId)
   return deletedSubscription
