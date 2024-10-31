@@ -280,7 +280,7 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
   const nativePackages: NativePackage[] = (data?.native_packages || []) as any as NativePackage[]
   for (const pkg of nativePackages) {
     if (pkg && pkg.name === '@capgo/capacitor-updater') {
-      return format(parse(pkg.version))
+      return format(parse(pkg.version.replace('^', '').replace('~', '')))
     }
   }
   return ''
