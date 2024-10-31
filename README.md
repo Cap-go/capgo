@@ -224,6 +224,18 @@ supabase seed buckets
 ```
 https://supabase.com/docs/reference/cli/supabase-seed-buckets
 
+Seed the secret for functions:
+
+```bash
+supabase secrets set --env-file supabase/functions/.env
+```
+
+Push the functions to the cloud:
+
+```bash
+supabase functions deploy
+```
+
 ### Build
 
 To build the webApp in mobile, to push to store, run
