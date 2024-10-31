@@ -43,7 +43,7 @@ alert-not-reverse-message: This action is not reversible
 alert-regenerate-key: Are you sure you want to regenerate this key
 alert-unknown-error: Unknown error, see dev console
 allow-develoment-bui: Allow develoment build
-allow-device-to-self: Allow devices to self associate
+allow-device-to-self: Allow devices to self dissociate/associate
 allow-emulator: Allow Emulators
 already-account: You already have an account?
 api-doc: API doc

@@ -49,7 +49,7 @@ alert-not-reverse-message: Esta acción no es reversible
 alert-regenerate-key: ¿Estás seguro de que quieres regenerar esta clave?
 alert-unknown-error: Error desconocido, consulte la consola de desarrollo
 allow-develoment-bui: Permitir compilación de desarrollo
-allow-device-to-self: Permitir que los dispositivos se autoasocien
+allow-device-to-self: Permitir que los dispositivos se disocien/asocien por sí mismos
 allow-emulator: Permitir emuladores
 already-account: ¿Ya tienes una cuenta?
 api-doc: documento API

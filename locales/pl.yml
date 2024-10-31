@@ -45,7 +45,7 @@ alert-not-reverse-message: Ta czynność nie jest odwracalna
 alert-regenerate-key: Czy napewno chcesz zregenerować ten klucz?
 alert-unknown-error: Nieznany błąd, zobacz konsolę deweloperską
 allow-develoment-bui: Zezwalaj na kompilację deweloperską
-allow-device-to-self: Zezwól urządzeniom na samopowiązanie
+allow-device-to-self: Pozwól urządzeniom na samodzielne rozłączanie/łączenie się
 allow-emulator: Zezwalaj na emulatory
 already-account: Posiadasz już konto?
 api-doc: Dokument API

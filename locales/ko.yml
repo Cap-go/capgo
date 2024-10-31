@@ -43,7 +43,7 @@ alert-not-reverse-message: 이 작업은 되돌릴 수 없습니다.
 alert-regenerate-key: 이 키를 다시 생성하시겠습니까?
 alert-unknown-error: 알 수 없는 오류입니다. 개발자 콘솔을 참조하세요.
 allow-develoment-bui: 개발 빌드 허용
-allow-device-to-self: 장치가 자체 연결하도록 허용
+allow-device-to-self: 장치가 자체적으로 분리/연결을 허용하십시오.
 allow-emulator: 에뮬레이터 허용
 already-account: 이미 계정이 있으신가요?
 api-doc: API 문서

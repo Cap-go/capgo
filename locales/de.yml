@@ -51,7 +51,7 @@ alert-not-reverse-message: Diese Aktion ist nicht umkehrbar
 alert-regenerate-key: Sind Sie sicher, dass Sie diesen Schlüssel neu generieren möchten?
 alert-unknown-error: Unbekannter Fehler, siehe Entwicklungskonsole
 allow-develoment-bui: Entwicklungsbuild zulassen
-allow-device-to-self: Erlauben Sie Geräten, sich selbst zuzuordnen
+allow-device-to-self: Erlauben Sie Geräten, sich selbst zu dissoziieren/assoziiieren
 allow-emulator: Emulatoren zulassen
 already-account: Sie haben schon ein Konto?
 api-doc: API-Dokument

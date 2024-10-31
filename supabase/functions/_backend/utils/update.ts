@@ -280,7 +280,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         console.log({ requestId: c.get('requestId'), context: 'Cannot update via a private channel', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel' }])
         return c.json({
-          message: 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self associate" set to true',
+          message: 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self dissociate/associate" set to true',
           error: 'cannot_update_via_private_channel',
         }, 200)
       }

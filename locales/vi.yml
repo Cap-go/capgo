@@ -47,7 +47,7 @@ alert-not-reverse-message: Hành động này là không thể đảo ngược
 alert-regenerate-key: Bạn có chắc chắn muốn tạo lại khóa này không
 alert-unknown-error: Lỗi không xác định, hãy xem bảng điều khiển dành cho nhà phát triển
 allow-develoment-bui: Cho phép xây dựng phát triển
-allow-device-to-self: Cho phép các thiết bị tự liên kết
+allow-device-to-self: Cho phép thiết bị tự ngắt kết nối/kết nối
 allow-emulator: Cho phép giả lập
 already-account: Bạn đã có tài khoản?
 api-doc: tài liệu API

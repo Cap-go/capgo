@@ -47,7 +47,7 @@ alert-not-reverse-message: Questa azione non è reversibile
 alert-regenerate-key: Sei sicuro di voler rigenerare questa chiave?
 alert-unknown-error: Errore sconosciuto, vedere console di sviluppo
 allow-develoment-bui: Consenti build di sviluppo
-allow-device-to-self: Consenti ai dispositivi di associarsi automaticamente
+allow-device-to-self: Permetti ai dispositivi di dissociarsi/associarsi autonomamente
 allow-emulator: Consenti emulatori
 already-account: Hai già un account?
 api-doc: Documento API

@@ -47,7 +47,7 @@ alert-not-reverse-message: Это действие необратимо
 alert-regenerate-key: Вы уверены, что хотите восстановить этот ключ?
 alert-unknown-error: Неизвестная ошибка, см. консоль разработчика.
 allow-develoment-bui: Разрешить сборку разработки
-allow-device-to-self: Разрешить устройствам самостоятельно связываться
+allow-device-to-self: Разрешить устройствам самостоятельно отсоединяться/подключаться
 allow-emulator: Разрешить эмуляторы
 already-account: У вас уже есть аккаунт?
 api-doc: API-документ

@@ -43,7 +43,7 @@ alert-not-reverse-message: Tindakan ini tidak dapat dibatalkan
 alert-regenerate-key: Apakah Anda yakin ingin membuat ulang kunci ini
 alert-unknown-error: Kesalahan tidak diketahui, lihat konsol pengembang
 allow-develoment-bui: Izinkan pembangunan pembangunan
-allow-device-to-self: Izinkan perangkat untuk mengasosiasikan diri
+allow-device-to-self: Izinkan perangkat untuk memisahkan/mengasosiasikan diri sendiri
 allow-emulator: Izinkan Emulator
 already-account: Anda sudah memiliki akun?
 api-doc: dokumen API

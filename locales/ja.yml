@@ -43,7 +43,7 @@ alert-not-reverse-message: このアクションは元に戻せません
 alert-regenerate-key: このキーを再生成してもよろしいですか?
 alert-unknown-error: 不明なエラー。開発コンソールを参照してください。
 allow-develoment-bui: 開発ビルドを許可
-allow-device-to-self: デバイスの自己関連付けを許可する
+allow-device-to-self: デバイスが自己分離/関連付けを許可する
 allow-emulator: エミュレータを許可
 already-account: すでにアカウントをお持ちですか？
 api-doc: APIドキュメント

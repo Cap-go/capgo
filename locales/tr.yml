@@ -43,7 +43,7 @@ alert-not-reverse-message: Bu eylem geri alınamaz
 alert-regenerate-key: Bu anahtarı yeniden oluşturmak istediğinizden emin misiniz?
 alert-unknown-error: Bilinmeyen hata, geliştirici konsoluna bakın
 allow-develoment-bui: Geliştirme derlemesine izin ver
-allow-device-to-self: Cihazların kendi kendini ilişkilendirmesine izin ver
+allow-device-to-self: Cihazların kendiliğinden ayrılmasına/bağlanmasına izin verin
 allow-emulator: Öykünücülere İzin Ver
 already-account: Zaten bir hesabınız var mı?
 api-doc: API belgesi
