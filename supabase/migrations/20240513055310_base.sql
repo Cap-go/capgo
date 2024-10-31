@@ -2756,7 +2756,8 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "apps_active" integer DEFAULT 0,
     "users_active" integer DEFAULT 0,
     "paying_yearly" integer DEFAULT 0,
-    "paying_monthly" integer DEFAULT 0
+    "paying_monthly" integer DEFAULT 0,
+    "updates_last_month" integer DEFAULT 0
 );
 
 ALTER TABLE "public"."global_stats" OWNER TO "postgres";

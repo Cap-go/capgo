@@ -2,9 +2,9 @@ import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import ky from 'ky'
-import { readActiveAppsCF } from '../utils/cloudflare.ts'
+import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { logsnagInsights } from '../utils/logsnag.ts'
+import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -14,6 +14,7 @@ interface CustomerCount { total: number, yearly: number, monthly: number }
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
+  updates_last_month: PromiseLike<number>
   users: PromiseLike<number>
   stars: Promise<number>
   onboarded: PromiseLike<number>
@@ -78,6 +79,7 @@ function getStats(c: Context): GlobalStats {
       }
       return { apps: app_ids.length, users: 0 }
     }),
+    updates_last_month: readLastMonthUpdatesCF(c),
   }
 }
 
@@ -96,6 +98,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       need_upgrade,
       plans,
       actives,
+      updates_last_month,
     ] = await Promise.all([
       res.apps,
       res.updates,
@@ -106,6 +109,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       res.need_upgrade,
       res.plans,
       res.actives,
+      res.updates_last_month,
     ])
     const not_paying = users - customers.total
     console.log({ requestId: c.get('requestId'), context: 'All Promises', apps, updates, users, stars, customers, onboarded, need_upgrade, plans })
@@ -127,6 +131,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       onboarded,
       need_upgrade,
       not_paying,
+      updates_last_month,
     }
     console.log({ requestId: c.get('requestId'), context: 'newData', newData })
     const { error } = await supabaseAdmin(c)
@@ -134,6 +139,17 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       .upsert(newData)
     if (error)
       console.error({ requestId: c.get('requestId'), context: 'insert global_stats error', error })
+    await logsnag(c).track({
+      channel: 'updates-stats',
+      event: 'Updates last month',
+      user_id: 'admin',
+      tags: {
+        updates_last_month,
+      },
+      icon: '📲',
+    }).catch((e) => {
+      console.error({ requestId: c.get('requestId'), context: 'insights error', e })
+    })
     await logsnagInsights(c, [
       {
         title: 'Apps',
@@ -148,6 +164,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       {
         title: 'Updates',
         value: updates,
+        icon: '📲',
+      },
+      {
+        title: 'Updates last month',
+        value: updates_last_month,
         icon: '📲',
       },
       {

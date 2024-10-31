@@ -620,6 +620,21 @@ export async function readActiveAppsCF(c: Context) {
   return []
 }
 
+export async function readLastMonthUpdatesCF(c: Context) {
+  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const query = `SELECT sum(if(blob2 = 'get', 1, 0)) AS count FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
+  console.log({ requestId: c.get('requestId'), context: 'readLastMonthUpdatesCF query', query })
+  try {
+    const response = await runQueryToCF<{ count: number }>(c, query)
+    console.log({ requestId: c.get('requestId'), context: 'readLastMonthUpdatesCF response', response })
+    return response[0].count ?? 0
+  }
+  catch (e) {
+    console.error({ requestId: c.get('requestId'), context: 'Error reading last month updates', error: e })
+  }
+  return 0
+}
+
 export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
   if (!c.env.DB_DEVICES)
     return Promise.resolve([] as StoreApp[])

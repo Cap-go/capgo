@@ -685,6 +685,7 @@ export type Database = {
           stars: number
           trial: number | null
           updates: number
+          updates_last_month: number | null
           users: number | null
           users_active: number | null
         }
@@ -702,6 +703,7 @@ export type Database = {
           stars: number
           trial?: number | null
           updates: number
+          updates_last_month?: number | null
           users?: number | null
           users_active?: number | null
         }
@@ -719,6 +721,7 @@ export type Database = {
           stars?: number
           trial?: number | null
           updates?: number
+          updates_last_month?: number | null
           users?: number | null
           users_active?: number | null
         }
