@@ -5,8 +5,6 @@ import { useCors } from '../utils/hono.ts'
 import { readStats } from '../utils/stats.ts'
 import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
-// get_stats
-
 interface dataStats {
   appId: string
   devicesId?: string[]

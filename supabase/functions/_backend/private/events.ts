@@ -7,8 +7,6 @@ import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { checkKey } from '../utils/utils.ts'
 
-// get_stats
-
 export const app = new Hono()
 
 app.use('/', useCors)

@@ -133,16 +133,9 @@ verify_jwt = false
 [functions.updates]
 verify_jwt = false
 
-[functions.updates_debug]
-verify_jwt = false
-
 [functions.stats]
 verify_jwt = false
 
-[functions.get_stats]
-verify_jwt = false
-
-# END of deprecated
 
 # PRIVATE ENDPOINTS
 
