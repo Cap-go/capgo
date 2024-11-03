@@ -85,7 +85,7 @@ const tabs = ref<Tab[]>([
     <div
       id="sidebar"
       ref="sidebar"
-      class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:mt-4 lg:h-[calc(100%-2rem)] lg:w-14 lg:translate-x-0 lg:overflow-y-auto lg:shadow-none 2xl:!w-64"
+      class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:mt-4 lg:h-[calc(100%-2rem)] lg:translate-x-0 lg:overflow-y-auto lg:shadow-none"
       :class="{
         'translate-x-0': props.sidebarOpen,
         '-translate-x-[120%]': !props.sidebarOpen,
@@ -95,7 +95,7 @@ const tabs = ref<Tab[]>([
       <div class="flex justify-between px-3 py-4 border-b border-slate-800">
         <router-link class="flex items-center space-x-2" to="/app/home">
           <img src="/capgo.webp" alt="logo" class="w-8 h-8">
-          <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 2xl:block lg:hidden hover:text-white">Capgo</span>
+          <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 hover:text-white">Capgo</span>
         </router-link>
       </div>
 
@@ -108,8 +108,7 @@ const tabs = ref<Tab[]>([
       <div class="px-3 py-4 space-y-4">
         <div>
           <h3 class="mb-3 text-xs font-semibold uppercase text-slate-500">
-            <span class="hidden w-6 text-center lg:block 2xl:hidden" aria-hidden="true">•••</span>
-            <span class="2xl:block lg:hidden">{{ t('pages') }}</span>
+            {{ t('pages') }}
           </h3>
           <ul class="space-y-1">
             <li v-for="tab, i in tabs" :key="i">
@@ -123,7 +122,7 @@ const tabs = ref<Tab[]>([
                 @click="openTab(tab)"
               >
                 <component :is="tab.icon" class="w-5 h-5 shrink-0" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
-                <span class="ml-3 text-sm font-medium duration-200 2xl:opacity-100 lg:opacity-0 first-letter:uppercase" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">
+                <span class="ml-3 text-sm font-medium" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">
                   {{ t(tab.label) }}
                 </span>
               </button>
