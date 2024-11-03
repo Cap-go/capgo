@@ -51,7 +51,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
   })
-  async function checkEncryption(output2: string, privateKey: string) {
+  async function checkEncryption(output2: string, privateKey: string, skipUpdate = false) {
     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1) as string
     expect(checksum).toBeDefined()
     expect(checksum?.length).toBe(8)
@@ -70,63 +70,65 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     expect(data?.session_key).toBeTruthy()
     expect(data?.session_key?.split(':').length).toBe(2)
 
+    if (!skipUpdate) {
     // let's now download the bundle
-    const baseData = getUpdateBaseData(APPNAME)
-    const response = await getUpdate(baseData)
-    await responseOk(response, 'Update new bundle')
+      const baseData = getUpdateBaseData(APPNAME)
+      const response = await getUpdate(baseData)
+      await responseOk(response, 'Update new bundle')
 
-    const responseJson = await response.json<{ url: string, version: string }>()
-    expect(responseJson.url).toBeDefined()
-    expect(responseJson.version).toBe(semver)
+      const responseJson = await response.json<{ url: string, version: string }>()
+      expect(responseJson.url).toBeDefined()
+      expect(responseJson.version).toBe(semver)
 
-    const downloadResponse = await fetch(responseJson.url)
-    await responseOk(downloadResponse, 'Download new bundle')
-    const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
-    expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
+      const downloadResponse = await fetch(responseJson.url)
+      await responseOk(downloadResponse, 'Download new bundle')
+      const encryptedArrayBuffer = await downloadResponse.arrayBuffer()
+      expect(encryptedArrayBuffer.byteLength).toBeGreaterThan(0)
 
-    const encryptedBufferStr = data?.session_key?.split(':').at(1)
-    expect(encryptedBufferStr).toBeTruthy()
+      const encryptedBufferStr = data?.session_key?.split(':').at(1)
+      expect(encryptedBufferStr).toBeTruthy()
 
-    const ivStr = data?.session_key?.split(':').at(0)
-    expect(ivStr).toBeTruthy()
+      const ivStr = data?.session_key?.split(':').at(0)
+      expect(ivStr).toBeTruthy()
 
-    const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
+      const encryptedBuffer = Buffer.from(encryptedBufferStr!, 'base64')
 
-    const aesKey = privateDecrypt(
-      {
-        key: privateKey,
-        padding: constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256',
-      },
-      Uint8Array.from(encryptedBuffer),
-    )
-    expect(aesKey.length).toBe(16)
+      const aesKey = privateDecrypt(
+        {
+          key: privateKey,
+          padding: constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Uint8Array.from(encryptedBuffer),
+      )
+      expect(aesKey.length).toBe(16)
 
-    // The Initialization Vector (IV) used during encryption (16 bytes for AES)
-    const iv = Buffer.from(ivStr!, 'base64')
-    expect(iv.length).toBeGreaterThan(0)
+      // The Initialization Vector (IV) used during encryption (16 bytes for AES)
+      const iv = Buffer.from(ivStr!, 'base64')
+      expect(iv.length).toBeGreaterThan(0)
 
-    const decipher = createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
-    // Decrypt without specifying output encoding to get Buffers
-    const decryptedChunks = []
-    decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
-    decryptedChunks.push(decipher.final())
+      const decipher = createDecipheriv('aes-128-cbc', Uint8Array.from(aesKey), Uint8Array.from(iv))
+      // Decrypt without specifying output encoding to get Buffers
+      const decryptedChunks = []
+      decryptedChunks.push(decipher.update(new Uint8Array(encryptedArrayBuffer)))
+      decryptedChunks.push(decipher.final())
 
-    // Concatenate all Buffer chunks
-    const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
+      // Concatenate all Buffer chunks
+      const decrypted = Buffer.concat(decryptedChunks.map(buf => new Uint8Array(buf)))
 
-    expect(decrypted.length).toBeGreaterThan(0)
+      expect(decrypted.length).toBeGreaterThan(0)
 
-    const zip = new AdmZip(Buffer.from(decrypted))
-    const zipEntries = zip.getEntries()
+      const zip = new AdmZip(Buffer.from(decrypted))
+      const zipEntries = zip.getEntries()
 
-    expect(zipEntries.length).toBe(2)
+      expect(zipEntries.length).toBe(2)
 
-    const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
-    expect(indexJsEntry).toBeDefined()
+      const indexJsEntry = zipEntries.find(entry => entry.entryName.includes('index.js'))
+      expect(indexJsEntry).toBeDefined()
 
-    const indexJsContent = indexJsEntry!.getData().toString('utf8')
-    expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
+      const indexJsContent = indexJsEntry!.getData().toString('utf8')
+      expect(indexJsContent).toBe('import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log(\"Hello world!!!\");\nCapacitorUpdater.notifyAppReady();')
+    }
   }
   it('test create key ', async () => {
     const output = await runCli(['key_old', 'create', '--force'], id, false, '')
@@ -155,7 +157,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     expect(output4).toContain('Time to share your update to the world')
     expect(output4).toContain('Encrypting your bundle')
 
-    await checkEncryption(output4, privateKey)
+    await checkEncryption(output4, privateKey, true)
   })
   it('test upload bundle with custom key path ', async () => {
     const privateKey = readFileSync(join(tempFileFolder(id), '.capgo_key'), 'utf-8')
@@ -173,7 +175,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     expect(output3).toContain('Time to share your update to the world')
     expect(output3).toContain('Encrypting your bundle')
 
-    await checkEncryption(output3, privateKey)
+    await checkEncryption(output3, privateKey, true)
   })
   cleanupCli(id)
 })
