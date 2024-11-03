@@ -8,7 +8,7 @@ BEGIN
   where coalesce(app_versions_meta.size, 0) = 0
   AND app_versions.deleted=false
   AND app_versions.storage_provider != 'external'
-  AND now() - app_versions.created_at > interval '30 seconds';
+  AND now() - app_versions.created_at > interval '120 seconds';
 END;
 $$;
 

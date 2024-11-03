@@ -38,7 +38,10 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const v2Path = await getPath(c, version)
     console.log({ requestId: c.get('requestId'), context: 'v2Path', v2Path })
     if (!v2Path) {
-      return errorOut(c, `Cannot find path for version ${version.id}`)
+      await supabase.from('app_versions')
+        .delete()
+        .eq('id', version.id)
+      return c.json(BRES)
     }
     let notFound = false
     try {
