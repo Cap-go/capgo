@@ -11,18 +11,14 @@ import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
-export function getBestDatabaseURL(c: Context): string {
-  // TODO: use it when we deployed replicate of database
-  // Use replicate i
-
-  // const clientContinent = null
-  const clientContinent = (c.req.raw as any)?.cf?.continent
-  console.log({ requestId: c.get('requestId'), context: 'clientContinent', clientContinent })
+export function getDatabaseURL(c: Context): string {
+  // TODO: uncomment when we enable back replicate
+  // const clientContinent = (c.req.raw as any)?.cf?.continent
+  // console.log({ requestId: c.get('requestId'), context: 'clientContinent', clientContinent })
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
 
-  // TODO: uncomment when we enable back replicate
   // if (!clientContinent)
   //   return DEFAULT_DB_URL
 
@@ -46,7 +42,7 @@ export function getBestDatabaseURL(c: Context): string {
 }
 
 export function getPgClient(c: Context) {
-  const dbUrl = getBestDatabaseURL(c)
+  const dbUrl = getDatabaseURL(c)
   console.log({ requestId: c.get('requestId'), context: 'SUPABASE_DB_URL', dbUrl })
   return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
@@ -63,7 +59,7 @@ export function getDrizzleClientD1(c: Context) {
 }
 
 export function getDrizzleClientD1Session(c: Context) {
-  // TODO: find why it doesn't work
+  // TODO: try when available in Cloudflare
   const token = c.req.raw.headers.get('x-d1-token') ?? 'first-unconditional'
   const session = c.env.DB_REPLICATE.withSession(token)
   return drizzleD1(session)

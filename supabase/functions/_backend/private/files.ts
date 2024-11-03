@@ -19,13 +19,12 @@ const ATTACHMENT_PREFIX = 'attachments'
 export const app = new Hono()
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkAppAccess, uploadHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, getHandler)
-// TODO: create a key system with DO to allow read only after a get returned it
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, getHandler)
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkAppAccess, uploadHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)
@@ -167,7 +166,7 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   await next()
 }
 
-async function checkAppAccess(c: Context, next: Next) {
+async function checkWriteAppAccess(c: Context, next: Next) {
   const requestId = c.get('fileId')
   const [orgs, owner_org, apps, app_id] = requestId.split('/')
   if (orgs !== 'orgs' || apps !== 'apps') {
@@ -176,7 +175,7 @@ async function checkAppAccess(c: Context, next: Next) {
   if (requestId.split('/').length < 5) {
     throw new HTTPException(400, { message: 'Invalid requestId' })
   }
-  console.log('checkAppAccess', app_id, owner_org)
+  console.log('checkWriteAppAccess', app_id, owner_org)
   const capgkey = c.get('capgkey')
   console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c)

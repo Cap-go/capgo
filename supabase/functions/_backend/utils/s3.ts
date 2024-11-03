@@ -72,7 +72,6 @@ async function deleteObject(c: Context, fileId: string) {
 async function checkIfExist(c: Context, fileId: string) {
   const client = initS3(c)
   try {
-    // TODO: migrate to ky.head
     const command = new HeadObjectCommand({
       Bucket: getEnv(c, 'S3_BUCKET'),
       Key: fileId,

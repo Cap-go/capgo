@@ -140,7 +140,6 @@ export async function countAllUpdates(c: Context): Promise<number> {
   ])
 
   const res = storeAppsCount + logsCount
-  // TODO: fix this count undestand why it return 0 sometimes
   return res || 14593631
 }
 

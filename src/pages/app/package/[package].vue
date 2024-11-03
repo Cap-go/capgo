@@ -35,10 +35,6 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
     const promises = []
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
-    // normalize version
-    // capgoVersion.value =
-    // if (capgoVersion.value && gte(capgoVersion.value, '6.0.1')) // TODO: removed in 2025 if there is not more old plugin used
-    // canShowMobileStats.value = true
     updatesNb.value = main.getTotalStatsByApp(id.value)
     devicesNb.value = main.getTotalMauByApp(id.value)
 

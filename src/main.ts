@@ -33,7 +33,6 @@ const newRoutes = routes.map((route) => {
   return route
 })
 const router = createRouter({
-  // TODO: fix this redirect are not working
   routes: [
     { path: '/app', redirect: '/app/home' },
     { path: '/', redirect: '/login' },

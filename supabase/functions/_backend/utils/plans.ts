@@ -96,7 +96,6 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
 }
 
 export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
-  // TODO: change the funciton to use the org instead of user id
   try {
     const { data: org, error: userError } = await supabaseAdmin(c)
       .from('orgs')

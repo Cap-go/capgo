@@ -157,7 +157,6 @@ if (main.dashboardFetched)
 
 <template>
   <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId && showMobileStats ? 'grid-cols-16' : ''">
-    <!-- TODO: to reactivate when we do the new chart https://github.com/Cap-go/capgo/issues/645 <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId ? 'grid-cols-16' : ''"> -->
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald"
       :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"

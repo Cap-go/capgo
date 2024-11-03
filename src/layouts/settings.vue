@@ -103,7 +103,6 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
 
-  // TODO: reenable after we fix usage
   if (organizationStore.currentOrganization?.paying
     && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
