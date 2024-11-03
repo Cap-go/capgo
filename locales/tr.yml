@@ -92,6 +92,7 @@ cannot-change-default-upload-channel: >-
   edin
 cannot-change-name: Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-change-permission: İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin
+cannot-change-retention: Saklama süresi değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin
 cannot-copy: Panonuza kopyalayamazsınız, lütfen modal'dan kendiniz kopyalayın.
 cannot-copy-key: Anahtarınız panonuza kopyalanamıyor, lütfen kendiniz kopyalayın.
 cannot-create-empty-device: Boş cihaz oluşturulamıyor. Lütfen tarayıcı konsolunu kontrol edin
@@ -124,6 +125,7 @@ change: Değiştirmek
 change-api-key-name: Apikey'in adını değiştirin
 change-your-picture: Resmini değiştir
 changed-app-name: Uygulama adı başarıyla değiştirildi
+changed-app-retention: Uygulamanın saklama süresi başarıyla değiştirildi
 changed-name: Apikey'in adı başarıyla değiştirildi
 changed-password-suc: parola başarıyla değiştirildi
 channel: Kanal
@@ -277,7 +279,7 @@ live-reload: Canlı yeniden yükleme
 log-as: Sahtelemeye başla
 log-in: Giriş yapmak
 login-to-your-accoun: hesabınıza giriş yapın
-logout: ''
+logout: oturum kapatma
 logs: Kütükler
 main-bundle-number: Ana paket numarası
 major: Ana
@@ -420,6 +422,7 @@ resend-email: Yeniden Onay E-postası Gönder
 reset-password: Şifreyi yenile
 reset-spoofed-user: Sahte yapmayı durdur
 reset-your-password: şifrenizi sıfırlayın
+retention: Bekletme (saniye cinsinden)
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
 search-bundle-id: Paket kimliğine göre ara

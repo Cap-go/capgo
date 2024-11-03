@@ -90,6 +90,7 @@ canceled-photo-selection: 您取消了图片选择
 cannot-change-default-upload-channel: 无法更改默认上传通道，请检查浏览器控制台
 cannot-change-name: 无法更改名称，请检查浏览器控制台
 cannot-change-permission: 无法更改权限，请检查浏览器控制台
+cannot-change-retention: 无法更改保留，请检查浏览器控制台
 cannot-copy: 无法复制到您的剪贴板，请从模态窗口中自行复制
 cannot-copy-key: 无法复制您剪贴板中的密钥，请自行复制
 cannot-create-empty-device: 无法创建空设备。请检查浏览器控制台
@@ -120,6 +121,7 @@ change: 改变
 change-api-key-name: 更改 apikey 的名称
 change-your-picture: 改变你的图片
 changed-app-name: 更改应用名称成功
+changed-app-retention: 成功更改了应用程序的保留时间
 changed-name: 已成功更改 apikey 名称
 changed-password-suc: 密码修改成功
 channel: 渠道
@@ -268,7 +270,7 @@ live-reload: 实时重新加载
 log-as: 开始欺骗
 log-in: 登录
 login-to-your-accoun: 登录到您的帐户
-logout: ''
+logout: 注销
 logs: 日志
 main-bundle-number: 主束编号
 major: 主要的
@@ -403,6 +405,7 @@ resend-email: 重新发送确认邮件
 reset-password: 重设密码
 reset-spoofed-user: 停止欺骗
 reset-your-password: 重置你的密码
+retention: 保留时间（秒）
 save: 保存
 save-changes: 保存更改
 search-bundle-id: 按包 ID 搜索

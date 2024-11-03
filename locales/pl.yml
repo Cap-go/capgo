@@ -92,6 +92,7 @@ canceled-photo-selection: Anulowałeś wybór zdjęć
 cannot-change-default-upload-channel: Nie można zmienić domyślnego kanału przesyłania, sprawdź konsolę przeglądarki
 cannot-change-name: Nie można zmienić nazwy. Sprawdź konsolę przeglądarki
 cannot-change-permission: Nie można zmienić uprawnień. Sprawdź konsolę przeglądarki
+cannot-change-retention: Nie można zmienić retencji, sprawdź konsolę przeglądarki
 cannot-copy: >-
   Nie można skopiować do schowka, proszę skopiować samodzielnie z okna
   modalnego.
@@ -128,6 +129,7 @@ change: Zmiana
 change-api-key-name: Zmień nazwę apikey
 change-your-picture: Zmień swoje zdjęcie
 changed-app-name: Pomyślnie zmieniono nazwę aplikacji
+changed-app-retention: Pomyślnie zmieniono retencję aplikacji
 changed-name: Pomyślnie zmieniono nazwę apikey
 changed-password-suc: Hasło zostało zmienione pomyślnie
 channel: Kanał
@@ -428,6 +430,7 @@ resend-email: Wyślij ponownie email z potwierdzeniem
 reset-password: Zresetuj hasło
 reset-spoofed-user: Przestań podszywać się
 reset-your-password: Zresetuj swoje hasło
+retention: Retencja (w sekundach)
 save: Zapisuje
 save-changes: Zapisz zmiany
 search-bundle-id: Wyszukaj według identyfikatora pakietu

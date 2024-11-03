@@ -90,6 +90,7 @@ canceled-photo-selection: Anda membatalkan pemilihan gambar
 cannot-change-default-upload-channel: Tidak dapat mengubah saluran unggahan default, silakan periksa konsol browser
 cannot-change-name: Tidak dapat mengubah nama, silakan periksa konsol browser
 cannot-change-permission: Tidak dapat mengubah izin, periksa konsol browser
+cannot-change-retention: Tidak dapat mengubah retensi, silakan periksa konsol browser
 cannot-copy: Tidak dapat menyalin ke clipboard Anda, silakan salin sendiri dari modal
 cannot-copy-key: Tidak dapat menyalin kunci di clipboard Anda, silakan salin sendiri
 cannot-create-empty-device: Tidak dapat membuat perangkat kosong. Silakan periksa konsol browser
@@ -122,6 +123,7 @@ change: Mengubah
 change-api-key-name: Ubah nama apikey
 change-your-picture: Ubah gambar Anda
 changed-app-name: Berhasil mengubah nama aplikasi
+changed-app-retention: Berhasil mengubah retensi aplikasi
 changed-name: Berhasil mengubah nama apikey
 changed-password-suc: Kata sandi berhasil diubah
 channel: Saluran
@@ -424,6 +426,7 @@ resend-email: Kirim Ulang Email Konfirmasi
 reset-password: Atur Ulang Kata Sandi
 reset-spoofed-user: Berhenti melakukan spoofing
 reset-your-password: Mereset password Anda
+retention: Retensi (dalam detik)
 save: Menghemat
 save-changes: Simpan perubahan
 search-bundle-id: Cari berdasarkan bundel ID

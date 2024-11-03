@@ -3,6 +3,7 @@ import { Camera } from '@capacitor/camera'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
 import Pencil from '~icons/heroicons/pencil-square'
+import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import mime from 'mime'
 import { useI18n } from 'petite-vue-i18n'
@@ -114,7 +115,7 @@ async function deleteApp() {
     toast.error(t('cannot-delete-app'))
   }
 }
-async function submit(form: { app_name: string }) {
+async function submit(form: { app_name: string, retention: number }) {
   isLoading.value = true
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
     toast.error(t('no-permission'))
@@ -137,11 +138,25 @@ async function submit(form: { app_name: string }) {
       return
     }
 
-    if (appRef.value?.name)
+    if (appRef.value)
       appRef.value.name = newName
 
     toast.success(t('changed-app-name'))
   }
+  if (form.retention !== appRef.value?.retention) {
+    const { error } = await supabase.from('apps').update({ retention: form.retention }).eq('app_id', appId.value)
+    if (error) {
+      toast.error(t('cannot-change-retention'))
+      console.error(error)
+      isLoading.value = false
+    }
+    else {
+      toast.success(t('changed-app-retention'))
+      if (appRef.value)
+        appRef.value.retention = form.retention
+    }
+  }
+  isLoading.value = false
 }
 
 async function setDefaultChannel() {
@@ -394,6 +409,14 @@ async function editPhoto() {
                   </template>
                 </FormKit>
               </div>
+              <FormKit
+                type="number"
+                number="integer"
+                name="retention"
+                :prefix-icon="gearSix"
+                :value="appRef?.retention || 0"
+                :label="t('retention')"
+              />
             </div>
           </div>
           <FormKitMessages />
