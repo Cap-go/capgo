@@ -129,7 +129,7 @@
     "@sentry/cli": "^2.36.1",
     "@std/assert": "npm:@jsr/std__assert",
     "@std/semver": "npm:@jsr/std__semver",
-    "@supabase/supabase-js": "2.46.0",
+    "@supabase/supabase-js": "2.46.1",
     "@tailwindcss/forms": "^0.5.9",
     "@vuepic/vue-datepicker": "^9.0.3",
     "@vueuse/components": "^11.1.0",
