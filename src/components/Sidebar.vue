@@ -122,7 +122,7 @@ const tabs = ref<Tab[]>([
                 @click="openTab(tab)"
               >
                 <component :is="tab.icon" class="w-5 h-5 shrink-0" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
-                <span class="ml-3 text-sm font-medium" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">
+                <span class="ml-3 text-sm font-medium first-letter:uppercase" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">
                   {{ t(tab.label) }}
                 </span>
               </button>

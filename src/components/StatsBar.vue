@@ -38,9 +38,9 @@ const refStats = toRef(() => props.stats)
         <div class="flex flex-row-reverse items-center justify-center flex-column">
           <h3 class="mt-5 text-sm font-bold tracking-widest text-gray-400 uppercase font-pj lg:order-2 lg:mt-0">
             <span :class="{ 'group-hover:hidden': s.link && (s.hoverLabel || s.link) }">{{ s.label }}</span>
-            <span v-if="s.link && (s.hoverLabel || s.link)" class="hidden group-hover:inline">{{ s.hoverLabel || s.label }}</span>
+            <span v-if="s.link && (s.hoverLabel || s.link)" class="hidden group-hover:inline first-letter:uppercase">{{ s.hoverLabel || s.label }}</span>
           </h3>
-          <InformationInfo v-if="!!s.informationIcon" class="ml-1" @click="s.informationIcon" />
+          <InformationInfo v-if="!!s.informationIcon" class="ml-1 first-letter:uppercase" @click="s.informationIcon" />
         </div>
       </span>
     </component>

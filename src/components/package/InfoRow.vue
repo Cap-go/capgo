@@ -25,7 +25,7 @@ watch(rowInput, useDebounceFn(() => {
 <template>
   <div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
     <dl>
-      <dt class="text-sm font-medium text-gray-700 dark:text-gray-200">
+      <dt class="text-sm font-medium text-gray-700 dark:text-gray-200 first-letter:uppercase">
         {{ props.label }}
       </dt>
     </dl>
