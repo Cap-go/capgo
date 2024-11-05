@@ -148,7 +148,7 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.35.3",
     "envfile": "^7.1.0",
-    "firebase": "10.14.0",
+    "firebase": "10.14.1",
     "google-play-scraper": "^9.2.0",
     "ky": "^1.7.2",
     "mime": "^4.0.4",
