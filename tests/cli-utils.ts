@@ -1,6 +1,6 @@
 import type { ExecSyncOptions } from 'node:child_process'
 import type { Readable } from 'node:stream'
-import { execSync, spawn } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
