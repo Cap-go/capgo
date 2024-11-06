@@ -4,7 +4,6 @@ CREATE OR REPLACE PROCEDURE "public"."update_app_versions_retention"()
 BEGIN
     UPDATE app_versions
     SET deleted = true
-    FROM app_versions_meta
     where extract(epoch from now()) - extract(epoch from app_versions.created_at) > ((select retention from apps where app_id=app_versions.app_id))
     AND NOT EXISTS (
         SELECT 1
