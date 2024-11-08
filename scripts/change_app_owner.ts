@@ -1,4 +1,4 @@
-import type { Database } from '../_backend/utils/supabase.types.ts'
+import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 /// <reference lib="deno.ns" />
 import { ensureFile } from 'https://deno.land/std/fs/ensure_file.ts'
 import { S3Client } from 'https://deno.land/x/s3_lite_client@0.7.0/mod.ts'
