@@ -7,7 +7,7 @@ import { get } from './get.ts'
 
 export const app = new Hono()
 
-app.get('/', middlewareKey(['all', 'write']), async (c: Context) => {
+app.get('/', middlewareKey(['all', 'write', 'read']), async (c: Context) => {
   try {
     const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey')
