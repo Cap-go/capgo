@@ -73,11 +73,13 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
         role: 'admin',
         handler: () => permision = invite ? 'invite_admin' : 'admin',
       },
-      {
-        text: t('key-super-admin'),
-        role: 'super_admin',
-        handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
-      },
+      ...(isSuperAdmin()
+        ? [{
+            text: t('key-super-admin'),
+            role: 'super_admin',
+            handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
+          }]
+        : []),
     ],
   }
   displayStore.showDialog = true
@@ -250,6 +252,9 @@ function acronym(email: string) {
 }
 function canEdit(member: ExtendedOrganizationMember) {
   return (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
+}
+function isSuperAdmin() {
+  return organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
 }
 function canDelete(member: ExtendedOrganizationMember) {
   return (member.uid === main.user?.id || currentOrganization?.value?.created_by === main.user?.id || organizationStore.currentRole === 'admin') && member.uid !== currentOrganization?.value?.created_by
