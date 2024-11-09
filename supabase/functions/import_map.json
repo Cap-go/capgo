@@ -12,7 +12,7 @@
     "hono/http-exception": "jsr:@hono/hono@^4.6.7/http-exception",
     "hono/adapter": "jsr:@hono/hono@^4.6.7/adapter",
     "hono/utils/buffer": "jsr:@hono/hono@^4.6.7/utils/buffer",
-    "stripe": "npm:stripe@15.8.0",
+    "stripe": "npm:stripe@17.3.0",
     "zod": "https://esm.sh/zod@3.23.8?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.11?target=deno",
     "ky": "https://esm.sh/ky@1.2.4",

@@ -2,18 +2,13 @@ import type { Context } from '@hono/hono'
 import type { MeteredData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
-import { parsePriceIds } from './stripe.ts'
+import { getStripe, parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
 export function parseStripeEvent(c: Context, body: string, signature: string) {
-  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
   const webhookKey = getEnv(c, 'STRIPE_WEBHOOK_SECRET')
-  const stripe = new Stripe(secretKey, {
-    apiVersion: '2024-04-10',
-    httpClient: Stripe.createFetchHttpClient(),
-  })
 
-  return stripe.webhooks.constructEventAsync(
+  return getStripe(c).webhooks.constructEventAsync(
     body,
     signature,
     webhookKey,
@@ -22,7 +17,7 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   )
 }
 
-export function extractDataEvent(c: Context, event: Stripe.Event): Database['public']['Tables']['stripe_info']['Insert'] {
+export function extractDataEvent(c: Context, event: Stripe.Event): { data: Database['public']['Tables']['stripe_info']['Insert'], isUpgrade: boolean, previousProductId: string | undefined } {
   const data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',
@@ -34,11 +29,19 @@ export function extractDataEvent(c: Context, event: Stripe.Event): Database['pub
     is_good_plan: true,
     status: undefined,
   }
+  let isUpgrade = false
+  let previousProductId: string | undefined
 
   console.log({ requestId: c.get('requestId'), context: 'event', event: JSON.stringify(event, null, 2) })
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated') {
       const subscription = event.data.object
+      const previousAttributes = event.data.previous_attributes as Partial<Stripe.Subscription>
+
+      // Get previous items if available
+      const previousItems = previousAttributes?.items?.data as Stripe.SubscriptionItem[] | undefined
+      previousProductId = previousItems?.[0]?.plan.product as string | undefined
+
       const res = parsePriceIds(c, subscription.items.data)
       data.price_id = res.priceId
       if (res.productId)
@@ -54,6 +57,11 @@ export function extractDataEvent(c: Context, event: Stripe.Event): Database['pub
       data.status = subscription.cancel_at ? 'canceled' : 'updated'
       data.subscription_id = subscription.id
       data.customer_id = String(subscription.customer)
+
+      // Check if this is an upgrade
+      if (previousProductId && data.product_id !== previousProductId) {
+        isUpgrade = true
+      }
     }
     else if (event.type === 'customer.subscription.deleted') {
       const charge = event.data.object
@@ -65,5 +73,5 @@ export function extractDataEvent(c: Context, event: Stripe.Event): Database['pub
       console.error({ requestId: c.get('requestId'), context: 'Other event', event })
     }
   }
-  return data
+  return { data, isUpgrade, previousProductId }
 }
