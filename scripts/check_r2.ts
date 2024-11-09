@@ -1,16 +1,16 @@
+/* eslint-disable node/prefer-global/process */
 import type { _Object, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3'
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'// supabase.types.ts'
 import { CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { createClient } from '@supabase/supabase-js'
 
 const S3_BUCKET = 'capgo'
-const MAGIC_TO_DELETE = './tmp/magic_to_delete5.txt'
+const MAGIC_TO_DELETE = './tmp/magic_to_delete6.txt'
 
 async function main() {
-  // eslint-disable-next-line node/prefer-global/process
   if (process.env.MAKE_COPY === '1') {
     const s3 = await initS3()
-    const files = JSON.parse(await Bun.file(MAGIC_TO_DELETE).text()) as _Object[]
+    const files = JSON.parse(await Bun.file('./tmp/filtr.txt'/* MAGIC_TO_DELETE */).text()) as _Object[]
     const file = files[0]
     console.log({
       Bucket: 'capgo-cleanup-backup',
@@ -43,19 +43,36 @@ async function main() {
     await Promise.all(promises)
     return
   }
-  // eslint-disable-next-line node/prefer-global/process
+  else if (process.env.LIST_FILES === '1') {
+    // 10250
+    const s3 = await initS3()
+    const files = await listAllObjectsInFolder(s3, null as any, 'backuptmp')
+    console.log(files.length)
+    const allFiles = JSON.parse(await Bun.file(MAGIC_TO_DELETE).text()) as _Object[]
+    const filesMap = new Map(files.map(f => [f.Key ?? 'a', f]))
+    const filter = allFiles.filter(f => !filesMap.get(f.Key ?? ''))
+    const str = JSON.stringify(filter, null, 2)
+    await Bun.write('./tmp/filtr.txt', str)
+    return
+  }
+
   else if (process.env.DELETE_FILES === '1') {
     const s3 = await initS3()
     const files = JSON.parse(await Bun.file(MAGIC_TO_DELETE).text()) as _Object[]
     // eslint-disable-next-line style/max-statements-per-line
     const toDelete = files.map((file) => { return { Key: file.Key ?? '' } })
-    const command = new DeleteObjectsCommand({
-      Bucket: S3_BUCKET,
-      Delete: {
-        Objects: toDelete,
-      },
-    })
-    s3.send(command)
+    while (toDelete.length > 0) {
+      const chunk = toDelete.splice(0, 999)
+      console.log('delete!')
+      const command = new DeleteObjectsCommand({
+        Bucket: S3_BUCKET,
+        Delete: {
+          Objects: chunk,
+        },
+      })
+      s3.send(command)
+    }
+    return
   }
 
   const s3 = await initS3()
@@ -190,12 +207,10 @@ async function main() {
 }
 
 function getEnv(c: any, s: string) {
-  // eslint-disable-next-line node/prefer-global/process
   return process.env[s] ?? ''
 }
 
-async function listAllObjectsInFolder(s3: S3Client, path: string) {
-  const bucketName = S3_BUCKET
+async function listAllObjectsInFolder(s3: S3Client, path: string, bucketName: string | null = null) {
   const folderPrefix = path
 
   let continuationToken: string | null = null
@@ -204,7 +219,7 @@ async function listAllObjectsInFolder(s3: S3Client, path: string) {
   try {
     while (true) {
       const data = await s3.send(new ListObjectsV2Command({
-        Bucket: bucketName,
+        Bucket: bucketName ?? S3_BUCKET,
         Prefix: folderPrefix,
         ContinuationToken: continuationToken || undefined,
       })) as ListObjectsV2CommandOutput
@@ -219,7 +234,7 @@ async function listAllObjectsInFolder(s3: S3Client, path: string) {
   }
   catch (err) {
     console.error('Error listing objects', err)
-    // eslint-disable-next-line node/prefer-global/process
+
     process.exit(1)
   }
   return object
