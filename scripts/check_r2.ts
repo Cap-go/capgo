@@ -1,43 +1,64 @@
 import type { _Object, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3'
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'// supabase.types.ts'
-import { CopyObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
-import * as semver from '@std/semver'
+import { CopyObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
 import { createClient } from '@supabase/supabase-js'
 
 const S3_BUCKET = 'capgo'
+const MAGIC_TO_DELETE = './tmp/magic_to_delete5.txt'
 
 async function main() {
   // eslint-disable-next-line node/prefer-global/process
   if (process.env.MAKE_COPY === '1') {
     const s3 = await initS3()
-    const files = JSON.parse(await Bun.file('./tmp/magic_to_delete3.txt').text()) as _Object[]
+    const files = JSON.parse(await Bun.file(MAGIC_TO_DELETE).text()) as _Object[]
     const file = files[0]
     console.log({
       Bucket: 'capgo-cleanup-backup',
       CopySource: `${S3_BUCKET}/${file.Key}`,
       Key: file.Key,
     })
-    try {
+    // try {
+    //   const com = new CopyObjectCommand({
+    //     Bucket: ('backuptmp'),
+    //     CopySource: (`${S3_BUCKET}/${file.Key}`),
+    //     Key: (file.Key ?? ''),
+    //     // ACL: 'authenticated-read',
+    //   })
+    //   console.log(com)
+    //   await s3.send(com)
+    // }
+    // catch (e) {
+    //   console.log(e)
+    // }
+
+    const promises = files.map((file) => {
       const com = new CopyObjectCommand({
-        Bucket: encodeURIComponent('capgo-cleanup-backup'),
-        CopySource: encodeURIComponent(`${S3_BUCKET}/${file.Key}`),
-        Key: encodeURIComponent(file.Key ?? ''),
+        Bucket: ('backuptmp'),
+        CopySource: (`${S3_BUCKET}/${file.Key}`),
+        Key: (file.Key ?? ''),
         // ACL: 'authenticated-read',
       })
-      console.log(com)
-      await s3.send(com)
-    }
-    catch (e) {
-      console.log(e)
-    }
-
-    // const promises = files.map((file) => {
-    //   return
-    // })
-    // await Promise.all(promises)
+      return s3.send(com)
+    })
+    await Promise.all(promises)
     return
   }
+  // eslint-disable-next-line node/prefer-global/process
+  else if (process.env.DELETE_FILES === '1') {
+    const s3 = await initS3()
+    const files = JSON.parse(await Bun.file(MAGIC_TO_DELETE).text()) as _Object[]
+    // eslint-disable-next-line style/max-statements-per-line
+    const toDelete = files.map((file) => { return { Key: file.Key ?? '' } })
+    const command = new DeleteObjectsCommand({
+      Bucket: S3_BUCKET,
+      Delete: {
+        Objects: toDelete,
+      },
+    })
+    s3.send(command)
+  }
 
+  const s3 = await initS3()
   const supabase = supabaseAdmin()
   const list = await listAllObjectsInFolder(s3, 'apps/')
   // await s3.send(new ListObjectsV2Command({
@@ -160,7 +181,7 @@ async function main() {
     await Promise.all(promises)
     console.log(`Not found items: ${notFoundObjects.length}; Total items: ${list.length + handled}`)
     const str = JSON.stringify(notFoundObjects, null, 2)
-    await Bun.write('./tmp/magic_to_delete4.txt', str)
+    await Bun.write(MAGIC_TO_DELETE, str)
     // console.log(notFoundObjects)
   }
 
@@ -233,12 +254,13 @@ export function initS3() {
     region: storageRegion ?? 'us-east-1',
     // not apply in supabase local
     forcePathStyle: true, // storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
-    signingEscapePath: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
+    signingEscapePath: false,
+    // signingEscapePath: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
   }
 
   console.log({ context: 'initS3', params })
 
-  return new S3Client(params)
+  return new S3Client({ ...params })
 }
 
 await main()
