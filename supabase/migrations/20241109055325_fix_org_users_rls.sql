@@ -54,7 +54,7 @@ Begin
   END IF;
 
 
-  if NOT (check_min_rights('super_admin'::user_min_right, (select auth.uid()), invite_user_to_org.org_id, NULL::character varying, NULL::bigint) AND (invite_type is not distinct from 'super_admin'::"public"."user_min_right" or invite_type is not distinct from 'invite_super_admin'::"public"."user_min_right")) THEN
+  if NOT (check_min_rights('super_admin'::user_min_right, (select auth.uid()), invite_user_to_org.org_id, NULL::character varying, NULL::bigint) AND (invite_type is distinct from 'super_admin'::"public"."user_min_right" or invite_type is distinct from 'invite_super_admin'::"public"."user_min_right")) THEN
     return 'NO_RIGHTS';
   END IF;
 
