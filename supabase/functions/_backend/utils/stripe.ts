@@ -2,7 +2,12 @@ import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
 import { existInEnv, getEnv } from './utils.ts'
 
-const getStripe = (c: Context) => new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'))
+export function getStripe(c: Context) {
+  return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
+    apiVersion: '2024-10-28.acacia',
+    httpClient: Stripe.createFetchHttpClient(),
+  })
+}
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
@@ -24,12 +29,11 @@ export function updateCustomerEmail(c: Context, customerId: string, newEmail: st
 export async function cancelSubscription(c: Context, customerId: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
-  const stripe = new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'))
-  const allSubscriptions = await stripe.subscriptions.list({
+  const allSubscriptions = await getStripe(c).subscriptions.list({
     customer: customerId,
   })
   return Promise.all(
-    allSubscriptions.data.map(sub => stripe.subscriptions.cancel(sub.id)),
+    allSubscriptions.data.map(sub => getStripe(c).subscriptions.cancel(sub.id)),
   ).catch((err) => {
     console.error({ requestId: c.get('requestId'), context: 'cancelSubscription', error: err })
   })

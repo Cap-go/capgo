@@ -2,7 +2,6 @@ import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { removeOldSubscription } from '../utils/stripe.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -21,7 +20,8 @@ app.post('/', async (c: Context) => {
     // event.headers
     const body = await c.req.text()
     const stripeEvent = await parseStripeEvent(c, body, signature!)
-    const stripeData = await extractDataEvent(c, stripeEvent)
+    const stripeDataEvent = extractDataEvent(c, stripeEvent)
+    const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '')
       return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
 
@@ -64,9 +64,24 @@ app.post('/', async (c: Context) => {
           .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
-        if (customer && customer.subscription_id && customer.subscription_id !== stripeData.subscription_id) {
-          await removeOldSubscription(c, customer.subscription_id)
+        if (stripeDataEvent.isUpgrade && stripeDataEvent.previousProductId) {
           statusName = 'upgraded'
+          const previousProduct = await supabaseAdmin(c)
+            .from('plans')
+            .select()
+            .eq('stripe_id', stripeDataEvent.previousProductId)
+            .single()
+          await LogSnag.track({
+            channel: 'usage',
+            event: 'User Upgraded',
+            icon: '💰',
+            user_id: org.id,
+            notify: true,
+            tags: {
+              plan_name: plan.name,
+              previous_plan_name: previousProduct.data?.name || '',
+            },
+          }).catch()
         }
 
         if (dbError2)
@@ -83,6 +98,9 @@ app.post('/', async (c: Context) => {
           icon: '💰',
           user_id: org.id,
           notify: status === 'succeeded',
+          tags: {
+            plan_name: plan.name,
+          },
         }).catch()
       }
       else {
