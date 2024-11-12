@@ -35,6 +35,11 @@ describe('tests CLI metadata', () => {
 
     await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', '6.0.0', '✅')
 
+    setDependencies({
+      '@capacitor/android': '6.0.0',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', '6.0.0', '^6.0.0', '✅')
+
     setDependencies({}, id, APPNAME)
 
     // well, the local version doesn't exist, so I expect an empty string ???
