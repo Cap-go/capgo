@@ -110,7 +110,7 @@
     "@capgo/capacitor-flash": "^6.0.3",
     "@capgo/capacitor-mute": "^6.0.3",
     "@capgo/capacitor-native-biometric": "^6.0.3",
-    "@capgo/capacitor-screen-recorder": "8.1.75",
+    "@capgo/capacitor-screen-recorder": "8.1.82",
     "@capgo/capacitor-updater": "^6.3.3",
     "@capgo/google-play-scraper": "^9.1.2",
     "@capgo/inappbrowser": "^6.6.8",
