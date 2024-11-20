@@ -90,6 +90,7 @@ canceled-photo-selection: 画像の選択をキャンセルしました
 cannot-change-default-upload-channel: デフォルトのアップロードチャンネルを変更できません。
 cannot-change-name: 名前を変更できません。ブラウザコンソールを確認してください。
 cannot-change-permission: 権限を変更できません。ブラウザコンソールを確認してください
+cannot-change-retention: 保持を変更できません。ブラウザのコンソールを確認してください。
 cannot-copy: クリップボードにコピーできません、モーダルから自分でコピーしてください。
 cannot-copy-key: クリップボードにキーをコピーできません、自分でコピーしてください
 cannot-create-empty-device: 空のデバイスを作成できません。ブラウザのコンソールを確認してください。
@@ -120,6 +121,7 @@ change: 変化
 change-api-key-name: apikey の名前を変更する
 change-your-picture: 写真を変更する
 changed-app-name: アプリ名が正常に変更されました
+changed-app-retention: アプリのリテンション変更に成功
 changed-name: apikey の名前が正常に変更されました
 changed-password-suc: パスワードは正常に変更されました
 channel: チャネル
@@ -403,6 +405,7 @@ resend-email: 確認メールを再送してください
 reset-password: パスワードを再設定する
 reset-spoofed-user: スプーフィングをやめてください
 reset-your-password: あなたのパスワードをリセット
+retention: 保持時間（秒）
 save: セーブ
 save-changes: 変更内容を保存
 search-bundle-id: バンドル ID で検索

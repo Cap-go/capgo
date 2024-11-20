@@ -102,6 +102,9 @@ cannot-change-default-upload-channel: >-
   Browser-Konsole
 cannot-change-name: Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole
 cannot-change-permission: Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole
+cannot-change-retention: >-
+  Die Speicherung kann nicht geändert werden, bitte überprüfen Sie die
+  Browserkonsole
 cannot-copy: >-
   Kann nicht in Ihre Zwischenablage kopieren, bitte kopieren Sie selbst aus dem
   Modal.
@@ -146,6 +149,7 @@ change: Ändern
 change-api-key-name: Ändern Sie den Namen des Apikeys
 change-your-picture: Ändere dein Bild
 changed-app-name: App-Name erfolgreich geändert
+changed-app-retention: Erfolgreich die Speicherung der App geändert
 changed-name: Der Name von apikey wurde erfolgreich geändert
 changed-password-suc: das Passwort wurde erfolgreich geändert
 channel: Kanal
@@ -463,6 +467,7 @@ resend-email: Bestätigungs-E-Mail erneut senden
 reset-password: Passwort zurücksetzen
 reset-spoofed-user: Hör auf zu fälschen
 reset-your-password: Setze dein Passwort zurück
+retention: Verweildauer (in Sekunden)
 save: Speichert
 save-changes: Änderungen speichern
 search-bundle-id: Suche nach Bündel-ID

@@ -98,6 +98,9 @@ cannot-change-default-upload-channel: >-
   consola del navegador
 cannot-change-name: No se puede cambiar el nombre, verifique la consola del navegador
 cannot-change-permission: No se pueden cambiar los permisos, verifique la consola del navegador
+cannot-change-retention: >-
+  No se puede cambiar la retención, por favor, compruebe la consola del
+  navegador
 cannot-copy: No se puede copiar en tu portapapeles, por favor copia tú mismo desde el modal
 cannot-copy-key: No se puede copiar la clave en tu portapapeles, por favor cópiala tú mismo.
 cannot-create-empty-device: >-
@@ -134,6 +137,7 @@ change: Cambiar
 change-api-key-name: Cambiar el nombre del apikey
 change-your-picture: Cambia tu fotografía
 changed-app-name: El nombre de la aplicación se cambió correctamente
+changed-app-retention: Cambiada con éxito la retención de la aplicación
 changed-name: Cambió exitosamente el nombre de apikey
 changed-password-suc: Contraseña cambiada con éxito
 channel: Canal
@@ -442,6 +446,7 @@ resend-email: Reenviar Correo Electrónico de Confirmación
 reset-password: Restablecer la contraseña
 reset-spoofed-user: Deja de falsificar
 reset-your-password: Restablecer su contraseña
+retention: Retención (en segundos)
 save: Ahorra
 save-changes: Guardar cambios
 search-bundle-id: Buscar por ID de paquete

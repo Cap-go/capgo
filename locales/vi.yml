@@ -96,6 +96,7 @@ cannot-change-default-upload-channel: >-
   trình duyệt
 cannot-change-name: Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-change-permission: Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt
+cannot-change-retention: Không thể thay đổi lưu giữ, vui lòng kiểm tra bảng điều khiển trình duyệt
 cannot-copy: >-
   Không thể sao chép vào clipboard của bạn, vui lòng tự sao chép từ cửa sổ hiện
   ra
@@ -136,6 +137,7 @@ change: Thay đổi
 change-api-key-name: Thay đổi tên của apikey
 change-your-picture: Thay đổi hình ảnh của bạn
 changed-app-name: Đã đổi tên ứng dụng thành công
+changed-app-retention: Đã thay đổi thành công tỷ lệ lưu giữ của ứng dụng
 changed-name: Đã đổi tên apikey thành công
 changed-password-suc: Đã đổi mật khẩu thành công
 channel: Kênh
@@ -292,7 +294,7 @@ live-reload: tải lại trực tiếp
 log-as: Bắt đầu giả mạo
 log-in: Đăng nhập
 login-to-your-accoun: đăng nhập vào tài khoản của bạn
-logout: ''
+logout: đăng xuất
 logs: Nhật ký
 main-bundle-number: Số gói chính
 major: Lớn lao
@@ -435,6 +437,7 @@ resend-email: Gửi lại email xác nhận
 reset-password: Đặt lại mật khẩu
 reset-spoofed-user: Dừng giả mạo
 reset-your-password: Đặt lại mật khẩu của bạn
+retention: Lưu giữ (tính bằng giây)
 save: tiết kiệm
 save-changes: Lưu thay đổi
 search-bundle-id: Tìm kiếm theo ID gói

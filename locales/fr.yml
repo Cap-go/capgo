@@ -100,6 +100,9 @@ cannot-change-default-upload-channel: >-
   la console du navigateur
 cannot-change-name: Impossible de changer le nom, veuillez vérifier la console du navigateur
 cannot-change-permission: Impossible de modifier les autorisations, vérifiez la console du navigateur
+cannot-change-retention: >-
+  Impossible de modifier la rétention, veuillez vérifier la console du
+  navigateur
 cannot-copy: >-
   Impossible de copier dans votre presse-papiers, veuillez copier vous-même
   depuis le modal
@@ -144,6 +147,7 @@ change: Changement
 change-api-key-name: Changer le nom de l'apikey
 change-your-picture: Changez votre photo
 changed-app-name: Nom de l'application modifié avec succès
+changed-app-retention: Modification réussie de la rétention de l'application
 changed-name: Le nom de l'apikey a été modifié avec succès
 changed-password-suc: Mot de passe modifié avec succès
 channel: Canal
@@ -446,6 +450,7 @@ resend-email: Renvoyer l'email de confirmation
 reset-password: Réinitialiser le mot de passe
 reset-spoofed-user: Arrêtez le spoofing
 reset-your-password: Réinitialisez votre mot de passe
+retention: Rétention (en secondes)
 save: Économies
 save-changes: Enregistrer les modifications
 search-bundle-id: Recherche par ID de paquet

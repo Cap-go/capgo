@@ -96,6 +96,7 @@ cannot-change-default-upload-channel: >-
   браузера
 cannot-change-name: Невозможно изменить имя, проверьте консоль браузера.
 cannot-change-permission: Невозможно изменить разрешения, проверьте консоль браузера
+cannot-change-retention: Не удается изменить сохранение, проверьте консоль браузера
 cannot-copy: >-
   Не удается скопировать в буфер обмена, пожалуйста, скопируйте самостоятельно
   из модального окна
@@ -132,6 +133,7 @@ change: Изменять
 change-api-key-name: Измените имя апикея
 change-your-picture: Измените свою фотографию
 changed-app-name: Название приложения успешно изменено.
+changed-app-retention: Успешное изменение удержания приложения
 changed-name: Имя апикея успешно изменено.
 changed-password-suc: Пароль успешно изменен
 channel: Канал
@@ -429,6 +431,7 @@ resend-email: Отправить письмо подтверждения еще 
 reset-password: Сброс пароля
 reset-spoofed-user: Прекратите подделку
 reset-your-password: Сбросить пароль
+retention: Сохранение (в секундах)
 save: Сохраняет
 save-changes: Сохранить изменения
 search-bundle-id: Поиск по идентификатору пакета

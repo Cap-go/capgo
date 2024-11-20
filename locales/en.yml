@@ -90,6 +90,7 @@ canceled-photo-selection: You canceled the picture selection
 cannot-change-default-upload-channel: Cannot change default upload channel, please check the browser console
 cannot-change-name: Cannot change name, please check the browser console
 cannot-change-permission: Cannot change permissions, check browser console
+cannot-change-retention: Cannot change retention, please check the browser console
 cannot-copy: Cannot copy in your clipboard, please copy youself from the modal
 cannot-copy-key: Cannot copy key in your clipboard, please copy it yourself
 cannot-create-empty-device: Cannot create empty device. Please check the browser's console
@@ -122,6 +123,7 @@ change: Change
 change-api-key-name: Change the apikey's name
 change-your-picture: Change your picture
 changed-app-name: Successfully changed app name
+changed-app-retention: Successfully changed the app's retention
 changed-name: Successfully changed apikey's name
 changed-password-suc: Password changed successfully
 channel: Channel
@@ -312,7 +314,7 @@ new-name-to-long: The new name is too long. You can only use 32 characters
 new-name-to-short: The apikey name is too short. It must be atleast 4 characters longs
 next: Next
 next-run: Next update
-no: no
+'no': 'no'
 no-app-icon: This app does not have any app icon
 no-data: No Data
 no-permission: Insufficient permissions
@@ -402,6 +404,7 @@ resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-spoofed-user: Stop spoofing
 reset-your-password: Reset your password
+retention: Retention (in seconds)
 save: Saves
 save-changes: Save Changes
 search-bundle-id: Search by bundle ID
@@ -493,7 +496,7 @@ what-to-do-with-photo-dec: What would you like to do with the app photo?
 write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
-yes: yes
+'yes': 'yes'
 you-can-change-your-: You can change your personal informations here.
 you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached
