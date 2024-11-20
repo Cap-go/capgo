@@ -426,7 +426,7 @@ resend-email: Kirim Ulang Email Konfirmasi
 reset-password: Atur Ulang Kata Sandi
 reset-spoofed-user: Berhenti melakukan spoofing
 reset-your-password: Mereset password Anda
-retention: Retensi (dalam detik)
+retention: Hapus otomatis bundel yang tidak digunakan (setelah x detik)
 save: Menghemat
 save-changes: Simpan perubahan
 search-bundle-id: Cari berdasarkan bundel ID

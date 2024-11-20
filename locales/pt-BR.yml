@@ -430,7 +430,7 @@ resend-email: Reenviar Email de Confirmação
 reset-password: Redefinir senha
 reset-spoofed-user: Pare de falsificar
 reset-your-password: Redefina sua senha
-retention: Retenção (em segundos)
+retention: Excluir automaticamente pacotes não utilizados (após x segundos)
 save: Economizar
 save-changes: Salvar alterações
 search-bundle-id: Pesquisar por ID do pacote

@@ -404,7 +404,7 @@ resend-email: Resend Confirmation Email
 reset-password: Reset Password
 reset-spoofed-user: Stop spoofing
 reset-your-password: Reset your password
-retention: Retention (in seconds)
+retention: Auto delete bundles not used (after x seconds)
 save: Saves
 save-changes: Save Changes
 search-bundle-id: Search by bundle ID

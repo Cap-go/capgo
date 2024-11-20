@@ -467,7 +467,7 @@ resend-email: Bestätigungs-E-Mail erneut senden
 reset-password: Passwort zurücksetzen
 reset-spoofed-user: Hör auf zu fälschen
 reset-your-password: Setze dein Passwort zurück
-retention: Verweildauer (in Sekunden)
+retention: Automatische Löschung von nicht genutzten Paketen (nach x Sekunden)
 save: Speichert
 save-changes: Änderungen speichern
 search-bundle-id: Suche nach Bündel-ID

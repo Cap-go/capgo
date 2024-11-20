@@ -422,7 +422,7 @@ resend-email: Yeniden Onay E-postası Gönder
 reset-password: Şifreyi yenile
 reset-spoofed-user: Sahte yapmayı durdur
 reset-your-password: şifrenizi sıfırlayın
-retention: Bekletme (saniye cinsinden)
+retention: Kullanılmayan paketleri otomatik sil (x saniye sonra)
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
 search-bundle-id: Paket kimliğine göre ara

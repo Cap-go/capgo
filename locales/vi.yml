@@ -437,7 +437,7 @@ resend-email: Gửi lại email xác nhận
 reset-password: Đặt lại mật khẩu
 reset-spoofed-user: Dừng giả mạo
 reset-your-password: Đặt lại mật khẩu của bạn
-retention: Lưu giữ (tính bằng giây)
+retention: Tự động xóa các gói không được sử dụng (sau x giây)
 save: tiết kiệm
 save-changes: Lưu thay đổi
 search-bundle-id: Tìm kiếm theo ID gói

@@ -450,7 +450,7 @@ resend-email: Renvoyer l'email de confirmation
 reset-password: Réinitialiser le mot de passe
 reset-spoofed-user: Arrêtez le spoofing
 reset-your-password: Réinitialisez votre mot de passe
-retention: Rétention (en secondes)
+retention: Supprimer automatiquement les lots non utilisés (après x secondes)
 save: Économies
 save-changes: Enregistrer les modifications
 search-bundle-id: Recherche par ID de paquet

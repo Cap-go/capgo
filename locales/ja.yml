@@ -405,7 +405,7 @@ resend-email: 確認メールを再送してください
 reset-password: パスワードを再設定する
 reset-spoofed-user: スプーフィングをやめてください
 reset-your-password: あなたのパスワードをリセット
-retention: 保持時間（秒）
+retention: 使用されていないバンドルを自動的に削除する（x秒後）
 save: セーブ
 save-changes: 変更内容を保存
 search-bundle-id: バンドル ID で検索

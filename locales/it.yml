@@ -438,7 +438,7 @@ resend-email: Reenviar correo electrónico de confirmación
 reset-password: Resetta la password
 reset-spoofed-user: Smetti di falsificare
 reset-your-password: reimposta la tua password
-retention: Ritenzione (in secondi)
+retention: Elimina automaticamente i pacchetti non utilizzati (dopo x secondi)
 save: Salva
 save-changes: Salvare le modifiche
 search-bundle-id: Cerca per ID pacchetto

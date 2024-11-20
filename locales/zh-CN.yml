@@ -405,7 +405,7 @@ resend-email: 重新发送确认邮件
 reset-password: 重设密码
 reset-spoofed-user: 停止欺骗
 reset-your-password: 重置你的密码
-retention: 保留时间（秒）
+retention: 自动删除未使用的捆绑包（在x秒后）
 save: 保存
 save-changes: 保存更改
 search-bundle-id: 按包 ID 搜索

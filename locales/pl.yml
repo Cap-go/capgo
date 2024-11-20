@@ -430,7 +430,7 @@ resend-email: Wyślij ponownie email z potwierdzeniem
 reset-password: Zresetuj hasło
 reset-spoofed-user: Przestań podszywać się
 reset-your-password: Zresetuj swoje hasło
-retention: Retencja (w sekundach)
+retention: Automatyczne usuwanie pakietów nie używanych (po x sekundach)
 save: Zapisuje
 save-changes: Zapisz zmiany
 search-bundle-id: Wyszukaj według identyfikatora pakietu

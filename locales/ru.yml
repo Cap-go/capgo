@@ -431,7 +431,7 @@ resend-email: Отправить письмо подтверждения еще 
 reset-password: Сброс пароля
 reset-spoofed-user: Прекратите подделку
 reset-your-password: Сбросить пароль
-retention: Сохранение (в секундах)
+retention: Автоматическое удаление неиспользуемых пакетов (через x секунд)
 save: Сохраняет
 save-changes: Сохранить изменения
 search-bundle-id: Поиск по идентификатору пакета
