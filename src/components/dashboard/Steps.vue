@@ -4,7 +4,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
 import { pushEvent } from '~/services/bento'
-import { useSupabase } from '~/services/supabase'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 
@@ -31,10 +31,15 @@ interface Step {
   link?: string
 }
 
+const config = getLocalConfig()
+function isLocal() {
+  return config.supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+}
+
 const simpleStep: Step[] = [
   {
     title: t('init-capgo-in-your-a'),
-    command: 'npx @capgo/cli@latest init [APIKEY]',
+    command: !isLocal() ? `npx @capgo/cli@latest init [APIKEY]` : `npx @capgo/cli@latest init [APIKEY] --supa-host ${config.supaHost} --supa-anon ${config.supaKey}`,
     subtitle: '',
     link: '',
   },

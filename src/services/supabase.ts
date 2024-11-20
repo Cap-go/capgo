@@ -20,7 +20,7 @@ interface CapgoConfig {
   hostWeb: string
 }
 
-function getLocalConfig() {
+export function getLocalConfig() {
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
