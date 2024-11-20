@@ -1,3 +1,4 @@
+import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -7,7 +8,6 @@ import { version } from '../../package.json'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as files } from '../../supabase/functions/_backend/private/files.ts'
 import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
