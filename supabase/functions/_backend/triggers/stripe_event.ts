@@ -133,6 +133,25 @@ app.post('/', async (c: Context) => {
         return c.json({ error: JSON.stringify(dbError) }, 500)
     }
 
+    const previousAttributes = stripeEvent.data.previous_attributes ?? {} as any
+    if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === true && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === false) {
+      // console.log('USER CANCELLED!!!!!!!!!!!!!!!')
+      const { error: dbError2 } = await supabaseAdmin(c)
+        .from('stripe_info')
+        .update({ canceled_at: new Date().toISOString() })
+        .eq('customer_id', stripeData.customer_id)
+      if (dbError2)
+        return c.json({ error: JSON.stringify(dbError) }, 500)
+    }
+    else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
+      // console.log('USER UNCANCELED')
+      const { error: dbError2 } = await supabaseAdmin(c)
+        .from('stripe_info')
+        .update({ canceled_at: null })
+        .eq('customer_id', stripeData.customer_id)
+      if (dbError2)
+        return c.json({ error: JSON.stringify(dbError) }, 500)
+    }
     return c.json({ received: true })
   }
   catch (e) {
