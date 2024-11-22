@@ -128,7 +128,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
     console.log({ requestId: c.get('requestId'), context: 'missing device_id, channel_id, or app_id' })
     return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
   }
-  update.device_id = update.device_id.toLocaleLowerCase()
+  update.device_id = update.device_id.toLowerCase()
 
   const { data: existingChannelDevice } = await supabaseAdmin(c)
     .from('channel_devices')
@@ -535,7 +535,7 @@ export function trackBandwidthUsageSB(
     .from('bandwidth_usage')
     .insert([
       {
-        device_id: deviceId,
+        device_id: deviceId.toLowerCase(),
         app_id: appId,
         file_size: fileSize,
       },
@@ -568,7 +568,7 @@ export function trackDeviceUsageSB(
     .from('device_usage')
     .insert([
       {
-        device_id: deviceId,
+        device_id: deviceId.toLowerCase(),
         app_id: appId,
       },
     ])
@@ -599,7 +599,7 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
       {
         app_id,
         updated_at: new Date().toISOString(),
-        device_id,
+        device_id: device_id.toLowerCase(),
         platform,
         plugin_version,
         os_version,
@@ -610,7 +610,7 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
         is_emulator,
       },
     )
-    .eq('device_id', device_id)
+    .eq('device_id', device_id.toLowerCase())
 }
 
 export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
@@ -620,7 +620,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
       {
         app_id,
         created_at: new Date().toISOString(),
-        device_id,
+        device_id: device_id.toLowerCase(),
         action,
         version: version_id,
       },

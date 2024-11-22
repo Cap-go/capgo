@@ -146,7 +146,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     )
   `)
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLocaleLowerCase())
+    .eq('device_id', device_id.toLowerCase())
     .single()
   if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
     console.error({ requestId: c.get('requestId'), context: 'Cannot change device override current channel don\t allow it', channel, dataChannelOverride })
@@ -211,7 +211,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
         .from('channel_devices')
         .delete()
         .eq('app_id', app_id)
-        .eq('device_id', device_id.toLocaleLowerCase())
+        .eq('device_id', device_id.toLowerCase())
       if (dbErrorDev) {
         console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
         return c.json({
@@ -235,7 +235,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           .from('channel_devices')
           .delete()
           .eq('app_id', app_id)
-          .eq('device_id', device_id.toLocaleLowerCase())
+          .eq('device_id', device_id.toLowerCase())
         if (dbErrorDev) {
           console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
           return c.json({
@@ -247,7 +247,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .upsert({
-          device_id: device_id.toLocaleLowerCase(),
+          device_id: device_id.toLowerCase(),
           channel_id: dataChannel.id,
           app_id,
           owner_org: dataChannel.owner_org,
@@ -362,7 +362,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
       )
     `)
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLocaleLowerCase())
+    .eq('device_id', device_id.toLowerCase())
     .single()
   if (dataChannelOverride && dataChannelOverride.channel_id) {
     const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
@@ -445,7 +445,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     )
   `)
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLocaleLowerCase())
+    .eq('device_id', device_id.toLowerCase())
     .single()
   if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
     console.error({ requestId: c.get('requestId'), context: 'Cannot change device override current channel don\t allow it', dataChannelOverride })
@@ -458,7 +458,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .from('channel_devices')
     .delete()
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLocaleLowerCase())
+    .eq('device_id', device_id.toLowerCase())
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'Cannot delete channel override', error })
     return c.json({

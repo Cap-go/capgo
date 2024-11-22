@@ -22,7 +22,7 @@ export function trackDeviceUsageCF(c: Context, device_id: string, app_id: string
   if (!c.env.DEVICE_USAGE)
     return Promise.resolve()
   c.env.DEVICE_USAGE.writeDataPoint({
-    blobs: [device_id],
+    blobs: [device_id.toLowerCase()],
     indexes: [app_id],
   })
   return Promise.resolve()
@@ -32,7 +32,7 @@ export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: str
   if (!c.env.BANDWIDTH_USAGE)
     return Promise.resolve()
   c.env.BANDWIDTH_USAGE.writeDataPoint({
-    blobs: [device_id],
+    blobs: [device_id.toLowerCase()],
     doubles: [file_size],
     indexes: [app_id],
   })
@@ -53,7 +53,7 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
   if (!c.env.APP_LOG)
     return Promise.resolve()
   c.env.APP_LOG.writeDataPoint({
-    blobs: [device_id, action],
+    blobs: [device_id.toLowerCase(), action],
     doubles: [version_id],
     indexes: [app_id],
   })
@@ -63,7 +63,7 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
 export async function trackDevicesCF(
   c: Context,
   app_id: string,
-  device_id: string,
+  device_id_raw: string,
   version_id: number,
   platform: Database['public']['Enums']['platform_os'],
   plugin_version: string,
@@ -73,6 +73,7 @@ export async function trackDevicesCF(
   is_prod: boolean,
   is_emulator: boolean,
 ) {
+  const device_id = device_id_raw.toLowerCase()
   console.log({ requestId: c.get('requestId'), context: 'trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
 
   if (!c.env.DB_DEVICES)
@@ -85,7 +86,7 @@ export async function trackDevicesCF(
     const existingRow = await c.env.DB_DEVICES.prepare(`
       SELECT * FROM devices 
       WHERE device_id = ? AND app_id = ?
-    `).bind(device_id.toLocaleLowerCase(), app_id).first()
+    `).bind(device_id, app_id).first()
 
     if (!existingRow || (
       existingRow.version !== version_id
@@ -119,7 +120,7 @@ export async function trackDevicesCF(
       const res = await c.env.DB_DEVICES.prepare(upsertQuery)
         .bind(
           updated_at,
-          device_id.toLocaleLowerCase(),
+          device_id,
           version_id,
           app_id,
           platform,

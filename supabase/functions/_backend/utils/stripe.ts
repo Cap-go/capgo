@@ -80,7 +80,7 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
         productId = price.plan.product as string
       }
       if (price.plan.billing_scheme === 'per_unit' && price?.plan?.usage_type !== 'licensed' && price.plan.nickname) {
-        meteredData[price.plan.nickname.toLocaleLowerCase()] = price.plan.id
+        meteredData[price.plan.nickname.toLowerCase()] = price.plan.id
         console.log({ requestId: c.get('requestId'), context: 'metered price', price })
       }
     })
