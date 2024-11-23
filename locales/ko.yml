@@ -100,6 +100,10 @@ cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
+cannot-delete-bundle-linked-channel-1: 버전을 대량 삭제할 수 없습니다.
+cannot-delete-bundle-linked-channel-2: '다음 버전은 최소 1개 이상의 채널에 연결되어 있습니다:'
+cannot-delete-bundle-linked-channel-3: 수동으로 연결을 해제하고 다시 시도하세요.
+cannot-delete-bundles: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
@@ -406,6 +410,7 @@ reset-password: 암호를 재설정
 reset-spoofed-user: 스푸핑을 중단하십시오
 reset-your-password: 비밀번호를 재설정
 retention: 사용하지 않는 번들 자동 삭제 (x 초 후)
+revert-to-builtin: 기본 제공으로 되돌리기
 save: 저장
 save-changes: 변경 사항을 저장하다
 search-bundle-id: 번들 ID로 검색

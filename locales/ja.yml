@@ -100,6 +100,10 @@ cannot-del-org: 組織を削除できません。ブラウザのログを確認�
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-bundle: バンドルを削除できません
+cannot-delete-bundle-linked-channel-1: バージョンの一括削除はできません。
+cannot-delete-bundle-linked-channel-2: 以下のバージョンは少なくとも1チャンネルでリンクされている：
+cannot-delete-bundle-linked-channel-3: 手動でリンクを解除し、再度お試しください。
+cannot-delete-bundles: バンドルが削除できない
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
@@ -406,6 +410,7 @@ reset-password: パスワードを再設定する
 reset-spoofed-user: スプーフィングをやめてください
 reset-your-password: あなたのパスワードをリセット
 retention: 使用されていないバンドルを自動的に削除する（x秒後）
+revert-to-builtin: ビルトインに戻す
 save: セーブ
 save-changes: 変更内容を保存
 search-bundle-id: バンドル ID で検索

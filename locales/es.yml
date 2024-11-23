@@ -114,6 +114,10 @@ cannot-del-org: No se puede eliminar la organización; consulte el registro del 
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
 cannot-delete-bundle: No se puede eliminar el paquete
+cannot-delete-bundle-linked-channel-1: No se pueden borrar versiones en masa
+cannot-delete-bundle-linked-channel-2: 'Las siguientes versiones están vinculadas en al menos 1 canal:'
+cannot-delete-bundle-linked-channel-3: Por favor, desvincúlalos manualmente e inténtalo de nuevo
+cannot-delete-bundles: No se pueden eliminar paquetes
 cannot-delete-channel: No se puede eliminar el canal
 cannot-delete-member: No se puede eliminar un miembro, verifique la consola del navegador
 cannot-delete-owner: No se puede eliminar el propietario de la organización
@@ -447,6 +451,7 @@ reset-password: Restablecer la contraseña
 reset-spoofed-user: Deja de falsificar
 reset-your-password: Restablecer su contraseña
 retention: Eliminar automáticamente los paquetes no utilizados (después de x segundos)
+revert-to-builtin: volver al sistema incorporado
 save: Ahorra
 save-changes: Guardar cambios
 search-bundle-id: Buscar por ID de paquete

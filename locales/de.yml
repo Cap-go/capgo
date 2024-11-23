@@ -126,6 +126,10 @@ cannot-del-org: >-
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-icon: App-Symbol kann nicht gelöscht werden
 cannot-delete-bundle: Paket kann nicht gelöscht werden
+cannot-delete-bundle-linked-channel-1: Sie können Versionen nicht massenweise löschen
+cannot-delete-bundle-linked-channel-2: 'Die folgenden Versionen sind in mindestens einem Kanal miteinander verbunden:'
+cannot-delete-bundle-linked-channel-3: Bitte heben Sie die Verknüpfung manuell auf und versuchen Sie es erneut.
+cannot-delete-bundles: Bundles können nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
@@ -468,6 +472,7 @@ reset-password: Passwort zurücksetzen
 reset-spoofed-user: Hör auf zu fälschen
 reset-your-password: Setze dein Passwort zurück
 retention: Automatische Löschung von nicht genutzten Paketen (nach x Sekunden)
+revert-to-builtin: auf eingebautes System zurückgreifen
 save: Speichert
 save-changes: Änderungen speichern
 search-bundle-id: Suche nach Bündel-ID

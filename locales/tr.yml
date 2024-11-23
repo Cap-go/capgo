@@ -102,6 +102,10 @@ cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol 
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-bundle: Paket silinemiyor
+cannot-delete-bundle-linked-channel-1: Sürümleri toplu olarak silemezsiniz
+cannot-delete-bundle-linked-channel-2: 'Aşağıdaki versiyonlar en az 1 kanalda bağlantılıdır:'
+cannot-delete-bundle-linked-channel-3: Lütfen bağlantılarını manuel olarak kaldırın ve tekrar deneyin
+cannot-delete-bundles: Paketler silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
@@ -423,6 +427,7 @@ reset-password: Şifreyi yenile
 reset-spoofed-user: Sahte yapmayı durdur
 reset-your-password: şifrenizi sıfırlayın
 retention: Kullanılmayan paketleri otomatik sil (x saniye sonra)
+revert-to-builtin: yerleşik olana geri dön
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
 search-bundle-id: Paket kimliğine göre ara

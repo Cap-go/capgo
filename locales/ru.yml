@@ -110,6 +110,10 @@ cannot-del-org: Невозможно удалить организацию, пр
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-bundle: Невозможно удалить пакет
+cannot-delete-bundle-linked-channel-1: Массовое удаление версий невозможно
+cannot-delete-bundle-linked-channel-2: 'Следующие версии связаны как минимум по одному каналу:'
+cannot-delete-bundle-linked-channel-3: Пожалуйста, отсоедините их вручную и попробуйте снова
+cannot-delete-bundles: Невозможно удалить пакеты
 cannot-delete-channel: Не могу удалить канал
 cannot-delete-member: Невозможно удалить участника, проверьте консоль браузера
 cannot-delete-owner: Невозможно удалить владельца из организации
@@ -432,6 +436,7 @@ reset-password: Сброс пароля
 reset-spoofed-user: Прекратите подделку
 reset-your-password: Сбросить пароль
 retention: Автоматическое удаление неиспользуемых пакетов (через x секунд)
+revert-to-builtin: вернуться к встроенному
 save: Сохраняет
 save-changes: Сохранить изменения
 search-bundle-id: Поиск по идентификатору пакета

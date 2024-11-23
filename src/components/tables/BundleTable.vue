@@ -6,6 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import Table from '~/components/Table.vue'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -30,6 +31,7 @@ const organizationStore = useOrganizationStore()
 const total = ref(0)
 const search = ref('')
 const elements = ref<Element[]>([])
+const selectedElements = ref<Element[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 const filters = ref({
@@ -145,6 +147,7 @@ async function refreshData() {
   try {
     currentPage.value = 1
     elements.value.length = 0
+    selectedElements.value.length = 0
     await getData()
   }
   catch (error) {
@@ -316,6 +319,67 @@ async function reload() {
   }
 }
 
+async function massDelete() {
+  const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
+    return {
+      data: await supabase
+        .from('channels')
+        .select()
+        .eq('app_id', element.app_id)
+        .eq('version', element.id),
+      element,  
+    }
+  }))).map(({ data: { data, error }, element }) => {
+    if (error) {
+      throw new Error('Cannot find channel')
+    }
+    return {
+      element,
+      channelFound: (data?.length ?? 0) > 0,
+      rawChannel: data,
+    }
+  })
+
+  const linkedChannelsList = linkedChannels.filter(({ channelFound }) => channelFound)
+  if (linkedChannelsList.length > 0) {
+    displayStore.dialogOption = {
+      header: t('cannot-delete-bundle-linked-channel-1'),
+      buttonCenter: true,
+      textStyle: 'text-center',
+      headerStyle: 'text-center',
+      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => ch.name).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      buttons: [
+        {
+          text: t('ok'),
+          role: 'confirm',
+          id: 'confirm',
+        },
+      ],
+    }
+
+    displayStore.showDialog = true
+    return
+  }
+
+  const { error: updateError } = await supabase
+    .from('app_versions')
+    .update({ deleted: true })
+    .in('id', selectedElements.value.map(val => val.id))
+
+  if (updateError) {
+    toast.error(t('cannot-delete-bundles'))
+  }
+  else {
+    toast.success(t('bundle-deleted'))
+    await refreshData()
+  }
+}
+
+function selectedElementsFilter(val: boolean[]) {
+  console.log('selectedElementsFilter', val)
+  selectedElements.value = elements.value.filter((_, i) => val[i])
+}
+
 async function openOne(one: Element) {
   if (one.deleted)
     return
@@ -337,10 +401,13 @@ watch(props, async () => {
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
       :total="total" row-click :element-list="elements"
       filter-text="filters"
+      mass-select
       :is-loading="isLoading"
       :search-placeholder="t('search-bundle-id')"
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
+      @mass-delete="massDelete()"
+      @select-row="selectedElementsFilter"
     />
   </div>
 </template>

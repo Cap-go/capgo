@@ -100,6 +100,10 @@ cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-bundle: 无法删除捆绑包
+cannot-delete-bundle-linked-channel-1: 无法批量删除版本
+cannot-delete-bundle-linked-channel-2: 以下版本至少有 1 个通道相连：
+cannot-delete-bundle-linked-channel-3: 请手动取消链接，然后再试一次
+cannot-delete-bundles: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
@@ -406,6 +410,7 @@ reset-password: 重设密码
 reset-spoofed-user: 停止欺骗
 reset-your-password: 重置你的密码
 retention: 自动删除未使用的捆绑包（在x秒后）
+revert-to-builtin: 还原为内置
 save: 保存
 save-changes: 保存更改
 search-bundle-id: 按包 ID 搜索

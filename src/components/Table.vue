@@ -2,6 +2,7 @@
 import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
+import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -27,6 +28,7 @@ interface Props {
   currentPage: number
   columns: TableColumn[]
   elementList: { [key: string]: any }[]
+  massSelect?: boolean
 }
 
 const props = defineProps<Props>()
@@ -45,6 +47,8 @@ const emit = defineEmits([
   'plusClick',
   'rowClick',
   'sortClick',
+  'selectRow',
+  'massDelete',
 ])
 const { t } = useI18n()
 const searchVal = ref(props.search || '')
@@ -56,6 +60,9 @@ const offset = computed(() => {
     return 0
   return props.elementList.length
 })
+
+const selectedRows = ref<boolean[]>(props.elementList.map(_ => false))
+const previousSelectedRow = ref<number | null>(null)
 
 const filterList = computed(() => {
   if (!props.filters)
@@ -151,6 +158,27 @@ async function fastBackward() {
     emit('reload')
   }
 }
+watch(props.elementList, () => {
+  selectedRows.value = props.elementList.map(_ => false)
+  previousSelectedRow.value = null
+})
+async function handleCheckboxClick(i: number, e: MouseEvent) {
+  if (e.shiftKey && previousSelectedRow.value !== null) {
+    console.log((e as MouseEvent).shiftKey && true, i, previousSelectedRow)
+    for (let y = Math.min(previousSelectedRow.value, i); y <= Math.max(previousSelectedRow.value, i); y++) {
+      if (i > previousSelectedRow.value && y === previousSelectedRow.value)
+        continue
+
+      selectedRows.value[y] = !selectedRows.value[y]
+    }
+    emit('selectRow', selectedRows.value)
+  }
+  else {
+    selectedRows.value[i] = !selectedRows.value[i]
+    emit('selectRow', selectedRows.value)
+  }
+  previousSelectedRow.value = i
+}
 </script>
 
 <template>
@@ -182,6 +210,9 @@ async function fastBackward() {
           </ul>
         </div>
       </div>
+      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end ml-auto mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('massDelete')">
+        <IconTrash class="text-red-500 h-[24px]" />
+      </button>
       <!-- </div> -->
       <div class="flex h-10 md:w-auto">
         <FormKit
@@ -200,7 +231,8 @@ async function fastBackward() {
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-if="props.massSelect" class="ml-2" />
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3" :class="{ 'px-6': i !== 0, 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -217,16 +249,28 @@ async function fastBackward() {
             v-for="(elem, i) in elementList" :key="i"
             :class="{ 'cursor-pointer': rowClick }"
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
-            @click="emit('rowClick', elem)"
+            @click="(e: MouseEvent) => {
+              if (e.target !== null && (e.target as HTMLElement).id === 'select-rows') {
+                return
+              }
+              emit('rowClick', elem)
+            }"
           >
-            <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                {{ displayValueKey(elem, col) }}
+            <template v-if="true">
+              <th v-if="props.massSelect" class="pl-4 pr-0">
+                <input
+                  id="select-rows" :checked="selectedRows[i]" class="scale-checkbox" type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
+                >
               </th>
-              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
-              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4">
-                {{ displayValueKey(elem, col) }}
-              </td>
+              <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
+                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${_y !== 0 ? 'px-6' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  {{ displayValueKey(elem, col) }}
+                </th>
+                <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4">
+                  {{ displayValueKey(elem, col) }}
+                </td>
+              </template>
             </template>
           </tr>
         </tbody>
@@ -289,3 +333,10 @@ async function fastBackward() {
     </nav>
   </div>
 </template>
+
+<style scoped>
+.scale-checkbox {
+  transform: scale(1.5);
+  transform-origin: center;
+}
+</style>
