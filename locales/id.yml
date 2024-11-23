@@ -100,10 +100,6 @@ cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
-cannot-delete-bundle-linked-channel-1: Anda tidak dapat menghapus versi secara massal
-cannot-delete-bundle-linked-channel-2: 'Versi berikut ini ditautkan setidaknya dalam 1 saluran:'
-cannot-delete-bundle-linked-channel-3: Putuskan tautan secara manual dan coba lagi
-cannot-delete-bundles: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
@@ -152,6 +148,7 @@ check-on-web: Periksa di situs web
 checksum: Checksum
 cli-doc: dokumen CLI
 commands: perintah
+confirm: konfirmasi
 confirm-email: Konfirmasi email Anda
 confirm-email-sent: >-
   Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
@@ -225,6 +222,7 @@ enter-your-email-add: >-
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 error: Kesalahan
+error-revert-to-builtin: Tidak dapat kembali ke bawaan
 fail: Instal gagal
 failed: Gagal
 failed-to-get-user: Gagal memuat pengguna
@@ -431,7 +429,10 @@ reset-password: Atur Ulang Kata Sandi
 reset-spoofed-user: Berhenti melakukan spoofing
 reset-your-password: Mereset password Anda
 retention: Hapus otomatis bundel yang tidak digunakan (setelah x detik)
-revert-to-builtin: kembali ke bawaan
+revert-to-builtin: Kembali ke bawaan
+revert-to-builtin-confirm: >-
+  Apakah Anda yakin ingin kembali ke versi bawaan? Saat saluran dikembalikan,
+  capgo tidak akan mendistribusikan pembaruan melalui saluran tersebut.
 save: Menghemat
 save-changes: Simpan perubahan
 search-bundle-id: Cari berdasarkan bundel ID

@@ -122,10 +122,6 @@ cannot-del-org: >-
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-bundle: Impossible de supprimer le paquet
-cannot-delete-bundle-linked-channel-1: Vous ne pouvez pas supprimer des versions en masse
-cannot-delete-bundle-linked-channel-2: 'Les versions suivantes sont liées dans au moins un canal :'
-cannot-delete-bundle-linked-channel-3: Veuillez les dissocier manuellement et réessayer.
-cannot-delete-bundles: Impossible de supprimer des lots
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
@@ -176,6 +172,7 @@ check-on-web: Vérifiez sur le site web
 checksum: Somme de contrôle
 cli-doc: Document CLI
 commands: commandes
+confirm: confirmer
 confirm-email: Confirmez votre email
 confirm-email-sent: >-
   Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
@@ -247,6 +244,7 @@ enter-your-email-add: >-
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 error: Erreur
+error-revert-to-builtin: Impossible de revenir à la version intégrée
 fail: L'installation a échoué
 failed: Échoué
 failed-to-get-user: Échec du chargement de l'utilisateur
@@ -455,7 +453,10 @@ reset-password: Réinitialiser le mot de passe
 reset-spoofed-user: Arrêtez le spoofing
 reset-your-password: Réinitialisez votre mot de passe
 retention: Supprimer automatiquement les lots non utilisés (après x secondes)
-revert-to-builtin: revenir à la version intégrée
+revert-to-builtin: Revenir à la version intégrée
+revert-to-builtin-confirm: >-
+  Etes-vous sûr de vouloir revenir à la version intégrée ? Tant que le canal est
+  rétabli, capgo ne distribuera pas de mises à jour par son intermédiaire.
 save: Économies
 save-changes: Enregistrer les modifications
 search-bundle-id: Recherche par ID de paquet

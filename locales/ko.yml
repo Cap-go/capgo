@@ -100,10 +100,6 @@ cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
-cannot-delete-bundle-linked-channel-1: 버전을 대량 삭제할 수 없습니다.
-cannot-delete-bundle-linked-channel-2: '다음 버전은 최소 1개 이상의 채널에 연결되어 있습니다:'
-cannot-delete-bundle-linked-channel-3: 수동으로 연결을 해제하고 다시 시도하세요.
-cannot-delete-bundles: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
@@ -150,6 +146,7 @@ check-on-web: 웹사이트에서 확인
 checksum: 체크섬
 cli-doc: CLI 문서
 commands: 명령
+confirm: 확인
 confirm-email: 이메일 확인
 confirm-email-sent: 확인 이메일이 전송되었습니다. 이메일을 확인하려면 링크를 클릭하세요.
 confirm-overwrite: 덮어쓰기 확인
@@ -216,6 +213,7 @@ enabled-progressive-deploy: 점진적 배포 활성화
 enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
 enter-your-new-passw: 새 비밀번호를 입력하고 확인
 error: 오류
+error-revert-to-builtin: 기본 제공으로 되돌릴 수 없습니다.
 fail: 설치 실패
 failed: 실패한
 failed-to-get-user: 사용자를 로드하지 못했습니다.
@@ -411,6 +409,7 @@ reset-spoofed-user: 스푸핑을 중단하십시오
 reset-your-password: 비밀번호를 재설정
 retention: 사용하지 않는 번들 자동 삭제 (x 초 후)
 revert-to-builtin: 기본 제공으로 되돌리기
+revert-to-builtin-confirm: 기본 버전으로 되돌리시겠습니까? 채널이 되돌려지는 동안 캡고는 해당 채널을 통해 업데이트를 배포하지 않습니다.
 save: 저장
 save-changes: 변경 사항을 저장하다
 search-bundle-id: 번들 ID로 검색

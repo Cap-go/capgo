@@ -110,10 +110,6 @@ cannot-del-org: Impossibile eliminare l'organizzazione, controlla il registro de
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
 cannot-delete-bundle: Impossibile eliminare il gruppo
-cannot-delete-bundle-linked-channel-1: Non è possibile eliminare in massa le versioni
-cannot-delete-bundle-linked-channel-2: 'Le seguenti versioni sono collegate in almeno 1 canale:'
-cannot-delete-bundle-linked-channel-3: Disconnetterli manualmente e riprovare
-cannot-delete-bundles: Impossibile eliminare i bundle
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-delete-member: Impossibile eliminare il membro, controlla la console del browser
 cannot-delete-owner: Impossibile eliminare il proprietario dall'organizzazione
@@ -162,6 +158,7 @@ check-on-web: Controlla sul sito web
 checksum: Somma di controllo
 cli-doc: Documento CLI
 commands: comandi
+confirm: confermare
 confirm-email: conferma la tua email
 confirm-email-sent: >-
   Se envió un correo electrónico de confirmación, haz clic en el enlace para
@@ -237,6 +234,7 @@ enter-your-email-add: >-
   password.
 enter-your-new-passw: Inserisci la tua nuova password e conferma
 error: Errore
+error-revert-to-builtin: Non è possibile tornare al programma integrato
 fail: Installazione non riuscita
 failed: Fallito
 failed-to-get-user: Impossibile caricare l'utente
@@ -443,7 +441,10 @@ reset-password: Resetta la password
 reset-spoofed-user: Smetti di falsificare
 reset-your-password: reimposta la tua password
 retention: Elimina automaticamente i pacchetti non utilizzati (dopo x secondi)
-revert-to-builtin: torna al programma incorporato
+revert-to-builtin: Torna al programma incorporato
+revert-to-builtin-confirm: >-
+  Sei sicuro di voler tornare alla versione integrata? Mentre il canale è
+  ripristinato, capgo non distribuirà gli aggiornamenti attraverso di esso.
 save: Salva
 save-changes: Salvare le modifiche
 search-bundle-id: Cerca per ID pacchetto

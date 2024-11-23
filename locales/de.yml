@@ -178,6 +178,7 @@ check-on-web: Überprüfen Sie auf der Website
 checksum: Prüfsumme
 cli-doc: CLI-Dokument
 commands: Befehle
+confirm: bestätigen.
 confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-
   Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
@@ -252,6 +253,7 @@ enter-your-email-add: >-
   Zurücksetzen Ihres Passworts.
 enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 error: Fehler
+error-revert-to-builtin: Kann nicht auf Built-in zurückgreifen
 fail: Installation fehlgeschlagen
 failed: Fehlgeschlagen
 failed-to-get-user: Der Benutzer konnte nicht geladen werden
@@ -472,7 +474,10 @@ reset-password: Passwort zurücksetzen
 reset-spoofed-user: Hör auf zu fälschen
 reset-your-password: Setze dein Passwort zurück
 retention: Automatische Löschung von nicht genutzten Paketen (nach x Sekunden)
-revert-to-builtin: auf eingebautes System zurückgreifen
+revert-to-builtin: Zu eingebautem System zurückkehren
+revert-to-builtin-confirm: >-
+  Sind Sie sicher, dass Sie zur eingebauten Version zurückkehren wollen? Solange
+  der Kanal zurückgesetzt ist, wird capgo keine Updates über ihn verteilen.
 save: Speichert
 save-changes: Änderungen speichern
 search-bundle-id: Suche nach Bündel-ID

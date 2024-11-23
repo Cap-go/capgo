@@ -100,10 +100,6 @@ cannot-del-org: 組織を削除できません。ブラウザのログを確認�
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-bundle: バンドルを削除できません
-cannot-delete-bundle-linked-channel-1: バージョンの一括削除はできません。
-cannot-delete-bundle-linked-channel-2: 以下のバージョンは少なくとも1チャンネルでリンクされている：
-cannot-delete-bundle-linked-channel-3: 手動でリンクを解除し、再度お試しください。
-cannot-delete-bundles: バンドルが削除できない
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
@@ -150,6 +146,7 @@ check-on-web: ウェブサイトでチェック
 checksum: チェックサム
 cli-doc: CLIドキュメント
 commands: コマンド
+confirm: 確認する
 confirm-email: メールを確認する
 confirm-email-sent: 確認メールが送信されました。リンクをクリックしてメールアドレスを確認してください。
 confirm-overwrite: 上書き確認
@@ -216,6 +213,7 @@ enabled-progressive-deploy: プログレッシブ展開を有効にしました
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
 error: エラー
+error-revert-to-builtin: ビルトインに戻せない
 fail: インストールに失敗しました
 failed: 失敗した
 failed-to-get-user: ユーザーのロードに失敗しました
@@ -411,6 +409,7 @@ reset-spoofed-user: スプーフィングをやめてください
 reset-your-password: あなたのパスワードをリセット
 retention: 使用されていないバンドルを自動的に削除する（x秒後）
 revert-to-builtin: ビルトインに戻す
+revert-to-builtin-confirm: 本当にビルトインバージョンに戻したいのですか？チャンネルが戻されている間、capgoはアップデートを配信しません。
 save: セーブ
 save-changes: 変更内容を保存
 search-bundle-id: バンドル ID で検索

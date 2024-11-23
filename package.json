@@ -230,5 +230,9 @@
     "messagePrompt": true,
     "capitalizeTitle": true,
     "gitmojisUrl": "https://gitmoji.dev/api/gitmojis"
-  }
+  },
+  "trustedDependencies": [
+    "@sentry/cli",
+    "core-js"
+  ]
 }

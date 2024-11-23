@@ -102,10 +102,6 @@ cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol 
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-bundle: Paket silinemiyor
-cannot-delete-bundle-linked-channel-1: Sürümleri toplu olarak silemezsiniz
-cannot-delete-bundle-linked-channel-2: 'Aşağıdaki versiyonlar en az 1 kanalda bağlantılıdır:'
-cannot-delete-bundle-linked-channel-3: Lütfen bağlantılarını manuel olarak kaldırın ve tekrar deneyin
-cannot-delete-bundles: Paketler silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
@@ -154,6 +150,7 @@ check-on-web: Web sitesinde kontrol edin
 checksum: sağlama toplamı
 cli-doc: CLI belgesi
 commands: komutlar
+confirm: onaylayın
 confirm-email: e-postanızı onaylayın
 confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
 confirm-overwrite: Üzerine yazmayı onayla
@@ -225,6 +222,7 @@ enter-your-email-add: >-
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 error: Hata
+error-revert-to-builtin: Yerleşik sisteme geri dönülemez
 fail: Yükleme başarısız
 failed: Arızalı
 failed-to-get-user: Kullanıcı yüklenemedi
@@ -427,7 +425,10 @@ reset-password: Şifreyi yenile
 reset-spoofed-user: Sahte yapmayı durdur
 reset-your-password: şifrenizi sıfırlayın
 retention: Kullanılmayan paketleri otomatik sil (x saniye sonra)
-revert-to-builtin: yerleşik olana geri dön
+revert-to-builtin: Yerleşik sisteme geri dön
+revert-to-builtin-confirm: >-
+  Yerleşik sürüme geri dönmek istediğinizden emin misiniz? Kanal geri
+  döndürüldüğünde, capgo güncellemeleri kanal üzerinden dağıtmayacaktır.
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
 search-bundle-id: Paket kimliğine göre ara

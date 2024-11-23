@@ -100,10 +100,6 @@ cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-bundle: 无法删除捆绑包
-cannot-delete-bundle-linked-channel-1: 无法批量删除版本
-cannot-delete-bundle-linked-channel-2: 以下版本至少有 1 个通道相连：
-cannot-delete-bundle-linked-channel-3: 请手动取消链接，然后再试一次
-cannot-delete-bundles: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
@@ -150,6 +146,7 @@ check-on-web: 在网站上查看
 checksum: 校验和
 cli-doc: CLI文档
 commands: 命令
+confirm: 确定
 confirm-email: 确认您的电子邮件
 confirm-email-sent: 已发送确认邮件，请点击链接确认您的电子邮件。
 confirm-overwrite: 确认覆盖
@@ -216,6 +213,7 @@ enabled-progressive-deploy: 启用渐进式部署
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
 enter-your-new-passw: 输入您的新密码并确认
 error: 错误
+error-revert-to-builtin: 无法还原为内置
 fail: 安装失败
 failed: 失败的
 failed-to-get-user: 加载用户失败
@@ -411,6 +409,7 @@ reset-spoofed-user: 停止欺骗
 reset-your-password: 重置你的密码
 retention: 自动删除未使用的捆绑包（在x秒后）
 revert-to-builtin: 还原为内置
+revert-to-builtin-confirm: 您确定要恢复到内置版本吗？通道恢复后，capgo 不会通过它发布更新。
 save: 保存
 save-changes: 保存更改
 search-bundle-id: 按包 ID 搜索

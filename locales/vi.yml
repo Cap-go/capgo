@@ -112,10 +112,6 @@ cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký t
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-bundle: Không thể xóa gói
-cannot-delete-bundle-linked-channel-1: Bạn không thể xóa hàng loạt phiên bản
-cannot-delete-bundle-linked-channel-2: 'Các phiên bản sau được liên kết trong ít nhất 1 kênh:'
-cannot-delete-bundle-linked-channel-3: Vui lòng hủy liên kết chúng theo cách thủ công và thử lại
-cannot-delete-bundles: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
@@ -166,6 +162,7 @@ check-on-web: Kiểm tra trên trang web
 checksum: tổng kiểm tra
 cli-doc: tài liệu CLI
 commands: mệnh lệnh
+confirm: xác nhận
 confirm-email: Xác nhận email của bạn
 confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
 confirm-overwrite: Xác nhận ghi đè
@@ -238,6 +235,7 @@ enter-your-email-add: >-
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 error: Lỗi
+error-revert-to-builtin: Không thể hoàn nguyên về nội dung sẵn
 fail: Cài đặt không thành công
 failed: Thất bại
 failed-to-get-user: Không tải được người dùng
@@ -442,7 +440,12 @@ reset-password: Đặt lại mật khẩu
 reset-spoofed-user: Dừng giả mạo
 reset-your-password: Đặt lại mật khẩu của bạn
 retention: Tự động xóa các gói không được sử dụng (sau x giây)
-revert-to-builtin: trở lại nội dung sẵn
+revert-to-builtin: Hoàn nguyên về nội dung
+revert-to-builtin-confirm: >-
+  Bạn có chắc chắn muốn quay lại phiên bản dựng sẵn không? 
+
+  Khi kênh được hoàn nguyên, capgo sẽ không phân phối các bản cập nhật thông qua
+  kênh đó.
 save: tiết kiệm
 save-changes: Lưu thay đổi
 search-bundle-id: Tìm kiếm theo ID gói

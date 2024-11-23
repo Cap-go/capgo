@@ -110,10 +110,6 @@ cannot-del-org: Невозможно удалить организацию, пр
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-bundle: Невозможно удалить пакет
-cannot-delete-bundle-linked-channel-1: Массовое удаление версий невозможно
-cannot-delete-bundle-linked-channel-2: 'Следующие версии связаны как минимум по одному каналу:'
-cannot-delete-bundle-linked-channel-3: Пожалуйста, отсоедините их вручную и попробуйте снова
-cannot-delete-bundles: Невозможно удалить пакеты
 cannot-delete-channel: Не могу удалить канал
 cannot-delete-member: Невозможно удалить участника, проверьте консоль браузера
 cannot-delete-owner: Невозможно удалить владельца из организации
@@ -162,6 +158,7 @@ check-on-web: Проверить на сайте
 checksum: Контрольная сумма
 cli-doc: Документация CLI
 commands: команды
+confirm: подтвердить
 confirm-email: Подтвердите ваш адрес электронной почты
 confirm-email-sent: >-
   Подтверждающее письмо было отправлено, нажмите на ссылку, чтобы подтвердить
@@ -232,6 +229,7 @@ enabled-progressive-deploy: Включено прогрессивное разв
 enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
 enter-your-new-passw: Введите новый пароль и подтвердите
 error: Ошибка
+error-revert-to-builtin: Невозможно вернуться к встроенному
 fail: Установка не удалась
 failed: Неуспешный
 failed-to-get-user: Не удалось загрузить пользователя
@@ -436,7 +434,10 @@ reset-password: Сброс пароля
 reset-spoofed-user: Прекратите подделку
 reset-your-password: Сбросить пароль
 retention: Автоматическое удаление неиспользуемых пакетов (через x секунд)
-revert-to-builtin: вернуться к встроенному
+revert-to-builtin: Вернитесь к встроенному
+revert-to-builtin-confirm: >-
+  Вы уверены, что хотите вернуться к встроенной версии? Пока канал реверсирован,
+  capgo не будет распространять через него обновления.
 save: Сохраняет
 save-changes: Сохранить изменения
 search-bundle-id: Поиск по идентификатору пакета

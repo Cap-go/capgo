@@ -108,10 +108,6 @@ cannot-del-org: Não é possível excluir a organização. Verifique o registro 
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-bundle: Não é possível excluir o pacote
-cannot-delete-bundle-linked-channel-1: Não é possível eliminar versões em massa
-cannot-delete-bundle-linked-channel-2: 'As versões seguintes estão ligadas em pelo menos um canal:'
-cannot-delete-bundle-linked-channel-3: Desfaça as ligações manualmente e tente novamente
-cannot-delete-bundles: Não é possível eliminar pacotes
 cannot-delete-channel: Não é possível excluir o canal
 cannot-delete-member: Não é possível excluir o membro. Verifique o console do navegador
 cannot-delete-owner: Não é possível excluir o proprietário da organização
@@ -160,6 +156,7 @@ check-on-web: Verifique no site
 checksum: soma de verificação
 cli-doc: Documento CLI
 commands: comandos
+confirm: confirmar
 confirm-email: confirme seu email
 confirm-email-sent: Um email de confirmação foi enviado, clique no link para confirmar seu email.
 confirm-overwrite: Confirmar a substituição
@@ -229,6 +226,7 @@ enabled-progressive-deploy: Implantação progressiva habilitada
 enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha.
 enter-your-new-passw: Digite sua nova senha e confirme
 error: Erro
+error-revert-to-builtin: Não é possível reverter para a versão incorporada
 fail: Falha na instalação
 failed: Fracassado
 failed-to-get-user: Falha ao carregar o usuário
@@ -435,7 +433,10 @@ reset-password: Redefinir senha
 reset-spoofed-user: Pare de falsificar
 reset-your-password: Redefina sua senha
 retention: Excluir automaticamente pacotes não utilizados (após x segundos)
-revert-to-builtin: reverter para a versão incorporada
+revert-to-builtin: Reverter para a versão incorporada
+revert-to-builtin-confirm: >-
+  Tens a certeza de que queres reverter para a versão integrada? Enquanto o
+  canal estiver revertido, o capgo não distribuirá actualizações através dele.
 save: Economizar
 save-changes: Salvar alterações
 search-bundle-id: Pesquisar por ID do pacote
