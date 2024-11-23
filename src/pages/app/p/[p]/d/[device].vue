@@ -237,7 +237,7 @@ async function loadRevertToNativeVersion() {
     .rpc('check_revert_to_builtin_version', { appid: packageId.value })
 
   if (error) {
-    console.error('lazy load revertVersionId fail', error);
+    console.error('lazy load revertVersionId fail', error)
     return
   }
 
