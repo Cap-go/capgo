@@ -327,7 +327,7 @@ async function massDelete() {
         .select()
         .eq('app_id', element.app_id)
         .eq('version', element.id),
-      element,  
+      element,
     }
   }))).map(({ data: { data, error }, element }) => {
     if (error) {
