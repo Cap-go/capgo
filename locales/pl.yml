@@ -154,6 +154,7 @@ check-on-web: Sprawdź na stronie internetowej
 checksum: Suma kontrolna
 cli-doc: Dokument CLI
 commands: polecenia
+confirm: potwierdzać
 confirm-email: Potwierdź swój email
 confirm-email-sent: >-
   Wysłano email z potwierdzeniem, kliknij link, aby potwierdzić swój adres
@@ -225,6 +226,7 @@ enabled-progressive-deploy: Włączono wdrażanie progresywne
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
 error: Błąd
+error-revert-to-builtin: Nie można przywrócić wbudowanego
 fail: Instalacja nie powiodła się
 failed: Przegrany
 failed-to-get-user: Nie udało się załadować użytkownika
@@ -431,6 +433,10 @@ reset-password: Zresetuj hasło
 reset-spoofed-user: Przestań podszywać się
 reset-your-password: Zresetuj swoje hasło
 retention: Automatyczne usuwanie pakietów nie używanych (po x sekundach)
+revert-to-builtin: Przywróć wbudowane
+revert-to-builtin-confirm: >-
+  Czy na pewno chcesz przywrócić wbudowaną wersję? Gdy kanał jest przywrócony,
+  capgo nie będzie dystrybuować aktualizacji za jego pośrednictwem.
 save: Zapisuje
 save-changes: Zapisz zmiany
 search-bundle-id: Wyszukaj według identyfikatora pakietu

@@ -162,6 +162,7 @@ check-on-web: Comprobar en el sitio web
 checksum: Suma de verificación
 cli-doc: documento CLI
 commands: comandos
+confirm: confirmar
 confirm-email: confirme su email
 confirm-email-sent: >-
   Se envió un correo electrónico de confirmación, haz clic en el enlace para
@@ -235,6 +236,7 @@ enter-your-email-add: >-
   restablecer su contraseña.
 enter-your-new-passw: Ingrese su nueva contraseña y confirme
 error: Error
+error-revert-to-builtin: No se puede volver al sistema incorporado
 fail: Instalación fallida
 failed: Fallido
 failed-to-get-user: No se pudo cargar el usuario
@@ -447,6 +449,10 @@ reset-password: Restablecer la contraseña
 reset-spoofed-user: Deja de falsificar
 reset-your-password: Restablecer su contraseña
 retention: Eliminar automáticamente los paquetes no utilizados (después de x segundos)
+revert-to-builtin: Volver a la versión integrada
+revert-to-builtin-confirm: >-
+  ¿Está seguro de que desea revertir a la versión incorporada? Mientras el canal
+  esté revertido, capgo no distribuirá actualizaciones a través de él.
 save: Ahorra
 save-changes: Guardar cambios
 search-bundle-id: Buscar por ID de paquete

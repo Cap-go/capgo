@@ -172,6 +172,7 @@ check-on-web: Vérifiez sur le site web
 checksum: Somme de contrôle
 cli-doc: Document CLI
 commands: commandes
+confirm: confirmer
 confirm-email: Confirmez votre email
 confirm-email-sent: >-
   Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
@@ -243,6 +244,7 @@ enter-your-email-add: >-
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 error: Erreur
+error-revert-to-builtin: Impossible de revenir à la version intégrée
 fail: L'installation a échoué
 failed: Échoué
 failed-to-get-user: Échec du chargement de l'utilisateur
@@ -451,6 +453,10 @@ reset-password: Réinitialiser le mot de passe
 reset-spoofed-user: Arrêtez le spoofing
 reset-your-password: Réinitialisez votre mot de passe
 retention: Supprimer automatiquement les lots non utilisés (après x secondes)
+revert-to-builtin: Revenir à la version intégrée
+revert-to-builtin-confirm: >-
+  Etes-vous sûr de vouloir revenir à la version intégrée ? Tant que le canal est
+  rétabli, capgo ne distribuera pas de mises à jour par son intermédiaire.
 save: Économies
 save-changes: Enregistrer les modifications
 search-bundle-id: Recherche par ID de paquet

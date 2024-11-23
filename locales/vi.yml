@@ -162,6 +162,7 @@ check-on-web: Kiểm tra trên trang web
 checksum: tổng kiểm tra
 cli-doc: tài liệu CLI
 commands: mệnh lệnh
+confirm: xác nhận
 confirm-email: Xác nhận email của bạn
 confirm-email-sent: Đã gửi một email xác nhận, hãy nhấp vào liên kết để xác nhận email của bạn
 confirm-overwrite: Xác nhận ghi đè
@@ -234,6 +235,7 @@ enter-your-email-add: >-
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 error: Lỗi
+error-revert-to-builtin: Không thể hoàn nguyên về nội dung sẵn
 fail: Cài đặt không thành công
 failed: Thất bại
 failed-to-get-user: Không tải được người dùng
@@ -438,6 +440,12 @@ reset-password: Đặt lại mật khẩu
 reset-spoofed-user: Dừng giả mạo
 reset-your-password: Đặt lại mật khẩu của bạn
 retention: Tự động xóa các gói không được sử dụng (sau x giây)
+revert-to-builtin: Hoàn nguyên về nội dung
+revert-to-builtin-confirm: >-
+  Bạn có chắc chắn muốn quay lại phiên bản dựng sẵn không? 
+
+  Khi kênh được hoàn nguyên, capgo sẽ không phân phối các bản cập nhật thông qua
+  kênh đó.
 save: tiết kiệm
 save-changes: Lưu thay đổi
 search-bundle-id: Tìm kiếm theo ID gói

@@ -150,6 +150,7 @@ check-on-web: Web sitesinde kontrol edin
 checksum: sağlama toplamı
 cli-doc: CLI belgesi
 commands: komutlar
+confirm: onaylayın
 confirm-email: e-postanızı onaylayın
 confirm-email-sent: Onaylama e-postası gönderildi, e-postanızı onaylamak için linke tıklayın.
 confirm-overwrite: Üzerine yazmayı onayla
@@ -221,6 +222,7 @@ enter-your-email-add: >-
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 error: Hata
+error-revert-to-builtin: Yerleşik sisteme geri dönülemez
 fail: Yükleme başarısız
 failed: Arızalı
 failed-to-get-user: Kullanıcı yüklenemedi
@@ -423,6 +425,10 @@ reset-password: Şifreyi yenile
 reset-spoofed-user: Sahte yapmayı durdur
 reset-your-password: şifrenizi sıfırlayın
 retention: Kullanılmayan paketleri otomatik sil (x saniye sonra)
+revert-to-builtin: Yerleşik sisteme geri dön
+revert-to-builtin-confirm: >-
+  Yerleşik sürüme geri dönmek istediğinizden emin misiniz? Kanal geri
+  döndürüldüğünde, capgo güncellemeleri kanal üzerinden dağıtmayacaktır.
 save: kaydeder
 save-changes: Değişiklikleri Kaydet
 search-bundle-id: Paket kimliğine göre ara

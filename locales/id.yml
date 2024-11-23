@@ -148,6 +148,7 @@ check-on-web: Periksa di situs web
 checksum: Checksum
 cli-doc: dokumen CLI
 commands: perintah
+confirm: konfirmasi
 confirm-email: Konfirmasi email Anda
 confirm-email-sent: >-
   Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
@@ -221,6 +222,7 @@ enter-your-email-add: >-
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 error: Kesalahan
+error-revert-to-builtin: Tidak dapat kembali ke bawaan
 fail: Instal gagal
 failed: Gagal
 failed-to-get-user: Gagal memuat pengguna
@@ -427,6 +429,10 @@ reset-password: Atur Ulang Kata Sandi
 reset-spoofed-user: Berhenti melakukan spoofing
 reset-your-password: Mereset password Anda
 retention: Hapus otomatis bundel yang tidak digunakan (setelah x detik)
+revert-to-builtin: Kembali ke bawaan
+revert-to-builtin-confirm: >-
+  Apakah Anda yakin ingin kembali ke versi bawaan? Saat saluran dikembalikan,
+  capgo tidak akan mendistribusikan pembaruan melalui saluran tersebut.
 save: Menghemat
 save-changes: Simpan perubahan
 search-bundle-id: Cari berdasarkan bundel ID
