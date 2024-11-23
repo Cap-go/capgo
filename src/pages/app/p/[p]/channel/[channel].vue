@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
+import Backward from '~icons/heroicons/backward'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -16,7 +17,6 @@ import { useMainStore } from '~/stores/main'
 import type { OrganizationRole } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
-import Backward from '~icons/heroicons/backward'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -492,7 +492,7 @@ async function onChangeAutoUpdate(event: Event) {
 }
 
 async function handleRevertToBuiltin() {
-    if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
     return
   }
@@ -524,13 +524,13 @@ async function handleRevertToBuiltin() {
           }
 
           await getChannel()
-        }
+        },
       },
       {
         text: t('cancel'),
-        role: 'cancel'
-      }
-    ]
+        role: 'cancel',
+      },
+    ],
   }
   displayStore.showDialog = true
 }
