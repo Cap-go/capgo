@@ -232,7 +232,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
             <th v-if="props.massSelect" class="ml-2" />
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3" :class="{ 'px-6': i !== 0, 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3" :class="{ 'px-6': ((i !== 0 && props.massSelect) || !props.massSelect), 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -263,7 +263,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${_y !== 0 ? 'px-6' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                   {{ displayValueKey(elem, col) }}
                 </th>
                 <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
