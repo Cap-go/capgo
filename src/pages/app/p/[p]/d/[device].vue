@@ -40,6 +40,7 @@ const id = ref<string>()
 const isLoading = ref(true)
 const ActiveTab = ref('info')
 const organizationStore = useOrganizationStore()
+const revertToBuiltinValue = ref(`revert-to-builtin-${crypto.randomUUID()}`)
 
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
 const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
@@ -49,6 +50,8 @@ const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
 const role = ref<OrganizationRole | null>(null)
 const reloadCount = ref(0)
+
+const revertToNativeVersion = ref<Database['public']['Functions']['check_revert_to_builtin_version']['Returns'] | null>(null)
 
 const tabs: Tab[] = [
   {
@@ -70,6 +73,7 @@ async function getVersion() {
       .select()
       .eq('app_id', packageId.value)
       .eq('deleted', false)
+      .neq('storage_provider', 'revert_to_builtin')
       .order('created_at', { ascending: false })
       .throwOnError()
     versions.value = data || []
@@ -225,6 +229,21 @@ function minVersion(val: string, min = '4.6.99') {
   return greaterThan(parse(val), parse(min))
 }
 
+async function loadRevertToNativeVersion() {
+  if (revertToNativeVersion.value !== null) {
+    return
+  }
+  const { data: revertVersionId, error } = await supabase
+    .rpc('check_revert_to_builtin_version', { appid: packageId.value })
+
+  if (error) {
+    console.error('lazy load revertVersionId fail', error);
+    return
+  }
+
+  revertToNativeVersion.value = revertVersionId
+}
+
 async function loadData() {
   isLoading.value = true
   logs.value = []
@@ -235,6 +254,7 @@ async function loadData() {
     getChannels(),
     getVersion(),
     getOrgRole(),
+    loadRevertToNativeVersion(),
   ])
   reloadCount.value += 1
   isLoading.value = false
@@ -282,7 +302,7 @@ async function delDevVersion(device: string) {
     .eq('app_id', packageId.value)
 }
 async function updateVersionOverride(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
+  let value = (event.target as HTMLSelectElement).value
   const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
@@ -302,6 +322,10 @@ async function updateVersionOverride(event: Event) {
       return
     }
     try {
+      if (revertToNativeVersion.value !== null && value === revertToBuiltinValue.value) {
+        value = revertToNativeVersion.value.toString()
+      }
+
       upsertDevVersion(device.value?.device_id, Number(value))
         .then(async () => {
           toast.success(t('version-linked'))
@@ -403,6 +427,9 @@ watchEffect(async () => {
 })
 
 function openVersion() {
+  if (revertToNativeVersion.value !== null && deviceOverride.value?.version?.id === revertToNativeVersion.value) {
+    return
+  }
   if (packageId.value && deviceOverride.value?.version?.id)
     router.push(`/app/p/${appIdToUrl(packageId.value)}/bundle/${deviceOverride.value.version.id}`)
 }
@@ -435,9 +462,12 @@ function openChannel() {
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
             <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click="openVersion()">
-              <select :value="deviceOverride?.version?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateVersionOverride">
+              <select :value="deviceOverride?.version?.id !== revertToNativeVersion ? (deviceOverride?.version?.id || 'none') : revertToBuiltinValue" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateVersionOverride">
                 <option value="none">
                   {{ t('none') }}
+                </option>
+                <option :value="revertToBuiltinValue">
+                  {{ t('revert-to-builtin') }}
                 </option>
                 <option v-for="vs in versions" :key="vs.id" :value="vs.id">
                   {{ vs.name }}

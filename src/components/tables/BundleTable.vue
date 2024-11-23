@@ -111,6 +111,7 @@ async function getData() {
       .from('app_versions')
       .select('*', { count: 'exact' })
       .eq('app_id', props.appId)
+      .neq('storage_provider', 'revert_to_builtin')
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
     if (search.value)
