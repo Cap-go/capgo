@@ -43,8 +43,9 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-
+import { rateLimit } from '@elithrar/workers-hono-rate-limit'
 export { AttachmentUploadHandler, UploadHandler, UploadHandler as TemporaryKeyHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
+import { Context, Next  } from "hono";
 
 const app = new Hono<{ Bindings: Bindings }>()
 const appTriggers = new Hono<{ Bindings: Bindings }>()
@@ -56,11 +57,20 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', requestId())
 
+const rateLimiter = async (c: Context, next: Next) => {
+  const capgkey_string = c.req.header('capgkey')
+  const apikey_string = c.req.header('authorization')
+  const key = capgkey_string || apikey_string
+  if (!key)
+    return next()
+	return await rateLimit(c.env.API_PUBLIC_RATE_LIMITER, () => key)(c, next);
+};
+
 // Public API
 app.route('/ok', ok)
-app.route('/bundle', bundle)
-app.route('/channel', channel)
-app.route('/device', device)
+app.route('/bundle', bundle).use('*', rateLimiter)
+app.route('/channel', channel).use('*', rateLimiter)
+app.route('/device', device).use('*', rateLimiter)
 
 app.route('/on_app_create', on_app_create)
 

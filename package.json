@@ -116,11 +116,12 @@
     "@capgo/inappbrowser": "^6.9.14",
     "@capgo/native-audio": "^6.4.23",
     "@capgo/native-market": "^6.0.2",
+    "@elithrar/workers-hono-rate-limit": "^0.4.3",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
     "@formkit/i18n": "^1.6.9",
     "@formkit/themes": "1.6.9",
     "@formkit/vue": "1.6.9",
-    "@hono/hono": "npm:@jsr/hono__hono@4.6.7",
+    "@hono/hono": "npm:@jsr/hono__hono@4.6.12",
     "@hono/sentry": "^1.2.0",
     "@iconify-json/simple-icons": "^1.2.5",
     "@intlify/unplugin-vue-i18n": "^5.2.0",
@@ -207,7 +208,7 @@
     "postcss": "^8.4.49",
     "sass": "1.81.0",
     "tailwindcss": "^3.4.15",
-    "typescript": "5.6.3",
+    "typescript": "5.7.2",
     "unplugin-icons": "0.20.1",
     "unplugin-vue-components": "^0.27.4",
     "vite": "5.4.11",
@@ -230,5 +231,9 @@
     "messagePrompt": true,
     "capitalizeTitle": true,
     "gitmojisUrl": "https://gitmoji.dev/api/gitmojis"
-  }
+  },
+  "trustedDependencies": [
+    "@sentry/cli",
+    "core-js"
+  ]
 }
