@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.4.139",
+  "version": "11.4.142",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -88,7 +88,7 @@
     "@capacitor/clipboard": "^6.0.1",
     "@capacitor/device": "^6.0.1",
     "@capacitor/dialog": "^6.0.1",
-    "@capacitor/filesystem": "6.0.1",
+    "@capacitor/filesystem": "6.0.2",
     "@capacitor/geolocation": "^6.0.1",
     "@capacitor/haptics": "^6.0.1",
     "@capacitor/ios": "^6.2.0",
