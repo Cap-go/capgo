@@ -46,8 +46,49 @@ d1_databases = [
 ]
 
 [[unsafe.bindings]]
-name = "API_PUBLIC_RATE_LIMITER"
+name = "API_BUNDLE_GET_RATE_LIMITER"
 type = "ratelimit"
 namespace_id = "1001"
-# 20 requests per 10 seconds
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_BUNDLE_DELETE_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_CHANNEL_GET_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1003"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_CHANNEL_POST_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1004"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_CHANNEL_DELETE_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1005"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_DEVICE_GET_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1006"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_DEVICE_POST_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1007"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "API_DEVICE_DELETE_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1008"
 simple = { limit = 20, period = 10 }
