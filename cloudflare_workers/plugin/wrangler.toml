@@ -65,3 +65,33 @@ analytics_engine_datasets = [
   { binding = "VERSION_USAGE", dataset = "version_usage_alpha" },
   { binding = "APP_LOG", dataset = "app_log_alpha" },
 ]
+
+[[unsafe.bindings]]
+name = "PUBLIC_DEVICE_APP_ID_CHANNEL_SELF_POST_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_DEVICE_APP_ID_CHANNEL_SELF_DELETE_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_DEVICE_APP_ID_CHANNEL_SELF_PUT_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_DEVICE_APP_ID_CHANNEL_SELF_GET_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_DEVICE_APP_ID_UPDATES_GET_GET_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1003"
+simple = { limit = 20, period = 10 }
