@@ -30,7 +30,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   console.log('rangeEnd', rangeEnd)
   // if device_id get one device
   if (body.device_id) {
-    const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id])
+    const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id.toLowerCase()])
     console.log('res', res)
 
     if (!res || !res.length)
