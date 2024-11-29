@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import iconEmail from '~icons/oui/email?raw'
-import iconPassword from '~icons/ph/key?raw'
 import { useI18n } from 'petite-vue-i18n'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -116,12 +116,12 @@ onMounted (() => {
       <div class="max-w-2xl mx-auto text-center">
         <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">
         <h1 class="text-3xl font-bold leading-tight text-black lg:text-5xl sm:text-4xl dark:text-white">
-          {{ $t('leaving') }} <p class="inline font-prompt">
+          {{ t('leaving') }} <p class="inline font-prompt">
             Capgo
           </p> ?
         </h1>
         <p class="max-w-xl mx-auto mt-4 text-base leading-relaxed text-gray-600 dark:text-gray-300">
-          {{ $t('delete-your-account') }}
+          {{ t('delete-your-account') }}
         </p>
       </div>
 
@@ -168,7 +168,7 @@ onMounted (() => {
                       v-if="!isLoading" type="submit"
                       class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
                     >
-                      {{ $t('delete-account-0') }}
+                      {{ t('delete-account-0') }}
                     </button>
                   </div>
                 </div>
