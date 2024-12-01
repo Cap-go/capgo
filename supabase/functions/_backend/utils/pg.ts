@@ -5,7 +5,6 @@ import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import { getRuntimeKey } from 'hono/adapter'
-// import { drizzle } from 'drizzle-orm/neon-http';
 import postgres from 'postgres'
 import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
@@ -36,6 +35,9 @@ export function getDatabaseURL(c: Context): string {
   // if ((clientContinent === 'NA' || clientContinent === 'SA') && existInEnv(c, 'GK_SUPABASE_DB_URL')) {
   //   return getEnv(c, 'GK_SUPABASE_DB_URL')
   // }
+  // Hyperdrive test
+  if (existInEnv(c, 'HYPERDRIVE_DB'))
+    return (getEnv(c, 'HYPERDRIVE_DB') as any as Hyperdrive).connectionString
 
   // // Default to Germany for any other cases
   return DEFAULT_DB_URL

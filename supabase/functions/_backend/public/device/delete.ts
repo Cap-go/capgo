@@ -19,7 +19,7 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
       .from('devices_override')
       .delete()
       .eq('app_id', body.app_id)
-      .eq('device_id', body.device_id)
+      .eq('device_id', body.device_id.toLowerCase())
     if (error)
       return c.json({ status: 'Cannot delete override', error: JSON.stringify(error) }, 400)
 
@@ -27,7 +27,7 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
       .from('channel_devices')
       .delete()
       .eq('app_id', body.app_id)
-      .eq('device_id', body.device_id)
+      .eq('device_id', body.device_id.toLowerCase())
     if (errorChannel)
       return c.json({ status: 'Cannot delete channel override', error: JSON.stringify(errorChannel) }, 400)
   }

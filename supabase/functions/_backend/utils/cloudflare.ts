@@ -15,6 +15,7 @@ export type Bindings = {
   APP_LOG: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
   DB_REPLICATE: D1Database
+  HYPERDRIVE_DB: Hyperdrive
 }
 
 const DEFAULT_LIMIT = 1000
