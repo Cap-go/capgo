@@ -38,6 +38,7 @@ alert-confirm-delete: Подтвердите удаление
 alert-confirm-invite: Подтвердить приглашение
 alert-confirm-regenerate: Подтвердите восстановление ключа API
 alert-delete-message: Вы уверены, что хотите удалить это
+alert-delete-message-plural: Вы уверены, что хотите удалить эти
 alert-denied-invite: Приглашение отклонено
 alert-disable-2fa-message: Вы уверены, что хотите отключить 2FA?
 alert-generate-new-key: Пожалуйста, выберите тип ключа API, который вы хотите сгенерировать.
@@ -110,6 +111,10 @@ cannot-del-org: Невозможно удалить организацию, пр
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-bundle: Невозможно удалить пакет
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Не могу удалить канал
 cannot-delete-member: Невозможно удалить участника, проверьте консоль браузера
 cannot-delete-owner: Невозможно удалить владельца из организации

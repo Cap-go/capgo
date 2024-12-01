@@ -319,14 +319,41 @@ async function reload() {
   }
 }
 
+async function didCancelPlural() {
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        role: 'danger',
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  return displayStore.onDialogDismiss()
+}
+
 async function massDelete() {
+  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+  if (await didCancelPlural())
+    return
+  
   const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
     return {
-      data: await supabase
+      data: (await supabase
         .from('channels')
         .select()
         .eq('app_id', element.app_id)
-        .eq('version', element.id),
+        .eq('version', element.id)),
       element,
     }
   }))).map(({ data: { data, error }, element }) => {

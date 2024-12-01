@@ -40,6 +40,7 @@ alert-confirm-delete: Confirmar eliminación
 alert-confirm-invite: Confirmar invitación
 alert-confirm-regenerate: Confirmar la regeneración de la clave API
 alert-delete-message: Estás seguro que quieres eliminar esto
+alert-delete-message-plural: ¿Está seguro de que desea eliminar estos
 alert-denied-invite: Invitación denegada
 alert-disable-2fa-message: ¿Estás seguro de que deseas desactivar 2FA?
 alert-generate-new-key: Seleccione el tipo de clave API que desea generar.

@@ -34,6 +34,7 @@ alert-confirm-delete: Silmeyi Onayla
 alert-confirm-invite: Daveti onayla
 alert-confirm-regenerate: API anahtarının yeniden oluşturulmasını onaylayın
 alert-delete-message: Bunu silmek istediğinizden emin misiniz
+alert-delete-message-plural: Bunları silmek istediğinizden emin misiniz?
 alert-denied-invite: Davet reddedildi
 alert-disable-2fa-message: 2FA'yı devre dışı bırakmak istediğinizden emin misiniz?
 alert-generate-new-key: Lütfen oluşturmak istediğiniz API anahtarının türünü seçin.
@@ -102,6 +103,10 @@ cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol 
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-bundle: Paket silinemiyor
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor

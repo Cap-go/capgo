@@ -34,6 +34,7 @@ alert-confirm-delete: 确认删除
 alert-confirm-invite: 确认邀请
 alert-confirm-regenerate: 确认重新生成 API 密钥
 alert-delete-message: 你确定要删除这个吗
+alert-delete-message-plural: 您确定要删除这些
 alert-denied-invite: 邀请被拒绝
 alert-disable-2fa-message: 您确定要禁用 2FA 吗？
 alert-generate-new-key: 请选择您要生成的 API 密钥的类型。
@@ -100,6 +101,10 @@ cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-bundle: 无法删除捆绑包
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者

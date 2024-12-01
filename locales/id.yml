@@ -34,6 +34,7 @@ alert-confirm-delete: Konfirmasi Hapus
 alert-confirm-invite: Konfirmasikan undangan
 alert-confirm-regenerate: Konfirmasikan pembuatan ulang kunci API
 alert-delete-message: Apa kamu yakin ingin menghapus ini
+alert-delete-message-plural: Apakah Anda yakin ingin menghapus ini
 alert-denied-invite: Undangan ditolak
 alert-disable-2fa-message: Apakah Anda yakin ingin menonaktifkan 2FA?
 alert-generate-new-key: Silakan pilih jenis kunci API yang ingin Anda hasilkan.
@@ -100,6 +101,10 @@ cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi

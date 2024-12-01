@@ -42,6 +42,7 @@ alert-confirm-delete: Confirmer la suppression
 alert-confirm-invite: Confirmer l'invitation
 alert-confirm-regenerate: Confirmer la régénération de la clé API
 alert-delete-message: Êtes-vous sûr de vouloir supprimer ceci ?
+alert-delete-message-plural: Êtes-vous sûr de vouloir supprimer ces
 alert-denied-invite: Invitation refusée
 alert-disable-2fa-message: Êtes-vous sûr de vouloir désactiver 2FA ?
 alert-generate-new-key: Veuillez sélectionner le type de clé API que vous souhaitez générer.
@@ -122,6 +123,10 @@ cannot-del-org: >-
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-bundle: Impossible de supprimer le paquet
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation

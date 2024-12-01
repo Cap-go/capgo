@@ -42,6 +42,7 @@ alert-confirm-delete: Löschen bestätigen
 alert-confirm-invite: Einladung bestätigen
 alert-confirm-regenerate: Bestätigen Sie die Neugenerierung des API-Schlüssels
 alert-delete-message: Möchten Sie diese wirklich löschen?
+alert-delete-message-plural: Sind Sie sicher, dass Sie diese Dateien löschen möchten?
 alert-denied-invite: Einladung abgelehnt
 alert-disable-2fa-message: Sind Sie sicher, dass Sie 2FA deaktivieren möchten?
 alert-generate-new-key: Bitte wählen Sie den Typ des API-Schlüssels aus, den Sie generieren möchten.

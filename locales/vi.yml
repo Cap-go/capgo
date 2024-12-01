@@ -38,6 +38,7 @@ alert-confirm-delete: Xác nhận Xóa
 alert-confirm-invite: Xác nhận lời mời
 alert-confirm-regenerate: Xác nhận khóa API tái tạo
 alert-delete-message: Bạn có chắc chắn muốn xóa cái này
+alert-delete-message-plural: Bạn có chắc chắn muốn xóa những thứ này
 alert-denied-invite: Lời mời bị từ chối
 alert-disable-2fa-message: Bạn có chắc chắn muốn tắt 2FA không?
 alert-generate-new-key: Vui lòng chọn loại khóa API mà bạn muốn tạo.
@@ -112,6 +113,10 @@ cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký t
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-bundle: Không thể xóa gói
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức

@@ -34,6 +34,7 @@ alert-confirm-delete: 삭제 확인
 alert-confirm-invite: 초대 확인
 alert-confirm-regenerate: API 키 재생성 확인
 alert-delete-message: 삭제하시겠습니까?
+alert-delete-message-plural: 정말 삭제하시겠습니까?
 alert-denied-invite: 초대가 거부되었습니다.
 alert-disable-2fa-message: 2FA를 비활성화하시겠습니까?
 alert-generate-new-key: 생성하려는 API 키 유형을 선택하세요.
@@ -100,6 +101,10 @@ cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.

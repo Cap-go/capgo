@@ -34,6 +34,7 @@ alert-confirm-delete: 削除の確認
 alert-confirm-invite: 招待を確認する
 alert-confirm-regenerate: APIキーの再生成を確認する
 alert-delete-message: これを削除してもよろしいですか
+alert-delete-message-plural: 本当に削除しますか？
 alert-denied-invite: 招待が拒否されました
 alert-disable-2fa-message: 2FA を無効にしてもよろしいですか?
 alert-generate-new-key: 生成する API キーの種類を選択してください。
@@ -100,6 +101,10 @@ cannot-del-org: 組織を削除できません。ブラウザのログを確認�
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-bundle: バンドルを削除できません
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません

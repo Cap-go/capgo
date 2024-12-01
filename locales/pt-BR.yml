@@ -36,6 +36,7 @@ alert-confirm-delete: Confirmar exclusão
 alert-confirm-invite: Confirmar convite
 alert-confirm-regenerate: Confirmar a regeneração da chave de API
 alert-delete-message: Tem certeza de que deseja excluir isso
+alert-delete-message-plural: Tem a certeza de que pretende apagar estes
 alert-denied-invite: Convite negado
 alert-disable-2fa-message: Tem certeza de que deseja desativar o 2FA?
 alert-generate-new-key: Selecione o tipo de chave de API que você deseja gerar.
@@ -108,6 +109,10 @@ cannot-del-org: Não é possível excluir a organização. Verifique o registro 
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-bundle: Não é possível excluir o pacote
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Não é possível excluir o canal
 cannot-delete-member: Não é possível excluir o membro. Verifique o console do navegador
 cannot-delete-owner: Não é possível excluir o proprietário da organização
