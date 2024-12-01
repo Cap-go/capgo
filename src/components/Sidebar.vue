@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { Tab } from './comp_def'
 import { onClickOutside } from '@vueuse/core'
-import IconDoc from '~icons/gg/loadbar-doc'
-import IconDiscord from '~icons/ic/round-discord'
-import IconDashboard from '~icons/ic/round-space-dashboard'
-
-// import FluentLive20Filled from '~icons/fluent/live-20-filled'
-import IconApiKey from '~icons/mdi/shield-key'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+
+import IconDoc from '~icons/gg/loadbar-doc'
+import IconDiscord from '~icons/ic/round-discord'
+import IconDashboard from '~icons/ic/round-space-dashboard'
+// import FluentLive20Filled from '~icons/fluent/live-20-filled'
+import IconApiKey from '~icons/mdi/shield-key'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 
 const props = defineProps < {

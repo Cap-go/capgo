@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
-import IconTrash from '~icons/heroicons/trash?raw'
+import type { OrganizationRole } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconTrash from '~icons/heroicons/trash?raw'
 import Table from '~/components/Table.vue'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
-import type { OrganizationRole } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
   appId: string
@@ -346,7 +346,7 @@ async function massDelete() {
   }
   if (await didCancelPlural())
     return
-  
+
   const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
     return {
       data: (await supabase

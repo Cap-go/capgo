@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import iconPassword from '~icons/ph/key?raw'
 import { useI18n } from 'petite-vue-i18n'
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import iconPassword from '~icons/ph/key?raw'
 import { useSupabase } from '~/services/supabase'
 
 const isLoading = ref(false)

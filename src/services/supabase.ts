@@ -1,12 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { format, parse } from '@std/semver'
-import { createClient } from '@supabase/supabase-js'
-import dayjs from 'dayjs'
-import ky from 'ky'
-
 // import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
+import { format, parse } from '@std/semver'
+import { createClient } from '@supabase/supabase-js'
+
+import dayjs from 'dayjs'
+import ky from 'ky'
 
 let supaClient: SupabaseClient<Database> = null as any
 

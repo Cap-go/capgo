@@ -1,16 +1,16 @@
 <script setup lang="ts">
+import type { Database } from '~/types/supabase.types'
+import { useI18n } from 'petite-vue-i18n'
+import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import ArrowPath from '~icons/heroicons/arrow-path'
 import Clipboard from '~icons/heroicons/clipboard-document'
 import Pencil from '~icons/heroicons/pencil'
 import Trash from '~icons/heroicons/trash'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
-import { useI18n } from 'petite-vue-i18n'
-import { ref } from 'vue'
-import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()

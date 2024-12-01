@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import IconSettings from '~icons/heroicons/cog-8-tooth'
+import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useMainStore } from '~/stores/main'
-import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
   app: Database['public']['Tables']['apps']['Row']

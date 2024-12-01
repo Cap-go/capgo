@@ -1,9 +1,9 @@
+import type { UserModule } from '~/types'
 import { setUser } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
-import type { UserModule } from '~/types'
 import { getPlans, isAdmin } from './../services/supabase'
 
 async function guard(next: any, to: string, from: string) {

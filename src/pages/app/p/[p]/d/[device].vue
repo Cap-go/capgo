@@ -1,21 +1,21 @@
 <script setup lang="ts">
+import type { Tab } from '~/components/comp_def'
+import type { OrganizationRole } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
-import IconLog from '~icons/heroicons/document'
-import IconInformations from '~icons/heroicons/information-circle'
 import ky from 'ky'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import type { Tab } from '~/components/comp_def'
+import IconLog from '~icons/heroicons/document'
+import IconInformations from '~icons/heroicons/information-circle'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import type { OrganizationRole } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 interface Device {
   version: Database['public']['Tables']['app_versions']['Row']

@@ -1,21 +1,21 @@
 <script setup lang="ts">
+import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
-import iconEmail from '~icons/oui/email?raw'
-import iconFlag from '~icons/ph/flag?raw'
-import iconName from '~icons/ph/user?raw'
-import IconVersion from '~icons/radix-icons/update'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import iconEmail from '~icons/oui/email?raw'
+import iconFlag from '~icons/ph/flag?raw'
+import iconName from '~icons/ph/user?raw'
+import IconVersion from '~icons/radix-icons/update'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import type { Database } from '~/types/supabase.types'
 
 const version = import.meta.env.VITE_APP_VERSION
 const { t } = useI18n()

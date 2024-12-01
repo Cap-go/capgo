@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
@@ -7,7 +8,6 @@ import { bytesToGb, getDaysBetweenDates, toFixed } from '~/services/conversion'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { getPlans, getTotalAppStorage } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
-import type { Database } from '~/types/supabase.types'
 import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
