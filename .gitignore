@@ -72,6 +72,9 @@ scripts/local_cf_backend/spawn
 temp_cli_test*
 internal/netlify/.env.prod
 internal/supabase/.env.prod
+cloudflare_workers/files/*
 internal/files-api-dev/files_hash_map.json
-internal/files-api-dev/files/*
-internal/files-api-dev/files_hash_map.json
+internal/files-api-dev/uploads/*
+internal/files-api-dev/main.go
+internal/files-api-dev/go.mod
+internal/files-api-dev/go.sum
