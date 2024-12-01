@@ -72,3 +72,6 @@ scripts/local_cf_backend/spawn
 temp_cli_test*
 internal/netlify/.env.prod
 internal/supabase/.env.prod
+internal/files-api-dev/files_hash_map.json
+internal/files-api-dev/files/*
+internal/files-api-dev/files_hash_map.json
