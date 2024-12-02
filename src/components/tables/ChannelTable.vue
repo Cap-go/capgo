@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
-import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
-import IconTrash from '~icons/heroicons/trash?raw'
+import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
+import IconTrash from '~icons/heroicons/trash?raw'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 const props = defineProps<{
   appId: string

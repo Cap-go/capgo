@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { ChartOptions } from 'chart.js'
-import IcBaselineInfo from '~icons/ic/baseline-info'
+import type { appUsageByVersion, VersionName } from '~/services/supabase'
 import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useRoute } from 'vue-router'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
-import type { appUsageByVersion, VersionName } from '~/services/supabase'
 import { getDailyVersion, getVersionNames } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 

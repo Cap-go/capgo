@@ -42,6 +42,7 @@ alert-confirm-delete: Löschen bestätigen
 alert-confirm-invite: Einladung bestätigen
 alert-confirm-regenerate: Bestätigen Sie die Neugenerierung des API-Schlüssels
 alert-delete-message: Möchten Sie diese wirklich löschen?
+alert-delete-message-plural: Sind Sie sicher, dass Sie diese Dateien löschen möchten?
 alert-denied-invite: Einladung abgelehnt
 alert-disable-2fa-message: Sind Sie sicher, dass Sie 2FA deaktivieren möchten?
 alert-generate-new-key: Bitte wählen Sie den Typ des API-Schlüssels aus, den Sie generieren möchten.
@@ -126,6 +127,10 @@ cannot-del-org: >-
 cannot-delete-app: App kann nicht gelöscht werden
 cannot-delete-app-icon: App-Symbol kann nicht gelöscht werden
 cannot-delete-bundle: Paket kann nicht gelöscht werden
+cannot-delete-bundle-linked-channel-1: Sie können Versionen nicht massenweise löschen
+cannot-delete-bundle-linked-channel-2: 'Die folgenden Versionen sind in mindestens einem Kanal miteinander verbunden:'
+cannot-delete-bundle-linked-channel-3: Bitte heben Sie die Verknüpfung manuell auf und versuchen Sie es erneut.
+cannot-delete-bundles: Bundles können nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
@@ -174,6 +179,7 @@ check-on-web: Überprüfen Sie auf der Website
 checksum: Prüfsumme
 cli-doc: CLI-Dokument
 commands: Befehle
+confirm: bestätigen.
 confirm-email: Bestätige deine E-Mail
 confirm-email-sent: >-
   Eine Bestätigungs-E-Mail wurde gesendet. Klicken Sie auf den Link, um Ihre
@@ -248,6 +254,7 @@ enter-your-email-add: >-
   Zurücksetzen Ihres Passworts.
 enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 error: Fehler
+error-revert-to-builtin: Kann nicht auf Built-in zurückgreifen
 fail: Installation fehlgeschlagen
 failed: Fehlgeschlagen
 failed-to-get-user: Der Benutzer konnte nicht geladen werden
@@ -468,6 +475,10 @@ reset-password: Passwort zurücksetzen
 reset-spoofed-user: Hör auf zu fälschen
 reset-your-password: Setze dein Passwort zurück
 retention: Automatische Löschung von nicht genutzten Paketen (nach x Sekunden)
+revert-to-builtin: Zu eingebautem System zurückkehren
+revert-to-builtin-confirm: >-
+  Sind Sie sicher, dass Sie zur eingebauten Version zurückkehren wollen? Solange
+  der Kanal zurückgesetzt ist, wird capgo keine Updates über ihn verteilen.
 save: Speichert
 save-changes: Änderungen speichern
 search-bundle-id: Suche nach Bündel-ID

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
+import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
+import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import { appIdToUrl } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
-import type { Database } from '~/types/supabase.types'
 
 type ExtraChannel = (Database['public']['Tables']['channels']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] })
 

@@ -36,6 +36,7 @@ alert-confirm-delete: Potwierdź usunięcie
 alert-confirm-invite: Potwierdź zaproszenie
 alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
+alert-delete-message-plural: Czy na pewno chcesz je usunąć?
 alert-denied-invite: Zaproszenie odrzucone
 alert-disable-2fa-message: Czy na pewno chcesz wyłączyć 2FA?
 alert-generate-new-key: Proszę wybrać typ klucza API który chcesz wygenerować.
@@ -104,6 +105,10 @@ cannot-del-org: Nie można usunąć organizacji. Sprawdź dziennik przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-bundle: Nie można usunąć pakietu
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
@@ -154,6 +159,7 @@ check-on-web: Sprawdź na stronie internetowej
 checksum: Suma kontrolna
 cli-doc: Dokument CLI
 commands: polecenia
+confirm: potwierdzać
 confirm-email: Potwierdź swój email
 confirm-email-sent: >-
   Wysłano email z potwierdzeniem, kliknij link, aby potwierdzić swój adres
@@ -225,6 +231,7 @@ enabled-progressive-deploy: Włączono wdrażanie progresywne
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
 error: Błąd
+error-revert-to-builtin: Nie można przywrócić wbudowanego
 fail: Instalacja nie powiodła się
 failed: Przegrany
 failed-to-get-user: Nie udało się załadować użytkownika
@@ -431,6 +438,10 @@ reset-password: Zresetuj hasło
 reset-spoofed-user: Przestań podszywać się
 reset-your-password: Zresetuj swoje hasło
 retention: Automatyczne usuwanie pakietów nie używanych (po x sekundach)
+revert-to-builtin: Przywróć wbudowane
+revert-to-builtin-confirm: >-
+  Czy na pewno chcesz przywrócić wbudowaną wersję? Gdy kanał jest przywrócony,
+  capgo nie będzie dystrybuować aktualizacji za jego pośrednictwem.
 save: Zapisuje
 save-changes: Zapisz zmiany
 search-bundle-id: Wyszukaj według identyfikatora pakietu

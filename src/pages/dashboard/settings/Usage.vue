@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import IcBaselineInfo from '~icons/ic/baseline-info'
+import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 import { bytesToGb } from '~/services/conversion'
 import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
-import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])

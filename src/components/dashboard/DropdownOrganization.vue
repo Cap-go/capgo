@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import Plus from '~icons/heroicons/plus'
-import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import type { Organization } from '~/stores/organization'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { onMounted } from 'vue'
 import { toast } from 'vue-sonner'
+import Plus from '~icons/heroicons/plus'
+import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import type { Organization } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
