@@ -215,7 +215,7 @@
     "vite-plugin-inspect": "^0.10.1",
     "vite-plugin-pwa": "0.21.0",
     "vite-plugin-vue-layouts": "0.11.0",
-    "vitest": "2.1.5",
+    "vitest": "2.1.6",
     "vue-tsc": "2.1.10",
     "wrangler": "^3.91.0"
   },
