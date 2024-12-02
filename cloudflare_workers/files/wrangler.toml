@@ -46,3 +46,10 @@ routes = [
 durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
 
 r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo-alpha", preview_bucket_name = "capgo-alpha" } ]
+
+[env.local]
+name = "capgo_files-local"
+
+durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
+
+r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo-local", preview_bucket_name = "capgo-local" } ]

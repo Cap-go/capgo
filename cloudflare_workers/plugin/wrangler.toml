@@ -80,3 +80,6 @@ analytics_engine_datasets = [
 hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a06" }, ]
 
 # durable_objects.bindings = [ { name = "DB_REPLICATE", class_name = "ReplicateHandler" } ]
+
+[env.local]
+name = "capgo_plugin-local"
