@@ -5,10 +5,10 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { InAppBrowser } from '@capgo/inappbrowser'
 import { NativeAudio } from '@capgo/native-audio'
 import { NativeMarket } from '@capgo/native-market'
-import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import { useI18n } from 'petite-vue-i18n'
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()

@@ -1,6 +1,6 @@
+import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, watch } from 'vue'
-import type { Database } from '~/types/supabase.types'
 
 export interface ActionSheetOptionButton {
   text: string

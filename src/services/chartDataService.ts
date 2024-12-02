@@ -1,7 +1,7 @@
 // chartDataService.ts
 
-import colors from 'tailwindcss/colors'
 import type { appUsageByVersion, VersionName } from '~/services/supabase'
+import colors from 'tailwindcss/colors'
 
 const SKIP_COLOR = 10
 const colorKeys = Object.keys(colors)

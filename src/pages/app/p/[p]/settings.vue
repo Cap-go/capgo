@@ -1,17 +1,17 @@
 <script setup lang="ts">
+import type { OrganizationRole } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 import { Camera } from '@capacitor/camera'
 import { FormKit, FormKitMessages } from '@formkit/vue'
+import mime from 'mime'
+import { useI18n } from 'petite-vue-i18n'
+import { toast } from 'vue-sonner'
 import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
 import Pencil from '~icons/heroicons/pencil-square'
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
-import mime from 'mime'
-import { useI18n } from 'petite-vue-i18n'
-import { toast } from 'vue-sonner'
 import { urlToAppId } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
-import type { OrganizationRole } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 const isLoading = ref(false)
 const isFirstLoading = ref(true)
