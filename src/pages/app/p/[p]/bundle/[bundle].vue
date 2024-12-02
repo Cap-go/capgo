@@ -1,22 +1,22 @@
 <script setup lang="ts">
+import type { Tab } from '~/components/comp_def'
+import type { OrganizationRole } from '~/stores/organization'
+import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import { parse } from '@std/semver'
-import IconDevice from '~icons/heroicons/device-phone-mobile'
-import IconInformations from '~icons/material-symbols/info-rounded'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import type { Tab } from '~/components/comp_def'
+import IconDevice from '~icons/heroicons/device-phone-mobile'
+import IconInformations from '~icons/material-symbols/info-rounded'
 import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import type { OrganizationRole } from '~/stores/organization'
 import { useOrganizationStore } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 const { t } = useI18n()
 const route = useRoute('/app/p/[p]/bundle/[bundle]')

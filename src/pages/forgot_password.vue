@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import iconEmail from '~icons/oui/email?raw'
-import iconPassword from '~icons/ph/key?raw'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
+import iconEmail from '~icons/oui/email?raw'
+import iconPassword from '~icons/ph/key?raw'
 import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 

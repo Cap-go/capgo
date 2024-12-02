@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import IcBaselineInfo from '~icons/ic/baseline-info'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 import LineChartStats from '~/components/LineChartStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'

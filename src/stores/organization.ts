@@ -1,9 +1,9 @@
 import type { ComputedRef, Ref } from 'vue'
+import type { ArrayElement, Concrete, Merge } from '~/services/types'
+import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { getProcessCronStatsJobInfo, useSupabase } from '~/services/supabase'
-import type { ArrayElement, Concrete, Merge } from '~/services/types'
-import type { Database } from '~/types/supabase.types'
 import { useMainStore } from './main'
 
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v6']['Returns']>

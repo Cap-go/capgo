@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
@@ -6,7 +7,6 @@ import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 import Dashboard from '../../components/dashboard/Dashboard.vue'
 import Steps from '../../components/dashboard/Steps.vue'
 

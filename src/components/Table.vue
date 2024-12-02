@@ -2,6 +2,8 @@
 import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
+import { useI18n } from 'petite-vue-i18n'
+import { computed, ref, watch } from 'vue'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -13,8 +15,6 @@ import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watch } from 'vue'
 
 interface Props {
   rowClick?: boolean
