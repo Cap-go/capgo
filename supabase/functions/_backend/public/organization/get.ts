@@ -11,10 +11,10 @@ const orgSchema = z.object({
   created_by: z.string().uuid(),
   created_at: z.coerce.date(),
   updated_at: z.coerce.date(),
-  logo: z.string(),
+  logo: z.string().nullable(),
   name: z.string(),
   management_email: z.string().email(),
-  customer_id: z.string(),
+  customer_id: z.string().nullable(),
 })
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
