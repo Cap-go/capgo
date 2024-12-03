@@ -8,7 +8,7 @@ const bodySchema = z.object({
   logo: z.string().optional(),
   name: z.string().optional(),
   management_email: z.string().email().optional(),
-  
+
 })
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
