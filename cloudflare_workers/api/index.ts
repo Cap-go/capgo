@@ -43,6 +43,7 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
+import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 
 export { AttachmentUploadHandler, UploadHandler, UploadHandler as TemporaryKeyHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
@@ -61,6 +62,7 @@ app.route('/ok', ok)
 app.route('/bundle', bundle)
 app.route('/channel', channel)
 app.route('/device', device)
+app.route('/organization', organization)
 
 app.route('/on_app_create', on_app_create)
 
