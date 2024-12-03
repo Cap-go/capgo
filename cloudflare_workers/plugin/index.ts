@@ -22,7 +22,7 @@ app.use('*', sentry({
   release: version,
 }))
 app.use('*', logger())
-app.use('*', requestId())
+app.use('*', (requestId as any)())
 
 // Plugin API
 app.route('/plugin/ok', ok)

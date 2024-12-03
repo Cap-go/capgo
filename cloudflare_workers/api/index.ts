@@ -55,7 +55,7 @@ app.use('*', sentry({
   release: version,
 }))
 app.use('*', logger())
-app.use('*', requestId())
+app.use('*', (requestId as any)())
 
 // Public API
 app.route('/ok', ok)
