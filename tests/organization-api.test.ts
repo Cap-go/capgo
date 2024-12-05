@@ -76,6 +76,10 @@ describe('[POST] /organization/members', () => {
         invite_type: 'read',
       }),
     })
+
+    const res = await response.json()
+    console.log(res)
+    
     expect(response.status).toBe(200)
     const type = z.object({
       status: z.string(),
