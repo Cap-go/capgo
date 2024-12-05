@@ -566,9 +566,7 @@ function getProgressivePercentage() {
             <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'">
               <div class="flex items-center">
                 <span @click="openBundle()">{{ channel.version.name }}</span>
-                <button v-if="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()">
-                  <Backward class="w-6 h-6 ml-1" />
-                </button>
+                <!-- <button v-if="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()"><Backward class="w-6 h-6 ml-1" /></button>  -->
               </div>
             </InfoRow>
             <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
