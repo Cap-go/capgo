@@ -256,20 +256,21 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (currentPlan.value?.name === p.name && currentData.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
-  return t('plan-upgrade')
+  return p.price_m >= (currentPlan.value?.price_m ?? 0) ? t('plan-upgrade') : t('downgrade')
 }
 
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
+  console.log(currentOrganization.value?.paying, currentOrganization.value?.is_yearly, isYearly.value)
   return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
-  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value
+  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value && (currentPlanSuggest.value?.price_m ?? 0) > (p.price_m ?? 0)
 }
 function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
   return {
     'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': isRecommended(p),
-    'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest.value?.name !== p.name,
+    'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest.value?.name !== p.name && (currentPlanSuggest.value?.price_m ?? 0) < (currentPlan.value?.price_m ?? 0),
     'cursor-not-allowed bg-gray-500 dark:bg-gray-400': isDisabled(p),
   }
 }
