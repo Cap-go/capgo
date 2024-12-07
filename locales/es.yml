@@ -40,6 +40,7 @@ alert-confirm-delete: Confirmar eliminación
 alert-confirm-invite: Confirmar invitación
 alert-confirm-regenerate: Confirmar la regeneración de la clave API
 alert-delete-message: Estás seguro que quieres eliminar esto
+alert-delete-message-plural: ¿Está seguro de que desea eliminar estos
 alert-denied-invite: Invitación denegada
 alert-disable-2fa-message: ¿Estás seguro de que deseas desactivar 2FA?
 alert-generate-new-key: Seleccione el tipo de clave API que desea generar.
@@ -114,6 +115,10 @@ cannot-del-org: No se puede eliminar la organización; consulte el registro del 
 cannot-delete-app: No se puede eliminar la aplicación
 cannot-delete-app-icon: No se puede eliminar el ícono de la aplicación
 cannot-delete-bundle: No se puede eliminar el paquete
+cannot-delete-bundle-linked-channel-1: No se pueden borrar versiones en masa
+cannot-delete-bundle-linked-channel-2: 'Las siguientes versiones están vinculadas en al menos 1 canal:'
+cannot-delete-bundle-linked-channel-3: Por favor, desvincúlalos manualmente e inténtalo de nuevo
+cannot-delete-bundles: No se pueden eliminar paquetes
 cannot-delete-channel: No se puede eliminar el canal
 cannot-delete-member: No se puede eliminar un miembro, verifique la consola del navegador
 cannot-delete-owner: No se puede eliminar el propietario de la organización
@@ -162,6 +167,7 @@ check-on-web: Comprobar en el sitio web
 checksum: Suma de verificación
 cli-doc: documento CLI
 commands: comandos
+confirm: confirmar
 confirm-email: confirme su email
 confirm-email-sent: >-
   Se envió un correo electrónico de confirmación, haz clic en el enlace para
@@ -235,6 +241,7 @@ enter-your-email-add: >-
   restablecer su contraseña.
 enter-your-new-passw: Ingrese su nueva contraseña y confirme
 error: Error
+error-revert-to-builtin: No se puede volver al sistema incorporado
 fail: Instalación fallida
 failed: Fallido
 failed-to-get-user: No se pudo cargar el usuario
@@ -447,6 +454,10 @@ reset-password: Restablecer la contraseña
 reset-spoofed-user: Deja de falsificar
 reset-your-password: Restablecer su contraseña
 retention: Eliminar automáticamente los paquetes no utilizados (después de x segundos)
+revert-to-builtin: Volver a la versión integrada
+revert-to-builtin-confirm: >-
+  ¿Está seguro de que desea revertir a la versión incorporada? Mientras el canal
+  esté revertido, capgo no distribuirá actualizaciones a través de él.
 save: Ahorra
 save-changes: Guardar cambios
 search-bundle-id: Buscar por ID de paquete

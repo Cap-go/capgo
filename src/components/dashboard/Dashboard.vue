@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
+import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import TopApps from '~/components/dashboard/TopApps.vue'
-import type { Database } from '~/types/supabase.types'
 import WelcomeBanner from './WelcomeBanner.vue'
 
 const props = defineProps<{

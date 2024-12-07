@@ -34,6 +34,7 @@ alert-confirm-delete: Konfirmasi Hapus
 alert-confirm-invite: Konfirmasikan undangan
 alert-confirm-regenerate: Konfirmasikan pembuatan ulang kunci API
 alert-delete-message: Apa kamu yakin ingin menghapus ini
+alert-delete-message-plural: Apakah Anda yakin ingin menghapus ini
 alert-denied-invite: Undangan ditolak
 alert-disable-2fa-message: Apakah Anda yakin ingin menonaktifkan 2FA?
 alert-generate-new-key: Silakan pilih jenis kunci API yang ingin Anda hasilkan.
@@ -100,6 +101,10 @@ cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
@@ -148,6 +153,7 @@ check-on-web: Periksa di situs web
 checksum: Checksum
 cli-doc: dokumen CLI
 commands: perintah
+confirm: konfirmasi
 confirm-email: Konfirmasi email Anda
 confirm-email-sent: >-
   Sebuah email konfirmasi telah dikirim, klik tautan untuk mengkonfirmasi email
@@ -221,6 +227,7 @@ enter-your-email-add: >-
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 error: Kesalahan
+error-revert-to-builtin: Tidak dapat kembali ke bawaan
 fail: Instal gagal
 failed: Gagal
 failed-to-get-user: Gagal memuat pengguna
@@ -427,6 +434,10 @@ reset-password: Atur Ulang Kata Sandi
 reset-spoofed-user: Berhenti melakukan spoofing
 reset-your-password: Mereset password Anda
 retention: Hapus otomatis bundel yang tidak digunakan (setelah x detik)
+revert-to-builtin: Kembali ke bawaan
+revert-to-builtin-confirm: >-
+  Apakah Anda yakin ingin kembali ke versi bawaan? Saat saluran dikembalikan,
+  capgo tidak akan mendistribusikan pembaruan melalui saluran tersebut.
 save: Menghemat
 save-changes: Simpan perubahan
 search-bundle-id: Cari berdasarkan bundel ID

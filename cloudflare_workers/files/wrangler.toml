@@ -2,6 +2,7 @@ name = "capgo_files-prod"
 routes = [
   { pattern = "files.capgo.app", custom_domain = true },
   { pattern = "api.capgo.app/files*", zone_name = "capgo.app" },
+  { pattern = "plugin.capgo.app/files*", zone_name = "capgo.app" },
   { pattern = "api.capgo.app/private/files*", zone_name = "capgo.app" }, # TODO: remove this when all users have been migrated
   { pattern = "api.capgo.app/private/download_link", zone_name = "capgo.app" },
 ]
@@ -45,3 +46,10 @@ routes = [
 durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
 
 r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo-alpha", preview_bucket_name = "capgo-alpha" } ]
+
+[env.local]
+name = "capgo_files-local"
+
+durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
+
+r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo-local", preview_bucket_name = "capgo-local" } ]

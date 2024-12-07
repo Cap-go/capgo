@@ -66,6 +66,20 @@ export function supabaseAdmin(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
 }
 
+export function supabaseApikey(c: Context, apikey: string) {
+  console.log({ requestId: c.get('requestId'), context: 'supabaseApikey', apikey })
+  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), {
+    auth: {
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        capgkey: apikey,
+      },
+    },
+  })
+}
+
 export async function getAppsFromSB(c: Context): Promise<string[]> {
   const limit = 1000
   let page = 0

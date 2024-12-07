@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
+import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { pushEvent } from '~/services/bento'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'

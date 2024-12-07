@@ -42,6 +42,7 @@ alert-confirm-delete: Confirmer la suppression
 alert-confirm-invite: Confirmer l'invitation
 alert-confirm-regenerate: Confirmer la régénération de la clé API
 alert-delete-message: Êtes-vous sûr de vouloir supprimer ceci ?
+alert-delete-message-plural: Êtes-vous sûr de vouloir supprimer ces
 alert-denied-invite: Invitation refusée
 alert-disable-2fa-message: Êtes-vous sûr de vouloir désactiver 2FA ?
 alert-generate-new-key: Veuillez sélectionner le type de clé API que vous souhaitez générer.
@@ -122,6 +123,10 @@ cannot-del-org: >-
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-bundle: Impossible de supprimer le paquet
+cannot-delete-bundle-linked-channel-1: ''
+cannot-delete-bundle-linked-channel-2: ''
+cannot-delete-bundle-linked-channel-3: ''
+cannot-delete-bundles: ''
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
@@ -172,6 +177,7 @@ check-on-web: Vérifiez sur le site web
 checksum: Somme de contrôle
 cli-doc: Document CLI
 commands: commandes
+confirm: confirmer
 confirm-email: Confirmez votre email
 confirm-email-sent: >-
   Un email de confirmation a été envoyé, cliquez sur le lien pour confirmer
@@ -243,6 +249,7 @@ enter-your-email-add: >-
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 error: Erreur
+error-revert-to-builtin: Impossible de revenir à la version intégrée
 fail: L'installation a échoué
 failed: Échoué
 failed-to-get-user: Échec du chargement de l'utilisateur
@@ -451,6 +458,10 @@ reset-password: Réinitialiser le mot de passe
 reset-spoofed-user: Arrêtez le spoofing
 reset-your-password: Réinitialisez votre mot de passe
 retention: Supprimer automatiquement les lots non utilisés (après x secondes)
+revert-to-builtin: Revenir à la version intégrée
+revert-to-builtin-confirm: >-
+  Etes-vous sûr de vouloir revenir à la version intégrée ? Tant que le canal est
+  rétabli, capgo ne distribuera pas de mises à jour par son intermédiaire.
 save: Économies
 save-changes: Enregistrer les modifications
 search-bundle-id: Recherche par ID de paquet

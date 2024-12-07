@@ -34,6 +34,7 @@ alert-confirm-delete: Confirm Delete
 alert-confirm-invite: Confirm invitation
 alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
+alert-delete-message-plural: Are you sure you want to delete these
 alert-denied-invite: Invitation denied
 alert-disable-2fa-message: Are you sure you want to disable 2FA?
 alert-generate-new-key: Please select the type of API key that you want to generate.
@@ -100,6 +101,10 @@ cannot-del-org: Cannot delete the organization, please check the browser log
 cannot-delete-app: Cannot delete App
 cannot-delete-app-icon: Cannot delete app icon
 cannot-delete-bundle: Cannot delete bundle
+cannot-delete-bundle-linked-channel-1: You cannot mass delete versions
+cannot-delete-bundle-linked-channel-2: 'The following versions are linked in at least 1 channel:'
+cannot-delete-bundle-linked-channel-3: Please unlink them manually and try again
+cannot-delete-bundles: Cannot delete bundles
 cannot-delete-channel: Cannot delete channel
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
@@ -148,6 +153,7 @@ check-on-web: Check on website
 checksum: Checksum
 cli-doc: CLI doc
 commands: commands
+confirm: confirm
 confirm-email: Confirm your email
 confirm-email-sent: A confirmation email was sent click to link to confirm your email
 confirm-overwrite: Confirm overwrite
@@ -213,6 +219,7 @@ enabled-progressive-deploy: Enabled progressive deploy
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
 error: Error
+error-revert-to-builtin: Cannot revert to builtin
 fail: Install failed
 failed: Failed
 failed-to-get-user: Failed to load the user
@@ -405,6 +412,10 @@ reset-password: Reset Password
 reset-spoofed-user: Stop spoofing
 reset-your-password: Reset your password
 retention: Auto delete bundles not used (after x seconds)
+revert-to-builtin: Revert to builtin
+revert-to-builtin-confirm: >-
+  Are you sure that you want to revert to builtin version? While the channel is
+  reverted, capgo will not distribue updates thru it.
 save: Saves
 save-changes: Save Changes
 search-bundle-id: Search by bundle ID

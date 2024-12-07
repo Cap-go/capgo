@@ -17,7 +17,7 @@ app.use('*', sentry({
   release: version,
 }))
 app.use('*', logger())
-app.use('*', requestId())
+app.use('*', (requestId as any)())
 
 // Files API
 app.route('/files', files)

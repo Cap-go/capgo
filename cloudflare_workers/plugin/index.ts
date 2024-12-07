@@ -29,7 +29,7 @@ app.use('*', sentry({
   release: version,
 }))
 app.use('*', logger())
-app.use('*', requestId())
+app.use('*', (requestId as any)())
 
 export function deviceAppIdRateLimiter(rateLimiterAction: String, methods: string[]) {
   const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {

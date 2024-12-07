@@ -9,6 +9,7 @@ export async function post(c: Context, body: DeviceLink, apikey: Database['publi
     console.log('Missing device_id or app_id')
     return c.json({ status: 'Missing device_id or app_id' }, 400)
   }
+  body.device_id = body.device_id.toLowerCase()
 
   if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write'))) {
     console.log('You can\'t access this app', body.app_id)

@@ -1,19 +1,19 @@
 <script setup lang="ts">
+import type { Stat } from '~/components/comp_def'
+import type { ArrayElement } from '~/services/types'
+import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import type { Stat } from '~/components/comp_def'
 import { openMessenger } from '~/services/bento'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
-import type { ArrayElement } from '~/services/types'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 function openSupport() {
   openMessenger()
