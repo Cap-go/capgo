@@ -77,14 +77,12 @@ describe('[POST] /organization/members', () => {
       }),
     })
 
-    const res = await response.json()
-    console.log(res)
-    
+    const responseData = await response.json()
     expect(response.status).toBe(200)
     const type = z.object({
       status: z.string(),
     })
-    const safe = type.safeParse(await response.json())
+    const safe = type.safeParse(responseData)
     expect(safe.success).toBe(true)
     expect(safe.data?.status).toBe('OK')
 
