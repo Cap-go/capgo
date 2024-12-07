@@ -59,7 +59,7 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', (requestId as any)())
 
-export function publicRateLimiter(rateLimiterAction: String) {
+export function publicRateLimiter(rateLimiterAction: String, _methods: { limit: number, period: number, method: string }[]) {
   const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
@@ -77,17 +77,15 @@ app.route('/ok', ok)
 
 app.route('/organization', organization)
 
+app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/bundle', bundle)
-  .get('*', publicRateLimiter('BUNDLE_GET'))
-  .delete('*', publicRateLimiter('BUNDLE_DELETE'))
+
+app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/channel', channel)
-  .get('*', publicRateLimiter('CHANNEL_GET'))
-  .post('*', publicRateLimiter('CHANNEL_POST'))
-  .delete('*', publicRateLimiter('CHANNEL_DELETE'))
+
+app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/device', device)
-  .get('*', publicRateLimiter('DEVICE_GET'))
-  .post('*', publicRateLimiter('DEVICE_POST'))
-  .delete('*', publicRateLimiter('DEVICE_DELETE'))
+
 app.route('/on_app_create', on_app_create)
 
 // Private API
