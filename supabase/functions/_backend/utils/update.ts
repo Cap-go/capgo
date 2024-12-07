@@ -381,7 +381,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     if (version.name === 'builtin' && greaterOrEqual(parse(plugin_version), parse('6.2.0'))) {
       if (body.version_name === 'builtin' && version.name === 'builtin') {
         return c.json({ message: 'Already on builtin' }, 200)
-      } else {
+      }
+      else {
         return c.json({ version: 'builtin' })
       }
     }
