@@ -466,7 +466,9 @@ function openChannel() {
                 <option value="none">
                   {{ t('none') }}
                 </option>
-                <!-- <option :value="revertToBuiltinValue">{{ t('revert-to-builtin') }}</option>   -->
+                <option :value="revertToBuiltinValue">
+                  {{ t('revert-to-builtin') }}
+                </option>
                 <option v-for="vs in versions" :key="vs.id" :value="vs.id">
                   {{ vs.name }}
                 </option>

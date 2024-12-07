@@ -34,6 +34,7 @@
     "dev-ios": "cap sync && cap run ios",
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
+    "lint-fix": "eslint \"src/**/*.{vue,ts,js}\" --fix",
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "lint-sql": "sqlfluff fix --dialect postgres",
     "types": "bun ./scripts/getTypes.mjs",
