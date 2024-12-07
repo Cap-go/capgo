@@ -107,7 +107,14 @@ function convertKey(key: string) {
 
 const currentData = computed(() => orgsHashmap.value.get(currentOrganization.value?.gid ?? ''))
 
-const currentPlanSuggest = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
+const currentPlanSuggest = ref<Database['public']['Tables']['plans']['Row'] | undefined>(undefined)
+watchEffect(() => {
+  currentPlanSuggest.value = mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest)
+})
+watch(() => main.bestPlan, (newBestPlan) => {
+  currentPlanSuggest.value = mainStore.plans.find(plan => plan.name === newBestPlan)
+})
+// watchEffect(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
 const currentPlan = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planCurrrent))
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
@@ -187,6 +194,10 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
+const failed = computed(() => {
+  return !(!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value)
+})
+
 watch(currentOrganization, async (newOrg, prevOrg) => {
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
     if (!initialLoad.value) {
@@ -256,7 +267,10 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (currentPlan.value?.name === p.name && currentData.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
-  return p.price_m >= (currentPlan.value?.price_m ?? 0) ? t('plan-upgrade') : t('downgrade')
+  if (isTrial.value || failed.value) {
+    return t('plan-upgrade')
+  }
+  return p.price_m >= (currentPlan.value?.price_m ?? 0) ? (t('plan-upgrade-v2')) : (t('downgrade'))
 }
 
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
@@ -265,19 +279,16 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
-  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value && (currentPlanSuggest.value?.price_m ?? 0) > (p.price_m ?? 0)
+  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value && (currentPlanSuggest.value?.price_m ?? 0) > (currentPlan.value?.price_m ?? 0)
 }
 function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
+  console.log(currentPlanSuggest.value?.name, p.name, (currentPlanSuggest.value?.price_m ?? 0), (currentPlan.value?.price_m ?? 0))
   return {
     'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700': isRecommended(p),
-    'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': currentPlanSuggest.value?.name !== p.name && (currentPlanSuggest.value?.price_m ?? 0) < (currentPlan.value?.price_m ?? 0),
+    'bg-black dark:bg-white dark:text-black hover:bg-gray-500 focus:ring-gray-500': true,
     'cursor-not-allowed bg-gray-500 dark:bg-gray-400': isDisabled(p),
   }
 }
-
-const failed = computed(() => {
-  return !(!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value)
-})
 
 const hightLights = computed<Stat[]>(() => ([
   {
