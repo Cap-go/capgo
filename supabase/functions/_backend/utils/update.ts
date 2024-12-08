@@ -380,14 +380,27 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
     if ((version.bucket_id || version.r2_path) && !version.external_url) {
-      const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
+      const res = await getBundleUrl(c, appOwner.orgs.created_by, {
+        id: version.id,
+        storage_provider: version.storage_provider,
+        r2_path: version.r2_path,
+        bucket_id: version.bucket_id,
+        app_id,
+      }, device_id)
       if (res) {
         signedURL = res.url
         // only count the size of the bundle if it's not external
         await createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = await getManifestUrl(c, { app_id, ...version })
+        manifest = await getManifestUrl(c, {
+          id: version.id,
+          storage_provider: version.storage_provider,
+          r2_path: version.r2_path,
+          bucket_id: version.bucket_id,
+          app_id,
+          manifest: version.manifest as any,
+        }, device_id)
       }
     }
     //  check signedURL and if it's url
