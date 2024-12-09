@@ -39,7 +39,7 @@ function isLocal() {
 const simpleStep: Step[] = [
   {
     title: t('init-capgo-in-your-a'),
-    command: !isLocal() ? `npx @capgo/cli@latest init [APIKEY]` : `npx @capgo/cli@latest init [APIKEY] --supa-host ${config.supaHost} --supa-anon ${config.supaKey}`,
+    command: `npx @capgo/cli@latest i [APIKEY]${isLocal() ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
     subtitle: '',
     link: '',
   },
@@ -222,7 +222,7 @@ watchEffect(async () => {
           @change="changeMode()"
         />
       </div> -->
-      <div class="max-w-2xl mx-auto mt-12 sm:px-10">
+      <div class="max-w-4xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
 
@@ -240,7 +240,7 @@ watchEffect(async () => {
                 {{ s.title }}<br>
                 <span class="text-sm">{{ s.subtitle }}</span>
                 <div class="p-3 rounded-lg" :class="{ 'dark:bg-black bg-gray-100': s.command }">
-                  <code v-if="s.command" :id="`step_command_${i}`" class="text-lg cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
+                  <code v-if="s.command" :id="`step_command_${i}`" class="block text-lg break-all whitespace-pre-wrap cursor-pointer text-pumpkin-orange-700" @click="copyToast(step === i, `step_command_${i}`, s.command)">
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
