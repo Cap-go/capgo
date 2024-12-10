@@ -43,6 +43,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
+    console.error('Error on_organization_create', c.get('requestId'), e)
     return c.json({ status: 'Cannot handle org creation', error: JSON.stringify(e) }, 500)
   }
 })

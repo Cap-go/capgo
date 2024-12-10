@@ -1,7 +1,6 @@
 -- First, drop existing queue-related functions and tables
 DROP FUNCTION IF EXISTS "public"."process_current_jobs_if_unlocked";
 DROP FUNCTION IF EXISTS "public"."process_requested_jobs";
-DROP FUNCTION IF EXISTS "public"."http_post_helper";
 DROP FUNCTION IF EXISTS "public"."delete_failed_jobs";
 DROP FUNCTION IF EXISTS "public"."retry_failed_jobs";
 
@@ -73,26 +72,26 @@ SECURITY DEFINER
 AS $$
 DECLARE 
   payload jsonb;
-  queue_name text;
 BEGIN 
   -- Build the base payload
   payload := jsonb_build_object(
-    'old_record', OLD, 
-    'record', NEW, 
-    'type', TG_OP,
-    'table', TG_TABLE_NAME,
-    'schema', TG_TABLE_SCHEMA,
     'function_name', TG_ARGV[0],
-    'function_type', TG_ARGV[1]
+    'function_type', TG_ARGV[1],
+    'payload', jsonb_build_object(
+      'old_record', OLD, 
+      'record', NEW, 
+      'type', TG_OP,
+      'table', TG_TABLE_NAME,
+      'schema', TG_TABLE_SCHEMA
+    )
   );
 
   -- Send to table_events queue for replication
   PERFORM queue_message('table_events', payload);
   
   -- Also send to function-specific queue
-  queue_name := TG_ARGV[0];
-  IF queue_name IS NOT NULL THEN
-    PERFORM queue_message(queue_name, payload);
+  IF TG_ARGV[0] IS NOT NULL THEN
+    PERFORM queue_message(TG_ARGV[0], payload);
   END IF;
 
   RETURN NEW;
@@ -190,7 +189,7 @@ BEGIN
             SELECT http_post_helper(
                 payload->>'function_name',
                 payload->>'function_type',
-                CASE WHEN payload ? 'payload' THEN payload->'payload' ELSE payload END
+                payload->'payload'
             ) INTO request_id;
             
             -- Queue response handling
@@ -266,101 +265,101 @@ $$;
 -- Schedule response processing
 SELECT cron.schedule(
     'process_http_responses',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_http_responses();$$
 );
 
 -- Schedule cron jobs for consumers
 SELECT cron.schedule(
     'process_table_events',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('table_events');$$
 );
 
 -- Schedule cron jobs for each function queue
 SELECT cron.schedule(
     'process_cron_stats_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_stats');$$
 );
 
 SELECT cron.schedule(
     'process_cron_plan_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_plan');$$
 );
 
 SELECT cron.schedule(
     'process_cron_clear_versions_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_clear_versions');$$
 );
 
 SELECT cron.schedule(
     'process_cron_email_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_email');$$
 );
 
 -- Schedule event triggers queues
 SELECT cron.schedule(
     'process_app_events_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_app_create');$$
 );
 
 SELECT cron.schedule(
     'process_channel_update_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_channel_update');$$
 );
 
 SELECT cron.schedule(
     'process_organization_create_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_organization_create');$$
 );
 
 SELECT cron.schedule(
     'process_organization_delete_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_organization_delete');$$
 );
 
 SELECT cron.schedule(
     'process_user_create_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_user_create');$$
 );
 
 SELECT cron.schedule(
     'process_user_update_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_user_update');$$
 );
 
 SELECT cron.schedule(
     'process_version_create_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_version_create');$$
 );
 
 SELECT cron.schedule(
     'process_version_delete_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_version_delete');$$
 );
 
 SELECT cron.schedule(
     'process_version_update_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('on_version_update');$$
 );
 
 -- Schedule D1 replication queue
 SELECT cron.schedule(
     'process_replicate_data_queue',
-    '* * * * *',
+    '5 seconds',
     $$SELECT process_function_queue('replicate_data');$$
 );
 
