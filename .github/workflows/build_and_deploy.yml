@@ -75,7 +75,7 @@ jobs:
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
             echo "ENV=alpha" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp-preprod" >> $GITHUB_ENV
+            echo "PROJECT_NAME=capgo-webapp-alpha" >> $GITHUB_ENV
             echo "CHANNEL=alpha" >> $GITHUB_ENV
           else
             echo "ENV=prod" >> $GITHUB_ENV

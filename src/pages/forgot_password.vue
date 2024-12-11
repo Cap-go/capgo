@@ -29,9 +29,6 @@ async function submit(form: { email: string, password: string }) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
     // console.log('redirect', redirectTo)
     const { error } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo, captchaToken: turnstileToken.value })
-    setTimeout(() => {
-      isLoading.value = false
-    }, 5000)
     if (error) {
       if (error.message.includes('captcha')) {
         toast.error(t('captcha-fail'))
@@ -42,6 +39,7 @@ async function submit(form: { email: string, password: string }) {
     else {
       toast.success(t('forgot-check-email'))
     }
+    isLoading.value = false
   }
   else if (step.value === 2 && route.hash) {
     const queryString = route.hash.replace('#', '')
@@ -49,20 +47,15 @@ async function submit(form: { email: string, password: string }) {
     const access_token = urlParams.get('access_token') || ''
     const refresh_token = urlParams.get('refresh_token') || ''
     // login with access_token
-    const res = await supabase.auth.setSession({ refresh_token, access_token })
-    if (res.error) {
-      setErrors('forgot-password', [res.error.message], {})
-      return
-    }
-    else {
-      console.log('res', res)
-    }
-    const { error } = await supabase.auth.updateUser({ password: form.password })
-    setTimeout(() => {
-      isLoading.value = false
-    }, 5000)
+    const { error } = await supabase.auth.setSession({ refresh_token, access_token })
     if (error) {
       setErrors('forgot-password', [error.message], {})
+      return
+    }
+    const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
+    isLoading.value = false
+    if (updateError) {
+      setErrors('forgot-password', [updateError.message], {})
     }
     else {
       toast.success(t('forgot-success'))
@@ -75,7 +68,7 @@ async function submit(form: { email: string, password: string }) {
 watchEffect(() => {
   isLoadingMain.value = true
   if (route && route.path === '/forgot_password') {
-    console.log('router.currentRoute.value.query', router.currentRoute.value.query)
+    // console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
       step.value = Number.parseInt(router.currentRoute.value.query.step as string)
     isLoadingMain.value = false
