@@ -11,6 +11,7 @@ import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -19,6 +20,7 @@ const isLoading = ref(false)
 const supabase = useSupabase()
 const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>()
 const magicVal = ref(0)
+const organizationStore = useOrganizationStore()
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
@@ -38,9 +40,31 @@ displayStore.NavTitle = ''
 getKeys()
 
 async function addNewApiKey() {
+  console.log('displayStore.dialogCheckbox', organizationStore.organizations)
   if (await showAddNewKeyModal())
     return
 
+  if (displayStore.dialogCheckbox) {
+    displayStore.dialogOption = {
+      header: t('alert-confirm-org-limit'),
+      message: t('alert-confirm-org-limit-message'),
+      textStyle: 'mb-5',
+      listOrganizations: true,
+      buttons: [
+        {
+          text: t('button-cancel'), 
+          role: 'cancel',
+        },
+        {
+          text: t('button-confirm'),
+          id: 'confirm-button', 
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss())
+      return
+  }
   const keyType = displayStore.lastButtonRole
 
   let databaseKeyType: 'read' | 'write' | 'all' | 'upload'
@@ -256,6 +280,7 @@ async function showAddNewKeyModal() {
         id: 'all-button',
       },
     ],
+    checkboxText: t('limit-to-org'),
   }
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()

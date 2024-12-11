@@ -32,6 +32,8 @@ alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
 alert-confirm-delete: 削除の確認
 alert-confirm-invite: 招待を確認する
+alert-confirm-org-limit: ''
+alert-confirm-org-limit-message: ''
 alert-confirm-regenerate: APIキーの再生成を確認する
 alert-delete-message: これを削除してもよろしいですか
 alert-delete-message-plural: 本当に削除しますか？
@@ -273,6 +275,7 @@ last-version: 最後のバージョン
 latest_version: 最新バンドル
 launch-bundle: バンドルを起動
 leaving: 出発
+limit-to-org: ''
 live-reload: ライブリロード
 log-as: スプーフィングを開始する
 log-in: ログイン

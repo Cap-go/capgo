@@ -21,6 +21,8 @@ export interface ActionSheetOption {
   buttonCenter?: boolean
   buttonVertical?: boolean
   preventAccidentalClose?: boolean
+  checkboxText?: string
+  listOrganizations?: boolean,
   buttons?: ActionSheetOptionButton[]
 }
 
@@ -40,6 +42,7 @@ export const useDisplayStore = defineStore('display', () => {
   const durationToast = ref<number>(2000)
   const lastButtonRole = ref<string>('')
   const dialogInputText = ref('')
+  const dialogCheckbox = ref<boolean>(false)
   const onDialogDismiss = (): Promise<boolean> => {
     // watch showDialog for changes and if false then resolve
     return new Promise((resolve) => {
@@ -65,6 +68,7 @@ export const useDisplayStore = defineStore('display', () => {
     NavTitle,
     defaultBack,
     dialogInputText,
+    dialogCheckbox,
   }
 })
 

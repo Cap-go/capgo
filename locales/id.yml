@@ -32,6 +32,8 @@ alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
 alert-confirm-delete: Konfirmasi Hapus
 alert-confirm-invite: Konfirmasikan undangan
+alert-confirm-org-limit: ''
+alert-confirm-org-limit-message: ''
 alert-confirm-regenerate: Konfirmasikan pembuatan ulang kunci API
 alert-delete-message: Apa kamu yakin ingin menghapus ini
 alert-delete-message-plural: Apakah Anda yakin ingin menghapus ini
@@ -284,6 +286,7 @@ last-version: Versi terakhir
 latest_version: Paket terbaru
 launch-bundle: Luncurkan bundel
 leaving: Meninggalkan
+limit-to-org: ''
 live-reload: Muat ulang langsung
 log-as: Mulai melakukan spoofing
 log-in: Gabung

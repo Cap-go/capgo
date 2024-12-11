@@ -36,6 +36,8 @@ alert-accept-inviation: Вы принимаете приглашение в %ORG
 alert-add-new-key: Выберите новый тип ключа API
 alert-confirm-delete: Подтвердите удаление
 alert-confirm-invite: Подтвердить приглашение
+alert-confirm-org-limit: ''
+alert-confirm-org-limit-message: ''
 alert-confirm-regenerate: Подтвердите восстановление ключа API
 alert-delete-message: Вы уверены, что хотите удалить это
 alert-delete-message-plural: Вы уверены, что хотите удалить эти
@@ -289,6 +291,7 @@ last-version: Последняя версия
 latest_version: Последний пакет
 launch-bundle: Пакет запуска
 leaving: Уход
+limit-to-org: ''
 live-reload: Живая перезагрузка
 log-as: Начать подделку
 log-in: Авторизоваться

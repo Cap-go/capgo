@@ -40,6 +40,8 @@ alert-accept-inviation: Nehmen Sie die Einladung zu %ORG% an?
 alert-add-new-key: Wählen Sie einen neuen API-Schlüsseltyp aus
 alert-confirm-delete: Löschen bestätigen
 alert-confirm-invite: Einladung bestätigen
+alert-confirm-org-limit: ''
+alert-confirm-org-limit-message: ''
 alert-confirm-regenerate: Bestätigen Sie die Neugenerierung des API-Schlüssels
 alert-delete-message: Möchten Sie diese wirklich löschen?
 alert-delete-message-plural: Sind Sie sicher, dass Sie diese Dateien löschen möchten?
@@ -311,6 +313,7 @@ last-version: Letzte Version
 latest_version: Neuestes Paket
 launch-bundle: Bündel starten
 leaving: Verlassen
+limit-to-org: ''
 live-reload: Live-Neuladen
 log-as: Beginnen Sie mit dem Spoofing
 log-in: Anmeldung

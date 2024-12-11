@@ -36,6 +36,8 @@ alert-accept-inviation: Bạn có chấp nhận lời mời tham gia %ORG% khôn
 alert-add-new-key: Chọn loại khóa API mới
 alert-confirm-delete: Xác nhận Xóa
 alert-confirm-invite: Xác nhận lời mời
+alert-confirm-org-limit: ''
+alert-confirm-org-limit-message: ''
 alert-confirm-regenerate: Xác nhận khóa API tái tạo
 alert-delete-message: Bạn có chắc chắn muốn xóa cái này
 alert-delete-message-plural: Bạn có chắc chắn muốn xóa những thứ này
@@ -297,6 +299,7 @@ last-version: Phiên bản cuối cùng
 latest_version: Gói mới nhất
 launch-bundle: Khởi chạy gói
 leaving: Rời đi
+limit-to-org: ''
 live-reload: tải lại trực tiếp
 log-as: Bắt đầu giả mạo
 log-in: Đăng nhập
