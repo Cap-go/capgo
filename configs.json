@@ -25,7 +25,7 @@
   },
   "captcha_key": {
     "prod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
-    "preprod": "",
+    "preprod": "0x4AAAAAAAxDbvW2bw7mcEZs",
     "development": "",
     "local": ""
   }
