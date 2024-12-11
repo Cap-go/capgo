@@ -526,3 +526,9 @@ GRANT ALL ON FUNCTION "public"."replicate_to_d1"(jsonb, jsonb, text, text) TO "p
 
 REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1"() TO "postgres";
+
+REVOKE ALL ON FUNCTION "public"."process_http_responses"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."process_http_responses"() TO "postgres";
+
+REVOKE ALL ON FUNCTION public.queue_message FROM PUBLIC;
+GRANT ALL ON FUNCTION public.queue_message TO "postgres";
