@@ -29,7 +29,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
 
     if (!record.customer_id)
-      createStripeCustomer(c, record as any)
+      await createStripeCustomer(c, record as any)
 
     const LogSnag = logsnag(c)
     LogSnag.track({

@@ -139,7 +139,9 @@ export interface StripeCustomer {
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, name: string) {
+  console.log({ requestId: c.get('requestId'), context: 'createCustomer', email, userId, name })
   if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
+    console.log({ requestId: c.get('requestId'), context: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     return { id: `cus_${randomId}`, email, name, metadata: { user_id: userId } }
