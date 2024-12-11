@@ -23,14 +23,14 @@ jobs:
       - name: Set environment variable
         run: |
           if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
+            echo "SUPA_ENV=ALPHA" >> $GITHUB_ENV
           else
-            echo "ENV=prod" >> $GITHUB_ENV
+            echo "SUPA_ENV=PROD" >> $GITHUB_ENV
           fi
       - name: Set Supabase credentials
         run: |
-          echo "SUPABASE_DB_PASSWORD=${{ secrets[format('SUPABASE_DB_PASS_{0}', env.ENV)] }}" >> $GITHUB_ENV
-          echo "SUPABASE_PROJECT_ID=${{ secrets[format('SUPABASE_PROJECT_ID_{0}', env.ENV)] }}" >> $GITHUB_ENV
+          echo "SUPABASE_DB_PASSWORD=${{ secrets[format('SUPABASE_DB_PASS_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
+          echo "SUPABASE_PROJECT_ID=${{ secrets[format('SUPABASE_PROJECT_ID_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
       - name: Install dependencies
         run: bun install
       - name: Lint
