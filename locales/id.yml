@@ -32,8 +32,8 @@ alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
 alert-confirm-delete: Konfirmasi Hapus
 alert-confirm-invite: Konfirmasikan undangan
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: Batasi kunci API untuk organisasi tertentu
+alert-confirm-org-limit-message: Pilih organisasi yang akan diakses oleh kunci API ini
 alert-confirm-regenerate: Konfirmasikan pembuatan ulang kunci API
 alert-delete-message: Apa kamu yakin ingin menghapus ini
 alert-delete-message-plural: Apakah Anda yakin ingin menghapus ini
@@ -103,10 +103,10 @@ cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Anda tidak dapat menghapus versi secara massal
+cannot-delete-bundle-linked-channel-2: 'Versi berikut ini ditautkan setidaknya dalam 1 saluran:'
+cannot-delete-bundle-linked-channel-3: Putuskan tautan secara manual dan coba lagi
+cannot-delete-bundles: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
@@ -286,7 +286,9 @@ last-version: Versi terakhir
 latest_version: Paket terbaru
 launch-bundle: Luncurkan bundel
 leaving: Meninggalkan
-limit-to-org: ''
+limit-to-org: |-
+  Batasi kunci API untuk organisasi tertentu
+  organisasi tertentu?
 live-reload: Muat ulang langsung
 log-as: Mulai melakukan spoofing
 log-in: Gabung

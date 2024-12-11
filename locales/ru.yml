@@ -36,8 +36,8 @@ alert-accept-inviation: Вы принимаете приглашение в %ORG
 alert-add-new-key: Выберите новый тип ключа API
 alert-confirm-delete: Подтвердите удаление
 alert-confirm-invite: Подтвердить приглашение
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: Ограничьте доступ к ключу API для определенных организаций
+alert-confirm-org-limit-message: Выберите организации, к которым этот ключ API будет иметь доступ
 alert-confirm-regenerate: Подтвердите восстановление ключа API
 alert-delete-message: Вы уверены, что хотите удалить это
 alert-delete-message-plural: Вы уверены, что хотите удалить эти
@@ -113,10 +113,10 @@ cannot-del-org: Невозможно удалить организацию, пр
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-bundle: Невозможно удалить пакет
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Массовое удаление версий невозможно
+cannot-delete-bundle-linked-channel-2: 'Следующие версии связаны как минимум по одному каналу:'
+cannot-delete-bundle-linked-channel-3: Пожалуйста, отсоедините их вручную и попробуйте снова
+cannot-delete-bundles: Невозможно удалить пакеты
 cannot-delete-channel: Не могу удалить канал
 cannot-delete-member: Невозможно удалить участника, проверьте консоль браузера
 cannot-delete-owner: Невозможно удалить владельца из организации
@@ -291,7 +291,9 @@ last-version: Последняя версия
 latest_version: Последний пакет
 launch-bundle: Пакет запуска
 leaving: Уход
-limit-to-org: ''
+limit-to-org: |-
+  Ограничить доступ к ключу API для выбранных
+  организаций?
 live-reload: Живая перезагрузка
 log-as: Начать подделку
 log-in: Авторизоваться

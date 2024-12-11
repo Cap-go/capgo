@@ -32,8 +32,8 @@ alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
 alert-confirm-delete: 削除の確認
 alert-confirm-invite: 招待を確認する
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: APIキーを特定の組織に限定する
+alert-confirm-org-limit-message: このAPIキーがアクセスできる組織を選択します。
 alert-confirm-regenerate: APIキーの再生成を確認する
 alert-delete-message: これを削除してもよろしいですか
 alert-delete-message-plural: 本当に削除しますか？
@@ -103,10 +103,10 @@ cannot-del-org: 組織を削除できません。ブラウザのログを確認�
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-bundle: バンドルを削除できません
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: バージョンの一括削除はできません。
+cannot-delete-bundle-linked-channel-2: 以下のバージョンは少なくとも1チャンネルでリンクされている：
+cannot-delete-bundle-linked-channel-3: 手動でリンクを解除し、再度お試しください。
+cannot-delete-bundles: バンドルが削除できない
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
@@ -275,7 +275,9 @@ last-version: 最後のバージョン
 latest_version: 最新バンドル
 launch-bundle: バンドルを起動
 leaving: 出発
-limit-to-org: ''
+limit-to-org: |-
+  APIキーを選択した
+  組織ですか？
 live-reload: ライブリロード
 log-as: スプーフィングを開始する
 log-in: ログイン

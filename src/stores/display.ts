@@ -41,6 +41,7 @@ export const useDisplayStore = defineStore('display', () => {
   const messageToast = ref<string[]>([])
   const durationToast = ref<number>(2000)
   const lastButtonRole = ref<string>('')
+  const selectedOrganizations = ref<string[]>([])
   const dialogInputText = ref('')
   const dialogCheckbox = ref<boolean>(false)
   const onDialogDismiss = (): Promise<boolean> => {
@@ -69,6 +70,7 @@ export const useDisplayStore = defineStore('display', () => {
     defaultBack,
     dialogInputText,
     dialogCheckbox,
+    selectedOrganizations,
   }
 })
 

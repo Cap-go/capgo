@@ -36,8 +36,8 @@ alert-accept-inviation: Bạn có chấp nhận lời mời tham gia %ORG% khôn
 alert-add-new-key: Chọn loại khóa API mới
 alert-confirm-delete: Xác nhận Xóa
 alert-confirm-invite: Xác nhận lời mời
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: Giới hạn khóa API cho các tổ chức được chứng nhận
+alert-confirm-org-limit-message: Chọn các tổ chức mà khóa API này sẽ có quyền truy cập
 alert-confirm-regenerate: Xác nhận khóa API tái tạo
 alert-delete-message: Bạn có chắc chắn muốn xóa cái này
 alert-delete-message-plural: Bạn có chắc chắn muốn xóa những thứ này
@@ -115,10 +115,10 @@ cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký t
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-bundle: Không thể xóa gói
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Bạn không thể xóa hàng loạt phiên bản
+cannot-delete-bundle-linked-channel-2: 'Các phiên bản sau được liên kết trong ít nhất 1 kênh:'
+cannot-delete-bundle-linked-channel-3: Vui lòng hủy liên kết chúng theo cách thủ công và thử lại
+cannot-delete-bundles: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
@@ -299,7 +299,10 @@ last-version: Phiên bản cuối cùng
 latest_version: Gói mới nhất
 launch-bundle: Khởi chạy gói
 leaving: Rời đi
-limit-to-org: ''
+limit-to-org: |-
+  Giới hạn khóa API ở mức đã chọn 
+
+  tổ chức?
 live-reload: tải lại trực tiếp
 log-as: Bắt đầu giả mạo
 log-in: Đăng nhập

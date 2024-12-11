@@ -44,27 +44,6 @@ async function addNewApiKey() {
   if (await showAddNewKeyModal())
     return
 
-  if (displayStore.dialogCheckbox) {
-    displayStore.dialogOption = {
-      header: t('alert-confirm-org-limit'),
-      message: t('alert-confirm-org-limit-message'),
-      textStyle: 'mb-5',
-      listOrganizations: true,
-      buttons: [
-        {
-          text: t('button-cancel'), 
-          role: 'cancel',
-        },
-        {
-          text: t('button-confirm'),
-          id: 'confirm-button', 
-        },
-      ],
-    }
-    displayStore.showDialog = true
-    if (await displayStore.onDialogDismiss())
-      return
-  }
   const keyType = displayStore.lastButtonRole
 
   let databaseKeyType: 'read' | 'write' | 'all' | 'upload'
@@ -89,6 +68,30 @@ async function addNewApiKey() {
       return
   }
 
+  var selectedOrganizations = [] as string[]
+  if (displayStore.dialogCheckbox) {
+    displayStore.dialogOption = {
+      header: t('alert-confirm-org-limit'),
+      message: t('alert-confirm-org-limit-message'),
+      textStyle: 'mb-5',
+      listOrganizations: true,
+      buttons: [
+        {
+          text: t('button-cancel'), 
+          role: 'cancel',
+        },
+        {
+          text: t('button-confirm'),
+          id: 'confirm-button', 
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss())
+      return
+    selectedOrganizations = displayStore.selectedOrganizations
+  }
+
   const newApiKey = crypto.randomUUID()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -99,7 +102,7 @@ async function addNewApiKey() {
 
   const { data, error } = await supabase
     .from('apikeys')
-    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType, name: '' })
+    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType, name: '', limited_to_orgs: selectedOrganizations.length > 0 ? selectedOrganizations : null })
     .select()
 
   if (error)

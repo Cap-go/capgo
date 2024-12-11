@@ -32,8 +32,8 @@ alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
 alert-add-new-key: Yeni API anahtarı türünü seçin
 alert-confirm-delete: Silmeyi Onayla
 alert-confirm-invite: Daveti onayla
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: API anahtarını belirli kuruluşlarla sınırlayın
+alert-confirm-org-limit-message: Bu API anahtarının erişebileceği kuruluşları seçin
 alert-confirm-regenerate: API anahtarının yeniden oluşturulmasını onaylayın
 alert-delete-message: Bunu silmek istediğinizden emin misiniz
 alert-delete-message-plural: Bunları silmek istediğinizden emin misiniz?
@@ -105,10 +105,10 @@ cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol 
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-bundle: Paket silinemiyor
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Sürümleri toplu olarak silemezsiniz
+cannot-delete-bundle-linked-channel-2: 'Aşağıdaki versiyonlar en az 1 kanalda bağlantılıdır:'
+cannot-delete-bundle-linked-channel-3: Lütfen bağlantılarını manuel olarak kaldırın ve tekrar deneyin
+cannot-delete-bundles: Paketler silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
@@ -284,7 +284,9 @@ last-version: Son sürüm
 latest_version: En son paket
 launch-bundle: Paketi başlat
 leaving: Ayrılıyorum
-limit-to-org: ''
+limit-to-org: |-
+  API anahtarını seçilenle sınırla
+  organizasyonlar?
 live-reload: Canlı yeniden yükleme
 log-as: Sahtelemeye başla
 log-in: Giriş yapmak

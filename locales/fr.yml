@@ -40,8 +40,8 @@ alert-accept-inviation: Acceptez-vous l'invitation à %ORG%?
 alert-add-new-key: Sélectionnez le nouveau type de clé API
 alert-confirm-delete: Confirmer la suppression
 alert-confirm-invite: Confirmer l'invitation
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: Limiter la clé API à certaines organisations
+alert-confirm-org-limit-message: Sélectionnez les organisations auxquelles cette clé API aura accès.
 alert-confirm-regenerate: Confirmer la régénération de la clé API
 alert-delete-message: Êtes-vous sûr de vouloir supprimer ceci ?
 alert-delete-message-plural: Êtes-vous sûr de vouloir supprimer ces
@@ -125,10 +125,10 @@ cannot-del-org: >-
 cannot-delete-app: Impossible de supprimer l'application
 cannot-delete-app-icon: Impossible de supprimer l'icône de l'application
 cannot-delete-bundle: Impossible de supprimer le paquet
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Vous ne pouvez pas supprimer des versions en masse
+cannot-delete-bundle-linked-channel-2: 'Les versions suivantes sont liées dans au moins un canal :'
+cannot-delete-bundle-linked-channel-3: Veuillez les dissocier manuellement et réessayer.
+cannot-delete-bundles: Impossible de supprimer des lots
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
@@ -310,7 +310,9 @@ last-version: Dernière version
 latest_version: Dernier paquet
 launch-bundle: Lancement du paquet
 leaving: Partir
-limit-to-org: ''
+limit-to-org: |-
+  Limiter la clé API à des organisations
+  sélectionnées ?
 live-reload: Rechargement en direct
 log-as: Commencez le spoofing
 log-in: Se connecter

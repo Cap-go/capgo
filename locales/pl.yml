@@ -34,8 +34,8 @@ alert-accept-inviation: Czy akceptujesz zaproszenie do %ORG%?
 alert-add-new-key: Wybór typu klucza do wygenerowania
 alert-confirm-delete: Potwierdź usunięcie
 alert-confirm-invite: Potwierdź zaproszenie
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: Ograniczenie klucza API do określonych organizacji
+alert-confirm-org-limit-message: Wybierz organizacje, do których ten klucz API będzie miał dostęp
 alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
 alert-delete-message-plural: Czy na pewno chcesz je usunąć?
@@ -107,10 +107,10 @@ cannot-del-org: Nie można usunąć organizacji. Sprawdź dziennik przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-bundle: Nie można usunąć pakietu
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Nie można masowo usuwać wersji
+cannot-delete-bundle-linked-channel-2: 'Następujące wersje są połączone w co najmniej 1 kanale:'
+cannot-delete-bundle-linked-channel-3: Odłącz je ręcznie i spróbuj ponownie
+cannot-delete-bundles: Nie można usunąć pakietów
 cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
@@ -288,7 +288,9 @@ last-version: Ostatnia wersja
 latest_version: Najnowszy pakiet
 launch-bundle: Uruchom pakiet
 leaving: Odjazd
-limit-to-org: ''
+limit-to-org: |-
+  Ograniczenie klucza API do wybranych
+  organizacji?
 live-reload: Przeładowanie na żywo
 log-as: Zacznij podszywać się
 log-in: Zaloguj sie

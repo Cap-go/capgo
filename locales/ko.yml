@@ -32,8 +32,8 @@ alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
 alert-confirm-delete: 삭제 확인
 alert-confirm-invite: 초대 확인
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: API 키를 인증된 조직으로 제한
+alert-confirm-org-limit-message: 이 API 키가 액세스할 수 있는 조직을 선택합니다.
 alert-confirm-regenerate: API 키 재생성 확인
 alert-delete-message: 삭제하시겠습니까?
 alert-delete-message-plural: 정말 삭제하시겠습니까?
@@ -103,10 +103,10 @@ cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: 버전을 대량 삭제할 수 없습니다.
+cannot-delete-bundle-linked-channel-2: '다음 버전은 최소 1개 이상의 채널에 연결되어 있습니다:'
+cannot-delete-bundle-linked-channel-3: 수동으로 연결을 해제하고 다시 시도하세요.
+cannot-delete-bundles: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
@@ -275,7 +275,9 @@ last-version: 마지막 버전
 latest_version: 최신 번들
 launch-bundle: 번들 실행
 leaving: 퇴거
-limit-to-org: ''
+limit-to-org: |-
+  API 키를 선택한
+  조직으로 제한하시겠습니까?
 live-reload: 라이브 리로드
 log-as: 스푸핑 시작
 log-in: 로그인

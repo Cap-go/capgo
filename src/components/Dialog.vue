@@ -88,6 +88,12 @@ onMounted(() => {
                   <FormKit
                     type="checkbox"
                     :name="`org-${org.gid}`"
+                    @input="(value) => {
+                      if (value)
+                        displayStore.selectedOrganizations.push(org.gid)
+                      else
+                        displayStore.selectedOrganizations = displayStore.selectedOrganizations.filter(gid => gid !== org.gid)
+                    }"
                     :classes="{ 
                       outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
                       inner: '!max-w-[18px]',

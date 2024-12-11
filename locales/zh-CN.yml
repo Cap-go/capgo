@@ -32,8 +32,8 @@ alert-accept-inviation: 您接受%ORG% 的邀请吗？
 alert-add-new-key: 选择新的 API 密钥类型
 alert-confirm-delete: 确认删除
 alert-confirm-invite: 确认邀请
-alert-confirm-org-limit: ''
-alert-confirm-org-limit-message: ''
+alert-confirm-org-limit: 将应用程序接口密钥限制在特定机构
+alert-confirm-org-limit-message: 选择此 API 密钥可访问的机构
 alert-confirm-regenerate: 确认重新生成 API 密钥
 alert-delete-message: 你确定要删除这个吗
 alert-delete-message-plural: 您确定要删除这些
@@ -103,10 +103,10 @@ cannot-del-org: 无法删除组织，请检查浏览器日志
 cannot-delete-app: 无法删除应用
 cannot-delete-app-icon: 无法删除应用程序图标
 cannot-delete-bundle: 无法删除捆绑包
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: 无法批量删除版本
+cannot-delete-bundle-linked-channel-2: 以下版本至少有 1 个通道相连：
+cannot-delete-bundle-linked-channel-3: 请手动取消链接，然后再试一次
+cannot-delete-bundles: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
@@ -275,7 +275,9 @@ last-version: 最新版本
 latest_version: 最新捆绑包
 launch-bundle: 启动包
 leaving: 离开
-limit-to-org: ''
+limit-to-org: |-
+  将 API 密钥限制给选定的
+  组织？
 live-reload: 实时重新加载
 log-as: 开始欺骗
 log-in: 登录
