@@ -243,6 +243,7 @@ discover-module-in-a: Entdecken Sie das Modul in Awesome-capacitor
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
+downgrade: Herabstufung
 download: Herunterladen
 email: Email
 enable: Aktivieren
@@ -440,6 +441,7 @@ plan-storage: GB Speicher
 plan-team: Am besten für Großunternehmer geeignet
 plan-updates: Aktualisierung
 plan-upgrade: Abonniert
+plan-upgrade-v2: Upgrade
 plan-whats-included: Was ist inbegriffen
 plans: Pläne
 plans-super-only: Nur Superadministratoren dürfen Pläne und Abrechnungen einsehen

@@ -516,8 +516,11 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
   const soloPlan = await getDefaultPlan(c)
-  if (!soloPlan)
+  if (!soloPlan) {
+    console.log({ requestId: c.get('requestId'), context: 'no default plan' })
     throw new Error('no default plan')
+  }
+  console.log({ requestId: c.get('requestId'), context: 'createInfo', soloPlan, customer })
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({

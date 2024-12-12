@@ -31,7 +31,7 @@ async function deleteAccount() {
 
           const authUser = await supabase.auth.getUser()
           if (authUser.error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
 
           try {
             const { data: user } = await supabaseClient
@@ -40,7 +40,7 @@ async function deleteAccount() {
               .eq('id', authUser.data.user.id)
               .single()
             if (!user)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
 
             if (user.customer_id) {
               await supabaseClient
@@ -69,7 +69,7 @@ async function deleteAccount() {
           }
           catch (error) {
             console.error(error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
           }
         },
       },
@@ -128,7 +128,7 @@ onMounted (() => {
       <div class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <FormKit id="login-account" type="form" :actions="false" @submit="submit">
+            <FormKit id="delete-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
                   type="email" name="email" :disabled="isLoading" enterkeyhint="next"

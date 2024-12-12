@@ -19,3 +19,7 @@ BEGIN
     );
 END;
 $$;
+
+-- Set old versions to deleted after retention passed 
+select
+    cron.schedule('Delete old app version', '40 0 * * *', $$CALL update_app_versions_retention()$$);
