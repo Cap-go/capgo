@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { middlewareKey } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
-import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 
 interface dataUpload {
   app_id: string
@@ -27,7 +27,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       return c.json({ status: 'Error User not found' }, 500)
     }
 
-    if (!(await hasAppRight(c, body.app_id, userId, 'read'))) {
+    if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
       console.log({ requestId: c.get('requestId'), context: 'not has app right', userId, app_id: body.app_id })
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }

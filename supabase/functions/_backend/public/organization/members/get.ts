@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
 import { getPgClient } from '../../../utils/pg.ts'
-import { hasOrgRight } from '../../../utils/supabase.ts'
+import { hasOrgRightApikey } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -32,7 +32,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
   const body = bodyParsed.data
 
-  if (!(await hasOrgRight(c, body.orgId, apikey.user_id, 'read')))
+  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)))
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
 
   const pgClient = getPgClient(c)

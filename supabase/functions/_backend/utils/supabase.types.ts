@@ -39,6 +39,7 @@ export type Database = {
           created_at: string | null
           id: number
           key: string
+          limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
           updated_at: string | null
@@ -48,6 +49,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           key: string
+          limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
           updated_at?: string | null
@@ -57,6 +59,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           key?: string
+          limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
           name?: string
           updated_at?: string | null
@@ -1268,6 +1271,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      check_revert_to_builtin_version: {
+        Args: {
+          appid: string
+        }
+        Returns: number
+      }
       convert_bytes_to_gb: {
         Args: {
           byt: number
@@ -1774,6 +1783,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_app_right_apikey: {
+        Args: {
+          appid: string
+          right: Database["public"]["Enums"]["user_min_right"]
+          userid: string
+          apikey: string
+        }
+        Returns: boolean
+      }
       has_app_right_userid: {
         Args: {
           appid: string
@@ -2010,6 +2028,15 @@ export type Database = {
           install: number
           uninstall: number
         }[]
+      }
+      replicate_to_d1: {
+        Args: {
+          record: Json
+          old_record: Json
+          operation: string
+          table_name: string
+        }
+        Returns: undefined
       }
       reset_and_seed_app_data: {
         Args: {

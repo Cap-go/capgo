@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface GetLatest {
   app_id?: string
@@ -13,7 +13,7 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
   if (!body.app_id)
     return c.json({ status: 'Missing app_id' }, 400)
 
-  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {

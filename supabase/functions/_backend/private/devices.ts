@@ -3,7 +3,7 @@ import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
-import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
 interface dataDevice {
   appId: string
@@ -33,7 +33,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
         .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
       if (_errorUserId || !userId)
         return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
-      if (!(await hasAppRight(c, body.appId, userId, 'read')))
+      if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string)))
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }
     else if (authorization) {
