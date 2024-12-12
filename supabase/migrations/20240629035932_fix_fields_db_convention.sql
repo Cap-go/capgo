@@ -31,6 +31,9 @@ BEGIN
 END;
 $$;
 
+select
+    cron.schedule('Update channel for progressive deploy if too many fail', '*/10 * * * *', $$CALL update_channels_progressive_deploy()$$);
+
 -- Add dummy columns
 
 ALTER TABLE channels 

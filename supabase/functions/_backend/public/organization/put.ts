@@ -18,17 +18,19 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
   if (error)
     return c.json({ status: 'Cannot get user', error: error.message }, 500)
 
-  const { error: errorOrg } = await supabaseAdmin(c)
+  const { data: dataOrg, error: errorOrg } = await supabaseAdmin(c)
     .from('orgs')
     .insert({
       name: body.name,
       created_by: userId,
       management_email: data.email,
     })
+    .select()
+    .single()
 
   if (errorOrg) {
     console.error('Error when creating org', errorOrg)
     return c.json({ status: 'Cannot create org', error: errorOrg.message }, 500)
   }
-  return c.json({ status: 'Organization created', id: data.id }, 200)
+  return c.json({ status: 'Organization created', id: dataOrg.id }, 200)
 }

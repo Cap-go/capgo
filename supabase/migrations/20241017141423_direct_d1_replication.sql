@@ -121,3 +121,6 @@ BEGIN
     RETURN NEW;
 END;
 $$; 
+
+REVOKE ALL ON FUNCTION public.replicate_to_d1 FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.replicate_to_d1 TO service_role;

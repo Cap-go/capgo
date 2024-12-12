@@ -209,6 +209,7 @@ discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
+downgrade: 다운그레이드
 download: 다운로드
 email: 이메일
 enable: 할 수 있게 하다
@@ -382,6 +383,7 @@ plan-storage: GB 스토리지
 plan-team: 대기업 소유자에게 가장 적합
 plan-updates: 업데이트
 plan-upgrade: 구독자
+plan-upgrade-v2: 업그레이드
 plan-whats-included: 포함된 것
 plans: 계획
 plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니다.
