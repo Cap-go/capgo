@@ -59,7 +59,8 @@ export async function getBundleUrl(
     }
   }
 
-  const url = new URL(c.req.url)
+  console.log(c.req.url)
+  const url = new URL('http://wolny-ubuntu.local:7887')
   const downloadUrl = `${url.protocol}//${url.host}/${BASE_PATH}/${path}?key=${bundleMeta?.checksum}`
   return { url: downloadUrl, size: bundleMeta?.size }
 }
@@ -77,7 +78,7 @@ export async function getManifestUrl(c: Context, version: {
   }
 
   try {
-    const url = new URL(c.req.url)
+    const url = new URL('http://wolny-ubuntu.local:7887')
     const signKey = version.id
 
     return version.manifest.map((entry) => {

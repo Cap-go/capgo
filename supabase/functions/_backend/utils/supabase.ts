@@ -201,6 +201,27 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
   return data
 }
 
+export async function hasAppRightApikey(c: Context, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+  if (!appId)
+    return false
+
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
+
+  if (error) {
+    console.error({ requestId: c.get('requestId'), context: 'has_app_right_userid error', error })
+    return false
+  }
+
+  return data
+}
+
+export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
+  if (!key.limited_to_orgs)
+    return true
+  return key.limited_to_orgs.includes(orgId)
+}
+
 export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
   const userRight = await supabaseAdmin(c).rpc('check_min_rights', {
     min_right: right,
