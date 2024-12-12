@@ -34,6 +34,8 @@ add-member: Añadir miembro
 add-your-first-app-t: ¡Agregue su primera aplicación a su cuenta y empujemos las actualizaciones!
 admin: administración
 alert-2fa-disable: Confirma que deseas desactivar 2FA
+alert-2fa-required: Se requiere 2FA para restablecer la contraseña
+alert-2fa-required-message: Introduzca el código 2fa
 alert-accept-inviation: ¿Aceptas la invitación a %ORG%?
 alert-add-new-key: Seleccione un nuevo tipo de clave API
 alert-confirm-delete: Confirmar eliminación

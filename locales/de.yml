@@ -36,6 +36,8 @@ add-your-first-app-t: >-
   veröffentlichen!
 admin: Administrator
 alert-2fa-disable: Bestätigen Sie, dass Sie 2FA deaktivieren möchten
+alert-2fa-required: 2FA ist erforderlich, um das Passwort zurückzusetzen
+alert-2fa-required-message: Bitte geben Sie den 2fa-Code ein
 alert-accept-inviation: Nehmen Sie die Einladung zu %ORG% an?
 alert-add-new-key: Wählen Sie einen neuen API-Schlüsseltyp aus
 alert-confirm-delete: Löschen bestätigen
