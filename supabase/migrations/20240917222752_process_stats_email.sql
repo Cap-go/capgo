@@ -21,6 +21,9 @@ BEGIN
 END;
 $$;
 
+select
+    cron.schedule('Send stats email every week', '0 12 * * 6', $$SELECT process_stats_email();$$);
+
 ALTER FUNCTION "public"."process_stats_email"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."process_stats_email"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."process_stats_email"() TO "service_role";
