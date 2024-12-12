@@ -99,7 +99,7 @@ watchEffect(() => {
         <div class="relative max-w-md mx-auto mt-8 md:mt-4">
           <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
-              <FormKit id="forgot-pass" type="form" :actions="false" @submit="submit">
+              <FormKit id="forgot-password" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5 text-gray-500">
                   <div v-if="step === 1">
                     <FormKit
