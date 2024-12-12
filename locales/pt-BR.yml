@@ -30,6 +30,8 @@ add-member: Adicionar membro
 add-your-first-app-t: Adicione seu primeiro aplicativo à sua conta e vamos enviar atualizações!
 admin: administrador
 alert-2fa-disable: Confirme que deseja desativar 2FA
+alert-2fa-required: A 2FA é necessária para repor a palavra-passe
+alert-2fa-required-message: Introduzir o código 2fa
 alert-accept-inviation: Você aceita o convite para %ORG%?
 alert-add-new-key: Selecione o novo tipo de chave de API
 alert-confirm-delete: Confirmar exclusão
@@ -109,10 +111,10 @@ cannot-del-org: Não é possível excluir a organização. Verifique o registro 
 cannot-delete-app: Não é possível excluir o aplicativo
 cannot-delete-app-icon: Não é possível excluir o ícone do aplicativo
 cannot-delete-bundle: Não é possível excluir o pacote
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Não é possível eliminar versões em massa
+cannot-delete-bundle-linked-channel-2: 'As versões seguintes estão ligadas em pelo menos um canal:'
+cannot-delete-bundle-linked-channel-3: Desfaça as ligações manualmente e tente novamente
+cannot-delete-bundles: Não é possível eliminar pacotes
 cannot-delete-channel: Não é possível excluir o canal
 cannot-delete-member: Não é possível excluir o membro. Verifique o console do navegador
 cannot-delete-owner: Não é possível excluir o proprietário da organização

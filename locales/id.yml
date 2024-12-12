@@ -28,6 +28,8 @@ add-member: Tambahkan anggota
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
 admin: admin
 alert-2fa-disable: Konfirmasikan bahwa Anda ingin menonaktifkan 2FA
+alert-2fa-required: 2FA diperlukan untuk mengatur ulang kata sandi
+alert-2fa-required-message: Silakan masukkan kode 2fa
 alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
 alert-confirm-delete: Konfirmasi Hapus
@@ -101,10 +103,10 @@ cannot-del-org: Tidak dapat menghapus organisasi, harap periksa log browser
 cannot-delete-app: Tidak dapat menghapus Aplikasi
 cannot-delete-app-icon: Tidak dapat menghapus ikon aplikasi
 cannot-delete-bundle: Tidak dapat menghapus bundel
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Anda tidak dapat menghapus versi secara massal
+cannot-delete-bundle-linked-channel-2: 'Versi berikut ini ditautkan setidaknya dalam 1 saluran:'
+cannot-delete-bundle-linked-channel-3: Putuskan tautan secara manual dan coba lagi
+cannot-delete-bundles: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi

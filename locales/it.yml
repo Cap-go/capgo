@@ -32,6 +32,8 @@ add-member: Aggiungi membro
 add-your-first-app-t: Aggiungi la tua prima app al tuo account e inviamo gli aggiornamenti!
 admin: amministratore
 alert-2fa-disable: Conferma di voler disattivare 2FA
+alert-2fa-required: Per reimpostare la password è necessario il 2FA
+alert-2fa-required-message: Inserire il codice 2fa
 alert-accept-inviation: Accetti l'invito a %ORG%?
 alert-add-new-key: Seleziona il nuovo tipo di chiave API
 alert-confirm-delete: Conferma cancellazione
@@ -111,10 +113,10 @@ cannot-del-org: Impossibile eliminare l'organizzazione, controlla il registro de
 cannot-delete-app: Impossibile eliminare l'app
 cannot-delete-app-icon: Impossibile eliminare l'icona dell'app
 cannot-delete-bundle: Impossibile eliminare il gruppo
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Non è possibile eliminare in massa le versioni
+cannot-delete-bundle-linked-channel-2: 'Le seguenti versioni sono collegate in almeno 1 canale:'
+cannot-delete-bundle-linked-channel-3: Disconnetterli manualmente e riprovare
+cannot-delete-bundles: Impossibile eliminare i bundle
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-delete-member: Impossibile eliminare il membro, controlla la console del browser
 cannot-delete-owner: Impossibile eliminare il proprietario dall'organizzazione

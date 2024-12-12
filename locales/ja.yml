@@ -28,6 +28,8 @@ add-member: メンバーを追加
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
 admin: 管理者
 alert-2fa-disable: 2FA を無効にすることを確認します
+alert-2fa-required: パスワードのリセットには2FAが必要
+alert-2fa-required-message: 2faコードを入力してください。
 alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
 alert-confirm-delete: 削除の確認
@@ -101,10 +103,10 @@ cannot-del-org: 組織を削除できません。ブラウザのログを確認�
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-bundle: バンドルを削除できません
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: バージョンの一括削除はできません。
+cannot-delete-bundle-linked-channel-2: 以下のバージョンは少なくとも1チャンネルでリンクされている：
+cannot-delete-bundle-linked-channel-3: 手動でリンクを解除し、再度お試しください。
+cannot-delete-bundles: バンドルが削除できない
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
