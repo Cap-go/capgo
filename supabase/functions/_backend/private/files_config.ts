@@ -18,7 +18,7 @@ app.get('/', (c: Context) => {
     })
   }
   // force partial and tus for 20% of the requests
-  const randomPU = Math.random()
+  // const randomPU = Math.random()
   const randomTUS = Math.random()
   // const forcePartialUpload = randomPU < 0.5
   const forceTUSUpload = randomTUS < 0.3
