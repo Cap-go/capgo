@@ -71,6 +71,7 @@
     "deploy:supabase:preprod": "bunx supabase functions deploy",
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
     "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.preprod",
+    "deploy:supabase_env:alpha": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
     "deploy:netlify_env:prod": "bunx netlify env:import -r internal/cloudflare/.env.prod",
     "deploy:netlify_env:preprod": "bunx netlify env:import -r internal/cloudflare/.env.preprod",
     "size": "bunx vite-bundle-visualizer"
