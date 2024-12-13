@@ -485,8 +485,6 @@ BEGIN
       'schema', TG_TABLE_SCHEMA
     )
   );
-  -- Send to table_events queue for replication
-  PERFORM queue_message('table_events', payload);
   
   -- Also send to function-specific queue
   IF TG_ARGV[0] IS NOT NULL THEN
