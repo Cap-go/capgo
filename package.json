@@ -46,6 +46,7 @@
     "cf-edge:run": "./scripts/local_cf_backend/spawn.sh",
     "deploy:cloudflare_frontend:prod": "wrangler pages deploy dist --project-name capgo-webapp --branch main",
     "deploy:cloudflare_frontend:preprod": "wrangler pages deploy dist --project-name capgo-webapp-preprod --branch main",
+    "deploy:cloudflare_frontend:alpha": "wrangler pages deploy dist --project-name capgo-webapp-alpha --branch main",
     "deploy:cloudflare:prod": "npm run deploy:cloudflare:api:prod && npm run deploy:cloudflare:files:prod && npm run deploy:cloudflare:plugin:prod",
     "deploy:cloudflare:api:prod": "bunx wrangler deploy --config cloudflare_workers/api/wrangler.toml",
     "deploy:cloudflare:files:prod": "bunx wrangler deploy --config cloudflare_workers/files/wrangler.toml",
