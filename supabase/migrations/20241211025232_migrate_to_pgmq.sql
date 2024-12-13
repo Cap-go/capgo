@@ -239,19 +239,19 @@ SELECT cron.schedule(
 -- Schedule cron jobs for each function queue
 SELECT cron.schedule(
     'process_cron_stats_queue',
-    '5 seconds',
+    '0 */2 * * *',
     $$SELECT process_function_queue('cron_stats');$$
 );
 
 SELECT cron.schedule(
     'process_cron_plan_queue',
-    '5 seconds',
+    '0 3 * * *',
     $$SELECT process_function_queue('cron_plan');$$
 );
 
 SELECT cron.schedule(
     'process_cron_clear_versions_queue',
-    '5 seconds',
+    '30 3 * * *',
     $$SELECT process_function_queue('cron_clear_versions');$$
 );
 
