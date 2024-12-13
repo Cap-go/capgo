@@ -11,6 +11,7 @@ import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
 import { openMessenger } from '~/services/bento'
 import { useSupabase } from '~/services/supabase'
+import { registerWebsiteDomain } from '~/utils/Utils'
 
 const router = useRouter()
 const supabase = useSupabase()
@@ -21,6 +22,11 @@ const isLoading = ref(false)
 
 function openSupport() {
   openMessenger()
+}
+
+if (registerWebsiteDomain() === 'https://capgo.app') {
+  // do not allow to register on webapp on production
+  window.location.href = 'https://capgo.app/register/'
 }
 
 async function submit(form: { first_name: string, last_name: string, password: string, email: string }) {
