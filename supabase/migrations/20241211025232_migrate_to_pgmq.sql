@@ -465,6 +465,39 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"()
+RETURNS "trigger"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+AS $$
+DECLARE 
+  payload jsonb;
+BEGIN 
+  -- Build the base payload
+  payload := jsonb_build_object(
+    'function_name', TG_ARGV[0],
+    'function_type', TG_ARGV[1],
+    'payload', jsonb_build_object(
+      'old_record', OLD, 
+      'record', NEW, 
+      'type', TG_OP,
+      'table', TG_TABLE_NAME,
+      'schema', TG_TABLE_SCHEMA
+    )
+  );
+  -- Send to table_events queue for replication
+  PERFORM queue_message('table_events', payload);
+  
+  -- Also send to function-specific queue
+  IF TG_ARGV[0] IS NOT NULL THEN
+    PERFORM queue_message(TG_ARGV[0], payload);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."trigger_http_queue_post_to_function"() OWNER TO "postgres";
+
 -- Replace trigger function to use direct D1 replication
 CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function_d1"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
