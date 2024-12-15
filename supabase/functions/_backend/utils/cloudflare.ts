@@ -14,6 +14,7 @@ export type Bindings = {
   VERSION_USAGE: AnalyticsEngineDataPoint
   APP_LOG: AnalyticsEngineDataPoint
   DB_DEVICES: D1Database
+  DB_STOREAPPS: D1Database
   DB_REPLICATE: D1Database
   HYPERDRIVE_DB: Hyperdrive
 }
@@ -549,14 +550,14 @@ LIMIT ${limit}`
 }
 
 export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve([])
 
   const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''`
   console.log({ requestId: c.get('requestId'), context: 'getAppsFromCF query', query })
-  // use c.env.DB_DEVICES and table store_apps
+  // use c.env.DB_STOREAPPS and table store_apps
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
       .all()
     const res = await readD1
@@ -571,14 +572,14 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
 }
 
 export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve(0)
   // use countUpdatesFromStoreApps exemple to make it work with Cloudflare
   const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
 
   console.log({ requestId: c.get('requestId'), context: 'countUpdatesFromStoreAppsCF query', query })
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
       .first('count')
     const res = await readD1
@@ -638,13 +639,13 @@ export async function readLastMonthUpdatesCF(c: Context) {
 }
 
 export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve([] as StoreApp[])
   const query = `SELECT * FROM store_apps WHERE ${flag} = 1 ORDER BY created_at ASC LIMIT ${limit}`
 
   console.log({ requestId: c.get('requestId'), context: 'getAppsToProcessCF query', query })
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
       .all()
     const res = await readD1
@@ -665,7 +666,7 @@ interface topApp {
   category: string
 }
 export async function getTopAppsCF(c: Context, mode: string, limit: number): Promise<topApp[]> {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve([] as StoreApp[])
   let modeQuery = ''
   if (mode === 'cordova')
@@ -689,7 +690,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 
   console.log({ requestId: c.get('requestId'), context: 'getTopAppsCF query', query })
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
       .all()
     const res = await readD1
@@ -702,7 +703,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 }
 
 export async function getTotalAppsByModeCF(c: Context, mode: string) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve(0)
   let modeQuery = ''
   if (mode === 'cordova')
@@ -726,7 +727,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 
   console.log({ requestId: c.get('requestId'), context: 'getTotalAppsByModeCF query', query })
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
       .first('total')
     const res = await readD1
@@ -739,13 +740,13 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 }
 
 export async function getStoreAppByIdCF(c: Context, appId: string): Promise<StoreApp> {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve({} as StoreApp)
   const query = `SELECT * FROM store_apps WHERE app_id = '${appId}' LIMIT 1`
 
   console.log({ requestId: c.get('requestId'), context: 'getStoreAppByIdCF query', query })
   try {
-    const readD1 = c.env.DB_DEVICES
+    const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
       .first()
     const res = await readD1
@@ -758,7 +759,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
 }
 
 export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve()
 
   const columns = Object.keys(app).filter(column => column !== 'app_id') as (keyof StoreApp)[]
@@ -770,7 +771,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
   const query = `INSERT INTO store_apps (app_id, ${columns.join(', ')}) VALUES (?, ${placeholders}) ON CONFLICT(app_id) DO UPDATE SET ${updates}`
 
   try {
-    const res = await c.env.DB_DEVICES
+    const res = await c.env.DB_STOREAPPS
       .prepare(query)
       .bind(app.app_id, ...values)
       .run()
@@ -783,8 +784,8 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
   return Promise.resolve()
 }
 
-export async function bulkUpdateStoreAppsCF(c: Context, apps: StoreApp[]) {
-  if (!c.env.DB_DEVICES)
+export function bulkUpdateStoreAppsCF(c: Context, apps: StoreApp[]) {
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve()
 
   if (!apps.length)
@@ -799,13 +800,13 @@ export async function bulkUpdateStoreAppsCF(c: Context, apps: StoreApp[]) {
 }
 
 export async function updateStoreApp(c: Context, appId: string, updates: number) {
-  if (!c.env.DB_DEVICES)
+  if (!c.env.DB_STOREAPPS)
     return Promise.resolve()
 
   const query = `INSERT INTO store_apps (app_id, updates) VALUES (?, ?) ON CONFLICT(app_id) DO UPDATE SET updates = updates + ?`
 
   try {
-    const res = await c.env.DB_DEVICES
+    const res = await c.env.DB_STOREAPPS
       .prepare(query)
       .bind(appId, updates)
       .run()
