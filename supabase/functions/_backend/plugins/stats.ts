@@ -5,7 +5,7 @@ import type { AppStats } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
+import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
@@ -99,7 +99,7 @@ async function post(c: Context, body: AppStats) {
       .single()
     if (!appOwner) {
       if (app_id) {
-        await saveStoreInfoCF(c, {
+        await createIfNotExistStoreInfo(c, {
           app_id,
           onprem: true,
           capacitor: true,

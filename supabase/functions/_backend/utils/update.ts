@@ -11,7 +11,7 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
-import { saveStoreInfoCF } from './cloudflare.ts'
+import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
@@ -64,7 +64,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
     if (!appOwner) {
       if (app_id) {
-        await backgroundTask(c, saveStoreInfoCF(c, {
+        await backgroundTask(c, createIfNotExistStoreInfo(c, {
           app_id,
           onprem: true,
           capacitor: true,

@@ -758,6 +758,41 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
   return {} as StoreApp
 }
 
+// add function createIfNotExistStoreInfo
+
+export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreApp>) {
+  if (!c.env.DB_STOREAPPS || !app.app_id)
+    return Promise.resolve()
+
+  try {
+    // Check if app exists
+    const existingApp = await c.env.DB_STOREAPPS
+      .prepare('SELECT app_id FROM store_apps WHERE app_id = ?')
+      .bind(app.app_id)
+      .first()
+
+    if (!existingApp) {
+      const columns = Object.keys(app)
+      const placeholders = columns.map(() => '?').join(', ')
+      const values = columns.map(column => app[column as keyof StoreApp])
+
+      const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
+
+      const res = await c.env.DB_STOREAPPS
+        .prepare(query)
+        .bind(...values)
+        .run()
+
+      console.log({ requestId: c.get('requestId'), context: 'createIfNotExistStoreInfo result', res })
+    }
+  }
+  catch (e) {
+    console.error({ requestId: c.get('requestId'), context: 'Error creating store info', error: e })
+  }
+
+  return Promise.resolve()
+}
+
 export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve()
