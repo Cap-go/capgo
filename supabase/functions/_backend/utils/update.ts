@@ -138,9 +138,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
 
+    const start = performance.now()
+
     const requestedInto = isV2
       ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
       : await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
+
+    const end = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'requestInfosPostgres', duration: `${end - start}ms` })
 
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
