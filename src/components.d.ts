@@ -10,7 +10,6 @@ declare module 'vue' {
     AddDeviceOverwriteButton: typeof import('./components/AddDeviceOverwriteButton.vue')['default']
     ApiKeys: typeof import('./components/ApiKeys.vue')['default']
     AppCard: typeof import('./components/dashboard/AppCard.vue')['default']
-    AppStat: typeof import('./components/package/AppStat.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']

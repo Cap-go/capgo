@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Set environment variable
@@ -38,7 +38,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.0.8
+          version: 2.1.0
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Prepare Supabase
@@ -66,7 +66,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
@@ -104,7 +104,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
@@ -129,7 +129,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
@@ -154,7 +154,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
