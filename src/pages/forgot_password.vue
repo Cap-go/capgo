@@ -24,7 +24,7 @@ const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
 
-async function submit(form: { email: string, password: string }) {
+async function submit(form: { email: string, password: string, password_confirm: string }) {
   isLoading.value = true
   if (step.value === 1) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
@@ -53,69 +53,63 @@ async function submit(form: { email: string, password: string }) {
       setErrors('forgot-password', [error.message], {})
       return
     }
+    const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    const { currentLevel, nextLevel } = aal.data!
+    if (nextLevel !== currentLevel) {
+      const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
+      if (mfaError) {
+        setErrors('forgot-password', [mfaError.message], {})
+        console.error('Cannot get MFA factors', mfaError)
+        return
+      }
+      const factor = mfaFactors.all.find(factor => factor.status === 'verified')
+      if (!factor) {
+        setErrors('forgot-password', ['Cannot find MFA factor'], {})
+        console.error('Cannot get MFA factors', mfaError)
+        return
+      }
+
+      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+      if (errorChallenge) {
+        setErrors('forgot-password', [errorChallenge.message], {})
+        console.error('Cannot challenge MFA factor', errorChallenge)
+        return
+      }
+
+      displayStore.dialogOption = {
+        header: t('alert-2fa-required'),
+        message: t('alert-2fa-required-message'),
+        preventAccidentalClose: true,
+        input: true,
+        buttons: [
+          {
+            text: t('button-confirm'),
+            role: 'confirm',
+            handler: async () => {
+              const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
+                factorId: factor.id,
+                challengeId: challenge.id,
+                code: displayStore.dialogInputText.replace(' ', ''),
+              })
+              if (errorVerify) {
+                displayStore.showDialog = true
+                toast.error(t('invalid-mfa-code'))
+              }
+            },
+          },
+        ],
+      }
+      displayStore.showDialog = true
+      await displayStore.onDialogDismiss()
+    }
     const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
     isLoading.value = false
     if (updateError) {
-      if (updateError.message.includes('AAL2')) {
-        const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
-        if (mfaError) {
-          setErrors('forgot-password', [mfaError.message], {})
-          console.error('Cannot get MFA factors', mfaError)
-          return
-        }
-        const factor = mfaFactors.all.find(factor => factor.status === 'verified')
-        if (!factor) {
-          setErrors('forgot-password', ['Cannot find MFA factor'], {})
-          console.error('Cannot get MFA factors', mfaError)
-          return
-        }
-
-        const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
-        if (errorChallenge) {
-          setErrors('forgot-password', [errorChallenge.message], {})
-          console.error('Cannot challenge MFA factor', errorChallenge)
-          return
-        }
-
-        displayStore.dialogOption = {
-          header: t('alert-2fa-required'),
-          message: t('alert-2fa-required-message'),
-          preventAccidentalClose: true,
-          input: true,
-          buttons: [
-            {
-              text: t('button-confirm'),
-              role: 'confirm',
-              handler: async () => {
-                const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
-                  factorId: factor.id,
-                  challengeId: challenge.id,
-                  code: displayStore.dialogInputText.replace(' ', ''),
-                })
-                if (errorVerify) {
-                  displayStore.showDialog = true
-                  toast.error(t('invalid-mfa-code'))
-                  return
-                }
-
-                const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
-                if (updateError) {
-                  setErrors('forgot-password', [updateError.message], {})
-                  console.error('Cannot update password', updateError)
-                  return
-                }
-
-                toast.success(t('forgot-success'))
-              },
-            },
-          ],
-        }
-        displayStore.showDialog = true
-        await displayStore.onDialogDismiss()
-      }
       setErrors('forgot-password', [updateError.message], {})
     }
     else {
+      form.password = ''
+      form.password_confirm = ''
       toast.success(t('forgot-success'))
       await supabase.auth.signOut()
       router.push('/login')
