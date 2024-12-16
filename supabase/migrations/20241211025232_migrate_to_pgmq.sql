@@ -52,22 +52,10 @@ SELECT pgmq.create('on_version_update');
 SELECT pgmq.create('replicate_data');
 SELECT pgmq.create('http_responses');
 
--- Create new helper function for sending messages to queues
-CREATE OR REPLACE FUNCTION "public"."queue_message"("queue_name" text, "message" jsonb)
-RETURNS bigint
-LANGUAGE "plpgsql"
-SECURITY DEFINER
-AS $$
-BEGIN
-    RETURN (SELECT pgmq.send(queue_name, message));
-END;
-$$;
+-- Remove queue_message function since we're using pgmq.send directly
+DROP FUNCTION IF EXISTS "public"."queue_message";
 
--- Set appropriate permissions
-REVOKE ALL ON FUNCTION "public"."queue_message"("queue_name" text, "message" jsonb) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."queue_message"("queue_name" text, "message" jsonb) TO "service_role";
-
--- Update other functions that were using the old queue system
+-- Update process_cron_stats_jobs function
 CREATE OR REPLACE FUNCTION "public"."process_cron_stats_jobs"()
 RETURNS "void"
 LANGUAGE "plpgsql"
@@ -88,7 +76,7 @@ BEGIN
     WHERE dm.date >= NOW() - INTERVAL '30 days' AND dm.mau > 0
   )
   LOOP
-    PERFORM queue_message('cron_stats', 
+    PERFORM pgmq.send('cron_stats', 
       jsonb_build_object(
         'function_name', 'cron_stats',
         'function_type', 'cloudflare',
@@ -118,7 +106,7 @@ BEGIN
     WHERE si.status = 'succeeded' AND si.product_id != 'free'
   )
   LOOP
-    PERFORM queue_message('cron_plan',
+    PERFORM pgmq.send('cron_plan',
       jsonb_build_object(
         'function_name', 'cron_plan',
         'function_type', 'cloudflare',
@@ -239,19 +227,19 @@ SELECT cron.schedule(
 -- Schedule cron jobs for each function queue
 SELECT cron.schedule(
     'process_cron_stats_queue',
-    '0 */2 * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_stats');$$
 );
 
 SELECT cron.schedule(
     'process_cron_plan_queue',
-    '0 3 * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_plan');$$
 );
 
 SELECT cron.schedule(
     'process_cron_clear_versions_queue',
-    '30 3 * * *',
+    '5 seconds',
     $$SELECT process_function_queue('cron_clear_versions');$$
 );
 
@@ -371,7 +359,7 @@ CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function_d1"() R
     AS $$
 BEGIN
     -- Queue the operation for batch processing
-    PERFORM queue_message('replicate_data', 
+    PERFORM pgmq.send('replicate_data', 
         jsonb_build_object(
             'record', to_jsonb(NEW),
             'old_record', to_jsonb(OLD),
@@ -444,3 +432,57 @@ SELECT cron.schedule(
 
 REVOKE ALL ON FUNCTION public.queue_message FROM PUBLIC;
 GRANT ALL ON FUNCTION public.queue_message TO "postgres";
+
+
+-- Update trigger_http_queue_post_to_function function
+CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"()
+RETURNS "trigger"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+AS $$
+DECLARE 
+  payload jsonb;
+BEGIN 
+  -- Build the base payload
+  payload := jsonb_build_object(
+    'function_name', TG_ARGV[0],
+    'function_type', TG_ARGV[1],
+    'payload', jsonb_build_object(
+      'old_record', OLD, 
+      'record', NEW, 
+      'type', TG_OP,
+      'table', TG_TABLE_NAME,
+      'schema', TG_TABLE_SCHEMA
+    )
+  );
+  
+  -- Also send to function-specific queue
+  IF TG_ARGV[0] IS NOT NULL THEN
+    PERFORM pgmq.send(TG_ARGV[0], payload);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Add process_failed_uploads function
+CREATE OR REPLACE FUNCTION "public"."process_failed_uploads"()
+RETURNS "void"
+LANGUAGE "plpgsql"
+AS $$
+DECLARE
+  failed_version RECORD;
+BEGIN
+  FOR failed_version IN (
+    SELECT * FROM get_versions_with_no_metadata()
+  )
+  LOOP
+    PERFORM pgmq.send('cron_clear_versions',
+      jsonb_build_object(
+        'function_name', 'cron_clear_versions',
+        'function_type', 'cloudflare',
+        'payload', jsonb_build_object('version', failed_version)
+      )
+    );
+  END LOOP;
+END;
+$$;

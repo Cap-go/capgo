@@ -20,7 +20,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     }
 
-    console.log({ requestId: c.get('requestId'), context: 'replicate_data', operations })
+    console.log({ requestId: c.get('requestId'), context: 'replicate_data' })
 
     const d1 = c.env.DB_REPLICATE as D1Database
     const queries: string[] = []
@@ -32,13 +32,17 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       switch (type) {
         case 'INSERT': {
           const columns = Object.keys(cleanRecord)
-          const values = Object.values(cleanRecord).map(v => typeof v === 'string' ? `'${v}'` : v)
+          const values = Object.values(cleanRecord).map(v =>
+            v === null ? 'NULL' : typeof v === 'string' ? `'${v}'` : v,
+          )
           queries.push(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});`)
           break
         }
         case 'UPDATE': {
           const setClause = Object.entries(cleanRecord)
-            .map(([key, value]) => `${key} = ${typeof value === 'string' ? `'${value}'` : value}`)
+            .map(([key, value]) =>
+              `${key} = ${value === null ? 'NULL' : typeof value === 'string' ? `'${value}'` : value}`,
+            )
             .join(', ')
           queries.push(`UPDATE ${table} SET ${setClause} WHERE id = '${old_record.id}';`)
           break
@@ -49,11 +53,10 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       }
     }
     console.log('operations', operations.length)
-    console.log('queries', queries.length)
+    console.log('queries', queries.length, queries[0])
 
     // Execute batch operation
     const query = queries.join('\n')
-    console.log({ requestId: c.get('requestId'), context: 'batch query', query })
     asyncWrap(c, d1.exec(query))
     return c.json(BRES)
   }

@@ -117,6 +117,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+SELECT cron.unschedule('process_cron_stats_jobs');
+
+SELECT cron.schedule(
+    'process_cron_stats_jobs',
+    '0 */2 * * *',
+    $$SELECT process_cron_stats_jobs();$$
+);
+
 -- Main function to get stats job info
 CREATE OR REPLACE FUNCTION get_process_cron_stats_job_info()
 RETURNS TABLE (last_run timestamp with time zone, next_run timestamp with time zone) SECURITY DEFINER
@@ -126,7 +134,7 @@ BEGIN
     WITH last_run AS (
         SELECT start_time
         FROM cron.job_run_details
-        WHERE command LIKE '%process_function_queue(''cron_stats'')%'
+        WHERE jobname = 'process_cron_stats_jobs'
         AND status = 'succeeded'
         ORDER BY start_time DESC
         LIMIT 1
