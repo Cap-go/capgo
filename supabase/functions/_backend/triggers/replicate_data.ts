@@ -35,7 +35,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           const values = Object.values(cleanRecord).map(v =>
             v === null ? 'NULL' : typeof v === 'string' ? `'${v}'` : v,
           )
-          queries.push(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});`)
+          queries.push(`BEGIN; INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')}); COMMIT;`)
           break
         }
         case 'UPDATE': {
@@ -44,25 +44,31 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
               `${key} = ${value === null ? 'NULL' : typeof value === 'string' ? `'${value}'` : value}`,
             )
             .join(', ')
-          queries.push(`UPDATE ${table} SET ${setClause} WHERE id = '${old_record.id}';`)
+          queries.push(`BEGIN; UPDATE ${table} SET ${setClause} WHERE id = '${old_record.id}'; COMMIT;`)
           break
         }
         case 'DELETE':
-          queries.push(`DELETE FROM ${table} WHERE id = '${old_record.id}';`)
+          queries.push(`BEGIN; DELETE FROM ${table} WHERE id = '${old_record.id}'; COMMIT;`)
           break
       }
     }
     console.log('operations', operations.length)
     console.log('queries', queries.length, queries[0])
 
-    // Execute batch operation
-    const query = queries.join('\n')
-    asyncWrap(c, d1.exec(query))
+    // Execute batch operations in chunks to stay under 100kb
+    const CHUNK_SIZE = Math.max(1, Math.floor(100_000 / queries.reduce((acc, q) => acc + q.length, 0) * queries.length))
+    for (let i = 0; i < queries.length; i += CHUNK_SIZE) {
+      const chunk = queries.slice(i, i + CHUNK_SIZE)
+      const query = chunk.join('\n')
+      console.log(`Chunk ${i}, size ${CHUNK_SIZE}`)
+      asyncWrap(c, d1.exec(query))
+    }
     return c.json(BRES)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error in replicate_data', error: e })
     const errorMessage = e instanceof Error ? e.message : String(e)
+    console.error({ requestId: c.get('requestId'), context: 'Error in replicate_data', errorMessage, error: JSON.stringify(e),
+    })
     return c.json({ status: 'Error in replication', error: errorMessage }, 500)
   }
 })
@@ -101,7 +107,8 @@ export function cleanFieldsAppVersions(record: any, table: string) {
 // function to c.executionCtx.waitUntil the db operation and catch issue who insert in job_queue as failed job
 function asyncWrap(c: Context, promise: Promise<any>) {
   c.executionCtx.waitUntil(promise.catch((e) => {
-    console.error({ requestId: c.get('requestId'), context: 'Error exec replicateData', error: e })
+    const errorMessage = e instanceof Error ? e.message : String(e)
+    console.error({ requestId: c.get('requestId'), context: 'Error exec replicateData', error: JSON.stringify(e), errorMessage })
     // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
     if (e.message.includes('UNIQUE constraint failed')) {
       console.log('Object exist already')
