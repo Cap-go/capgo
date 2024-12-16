@@ -390,10 +390,7 @@ BEGIN
         SELECT * FROM pgmq.read('replicate_data', 60, batch_size)
     LOOP
         -- Add operation to batch
-        batch_operations := array_append(batch_operations, msg.message::jsonb);
-        
-        -- Delete processed message
-        PERFORM pgmq.delete('replicate_data', msg.msg_id);
+        batch_operations := array_append(batch_operations, msg.message::jsonb);        
     END LOOP;
     
     -- Process batch if we have any operations
