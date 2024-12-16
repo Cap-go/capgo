@@ -242,15 +242,15 @@ async function deleteOne(one: Element) {
     }
     const { error: delAppError } = await (didCancelRes === 'normal'
       ? supabase
-        .from('app_versions')
-        .update({ deleted: true })
-        .eq('app_id', one.app_id)
-        .eq('id', one.id)
+          .from('app_versions')
+          .update({ deleted: true })
+          .eq('app_id', one.app_id)
+          .eq('id', one.id)
       : supabase
-        .from('app_versions')
-        .delete()
-        .eq('app_id', one.app_id)
-        .eq('id', one.id)
+          .from('app_versions')
+          .delete()
+          .eq('app_id', one.app_id)
+          .eq('id', one.id)
     )
 
     if (delAppError) {
