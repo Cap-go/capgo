@@ -486,3 +486,31 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- Add process_stats_email function
+CREATE OR REPLACE FUNCTION "public"."process_stats_email"()
+RETURNS "void"
+LANGUAGE "plpgsql"
+AS $$
+DECLARE
+  app_record RECORD;
+BEGIN
+  FOR app_record IN (
+    SELECT a.app_id, o.management_email
+    FROM apps a
+    JOIN orgs o ON a.owner_org = o.id
+  )
+  LOOP
+    PERFORM pgmq.send('cron_email',
+      jsonb_build_object(
+        'function_name', 'cron_email',
+        'function_type', 'cloudflare',
+        'payload', jsonb_build_object(
+          'email', app_record.management_email,
+          'appId', app_record.app_id
+        )
+      )
+    );
+  END LOOP;
+END;
+$$;
