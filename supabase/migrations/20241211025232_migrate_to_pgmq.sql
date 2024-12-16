@@ -427,10 +427,6 @@ SELECT cron.schedule(
     $$SELECT process_d1_replication_batch();$$
 );
 
-REVOKE ALL ON FUNCTION public.queue_message FROM PUBLIC;
-GRANT ALL ON FUNCTION public.queue_message TO "postgres";
-
-
 -- Update trigger_http_queue_post_to_function function
 CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"()
 RETURNS "trigger"
