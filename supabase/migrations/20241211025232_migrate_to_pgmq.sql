@@ -365,161 +365,82 @@ SELECT cron.schedule(
     $$SELECT cleanup_queue_messages();$$
 );
 
--- Create function to handle D1 replication
-CREATE OR REPLACE FUNCTION "public"."replicate_to_d1"(
-    record jsonb,
-    old_record jsonb,
-    operation text,
-    table_name text
-) RETURNS void
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-DECLARE
-    d1_url TEXT;
-    d1_token TEXT;
-    query text;
-    values_array jsonb[];
-    columns_array text[];
-    set_clause text;
-BEGIN
-    -- Get D1 credentials from vault
-    SELECT decrypted_secret INTO d1_url FROM vault.decrypted_secrets WHERE name = 'D1_URL';
-    SELECT decrypted_secret INTO d1_token FROM vault.decrypted_secrets WHERE name = 'D1_TOKEN';
-
-    -- Clean fields based on table
-    IF table_name = 'app_versions' THEN
-        record = record - 'minUpdateVersion' - 'native_packages';
-        IF record ? 'manifest' THEN
-            record = jsonb_set(record, '{manifest}', to_jsonb(record->>'manifest'));
-        END IF;
-    ELSIF table_name = 'channels' THEN
-        record = record - 'secondVersion' - 'secondaryVersionPercentage' - 'disableAutoUpdate';
-    ELSIF table_name IN ('channel_devices', 'devices_override') THEN
-        record = jsonb_set(record, '{device_id}', to_jsonb(lower(record->>'device_id')));
-        record = record - 'device_id_lower';
-    END IF;
-
-    -- Build SQL query based on operation
-    CASE operation
-        WHEN 'INSERT' THEN
-            SELECT array_agg(key), array_agg(to_jsonb(value))
-            INTO columns_array, values_array
-            FROM jsonb_each_text(record);
-            
-            query = format('INSERT INTO %I (%s) VALUES (%s)',
-                table_name,
-                array_to_string(columns_array, ', '),
-                array_to_string(array_fill('?'::text, ARRAY[array_length(columns_array, 1)]), ', ')
-            );
-
-        WHEN 'UPDATE' THEN
-            SELECT string_agg(format('%I = ?', key), ', ')
-            INTO set_clause
-            FROM jsonb_each_text(record);
-            
-            query = format('UPDATE %I SET %s WHERE id = ?',
-                table_name,
-                set_clause
-            );
-            
-            values_array = array_append(
-                ARRAY(SELECT to_jsonb(value) FROM jsonb_each_text(record)),
-                to_jsonb((old_record->>'id'))
-            );
-
-        WHEN 'DELETE' THEN
-            query = format('DELETE FROM %I WHERE id = ?', table_name);
-            values_array = ARRAY[to_jsonb((old_record->>'id'))];
-    END CASE;
-
-    -- Make HTTP request to D1
-    PERFORM net.http_post(
-        url := d1_url,
-        headers := jsonb_build_object(
-            'Authorization', format('Bearer %s', d1_token),
-            'Content-Type', 'application/json'
-        ),
-        body := jsonb_build_object(
-            'sql', query,
-            'params', values_array
-        )
-    );
-
-EXCEPTION WHEN OTHERS THEN
-    -- On error, queue message for retry using PGMQ
-    PERFORM queue_message('replicate_data', 
-        jsonb_build_object(
-            'function_name', 'replicate_data',
-            'function_type', 'cloudflare',
-            'payload', jsonb_build_object(
-                'record', record,
-                'old_record', old_record,
-                'type', operation,
-                'table', table_name,
-                'schema', 'public',
-                'retry_count', 1
-            ),
-            'error', SQLERRM
-        )
-    );
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"()
-RETURNS "trigger"
-LANGUAGE "plpgsql"
-SECURITY DEFINER
-AS $$
-DECLARE 
-  payload jsonb;
-BEGIN 
-  -- Build the base payload
-  payload := jsonb_build_object(
-    'function_name', TG_ARGV[0],
-    'function_type', TG_ARGV[1],
-    'payload', jsonb_build_object(
-      'old_record', OLD, 
-      'record', NEW, 
-      'type', TG_OP,
-      'table', TG_TABLE_NAME,
-      'schema', TG_TABLE_SCHEMA
-    )
-  );
-  
-  -- Also send to function-specific queue
-  IF TG_ARGV[0] IS NOT NULL THEN
-    PERFORM queue_message(TG_ARGV[0], payload);
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "public"."trigger_http_queue_post_to_function"() OWNER TO "postgres";
-
--- Replace trigger function to use direct D1 replication
+-- Replace trigger function to batch D1 replication
 CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function_d1"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
-    PERFORM replicate_to_d1(
-        to_jsonb(NEW),
-        to_jsonb(OLD),
-        TG_OP,
-        TG_TABLE_NAME
+    -- Queue the operation for batch processing
+    PERFORM queue_message('replicate_data', 
+        jsonb_build_object(
+            'record', to_jsonb(NEW),
+            'old_record', to_jsonb(OLD),
+            'type', TG_OP,
+            'table', TG_TABLE_NAME
+        )
     );
     RETURN NEW;
 END;
 $$;
 
+-- Add new function to process batched D1 operations
+CREATE OR REPLACE FUNCTION "public"."process_d1_replication_batch"()
+RETURNS "void"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+AS $$
+DECLARE
+    msg record;
+    batch_operations jsonb[];
+    batch_size int := 10000;
+    request_id bigint;
+BEGIN
+    batch_operations := array[]::jsonb[];
+    
+    -- Read messages in batch
+    FOR msg IN 
+        SELECT * FROM pgmq.read('replicate_data', 60, batch_size)
+    LOOP
+        -- Add operation to batch
+        batch_operations := array_append(batch_operations, msg.message::jsonb);
+        
+        -- Delete processed message
+        PERFORM pgmq.delete('replicate_data', msg.msg_id);
+    END LOOP;
+    
+    -- Process batch if we have any operations
+    IF array_length(batch_operations, 1) > 0 THEN
+        -- Send request using http_post_helper
+        SELECT http_post_helper(
+            'replicate_data',
+            'cloudflare',
+            jsonb_build_object('operations', batch_operations)
+        ) INTO request_id;
+
+        -- Queue response handling
+        PERFORM pgmq.send('http_responses', jsonb_build_object(
+            'request_id', request_id,
+            'queue_name', 'replicate_data',
+            'msg_id', msg.msg_id,
+            'read_ct', msg.read_ct
+        ));
+    END IF;
+END;
+$$;
+
 -- Set permissions
-REVOKE ALL ON FUNCTION "public"."replicate_to_d1"(jsonb, jsonb, text, text) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."replicate_to_d1"(jsonb, jsonb, text, text) TO "postgres";
+REVOKE ALL ON FUNCTION "public"."process_d1_replication_batch"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."process_d1_replication_batch"() TO "postgres";
 
 REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1"() TO "postgres";
 
-REVOKE ALL ON FUNCTION "public"."process_http_responses"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."process_http_responses"() TO "postgres";
+-- Schedule batch processing
+SELECT cron.schedule(
+    'process_d1_replication_batch',
+    '5 seconds',
+    $$SELECT process_d1_replication_batch();$$
+);
 
 REVOKE ALL ON FUNCTION public.queue_message FROM PUBLIC;
 GRANT ALL ON FUNCTION public.queue_message TO "postgres";
