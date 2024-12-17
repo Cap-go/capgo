@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
-import { getRuntimeKey } from 'hono/adapter'
+import { backgroundTask } from '../utils/utils.ts'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 
@@ -111,16 +111,10 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   // if (statsActions.some(({ action }) => ['set', 'reset', 'app_moved_to_foreground'].includes(action))) // TODO: check if we don't fuck our billing without this
   jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
-  if (getRuntimeKey() === 'workerd') {
-    c.executionCtx.waitUntil(Promise.all(jobs))
-    return Promise.resolve()
-  }
-  else {
-    return Promise.all(jobs)
-      .catch((error) => {
-        console.log({ requestId: c.get('requestId'), context: '[sendStatsAndDevice] rejected with error', error })
-      })
-  }
+  return backgroundTask(c, Promise.all(jobs)
+    .catch((error) => {
+      console.log({ requestId: c.get('requestId'), context: '[sendStatsAndDevice] rejected with error', error })
+    }))
 }
 
 export async function countAllApps(c: Context): Promise<number> {

@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono()
 
@@ -54,6 +55,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     console.log('operations', operations.length)
     console.log('queries', queries.length, queries[0])
+    const all = []
 
     // Execute batch operations in chunks to stay under 100kb
     const CHUNK_SIZE = Math.max(1, Math.floor(100_000 / queries.reduce((acc, q) => acc + q.length, 0) * queries.length))
@@ -61,8 +63,9 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       const chunk = queries.slice(i, i + CHUNK_SIZE)
       const query = chunk.join('\n')
       console.log(`Chunk ${i}, size ${CHUNK_SIZE}`)
-      asyncWrap(c, d1.exec(query))
+      all.push(d1.exec(query))
     }
+    await asyncWrap(c, await Promise.all(all))
     return c.json(BRES)
   }
   catch (e) {
@@ -106,7 +109,7 @@ export function cleanFieldsAppVersions(record: any, table: string) {
 
 // function to c.executionCtx.waitUntil the db operation and catch issue who insert in job_queue as failed job
 function asyncWrap(c: Context, promise: Promise<any>) {
-  c.executionCtx.waitUntil(promise.catch((e) => {
+  return backgroundTask(c, promise.catch((e) => {
     const errorMessage = e instanceof Error ? e.message : String(e)
     console.error({ requestId: c.get('requestId'), context: 'Error exec replicateData', error: JSON.stringify(e), errorMessage })
     // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
