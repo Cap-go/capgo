@@ -390,10 +390,7 @@ BEGIN
         SELECT * FROM pgmq.read('replicate_data', 60, batch_size)
     LOOP
         -- Add operation to batch
-        batch_operations := array_append(batch_operations, msg.message::jsonb);
-        
-        -- Delete processed message
-        PERFORM pgmq.delete('replicate_data', msg.msg_id);
+        batch_operations := array_append(batch_operations, msg.message::jsonb);        
     END LOOP;
     
     -- Process batch if we have any operations
@@ -429,10 +426,6 @@ SELECT cron.schedule(
     '5 seconds',
     $$SELECT process_d1_replication_batch();$$
 );
-
-REVOKE ALL ON FUNCTION public.queue_message FROM PUBLIC;
-GRANT ALL ON FUNCTION public.queue_message TO "postgres";
-
 
 -- Update trigger_http_queue_post_to_function function
 CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"()

@@ -838,12 +838,12 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve()
 
-  const query = `INSERT INTO store_apps (app_id, updates) VALUES (?, ?) ON CONFLICT(app_id) DO UPDATE SET updates = updates + ?`
+  const query = `INSERT INTO store_apps (app_id, updates, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(app_id) DO UPDATE SET updates = updates + ?, updated_at = datetime('now')`
 
   try {
     const res = await c.env.DB_STOREAPPS
       .prepare(query)
-      .bind(appId, updates)
+      .bind(appId, updates, updates)
       .run()
     console.log({ requestId: c.get('requestId'), context: 'updateStoreApp result', res })
   }

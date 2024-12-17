@@ -4,11 +4,10 @@ import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { alias } from 'drizzle-orm/pg-core'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
-import { getRuntimeKey } from 'hono/adapter'
 import postgres from 'postgres'
+import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
-import { existInEnv, getEnv } from './utils.ts'
 
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
@@ -68,12 +67,8 @@ export function getDrizzleClientD1Session(c: Context) {
 }
 
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
-  // c.executionCtx.waitUntil(Promise.resolve())
   // console.log(c.get('requestId'), 'Closing client', client)
-  if (getRuntimeKey() === 'workerd')
-    c.executionCtx.waitUntil(client.end())
-  else
-    client.end()
+  return backgroundTask(c, client.end())
 }
 
 export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
