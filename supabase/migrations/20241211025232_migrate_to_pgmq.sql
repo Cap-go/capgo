@@ -130,7 +130,7 @@ DECLARE
     request_id bigint;
 BEGIN
     -- Read messages
-    FOR msg IN SELECT * FROM pgmq.read(queue_name, 60, 200)
+    FOR msg IN SELECT * FROM pgmq.read(queue_name, 60, 2000)
     LOOP
         BEGIN
             -- Parse message as JSONB
@@ -152,7 +152,7 @@ BEGIN
             ));
             
             -- Set visibility timeout
-            PERFORM pgmq.set_vt(queue_name, msg.msg_id, 30);
+            PERFORM pgmq.set_vt(queue_name, msg.msg_id, 3600);
 
         EXCEPTION WHEN OTHERS THEN
             -- On error, if max retries reached archive, otherwise retry
@@ -177,7 +177,7 @@ DECLARE
     response record;
 BEGIN
     -- Process responses
-    FOR msg IN SELECT * FROM pgmq.read('http_responses', 60, 200)
+    FOR msg IN SELECT * FROM pgmq.read('http_responses', 60, 20000)
     LOOP
         -- Get HTTP response
         SELECT * INTO response 
