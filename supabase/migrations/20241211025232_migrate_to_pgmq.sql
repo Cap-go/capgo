@@ -52,8 +52,6 @@ SELECT pgmq.create('on_version_update');
 SELECT pgmq.create('replicate_data');
 SELECT pgmq.create('http_responses');
 
--- Remove queue_message function since we're using pgmq.send directly
-DROP FUNCTION IF EXISTS "public"."queue_message";
 
 -- Update process_cron_stats_jobs function
 CREATE OR REPLACE FUNCTION "public"."process_cron_stats_jobs"()
