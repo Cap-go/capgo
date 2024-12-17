@@ -505,3 +505,18 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- Clean up job run details for frequent jobs
+SELECT cron.schedule(
+    'cleanup-frequent-job-details',
+    '5 seconds', -- Run every hour
+    $$
+    DELETE FROM cron.job_run_details 
+    WHERE job_id IN (
+        SELECT jobid 
+        FROM cron.job 
+        WHERE schedule = '5 seconds'
+    ) 
+    AND end_time < now() - interval '1 hour'
+    $$
+);
