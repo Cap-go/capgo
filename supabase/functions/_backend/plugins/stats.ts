@@ -127,7 +127,7 @@ async function post(c: Context, body: AppStats) {
         await updateStoreApp(c, app_id, 1)
       // save stats of unknow sources in our analytic DB
       await backgroundTask(c, createStatsLogs(c, device.app_id, device.device_id, 'get', device.version))
-
+      console.log({ requestId: c.get('requestId'), context: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
