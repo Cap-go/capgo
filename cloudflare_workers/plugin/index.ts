@@ -9,12 +9,12 @@ import { app as channel_self } from '../../supabase/functions/_backend/plugins/c
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
-
 import { app as update_stats } from '../../supabase/functions/_backend/private/updates_stats.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { Context, Next, MiddlewareHandler } from "hono";
-import { rateLimit } from '@elithrar/workers-hono-rate-limit'
+import { rateLimit, wasRateLimited } from '@elithrar/workers-hono-rate-limit'
 import { z } from 'zod'
+import { sendStatsAndDevice } from '../../supabase/functions/_backend/utils/stats.ts'
 // import { middlewareAPISecret } from '../../supabase/functions/_backend/utils/hono.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
@@ -31,6 +31,21 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', (requestId as any)())
 
+const zodDeviceSchema = z.object({
+  app_id: z.string(),
+  device_id: z.string(),
+  plugin_version: z.string(),
+  version: z.number().optional().default(0),
+  custom_id: z.string().optional(),
+  is_emulator: z.boolean().optional(),
+  is_prod: z.boolean().optional(), 
+  version_build: z.string(),
+  os_version: z.string().optional(),
+  platform: z.enum(['ios', 'android']),
+  updated_at: z.string().optional().default(new Date().toISOString()),
+})
+
+
 export function deviceAppIdRateLimiter(rateLimiterAction: String, _methods: { limit: number, period: number, method: string }[]) {
   const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
     let deviceId = ''
@@ -44,8 +59,19 @@ export function deviceAppIdRateLimiter(rateLimiterAction: String, _methods: { li
       console.error('publicRateLimiter', e)
       await next()
     }
-    console.log('deviceAppIdRateLimiter', `PUBLIC_API_DEVICE_${rateLimiterAction}_${c.req.method}_RATE_LIMITER`)
     await rateLimit(c.env[`PUBLIC_API_DEVICE_${rateLimiterAction}_${c.req.method}_RATE_LIMITER`], () => `${deviceId}-${appId}`)(c, next);
+    if (wasRateLimited(c)) {
+      const device = zodDeviceSchema.safeParse(await c.req.json())
+      console.log('deviceAppIdRateLimiter', JSON.stringify(device))
+      if (device.success) {
+        try {
+          // this as any should work. There are different honot types for hono and @hono/hono
+          await sendStatsAndDevice(c as any, device.data, [{ action: 'rateLimited' }])
+        } catch (e) {
+          console.error('deviceAppIdRateLimiter', `Error sending stats and device: ${e}`)
+        }
+      }
+    }
   }
   return subMiddlewareKey
 }
