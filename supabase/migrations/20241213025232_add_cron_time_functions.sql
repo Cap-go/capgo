@@ -221,7 +221,7 @@ BEGIN
     WITH last_run AS (
         SELECT start_time
         FROM cron.job_run_details
-        WHERE jobname = 'process_cron_stats_jobs'
+        WHERE command = 'SELECT process_cron_stats_jobs();'
         AND status = 'succeeded'
         ORDER BY start_time DESC
         LIMIT 1
@@ -229,7 +229,7 @@ BEGIN
     job_info AS (
         SELECT schedule
         FROM cron.job
-        WHERE jobname = 'process_cron_stats_queue'
+        WHERE jobname = 'process_cron_stats_jobs'
     )
     SELECT 
         COALESCE(last_run.start_time, CURRENT_TIMESTAMP - INTERVAL '1 day') AS last_run,
