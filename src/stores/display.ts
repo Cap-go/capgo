@@ -22,7 +22,7 @@ export interface ActionSheetOption {
   buttonVertical?: boolean
   preventAccidentalClose?: boolean
   checkboxText?: string
-  listOrganizations?: boolean,
+  listOrganizations?: boolean
   buttons?: ActionSheetOptionButton[]
 }
 

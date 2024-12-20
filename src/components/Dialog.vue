@@ -80,7 +80,7 @@ onMounted(() => {
             'py-4': !displayStore.dialogOption?.buttonVertical,
           }"
         >
-        <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" :class="displayStore.dialogOption?.textStyle" v-html="displayText(displayStore.dialogOption?.message)" />
+          <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" :class="displayStore.dialogOption?.textStyle" v-html="displayText(displayStore.dialogOption?.message)" />
           <div v-if="displayStore.dialogOption?.listOrganizations">
             <div class="flex flex-col gap-2">
               <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
@@ -88,16 +88,16 @@ onMounted(() => {
                   <FormKit
                     type="checkbox"
                     :name="`org-${org.gid}`"
+                    :classes="{
+                      outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
+                      inner: '!max-w-[18px]',
+                      wrapper: '!mb-0',
+                    }"
                     @input="(value) => {
                       if (value)
                         displayStore.selectedOrganizations.push(org.gid)
                       else
                         displayStore.selectedOrganizations = displayStore.selectedOrganizations.filter(gid => gid !== org.gid)
-                    }"
-                    :classes="{ 
-                      outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
-                      inner: '!max-w-[18px]',
-                      wrapper: '!mb-0',
                     }"
                   />
                 </div>
@@ -105,13 +105,13 @@ onMounted(() => {
                   type="checkbox"
                   :name="`org-${org.gid}`"
                   v-model="displayStore.dialogCheckbox"
-                  :classes="{ 
+                  :classes="{
                     outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
                     inner: '!max-w-[18px]',
                     wrapper: '!mb-0',
                   }"
                 /> -->
-                <img :src="org.logo" v-if="!!org.logo" class="w-[78px] h-[78px] rounded-full" />
+                <img v-if="!!org.logo" :src="org.logo" class="w-[78px] h-[78px] rounded-full">
                 <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
                   <span class="font-medium text-gray-300">
                     N/A
@@ -125,10 +125,10 @@ onMounted(() => {
           <div v-if="displayStore.dialogOption?.checkboxText" class="flex justify-start mb-0 mt-14">
             <FormKit id="dialog-input" type="form" :actions="false">
               <FormKit
-                type="checkbox"
-                :label="displayStore.dialogOption?.checkboxText" 
-                :classes="{ outer: 'mb-[0px]' }" 
                 v-model="displayStore.dialogCheckbox"
+                type="checkbox"
+                :label="displayStore.dialogOption?.checkboxText"
+                :classes="{ outer: 'mb-[0px]' }"
               />
             </FormKit>
           </div>
