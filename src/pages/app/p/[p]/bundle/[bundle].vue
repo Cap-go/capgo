@@ -468,7 +468,7 @@ function preventInputChangePerm(event: Event) {
             </InfoRow>
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="channels && channels.length > 0" :label="t('channel')">
-              <template #start>
+              <span class="flex justify-end w-full">
                 <span v-for="chn in channels" id="open-channel" :key="chn.id">
                   <span
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
@@ -477,7 +477,7 @@ function preventInputChangePerm(event: Event) {
                     {{ chn!.name }}
                   </span>
                 </span>
-              </template>
+              </span>
             </InfoRow>
             <InfoRow
               v-else id="open-channel" :label="t('channel')" :is-link="true"
