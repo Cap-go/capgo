@@ -77,11 +77,6 @@ const tabs: Tab[] = [
     icon: IconInformations,
     key: 'info',
   },
-  {
-    label: t('devices'),
-    icon: IconDevice,
-    key: 'devices',
-  },
 ]
 
 async function getChannels() {
