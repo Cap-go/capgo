@@ -50,7 +50,6 @@ export type Database = {
       app_versions: {
         Row: {
           app_id: string
-          bucket_id: string | null
           checksum: string | null
           created_at: string | null
           deleted: boolean
@@ -71,7 +70,6 @@ export type Database = {
         }
         Insert: {
           app_id: string
-          bucket_id?: string | null
           checksum?: string | null
           created_at?: string | null
           deleted?: boolean
@@ -92,7 +90,6 @@ export type Database = {
         }
         Update: {
           app_id?: string
-          bucket_id?: string | null
           checksum?: string | null
           created_at?: string | null
           deleted?: boolean
@@ -332,20 +329,15 @@ export type Database = {
           allow_emulator: boolean
           android: boolean
           app_id: string
-          beta: boolean
           created_at: string
           created_by: string | null
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native: boolean
-          enable_ab_testing: boolean
-          enable_progressive_deploy: boolean
           id: number
           ios: boolean
           name: string
           owner_org: string
           public: boolean
-          second_version: number | null
-          secondary_version_percentage: number
           updated_at: string
           version: number
         }
@@ -355,20 +347,15 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id: string
-          beta?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
-          enable_ab_testing?: boolean
-          enable_progressive_deploy?: boolean
           id?: number
           ios?: boolean
           name: string
           owner_org: string
           public?: boolean
-          second_version?: number | null
-          secondary_version_percentage?: number
           updated_at?: string
           version: number
         }
@@ -378,20 +365,15 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id?: string
-          beta?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
-          enable_ab_testing?: boolean
-          enable_progressive_deploy?: boolean
           id?: number
           ios?: boolean
           name?: string
           owner_org?: string
           public?: boolean
-          second_version?: number | null
-          secondary_version_percentage?: number
           updated_at?: string
           version?: number
         }
@@ -402,13 +384,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "channels_secondVersion_fkey"
-            columns: ["second_version"]
-            isOneToOne: false
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "channels_version_fkey"
@@ -599,58 +574,6 @@ export type Database = {
           version_build?: string | null
         }
         Relationships: []
-      }
-      devices_override: {
-        Row: {
-          app_id: string
-          created_at: string | null
-          device_id: string
-          id: number
-          owner_org: string
-          updated_at: string | null
-          version: number
-        }
-        Insert: {
-          app_id: string
-          created_at?: string | null
-          device_id: string
-          id?: number
-          owner_org: string
-          updated_at?: string | null
-          version: number
-        }
-        Update: {
-          app_id?: string
-          created_at?: string | null
-          device_id?: string
-          id?: number
-          owner_org?: string
-          updated_at?: string | null
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "devices_override_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "devices_override_version_fkey"
-            columns: ["version"]
-            isOneToOne: false
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "owner_org_id_fkey"
-            columns: ["owner_org"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       global_stats: {
         Row: {
@@ -1701,7 +1624,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           app_id: string
-          bucket_id: string | null
           checksum: string | null
           created_at: string | null
           deleted: boolean
