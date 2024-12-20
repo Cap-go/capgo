@@ -28,6 +28,8 @@ add-member: メンバーを追加
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
 admin: 管理者
 alert-2fa-disable: 2FA を無効にすることを確認します
+alert-2fa-required: パスワードのリセットには2FAが必要
+alert-2fa-required-message: 2faコードを入力してください。
 alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
 alert-confirm-delete: 削除の確認
@@ -211,6 +213,7 @@ discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
 documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
+downgrade: 格下げ
 download: ダウンロード
 email: Eメール
 enable: 有効にする
@@ -387,6 +390,7 @@ plan-storage: GB ストレージ
 plan-team: 大企業の経営者に最適
 plan-updates: アップデート
 plan-upgrade: 購読者
+plan-upgrade-v2: アップグレード
 plan-whats-included: 含まれるもの
 plans: 予定
 plans-super-only: スーパー管理者のみがプランと請求を表示できます

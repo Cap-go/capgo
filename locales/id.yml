@@ -28,6 +28,8 @@ add-member: Tambahkan anggota
 add-your-first-app-t: Tambahkan aplikasi pertama Anda ke akun Anda dan ayo dorong pembaruan!
 admin: admin
 alert-2fa-disable: Konfirmasikan bahwa Anda ingin menonaktifkan 2FA
+alert-2fa-required: 2FA diperlukan untuk mengatur ulang kata sandi
+alert-2fa-required-message: Silakan masukkan kode 2fa
 alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
 alert-confirm-delete: Konfirmasi Hapus
@@ -218,6 +220,7 @@ discover-module-in-a: Temukan modul di Awesome-capacitor
 discover-your-dashbo: Temukan dasbor Anda!
 documentation: dokumentasi
 dont-have-an-account: Belum punya akun?
+downgrade: Downgrade
 download: Unduh
 email: Surel
 enable: Memungkinkan
@@ -404,6 +407,7 @@ plan-storage: Penyimpanan GB
 plan-team: Terbaik untuk pemilik bisnis besar
 plan-updates: Pembaruan
 plan-upgrade: Berlangganan
+plan-upgrade-v2: Tingkatkan
 plan-whats-included: Apa yang disertakan
 plans: rencana
 plans-super-only: Hanya admin super yang diizinkan melihat paket dan penagihan

@@ -30,6 +30,8 @@ add-member: Adicionar membro
 add-your-first-app-t: Adicione seu primeiro aplicativo à sua conta e vamos enviar atualizações!
 admin: administrador
 alert-2fa-disable: Confirme que deseja desativar 2FA
+alert-2fa-required: A 2FA é necessária para repor a palavra-passe
+alert-2fa-required-message: Introduzir o código 2fa
 alert-accept-inviation: Você aceita o convite para %ORG%?
 alert-add-new-key: Selecione o novo tipo de chave de API
 alert-confirm-delete: Confirmar exclusão
@@ -224,6 +226,7 @@ discover-module-in-a: Descubra o módulo no capacitor Awesome
 discover-your-dashbo: Descubra o seu painel!
 documentation: documentação
 dont-have-an-account: Não tem uma conta?
+downgrade: Rebaixar
 download: Download
 email: E-mail
 enable: Habilitar
@@ -410,6 +413,7 @@ plan-storage: GB de armazenamento
 plan-team: Melhor para proprietários de grandes empresas
 plan-updates: Atualizações
 plan-upgrade: Assinaturas
+plan-upgrade-v2: Atualização
 plan-whats-included: O que está incluído
 plans: planos
 plans-super-only: Somente superadministradores têm permissão para visualizar planos e cobranças

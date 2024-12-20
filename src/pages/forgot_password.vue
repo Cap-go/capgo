@@ -19,19 +19,17 @@ const step = ref(1)
 const turnstileToken = ref('')
 
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const displayStore = useDisplayStore()
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
 
-async function submit(form: { email: string, password: string }) {
+async function submit(form: { email: string, password: string, password_confirm: string }) {
   isLoading.value = true
   if (step.value === 1) {
     const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
     // console.log('redirect', redirectTo)
     const { error } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo, captchaToken: turnstileToken.value })
-    setTimeout(() => {
-      isLoading.value = false
-    }, 5000)
     if (error) {
       if (error.message.includes('captcha')) {
         toast.error(t('captcha-fail'))
@@ -42,6 +40,7 @@ async function submit(form: { email: string, password: string }) {
     else {
       toast.success(t('forgot-check-email'))
     }
+    isLoading.value = false
   }
   else if (step.value === 2 && route.hash) {
     const queryString = route.hash.replace('#', '')
@@ -49,22 +48,68 @@ async function submit(form: { email: string, password: string }) {
     const access_token = urlParams.get('access_token') || ''
     const refresh_token = urlParams.get('refresh_token') || ''
     // login with access_token
-    const res = await supabase.auth.setSession({ refresh_token, access_token })
-    if (res.error) {
-      setErrors('forgot-password', [res.error.message], {})
-      return
-    }
-    else {
-      console.log('res', res)
-    }
-    const { error } = await supabase.auth.updateUser({ password: form.password })
-    setTimeout(() => {
-      isLoading.value = false
-    }, 5000)
+    const { error } = await supabase.auth.setSession({ refresh_token, access_token })
     if (error) {
       setErrors('forgot-password', [error.message], {})
+      return
+    }
+    const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    const { currentLevel, nextLevel } = aal.data!
+    if (nextLevel !== currentLevel) {
+      const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
+      if (mfaError) {
+        setErrors('forgot-password', [mfaError.message], {})
+        console.error('Cannot get MFA factors', mfaError)
+        return
+      }
+      const factor = mfaFactors.all.find(factor => factor.status === 'verified')
+      if (!factor) {
+        setErrors('forgot-password', ['Cannot find MFA factor'], {})
+        console.error('Cannot get MFA factors', mfaError)
+        return
+      }
+
+      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+      if (errorChallenge) {
+        setErrors('forgot-password', [errorChallenge.message], {})
+        console.error('Cannot challenge MFA factor', errorChallenge)
+        return
+      }
+
+      displayStore.dialogOption = {
+        header: t('alert-2fa-required'),
+        message: t('alert-2fa-required-message'),
+        preventAccidentalClose: true,
+        input: true,
+        buttons: [
+          {
+            text: t('button-confirm'),
+            role: 'confirm',
+            handler: async () => {
+              const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
+                factorId: factor.id,
+                challengeId: challenge.id,
+                code: displayStore.dialogInputText.replace(' ', ''),
+              })
+              if (errorVerify) {
+                displayStore.showDialog = true
+                toast.error(t('invalid-mfa-code'))
+              }
+            },
+          },
+        ],
+      }
+      displayStore.showDialog = true
+      await displayStore.onDialogDismiss()
+    }
+    const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
+    isLoading.value = false
+    if (updateError) {
+      setErrors('forgot-password', [updateError.message], {})
     }
     else {
+      form.password = ''
+      form.password_confirm = ''
       toast.success(t('forgot-success'))
       await supabase.auth.signOut()
       router.push('/login')
@@ -75,7 +120,7 @@ async function submit(form: { email: string, password: string }) {
 watchEffect(() => {
   isLoadingMain.value = true
   if (route && route.path === '/forgot_password') {
-    console.log('router.currentRoute.value.query', router.currentRoute.value.query)
+    // console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
       step.value = Number.parseInt(router.currentRoute.value.query.step as string)
     isLoadingMain.value = false
@@ -106,7 +151,7 @@ watchEffect(() => {
         <div class="relative max-w-md mx-auto mt-8 md:mt-4">
           <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="px-4 py-6 sm:px-8 sm:py-7">
-              <FormKit id="forgot-pass" type="form" :actions="false" @submit="submit">
+              <FormKit id="forgot-password" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5 text-gray-500">
                   <div v-if="step === 1">
                     <FormKit

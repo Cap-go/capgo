@@ -32,6 +32,8 @@ add-your-first-app-t: >-
   nhật!
 admin: quản trị viên
 alert-2fa-disable: Xác nhận rằng bạn muốn tắt 2FA
+alert-2fa-required: Cần có 2FA để đặt lại mật khẩu
+alert-2fa-required-message: Vui lòng nhập mã 2fa
 alert-accept-inviation: Bạn có chấp nhận lời mời tham gia %ORG% không?
 alert-add-new-key: Chọn loại khóa API mới
 alert-confirm-delete: Xác nhận Xóa
@@ -231,6 +233,7 @@ discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá bảng điều khiển của bạn!
 documentation: tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
+downgrade: Hạ cấp
 download: Tải xuống
 email: E-mail
 enable: Cho phép
@@ -418,6 +421,7 @@ plan-storage: Dung lượng GB
 plan-team: Tốt nhất cho các chủ doanh nghiệp lớn
 plan-updates: cập nhật
 plan-upgrade: Đăng ký
+plan-upgrade-v2: Nâng cấp
 plan-whats-included: Bao gồm những gì
 plans: các kế hoạch
 plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem gói và thanh toán

@@ -8,6 +8,7 @@ import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
 import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
+import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
 import { app as files_config } from './files_config.ts'
 import { app as upload_link } from './upload_link.ts'
@@ -73,7 +74,7 @@ async function getHandler(c: Context): Promise<Response> {
   else {
     headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
     response = new Response(object.body, { headers })
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()))
+    await backgroundTask(c, cache.put(cacheKey, response.clone()))
     return response
   }
 }

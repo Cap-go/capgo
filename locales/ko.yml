@@ -28,6 +28,8 @@ add-member: 회원 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
 admin: 관리자
 alert-2fa-disable: 2FA를 비활성화할지 확인하세요.
+alert-2fa-required: 비밀번호를 재설정하려면 2FA가 필요합니다.
+alert-2fa-required-message: 2FA 코드를 입력하세요.
 alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
 alert-confirm-delete: 삭제 확인
@@ -211,6 +213,7 @@ discover-module-in-a: Awesome-capacitor에서 모듈 발견
 discover-your-dashbo: 대시보드를 발견하십시오!
 documentation: 선적 서류 비치
 dont-have-an-account: 계정이 없습니까?
+downgrade: 다운그레이드
 download: 다운로드
 email: 이메일
 enable: 할 수 있게 하다
@@ -387,6 +390,7 @@ plan-storage: GB 스토리지
 plan-team: 대기업 소유자에게 가장 적합
 plan-updates: 업데이트
 plan-upgrade: 구독자
+plan-upgrade-v2: 업그레이드
 plan-whats-included: 포함된 것
 plans: 계획
 plans-super-only: 최고 관리자만 요금제 및 결제를 볼 수 있습니다.

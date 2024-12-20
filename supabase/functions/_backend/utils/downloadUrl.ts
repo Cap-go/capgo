@@ -30,6 +30,7 @@ export async function getBundleUrl(
     bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
     app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
   },
+  deviceId: string,
 ) {
   console.log({ requestId: c.get('requestId'), context: 'getBundleUrlV2 version', version })
 
@@ -59,9 +60,8 @@ export async function getBundleUrl(
     }
   }
 
-  console.log(c.req.url)
-  const url = new URL('http://wolny-ubuntu.local:7887')
-  const downloadUrl = `${url.protocol}//${url.host}/${BASE_PATH}/${path}?key=${bundleMeta?.checksum}`
+  const url = new URL(c.req.url)
+  const downloadUrl = `${url.protocol}//${url.host}/${BASE_PATH}/${path}?key=${bundleMeta?.checksum}&device_id=${deviceId}`
   return { url: downloadUrl, size: bundleMeta?.size }
 }
 
@@ -72,7 +72,7 @@ export async function getManifestUrl(c: Context, version: {
   bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
   app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
   manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null
-}): Promise<ManifestEntry[]> {
+}, deviceId: string): Promise<ManifestEntry[]> {
   if (!version.manifest) {
     return []
   }
@@ -88,7 +88,7 @@ export async function getManifestUrl(c: Context, version: {
       return {
         file_name: entry.file_name,
         file_hash: entry.file_hash,
-        download_url: `${url.protocol}//${url.host}/${BASE_PATH}/${entry.s3_path}?key=${signKey}`,
+        download_url: `${url.protocol}//${url.host}/${BASE_PATH}/${entry.s3_path}?key=${signKey}&device_id=${deviceId}`,
       }
     }).filter(entry => entry !== null) as ManifestEntry[]
   }

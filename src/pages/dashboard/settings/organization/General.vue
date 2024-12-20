@@ -52,14 +52,14 @@ async function presentActionSheet() {
         text: t('button-camera'),
         id: 'camera-button',
         handler: async () => {
-          takePhoto(isLoading, 'org', '')
+          takePhoto('update-org', isLoading, 'org', '')
         },
       },
       {
         id: 'browse-button',
         text: t('button-browse'),
         handler: () => {
-          pickPhoto(isLoading, 'org', '')
+          pickPhoto('update-org', isLoading, 'org', '')
         },
       },
     ],

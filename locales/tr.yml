@@ -28,6 +28,8 @@ add-member: Üye ekle
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
 admin: yönetici
 alert-2fa-disable: 2FA'yı devre dışı bırakmak istediğinizi onaylayın
+alert-2fa-required: Parolayı sıfırlamak için 2FA gereklidir
+alert-2fa-required-message: Lütfen 2fa kodunu girin
 alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
 alert-add-new-key: Yeni API anahtarı türünü seçin
 alert-confirm-delete: Silmeyi Onayla
@@ -218,6 +220,7 @@ discover-module-in-a: Müthiş kapasitörde modülü keşfedin
 discover-your-dashbo: Kontrol panelinizi keşfedin!
 documentation: dokümantasyon
 dont-have-an-account: Hesabınız yok mu?
+downgrade: Not düşürme
 download: İndirmek
 email: E-posta
 enable: Olanak vermek
@@ -402,6 +405,7 @@ plan-storage: GB Depolama
 plan-team: Büyük işletme sahipleri için en iyisi
 plan-updates: Güncellemeler
 plan-upgrade: aboneler
+plan-upgrade-v2: Yükseltme
 plan-whats-included: Neler dahil
 plans: planlar
 plans-super-only: >-

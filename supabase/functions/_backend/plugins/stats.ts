@@ -5,13 +5,13 @@ import type { AppStats } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { saveStoreInfoCF, updateStoreApp } from '../utils/cloudflare.ts'
+import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
+import { createStatsLogs, createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
-import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
+import { backgroundTask, deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 
 const failActions = [
   'set_fail',
@@ -97,23 +97,6 @@ async function post(c: Context, body: AppStats) {
       .select('app_id')
       .eq('app_id', app_id)
       .single()
-    if (!appOwner) {
-      if (app_id) {
-        await saveStoreInfoCF(c, {
-          app_id,
-          onprem: true,
-          capacitor: true,
-          capgo: true,
-        })
-      }
-      if (action === 'get')
-        await updateStoreApp(c, app_id, 1)
-
-      return c.json({
-        message: 'App not found',
-        error: 'app_not_found',
-      }, 200)
-    }
 
     if (coerce)
       version_build = format(coerce)
@@ -130,6 +113,25 @@ async function post(c: Context, body: AppStats) {
       is_prod: is_prod == null ? true : is_prod,
       custom_id,
       updated_at: new Date().toISOString(),
+    }
+    if (!appOwner) {
+      if (app_id) {
+        await createIfNotExistStoreInfo(c, {
+          app_id,
+          onprem: true,
+          capacitor: true,
+          capgo: true,
+        })
+      }
+      if (action === 'get')
+        await updateStoreApp(c, app_id, 1)
+      // save stats of unknow sources in our analytic DB
+      await backgroundTask(c, createStatsLogs(c, device.app_id, device.device_id, 'get', device.version))
+      console.log({ requestId: c.get('requestId'), context: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
+      return c.json({
+        message: 'App not found',
+        error: 'app_not_found',
+      }, 200)
     }
     const statsActions: StatsActions[] = []
 

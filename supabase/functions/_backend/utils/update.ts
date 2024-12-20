@@ -11,7 +11,7 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
-import { saveStoreInfoCF } from './cloudflare.ts'
+import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
@@ -64,7 +64,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
     if (!appOwner) {
       if (app_id) {
-        await backgroundTask(c, saveStoreInfoCF(c, {
+        await backgroundTask(c, createIfNotExistStoreInfo(c, {
           app_id,
           onprem: true,
           capacitor: true,
@@ -138,9 +138,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
 
+    const start = performance.now()
+
     const requestedInto = isV2
       ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
       : await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
+
+    const end = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'requestInfosPostgres', duration: `${end - start}ms` })
 
     const { versionData, channelOverride, devicesOverride } = requestedInto
     let { channelData } = requestedInto
@@ -380,14 +385,27 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
     if ((version.bucket_id || version.r2_path) && !version.external_url) {
-      const res = await getBundleUrl(c, appOwner.orgs.created_by, { app_id, ...version })
+      const res = await getBundleUrl(c, appOwner.orgs.created_by, {
+        id: version.id,
+        storage_provider: version.storage_provider,
+        r2_path: version.r2_path,
+        bucket_id: version.bucket_id,
+        app_id,
+      }, device_id)
       if (res) {
         signedURL = res.url
         // only count the size of the bundle if it's not external
         await createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = await getManifestUrl(c, { app_id, ...version })
+        manifest = await getManifestUrl(c, {
+          id: version.id,
+          storage_provider: version.storage_provider,
+          r2_path: version.r2_path,
+          bucket_id: version.bucket_id,
+          app_id,
+          manifest: version.manifest as any,
+        }, device_id)
       }
     }
     //  check signedURL and if it's url

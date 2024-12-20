@@ -36,6 +36,8 @@ add-your-first-app-t: >-
   veröffentlichen!
 admin: Administrator
 alert-2fa-disable: Bestätigen Sie, dass Sie 2FA deaktivieren möchten
+alert-2fa-required: 2FA ist erforderlich, um das Passwort zurückzusetzen
+alert-2fa-required-message: Bitte geben Sie den 2fa-Code ein
 alert-accept-inviation: Nehmen Sie die Einladung zu %ORG% an?
 alert-add-new-key: Wählen Sie einen neuen API-Schlüsseltyp aus
 alert-confirm-delete: Löschen bestätigen
@@ -245,6 +247,7 @@ discover-module-in-a: Entdecken Sie das Modul in Awesome-capacitor
 discover-your-dashbo: Entdecken Sie Ihr Dashboard!
 documentation: Dokumentation
 dont-have-an-account: Sie haben kein Konto?
+downgrade: Herabstufung
 download: Herunterladen
 email: Email
 enable: Aktivieren
@@ -445,6 +448,7 @@ plan-storage: GB Speicher
 plan-team: Am besten für Großunternehmer geeignet
 plan-updates: Aktualisierung
 plan-upgrade: Abonniert
+plan-upgrade-v2: Upgrade
 plan-whats-included: Was ist inbegriffen
 plans: Pläne
 plans-super-only: Nur Superadministratoren dürfen Pläne und Abrechnungen einsehen

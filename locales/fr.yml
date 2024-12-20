@@ -36,6 +36,8 @@ add-your-first-app-t: >-
   !
 admin: administrateur
 alert-2fa-disable: Confirmez que vous souhaitez désactiver 2FA
+alert-2fa-required: Le 2FA est nécessaire pour réinitialiser le mot de passe
+alert-2fa-required-message: Veuillez saisir le code 2fa
 alert-accept-inviation: Acceptez-vous l'invitation à %ORG%?
 alert-add-new-key: Sélectionnez le nouveau type de clé API
 alert-confirm-delete: Confirmer la suppression
@@ -240,6 +242,7 @@ discover-module-in-a: Découvrez le module dans Awesome-capacitor
 discover-your-dashbo: Découvrez votre tableau de bord !
 documentation: documentation
 dont-have-an-account: Vous n'avez pas de compte ?
+downgrade: Rétrogradation
 download: Télécharger
 email: Courriel
 enable: Activer
@@ -426,6 +429,7 @@ plan-storage: Stockage GB
 plan-team: Meilleur pour les grands propriétaires d'entreprise
 plan-updates: Mises à jour
 plan-upgrade: S'abonner
+plan-upgrade-v2: Mise à niveau
 plan-whats-included: Qu'est-ce qui est inclus
 plans: projets
 plans-super-only: >-

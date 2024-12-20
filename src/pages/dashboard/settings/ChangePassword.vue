@@ -8,16 +8,67 @@ import iconPassword from '~icons/ph/key?raw'
 import { useSupabase } from '~/services/supabase'
 
 const isLoading = ref(false)
+const displayStore = useDisplayStore()
 const supabase = useSupabase()
 
 const { t } = useI18n()
 
+// https://xvwzpoazmxkqosrdewyv.supabase.co/auth/v1/verify?token=69af7abb6508b17c05fec3ac963d335eafee0e5802a7977fc9b7aa35&type=recovery&redirect_to=http%3A%2F%2Flocalhost:5173%2Fforgot_password%3Fstep%3D2
 async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)
   if (isLoading.value)
     return
   isLoading.value = true
 
+  const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  const { currentLevel, nextLevel } = aal.data!
+  if (nextLevel !== currentLevel) {
+    const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
+    if (mfaError) {
+      setErrors('forgot-password', [mfaError.message], {})
+      console.error('Cannot get MFA factors', mfaError)
+      return
+    }
+    const factor = mfaFactors.all.find(factor => factor.status === 'verified')
+    if (!factor) {
+      setErrors('forgot-password', ['Cannot find MFA factor'], {})
+      console.error('Cannot get MFA factors', mfaError)
+      return
+    }
+
+    const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+    if (errorChallenge) {
+      setErrors('forgot-password', [errorChallenge.message], {})
+      console.error('Cannot challenge MFA factor', errorChallenge)
+      return
+    }
+
+    displayStore.dialogOption = {
+      header: t('alert-2fa-required'),
+      message: t('alert-2fa-required-message'),
+      preventAccidentalClose: true,
+      input: true,
+      buttons: [
+        {
+          text: t('button-confirm'),
+          role: 'confirm',
+          handler: async () => {
+            const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
+              factorId: factor.id,
+              challengeId: challenge.id,
+              code: displayStore.dialogInputText.replace(' ', ''),
+            })
+            if (errorVerify) {
+              displayStore.showDialog = true
+              toast.error(t('invalid-mfa-code'))
+            }
+          },
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+  }
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
 
   isLoading.value = false
@@ -25,6 +76,8 @@ async function submit(form: { password: string, password_confirm: string }) {
     setErrors('change-pass', [t('account-password-error')], {})
   else
     toast.success(t('changed-password-suc'))
+  form.password = ''
+  form.password_confirm = ''
 }
 </script>
 

@@ -28,6 +28,8 @@ add-member: 添加会员
 add-your-first-app-t: 将您的第一个应用程序添加到您的帐户，让我们推送更新！
 admin: 行政
 alert-2fa-disable: 确认您要禁用 2FA
+alert-2fa-required: 重置密码需要 2FA
+alert-2fa-required-message: 请输入 2fa 代码
 alert-accept-inviation: 您接受%ORG% 的邀请吗？
 alert-add-new-key: 选择新的 API 密钥类型
 alert-confirm-delete: 确认删除
@@ -211,6 +213,7 @@ discover-module-in-a: 在 Awesome-capacitor 中发现模块
 discover-your-dashbo: 发现您的仪表板！
 documentation: 文档
 dont-have-an-account: 没有帐户？
+downgrade: 降级
 download: 下载
 email: 电子邮件
 enable: 使能够
@@ -387,6 +390,7 @@ plan-storage: GB 存储
 plan-team: 最适合大企业主
 plan-updates: 更新
 plan-upgrade: 订阅
+plan-upgrade-v2: 升级
 plan-whats-included: 包括什么
 plans: 计划
 plans-super-only: 仅允许超级管理员查看计划和账单
