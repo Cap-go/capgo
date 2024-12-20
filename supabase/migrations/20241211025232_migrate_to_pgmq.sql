@@ -348,12 +348,15 @@ AS $$
 DECLARE
     msg record;
     batch_operations jsonb[];
+    messages_to_delete bigint[];
     batch_size int := 10000;
     request_id bigint;
     response record;
     payload jsonb;
+    msg_id bigint;
 BEGIN
     batch_operations := array[]::jsonb[];
+    messages_to_delete := array[]::bigint[];
     
     -- Read messages in batch
     FOR msg IN 
@@ -384,6 +387,7 @@ BEGIN
         ELSE
             -- Add operation to batch
             batch_operations := array_append(batch_operations, payload);
+            messages_to_delete := array_append(messages_to_delete, msg.msg_id);
         END IF;
     END LOOP;
     
@@ -405,12 +409,9 @@ BEGIN
         );
         
         -- Delete original messages
-        FOR msg IN 
-            SELECT * FROM pgmq.read('replicate_data', 60, batch_size)
+        FOREACH msg_id IN ARRAY messages_to_delete
         LOOP
-            IF (msg.message::jsonb->>'request_id') IS NULL THEN
-                PERFORM pgmq.delete('replicate_data', msg.msg_id);
-            END IF;
+            PERFORM pgmq.delete('replicate_data', msg_id);
         END LOOP;
     END IF;
 END;
@@ -525,3 +526,6 @@ SELECT cron.schedule(
     AND end_time < now() - interval '1 hour'
     $$
 );
+
+alter system set pg_net.batch_size to 2000;
+select net.worker_restart();
