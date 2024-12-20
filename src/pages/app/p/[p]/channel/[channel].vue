@@ -110,7 +110,6 @@ async function getChannel() {
             id,
             name,
             app_id,
-            bucket_id,
             created_at,
             min_update_version,
             storage_provider

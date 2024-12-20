@@ -199,7 +199,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //   }, 400)
     // }
 
-    if (!version.bucket_id && !version.external_url && !version.r2_path) {
+    if (!version.external_url && !version.r2_path) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -354,7 +354,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
-    if ((version.bucket_id || version.r2_path) && !version.external_url) {
+    if (version.r2_path && !version.external_url) {
       const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
       if (res) {
         signedURL = res.url

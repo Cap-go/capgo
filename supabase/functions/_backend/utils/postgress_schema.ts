@@ -48,7 +48,6 @@ export const app_versions = pgTable('app_versions', {
   created_at: timestamp('created_at').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),
   name: varchar('name').notNull(),
-  bucket_id: varchar('bucket_id'),
   user_id: uuid('user_id'),
   updated_at: timestamp('updated_at').defaultNow(),
   deleted: boolean('deleted').default(false),

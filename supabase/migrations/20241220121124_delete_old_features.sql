@@ -8,3 +8,6 @@ DROP COLUMN IF EXISTS enable_progressive_deploy,
 DROP COLUMN IF EXISTS enable_ab_testing,
 DROP COLUMN IF EXISTS second_version,
 DROP COLUMN IF EXISTS beta;
+
+ALTER TABLE app_versions
+DROP COLUMN IF EXISTS bucket_id;

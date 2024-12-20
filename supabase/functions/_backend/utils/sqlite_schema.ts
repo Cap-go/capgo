@@ -28,7 +28,6 @@ export const app_versions = sqliteTable('app_versions', {
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   app_id: text('app_id').notNull().references(() => apps.name),
   name: text('name').notNull(),
-  bucket_id: text('bucket_id'),
   r2_path: text('r2_path'),
   user_id: text('user_id'),
   updated_at: integer('updated_at', { mode: 'timestamp' }),

@@ -267,11 +267,8 @@ async function openDownload() {
           if (!version.value)
             return
           if (version.value.session_key) {
-            let localPath = `./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'}`
-            if (version.value.r2_path) {
-              const filename = version.value.r2_path.split('/').slice(-1)[0]
-              localPath = `./${filename}`
-            }
+            const filename = version.value.r2_path?.split('/').slice(-1)[0]
+            const localPath = `./${filename}`
             const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
             displayStore.dialogOption = {
               header: '',

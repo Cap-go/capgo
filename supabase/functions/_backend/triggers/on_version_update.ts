@@ -15,7 +15,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 
   if (v2Path && record.storage_provider === 'r2') {
     // pdate size and checksum
-    console.log({ requestId: c.get('requestId'), context: 'V2', bucket_id: record.bucket_id, r2_path: record.r2_path })
+    console.log({ requestId: c.get('requestId'), context: 'V2', r2_path: record.r2_path })
     // set checksum in s3
     const size = await s3.getSize(c, v2Path)
     if (size) {
@@ -41,7 +41,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  console.log({ requestId: c.get('requestId'), context: 'Delete', bucket_id: record.bucket_id, r2_path: record.r2_path })
+  console.log({ requestId: c.get('requestId'), context: 'Delete', r2_path: record.r2_path })
 
   const v2Path = await getPath(c, record)
   if (!v2Path) {
@@ -53,7 +53,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     await s3.deleteObject(c, v2Path)
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'Cannot delete s3 (v2)', bucket_id: record.bucket_id, error })
+    console.log({ requestId: c.get('requestId'), context: 'Cannot delete s3 (v2)', error })
     return c.json(BRES)
   }
 
@@ -74,16 +74,6 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .eq('id', record.id)
   if (errorUpdate)
     console.log({ requestId: c.get('requestId'), context: 'error', error: errorUpdate })
-
-  if (record.bucket_id) {
-    const { error: errorDelete } = await supabaseAdmin(c)
-      .storage
-      .from(`apps/${record.user_id}/${record.app_id}/versions`)
-      .remove([record.bucket_id])
-
-    if (errorDelete)
-      console.log({ requestId: c.get('requestId'), context: 'errorDelete from supabase storage', bucket_id: record.bucket_id, error: errorDelete })
-  }
 
   return c.json(BRES)
 }
@@ -109,8 +99,8 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id' })
       return c.json(BRES)
     }
-    if (!record.bucket_id && !record.r2_path) {
-      console.log({ requestId: c.get('requestId'), context: 'no bucket_id' })
+    if (!record.r2_path) {
+      console.log({ requestId: c.get('requestId'), context: 'no r2_path' })
       return c.json(BRES)
     }
     // // check if not deleted it's present in s3 storage
