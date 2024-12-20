@@ -2,7 +2,7 @@
 DROP TABLE IF EXISTS devices_override;
 
 -- Remove fields from channel table
-ALTER TABLE channel 
+ALTER TABLE channels
 DROP COLUMN IF EXISTS secondary_version_percentage,
 DROP COLUMN IF EXISTS enable_progressive_deploy,
 DROP COLUMN IF EXISTS enable_ab_testing,
