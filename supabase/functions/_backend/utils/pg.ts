@@ -89,21 +89,17 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
 
 function getAlias() {
   const versionAlias = alias(schema.app_versions, 'version')
-  const secondVersionAlias = alias(schema.app_versions, 'second_version')
-  const devicesOverrideAlias = alias(schema.devices_override, 'devices_override')
   const channelDevicesAlias = alias(schema.channel_devices, 'channel_devices')
   const channelAlias = alias(schema.channels, 'channels')
-  return { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias }
+  return { versionAlias, channelDevicesAlias, channelAlias }
 }
 function getAliasV2() {
   const versionAlias = aliasV2(schemaV2.app_versions, 'version')
-  const secondVersionAlias = aliasV2(schemaV2.app_versions, 'second_version')
-  const devicesOverrideAlias = aliasV2(schemaV2.devices_override, 'devices_override')
   const channelDevicesAlias = aliasV2(schemaV2.channel_devices, 'channel_devices')
   const channelAlias = aliasV2(schemaV2.channels, 'channels')
-  return { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias }
+  return { versionAlias, channelDevicesAlias, channelAlias }
 }
-export async function requestInfosPostgres(
+export function requestInfosPostgres(
   platform: string,
   app_id: string,
   device_id: string,
@@ -111,7 +107,7 @@ export async function requestInfosPostgres(
   defaultChannel: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
 ) {
-  const { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias } = getAlias()
+  const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
   const appVersions = drizzleCient
     .select({
@@ -119,29 +115,6 @@ export async function requestInfosPostgres(
     })
     .from(versionAlias)
     .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
-    .limit(1)
-    .then(data => data.at(0))
-
-  const deviceOverwrite = drizzleCient
-    .select({
-      device_id: devicesOverrideAlias.device_id,
-      app_id: devicesOverrideAlias.app_id,
-      version: {
-        id: versionAlias.id,
-        name: versionAlias.name,
-        checksum: versionAlias.checksum,
-        session_key: versionAlias.session_key,
-        bucket_id: versionAlias.bucket_id,
-        storage_provider: versionAlias.storage_provider,
-        external_url: versionAlias.external_url,
-        min_update_version: versionAlias.min_update_version,
-        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
-      },
-    })
-    .from(devicesOverrideAlias)
-    .innerJoin(versionAlias, eq(devicesOverrideAlias.version, versionAlias.id))
-    .where(and(eq(devicesOverrideAlias.device_id, device_id), eq(devicesOverrideAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
@@ -163,18 +136,6 @@ export async function requestInfosPostgres(
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
-      secondVersion: {
-        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
-        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
-        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
-        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
-        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
-        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
-        r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
-      },
       channels: {
         id: channelAlias.id,
         name: channelAlias.name,
@@ -185,9 +146,6 @@ export async function requestInfosPostgres(
         disable_auto_update: channelAlias.disable_auto_update,
         ios: channelAlias.ios,
         android: channelAlias.android,
-        secondary_version_percentage: channelAlias.secondary_version_percentage,
-        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
-        enable_ab_testing: channelAlias.enable_ab_testing,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
@@ -196,13 +154,11 @@ export async function requestInfosPostgres(
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
   // v => version
-  // sv => secondversion
   const channel = drizzleCient
     .select({
       version: {
@@ -217,18 +173,6 @@ export async function requestInfosPostgres(
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
-      secondVersion: {
-        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
-        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
-        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
-        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
-        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
-        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
-        r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
-      },
       channels: {
         id: channelAlias.id,
         name: channelAlias.name,
@@ -239,16 +183,12 @@ export async function requestInfosPostgres(
         disable_auto_update: channelAlias.disable_auto_update,
         ios: channelAlias.ios,
         android: channelAlias.android,
-        secondary_version_percentage: channelAlias.secondary_version_percentage,
-        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
-        enable_ab_testing: channelAlias.enable_ab_testing,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
     .where(!defaultChannel
       ? and(
         eq(channelAlias.public, true),
@@ -264,11 +204,14 @@ export async function requestInfosPostgres(
     .then(data => data.at(0))
 
   // promise all
-  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
-  return { versionData, channelData, channelOverride, devicesOverride }
+  return Promise.all([channelDevice, channel, appVersions])
+    .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
+    .catch((e) => {
+      throw e
+    })
 }
 
-export async function requestInfosPostgresV2(
+export function requestInfosPostgresV2(
   platform: string,
   app_id: string,
   device_id: string,
@@ -276,7 +219,7 @@ export async function requestInfosPostgresV2(
   defaultChannel: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ) {
-  const { versionAlias, secondVersionAlias, devicesOverrideAlias, channelDevicesAlias, channelAlias } = getAliasV2()
+  const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
 
   const appVersions = drizzleCient
     .select({
@@ -288,29 +231,6 @@ export async function requestInfosPostgresV2(
     .then(data => data.at(0))
   console.error({ context: 'requestInfosPostgresV2 appVersions', appVersions })
 
-  const deviceOverwrite = drizzleCient
-    .select({
-      device_id: devicesOverrideAlias.device_id,
-      app_id: devicesOverrideAlias.app_id,
-      version: {
-        id: versionAlias.id,
-        name: versionAlias.name,
-        checksum: versionAlias.checksum,
-        session_key: versionAlias.session_key,
-        bucket_id: versionAlias.bucket_id,
-        storage_provider: versionAlias.storage_provider,
-        external_url: versionAlias.external_url,
-        min_update_version: versionAlias.min_update_version,
-        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
-      },
-    })
-    .from(devicesOverrideAlias)
-    .innerJoin(versionAlias, eq(devicesOverrideAlias.version, versionAlias.id))
-    .where(and(eq(devicesOverrideAlias.device_id, device_id), eq(devicesOverrideAlias.app_id, app_id)))
-    .limit(1)
-    .then(data => data.at(0))
-
   const channelDevice = drizzleCient
     .select({
       channel_devices: {
@@ -329,18 +249,6 @@ export async function requestInfosPostgresV2(
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
-      secondVersion: {
-        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
-        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
-        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
-        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
-        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
-        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
-        r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
-      },
       channels: {
         id: channelAlias.id,
         name: channelAlias.name,
@@ -351,9 +259,6 @@ export async function requestInfosPostgresV2(
         disable_auto_update: channelAlias.disable_auto_update,
         ios: channelAlias.ios,
         android: channelAlias.android,
-        secondary_version_percentage: channelAlias.secondary_version_percentage,
-        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
-        enable_ab_testing: channelAlias.enable_ab_testing,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
@@ -362,13 +267,11 @@ export async function requestInfosPostgresV2(
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
 
   // v => version
-  // sv => secondversion
   const channel = drizzleCient
     .select({
       version: {
@@ -383,18 +286,6 @@ export async function requestInfosPostgresV2(
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
         manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
-      secondVersion: {
-        id: sql<number>`${secondVersionAlias.id}`.as('svid'),
-        name: sql<string>`${secondVersionAlias.name}`.as('svname'),
-        checksum: sql<string | null>`${secondVersionAlias.checksum}`.as('svchecksum'),
-        session_key: sql<string | null>`${secondVersionAlias.session_key}`.as('svsession_key'),
-        bucket_id: sql<string | null>`${secondVersionAlias.bucket_id}`.as('svbucket_id'),
-        storage_provider: sql<string>`${secondVersionAlias.storage_provider}`.as('svstorage_provider'),
-        external_url: sql<string | null>`${secondVersionAlias.external_url}`.as('svexternal_url'),
-        min_update_version: sql<string | null>`${secondVersionAlias.min_update_version}`.as('svminUpdateVersion'),
-        r2_path: sql`${secondVersionAlias.r2_path}`.mapWith(secondVersionAlias.r2_path).as('svr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('svmanifest'),
-      },
       channels: {
         id: channelAlias.id,
         name: channelAlias.name,
@@ -405,16 +296,12 @@ export async function requestInfosPostgresV2(
         disable_auto_update: channelAlias.disable_auto_update,
         ios: channelAlias.ios,
         android: channelAlias.android,
-        secondary_version_percentage: channelAlias.secondary_version_percentage,
-        enable_progressive_deploy: channelAlias.enable_progressive_deploy,
-        enable_ab_testing: channelAlias.enable_ab_testing,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
-    .leftJoin(secondVersionAlias, eq(channelAlias.second_version, secondVersionAlias.id))
     .where(!defaultChannel
       ? and(
         eq(channelAlias.public, true),
@@ -430,9 +317,11 @@ export async function requestInfosPostgresV2(
     .then(data => data.at(0))
 
   // promise all
-  const [devicesOverride, channelOverride, channelData, versionData] = await Promise.all([deviceOverwrite, channelDevice, channel, appVersions])
-  console.error({ context: 'requestInfosPostgresV2 rres', devicesOverride, channelOverride, channelData, versionData })
-  return { versionData, channelData, channelOverride, devicesOverride }
+  return Promise.all([channelDevice, channel, appVersions])
+    .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
+    .catch((e) => {
+      throw e
+    })
 }
 
 export async function getAppOwnerPostgresV2(

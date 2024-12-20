@@ -272,39 +272,6 @@ describe('update scenarios', () => {
     await getSupabaseClient().from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APPNAME)
   })
 
-  it('version overwrite', async () => {
-    const uuid = randomUUID().toLowerCase()
-
-    // get the version id
-    const { data, error } = await getSupabaseClient().from('app_versions').select('id').eq('name', '1.359.0').eq('app_id', APPNAME).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    const versionId = data?.id
-
-    await getSupabaseClient().from('devices_override').insert({
-      device_id: uuid,
-      version: versionId,
-      app_id: APPNAME,
-      owner_org: '00000000-0000-0000-0000-000000000000',
-    })
-
-    await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APPNAME)
-
-    const baseData = getBaseData(APPNAME)
-    baseData.device_id = uuid
-    baseData.version_name = '0.0.0'
-
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-
-    const json = await response.json<UpdateRes>()
-    expect(() => updateNewScheme.parse(json)).not.toThrow()
-    expect(json.version).toBe('1.359.0')
-
-    // Clean up
-    await getSupabaseClient().from('devices_override').delete().eq('device_id', uuid).eq('app_id', APPNAME)
-  })
-
   it('disallowed public channel update', async () => {
     await getSupabaseClient().from('channels').update({ public: false }).eq('name', 'production').eq('app_id', APPNAME)
 

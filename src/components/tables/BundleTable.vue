@@ -231,15 +231,6 @@ async function deleteOne(one: Element) {
       }
     }
 
-    const { data: deviceFound, error: errorDevice } = await supabase
-      .from('devices_override')
-      .select()
-      .eq('app_id', one.app_id)
-      .eq('version', one.id)
-    if ((deviceFound && deviceFound.length) || errorDevice) {
-      toast.error(`${t('version')} ${one.app_id}@${one.name} ${t('bundle-is-linked-device')}`)
-      return
-    }
     const { error: delAppError } = await (didCancelRes === 'normal'
       ? supabase
         .from('app_versions')

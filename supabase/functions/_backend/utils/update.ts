@@ -83,12 +83,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     else {
       // get app owner with app_id
-      await sendNotifOrg(c, 'user:semver_issue', {
+      await backgroundTask(c, sendNotifOrg(c, 'user:semver_issue', {
         app_id,
         device_id,
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1')
+      }, appOwner.owner_org, app_id, '0 0 * * 1'))
       console.log({ requestId: c.get('requestId'), context: 'semver_issue', app_id, version_build })
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
@@ -97,12 +97,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     // if plugin_version is < 6 send notif to alert for update
     if (lessThan(parse(plugin_version), parse('6.0.0'))) {
-      await sendNotifOrg(c, 'user:plugin_issue', {
+      await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
         app_id,
         device_id,
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
-      }, appOwner.owner_org, app_id, '0 0 * * 1')
+      }, appOwner.owner_org, app_id, '0 0 * * 1'))
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
@@ -125,6 +125,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       platform: platform as Database['public']['Enums']['platform_os'],
       updated_at: new Date().toISOString(),
     }
+    const start = performance.now()
     const planValid = isV2 ? true : await isAllowedActionOrgPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id)
     if (!planValid) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
@@ -134,11 +135,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'need_plan_upgrade',
       }, 200)
     }
-    await createStatsMau(c, device_id, app_id) // TODO: see if anaylytics got too expensive or not. Then keep it or move it back to same place as createStatsBandwidth
+    await backgroundTask(c, createStatsMau(c, device_id, app_id))
 
     console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
-
-    const start = performance.now()
 
     const requestedInto = isV2
       ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
@@ -147,9 +146,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const end = performance.now()
     console.log({ requestId: c.get('requestId'), context: 'requestInfosPostgres', duration: `${end - start}ms` })
 
-    const { versionData, channelOverride, devicesOverride } = requestedInto
+    const { versionData, channelOverride } = requestedInto
     let { channelData } = requestedInto
-    console.log({ requestId: c.get('requestId'), context: 'requestedInto', message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, devicesOverride exists ? ${devicesOverride !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
+    console.log({ requestId: c.get('requestId'), context: 'requestedInto', message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
 
     if (!versionData) {
       console.log({ requestId: c.get('requestId'), context: 'No version data found' })
@@ -159,7 +158,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    if (!channelData && !channelOverride && !devicesOverride) {
+    if (!channelData && !channelOverride) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get channel or override', id: app_id, date: new Date().toISOString() })
       if (versionData)
         await sendStatsAndDevice(c, device, [{ action: 'NoChannelOrOverride', versionId: versionData.id }])
@@ -171,7 +170,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     // Trigger only if the channel is overwriten but the version is not
-    if (channelOverride && !devicesOverride)
+    if (channelOverride)
       channelData = channelOverride
 
     if (!channelData) {
@@ -181,37 +180,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    let enableAbTesting: boolean = channelData.channels.enable_ab_testing
-    const enableProgressiveDeploy: boolean = channelData.channels.enable_progressive_deploy
-    // let enableAbTesting: boolean = (channelOverride?.channel_id as any)?.enableAbTesting || channelData?.enableAbTesting
-
-    const enableSecondVersion = enableAbTesting || enableProgressiveDeploy
-
-    let version = devicesOverride?.version || channelOverride?.version || channelData.version
-    const secondVersion = enableSecondVersion ? (channelData.secondVersion) : undefined
-    // const secondVersion: Database['public']['Tables']['app_versions']['Row'] | undefined = (enableSecondVersion ? channelData? : undefined) as any as Database['public']['Tables']['app_versions']['Row'] | undefined
-
+    const version = channelOverride?.version || channelData.version
     device.version = versionData ? versionData.id : version.id
-
-    if (enableAbTesting || enableProgressiveDeploy) {
-      if (secondVersion && secondVersion?.name !== 'unknown') {
-        const secondVersionPercentage: number = channelData.channels.secondary_version_percentage // ((channelOverride?.channel_id as any)?.secondaryVersionPercentage || channelData?.secondaryVersionPercentage) ?? 0
-
-        if (secondVersion.name === version_name || version.name === 'unknown' || secondVersionPercentage === 1) {
-          version = secondVersion
-        }
-        else if (secondVersionPercentage === 0) { /* empty (do nothing) */ }
-        else if (version.name !== version_name) {
-          const randomChange = Math.random()
-
-          if (randomChange < secondVersionPercentage)
-            version = secondVersion
-        }
-      }
-      else {
-        enableAbTesting = false
-      }
-    }
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
     // const xForwardedFor = headers['x-forwarded-for'] || ''
@@ -247,7 +217,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    if (!devicesOverride && channelData) {
+    if (channelData) {
     // console.log(c.get('requestId'), 'check disableAutoUpdateToMajor', device_id)
       if (!channelData.channels.ios && platform === 'ios') {
         console.log({ requestId: c.get('requestId'), context: 'Cannot update, ios is disabled', id: device_id, date: new Date().toISOString() })
@@ -385,27 +355,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
     if ((version.bucket_id || version.r2_path) && !version.external_url) {
-      const res = await getBundleUrl(c, appOwner.orgs.created_by, {
-        id: version.id,
-        storage_provider: version.storage_provider,
-        r2_path: version.r2_path,
-        bucket_id: version.bucket_id,
-        app_id,
-      }, device_id)
+      const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
       if (res) {
         signedURL = res.url
         // only count the size of the bundle if it's not external
-        await createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
+        await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = await getManifestUrl(c, {
-          id: version.id,
-          storage_provider: version.storage_provider,
-          r2_path: version.r2_path,
-          bucket_id: version.bucket_id,
-          app_id,
-          manifest: version.manifest as any,
-        }, device_id)
+        manifest = getManifestUrl(c, version.id, version.manifest as any, device_id)
       }
     }
     //  check signedURL and if it's url
@@ -418,13 +375,15 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
     // console.log(c.get('requestId'), 'save stats', device_id)
-    await createStatsVersion(c, version.id, app_id, 'get')
-    await sendStatsAndDevice(c, device, [{ action: 'get' }])
+    await backgroundTask(c, Promise.all([
+      createStatsVersion(c, version.id, app_id, 'get'),
+      sendStatsAndDevice(c, device, [{ action: 'get' }]),
+    ]))
     console.log({ requestId: c.get('requestId'), context: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
     return c.json(resToVersion(plugin_version, signedURL, version as any, manifest), 200)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'update', error: e })
+    console.error({ requestId: c.get('requestId'), context: 'update', error: JSON.stringify(e), body })
     return c.json({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
@@ -463,6 +422,6 @@ export async function update(c: Context, body: AppInfos) {
     }, 500)
   }
   if (isV2 && pgClient)
-    closeClient(c, pgClient)
+    await closeClient(c, pgClient)
   return res
 }

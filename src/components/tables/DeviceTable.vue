@@ -77,19 +77,8 @@ async function getDevicesID() {
 
   const { data } = await req
 
-  let reqq = supabase
-    .from('devices_override')
-    .select('device_id')
-    .eq('app_id', props.appId)
-
-  if (props.ids)
-    reqq = reqq.eq('device_id', props.ids)
-
-  const { data: dataOverride } = await reqq
-
   const channelDev = data?.map(d => d.device_id) || []
-  const overrideDev = dataOverride?.map(d => d.device_id) || []
-  return [...channelDev, ...overrideDev]
+  return [...channelDev]
 }
 
 interface DeviceData {
@@ -235,6 +224,5 @@ onMounted(async () => {
       @reset="refreshData()"
       @row-click="openOne"
     />
-    <AddDeviceOverwriteButton :app-id="props.appId" />
   </div>
 </template>
