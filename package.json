@@ -155,7 +155,7 @@
     "ky": "^1.7.3",
     "mime": "^4.0.4",
     "petite-vue-i18n": "^10.0.5",
-    "pinia": "2.2.6",
+    "pinia": "2.2.8",
     "plausible-tracker": "^0.3.9",
     "postgres": "^3.4.5",
     "posthog-js": "^1.195.0",
