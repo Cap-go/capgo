@@ -1278,7 +1278,7 @@ CREATE OR REPLACE FUNCTION "public"."guard_r2_path"() RETURNS "trigger"
   END IF;
 
   IF NEW."r2_path" is distinct from (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id, NEW.id)) THEN
-    RAISE EXCEPTION 'The expected r2_path is %', (select format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id), NEW.id);
+    RAISE EXCEPTION 'The expected r2_path is %', format('orgs/%s/apps/%s/%s.zip', NEW.owner_org, NEW.app_id, NEW.id);
   END IF;
 
    RETURN NEW;
@@ -2053,11 +2053,11 @@ BEGIN
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org") VALUES
     (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
     (2, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (3, now(), 'com.demo.app', '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (4, now(), 'com.demo.app', '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (5, now(), 'com.demo.app', '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (6, now(), 'com.demo.app', '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (7, now(), 'com.demo.app', '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+    (3, now(), 'com.demo.app', '1.0.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/3.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (4, now(), 'com.demo.app', '1.0.1', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/4.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (5, now(), 'com.demo.app', '1.361.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/5.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (6, now(), 'com.demo.app', '1.360.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/6.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (7, now(), 'com.demo.app', '1.359.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/7.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
 
     INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size", "devices") VALUES
     (4,now(), 'com.demo.app', now(), '', 0, 10),
@@ -2066,10 +2066,10 @@ BEGIN
     (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
     (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't'),
-    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't'),
-    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 'f', 't', 't', 't');
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
+    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't'),
+    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't'),
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't');
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
@@ -2111,20 +2111,54 @@ BEGIN
     VALUES (now(), p_app_id, '', 'Seeded App', '1.0.0', now(), org_id, user_id);
 
     -- Insert app versions in a single statement
-    WITH inserted_versions AS (
-        INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "bucket_id", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org")
-        VALUES 
-            (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
-            (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
-            (now(), p_app_id, '1.0.1', 'test-bucket.zip', now(), 'f', NULL, '', 'r2-direct', org_id),
-            (now(), p_app_id, '1.0.0', '8093d4ad-7d4b-427b-8d73-fc2a97b79ab9.zip', now(), 'f', NULL, '3885ee49', 'r2', org_id),
-            (now(), p_app_id, '1.361.0', '3dfe0df9-94fa-4ae8-b538-3f1a9b305687.zip', now(), 'f', NULL, '9d4f798a', 'r2', org_id),
-            (now(), p_app_id, '1.360.0', 'ae4d9a98-ec25-4af8-933c-2aae4aa52b85.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id),
-            (now(), p_app_id, '1.359.0', '8aafd924-bd31-43be-8f35-3f6957890ff9.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id)
-        RETURNING id, name
+    WITH version_ids AS (
+      SELECT nextval('app_versions_id_seq') as id 
+      FROM generate_series(1,7)
+    ),
+    inserted_versions AS (
+      INSERT INTO "public"."app_versions" (
+        "id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org"
+      )
+      SELECT 
+        id,
+        now(),
+        p_app_id,
+        name,
+        CASE 
+          WHEN name IN ('builtin', 'unknown') THEN NULL 
+          ELSE format('orgs/%s/apps/%s/%s.zip', org_id, p_app_id, id)
+        END as r2_path,
+        now(),
+        name IN ('builtin', 'unknown'),
+        NULL,
+        CASE name
+          WHEN '1.0.1' THEN ''
+          WHEN '1.0.0' THEN '3885ee49'
+          WHEN '1.361.0' THEN '9d4f798a'
+          WHEN '1.360.0' THEN '44913a9f'
+          WHEN '1.359.0' THEN '9f74e70a'
+          ELSE NULL
+        END as checksum,
+        CASE 
+          WHEN name IN ('builtin', 'unknown') THEN 'supabase'
+          WHEN name = '1.0.1' THEN 'r2-direct'
+          ELSE 'r2'
+        END as storage_provider,
+        org_id
+      FROM version_ids
+      CROSS JOIN (VALUES 
+        ('builtin'),
+        ('unknown'),
+        ('1.0.1'),
+        ('1.0.0'),
+        ('1.361.0'),
+        ('1.360.0'),
+        ('1.359.0')
+      ) as names(name)
+      RETURNING id, name
     )
     -- Insert channels using the version IDs from the CTE
-    INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "beta", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
+    INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
     SELECT 
         now(),
         c.name,
@@ -2134,7 +2168,6 @@ BEGIN
         c.is_public,
         't',
         'major',
-        'f',
         c.ios,
         c.android,
         't',

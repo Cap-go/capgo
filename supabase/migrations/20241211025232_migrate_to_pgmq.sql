@@ -527,5 +527,5 @@ SELECT cron.schedule(
     $$
 );
 
-alter system set pg_net.batch_size to 2000;
-select net.worker_restart();
+-- alter system set pg_net.batch_size to 2000;
+-- select net.worker_restart();
