@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -17,7 +17,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   const body = bodyParsed.data
   const userId = apikey.user_id
 
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string)))
+  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId)))
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
 
   const { data, error } = await supabaseAdmin(c).from('users').select('*').eq('id', userId).single()
