@@ -68,7 +68,7 @@ async function addNewApiKey() {
       return
   }
 
-  var selectedOrganizations = [] as string[]
+  let selectedOrganizations = [] as string[]
   if (displayStore.dialogCheckbox) {
     displayStore.dialogOption = {
       header: t('alert-confirm-org-limit'),
@@ -77,12 +77,12 @@ async function addNewApiKey() {
       listOrganizations: true,
       buttons: [
         {
-          text: t('button-cancel'), 
+          text: t('button-cancel'),
           role: 'cancel',
         },
         {
           text: t('button-confirm'),
-          id: 'confirm-button', 
+          id: 'confirm-button',
         },
       ],
     }
