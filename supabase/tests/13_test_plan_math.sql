@@ -43,7 +43,7 @@ BEGIN
 
   UPDATE apps set owner_org='046a36ac-e03c-4590-9257-bd6c9dba9ee8' where app_id='com.demoadmin.app';
 
-  UPDATE app_versions set app_id='com.demoadmin.app' where id=7;
+  UPDATE app_versions set app_id='com.demoadmin.app', r2_path='orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demoadmin.app/7.zip' where id=7;
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 
   ('com.demoadmin.app', 10, (now() - interval '1 day')::date);
 
