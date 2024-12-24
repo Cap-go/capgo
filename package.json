@@ -181,7 +181,7 @@
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
     "@cloudflare/workers-types": "4.20241216.0",
-    "@iconify-json/carbon": "1.2.4",
+    "@iconify-json/carbon": "1.2.5",
     "@iconify-json/heroicons": "^1.2.1",
     "@iconify-json/ion": "1.2.1",
     "@iconify-json/ls": "1.2.0",
