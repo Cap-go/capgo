@@ -1,4 +1,4 @@
-import { customType, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { customType, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 const boolean = customType<{ data: boolean }>({
   dataType() {
