@@ -68,15 +68,6 @@ function openBundle() {
   router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
 }
 
-function openSecondBundle() {
-  if (!channel.value)
-    return
-  if (channel.value.second_version.name === 'unknown')
-    return
-  console.log('openBundle', channel.value.version.id)
-  router.push(`/app/p/${route.params.p}/bundle/${channel.value.second_version.id}`)
-}
-
 async function getDeviceIds() {
   if (!channel.value)
     return
