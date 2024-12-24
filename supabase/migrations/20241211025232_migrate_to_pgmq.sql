@@ -153,6 +153,10 @@ BEGIN
                     -- Max retries reached - archive message
                     PERFORM pgmq.archive(queue_name, msg.msg_id);
                 ELSE
+                    -- Delete failed response before retry
+                    DELETE FROM net._http_response 
+                    WHERE id = (payload->>'request_id')::bigint;
+                    
                     -- Retry - reset visibility timeout
                     PERFORM pgmq.set_vt(queue_name, msg.msg_id, 30);
                 END IF;

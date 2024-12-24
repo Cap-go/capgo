@@ -46,7 +46,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
 
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
-      .select('id')
+      .select('id, name')
       .eq('name', body.name)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
@@ -58,7 +58,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
     }
 
     // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/ee.forgr.capacitor_go/11.zip
-    const filePath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}.zip`
+    const filePath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.name}.zip`
     console.log({ requestId: c.get('requestId'), context: 'filePath', filePath })
     // check if app version exist
 
