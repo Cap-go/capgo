@@ -1,12 +1,12 @@
-import { Hono } from 'hono/tiny'
 import type { Context } from '@hono/hono'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts';
-import { z } from 'zod';
-import dayjs from 'dayjs'
-import { middlewareKey, useCors } from '../../utils/hono.ts';
-import { JSDOM } from 'jsdom'
-import { svgPathProperties } from 'svg-path-properties';
 import * as d3 from 'd3'
+import dayjs from 'dayjs'
+import { Hono } from 'hono/tiny'
+import { JSDOM } from 'jsdom'
+import { svgPathProperties } from 'svg-path-properties'
+import { z } from 'zod'
+import { middlewareKey, useCors } from '../../utils/hono.ts'
+import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = new Hono()
 app.use('*', useCors)
@@ -68,7 +68,7 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
         arr.push(undefined)
       return arr
     }
-    
+
     let mau = createUndefinedArray(graphDays) as number[]
     let storage = createUndefinedArray(graphDays) as number[]
     let bandwidth = createUndefinedArray(graphDays) as number[]
@@ -82,13 +82,13 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
             mau[dayNumber] += item.mau
           else
             mau[dayNumber] = item.mau
-  
+
           const storageVal = item.storage
           if (storage[dayNumber])
             storage[dayNumber] += storageVal
           else
             storage[dayNumber] = storageVal
-  
+
           const bandwidthVal = item.bandwidth ?? 0
           if (bandwidth[dayNumber])
             bandwidth[dayNumber] += bandwidthVal
@@ -110,9 +110,12 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
       const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
       storage[0] = initValue
     }
-    
+
+    // eslint-disable-next-line style/max-statements-per-line
     storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
     mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    // eslint-disable-next-line style/max-statements-per-line
     bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
     const baseDay = dayjs(body.from)
 
@@ -123,7 +126,7 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
         mau: mau[i],
         storage: storage[i],
         bandwidth: bandwidth[i],
-        date: day.toISOString()
+        date: day.toISOString(),
       }
     }
 
@@ -199,7 +202,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, supabase: Ret
       labels: dates,
       datasets,
     },
-    error: null
+    error: null,
   }
 }
 
@@ -281,7 +284,7 @@ function getActiveVersions(versions: number[], percentages: { [date: string]: { 
 
 // Create datasets for Chart.js
 function createDatasets(versions: number[], dates: string[], percentages: { [date: string]: { [version: number]: number } }, versionNames: VersionName[]) {
-  return versions.map((version, i) => {
+  return versions.map((version) => {
     const percentageData = dates.map(date => percentages[date][version] || 0)
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
     const versionName = versionNames.find(v => v.id === version)?.name || version
@@ -296,144 +299,144 @@ function createDatasets(versions: number[], dates: string[], percentages: { [dat
 async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
   const { data, error } = await getBundleUsage(appId, from, to, supabase)
   if (error)
-    return { data: null, error: error }
-
+    return { data: null, error }
 
   // const window = svgdom.createSVGWindow();
   const virtualDOM = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
-  (globalThis as any).document = virtualDOM.window.document;
+  (globalThis as any).document = virtualDOM.window.document
 
-  const svgWidth = 700;
-  const svgHeight = 700;
+  const svgWidth = 700
+  const svgHeight = 700
 
-  const margin = {top: 20, right: 20, bottom: 70, left: 120};
-  const graphWidth = svgWidth - margin.left - margin.right;
-  const graphHeight = svgHeight - margin.top - margin.bottom;
+  const margin = { top: 20, right: 20, bottom: 70, left: 120 }
+  const graphWidth = svgWidth - margin.left - margin.right
+  const graphHeight = svgHeight - margin.top - margin.bottom
 
-
-  const svg = d3.select(document.body).append('svg').attr("width", svgWidth).attr("height", svgHeight);
-  const graph = svg.append("g")
-    .attr("width", graphWidth)
-    .attr("height", graphHeight)
-    .attr("transform", `translate(${margin.left}, ${margin.top})`); 
+  const svg = d3.select(document.body).append('svg').attr('width', svgWidth).attr('height', svgHeight)
+  const graph = svg.append('g')
+    .attr('width', graphWidth)
+    .attr('height', graphHeight)
+    .attr('transform', `translate(${margin.left}, ${margin.top})`)
 
   const x = d3.scaleTime()
-    .range([0, graphWidth]);
+    .range([0, graphWidth])
 
-  const y = d3.scaleLinear().range([graphHeight, 0]);
+  const y = d3.scaleLinear().range([graphHeight, 0])
   // X scale domain
   // Parse dates from strings using d3's timeParse
-  const parseDate = d3.timeParse("%Y-%m-%d");
-  const parsedDates = data.labels.map(dateStr => parseDate(dateStr));
-  x.domain(d3.extent(parsedDates as any) as any);
+  const parseDate = d3.timeParse('%Y-%m-%d')
+  const parsedDates = data.labels.map(dateStr => parseDate(dateStr))
+  x.domain(d3.extent(parsedDates as any) as any)
   // x.domain(d3.extent(data.versionStats.labels, d => d) as [Date, Date]);
 
-  // Y scale domain  
-  y.domain([0, 100]);
-  y.ticks(10);
-  
-  const datasets = data.datasets.map(d => {
+  // Y scale domain
+  y.domain([0, 100])
+  y.ticks(10)
+
+  const datasets = data.datasets.map((d) => {
     return d.data.map((x, i) => {
       return {
         date: parseDate(data.labels[i])!,
-        value: x
+        value: x,
       }
     })
-  });
-  
-  const line = d3.line<typeof datasets[0][0]>()
-  .x(d => x(d.date))
-  .y(d => y(d.value))
-  .curve(d3.curveBasis);
+  })
 
-  const linesHashSet = new Set<string>();
-  
+  const line = d3.line<typeof datasets[0][0]>()
+    .x(d => x(d.date))
+    .y(d => y(d.value))
+    .curve(d3.curveBasis)
+
+  const linesHashSet = new Set<string>()
+
   // First pass: create texts and find max width
   const legendItems = datasets.map((dataset, i) => {
     function RNG(seed: number) {
-      const m = 2**35 - 31
+      const m = 2 ** 35 - 31
       const a = 185852
       let s = seed % m
       return function () {
-          return (s = s * a % m) / m
+        return (s = s * a % m) / m
       }
     }
     function crc32(str: string) {
-      let crc = -1;
+      let crc = -1
       for (let i = 0; i < str.length; i++) {
-        let byte = str.charCodeAt(i);
-        crc = crc ^ byte;
+        const byte = str.charCodeAt(i)
+        crc = crc ^ byte
         for (let j = 0; j < 8; j++) {
-          let mask = -(crc & 1);
-          crc = (crc >>> 1) ^ (0xEDB88320 & mask);
+          const mask = -(crc & 1)
+          crc = (crc >>> 1) ^ (0xEDB88320 & mask)
         }
       }
-      return ~crc >>> 0;
+      return ~crc >>> 0
     }
-    const seed = crc32(data.datasets[i].label.toString());
+    const seed = crc32(data.datasets[i].label.toString())
 
-    const random = RNG(seed)();
-    const stroke = `hsl(${random * 360}, 70%, 50%)`;
-    
-    const legendGroup = svg.append("g")
-      .attr("transform", `translate(${margin.left - 40}, ${margin.top})`);
-    
-    const legendText = legendGroup.append("text")
-      .attr("x", 0)
-      .attr("y", i * 20)
-      .attr("dy", "0.35em")
-      .attr("text-anchor", "end")
-      .style("font-size", "12px")
-      .style("fill", stroke)
-      .text(data.datasets[i].label);
+    const random = RNG(seed)()
+    const stroke = `hsl(${random * 360}, 70%, 50%)`
+
+    const legendGroup = svg.append('g')
+      .attr('transform', `translate(${margin.left - 40}, ${margin.top})`)
+
+    const legendText = legendGroup.append('text')
+      .attr('x', 0)
+      .attr('y', i * 20)
+      .attr('dy', '0.35em')
+      .attr('text-anchor', 'end')
+      .style('font-size', '12px')
+      .style('fill', stroke)
+      .text(data.datasets[i].label)
 
     // Polyfill getComputedTextLength for JSDOM environment
     if (!legendText.node()!.getComputedTextLength) {
-      const textContent = legendText.text();
+      const textContent = legendText.text()
       legendText.node()!.getComputedTextLength = () => {
         return textContent.split('').reduce((width, char) => {
           // Reduced all widths by ~25%
-          if (/[mwWM]/.test(char)) return width + 7.5;    // Was 10
-          if (/[ABCDEFGHIJKLNOPQRSTUVXYZ0123456789]/.test(char)) return width + 6;  // Was 8
-          if (/[il1\.]/.test(char)) return width + 3;     // Was 4
-          return width + 4.5;  // Was 6
-        }, 0);
-      };
+          if (/[mw]/i.test(char))
+            return width + 7.5 // Was 10
+          if (/[A-LN-VXYZ0-9]/.test(char))
+            return width + 6 // Was 8
+          if (/[il1.]/.test(char))
+            return width + 3 // Was 4
+          return width + 4.5 // Was 6
+        }, 0)
+      }
     }
 
     return {
       group: legendGroup,
       text: legendText,
       stroke,
-      width: legendText.node()!.getComputedTextLength()
-    };
-  });
+      width: legendText.node()!.getComputedTextLength(),
+    }
+  })
 
   // Find maximum text width
-  const maxTextWidth = Math.max(...legendItems.map(item => item.width));
+  const maxTextWidth = Math.max(...legendItems.map(item => item.width))
 
   // Second pass: add circles using consistent positioning
-  legendItems.forEach(item => {
-    item.group.append("circle")
-      .attr("cx", -maxTextWidth - 10)
-      .attr("cy", legendItems.indexOf(item) * 20)
-      .attr("r", 4)
-      .style("fill", item.stroke);
-  });
+  legendItems.forEach((item) => {
+    item.group.append('circle')
+      .attr('cx', -maxTextWidth - 10)
+      .attr('cy', legendItems.indexOf(item) * 20)
+      .attr('r', 4)
+      .style('fill', item.stroke)
+  })
 
   // Now continue with the rest of your dataset forEach loop
   datasets.forEach((dataset, i) => {
-    const stroke = legendItems[i].stroke; // Use the same color as legend
+    const stroke = legendItems[i].stroke // Use the same color as legend
     const key = dataset.map(d => `${d.date.toISOString()}=${d.value}`).join('$')
-    const hasKey = linesHashSet.has(key);
+    const hasKey = linesHashSet.has(key)
 
-    
     // const yOffset = hasKey ? 10 : 0;
     // graph.append("g")
     //   .attr("transform", `translate(0, ${yOffset})`)
     //   .append("path")
-    //   .datum(dataset)  
-    //   .attr("d", line)    
+    //   .datum(dataset)
+    //   .attr("d", line)
     //   .attr("stroke", stroke)
     //   .attr("stroke-width", 2)
     //   .attr("fill", "none");
@@ -446,40 +449,41 @@ async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase
       const smoothLine = d3.line<typeof dataset[0]>()
         .x(d => x(d.date))
         .y(d => y(d.value))
-        .curve(d3.curveBasis);
+        .curve(d3.curveBasis)
 
       // Create a temporary SVG path to get the points along the curved line
-      const tempPath = d3.create("svg")
-        .append("path")
-        .attr("d", smoothLine(dataset));
+      const tempPath = d3.create('svg')
+        .append('path')
+        .attr('d', smoothLine(dataset))
 
-        // Replace the polyfill section with:
-        if (!tempPath.node()?.getTotalLength) {
-          const pathNode = tempPath.node()!;
-          const properties = new svgPathProperties(pathNode.getAttribute('d')!);
-          pathNode.getTotalLength = () => properties.getTotalLength();
-          pathNode.getPointAtLength = (distance: number): DOMPoint => {
-            const point = properties.getPointAtLength(distance);
-            return Object.assign(point, {
-              x: point.x,
-              y: point.y,
-              w: 0,
-              z: 0,
-              matrixTransform: () => null as any,
-              toJSON: () => ({ x: point.x, y: point.y })
-            });
-          };
+      // Replace the polyfill section with:
+      if (!tempPath.node()?.getTotalLength) {
+        const pathNode = tempPath.node()!
+        // eslint-disable-next-line new-cap
+        const properties = new svgPathProperties(pathNode.getAttribute('d')!)
+        pathNode.getTotalLength = () => properties.getTotalLength()
+        pathNode.getPointAtLength = (distance: number): DOMPoint => {
+          const point = properties.getPointAtLength(distance)
+          return Object.assign(point, {
+            x: point.x,
+            y: point.y,
+            w: 0,
+            z: 0,
+            matrixTransform: () => null as any,
+            toJSON: () => ({ x: point.x, y: point.y }),
+          })
         }
+      }
 
-      const pathLength = tempPath.node()!.getTotalLength();
-      const numPoints = dataset.length * 20; // More points for smoother curve
-      const smoothPathPoints = Array.from({length: numPoints}, (_, i) => {
-        const point = tempPath.node()!.getPointAtLength(pathLength * i / (numPoints - 1));
+      const pathLength = tempPath.node()!.getTotalLength()
+      const numPoints = dataset.length * 20 // More points for smoother curve
+      const smoothPathPoints = Array.from({ length: numPoints }, (_, i) => {
+        const point = tempPath.node()!.getPointAtLength(pathLength * i / (numPoints - 1))
         return {
           x: point.x,
-          y: point.y
-        };
-      });
+          y: point.y,
+        }
+      })
 
       const finalSmoothPathPoints = smoothPathPoints.reduceRight((acc, p) => {
         if (acc.length === 0) {
@@ -487,115 +491,114 @@ async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase
             x: p.x,
             y: p.y,
             mX: p.x,
-            mY: p.y
-          });
-        } else {
-          const lastPoint = acc[acc.length - 1];
+            mY: p.y,
+          })
+        }
+        else {
+          const lastPoint = acc[acc.length - 1]
 
           if (lastPoint.y === p.y) {
-            return acc;
+            return acc
           }
-          const sX = (p.x + lastPoint.x) / 2;
-          const sY = (p.y + lastPoint.y) / 2;
-
+          const sX = (p.x + lastPoint.x) / 2
+          const sY = (p.y + lastPoint.y) / 2
 
           // Calculate points 5 units away from S(sX, sY)
-          const angle = Math.atan2(lastPoint.y - p.y, lastPoint.x - p.x);
-          const perpendicular = angle + Math.PI/2;
-          
+          const angle = Math.atan2(lastPoint.y - p.y, lastPoint.x - p.x)
+          const perpendicular = angle + Math.PI / 2
+
           const point2 = {
-            x: sX - 5 * Math.cos(perpendicular), 
-            y: sY - 5 * Math.sin(perpendicular)
-          };
+            x: sX - 5 * Math.cos(perpendicular),
+            y: sY - 5 * Math.sin(perpendicular),
+          }
 
           acc.push({
             x: p.x,
             y: p.y,
             mX: point2.x,
-            mY: point2.y
-          });
+            mY: point2.y,
+          })
         }
 
-        return acc;
-      }, [] as {x: number, y: number, mX: number, mY: number}[]).map(p => ({
+        return acc
+      }, [] as { x: number, y: number, mX: number, mY: number }[]).map(p => ({
         x: p.mX,
-        y: p.mY
-      }));
+        y: p.mY,
+      }))
 
       // Create a line generator for offset points
-      const offsetLine = d3.line<{x: number, y: number}>()
+      const offsetLine = d3.line<{ x: number, y: number }>()
         .x(d => d.x)
         .y(d => d.y)
         // .curve(d3.curveBasis);
 
       // Draw the offset path
-      graph.append("path")
+      graph.append('path')
         .datum(finalSmoothPathPoints)
-        .attr("d", offsetLine) // Type assertion needed due to d3 typing limitations
-        .attr("stroke", stroke)
-        .attr("stroke-width", 5)
-        .attr("fill", "none");
-      
+        .attr('d', offsetLine) // Type assertion needed due to d3 typing limitations
+        .attr('stroke', stroke)
+        .attr('stroke-width', 5)
+        .attr('fill', 'none')
+
       // graph.append("path")
-      //   .datum(dataset)  
-      //   .attr("d", line)    
+      //   .datum(dataset)
+      //   .attr("d", line)
       //   .attr("stroke", stroke)
       //   .attr("stroke-width", 5)
       //   .attr("fill", "none");
-    } else {
-      graph.append("path")
-        .datum(dataset)  
-        .attr("d", line)    
-        .attr("stroke", stroke)
-        .attr("stroke-width", 5)
-        .attr("fill", "none");
+    }
+    else {
+      graph.append('path')
+        .datum(dataset)
+        .attr('d', line)
+        .attr('stroke', stroke)
+        .attr('stroke-width', 5)
+        .attr('fill', 'none')
     }
 
-    linesHashSet.add(key);
-  });
-
-
+    linesHashSet.add(key)
+  })
 
   // graph.append("path")
-  //   .datum(data)  
-  //   .attr("d", line)    
+  //   .datum(data)
+  //   .attr("d", line)
   //   .attr("stroke", "#0099ff")
   //   .attr("stroke-width", 2)
-  //   .attr("fill", "none"); 
-    
-    // X axis
-    graph.append("g")
-      .attr("transform", `translate(0, ${graphHeight})`)
-      .call(d3.axisBottom(x)
-        .tickFormat((d) => d3.timeFormat("%Y-%m-%d")(d as any) as any)
-      );
-    // Rotate x-axis labels
-    graph.selectAll(".tick text")
-      .attr("transform", "rotate(-75)")
-      .style("text-anchor", "end")
-      .attr("dx", "-.8em")
-      .attr("dy", ".15em");
+  //   .attr("fill", "none");
 
-    // Y axis
-    graph.append("g")
-      .call(d3.axisLeft(y));  
+  // X axis
+  graph.append('g')
+    .attr('transform', `translate(0, ${graphHeight})`)
+    .call(d3.axisBottom(x)
+      .tickFormat(d => d3.timeFormat('%Y-%m-%d')(d as any) as any),
+    )
+  // Rotate x-axis labels
+  graph.selectAll('.tick text')
+    .attr('transform', 'rotate(-75)')
+    .style('text-anchor', 'end')
+    .attr('dx', '-.8em')
+    .attr('dy', '.15em')
+
+  // Y axis
+  graph.append('g')
+    .call(d3.axisLeft(y))
 
   // Convert HTML SVG to proper SVG string with XML declaration and namespace
-  const svgElement = virtualDOM.window.document.querySelector('svg');
+  const svgElement = virtualDOM.window.document.querySelector('svg')
   if (!svgElement) {
-    return { data: null, error: 'No SVG element found' };
+    return { data: null, error: 'No SVG element found' }
   }
 
   // Add required SVG namespace
-  svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  svgElement.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  svgElement.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
 
   // Create XML declaration and SVG string
-  const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>';
-  const svgString = xmlDeclaration + '\n' + svgElement.outerHTML;
+  const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
+  const svgString = `${xmlDeclaration}\n${svgElement.outerHTML}`
   // const svgString = virtualDOM.window.document.body.innerHTML;
 
-  return { data: svgString, error: null }; // Added missing return statement
+  return { data: svgString, error: null } // Added missing return statement
 }
 
 function getDaysBetweenDates(firstDate: Date, secondDate: Date) {
