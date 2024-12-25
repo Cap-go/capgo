@@ -105,7 +105,7 @@ redirect_uri = ""
 url = ""
 
 [analytics]
-enabled = false
+enabled = true
 port = 54327
 vector_port = 54328
 # Configure one of the supported backends: `postgres`, `bigquery`
@@ -140,6 +140,10 @@ verify_jwt = false
 # PRIVATE ENDPOINTS
 
 [functions.private]
+verify_jwt = false
+
+# STATISTICS ENDPOINTS
+[functions.statistics]
 verify_jwt = false
 
 # TRIGGERS ENDPOINTS
