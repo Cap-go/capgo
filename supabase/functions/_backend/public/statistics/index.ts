@@ -11,13 +11,19 @@ import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
 export const app = new Hono()
 app.use('*', useCors)
 
-const appBodySchema = z.object({
+const bundleUsageSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
   graph: z.string().optional().superRefine((val, ctx) => {
     if (val && val !== 'true' && val !== 'false')
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid graph value. Must be true or false.' })
   }).transform(val => val === 'true'),
+})
+
+const normalStatsSchema = z.object({
+  from: z.coerce.date(),
+  to: z.coerce.date(),
+  graph: z.enum(['mau', 'storage', 'bandwidth']).optional(),
 })
 
 interface VersionName {
@@ -34,10 +40,6 @@ interface appUsageByVersion {
   uninstall: number | null
 }
 
-app.get('/', async (c: Context) => {
-  return c.json({ status: 'ok' })
-})
-
 app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async (c: Context) => {
   try {
     const apikey = c.get('apikey')
@@ -47,90 +49,23 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
     if (!await hasAppRight(c, appId, apikey.user_id, 'read'))
       return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
 
-    const bodyParsed = appBodySchema.safeParse(query)
+    const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
     const supabase = supabaseAdmin(c)
-    const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
+    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, body.from, body.to, body.graph, supabase)
     if (error)
-      return c.json({ status: 'Cannot get app statistics. Cannot get app', error: JSON.stringify(error) }, 500)
+      return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
 
-    const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: data.owner_org, start_date: body.from.toISOString(), end_date: body.to.toISOString() })
-    if (metricsError)
-      return c.json({ status: 'Cannot get app statistics. Cannot get metrics', error: JSON.stringify(metricsError) }, 500)
-    const graphDays = getDaysBetweenDates(body.from, body.to)
-
-    const createUndefinedArray = (length: number) => {
-      const arr: any[] = [] as any[]
-      for (let i = 0; i < length; i++)
-        arr.push(undefined)
-      return arr
+    if (body.graph === undefined) {
+      return c.json({ status: 'ok', statistics: finalStats })
     }
-
-    let mau = createUndefinedArray(graphDays) as number[]
-    let storage = createUndefinedArray(graphDays) as number[]
-    let bandwidth = createUndefinedArray(graphDays) as number[]
-
-    metrics
-      .filter(m => m.app_id === appId)
-      .forEach((item, i) => {
-        if (item.date) {
-          const dayNumber = i
-          if (mau[dayNumber])
-            mau[dayNumber] += item.mau
-          else
-            mau[dayNumber] = item.mau
-
-          const storageVal = item.storage
-          if (storage[dayNumber])
-            storage[dayNumber] += storageVal
-          else
-            storage[dayNumber] = storageVal
-
-          const bandwidthVal = item.bandwidth ?? 0
-          if (bandwidth[dayNumber])
-            bandwidth[dayNumber] += bandwidthVal
-          else
-            bandwidth[dayNumber] = bandwidthVal
-        }
-      })
-
-    if (storage.length !== 0) {
-      // some magic, copied from the frontend without much understanding
-      const { data: currentStorageBytes, error: storageError } = await supabase.rpc('get_total_app_storage_size_orgs', { org_id: data.owner_org, app_id: appId })
-        .single()
-      if (storageError)
-        return c.json({ status: 'Cannot get app statistics. Cannot get storage', error: JSON.stringify(storageError) }, 500)
-
-      const storageVariance = storage.reduce((p, c) => (p + (c || 0)), 0)
-      const currentStorage = currentStorageBytes
-      console.log({ a: (currentStorage - storageVariance + (storage[0] ?? 0)) })
-      const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
-      storage[0] = initValue
+    else {
+      c.header('Content-Type', 'image/svg+xml')
+      return c.body(finalStats as string)
     }
-
-    // eslint-disable-next-line style/max-statements-per-line
-    storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    const baseDay = dayjs(body.from)
-
-    const finalStats = createUndefinedArray(graphDays)
-    for (let i = 0; i < graphDays; i++) {
-      const day = baseDay.add(i, 'day')
-      finalStats[i] = {
-        mau: mau[i],
-        storage: storage[i],
-        bandwidth: bandwidth[i],
-        date: day.toISOString(),
-      }
-    }
-
-    return c.json({ status: 'ok', statistics: finalStats })
   }
   catch (e) {
     console.error(e)
@@ -147,7 +82,7 @@ app.get('/app/:app_id/bundle_usage', middlewareKey(['all', 'write', 'read', 'upl
     if (!await hasAppRight(c, appId, apikey.user_id, 'read'))
       return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
 
-    const bodyParsed = appBodySchema.safeParse(query)
+    const bodyParsed = bundleUsageSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
@@ -157,13 +92,100 @@ app.get('/app/:app_id/bundle_usage', middlewareKey(['all', 'write', 'read', 'upl
     const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, supabase))
     if (error)
       return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
-    return c.json({ status: 'ok', data })
+
+    if (body.graph === false && typeof data !== 'string') {
+      return c.json({ status: 'ok', data })
+    }
+    else {
+      c.header('Content-Type', 'image/svg+xml')
+      return c.body(data as string)
+    }
   }
   catch (e) {
     console.error(e)
     return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(e) }, 500)
   }
 })
+
+async function getNormalStats(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
+  const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
+  if (error)
+    return { data: null, error }
+
+  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: data.owner_org, start_date: from.toISOString(), end_date: to.toISOString() })
+  if (metricsError)
+    return { data: null, error: metricsError }
+  const graphDays = getDaysBetweenDates(from, to)
+
+  const createUndefinedArray = (length: number) => {
+    const arr: any[] = [] as any[]
+    for (let i = 0; i < length; i++)
+      arr.push(undefined)
+    return arr
+  }
+
+  let mau = createUndefinedArray(graphDays) as number[]
+  let storage = createUndefinedArray(graphDays) as number[]
+  let bandwidth = createUndefinedArray(graphDays) as number[]
+
+  metrics
+    .filter(m => m.app_id === appId)
+    .forEach((item, i) => {
+      if (item.date) {
+        const dayNumber = i
+        if (mau[dayNumber])
+          mau[dayNumber] += item.mau
+        else
+          mau[dayNumber] = item.mau
+
+        const storageVal = item.storage
+        if (storage[dayNumber])
+          storage[dayNumber] += storageVal
+        else
+          storage[dayNumber] = storageVal
+
+        const bandwidthVal = item.bandwidth ?? 0
+        if (bandwidth[dayNumber])
+          bandwidth[dayNumber] += bandwidthVal
+        else
+          bandwidth[dayNumber] = bandwidthVal
+      }
+    })
+
+  if (storage.length !== 0) {
+    // some magic, copied from the frontend without much understanding
+    const { data: currentStorageBytes, error: storageError } = await supabase.rpc('get_total_app_storage_size_orgs', { org_id: data.owner_org, app_id: appId })
+      .single()
+    if (storageError)
+      return { data: null, error: storageError }
+
+    const storageVariance = storage.reduce((p, c) => (p + (c || 0)), 0)
+    const currentStorage = currentStorageBytes
+    console.log({ a: (currentStorage - storageVariance + (storage[0] ?? 0)) })
+    const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
+    storage[0] = initValue
+  }
+
+  // eslint-disable-next-line style/max-statements-per-line
+  storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  // eslint-disable-next-line style/max-statements-per-line
+  mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  // eslint-disable-next-line style/max-statements-per-line
+  bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  const baseDay = dayjs(from)
+
+  const finalStats = createUndefinedArray(graphDays)
+  for (let i = 0; i < graphDays; i++) {
+    const day = baseDay.add(i, 'day')
+    finalStats[i] = {
+      mau: mau[i],
+      storage: storage[i],
+      bandwidth: bandwidth[i],
+      date: day.toISOString(),
+    }
+  }
+  return { data: finalStats, error: null }
+}
 
 async function getBundleUsage(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
   const { data: dailyVersion, error: dailyVersionError } = await supabase
@@ -294,6 +316,98 @@ function createDatasets(versions: number[], dates: string[], percentages: { [dat
       data: percentageData,
     }
   })
+}
+
+async function drawGraphForNormalStats(appId: string, from: Date, to: Date, key: 'mau' | 'storage' | 'bandwidth', supabase: ReturnType<typeof supabaseAdmin>) {
+  const { data, error } = await getNormalStats(appId, from, to, supabase)
+  if (error)
+    return { data: null, error }
+
+  const virtualDOM = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
+  (globalThis as any).document = virtualDOM.window.document
+
+  const svgWidth = 700
+  const svgHeight = 700
+
+  const colors = {
+    mau: '#34d399',
+    storage: '#60a5fa',
+    bandwidth: '#fb923c',
+  }
+
+  const margin = { top: 20, right: 20, bottom: 70, left: 120 }
+  const graphWidth = svgWidth - margin.left - margin.right
+  const graphHeight = svgHeight - margin.top - margin.bottom
+
+  const svg = d3.select(document.body).append('svg').attr('width', svgWidth).attr('height', svgHeight)
+  const graph = svg.append('g')
+    .attr('width', graphWidth)
+    .attr('height', graphHeight)
+    .attr('transform', `translate(${margin.left}, ${margin.top})`)
+
+  const x = d3.scaleTime()
+    .range([0, graphWidth])
+
+  const y = d3.scaleLinear().range([graphHeight, 0])
+
+  // Debug the parsed dates and scale domains
+  const parseDate = d3.isoParse
+  const parsedDates = data.map(d => parseDate(d.date))
+  x.domain(d3.extent(parsedDates as any) as any)
+  y.domain([0, d3.max(data, d => d[key]) || 0])
+
+  const line = d3.line<typeof data[0]>()
+    .x((d) => {
+      const date = parseDate(d.date)!
+      return x(date!)
+    })
+    .y((d) => {
+      return y(d[key])
+    })
+    .curve(d3.curveBasis)
+
+  const stroke = colors[key]
+
+  graph.append('path')
+    .datum(data)
+    .attr('d', line)
+    .attr('stroke', stroke)
+    .attr('stroke-width', 2)
+    .attr('fill', 'none')
+
+  // X axis
+  graph.append('g')
+    .attr('transform', `translate(0, ${graphHeight})`)
+    .call(d3.axisBottom(x)
+      .tickFormat(d => d3.timeFormat('%Y-%m-%d')(d as any) as any),
+    )
+  // Rotate x-axis labels
+  graph.selectAll('.tick text')
+    .attr('transform', 'rotate(-75)')
+    .style('text-anchor', 'end')
+    .attr('dx', '-.8em')
+    .attr('dy', '.15em')
+
+  // Y axis
+  graph.append('g')
+    .call(d3.axisLeft(y))
+
+  // Convert HTML SVG to proper SVG string with XML declaration and namespace
+  const svgElement = virtualDOM.window.document.querySelector('svg')
+  if (!svgElement) {
+    return { data: null, error: 'No SVG element found' }
+  }
+
+  // Add required SVG namespace
+  svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  svgElement.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
+
+  // Create XML declaration and SVG string
+  const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
+  const svgString = `${xmlDeclaration}\n${svgElement.outerHTML}`
+  // const svgString = virtualDOM.window.document.body.innerHTML;
+
+  return { data: svgString, error: null } // Added missing return statement
 }
 
 async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
