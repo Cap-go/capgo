@@ -618,12 +618,11 @@ CREATE OR REPLACE FUNCTION "public"."get_customer_counts"() RETURNS TABLE("yearl
 BEGIN
   RETURN QUERY
   SELECT
-    COUNT(CASE WHEN p.price_y_id = s.price_id AND s.status = 'succeeded' THEN s.customer_id END) AS yearly,
-    COUNT(CASE WHEN p.price_m_id = s.price_id AND s.status = 'succeeded' THEN s.customer_id END) AS monthly,
-    COUNT(CASE WHEN s.status = 'succeeded' THEN s.customer_id END) AS total
+    COUNT(CASE WHEN s.price_id IN (SELECT price_y_id FROM plans WHERE price_y_id IS NOT NULL) THEN 1 END) AS yearly,
+    COUNT(CASE WHEN s.price_id IN (SELECT price_m_id FROM plans WHERE price_m_id IS NOT NULL) THEN 1 END) AS monthly,
+    COUNT(*) AS total
   FROM
     stripe_info s
-    JOIN plans p ON s.price_id = p.price_y_id OR s.price_id = p.price_m_id
   WHERE
     s.status = 'succeeded';
 END;
@@ -2745,6 +2744,7 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "date_id" character varying NOT NULL,
     "apps" bigint NOT NULL,
     "updates" bigint NOT NULL,
+    "updates_external" bigint DEFAULT '0'::bigint,
     "stars" bigint NOT NULL,
     "users" bigint DEFAULT '0'::bigint,
     "paying" bigint DEFAULT '0'::bigint,

@@ -9,7 +9,7 @@ import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.t
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
-import { createStatsLogs, createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
+import { createStatsLogsExternal, createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask, deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 
@@ -126,7 +126,7 @@ async function post(c: Context, body: AppStats) {
       if (action === 'get')
         await updateStoreApp(c, app_id, 1)
       // save stats of unknow sources in our analytic DB
-      await backgroundTask(c, createStatsLogs(c, device.app_id, device.device_id, 'get', device.version))
+      await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
       console.log({ requestId: c.get('requestId'), context: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
       return c.json({
         message: 'App not found',
@@ -181,7 +181,7 @@ async function post(c: Context, body: AppStats) {
         app_id_url: appIdToUrl(app_id),
       }, appVersion.owner_org, app_id, '0 0 * * 1')
     }
-    statsActions.push({ action: action as unknown as StatsActions })
+    statsActions.push({ action } as unknown as StatsActions)
     await sendStatsAndDevice(c, device, statsActions)
     return c.json(BRES)
   }

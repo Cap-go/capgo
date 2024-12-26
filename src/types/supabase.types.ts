@@ -590,6 +590,7 @@ export type Database = {
           stars: number
           trial: number | null
           updates: number
+          updates_external: number | null
           updates_last_month: number | null
           users: number | null
           users_active: number | null
@@ -608,6 +609,7 @@ export type Database = {
           stars: number
           trial?: number | null
           updates: number
+          updates_external?: number | null
           updates_last_month?: number | null
           users?: number | null
           users_active?: number | null
@@ -626,6 +628,7 @@ export type Database = {
           stars?: number
           trial?: number | null
           updates?: number
+          updates_external?: number | null
           updates_last_month?: number | null
           users?: number | null
           users_active?: number | null
@@ -1865,10 +1868,6 @@ export type Database = {
         Args: {
           queue_name: string
         }
-        Returns: undefined
-      }
-      process_http_responses: {
-        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       process_stats_email: {
