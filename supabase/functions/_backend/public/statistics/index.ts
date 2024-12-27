@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import { JSDOM } from 'jsdom'
 import { svgPathProperties } from 'svg-path-properties'
 import { z } from 'zod'
-import { middlewareKey, useCors } from '../../utils/hono.ts'
+import { useCors } from '../../utils/hono.ts'
 import { hasAppRight, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
 
@@ -41,19 +41,58 @@ interface appUsageByVersion {
   uninstall: number | null
 }
 
-app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async (c: Context) => {
+app.get('/app/:app_id', async (c: Context) => {
   try {
-    const apikey = c.get('apikey')
     const appId = c.req.param('app_id')
     const query = c.req.query()
-
-    if (!await hasAppRight(c, appId, apikey.user_id, 'read'))
-      return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
-
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
+
+    // deno-lint-ignore no-inner-declarations
+    async function checkApikeyAuth() {
+      const capgkey_string = c.req.header('capgkey')
+      if (!capgkey_string)
+        return c.json({ message: 'Invalid apikey' }, 400)
+
+      const apikey = await checkKey(c, capgkey_string, supabaseAdmin(c), ['all'])
+      if (!apikey)
+        return c.json({ message: 'Invalid apikey' }, 400)
+      c.set('apikey', apikey)
+      c.set('capgkey', capgkey_string)
+
+      return null
+    }
+
+    if (!body.graph) {
+      const authToken = c.req.header('authorization')
+      if (!authToken) {
+        const res = await checkApikeyAuth()
+        if (res)
+          return res
+      }
+      else {
+        const supabaseClient = useSupabaseClient(c, authToken)
+        const { data: _, error: appError } = await supabaseClient.from('apps').select('*').eq('app_id', appId).single()
+        if (appError)
+          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(appError) }, 400)
+        const { data: user, error: userError } = await supabaseClient.auth.getUser()
+        if (userError)
+          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(userError) }, 400)
+        c.set('userId', user.user?.id)
+      }
+    }
+    else {
+      const res = await checkApikeyAuth()
+      if (res)
+        return res
+    }
+
+    const apikey = c.get('apikey')
+    const userId = apikey ? apikey.user_id : c.get('userId')
+    if (!await hasAppRight(c, appId, userId, 'read'))
+      return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
 
     const supabase = supabaseAdmin(c)
     const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
@@ -74,22 +113,63 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
   }
 })
 
-app.get('/org/:org_id', middlewareKey(['all', 'write', 'read', 'upload']), async (c: Context) => {
+app.get('/org/:org_id', async (c: Context) => {
   try {
-    const apikey = c.get('apikey')
     const orgId = c.req.param('org_id')
     const query = c.req.query()
 
     // Check if user has access to this organization
     const supabase = supabaseAdmin(c)
 
-    if (!(await hasOrgRight(c, orgId, apikey.user_id, 'read')))
-      return c.json({ status: 'You can\'t access this organization', orgId }, 400)
-
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
+
+    // deno-lint-ignore no-inner-declarations
+    async function checkApikeyAuth() {
+      const capgkey_string = c.req.header('capgkey')
+      if (!capgkey_string)
+        return c.json({ message: 'Invalid apikey' }, 400)
+
+      const apikey = await checkKey(c, capgkey_string, supabaseAdmin(c), ['all'])
+      if (!apikey)
+        return c.json({ message: 'Invalid apikey' }, 400)
+      c.set('apikey', apikey)
+      c.set('capgkey', capgkey_string)
+
+      return null
+    }
+
+    if (!body.graph) {
+      const authToken = c.req.header('authorization')
+      if (!authToken) {
+        const res = await checkApikeyAuth()
+        if (res)
+          return res
+      }
+      else {
+        const supabaseClient = useSupabaseClient(c, authToken)
+        const { data: _, error: appError } = await supabaseClient.from('orgs').select('*').eq('id', orgId).single()
+        if (appError)
+          return c.json({ status: 'Cannot get organization statistics. You probably don\'t have access to this organization', error: JSON.stringify(appError) }, 400)
+        const { data: user, error: userError } = await supabaseClient.auth.getUser()
+        if (userError)
+          return c.json({ status: 'Cannot get organization statistics. You probably don\'t have access to this organization', error: JSON.stringify(userError) }, 400)
+        c.set('userId', user.user?.id)
+      }
+    }
+    else {
+      const res = await checkApikeyAuth()
+      if (res)
+        return res
+    }
+
+    const apikey = c.get('apikey')
+    const userId = apikey ? apikey.user_id : c.get('userId')
+
+    if (!(await hasOrgRight(c, orgId, userId, 'read')))
+      return c.json({ status: 'You can\'t access this organization', orgId }, 400)
 
     const { data: finalStats, error } = (body.graph === undefined)
       ? await getNormalStats(null, orgId, body.from, body.to, supabase)
@@ -147,8 +227,6 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
       }
       else {
         const supabaseClient = useSupabaseClient(c, authToken)
-        const t = await supabaseClient.from('apps').select('*')
-        console.log({ t })
         const { data: _, error: appError } = await supabaseClient.from('apps').select('*').eq('app_id', appId).single()
         if (appError)
           return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(appError) }, 400)
@@ -217,32 +295,46 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   let storage = createUndefinedArray(graphDays) as number[]
   let bandwidth = createUndefinedArray(graphDays) as number[]
 
-  metrics
-    .filter((m) => {
-      if (!appId)
-        return true
-      return m.app_id === appId
-    })
-    .forEach((item, i) => {
-      if (item.date) {
-        const dayNumber = i
-        if (mau[dayNumber])
-          mau[dayNumber] += item.mau
-        else
-          mau[dayNumber] = item.mau
+  // Group metrics by app_id
+  let metricsByApp = metrics.reduce((acc, metric) => {
+    if (!acc[metric.app_id]) {
+      acc[metric.app_id] = [metric]
+    }
+    else {
+      acc[metric.app_id].push(metric)
+    }
+    return acc
+  }, {} as Record<string, typeof metrics[0][]>)
 
-        const storageVal = item.storage
-        if (storage[dayNumber])
-          storage[dayNumber] += storageVal
-        else
-          storage[dayNumber] = storageVal
+  if (appId) {
+    metricsByApp = { [appId]: metricsByApp[appId] }
+  }
 
-        const bandwidthVal = item.bandwidth ?? 0
-        if (bandwidth[dayNumber])
-          bandwidth[dayNumber] += bandwidthVal
-        else
-          bandwidth[dayNumber] = bandwidthVal
-      }
+  Object.values(metricsByApp)
+    .forEach((arrItem) => {
+      const sortedArrItem = arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      console.log(sortedArrItem)
+      arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
+        if (item.date) {
+          const dayNumber = i
+          if (mau[dayNumber])
+            mau[dayNumber] += item.mau
+          else
+            mau[dayNumber] = item.mau
+
+          const storageVal = item.storage
+          if (storage[dayNumber])
+            storage[dayNumber] += storageVal
+          else
+            storage[dayNumber] = storageVal
+
+          const bandwidthVal = item.bandwidth ?? 0
+          if (bandwidth[dayNumber])
+            bandwidth[dayNumber] += bandwidthVal
+          else
+            bandwidth[dayNumber] = bandwidthVal
+        }
+      })
     })
 
   if (storage.length !== 0) {
