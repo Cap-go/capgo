@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ChartOptions } from 'chart.js'
-import type { appUsageByVersion, VersionName } from '~/services/supabase'
 import { CategoryScale, Chart, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
@@ -10,7 +9,7 @@ import { useRoute } from 'vue-router'
 import IcBaselineInfo from '~icons/ic/baseline-info'
 import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
-import { getDailyVersion, getVersionNames } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
@@ -21,8 +20,6 @@ const main = useMainStore()
 
 const appId = ref('')
 const isLoading = ref(true)
-const dailyUsage = ref<appUsageByVersion[]>([])
-const versionNames = ref<VersionName[]>([])
 
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
   maintainAspectRatio: false,
@@ -46,13 +43,15 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   },
 }))
 
-const chartData = useChartData(dailyUsage, versionNames)
+const { startDate, endDate } = getDateRange(30)
+const chartData = ref<any>(null)
 
 async function loadData() {
   isLoading.value = true
-  const { startDate, endDate } = getDateRange(30)
-  dailyUsage.value = await getDailyVersion(appId.value, startDate.toISOString(), endDate.toISOString())
-  versionNames.value = await getVersionNames(appId.value, dailyUsage.value.map(d => d.version_id))
+
+  // dailyUsage.value = await getDailyVersion(appId.value, startDate.toISOString(), endDate.toISOString())
+  // versionNames.value = await getVersionNames(appId.value, dailyUsage.value.map(d => d.version_id))
+  chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
   isLoading.value = false
 }
 
@@ -117,7 +116,7 @@ function lastRunDate() {
       <div class="mb-1 text-xs font-semibold uppercase text-slate-400 dark:text-white">
         {{ t('latest_version') }}
       </div>
-      <div v-if="chartData.latestVersion" class="flex items-start">
+      <div v-if="chartData && chartData.latestVersion" class="flex items-start">
         <div id="usage_val" class="mr-2 text-3xl font-bold text-slate-800 dark:text-white">
           {{ chartData.latestVersion?.name }}
         </div>

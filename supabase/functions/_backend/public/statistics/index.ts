@@ -6,7 +6,8 @@ import { JSDOM } from 'jsdom'
 import { svgPathProperties } from 'svg-path-properties'
 import { z } from 'zod'
 import { middlewareKey, useCors } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRight, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
+import { checkKey } from '../../utils/utils.ts'
 
 export const app = new Hono()
 app.use('*', useCors)
@@ -55,7 +56,7 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
     const body = bodyParsed.data
 
     const supabase = supabaseAdmin(c)
-    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, body.from, body.to, body.graph, supabase)
+    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
     if (error)
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
 
@@ -73,23 +74,104 @@ app.get('/app/:app_id', middlewareKey(['all', 'write', 'read', 'upload']), async
   }
 })
 
-app.get('/app/:app_id/bundle_usage', middlewareKey(['all', 'write', 'read', 'upload']), async (c: Context) => {
+app.get('/org/:org_id', middlewareKey(['all', 'write', 'read', 'upload']), async (c: Context) => {
   try {
     const apikey = c.get('apikey')
-    const appId = c.req.param('app_id')
+    const orgId = c.req.param('org_id')
     const query = c.req.query()
 
-    if (!await hasAppRight(c, appId, apikey.user_id, 'read'))
-      return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
+    // Check if user has access to this organization
+    const supabase = supabaseAdmin(c)
+
+    if (!(await hasOrgRight(c, orgId, apikey.user_id, 'read')))
+      return c.json({ status: 'You can\'t access this organization', orgId }, 400)
+
+    const bodyParsed = normalStatsSchema.safeParse(query)
+    if (!bodyParsed.success)
+      return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    const body = bodyParsed.data
+
+    const { data: finalStats, error } = (body.graph === undefined)
+      ? await getNormalStats(null, orgId, body.from, body.to, supabase)
+      : await drawGraphForNormalStats(null, orgId, body.from, body.to, body.graph, supabase)
+
+    if (error)
+      return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
+
+    if (body.graph === undefined) {
+      return c.json({ status: 'ok', statistics: finalStats })
+    }
+    else {
+      c.header('Content-Type', 'image/svg+xml')
+      return c.body(finalStats as string)
+    }
+  }
+  catch (e) {
+    console.error(e)
+    return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(e) }, 500)
+  }
+})
+
+app.get('/app/:app_id/bundle_usage', async (c: Context) => {
+  try {
+    const appId = c.req.param('app_id')
+    const query = c.req.query()
+    let useDashbord = false
 
     const bodyParsed = bundleUsageSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
+    // deno-lint-ignore no-inner-declarations
+    async function checkApikeyAuth() {
+      const capgkey_string = c.req.header('capgkey')
+      if (!capgkey_string)
+        return c.json({ message: 'Invalid apikey' }, 400)
+
+      const apikey = await checkKey(c, capgkey_string, supabaseAdmin(c), ['all'])
+      if (!apikey)
+        return c.json({ message: 'Invalid apikey' }, 400)
+      c.set('apikey', apikey)
+      c.set('capgkey', capgkey_string)
+
+      return null
+    }
+
+    if (!body.graph) {
+      const authToken = c.req.header('authorization')
+      if (!authToken) {
+        const res = await checkApikeyAuth()
+        if (res)
+          return res
+      }
+      else {
+        const supabaseClient = useSupabaseClient(c, authToken)
+        const t = await supabaseClient.from('apps').select('*')
+        console.log({ t })
+        const { data: _, error: appError } = await supabaseClient.from('apps').select('*').eq('app_id', appId).single()
+        if (appError)
+          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(appError) }, 400)
+        const { data: user, error: userError } = await supabaseClient.auth.getUser()
+        if (userError)
+          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(userError) }, 400)
+        c.set('userId', user.user?.id)
+        useDashbord = true
+      }
+    }
+    else {
+      const res = await checkApikeyAuth()
+      if (res)
+        return res
+    }
+
+    const apikey = c.get('apikey')
+    const userId = apikey ? apikey.user_id : c.get('userId')
+    if (!await hasAppRight(c, appId, userId, 'read'))
+      return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
+
     const supabase = supabaseAdmin(c)
-    console.log({ a: body.graph })
-    const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, supabase))
+    const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, useDashbord, supabase))
     if (error)
       return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
 
@@ -107,12 +189,19 @@ app.get('/app/:app_id/bundle_usage', middlewareKey(['all', 'write', 'read', 'upl
   }
 })
 
-async function getNormalStats(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
-  const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
-  if (error)
-    return { data: null, error }
+async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
+  if (!appId && !ownerOrg)
+    return { data: null, error: 'Invalid appId or ownerOrg' }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: data.owner_org, start_date: from.toISOString(), end_date: to.toISOString() })
+  let ownerOrgId = ownerOrg
+  if (appId) {
+    const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
+    if (error)
+      return { data: null, error }
+    ownerOrgId = data.owner_org
+  }
+
+  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId, start_date: from.toISOString(), end_date: to.toISOString() })
   if (metricsError)
     return { data: null, error: metricsError }
   const graphDays = getDaysBetweenDates(from, to)
@@ -129,7 +218,11 @@ async function getNormalStats(appId: string, from: Date, to: Date, supabase: Ret
   let bandwidth = createUndefinedArray(graphDays) as number[]
 
   metrics
-    .filter(m => m.app_id === appId)
+    .filter((m) => {
+      if (!appId)
+        return true
+      return m.app_id === appId
+    })
     .forEach((item, i) => {
       if (item.date) {
         const dayNumber = i
@@ -154,7 +247,7 @@ async function getNormalStats(appId: string, from: Date, to: Date, supabase: Ret
 
   if (storage.length !== 0) {
     // some magic, copied from the frontend without much understanding
-    const { data: currentStorageBytes, error: storageError } = await supabase.rpc('get_total_app_storage_size_orgs', { org_id: data.owner_org, app_id: appId })
+    const { data: currentStorageBytes, error: storageError } = await supabase.rpc(appId ? 'get_total_app_storage_size_orgs' : 'get_total_storage_size_org', appId ? { org_id: ownerOrgId, app_id: appId } : { org_id: ownerOrgId })
       .single()
     if (storageError)
       return { data: null, error: storageError }
@@ -187,7 +280,7 @@ async function getNormalStats(appId: string, from: Date, to: Date, supabase: Ret
   return { data: finalStats, error: null }
 }
 
-async function getBundleUsage(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
+async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseAdmin>) {
   const { data: dailyVersion, error: dailyVersionError } = await supabase
     .from('daily_version')
     .select('date, app_id, version_id, install, uninstall')
@@ -219,6 +312,24 @@ async function getBundleUsage(appId: string, from: Date, to: Date, supabase: Ret
   const activeVersions = getActiveVersions(versions, percentageData)
   // Step 4: Create datasets for the chart
   const datasets = createDatasets(activeVersions, dates, percentageData, versionNames)
+
+  if (shouldGetLatestVersion) {
+    const latestVersion = getLatestVersion(versionNames)
+    const latestVersionPercentage = getLatestVersionPercentage(datasets, latestVersion)
+
+    return {
+      data: {
+        labels: dates,
+        datasets,
+        latestVersion: {
+          name: latestVersion?.name,
+          percentage: latestVersionPercentage.toFixed(2),
+        },
+      },
+      error: null,
+    }
+  }
+
   return {
     data: {
       labels: dates,
@@ -318,8 +429,20 @@ function createDatasets(versions: number[], dates: string[], percentages: { [dat
   })
 }
 
-async function drawGraphForNormalStats(appId: string, from: Date, to: Date, key: 'mau' | 'storage' | 'bandwidth', supabase: ReturnType<typeof supabaseAdmin>) {
-  const { data, error } = await getNormalStats(appId, from, to, supabase)
+// Find the latest version based on creation date
+function getLatestVersion(versions: VersionName[]) {
+  return versions.reduce((latest, current) =>
+    new Date(current.created_at ?? '') > new Date(latest.created_at ?? '') ? current : latest, versions[0])
+}
+
+// Get the percentage of the latest version on the last day
+function getLatestVersionPercentage(datasets: any[], latestVersion: { name: string }) {
+  const latestVersionDataset = datasets.find(dataset => dataset.label === latestVersion?.name)
+  return latestVersionDataset ? latestVersionDataset.data[latestVersionDataset.data.length - 1] : 0
+}
+
+async function drawGraphForNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, key: 'mau' | 'storage' | 'bandwidth', supabase: ReturnType<typeof supabaseAdmin>) {
+  const { data, error } = await getNormalStats(appId, ownerOrg, from, to, supabase)
   if (error)
     return { data: null, error }
 
@@ -411,7 +534,7 @@ async function drawGraphForNormalStats(appId: string, from: Date, to: Date, key:
 }
 
 async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
-  const { data, error } = await getBundleUsage(appId, from, to, supabase)
+  const { data, error } = await getBundleUsage(appId, from, to, false, supabase)
   if (error)
     return { data: null, error }
 
@@ -511,7 +634,7 @@ async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase
           if (/[mw]/i.test(char))
             return width + 7.5 // Was 10
           if (/[A-LN-VXYZ0-9]/.test(char))
-            return width + 6 // Was 8
+            return width + 6.75 // Was 8
           if (/[il1.]/.test(char))
             return width + 3 // Was 4
           return width + 4.5 // Was 6
