@@ -201,7 +201,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
     ownerOrgId = data.owner_org
   }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId, start_date: from.toISOString(), end_date: to.toISOString() })
+  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId!, start_date: from.toISOString(), end_date: to.toISOString() })
   if (metricsError)
     return { data: null, error: metricsError }
   const graphDays = getDaysBetweenDates(from, to)
@@ -247,14 +247,13 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
 
   if (storage.length !== 0) {
     // some magic, copied from the frontend without much understanding
-    const { data: currentStorageBytes, error: storageError } = await supabase.rpc(appId ? 'get_total_app_storage_size_orgs' : 'get_total_storage_size_org', appId ? { org_id: ownerOrgId, app_id: appId } : { org_id: ownerOrgId })
+    const { data: currentStorageBytes, error: storageError } = await supabase.rpc(appId ? 'get_total_app_storage_size_orgs' : 'get_total_storage_size_org', appId ? { org_id: ownerOrgId!, app_id: appId } : { org_id: ownerOrgId! })
       .single()
     if (storageError)
       return { data: null, error: storageError }
 
     const storageVariance = storage.reduce((p, c) => (p + (c || 0)), 0)
     const currentStorage = currentStorageBytes
-    console.log({ a: (currentStorage - storageVariance + (storage[0] ?? 0)) })
     const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
     storage[0] = initValue
   }
@@ -267,7 +266,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
   const baseDay = dayjs(from)
 
-  const finalStats = createUndefinedArray(graphDays)
+  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number }[]
   for (let i = 0; i < graphDays; i++) {
     const day = baseDay.add(i, 'day')
     finalStats[i] = {
@@ -442,8 +441,11 @@ function getLatestVersionPercentage(datasets: any[], latestVersion: { name: stri
 }
 
 async function drawGraphForNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, key: 'mau' | 'storage' | 'bandwidth', supabase: ReturnType<typeof supabaseAdmin>) {
-  const { data, error } = await getNormalStats(appId, ownerOrg, from, to, supabase)
-  if (error)
+  const normalStatsRaw = await getNormalStats(appId, ownerOrg, from, to, supabase)
+  const error = normalStatsRaw.error
+  let data = normalStatsRaw.data
+
+  if (error || !data)
     return { data: null, error }
 
   const virtualDOM = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
@@ -473,7 +475,13 @@ async function drawGraphForNormalStats(appId: string | null, ownerOrg: string | 
 
   const y = d3.scaleLinear().range([graphHeight, 0])
 
-  // Debug the parsed dates and scale domains
+  if (key === 'storage' || key === 'bandwidth') {
+    data = data.map(d => ({
+      ...d,
+      [key]: d[key] / 1024 / 1024,
+    }))
+  }
+
   const parseDate = d3.isoParse
   const parsedDates = data.map(d => parseDate(d.date))
   x.domain(d3.extent(parsedDates as any) as any)
@@ -513,7 +521,7 @@ async function drawGraphForNormalStats(appId: string | null, ownerOrg: string | 
 
   // Y axis
   graph.append('g')
-    .call(d3.axisLeft(y))
+    .call(key === 'mau' ? d3.axisLeft(y) : d3.axisLeft(y).tickFormat((d: any) => `${d} MB`))
 
   // Convert HTML SVG to proper SVG string with XML declaration and namespace
   const svgElement = virtualDOM.window.document.querySelector('svg')
