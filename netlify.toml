@@ -142,3 +142,11 @@ function = "stats"
 [[edge_functions]]
 path = "/stats"
 function = "stats"
+
+[[edge_functions]]
+path = "/api-edge/statistics"
+function = "statistics"
+
+[[edge_functions]]
+path = "/statistics"
+function = "statistics"
