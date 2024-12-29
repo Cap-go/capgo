@@ -27,7 +27,7 @@ const useAuth: MiddlewareHandler<{
     const supabaseClient = useSupabaseClient(c, authToken)
     const { data: user, error: userError } = await supabaseClient.auth.getUser()
     if (userError)
-      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
+      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token', userError }, 401)
 
     c.set('auth', {
       userId: user.user?.id,
@@ -187,6 +187,45 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
     console.error(e)
     return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(e) }, 500)
   }
+})
+
+app.get('/user', async (c: Context) => {
+  const auth = c.get('auth') as AuthInfo
+  const supabase = supabaseAdmin(c)
+
+  const query = c.req.query()
+  const bodyParsed = normalStatsSchema.safeParse(query)
+  if (!bodyParsed.success)
+    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+  const body = bodyParsed.data
+
+  const orgs = await supabase.from('org_users').select('*').eq('user_id', auth.userId)
+  if (orgs.error)
+    return c.json({ status: 'User not found', error: JSON.stringify(orgs.error) }, 404)
+
+  // Deduplicate organizations by org_id using Set for better performance
+  const uniqueOrgs = Array.from(
+    new Map(orgs.data.map(org => [org.org_id, org])).values(),
+  )
+  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase)))
+  const errors = stats.filter(stat => stat.error).map(stat => stat.error)
+  if (errors.length > 0)
+    return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
+
+  const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
+    const current = acc.get(curr.date)
+    if (current) {
+      current.mau += curr.mau
+      current.storage += curr.storage
+      current.bandwidth += curr.bandwidth
+    }
+    else {
+      acc.set(curr.date, curr)
+    }
+    return acc
+  }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
+
+  return c.json({ status: 'ok', statistics: finalStats })
 })
 
 async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
