@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context, MiddlewareHandler } from '@hono/hono'
 import * as d3 from 'd3'
 import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
@@ -9,8 +9,52 @@ import { useCors } from '../../utils/hono.ts'
 import { hasAppRight, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
 
+interface AuthInfo {
+  userId: string
+  authType: 'apikey' | 'jwt'
+}
+
+const useAuth: MiddlewareHandler<{
+  Variables: {
+    auth: AuthInfo
+  }
+}> = async (c, next) => {
+  const authToken = c.req.header('authorization')
+  const capgkey = c.req.header('capgkey')
+
+  if (authToken) {
+    // JWT auth
+    const supabaseClient = useSupabaseClient(c, authToken)
+    const { data: user, error: userError } = await supabaseClient.auth.getUser()
+    if (userError)
+      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
+
+    c.set('auth', {
+      userId: user.user?.id,
+      authType: 'jwt',
+    } as AuthInfo)
+  }
+  else if (capgkey) {
+    // API key auth
+    const apikey = await checkKey(c, capgkey, supabaseAdmin(c), ['all'])
+    if (!apikey)
+      return c.json({ status: 'Unauthorized', error: 'Invalid API key' }, 401)
+
+    c.set('auth', {
+      userId: apikey.user_id,
+      authType: 'apikey',
+    } as AuthInfo)
+  }
+  else {
+    return c.json({ status: 'Unauthorized', error: 'No authentication provided' }, 401)
+  }
+
+  await next()
+}
+
 export const app = new Hono()
 app.use('*', useCors)
+app.use('*', useAuth)
 
 const bundleUsageSchema = z.object({
   from: z.coerce.date(),
@@ -50,49 +94,9 @@ app.get('/app/:app_id', async (c: Context) => {
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
-    // deno-lint-ignore no-inner-declarations
-    async function checkApikeyAuth() {
-      const capgkey_string = c.req.header('capgkey')
-      if (!capgkey_string)
-        return c.json({ message: 'Invalid apikey' }, 400)
-
-      const apikey = await checkKey(c, capgkey_string, supabaseAdmin(c), ['all'])
-      if (!apikey)
-        return c.json({ message: 'Invalid apikey' }, 400)
-      c.set('apikey', apikey)
-      c.set('capgkey', capgkey_string)
-
-      return null
-    }
-
-    if (!body.graph) {
-      const authToken = c.req.header('authorization')
-      if (!authToken) {
-        const res = await checkApikeyAuth()
-        if (res)
-          return res
-      }
-      else {
-        const supabaseClient = useSupabaseClient(c, authToken)
-        const { data: _, error: appError } = await supabaseClient.from('apps').select('*').eq('app_id', appId).single()
-        if (appError)
-          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(appError) }, 400)
-        const { data: user, error: userError } = await supabaseClient.auth.getUser()
-        if (userError)
-          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(userError) }, 400)
-        c.set('userId', user.user?.id)
-      }
-    }
-    else {
-      const res = await checkApikeyAuth()
-      if (res)
-        return res
-    }
-
-    const apikey = c.get('apikey')
-    const userId = apikey ? apikey.user_id : c.get('userId')
-    if (!await hasAppRight(c, appId, userId, 'read'))
-      return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
+    const auth = c.get('auth')
+    if (!await hasAppRight(c, appId, auth.userId, 'read'))
+      return c.json({ status: 'You can\'t access this app' }, 400)
 
     const supabase = supabaseAdmin(c)
     const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
@@ -126,50 +130,9 @@ app.get('/org/:org_id', async (c: Context) => {
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
-    // deno-lint-ignore no-inner-declarations
-    async function checkApikeyAuth() {
-      const capgkey_string = c.req.header('capgkey')
-      if (!capgkey_string)
-        return c.json({ message: 'Invalid apikey' }, 400)
-
-      const apikey = await checkKey(c, capgkey_string, supabaseAdmin(c), ['all'])
-      if (!apikey)
-        return c.json({ message: 'Invalid apikey' }, 400)
-      c.set('apikey', apikey)
-      c.set('capgkey', capgkey_string)
-
-      return null
-    }
-
-    if (!body.graph) {
-      const authToken = c.req.header('authorization')
-      if (!authToken) {
-        const res = await checkApikeyAuth()
-        if (res)
-          return res
-      }
-      else {
-        const supabaseClient = useSupabaseClient(c, authToken)
-        const { data: _, error: appError } = await supabaseClient.from('orgs').select('*').eq('id', orgId).single()
-        if (appError)
-          return c.json({ status: 'Cannot get organization statistics. You probably don\'t have access to this organization', error: JSON.stringify(appError) }, 400)
-        const { data: user, error: userError } = await supabaseClient.auth.getUser()
-        if (userError)
-          return c.json({ status: 'Cannot get organization statistics. You probably don\'t have access to this organization', error: JSON.stringify(userError) }, 400)
-        c.set('userId', user.user?.id)
-      }
-    }
-    else {
-      const res = await checkApikeyAuth()
-      if (res)
-        return res
-    }
-
-    const apikey = c.get('apikey')
-    const userId = apikey ? apikey.user_id : c.get('userId')
-
-    if (!(await hasOrgRight(c, orgId, userId, 'read')))
-      return c.json({ status: 'You can\'t access this organization', orgId }, 400)
+    const auth = c.get('auth')
+    if (!(await hasOrgRight(c, orgId, auth.userId, 'read')))
+      return c.json({ status: 'You can\'t access this organization' }, 400)
 
     const { data: finalStats, error } = (body.graph === undefined)
       ? await getNormalStats(null, orgId, body.from, body.to, supabase)
@@ -196,57 +159,16 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
   try {
     const appId = c.req.param('app_id')
     const query = c.req.query()
-    let useDashbord = false
+    const useDashbord = false
 
     const bodyParsed = bundleUsageSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
-    // deno-lint-ignore no-inner-declarations
-    async function checkApikeyAuth() {
-      const capgkey_string = c.req.header('capgkey')
-      if (!capgkey_string)
-        return c.json({ message: 'Invalid apikey' }, 400)
-
-      const apikey = await checkKey(c, capgkey_string, supabaseAdmin(c), ['all'])
-      if (!apikey)
-        return c.json({ message: 'Invalid apikey' }, 400)
-      c.set('apikey', apikey)
-      c.set('capgkey', capgkey_string)
-
-      return null
-    }
-
-    if (!body.graph) {
-      const authToken = c.req.header('authorization')
-      if (!authToken) {
-        const res = await checkApikeyAuth()
-        if (res)
-          return res
-      }
-      else {
-        const supabaseClient = useSupabaseClient(c, authToken)
-        const { data: _, error: appError } = await supabaseClient.from('apps').select('*').eq('app_id', appId).single()
-        if (appError)
-          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(appError) }, 400)
-        const { data: user, error: userError } = await supabaseClient.auth.getUser()
-        if (userError)
-          return c.json({ status: 'Cannot get app statistics. You probably don\'t have access to this app', error: JSON.stringify(userError) }, 400)
-        c.set('userId', user.user?.id)
-        useDashbord = true
-      }
-    }
-    else {
-      const res = await checkApikeyAuth()
-      if (res)
-        return res
-    }
-
-    const apikey = c.get('apikey')
-    const userId = apikey ? apikey.user_id : c.get('userId')
-    if (!await hasAppRight(c, appId, userId, 'read'))
-      return c.json({ status: 'You can\'t access this app', app_id: apikey.app_id }, 400)
+    const auth = c.get('auth')
+    if (!await hasAppRight(c, appId, auth.userId, 'read'))
+      return c.json({ status: 'You can\'t access this app' }, 400)
 
     const supabase = supabaseAdmin(c)
     const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, useDashbord, supabase))
