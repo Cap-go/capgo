@@ -43,14 +43,12 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   },
 }))
 
-const { startDate, endDate } = getDateRange(30)
 const chartData = ref<any>(null)
 
 async function loadData() {
   isLoading.value = true
 
-  // dailyUsage.value = await getDailyVersion(appId.value, startDate.toISOString(), endDate.toISOString())
-  // versionNames.value = await getVersionNames(appId.value, dailyUsage.value.map(d => d.version_id))
+  const { startDate, endDate } = getDateRange(30)
   chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
   isLoading.value = false
 }
