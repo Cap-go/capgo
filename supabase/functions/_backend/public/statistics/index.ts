@@ -27,7 +27,7 @@ const useAuth: MiddlewareHandler<{
     const supabaseClient = useSupabaseClient(c, authToken)
     const { data: user, error: userError } = await supabaseClient.auth.getUser()
     if (userError)
-      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token', userError }, 401)
+      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
 
     c.set('auth', {
       userId: user.user?.id,
