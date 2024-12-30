@@ -2168,6 +2168,10 @@ DECLARE
   random_version_id BIGINT := 3;
   random_action VARCHAR(20);
   random_timestamp TIMESTAMP;
+  random_daily_change NUMERIC := 0;
+  previous_install BIGINT := 0;
+  previous_version_id BIGINT := 3;
+  current_version_id BIGINT := 4;
 BEGIN
   -- Truncate all tables
   TRUNCATE TABLE daily_mau, daily_bandwidth, daily_storage, daily_version, storage_usage, version_usage, device_usage, bandwidth_usage, devices, stats;
@@ -2201,11 +2205,31 @@ BEGIN
   END LOOP;
 
   -- Seed data for daily_version
+
   curr_date := start_date::DATE;
   WHILE curr_date <= end_date::DATE LOOP
-    INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
-    VALUES (curr_date, 'com.demo.app', random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
-    
+    IF curr_date != start_date::DATE THEN
+      -- Generate a random value between 0.2 and 0.8 using a more reliable method
+      random_daily_change := (random() * 0.6 + 0.2);
+      IF previous_version_id = 3 THEN
+        current_version_id := 4;
+      ELSE
+        current_version_id := 3;
+      END IF;
+
+      INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+      VALUES (curr_date, 'com.demo.app', previous_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, 0, previous_install * random_daily_change);
+      
+      INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+      VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install * random_daily_change, 0);
+      previous_version_id := current_version_id;
+      previous_install := previous_install * random_daily_change;
+    ELSE
+      previous_install := FLOOR(RANDOM() * 50000) + 1;
+      INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+      VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install, 0);
+    END IF;
+
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
 

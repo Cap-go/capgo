@@ -5,7 +5,6 @@ import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
 
-import dayjs from 'dayjs'
 import ky from 'ky'
 
 let supaClient: SupabaseClient<Database> = null as any
@@ -35,6 +34,8 @@ let config: CapgoConfig = getLocalConfig()
 export async function getRemoteConfig() {
   // call host + /api/private/config and parse the result as json using ky
   const localConfig = await getLocalConfig()
+  if (import.meta.env.MODE === 'development')
+    return localConfig
   const data = await ky
     .get(`${defaultApiHost}/private/config`)
     .then(res => res.json<CapgoConfig>())
@@ -158,13 +159,9 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
 export interface appUsageByApp {
   app_id: string
   date: string
-  bandwidth: number
   mau: number
   storage: number
-  get: number
-  install: number
-  uninstall: number
-  fail: number
+  bandwidth: number
 }
 
 export interface appUsageByVersion {
@@ -180,10 +177,6 @@ export interface appUsageGlobal {
   bandwidth: number
   mau: number
   storage: number
-  get: number
-  install: number
-  uninstall: number
-  fail: number
 }
 
 export interface appUsageGlobalByApp {
@@ -192,71 +185,53 @@ export interface appUsageGlobalByApp {
 }
 
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobalByApp> {
-  const resAppIds = await useSupabase()
-    .from('apps')
-    .select('app_id')
-    .eq('owner_org', orgId)
-    .then(res => res.data?.map(app => app.app_id) || [])
-  // get_app_metrics
-  const appMetrics = await getAppMetrics(orgId, startDate, endDate)
+  try {
+    const supabase = useSupabase()
+    const resAppIds = await useSupabase()
+      .from('apps')
+      .select('app_id')
+      .eq('owner_org', orgId)
+      .then(res => res.data?.map(app => app.app_id) || [])
 
-  // generate all dates between startDate and endDate
-  const dates: string[] = []
-  // use dayjs to create dates
-  let currentDate = dayjs(startDate)
-  const end = dayjs(endDate)
-  while (currentDate <= end) {
-    dates.push(currentDate.toISOString().split('T')[0])
-    currentDate = currentDate.add(1, 'day')
+    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}`
+
+    // Combine orgData and appStats into a single Promise.all
+    const [orgStatistics, appStatistics] = await Promise.all([
+      // Get org statistics
+      supabase.functions.invoke(`statistics/org/${orgId}/${dateRange}`, {
+        method: 'GET',
+      }).then((res) => {
+        if (res.error)
+          throw new Error(res.error.message)
+        return (res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string }[] }).statistics
+      }),
+      // Get app statistics for all apps
+      Promise.all(resAppIds.map(appId =>
+        supabase.functions.invoke(`statistics/app/${appId}/${dateRange}`, {
+          method: 'GET',
+        }).then((res) => {
+          if (res.error)
+            throw new Error(res.error.message)
+          const typedData = res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string }[] }
+          return typedData.statistics.map(stat => ({
+            app_id: appId,
+            date: stat.date,
+            mau: stat.mau,
+            storage: stat.storage,
+            bandwidth: stat.bandwidth,
+          }))
+        }),
+      )).then(stats => stats.flat()),
+    ])
+
+    return {
+      global: orgStatistics.sort((a, b) => a.date.localeCompare(b.date)),
+      byApp: appStatistics.sort((a, b) => a.date.localeCompare(b.date)),
+    }
   }
-  const data = resAppIds.flatMap((appId) => {
-    // create only one entry for each day by appId
-    const appDays = dates.map((date) => {
-      const appDate = appMetrics.filter(app => app.app_id === appId && app.date === date)[0]
-      return {
-        app_id: appId,
-        date,
-        mau: appDate?.mau ?? 0,
-        storage: appDate?.storage ?? 0,
-        bandwidth: appDate?.bandwidth ?? 0,
-        get: appDate?.get ?? 0,
-        install: appDate?.install ?? 0,
-        uninstall: appDate?.uninstall ?? 0,
-        fail: appDate?.fail ?? 0,
-      }
-    })
-    return appDays
-  })
-  // reduce the list to have only one entry by day with the sum of all apps
-  const reducedData = data.reduce((acc: appUsageGlobal[], current) => {
-    const existing = acc.find(s => s.date === current.date)
-    if (existing) {
-      existing.mau += current.mau
-      existing.storage += current.storage
-      existing.bandwidth += current.bandwidth
-      existing.get += current.get
-      existing.install += current.install
-      existing.uninstall += current.uninstall
-      existing.fail += current.fail
-    }
-    else {
-      acc.push({
-        date: current.date,
-        mau: current.mau,
-        storage: current.storage,
-        bandwidth: current.bandwidth,
-        get: current.get,
-        install: current.install,
-        uninstall: current.uninstall,
-        fail: current.fail,
-      })
-    }
-    return acc
-  }, [])
-  // sort by date
-  return {
-    global: reducedData.sort((a, b) => a.date.localeCompare(b.date)),
-    byApp: data.sort((a, b) => a.date.localeCompare(b.date)),
+  catch (error) {
+    console.error('Error in getAllDashboard:', error)
+    throw error
   }
 }
 interface NativePackage {
