@@ -237,26 +237,34 @@ DECLARE
   user_id uuid;
 BEGIN
   SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
-  IF api_key_text IS DISTINCT FROM NULL THEN
+  
+  -- Initialize user_id as NULL
+  user_id := NULL;
+  
+  -- Check for API key first
+  IF api_key_text IS NOT NULL THEN
     SELECT * FROM apikeys WHERE key=api_key_text into api_key;
-    IF api_key IS DISTINCT FROM NULL THEN
+    IF api_key IS NOT NULL THEN
       user_id := api_key.user_id;
+      
+      -- Check limited_to_orgs only if api_key exists and has restrictions
+      IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
+        return query select orgs.* from get_orgs_v6(user_id) orgs 
+        where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+        RETURN;
+      END IF;
     END IF;
   END IF;
 
-  IF user_id IS NOT DISTINCT FROM NULL THEN
+  -- If no valid API key user_id yet, try to get from identity
+  IF user_id IS NULL THEN
     SELECT get_identity() into user_id;
   END IF;
 
-  IF user_id IS NOT DISTINCT FROM NULL THEN
+  IF user_id IS NULL THEN
     RAISE EXCEPTION 'Cannot do that as postgres!';
   END IF;
 
-  IF api_key IS DISTINCT FROM NULL AND api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
-    return query select orgs.* from get_orgs_v6("user_id") orgs where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
-    RETURN;
-  END IF;
-
-  return query select * from get_orgs_v6("user_id");
+  return query select * from get_orgs_v6(user_id);
 END;  
 $$;
