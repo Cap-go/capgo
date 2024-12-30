@@ -60,7 +60,22 @@ async function getAppStats() {
 async function getUsages() {
   const globalStats = await getAppStats()
   const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+
   const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
+  const currentDate = new Date()
+  const currentDay = currentDate.getDate()
+  let cycleDay: number | undefined
+
+  if (cycleStart.getDate() === 1) {
+    cycleDay = currentDay
+  }
+  else {
+    const cycleStartDay = cycleStart.getDate()
+    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+    cycleDay = (currentDay - cycleStartDay + 1 + daysInMonth) % daysInMonth
+    if (cycleDay === 0)
+      cycleDay = daysInMonth
+  }
 
   const finalData = globalStats.map((item: any) => {
     return {
@@ -80,18 +95,20 @@ async function getUsages() {
     datas.value.storage[index] = bytesToGb(item.storage ?? 0, 2)
     datas.value.bandwidth[index] = bytesToGb(item.bandwidth ?? 0, 2)
   })
+
+  // slice the lenght of the array to the current day
+  datas.value.mau = datas.value.mau.slice(0, cycleDay)
+  datas.value.storage = datas.value.storage.slice(0, cycleDay)
+  datas.value.bandwidth = datas.value.bandwidth.slice(0, cycleDay)
 }
 
 async function loadData() {
   isLoading.value = true
 
-  console.log('loadData 1')
-
   await getPlans().then((pls) => {
     plans.value.length = 0
     plans.value.push(...pls)
   })
-  console.log('loadData 2')
   await getUsages()
   isLoading.value = false
 }
