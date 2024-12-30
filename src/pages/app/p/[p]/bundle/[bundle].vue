@@ -8,7 +8,6 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/material-symbols/info-rounded'
 import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -32,9 +31,7 @@ const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
-const bundleChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
-const secondaryChannel = ref<boolean>(false)
 const showBundleMetadataInput = ref<boolean>(false)
 
 const role = ref<OrganizationRole | null>(null)
@@ -79,34 +76,20 @@ const tabs: Tab[] = [
     icon: IconInformations,
     key: 'info',
   },
-  {
-    label: t('devices'),
-    icon: IconDevice,
-    key: 'devices',
-  },
 ]
 
 async function getChannels() {
   if (!version.value)
     return
   channel.value = undefined
-  bundleChannels.value = []
   const { data: dataChannel } = await supabase
     .from('channels')
     .select()
     .eq('app_id', version.value.app_id)
+    .eq('version', version.value.id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
-  // search if the bundle is used in a channel
-  channels.value.forEach((chan) => {
-    const v: number = chan.version as any
-    if (version.value && (v === version.value.id || version.value.id === chan.second_version)) {
-      bundleChannels.value.push(chan)
-      secondaryChannel.value = (version.value.id === chan.second_version)
-    }
-  })
-
-  showBundleMetadataInput.value = !!bundleChannels.value.find(c => c.disable_auto_update === 'version_number')
+  showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
 }
 
 async function openChannelLink() {
@@ -145,37 +128,6 @@ async function setChannel(channel: Database['public']['Tables']['channels']['Row
     .eq('id', channel.id)
 }
 
-async function setSecondChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
-  return supabase
-    .from('channels')
-    .update({
-      second_version: id,
-    })
-    .eq('id', channel.id)
-}
-
-async function setChannelProgressive(channel: Database['public']['Tables']['channels']['Row'], id: number) {
-  return supabase
-    .from('channels')
-    .update({
-      second_version: id,
-      version: channel.second_version ?? undefined,
-      secondary_version_percentage: 0.1,
-    })
-    .eq('id', channel.id)
-}
-
-async function setChannelSkipProgressive(channel: Database['public']['Tables']['channels']['Row'], id: number) {
-  return supabase
-    .from('channels')
-    .update({
-      second_version: id,
-      version: id,
-      secondary_version_percentage: 1,
-    })
-    .eq('id', channel.id)
-}
-
 async function ASChannelChooser() {
   if (!version.value)
     return
@@ -184,30 +136,6 @@ async function ASChannelChooser() {
     return
   }
   const buttons = []
-
-  // This makes sure that A and B cannot be selected on the same time
-  const commonAbHandler = async (chan: Database['public']['Tables']['channels']['Row'] | undefined, ab: 'a' | 'b') => {
-    if (!chan)
-      return
-
-    const aSelected = version?.value?.id === (chan.version as any)
-    const bSelected = version?.value?.id === (chan.second_version as any)
-
-    if (aSelected && ab === 'b') {
-      const id = await getUnknowBundleId()
-      if (!id)
-        return
-
-      setChannel(chan, id)
-    }
-    else if (bSelected && ab === 'a') {
-      const id = await getUnknowBundleId()
-      if (!id)
-        return
-
-      setSecondChannel(chan, id)
-    }
-  }
 
   const normalHandler = async (chan: Database['public']['Tables']['channels']['Row']) => {
     if (!version.value)
@@ -222,104 +150,13 @@ async function ASChannelChooser() {
     }
   }
 
-  const secondHandler = async (chan: Database['public']['Tables']['channels']['Row']) => {
-    if (!version.value)
-      return
-    try {
-      await setSecondChannel(chan, version.value.id)
-      await getChannels()
-    }
-    catch (error) {
-      console.error(error)
-      toast.error(t('cannot-test-app-some'))
-    }
-  }
-
   for (const chan of channels.value) {
     const v: number = chan.version as any
-    if (!chan.enable_ab_testing && !chan.enable_progressive_deploy) {
-      buttons.push({
-        text: chan.name,
-        selected: version.value.id === v,
-        handler: async () => { await normalHandler(chan) },
-      })
-    }
-    else if (chan.enable_ab_testing && !chan.enable_progressive_deploy) {
-      buttons.push({
-        text: `${chan.name}-A`,
-        selected: version.value.id === v,
-        handler: async () => {
-          await commonAbHandler(channel.value, 'a')
-          await normalHandler(chan)
-        },
-      })
-      buttons.push({
-        text: `${chan.name}-B`,
-        selected: version.value.id === chan.second_version,
-        handler: async () => {
-          await commonAbHandler(channel.value, 'b')
-          await secondHandler(chan)
-        },
-      })
-    }
-    else {
-      buttons.push({
-        text: `${chan.name}`,
-        selected: version.value.id === chan.second_version,
-        handler: async () => {
-          const newButtons = []
-          newButtons.push({
-            text: t('start-new-deploy'),
-            selected: false,
-            handler: async () => {
-              if (!version.value)
-                return
-
-              try {
-                await setChannelProgressive(chan, version.value.id)
-                await getChannels()
-              }
-              catch (error) {
-                console.error(error)
-                toast.error(t('cannot-test-app-some'))
-              }
-            },
-          })
-
-          newButtons.push({
-            text: t('force-version-change'),
-            selected: false,
-            handler: async () => {
-              if (!version.value)
-                return
-              try {
-                await setChannelSkipProgressive(chan, version.value.id)
-                await getChannels()
-              }
-              catch (error) {
-                console.error(error)
-                toast.error(t('cannot-test-app-some'))
-              }
-            },
-          })
-
-          newButtons.push({
-            text: t('button-cancel'),
-            role: 'cancel',
-            handler: () => {
-              // console.log('Cancel clicked')
-            },
-          })
-
-          displayStore.dialogOption = {
-            header: t('progressive-deploy-option'),
-            buttons: newButtons,
-          }
-          displayStore.showDialog = true
-          return displayStore.onDialogDismiss()
-        },
-      })
-    }
+    buttons.push({
+      text: chan.name,
+      selected: version.value.id === v,
+      handler: async () => { await normalHandler(chan) },
+    })
   }
   buttons.push({
     text: t('button-cancel'),
@@ -339,7 +176,7 @@ async function ASChannelChooser() {
   return displayStore.onDialogDismiss()
 }
 
-async function openChannel(selChannel: Database['public']['Tables']['channels']['Row'], canHaveSecondVersion: boolean) {
+async function openChannel(selChannel: Database['public']['Tables']['channels']['Row']) {
   channel.value = selChannel
   if (!version.value || !main.auth)
     return
@@ -393,11 +230,7 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
             const id = await getUnknowBundleId()
             if (!id)
               return
-            if (!canHaveSecondVersion)
-              await setChannel(channel.value, id)
-            else
-              await setSecondChannel(channel.value, id)
-
+            await setChannel(channel.value, id)
             await getChannels()
           }
           catch (error) {
@@ -433,11 +266,8 @@ async function openDownload() {
           if (!version.value)
             return
           if (version.value.session_key) {
-            let localPath = `./${version.value.bucket_id}${version.value.storage_provider === 'r2' ? '' : '.zip'}`
-            if (version.value.r2_path) {
-              const filename = version.value.r2_path.split('/').slice(-1)[0]
-              localPath = `./${filename}`
-            }
+            const filename = version.value.r2_path?.split('/').slice(-1)[0]
+            const localPath = `./${filename}`
             const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
             displayStore.dialogOption = {
               header: '',
@@ -636,37 +466,21 @@ function preventInputChangePerm(event: Event) {
               {{ version_meta.fails.toLocaleString() }}
             </InfoRow>
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="bundleChannels && bundleChannels.length > 0" :label="t('channel')">
-              <template #start>
-                <span v-for="chn in bundleChannels" id="open-channel" :key="chn.id">
+            <InfoRow v-if="channels && channels.length > 0" :label="t('channel')">
+              <span class="flex justify-end w-full">
+                <span v-for="chn in channels" id="open-channel" :key="chn.id">
                   <span
-                    v-if="(chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? (chn!.second_version === version.id) : false"
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
-                    @click="openChannel(chn, true)"
+                    @click="openChannel(chn)"
                   >
-                    {{ (chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? ((chn!.second_version
-                      === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
-                  </span>
-                  <span
-                    v-if="(chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? (chn!.version === version.id) : false"
-                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
-                    @click="openChannel(chn, false)"
-                  >
-                    {{ `${chn!.name}-A` }}
-                  </span>
-                  <span
-                    v-if="(chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? false : true"
-                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
-                    @click="openChannel(chn, false)"
-                  >
-                    {{ (chn!.enable_ab_testing || chn!.enable_progressive_deploy) ? ((chn!.second_version === version.id) ? `${chn!.name}-B` : ``) : chn!.name }}
+                    {{ chn!.name }}
                   </span>
                 </span>
-              </template>
+              </span>
             </InfoRow>
             <InfoRow
               v-else id="open-channel" :label="t('channel')" :is-link="true"
-              @click="openChannel(channel!, false)"
+              @click="openChannel(channel!)"
             >
               {{ t('set-bundle') }}
             </InfoRow>

@@ -1,5 +1,5 @@
 import type { Database } from './supabase.types.ts'
-import { bigint, boolean, customType, doublePrecision, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, customType, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -48,7 +48,6 @@ export const app_versions = pgTable('app_versions', {
   created_at: timestamp('created_at').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),
   name: varchar('name').notNull(),
-  bucket_id: varchar('bucket_id'),
   user_id: uuid('user_id'),
   updated_at: timestamp('updated_at').defaultNow(),
   deleted: boolean('deleted').default(false),
@@ -72,25 +71,11 @@ export const channels = pgTable('channels', {
   public: boolean('public').notNull().default(false),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
   disable_auto_update: disableUpdatePgEnum('disable_auto_update').default('major').notNull(),
-  enable_ab_testing: boolean('enable_ab_testing').notNull().default(false),
-  enable_progressive_deploy: boolean('enable_progressive_deploy').default(false).notNull(),
-  secondary_version_percentage: doublePrecision('secondary_version_percentage').default(0).notNull(),
-  second_version: bigint('second_version', { mode: 'number' }).references(() => app_versions.id),
-  beta: boolean('beta').notNull().default(false),
   ios: boolean('ios').default(true).notNull(),
   android: boolean('android').notNull().default(true),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
   allow_emulator: boolean('allow_emulator').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
-})
-
-export const devices_override = pgTable('devices_override', {
-  created_at: timestamp('created_at').notNull().defaultNow(),
-  updated_at: timestamp('updated_at').defaultNow(),
-  device_id: text('device_id').notNull(),
-  version: bigint('version', { mode: 'number' }).notNull().references(() => app_versions.id),
-  app_id: varchar('app_id').notNull().references(() => apps.name),
-  created_by: uuid('created_by'),
 })
 
 export const channel_devices = pgTable('channel_devices', {

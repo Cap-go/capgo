@@ -6,9 +6,8 @@ import { s3 } from '../utils/s3.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 
 interface dataUpload {
-  name?: string
+  name: string
   app_id: string
-  bucket_id?: string
   version?: number
 }
 
@@ -45,14 +44,10 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       return c.json({ status: 'Error App not found' }, 500)
     }
 
-    if ((body.name && body.bucket_id) || (!body.name && !body.bucket_id))
-      return c.json({ status: 'Error name or bucket_id' }, 500)
-
-    // console.log(c.get('requestId'), 'body', body.name ?? body.bucket_id?.split('.')[0] ?? '')
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
-      .select('id')
-      .eq(body.name ? 'name' : 'bucket_id', body.name ? body.name : body.bucket_id ?? '')
+      .select('id, name')
+      .eq('name', body.name)
       .eq('app_id', body.app_id)
       .eq('storage_provider', 'r2-direct')
       .eq('user_id', apikey.user_id)
@@ -62,9 +57,8 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
       return c.json({ status: 'Error App or Version not found' }, 500)
     }
 
-    // const filePath = `apps/${apikey.user_id}/${body.app_id}/versions/${body.bucket_id}`
     // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/ee.forgr.capacitor_go/11.zip
-    const filePath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.id}.zip`
+    const filePath = `orgs/${app.owner_org}/apps/${app.app_id}/${version.name}.zip`
     console.log({ requestId: c.get('requestId'), context: 'filePath', filePath })
     // check if app version exist
 

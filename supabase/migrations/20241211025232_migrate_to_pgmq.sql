@@ -50,7 +50,6 @@ SELECT pgmq.create('on_version_create');
 SELECT pgmq.create('on_version_delete');
 SELECT pgmq.create('on_version_update');
 SELECT pgmq.create('replicate_data');
-SELECT pgmq.create('http_responses');
 
 
 -- Update process_cron_stats_jobs function
@@ -128,6 +127,7 @@ DECLARE
     msg record;
     payload jsonb;
     request_id bigint;
+    response record;
 BEGIN
     -- Read messages
     FOR msg IN SELECT * FROM pgmq.read(queue_name, 60, 2000)
@@ -136,23 +136,51 @@ BEGIN
             -- Parse message as JSONB
             payload := msg.message::jsonb;
             
-            -- Send request and queue response handling
-            SELECT http_post_helper(
-                payload->>'function_name',
-                payload->>'function_type',
-                payload->'payload'
-            ) INTO request_id;
-            
-            -- Queue response handling
-            PERFORM pgmq.send('http_responses', jsonb_build_object(
-                'request_id', request_id,
-                'queue_name', queue_name,
-                'msg_id', msg.msg_id,
-                'read_ct', msg.read_ct
-            ));
-            
-            -- Set visibility timeout
-            PERFORM pgmq.set_vt(queue_name, msg.msg_id, 3600);
+            -- If request_id exists, check response
+            IF (payload->>'request_id') IS NOT NULL THEN
+                SELECT * INTO response 
+                FROM net._http_response 
+                WHERE id = (payload->>'request_id')::bigint
+                AND (status_code IS NOT NULL OR error_msg IS NOT NULL);
+
+                -- Skip if response not ready
+                CONTINUE WHEN NOT FOUND;
+
+                IF response.error_msg IS NULL AND response.status_code >= 200 AND response.status_code < 300 THEN
+                    -- Success - delete message
+                    PERFORM pgmq.delete(queue_name, msg.msg_id);
+                ELSIF msg.read_ct >= 5 THEN
+                    -- Max retries reached - archive message
+                    PERFORM pgmq.archive(queue_name, msg.msg_id);
+                ELSE
+                    -- Delete failed response before retry
+                    DELETE FROM net._http_response 
+                    WHERE id = (payload->>'request_id')::bigint;
+                    
+                    -- Retry - reset visibility timeout
+                    PERFORM pgmq.set_vt(queue_name, msg.msg_id, 30);
+                END IF;
+            ELSE
+                -- Send new request
+                SELECT http_post_helper(
+                    payload->>'function_name',
+                    payload->>'function_type',
+                    payload->'payload'
+                ) INTO request_id;
+                
+                -- Update message with request_id
+                PERFORM pgmq.send(queue_name, 
+                    jsonb_build_object(
+                        'request_id', request_id,
+                        'function_name', payload->>'function_name',
+                        'function_type', payload->>'function_type',
+                        'payload', payload->'payload'
+                    )
+                );
+                
+                -- Delete original message
+                PERFORM pgmq.delete(queue_name, msg.msg_id);
+            END IF;
 
         EXCEPTION WHEN OTHERS THEN
             -- On error, if max retries reached archive, otherwise retry
@@ -165,60 +193,6 @@ BEGIN
     END LOOP;
 END;
 $$;
-
--- Add function to process responses
-CREATE OR REPLACE FUNCTION "public"."process_http_responses"()
-RETURNS void
-LANGUAGE "plpgsql"
-SECURITY DEFINER
-AS $$
-DECLARE
-    msg record;
-    response record;
-BEGIN
-    -- Process responses
-    FOR msg IN SELECT * FROM pgmq.read('http_responses', 60, 20000)
-    LOOP
-        -- Get HTTP response
-        SELECT * INTO response 
-        FROM net._http_response 
-        WHERE id = (msg.message::jsonb->>'request_id')::bigint
-        AND (status_code IS NOT NULL OR error_msg IS NOT NULL);
-        
-        -- Skip if response not ready
-        CONTINUE WHEN NOT FOUND;
-        
-        -- Handle response
-        IF response.error_msg IS NULL AND response.status_code >= 200 AND response.status_code < 300 THEN
-            -- Success - delete both messages
-            PERFORM pgmq.delete(msg.message::jsonb->>'queue_name', (msg.message::jsonb->>'msg_id')::bigint);
-            PERFORM pgmq.delete('http_responses', msg.msg_id);
-        ELSE
-            -- Failed - if max retries reached archive, otherwise retry
-            IF (msg.message::jsonb->>'read_ct')::int >= 5 THEN
-                PERFORM pgmq.archive(msg.message::jsonb->>'queue_name', (msg.message::jsonb->>'msg_id')::bigint);
-                PERFORM pgmq.delete('http_responses', msg.msg_id);
-            ELSE
-                -- Delete old response message
-                PERFORM pgmq.delete('http_responses', msg.msg_id);
-                -- Set original message for retry
-                PERFORM pgmq.set_vt(
-                    msg.message::jsonb->>'queue_name',
-                    (msg.message::jsonb->>'msg_id')::bigint,
-                    1
-                );
-            END IF;
-        END IF;
-    END LOOP;
-END;
-$$;
-
--- Schedule response processing
-SELECT cron.schedule(
-    'process_http_responses',
-    '5 seconds',
-    $$SELECT process_http_responses();$$
-);
 
 -- Schedule cron jobs for consumers
 
@@ -378,17 +352,47 @@ AS $$
 DECLARE
     msg record;
     batch_operations jsonb[];
+    messages_to_delete bigint[];
     batch_size int := 10000;
     request_id bigint;
+    response record;
+    payload jsonb;
+    msg_id bigint;
 BEGIN
     batch_operations := array[]::jsonb[];
+    messages_to_delete := array[]::bigint[];
     
     -- Read messages in batch
     FOR msg IN 
         SELECT * FROM pgmq.read('replicate_data', 60, batch_size)
     LOOP
-        -- Add operation to batch
-        batch_operations := array_append(batch_operations, msg.message::jsonb);        
+        payload := msg.message::jsonb;
+        
+        -- If request_id exists, check response
+        IF (payload->>'request_id') IS NOT NULL THEN
+            SELECT * INTO response 
+            FROM net._http_response 
+            WHERE id = (payload->>'request_id')::bigint
+            AND (status_code IS NOT NULL OR error_msg IS NOT NULL);
+
+            -- Skip if response not ready
+            CONTINUE WHEN NOT FOUND;
+
+            IF response.error_msg IS NULL AND response.status_code >= 200 AND response.status_code < 300 THEN
+                -- Success - delete message
+                PERFORM pgmq.delete('replicate_data', msg.msg_id);
+            ELSIF msg.read_ct >= 5 THEN
+                -- Max retries reached - archive message
+                PERFORM pgmq.archive('replicate_data', msg.msg_id);
+            ELSE
+                -- Retry - reset visibility timeout
+                PERFORM pgmq.set_vt('replicate_data', msg.msg_id, 30);
+            END IF;
+        ELSE
+            -- Add operation to batch
+            batch_operations := array_append(batch_operations, payload);
+            messages_to_delete := array_append(messages_to_delete, msg.msg_id);
+        END IF;
     END LOOP;
     
     -- Process batch if we have any operations
@@ -400,13 +404,19 @@ BEGIN
             jsonb_build_object('operations', batch_operations)
         ) INTO request_id;
 
-        -- Queue response handling
-        PERFORM pgmq.send('http_responses', jsonb_build_object(
-            'request_id', request_id,
-            'queue_name', 'replicate_data',
-            'msg_id', msg.msg_id,
-            'read_ct', msg.read_ct
-        ));
+        -- Create new message with request_id
+        PERFORM pgmq.send('replicate_data', 
+            jsonb_build_object(
+                'request_id', request_id,
+                'operations', batch_operations
+            )
+        );
+        
+        -- Delete original messages
+        FOREACH msg_id IN ARRAY messages_to_delete
+        LOOP
+            PERFORM pgmq.delete('replicate_data', msg_id);
+        END LOOP;
     END IF;
 END;
 $$;
@@ -520,3 +530,6 @@ SELECT cron.schedule(
     AND end_time < now() - interval '1 hour'
     $$
 );
+
+-- alter system set pg_net.batch_size to 2000;
+-- select net.worker_restart();

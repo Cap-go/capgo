@@ -1,4 +1,4 @@
-import type { AnalyticsEngineDataPoint, D1Database } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
@@ -55,6 +55,17 @@ export function trackLogsCF(c: Context, app_id: string, device_id: string, actio
   if (!c.env.APP_LOG)
     return Promise.resolve()
   c.env.APP_LOG.writeDataPoint({
+    blobs: [device_id.toLowerCase(), action],
+    doubles: [version_id],
+    indexes: [app_id],
+  })
+  return Promise.resolve()
+}
+
+export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+  if (!c.env.APP_LOG_EXTERNAL)
+    return Promise.resolve()
+  c.env.APP_LOG_EXTERNAL.writeDataPoint({
     blobs: [device_id.toLowerCase(), action],
     doubles: [version_id],
     indexes: [app_id],
@@ -596,6 +607,21 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
 
   console.log({ requestId: c.get('requestId'), context: 'countUpdatesFromLogsCF query', query })
+  try {
+    const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
+    return readAnalytics[0].count
+  }
+  catch (e) {
+    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from logs', error: e })
+  }
+  return 0
+}
+
+export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number> {
+  // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
+  const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'`
+
+  console.log({ requestId: c.get('requestId'), context: 'countUpdatesFromLogsExternalCF query', query })
   try {
     const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
     return readAnalytics[0].count

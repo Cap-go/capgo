@@ -80,19 +80,10 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 export function cleanFieldsAppVersions(record: any, table: string) {
   // remove old fields
   if (table === 'app_versions') {
-    // TODO: delete when we migrate to the new schema
-    delete record.minUpdateVersion
-    delete record.native_packages
     // in app_versions there is a column named manifest, but in d1 it's a JSON type convert it to make the insert work
     if (record.manifest) {
       record.manifest = JSON.stringify(record.manifest)
     }
-  }
-  if (table === 'channels') {
-    // TODO: delete when we migrate to the new schema
-    delete record.secondVersion
-    delete record.secondaryVersionPercentage
-    delete record.disableAutoUpdate
   }
   // device_id_lower when fucked the migration
   if (table === 'channel_devices') {

@@ -26,10 +26,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id' })
       return c.json(BRES)
     }
-    if (!record.bucket_id) {
-      console.log({ requestId: c.get('requestId'), context: 'no bucket_id' })
-      return c.json(BRES)
-    }
     return deleteIt(c, body.old_record as any)
   }
   catch (e) {

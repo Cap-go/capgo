@@ -2,8 +2,8 @@ import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import { backgroundTask } from '../utils/utils.ts'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF } from './cloudflare.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackLogsSBExternal, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
 export interface StatsActions {
@@ -32,6 +32,14 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
   if (!c.env.VERSION_USAGE)
     return trackVersionUsageSB(c, version_id, app_id, action)
   return trackVersionUsageCF(c, version_id, app_id, action)
+}
+
+export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+  const lowerDeviceId = device_id.toLowerCase()
+  // This is super important until every device get the version of plugin 6.2.5
+  if (!c.env.APP_LOG_EXTERNAL)
+    return trackLogsSB(c, app_id, lowerDeviceId, action, version_id)
+  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, version_id)
 }
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
@@ -128,13 +136,14 @@ export async function countAllApps(c: Context): Promise<number> {
 }
 
 export async function countAllUpdates(c: Context): Promise<number> {
-  const [storeAppsCount, logsCount] = await Promise.all([
-    countUpdatesFromStoreAppsCF(c),
-    countUpdatesFromLogsCF(c),
-  ])
+  const logsCount = await countUpdatesFromLogsCF(c)
 
-  const res = storeAppsCount + logsCount
-  return res || 14593631
+  return logsCount
+}
+
+export async function countAllUpdatesExternal(c: Context): Promise<number> {
+  const externalCount = await countUpdatesFromLogsExternalCF(c)
+  return externalCount
 }
 
 export async function getUpdateStats(c: Context) {

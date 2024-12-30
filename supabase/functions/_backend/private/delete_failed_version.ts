@@ -47,7 +47,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       return c.json({ status: 'Error app_id or bundle name missing' }, 500)
     }
 
-    // console.log(c.get('requestId'), body.name ?? body.bucket_id?.split('.')[0] ?? '')
     const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('*')

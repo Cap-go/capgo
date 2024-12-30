@@ -127,7 +127,6 @@ app.get('/', async (c: Context) => {
       'apps',
       'app_versions',
       'channels',
-      'devices_override',
       'channel_devices',
       'orgs',
     ]

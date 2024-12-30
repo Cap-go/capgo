@@ -30,9 +30,6 @@ interface Channel {
     created_at: string
     min_update_version: string | null
   }
-  second_version: {
-    min_update_version: string | null
-  }
   misconfigured: boolean | undefined
 }
 type Element = Database['public']['Tables']['channels']['Row'] & Channel
@@ -129,14 +126,9 @@ async function getData() {
             created_at,
             min_update_version
           ),
-          second_version (
-            min_update_version
-          ),
           created_at,
           updated_at,
-          disable_auto_update,
-          enable_ab_testing,
-          enable_progressive_deploy
+          disable_auto_update
           `, { count: 'exact' })
       .eq('app_id', props.appId)
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
@@ -167,11 +159,6 @@ async function getData() {
 
     for (const channel of channels) {
       if (channel.version.min_update_version === null) {
-        channel.misconfigured = true
-        anyMisconfigured = true
-      }
-
-      if ((channel.enable_progressive_deploy || channel.enable_ab_testing) && channel.second_version.min_update_version === null) {
         channel.misconfigured = true
         anyMisconfigured = true
       }

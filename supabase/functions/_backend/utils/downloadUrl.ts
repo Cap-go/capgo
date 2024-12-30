@@ -13,42 +13,27 @@ export interface ManifestEntry {
   download_url: string | null
 }
 
-export function getPathFromVersion(ownerOrg: string, appId: string, bucketId: string | null, storageProvider: string, r2Path: string | null) {
-  if (storageProvider === 'r2' && r2Path)
-    return r2Path
-  else if (storageProvider === 'r2' && bucketId && bucketId?.endsWith('.zip'))
-    return `apps/${ownerOrg}/${appId}/versions/${bucketId}`
-}
-
 export async function getBundleUrl(
   c: Context,
-  ownerOrg: string,
-  version: {
-    id: Database['public']['Tables']['app_versions']['Row']['id']
-    storage_provider: Database['public']['Tables']['app_versions']['Row']['storage_provider']
-    r2_path: Database['public']['Tables']['app_versions']['Row']['r2_path']
-    bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
-    app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
-  },
+  versionId: number,
+  r2_path: string | null,
   deviceId: string,
 ) {
-  console.log({ requestId: c.get('requestId'), context: 'getBundleUrlV2 version', version })
-
-  const path = getPathFromVersion(ownerOrg, version.app_id, version.bucket_id, version.storage_provider, version.r2_path)
+  console.log({ requestId: c.get('requestId'), context: 'getBundleUrlV2 version', versionId })
 
   const { data: bundleMeta } = await supabaseAdmin(c)
     .from('app_versions_meta')
     .select('size, checksum')
-    .eq('id', version.id)
+    .eq('id', versionId)
     .single()
 
-  console.log({ requestId: c.get('requestId'), context: 'path', path })
-  if (!path)
+  console.log({ requestId: c.get('requestId'), context: 'path', r2_path })
+  if (!r2_path)
     return null
 
   if (getRuntimeKey() !== 'workerd') {
     try {
-      const signedUrl = await s3.getSignedUrl(c, path, EXPIRATION_SECONDS)
+      const signedUrl = await s3.getSignedUrl(c, r2_path, EXPIRATION_SECONDS)
       console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
 
       const url = signedUrl
@@ -61,27 +46,20 @@ export async function getBundleUrl(
   }
 
   const url = new URL(c.req.url)
-  const downloadUrl = `${url.protocol}//${url.host}/${BASE_PATH}/${path}?key=${bundleMeta?.checksum}&device_id=${deviceId}`
+  const downloadUrl = `${url.protocol}//${url.host}/${BASE_PATH}/${r2_path}?key=${bundleMeta?.checksum}&device_id=${deviceId}`
   return { url: downloadUrl, size: bundleMeta?.size }
 }
 
-export async function getManifestUrl(c: Context, version: {
-  id: Database['public']['Tables']['app_versions']['Row']['id']
-  storage_provider: Database['public']['Tables']['app_versions']['Row']['storage_provider']
-  r2_path: Database['public']['Tables']['app_versions']['Row']['r2_path']
-  bucket_id: Database['public']['Tables']['app_versions']['Row']['bucket_id']
-  app_id: Database['public']['Tables']['app_versions']['Row']['app_id']
-  manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null
-}, deviceId: string): Promise<ManifestEntry[]> {
-  if (!version.manifest) {
+export function getManifestUrl(c: Context, versionId: number, manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null, deviceId: string): ManifestEntry[] {
+  if (!manifest) {
     return []
   }
 
   try {
-    const url = new URL('http://wolny-ubuntu.local:7887')
-    const signKey = version.id
+    const url = new URL(c.req.url)
+    const signKey = versionId
 
-    return version.manifest.map((entry) => {
+    return manifest.map((entry) => {
       if (!entry.s3_path)
         return null
 
