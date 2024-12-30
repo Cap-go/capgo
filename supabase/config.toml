@@ -146,6 +146,9 @@ verify_jwt = false
 [functions.triggers]
 verify_jwt = false
 
+[functions.apikey]
+verify_jwt = false
+
 # SCRAPPING ENDPOINTS
 
 [functions.scrapping]
