@@ -11,6 +11,7 @@ analytics_engine_datasets = [
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage" },
   { binding = "VERSION_USAGE", dataset = "version_usage" },
   { binding = "APP_LOG", dataset = "app_log" },
+  { binding = "APP_LOG_EXTERNAL", dataset = "app_log_external" },
 ]
 d1_databases = [
   { binding = "DB_DEVICES", database_name = "capgo_prod_devices", database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753" },
@@ -26,6 +27,7 @@ analytics_engine_datasets = [
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage" },
   { binding = "VERSION_USAGE", dataset = "version_usage" },
   { binding = "APP_LOG", dataset = "app_log" },
+  { binding = "APP_LOG_EXTERNAL", dataset = "app_log_external" },
 ]
 d1_databases = [
   { binding = "DB_DEVICES", database_name = "capgo_prod_devices", database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753" },
@@ -41,6 +43,7 @@ analytics_engine_datasets = [
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage_alpha" },
   { binding = "VERSION_USAGE", dataset = "version_usage_alpha" },
   { binding = "APP_LOG", dataset = "app_log_alpha" },
+  { binding = "APP_LOG_EXTERNAL", dataset = "app_log_external_alpha" },
 ]
 d1_databases = [
   { binding = "DB_DEVICES", database_name = "capgo_alpha_devices", database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753" },

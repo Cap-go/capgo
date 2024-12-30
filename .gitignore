@@ -92,3 +92,5 @@ cloudflare_workers/api/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/600b1da7
 cloudflare_workers/api/.wrangler/tmp/dev-1s8I9T/*
 cloudflare_workers/plugin/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/e522ef6a4a29b8efffaf804169da2dc3e4275158e3400565fa355da2388430d0.sqlite
 tmp/*
+internal/forgr-key.jks
+internal/forgr-key.jks.base64

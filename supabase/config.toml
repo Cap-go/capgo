@@ -136,7 +136,6 @@ verify_jwt = false
 [functions.stats]
 verify_jwt = false
 
-
 # PRIVATE ENDPOINTS
 
 [functions.private]
@@ -158,3 +157,6 @@ verify_jwt = false
 
 [functions.files]
 verify_jwt = false
+
+[edge_runtime]
+policy = "per_worker"

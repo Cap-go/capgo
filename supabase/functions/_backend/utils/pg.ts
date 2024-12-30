@@ -189,14 +189,14 @@ export function requestInfosPostgres(
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
     .where(!defaultChannel
       ? and(
-        eq(channelAlias.public, true),
-        eq(channelAlias.app_id, app_id),
-        eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
-      )
+          eq(channelAlias.public, true),
+          eq(channelAlias.app_id, app_id),
+          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+        )
       : and (
-        eq(channelAlias.app_id, app_id),
-        eq(channelAlias.name, defaultChannel),
-      ),
+          eq(channelAlias.app_id, app_id),
+          eq(channelAlias.name, defaultChannel),
+        ),
     )
     .limit(1)
     .then(data => data.at(0))
@@ -300,14 +300,14 @@ export function requestInfosPostgresV2(
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
     .where(!defaultChannel
       ? and(
-        eq(channelAlias.public, true),
-        eq(channelAlias.app_id, app_id),
-        eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
-      )
+          eq(channelAlias.public, true),
+          eq(channelAlias.app_id, app_id),
+          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+        )
       : and (
-        eq(channelAlias.app_id, app_id),
-        eq(channelAlias.name, defaultChannel),
-      ),
+          eq(channelAlias.app_id, app_id),
+          eq(channelAlias.name, defaultChannel),
+        ),
     )
     .limit(1)
     .then(data => data.at(0))

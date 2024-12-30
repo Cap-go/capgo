@@ -67,7 +67,6 @@ describe('[POST] /device operations', () => {
       body: JSON.stringify({
         app_id: APPNAME,
         device_id: 'test_device',
-        version_id: '1.0.0',
         channel: 'no_access',
       }),
     })
@@ -84,6 +83,20 @@ describe('[POST] /device operations', () => {
       body: JSON.stringify({
         app_id: 'invalid_app',
         device_id: 'test_device',
+      }),
+    })
+    await response.arrayBuffer()
+    expect(response.status).toBe(400)
+  })
+
+  it('invalid version_id', async () => {
+    const response = await fetch(`${BASE_URL}/device`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        device_id: 'test_device',
+        version_id: '1.0.0',
       }),
     })
     await response.arrayBuffer()
