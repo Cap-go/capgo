@@ -46,6 +46,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
       - name: Wait for tests to succeed
+        if: ${{ env.SUPA_ENV != 'ALPHA' }}
         uses: lewagon/wait-on-check-action@v1.3.4
         with:
           ref: ${{ github.ref }}
