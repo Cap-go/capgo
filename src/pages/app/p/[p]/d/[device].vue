@@ -40,11 +40,9 @@ const id = ref<string>()
 const isLoading = ref(true)
 const ActiveTab = ref('info')
 const organizationStore = useOrganizationStore()
-const revertToBuiltinValue = ref(`revert-to-builtin-${crypto.randomUUID()}`)
 
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
 const logs = ref<(Database['public']['Tables']['stats']['Row'] & Stat)[]>([])
-const deviceOverride = ref<Database['public']['Tables']['devices_override']['Row'] & Device>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
 const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const channelDevice = ref<Database['public']['Tables']['channels']['Row']>()
@@ -135,43 +133,6 @@ async function getChannelOverride() {
     channelDevice.value = undefined
   }
 }
-async function getDeviceOverride() {
-  try {
-    const { data } = await supabase
-      .from('devices_override')
-      .select(`
-      device_id,
-      app_id,
-      version,
-      created_at,
-      updated_at
-    `)
-      .eq('app_id', packageId.value)
-      .eq('device_id', id.value!.toLowerCase())
-      .single()
-      .throwOnError()
-    if (!data?.version) {
-      return
-    }
-
-    const { data: dataVersion } = await supabase
-      .from('app_versions')
-      .select(`
-          id,
-          name
-      `)
-      .eq('id', data!.version)
-      .single()
-
-    const overwriteVersion = (data || undefined) as Database['public']['Tables']['devices_override']['Row'] & Device
-    if (dataVersion)
-      overwriteVersion.version = dataVersion! as any as typeof overwriteVersion.version
-    deviceOverride.value = overwriteVersion
-  }
-  catch {
-    deviceOverride.value = undefined
-  }
-}
 async function getDevice() {
   if (!id.value)
     return
@@ -249,7 +210,6 @@ async function loadData() {
   logs.value = []
   await Promise.all([
     getDevice(),
-    getDeviceOverride(),
     getChannelOverride(),
     getChannels(),
     getVersion(),
@@ -260,18 +220,6 @@ async function loadData() {
   isLoading.value = false
 }
 
-async function upsertDevVersion(device: string, versionId: number) {
-  const currentGid = organizationStore.currentOrganization?.gid
-  return supabase
-    .from('devices_override')
-    .upsert({
-      device_id: device.toLowerCase(),
-      version: versionId,
-      app_id: packageId.value,
-      owner_org: currentGid as string,
-    })
-    .throwOnError()
-}
 async function didCancel(name: string) {
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
@@ -290,60 +238,6 @@ async function didCancel(name: string) {
   }
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
-}
-
-async function delDevVersion(device: string) {
-  if (await didCancel(t('device')))
-    return
-  return supabase
-    .from('devices_override')
-    .delete()
-    .eq('device_id', device.toLowerCase())
-    .eq('app_id', packageId.value)
-}
-async function updateVersionOverride(event: Event) {
-  let value = (event.target as HTMLSelectElement).value
-  const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
-
-  if (!hasPerm) {
-    toast.error(t('no-permission'))
-    return
-  }
-
-  if (deviceOverride.value && value === 'none') {
-    if (device.value?.device_id)
-      await delDevVersion(device.value?.device_id)
-    toast.success(t('unlink-version'))
-    await loadData()
-  }
-  else if (value !== 'none') {
-    if (!device.value?.device_id) {
-      toast.error(t('version-link-fail'))
-      return
-    }
-    try {
-      if (revertToNativeVersion.value !== null && value === revertToBuiltinValue.value) {
-        value = revertToNativeVersion.value.toString()
-      }
-
-      upsertDevVersion(device.value?.device_id, Number(value))
-        .then(async () => {
-          toast.success(t('version-linked'))
-          return loadData()
-        })
-        .catch(async (error) => {
-          console.error(error)
-          toast.error(t('version-link-fail'))
-        })
-    }
-    catch (error) {
-      console.error(error)
-      toast.error(t('version-link-fail'))
-    }
-  }
-  else {
-    toast.error(t('version-link-fail'))
-  }
 }
 
 async function upsertDevChannel(device: string, channelId: number) {
@@ -426,13 +320,6 @@ watchEffect(async () => {
   }
 })
 
-function openVersion() {
-  if (revertToNativeVersion.value !== null && deviceOverride.value?.version?.id === revertToNativeVersion.value) {
-    return
-  }
-  if (packageId.value && deviceOverride.value?.version?.id)
-    router.push(`/app/p/${appIdToUrl(packageId.value)}/bundle/${deviceOverride.value.version.id}`)
-}
 function openChannel() {
   if (packageId.value && channelDevice.value?.id)
     router.push(`/app/p/${appIdToUrl(packageId.value)}/channel/${channelDevice.value.id}`)
@@ -461,17 +348,6 @@ function openChannel() {
             <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-            <InfoRow :is-link="true" :label="t('force-version')" :value="deviceOverride?.version?.name || ''" @click="openVersion()">
-              <select :value="deviceOverride?.version?.id !== revertToNativeVersion ? (deviceOverride?.version?.id || 'none') : revertToBuiltinValue" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateVersionOverride">
-                <option value="none">
-                  {{ t('none') }}
-                </option>
-                <!-- <option :value="revertToBuiltinValue">{{ t('revert-to-builtin') }}</option>   -->
-                <option v-for="vs in versions" :key="vs.id" :value="vs.id">
-                  {{ vs.name }}
-                </option>
-              </select>
-            </InfoRow>
             <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name || ''" @click="openChannel()">
               <select :value="channelDevice?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateChannelOverride">
                 <option value="none">

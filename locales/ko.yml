@@ -28,6 +28,8 @@ add-member: 회원 추가
 add-your-first-app-t: 계정에 첫 번째 앱을 추가하고 업데이트를 푸시하세요!
 admin: 관리자
 alert-2fa-disable: 2FA를 비활성화할지 확인하세요.
+alert-2fa-required: 비밀번호를 재설정하려면 2FA가 필요합니다.
+alert-2fa-required-message: 2FA 코드를 입력하세요.
 alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
 alert-confirm-delete: 삭제 확인
@@ -101,10 +103,10 @@ cannot-del-org: 조직을 삭제할 수 없습니다. 브라우저 로그를 확
 cannot-delete-app: 앱을 삭제할 수 없습니다
 cannot-delete-app-icon: 앱 아이콘을 삭제할 수 없습니다.
 cannot-delete-bundle: 번들을 삭제할 수 없습니다.
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: 버전을 대량 삭제할 수 없습니다.
+cannot-delete-bundle-linked-channel-2: '다음 버전은 최소 1개 이상의 채널에 연결되어 있습니다:'
+cannot-delete-bundle-linked-channel-3: 수동으로 연결을 해제하고 다시 시도하세요.
+cannot-delete-bundles: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.

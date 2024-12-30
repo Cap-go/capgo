@@ -32,6 +32,8 @@ add-your-first-app-t: >-
   обновления!
 admin: администратор
 alert-2fa-disable: Подтвердите, что вы хотите отключить 2FA.
+alert-2fa-required: Для сброса пароля требуется 2FA
+alert-2fa-required-message: Пожалуйста, введите код 2fa
 alert-accept-inviation: Вы принимаете приглашение в %ORG%?
 alert-add-new-key: Выберите новый тип ключа API
 alert-confirm-delete: Подтвердите удаление
@@ -111,10 +113,10 @@ cannot-del-org: Невозможно удалить организацию, пр
 cannot-delete-app: Не могу удалить приложение
 cannot-delete-app-icon: Не могу удалить значок приложения
 cannot-delete-bundle: Невозможно удалить пакет
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Массовое удаление версий невозможно
+cannot-delete-bundle-linked-channel-2: 'Следующие версии связаны как минимум по одному каналу:'
+cannot-delete-bundle-linked-channel-3: Пожалуйста, отсоедините их вручную и попробуйте снова
+cannot-delete-bundles: Невозможно удалить пакеты
 cannot-delete-channel: Не могу удалить канал
 cannot-delete-member: Невозможно удалить участника, проверьте консоль браузера
 cannot-delete-owner: Невозможно удалить владельца из организации

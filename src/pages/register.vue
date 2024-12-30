@@ -5,20 +5,28 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
 import { openMessenger } from '~/services/bento'
 import { useSupabase } from '~/services/supabase'
+import { registerWebsiteDomain } from '~/utils/Utils'
 
 const router = useRouter()
 const supabase = useSupabase()
 const { t } = useI18n()
-
+const turnstileToken = ref('')
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
 
 function openSupport() {
   openMessenger()
+}
+
+if (registerWebsiteDomain() === 'https://capgo.app') {
+  // do not allow to register on webapp on production
+  window.location.href = 'https://capgo.app/register/'
 }
 
 async function submit(form: { first_name: string, last_name: string, password: string, email: string }) {
@@ -40,6 +48,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
       email: form.email,
       password: form.password,
       options: {
+        captchaToken: turnstileToken.value,
         data: {
           first_name: form.first_name,
           last_name: form.last_name,
@@ -61,7 +70,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
     setErrors('register-account', [error?.message || 'user not found'], {})
     return
   }
-  router.push(`/onboarding/confirm_email?email=${encodeURI(form.email)}`)
+  router.push(`/app/home`)
 }
 </script>
 
@@ -140,6 +149,9 @@ async function submit(form: { first_name: string, last_name: string, password: s
                 />
 
                 <div class="w-1/2 col-span-2 mx-auto">
+                  <div v-if="!!captchaKey">
+                    <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                  </div>
                   <button
                     :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
                   >

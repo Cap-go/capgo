@@ -28,6 +28,8 @@ add-member: Add Member
 add-your-first-app-t: Add your first app to your account and let's push updates !
 admin: admin
 alert-2fa-disable: Confirm that you want to disable 2FA
+alert-2fa-required: 2FA is required to reset the password
+alert-2fa-required-message: Please enter the 2fa code
 alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete

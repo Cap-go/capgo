@@ -16,6 +16,7 @@ import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { openMessenger } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
+import { registerWebsiteDomain } from '~/utils/Utils'
 
 const route = useRoute('/login')
 const supabase = useSupabase()
@@ -347,7 +348,7 @@ onMounted(checkLogin)
                   </div>
                   <div class="">
                     <a
-                      href="https://capgo.app/register/"
+                      :href="`${registerWebsiteDomain()}/register/`"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}

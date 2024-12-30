@@ -2,7 +2,6 @@
 import type { Tab } from '~/components/comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
-import { useDebounceFn } from '@vueuse/core'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -35,7 +34,6 @@ const loading = ref(true)
 const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
-const secondaryVersionPercentage = ref(50)
 
 const role = ref<OrganizationRole | null>(null)
 watch(channel, async (channel) => {
@@ -68,15 +66,6 @@ function openBundle() {
     return
   console.log('openBundle', channel.value.version.id)
   router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
-}
-
-function openSecondBundle() {
-  if (!channel.value)
-    return
-  if (channel.value.second_version.name === 'unknown')
-    return
-  console.log('openBundle', channel.value.version.id)
-  router.push(`/app/p/${route.params.p}/bundle/${channel.value.second_version.id}`)
 }
 
 async function getDeviceIds() {
@@ -112,7 +101,6 @@ async function getChannel() {
             id,
             name,
             app_id,
-            bucket_id,
             created_at,
             min_update_version,
             storage_provider
@@ -126,15 +114,7 @@ async function getChannel() {
           disable_auto_update,
           ios,
           android,
-          updated_at,
-          enable_ab_testing,
-          enable_progressive_deploy,
-          secondary_version_percentage,
-          second_version (
-            name,
-            id,
-            min_update_version
-          )
+          updated_at
         `)
       .eq('id', id.value)
       .single()
@@ -144,7 +124,6 @@ async function getChannel() {
     }
 
     channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
-    secondaryVersionPercentage.value = (data.secondary_version_percentage * 100) | 0
   }
   catch (error) {
     console.error(error)
@@ -335,107 +314,6 @@ async function openPannel() {
   return displayStore.onDialogDismiss()
 }
 
-async function enableAbTesting() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  if (!channel.value)
-    return
-
-  const val = !channel.value.enable_ab_testing
-
-  if (val && channel.value.enable_progressive_deploy) {
-    toast.error(t('ab-testing-progressive-deploy-conflict'))
-    return
-  }
-
-  const { error } = await supabase
-    .from('channels')
-    .update({ enable_ab_testing: val, second_version: val ? channel.value.version.id : undefined })
-    .eq('id', id.value)
-
-  if (error) {
-    console.error(error)
-  }
-  else {
-    channel.value.enable_ab_testing = val
-    toast.success(val ? t('enabled-ab-testing') : t('disable-ab-testing'))
-  }
-
-  await reload()
-}
-
-async function enableProgressiveDeploy() {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  if (!channel.value)
-    return
-
-  const val = !channel.value.enable_progressive_deploy
-
-  if (val && channel.value.enable_ab_testing) {
-    toast.error(t('ab-testing-progressive-deploy-conflict'))
-    return
-  }
-
-  const { error } = await supabase
-    .from('channels')
-    .update({ enable_progressive_deploy: val, second_version: val ? channel.value.version.id : undefined })
-    .eq('id', id.value)
-
-  if (error) {
-    console.error(error)
-  }
-  else {
-    channel.value.enable_progressive_deploy = val
-    toast.success(val ? t('enabled-progressive-deploy') : t('disable-progressive-deploy'))
-  }
-
-  await reload()
-}
-
-const debouncedSetSecondaryVersionPercentage = useDebounceFn(async (percentage: number) => {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  const { error } = await supabase
-    .from('channels')
-    .update({ secondary_version_percentage: percentage / 100 })
-    .eq('id', id.value)
-
-  if (error)
-    console.error(error)
-}, 500)
-
-async function setSecondaryVersionPercentage(percentage: number) {
-  if (channel.value?.enable_progressive_deploy)
-    return
-
-  secondaryVersionPercentage.value = percentage
-  await debouncedSetSecondaryVersionPercentage(percentage)
-}
-
-function onMouseDownSecondaryVersionSlider(event: Event) {
-  console.log('onMouseDownSecondaryVersionSlider', secondaryVersionPercentage.value)
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    event.preventDefault()
-    return
-  }
-
-  if (!channel.value?.enable_progressive_deploy) {
-    setSecondaryVersionPercentage(secondaryVersionPercentage.value)
-  }
-  else {
-    toast.error(t('progressive-deploy-set-percentage'))
-    event.preventDefault()
-  }
-}
-
 function guardChangeAutoUpdate(event: Event) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
@@ -443,25 +321,6 @@ function guardChangeAutoUpdate(event: Event) {
     return false
   }
 }
-
-const getVersion = computed(() => {
-  if (channel.value?.secondary_version_percentage !== 1) {
-    let label = t('status-failed')
-    if (channel.value?.secondary_version_percentage && channel.value?.secondary_version_percentage !== 0) {
-      label = `${channel.value?.secondary_version_percentage * 100}%`
-    }
-    return {
-      name: channel.value?.version.name ?? '',
-      label,
-    }
-  }
-  else {
-    return {
-      name: channel.value?.second_version.name,
-      label: t('status-complete'),
-    }
-  }
-})
 
 async function onChangeAutoUpdate(event: Event) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
@@ -490,66 +349,6 @@ async function onChangeAutoUpdate(event: Event) {
   if (channel.value?.disable_auto_update)
     channel.value.disable_auto_update = value
 }
-
-// async function handleRevertToBuiltin() {
-//   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
-//     toast.error(t('no-permission'))
-//     return
-//   }
-//   displayStore.dialogOption = {
-//     header: t('revert-to-builtin'),
-//     message: t('revert-to-builtin-confirm'),
-//     buttons: [
-//       {
-//         text: t('confirm'),
-//         handler: async () => {
-//           const { data: revertVersionId, error } = await supabase
-//             .rpc('check_revert_to_builtin_version', { appid: packageId.value })
-
-//           if (error) {
-//             console.error('lazy load revertVersionId fail', error)
-//             toast.error(t('error-revert-to-builtin'))
-//             return
-//           }
-
-//           const { error: updateError } = await supabase
-//             .from('channels')
-//             .update({ version: revertVersionId })
-//             .eq('id', id.value)
-
-//           if (updateError) {
-//             console.error(updateError)
-//             toast.error(t('error-revert-to-builtin'))
-//             return
-//           }
-
-//           await getChannel()
-//         },
-//       },
-//       {
-//         text: t('cancel'),
-//         role: 'cancel',
-//       },
-//     ],
-//   }
-//   displayStore.showDialog = true
-// }
-
-function getBundleNumber() {
-  if (!channel.value?.enable_ab_testing && !channel.value?.enable_progressive_deploy)
-    return channel.value?.version.name
-  if (channel.value?.enable_ab_testing && !channel.value?.enable_progressive_deploy)
-    return `${channel.value?.version.name} / ${channel.value?.second_version.name}`
-  return (channel.value?.secondary_version_percentage !== 1) ? channel.value?.version.name : channel.value?.second_version.name
-}
-
-function getProgressivePercentage() {
-  if (channel.value?.secondary_version_percentage === 1)
-    return t('status-complete')
-  if (channel.value?.secondary_version_percentage)
-    return `${((channel.value?.secondary_version_percentage * 100) | 0)}%`
-  return t('status-failed')
-}
 </script>
 
 <template>
@@ -562,69 +361,18 @@ function getProgressivePercentage() {
             {{ channel.name }}
           </InfoRow>
           <!-- Bundle Number -->
-          <template v-if="!channel.enable_ab_testing && !channel.enable_progressive_deploy">
-            <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'">
-              <div class="flex items-center">
-                <span @click="openBundle()">{{ channel.version.name }}</span>
-                <!-- <button v-if="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()"><Backward class="w-6 h-6 ml-1" /></button>  -->
-              </div>
-            </InfoRow>
-            <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
-              {{ channel.version.min_update_version ?? t('undefined-fail') }}
-            </InfoRow>
-          </template>
-          <template v-else-if="channel.enable_ab_testing && !channel.enable_progressive_deploy">
-            <InfoRow :label="`${t('bundle-number')} A`" :is-link="true" @click="openBundle()">
-              {{ channel.version.name }}
-            </InfoRow>
-            <InfoRow :label="`${t('bundle-number')} B`" :is-link="true" @click="openSecondBundle">
-              {{ channel.second_version.name }}
-            </InfoRow>
-            <template v-if="channel.disable_auto_update === 'version_number'">
-              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`">
-                {{ channel.version.min_update_version ?? t('undefined-fail') }}
-              </InfoRow>
-              <InfoRow :label="`${t('min-update-version')} B`">
-                {{ channel.second_version.min_update_version ?? t('undefined-fail') }}
-              </InfoRow>
-            </template>
-          </template>
-          <template v-else>
-            <InfoRow :label="`${t('main-bundle-number')}`" :is-link="true" @click="openBundle()">
-              {{ getBundleNumber() }}
-            </InfoRow>
-            <InfoRow :label="`${t('progressive-bundle-number')}`" :is-link="true" @click="openSecondBundle">
-              {{ getBundleNumber() }}
-            </InfoRow>
-            <InfoRow v-if="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`">
-              {{ getProgressivePercentage() }}
-            </InfoRow>
-            <template v-if="channel.disable_auto_update === 'version_number'">
-              <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`">
-                {{ channel.version.min_update_version ?? t('undefined-fail') }}
-              </InfoRow>
-              <InfoRow :label="`${t('min-update-version')} B`">
-                {{ channel.second_version.min_update_version ?? t('undefined-fail') }}
-              </InfoRow>
-              <InfoRow :label="`${t('main-bundle-number')}`" :is-link="true" @click="openBundle()">
-                {{ getVersion.name }}
-              </InfoRow>
-              <InfoRow :label="`${t('progressive-bundle-number')}`" :is-link="true" @click="openSecondBundle">
-                {{ getVersion.name }}
-              </InfoRow>
-              <InfoRow v-if="channel.enable_progressive_deploy" :label="`${t('progressive-percentage')}`">
-                {{ getVersion.label }}
-              </InfoRow>
-              <template v-if="channel.disable_auto_update === 'version_number'">
-                <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="`${t('min-update-version')} A`">
-                  {{ channel.version.min_update_version ?? t('undefined-fail') }}
-                </InfoRow>
-                <InfoRow :label="`${t('min-update-version')} B`">
-                  {{ channel.second_version.min_update_version ?? t('undefined-fail') }}
-                </InfoRow>
-              </template>
-            </template>
-          </template>
+          <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'">
+            <div class="flex items-center">
+              <span @click="openBundle()">{{ channel.version.name }}</span>
+              <!-- <button v-if="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()"><Backward class="w-6 h-6 ml-1" /></button>  -->
+            </div>
+          </InfoRow>
+          <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
+            {{ channel.version.min_update_version ?? t('undefined-fail') }}
+          </InfoRow>
+          <InfoRow :label="t('bundle-number')" :is-link="true" @click="openBundle()">
+            {{ channel.version.name }}
+          </InfoRow>
           <!-- Created At -->
           <InfoRow :label="t('created-at')">
             {{ formatDate(channel.created_at) }}
@@ -693,26 +441,6 @@ function getProgressivePercentage() {
               :value="channel?.allow_device_self_set"
               @change="saveChannelChange('allow_device_self_set', !channel?.allow_device_self_set)"
             />
-          </InfoRow>
-          <InfoRow :label="t('channel-ab-testing')">
-            <Toggle
-              :value="channel?.enable_ab_testing"
-              @change="enableAbTesting()"
-            />
-          </InfoRow>
-          <InfoRow :label="t('channel-progressive-deploy')">
-            <Toggle
-              :value="channel?.enable_progressive_deploy"
-              @change="enableProgressiveDeploy()"
-            />
-          </InfoRow>
-          <InfoRow v-if="channel.enable_ab_testing || channel.enable_progressive_deploy" :label="`${t('channel-ab-testing-percentage')}: ${secondaryVersionPercentage}%`">
-            <div>
-              <input v-model="secondaryVersionPercentage" type="range" min="0" max="100" class="range range-info" step="10" @mouseup="onMouseDownSecondaryVersionSlider">
-              <div class="w-full px-2 text-xs text-center">
-                <span>{{ secondaryVersionPercentage }}%</span>
-              </div>
-            </div>
           </InfoRow>
           <InfoRow :label="t('unlink-bundle')" :is-link="true" @click="openPannel">
             <button class="ml-auto bg-transparent w-7 h-7">

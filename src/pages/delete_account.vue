@@ -10,6 +10,7 @@ import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
+import { registerWebsiteDomain } from '~/utils/Utils'
 
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
@@ -176,7 +177,7 @@ onMounted (() => {
                 <div class="text-center">
                   <p class="text-base text-gray-600">
                     {{ t('dont-have-an-account') }} <br> <a
-                      href="https://capgo.app/register/"
+                      :href="`${registerWebsiteDomain()}/register/`"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}

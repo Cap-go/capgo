@@ -18,9 +18,11 @@ analytics_engine_datasets = [
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage" },
   { binding = "VERSION_USAGE", dataset = "version_usage" },
   { binding = "APP_LOG", dataset = "app_log" },
+  { binding = "APP_LOG_EXTERNAL", dataset = "app_log_external" },
 ]
 d1_databases = [
   { binding = "DB_DEVICES", database_name = "capgo_prod_devices", database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753" },
+  { binding = "DB_STOREAPPS", database_name = "capgo_prod_storeapps", database_id = "81236a0c-db6e-454d-87da-944fa9bc100c" },
   { binding = "DB_REPLICATE", database_name = "capgo_prod_replicate", database_id = "7f267d86-f4f7-49f5-9622-e44373aa00dc" },
 ]
 hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a06" }, ]
@@ -45,6 +47,7 @@ routes = [
 ]
 d1_databases = [
   { binding = "DB_DEVICES", database_name = "capgo_prod_devices", database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753" },
+  { binding = "DB_STOREAPPS", database_name = "capgo_prod_storeapps", database_id = "81236a0c-db6e-454d-87da-944fa9bc100c" },
   { binding = "DB_REPLICATE", database_name = "capgo_prod_replicate", database_id = "7f267d86-f4f7-49f5-9622-e44373aa00dc" },
 ]
 analytics_engine_datasets = [
@@ -52,6 +55,7 @@ analytics_engine_datasets = [
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage" },
   { binding = "VERSION_USAGE", dataset = "version_usage" },
   { binding = "APP_LOG", dataset = "app_log" },
+  { binding = "APP_LOG_EXTERNAL", dataset = "app_log_external" },
 ]
 hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a06" }, ]
 
@@ -69,6 +73,7 @@ routes = [
 ]
 d1_databases = [
   { binding = "DB_DEVICES", database_name = "capgo_alpha_devices", database_id = "2510b55c-d6a2-4595-a2a5-d9aca82a3753" },
+  { binding = "DB_STOREAPPS", database_name = "capgo_prod_storeapps", database_id = "81236a0c-db6e-454d-87da-944fa9bc100c" },
   { binding = "DB_REPLICATE", database_name = "capgo_alpha_replicate", database_id = "7f267d86-f4f7-49f5-9622-e44373aa00dc" },
 ]
 analytics_engine_datasets = [
@@ -76,6 +81,7 @@ analytics_engine_datasets = [
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage_alpha" },
   { binding = "VERSION_USAGE", dataset = "version_usage_alpha" },
   { binding = "APP_LOG", dataset = "app_log_alpha" },
+  { binding = "APP_LOG_EXTERNAL", dataset = "app_log_external_alpha" },
 ]
 hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a06" }, ]
 

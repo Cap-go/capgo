@@ -46,7 +46,6 @@ public class MainActivity extends BridgeActivity implements ShakeDetector.Listen
         updater.prefs = this.bridge.getContext().getSharedPreferences(WebView.WEBVIEW_PREFS_NAME, Activity.MODE_PRIVATE);
         updater.editor = this.prefs.edit();
         updater.documentsDir = this.bridge.getContext().getFilesDir();
-        updater.requestQueue = Volley.newRequestQueue(this.bridge.getContext());
         if (isShow) {
             return;
         }

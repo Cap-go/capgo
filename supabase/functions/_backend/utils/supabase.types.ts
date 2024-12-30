@@ -75,7 +75,6 @@ export type Database = {
       app_versions: {
         Row: {
           app_id: string
-          bucket_id: string | null
           checksum: string | null
           created_at: string | null
           deleted: boolean
@@ -85,7 +84,6 @@ export type Database = {
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
           min_update_version: string | null
-          minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
           owner_org: string
@@ -97,7 +95,6 @@ export type Database = {
         }
         Insert: {
           app_id: string
-          bucket_id?: string | null
           checksum?: string | null
           created_at?: string | null
           deleted?: boolean
@@ -107,7 +104,6 @@ export type Database = {
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
           min_update_version?: string | null
-          minUpdateVersion?: string | null
           name: string
           native_packages?: Json[] | null
           owner_org: string
@@ -119,7 +115,6 @@ export type Database = {
         }
         Update: {
           app_id?: string
-          bucket_id?: string | null
           checksum?: string | null
           created_at?: string | null
           deleted?: boolean
@@ -129,7 +124,6 @@ export type Database = {
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
           min_update_version?: string | null
-          minUpdateVersion?: string | null
           name?: string
           native_packages?: Json[] | null
           owner_org?: string
@@ -360,25 +354,15 @@ export type Database = {
           allow_emulator: boolean
           android: boolean
           app_id: string
-          beta: boolean
           created_at: string
           created_by: string | null
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native: boolean
-          disableAutoUpdate:
-            | Database["public"]["Enums"]["disable_update"]
-            | null
-          enable_ab_testing: boolean
-          enable_progressive_deploy: boolean
           id: number
           ios: boolean
           name: string
           owner_org: string
           public: boolean
-          second_version: number | null
-          secondary_version_percentage: number
-          secondaryVersionPercentage: number | null
-          secondVersion: number | null
           updated_at: string
           version: number
         }
@@ -388,25 +372,15 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id: string
-          beta?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
-          disableAutoUpdate?:
-            | Database["public"]["Enums"]["disable_update"]
-            | null
-          enable_ab_testing?: boolean
-          enable_progressive_deploy?: boolean
           id?: number
           ios?: boolean
           name: string
           owner_org: string
           public?: boolean
-          second_version?: number | null
-          secondary_version_percentage?: number
-          secondaryVersionPercentage?: number | null
-          secondVersion?: number | null
           updated_at?: string
           version: number
         }
@@ -416,25 +390,15 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id?: string
-          beta?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
-          disableAutoUpdate?:
-            | Database["public"]["Enums"]["disable_update"]
-            | null
-          enable_ab_testing?: boolean
-          enable_progressive_deploy?: boolean
           id?: number
           ios?: boolean
           name?: string
           owner_org?: string
           public?: boolean
-          second_version?: number | null
-          secondary_version_percentage?: number
-          secondaryVersionPercentage?: number | null
-          secondVersion?: number | null
           updated_at?: string
           version?: number
         }
@@ -445,13 +409,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "channels_secondVersion_fkey"
-            columns: ["second_version"]
-            isOneToOne: false
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "channels_version_fkey"
@@ -643,58 +600,6 @@ export type Database = {
         }
         Relationships: []
       }
-      devices_override: {
-        Row: {
-          app_id: string
-          created_at: string | null
-          device_id: string
-          id: number
-          owner_org: string
-          updated_at: string | null
-          version: number
-        }
-        Insert: {
-          app_id: string
-          created_at?: string | null
-          device_id: string
-          id?: number
-          owner_org: string
-          updated_at?: string | null
-          version: number
-        }
-        Update: {
-          app_id?: string
-          created_at?: string | null
-          device_id?: string
-          id?: number
-          owner_org?: string
-          updated_at?: string | null
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "devices_override_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "devices_override_version_fkey"
-            columns: ["version"]
-            isOneToOne: false
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "owner_org_id_fkey"
-            columns: ["owner_org"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       global_stats: {
         Row: {
           apps: number
@@ -710,6 +615,7 @@ export type Database = {
           stars: number
           trial: number | null
           updates: number
+          updates_external: number | null
           updates_last_month: number | null
           users: number | null
           users_active: number | null
@@ -728,6 +634,7 @@ export type Database = {
           stars: number
           trial?: number | null
           updates: number
+          updates_external?: number | null
           updates_last_month?: number | null
           users?: number | null
           users_active?: number | null
@@ -746,51 +653,10 @@ export type Database = {
           stars?: number
           trial?: number | null
           updates?: number
+          updates_external?: number | null
           updates_last_month?: number | null
           users?: number | null
           users_active?: number | null
-        }
-        Relationships: []
-      }
-      job_queue: {
-        Row: {
-          created_at: string | null
-          extra_info: Json
-          function_name: string | null
-          function_type: string | null
-          job_id: number
-          job_type: string
-          payload: string
-          request_id: number | null
-          retry_count: number | null
-          retry_limit: number | null
-          status: Database["public"]["Enums"]["queue_job_status"]
-        }
-        Insert: {
-          created_at?: string | null
-          extra_info?: Json
-          function_name?: string | null
-          function_type?: string | null
-          job_id?: number
-          job_type: string
-          payload: string
-          request_id?: number | null
-          retry_count?: number | null
-          retry_limit?: number | null
-          status?: Database["public"]["Enums"]["queue_job_status"]
-        }
-        Update: {
-          created_at?: string | null
-          extra_info?: Json
-          function_name?: string | null
-          function_type?: string | null
-          job_id?: number
-          job_type?: string
-          payload?: string
-          request_id?: number | null
-          retry_count?: number | null
-          retry_limit?: number | null
-          status?: Database["public"]["Enums"]["queue_job_status"]
         }
         Relationships: []
       }
@@ -1222,21 +1088,6 @@ export type Database = {
         }
         Relationships: []
       }
-      workers: {
-        Row: {
-          id: number
-          locked: boolean
-        }
-        Insert: {
-          id?: number
-          locked?: boolean
-        }
-        Update: {
-          id?: number
-          locked?: boolean
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -1273,6 +1124,10 @@ export type Database = {
           appid: string
         }
         Returns: number
+      }
+      cleanup_queue_messages: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       convert_bytes_to_gb: {
         Args: {
@@ -1325,10 +1180,6 @@ export type Database = {
           plan_name: string
           count: number
         }[]
-      }
-      delete_failed_jobs: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
       }
       delete_user: {
         Args: Record<PropertyKey, never>
@@ -1518,6 +1369,21 @@ export type Database = {
       get_netlify_function_url: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_next_cron_time: {
+        Args: {
+          p_schedule: string
+          p_timestamp: string
+        }
+        Returns: string
+      }
+      get_next_cron_value: {
+        Args: {
+          pattern: string
+          current_val: number
+          max_val: number
+        }
+        Returns: number
       }
       get_org_members: {
         Args: {
@@ -1742,7 +1608,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           app_id: string
-          bucket_id: string | null
           checksum: string | null
           created_at: string | null
           deleted: boolean
@@ -1752,7 +1617,6 @@ export type Database = {
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
           min_update_version: string | null
-          minUpdateVersion: string | null
           name: string
           native_packages: Json[] | null
           owner_org: string
@@ -1777,15 +1641,6 @@ export type Database = {
         Args: {
           appid: string
           right: Database["public"]["Enums"]["user_min_right"]
-        }
-        Returns: boolean
-      }
-      has_app_right_apikey: {
-        Args: {
-          appid: string
-          right: Database["public"]["Enums"]["user_min_right"]
-          userid: string
-          apikey: string
         }
         Returns: boolean
       }
@@ -1899,6 +1754,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_numeric: {
+        Args: {
+          "": string
+        }
+        Returns: boolean
+      }
       is_onboarded_org: {
         Args: {
           orgid: string
@@ -1946,13 +1807,27 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      parse_cron_field: {
+        Args: {
+          field: string
+          current_val: number
+          max_val: number
+        }
+        Returns: number
+      }
+      parse_step_pattern: {
+        Args: {
+          pattern: string
+        }
+        Returns: number
+      }
       process_cron_stats_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      process_current_jobs_if_unlocked: {
+      process_d1_replication_batch: {
         Args: Record<PropertyKey, never>
-        Returns: number[]
+        Returns: undefined
       }
       process_failed_uploads: {
         Args: Record<PropertyKey, never>
@@ -1962,8 +1837,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      process_requested_jobs: {
-        Args: Record<PropertyKey, never>
+      process_function_queue: {
+        Args: {
+          queue_name: string
+        }
         Returns: undefined
       }
       process_stats_email: {
@@ -2055,10 +1932,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      retry_failed_jobs: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -2068,7 +1941,6 @@ export type Database = {
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
-      queue_job_status: "inserted" | "requested" | "failed"
       stats_action:
         | "delete"
         | "reset"

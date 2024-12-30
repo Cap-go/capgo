@@ -197,8 +197,7 @@ const chartOptions = ref<ChartOptions & { plugins: { inlineAnnotationPlugin: Ann
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
       },
-    }
-    ,
+    },
   },
   plugins: {
     inlineAnnotationPlugin: generateAnnotations.value,

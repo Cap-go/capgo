@@ -28,6 +28,8 @@ add-member: Üye ekle
 add-your-first-app-t: İlk uygulamanızı hesabınıza ekleyin ve güncellemeleri gönderelim!
 admin: yönetici
 alert-2fa-disable: 2FA'yı devre dışı bırakmak istediğinizi onaylayın
+alert-2fa-required: Parolayı sıfırlamak için 2FA gereklidir
+alert-2fa-required-message: Lütfen 2fa kodunu girin
 alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
 alert-add-new-key: Yeni API anahtarı türünü seçin
 alert-confirm-delete: Silmeyi Onayla
@@ -103,10 +105,10 @@ cannot-del-org: Kuruluş silinemiyor, lütfen tarayıcı günlüğünü kontrol 
 cannot-delete-app: Uygulama silinemiyor
 cannot-delete-app-icon: Uygulama simgesi silinemiyor
 cannot-delete-bundle: Paket silinemiyor
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Sürümleri toplu olarak silemezsiniz
+cannot-delete-bundle-linked-channel-2: 'Aşağıdaki versiyonlar en az 1 kanalda bağlantılıdır:'
+cannot-delete-bundle-linked-channel-3: Lütfen bağlantılarını manuel olarak kaldırın ve tekrar deneyin
+cannot-delete-bundles: Paketler silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
