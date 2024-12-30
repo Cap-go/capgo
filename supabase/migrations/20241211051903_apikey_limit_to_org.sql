@@ -211,3 +211,52 @@ Begin
 End;
 $$;
 
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v6"()
+RETURNS TABLE(
+    "gid" "uuid", 
+    "created_by" "uuid", 
+    "logo" "text", 
+    "name" "text", 
+    "role" character varying, 
+    "paying" boolean, 
+    "trial_left" integer, 
+    "can_use_more" boolean, 
+    "is_canceled" boolean, 
+    "app_count" bigint, 
+    "subscription_start" timestamp with time zone, 
+    "subscription_end" timestamp with time zone, 
+    "management_email" "text",
+    "is_yearly" boolean
+)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  api_key_text text;
+  api_key record;
+  user_id uuid;
+BEGIN
+  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
+  IF api_key_text IS DISTINCT FROM NULL THEN
+    SELECT * FROM apikeys WHERE key=api_key_text into api_key;
+    IF api_key IS DISTINCT FROM NULL THEN
+      user_id := api_key.user_id;
+    END IF;
+  END IF;
+
+  IF user_id IS NOT DISTINCT FROM NULL THEN
+    SELECT get_identity() into user_id;
+  END IF;
+
+  IF user_id IS NOT DISTINCT FROM NULL THEN
+    RAISE EXCEPTION 'Cannot do that as postgres!';
+  END IF;
+
+  IF api_key IS DISTINCT FROM NULL AND api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
+    return query select orgs.* from get_orgs_v6("user_id") orgs where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+    RETURN;
+  END IF;
+
+  return query select * from get_orgs_v6("user_id");
+END;  
+$$;
