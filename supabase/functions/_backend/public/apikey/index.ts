@@ -50,4 +50,39 @@ app.post('/', middlewareKey(['all']), async (c) => {
   return c.json({ apikey: apikeyData })
 })
 
+app.delete('/:id', middlewareKey(['all']), async (c) => {
+  const key = c.get('apikey')
+  if (!key) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
+    return c.json({ error: 'You cannot do that as a limited API key' }, 401)
+  }
+
+  const id = c.req.param('id')
+  if (!id) {
+    return c.json({ error: 'API key ID is required' }, 400)
+  }
+
+  const supabase = supabaseAdmin(c)
+
+  const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').eq('key', id).eq('user_id', key.user_id).single()
+  if (!apikey || apikeyError) {
+    return c.json({ error: 'API key not found', supabaseError: apikeyError }, 404)
+  }
+
+  const { error } = await supabase
+    .from('apikeys')
+    .delete()
+    .eq('key', id)
+    .eq('user_id', key.user_id)
+
+  if (error) {
+    return c.json({ error: 'Failed to delete API key', supabaseError: error }, 500)
+  }
+
+  return c.json({ success: true })
+})
+
 export { app }
