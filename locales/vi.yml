@@ -476,6 +476,7 @@ select-style-of-deletion-msg: |-
   Bạn có thể đọc về sự khác biệt $1
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
+select_all: chọn tất cả
 session_key: IvSessionKey
 set-bundle: Đặt gói thành kênh
 settings: Cài đặt

@@ -210,7 +210,10 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
           </ul>
         </div>
       </div>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end ml-auto mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('massDelete')">
+      <button v-if="props.massSelect && selectedRows.find(val => val)" class="self-end ml-auto mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
+        <span class="text-sm">{{ t('select_all') }}</span>
+      </button>
+      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
       <!-- </div> -->

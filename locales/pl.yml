@@ -465,6 +465,7 @@ select-style-of-deletion-msg: |-
   Możesz przeczytać o różnicy $1
 select-user-perms: Wybierz uprawnienia użytkownika
 select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
+select_all: wybierz wszystko
 session_key: Klucz IVSesji
 set-bundle: Ustaw pakiet na kanał
 settings: Ustawienia

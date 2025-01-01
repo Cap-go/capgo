@@ -457,6 +457,7 @@ select-style-of-deletion-msg: |-
   Fark hakkında okuyabilirsiniz $1
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
+select_all: tümünü seç
 session_key: IvSessionKey
 set-bundle: Paketi kanala ayarla
 settings: Ayarlar

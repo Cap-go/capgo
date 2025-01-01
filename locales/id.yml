@@ -461,6 +461,7 @@ select-style-of-deletion-msg: |-
   Anda dapat membaca tentang perbedaannya di $1
 select-user-perms: Pilih izin pengguna
 select-user-perms-expanded: Pilih izin mana yang harus dimiliki oleh pengguna yang diundang
+select_all: pilih semua
 session_key: IvSessionKey
 set-bundle: Tetapkan bundel ke saluran
 settings: Pengaturan

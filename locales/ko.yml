@@ -438,6 +438,7 @@ select-style-of-deletion-msg: |-
   차이점에 대해 읽을 수 있습니다 $1
 select-user-perms: 사용자 권한 선택
 select-user-perms-expanded: 초대된 사용자가 어떤 권한을 가져야 하는지 선택하세요.
+select_all: 모두 선택
 session_key: IvSessionKey
 set-bundle: 번들을 채널로 설정
 settings: 설정

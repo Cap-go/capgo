@@ -504,6 +504,7 @@ select-style-of-deletion-msg: |-
   Sie können über den Unterschied lesen $1
 select-user-perms: Wählen Sie die Berechtigungen des Benutzers aus
 select-user-perms-expanded: Wählen Sie aus, welche Berechtigung der eingeladene Benutzer haben soll
+select_all: alle auswählen
 session_key: IvSessionKey
 set-bundle: Bündel auf Kanal setzen
 settings: Einstellungen
