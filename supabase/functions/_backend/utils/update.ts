@@ -211,6 +211,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     // console.log(c.get('requestId'), 'signedURL', device_id, signedURL, version_name, version.name)
     if (version_name === version.name) {
       console.log({ requestId: c.get('requestId'), context: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
+      // TODO: check why this event is send with wrong version_name
       await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
       return c.json({
         message: 'No new version available',
