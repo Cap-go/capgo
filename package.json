@@ -119,6 +119,7 @@
     "@capgo/inappbrowser": "^6.9.28",
     "@capgo/native-audio": "^6.4.23",
     "@capgo/native-market": "^6.0.2",
+    "@elithrar/workers-hono-rate-limit": "^0.4.3",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
     "@formkit/i18n": "^1.6.9",
     "@formkit/themes": "1.6.9",
