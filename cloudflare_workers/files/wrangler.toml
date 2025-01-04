@@ -21,19 +21,6 @@ migrations = [
   # { tag = "v2", renamed_classes = [ { from = "UploadHandler", to = "AttachmentUploadHandler" } ], new_classes = ["BackupUploadHandler"]},
 ]
 
-[env.preprod]
-name = "capgo_files-preprod"
-routes = [
-  { pattern = "files-preprod.capgo.app", custom_domain = true },
-  { pattern = "api-preprod.capgo.app/private/files*", zone_name = "capgo.app" },
-  { pattern = "api-preprod.capgo.app/files*", zone_name = "capgo.app" },
-  { pattern = "api-preprod.capgo.app/private/download_link", zone_name = "capgo.app" },
-]
-
-durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
-
-r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo", preview_bucket_name = "capgo" } ]
-
 [[unsafe.bindings]]
 name = "FILES_READ_RATE_LIMITER"
 type = "ratelimit"
@@ -46,6 +33,19 @@ name = "FILES_UPLOAD_RATE_LIMITER"
 type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 200, period = 10 }
+
+[env.preprod]
+name = "capgo_files-preprod"
+routes = [
+  { pattern = "files-preprod.capgo.app", custom_domain = true },
+  { pattern = "api-preprod.capgo.app/private/files*", zone_name = "capgo.app" },
+  { pattern = "api-preprod.capgo.app/files*", zone_name = "capgo.app" },
+  { pattern = "api-preprod.capgo.app/private/download_link", zone_name = "capgo.app" },
+]
+
+durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
+
+r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo", preview_bucket_name = "capgo" } ]
 
 [env.alpha]
 name = "capgo_files-alpha"
@@ -66,16 +66,3 @@ name = "capgo_files-local"
 durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]
 
 r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo-local", preview_bucket_name = "capgo-local" } ]
-
-[[unsafe.bindings]]
-name = "FILES_READ_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 200, period = 10 }
-
-
-[[unsafe.bindings]]
-name = "FILES_UPLOAD_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 200, period = 10 }
