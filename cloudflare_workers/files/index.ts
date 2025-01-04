@@ -39,8 +39,11 @@ export function readRateLimiter() {
 
     const key = `${appId}/${deviceId}`
 
-    await rateLimit(c.env[`FILES_READ_RATE_LIMITER`], () => key)(c, next);
+    const rateLimiterKey = `FILES_READ_RATE_LIMITER`
+    if (c.env[rateLimiterKey])
+      await rateLimit(c.env[rateLimiterKey], () => key)(c, next);
 
+    // TODO: make it async
     if (wasRateLimited(c)) {
       // let's read the device from the db
       const res = await readDevices(c as any, appId, 0, 1, undefined, [deviceId.toLowerCase()])
@@ -77,7 +80,9 @@ export function uploadRateLimiter() {
     }
 
     const key = `${capgkey}_${appId}`
-    await rateLimit(c.env[`FILES_UPLOAD_RATE_LIMITER`], () => key)(c, next);
+    const rateLimiterKey = `FILES_UPLOAD_RATE_LIMITER`
+    if (c.env[rateLimiterKey])
+      await rateLimit(c.env[rateLimiterKey], () => key)(c, next);
   }
   return subMiddlewareKey
 }

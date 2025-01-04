@@ -27,6 +27,36 @@ d1_databases = [
 ]
 hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a06" }, ]
 
+[[unsafe.bindings]]
+name = "PUBLIC_API_DEVICE_CHANNEL_SELF_POST_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_API_DEVICE_CHANNEL_SELF_DELETE_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_API_DEVICE_CHANNEL_SELF_PUT_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_API_DEVICE_CHANNEL_SELF_GET_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 10 }
+
+[[unsafe.bindings]]
+name = "PUBLIC_API_DEVICE_ALL_UPDATES_POST_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 20, period = 10 }
+
 # durable_objects.bindings = [ { name = "DB_REPLICATE", class_name = "ReplicateHandler" } ]
 
 # migrations = [
@@ -89,32 +119,3 @@ hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a
 
 [env.local]
 name = "capgo_plugin-local"
-[[unsafe.bindings]]
-name = "PUBLIC_API_DEVICE_CHANNEL_SELF_POST_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 20, period = 10 }
-
-[[unsafe.bindings]]
-name = "PUBLIC_API_DEVICE_CHANNEL_SELF_DELETE_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 20, period = 10 }
-
-[[unsafe.bindings]]
-name = "PUBLIC_API_DEVICE_CHANNEL_SELF_PUT_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 20, period = 10 }
-
-[[unsafe.bindings]]
-name = "PUBLIC_API_DEVICE_CHANNEL_SELF_GET_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 20, period = 10 }
-
-[[unsafe.bindings]]
-name = "PUBLIC_API_DEVICE_ALL_UPDATES_POST_RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1002"
-simple = { limit = 20, period = 10 }

@@ -68,7 +68,9 @@ export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: 
     const key = capgkey_string || apikey_string
     if (!key)
       return next()
-    await rateLimit(c.env[`API_${rateLimiterAction}_RATE_LIMITER`], () => key)(c, next)
+    const rateLimiterKey = `API_${rateLimiterAction}_RATE_LIMITER`
+    if (c.env[rateLimiterKey])
+      await rateLimit(c.env[rateLimiterKey], () => key)(c, next)
     await next()
   }
   return subMiddlewareKey

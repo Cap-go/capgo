@@ -14,6 +14,7 @@ export type Database = {
           created_at: string | null
           id: number
           key: string
+          limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
           updated_at: string | null
@@ -23,6 +24,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           key: string
+          limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
           updated_at?: string | null
@@ -32,6 +34,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           key?: string
+          limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
           name?: string
           updated_at?: string | null
@@ -200,6 +203,7 @@ export type Database = {
           name: string | null
           owner_org: string
           retention: number
+          transfer_history: Json[] | null
           updated_at: string | null
           user_id: string | null
         }
@@ -213,6 +217,7 @@ export type Database = {
           name?: string | null
           owner_org: string
           retention?: number
+          transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -226,6 +231,7 @@ export type Database = {
           name?: string | null
           owner_org?: string
           retention?: number
+          transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -329,7 +335,6 @@ export type Database = {
           allow_emulator: boolean
           android: boolean
           app_id: string
-          base_disable_auto_update_on_native: boolean
           created_at: string
           created_by: string | null
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
@@ -348,7 +353,6 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id: string
-          base_disable_auto_update_on_native?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -367,7 +371,6 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id?: string
-          base_disable_auto_update_on_native?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -1351,6 +1354,13 @@ export type Database = {
         }
         Returns: string
       }
+      get_identity_org: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          org_id: string
+        }
+        Returns: string
+      }
       get_infos: {
         Args: {
           appid: string
@@ -1666,6 +1676,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_app_right_apikey: {
+        Args: {
+          appid: string
+          right: Database["public"]["Enums"]["user_min_right"]
+          userid: string
+          apikey: string
+        }
+        Returns: boolean
+      }
       has_app_right_userid: {
         Args: {
           appid: string
@@ -1953,6 +1972,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      transfer_app: {
+        Args: {
+          p_app_id: string
+          p_new_org_id: string
+        }
+        Returns: undefined
+      }
       update_app_usage:
         | {
             Args: Record<PropertyKey, never>
@@ -2037,6 +2063,7 @@ export type Database = {
         | "NoChannelOrOverride"
         | "setChannel"
         | "getChannel"
+        | "rateLimited"
       stripe_status:
         | "created"
         | "succeeded"
