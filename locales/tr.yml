@@ -59,6 +59,10 @@ app-info-desc: Uygulama bilgilerinizi buradan değiştirebilirsiniz
 app-logo-deleted: Uygulama resmi başarıyla silindi
 app-name: Uygulama ismi
 app-perm: Uygulama izni
+app-transferred: Uygulama başarıyla aktarıldı
+app-will-be-transferred: >-
+  Uygulama $ORG_ID'ye aktarılacaktır. Aktarımı onaylamak için lütfen uygulama
+  kimliğini ('$APP_ID') yazın.
 are-u-sure: Emin misin ?
 are-you-sure-you-want-to-download: İndirmek istediğinizden emin misiniz?
 available-in-the-san: Korumalı alan uygulamasında mevcuttur
@@ -112,6 +116,7 @@ cannot-delete-bundles: Paketler silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
+cannot-delete-unknown-or-builtin: Bilinmeyen paket ve yerleşik paket silinemiyor
 cannot-determine-platform: Verilen UUID'nin IOS'a mı yoksa Android'e mi ait olduğu belirlenemiyor
 cannot-fetch-channels: Kanallar getirilemiyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-find-unknown-version: >-
@@ -123,6 +128,9 @@ cannot-load-app-settings: Uygulama ayarları yüklenemiyor
 cannot-set-this-vers: Bu sürüm ayarlanamıyor
 cannot-show: Bu sayfa gösterilemiyor
 cannot-test-app-some: Uygulama test edilemiyor, yanlış bir şey oldu
+cannot-transfer-app: >-
+  Organizasyon aktarılamıyor. Lütfen tarayıcı konsolunu kontrol edin ve hatayı
+  Capgo desteğe bildirin.
 cannot-view-plans: Planlar sayfası görüntülenemiyor
 cannot-view-usage: Kullanım sayfası görüntülenemiyor
 cannots-sign-off: Oturum açılamıyor
@@ -130,6 +138,7 @@ captcha: Captcha
 captcha-fail: Captcha doğrulaması başarısız oldu
 change: Değiştirmek
 change-api-key-name: Apikey'in adını değiştirin
+change-app-organisation-owner: Başvuruyu başka bir kuruluşa aktarın
 change-your-picture: Resmini değiştir
 changed-app-name: Uygulama adı başarıyla değiştirildi
 changed-app-retention: Uygulamanın saklama süresi başarıyla değiştirildi
@@ -175,10 +184,12 @@ confirm-public-desc: >-
   sağlar.
 
   Diğer varsayılan kanallar artık varsayılan olmayacak.
+confirm-transfer: Lütfen uygulama transferini onaylayın
 continue: Devam etmek
 copied-to-clipboard: Panoya kopyalandı
 copy-account-id: hesap kimliğini kopyala
 copy-command: Komutu kopyala
+copy-organization-id: kuruluş kimliğini kopyala
 country: Ülke
 create-a-free-accoun: Ücretsiz bir hesap oluştur
 create-new-org: Yeni bir kuruluş oluşturun
@@ -254,6 +265,7 @@ good: İyi
 here: Burada
 id: İD
 included-in-plan: Plana dahil
+incorrect-app-id: Yanlış uygulama kimliğini yazmışsınız.
 info: Bilgi
 init-capgo-in-your-a: Uygulamanızda Capgo'yu Başlatın
 insert-invite-email: Davet etmek istediğiniz kullanıcının e-posta adresini ekleyin
@@ -347,6 +359,7 @@ no-permission: Yetersiz yetkiler
 no-permission-ask-super-admin: >-
   Yetersiz izin, lütfen bir süper yöneticiden bu paketi güvenli olmayan bir
   şekilde silmesini isteyin
+no-super-admin-organizations: Hiçbir super_admin kuruluşu bulunamadı
 none: Hiçbiri
 normal: Normal
 not-found: Bulunamadı
@@ -368,6 +381,7 @@ org-deleted: Kuruluş başarıyla silindi
 org-invited-user: Kullanıcı başarıyla kuruluşa davet edildi
 org-with-this-name-exists: Bu adda zaten bir kuruluş oluşturdunuz!
 organization-email: Kuruluşun yönetim e-postası
+organization-id: Organizasyon kimliği
 organization-name: Kuruluş Adı
 organization-settings: Organizasyon ayarları
 os-version: OS sürümü
@@ -450,6 +464,8 @@ select-channel: Kanal seçin
 select-channel-msg: Lütfen bu üzerine yazma işleminde kullanmak istediğiniz kanalı seçin
 select-default-upload-channel: Lütfen varsayılan yükleme kanalını seçin
 select-default-upload-channel-header: Varsayılan kanalı seçin
+select-destination-organization: Hedef kuruluşu seçin
+select-organization-to-transfer: Bu uygulamayı dönüştürmek istediğiniz kuruluşu seçin
 select-style-of-deletion: Silme stilini seçin
 select-style-of-deletion-msg: |-
   Lütfen bu kanalı silmek istediğiniz yolu seçin.
@@ -457,6 +473,7 @@ select-style-of-deletion-msg: |-
   Fark hakkında okuyabilirsiniz $1
 select-user-perms: Kullanıcının izinlerini seçin
 select-user-perms-expanded: Davet edilen kullanıcının hangi izne sahip olması gerektiğini seçin
+select_all: tümünü seç
 session_key: IvSessionKey
 set-bundle: Paketi kanala ayarla
 settings: Ayarlar
@@ -484,6 +501,12 @@ this-page-will-self-: CLI'ye katılımınızı tamamladıktan sonra bu sayfa ken
 to: için
 to-open-encrypted-bu: 'Şifreli paketi açmak için şu komutu kullanın:'
 top-apps-v2: Uygulamalar
+transfer-app-ownership: Uygulama sahipliğini aktarma
+transfer-app-ownership-requirements: >-
+  Bir uygulamayı kuruluşlar arasında aktarmak için hem kaynak hem de hedef
+  kuruluşta super_admin ayrıcalıklarına sahip olmanız gerekir. Bu, sahipliğin
+  güvenli bir şekilde aktarılmasını sağlar ve yetkisiz erişimi önler.
+transfer-app-ownership-too-soon: Uygulamaları yalnızca 32 günde bir aktarabilirsiniz
 trial-left: Kalan günler
 trial-plan-expired: Deneme süresi sona erdi
 type-device-id: Cihaz kimliğini girin
@@ -534,6 +557,12 @@ wrong-name-org-del: |-
   Şunu yazmanız gerekiyordu: %1
 yearly: Yıllık
 'yes': Evet
+you-are-deleting-unsafely: >-
+  $1Uyarı!!!$2 Bu paketi güvenli olmayan bir şekilde siliyorsunuz, bu işlem geri
+  alınamaz. Daha fazla bilgi $3burada$4
+you-are-deleting-unsafely-plural: >-
+  $1Uyarı!!!$2 Bu paketleri güvenli olmayan bir şekilde siliyorsunuz, bu işlem
+  geri alınamaz. Daha fazlasını öğrenin $3burada$4
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı

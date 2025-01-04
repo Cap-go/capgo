@@ -8,6 +8,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
 import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
 import Pencil from '~icons/heroicons/pencil-square'
+import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&height=36'
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import { urlToAppId } from '~/services/conversion'
@@ -342,6 +343,110 @@ async function editPhoto() {
   displayStore.dialogInputText = appRef?.value?.name ?? ''
   displayStore.showDialog = true
 }
+
+async function transferAppOwnership() {
+  const lastTransfer = appRef.value?.transfer_history.length > 0
+    ? appRef.value?.transfer_history?.sort((a, b) =>
+      new Date(b.transferred_at).getTime() - new Date(a.transferred_at).getTime(),
+    )[0]
+    : null
+  if (lastTransfer && new Date(lastTransfer.transferred_at).getTime() + 32 * 24 * 60 * 60 * 1000 > Date.now()) {
+    toast.error(t('transfer-app-ownership-too-soon'))
+    return
+  }
+
+  displayStore.dialogOption = {
+    header: t('transfer-app-ownership'),
+    message: t('transfer-app-ownership-requirements'),
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-xl',
+    buttonCenter: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('ok'),
+        role: 'danger',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  if (await displayStore.onDialogDismiss())
+    return
+
+  // Continue with transfer logic here
+  const superAdminOrganizations = organizationStore.organizations.filter(org => org.role === 'super_admin' && org.gid !== appRef.value?.owner_org.id)
+  if (superAdminOrganizations.length === 0) {
+    toast.error(t('no-super-admin-organizations'))
+    return
+  }
+
+  displayStore.dialogOption = {
+    header: t('select-destination-organization'),
+    message: t('select-organization-to-transfer'),
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    size: 'max-w-xl',
+    buttonVertical: true,
+    preventAccidentalClose: true,
+    buttons: [
+      ...superAdminOrganizations.map(org => ({
+        text: org.name,
+        handler: async () => {
+          displayStore.dialogOption = {
+            header: t('confirm-transfer'),
+            message: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', appId.value)}`,
+            headerStyle: 'w-full text-center',
+            textStyle: 'w-full text-center mb-4',
+            size: 'max-w-xl',
+            input: true,
+            preventAccidentalClose: true,
+            buttonCenter: true,
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('transfer'),
+                role: 'danger',
+                handler: async () => {
+                  if (displayStore.dialogInputText !== appId.value) {
+                    toast.error(t('incorrect-app-id'))
+                    return
+                  }
+                  // Transfer logic will go here
+                  const { error } = await supabase.rpc('transfer_app', {
+                    p_app_id: appId.value,
+                    p_new_org_id: org.gid,
+                  })
+                  if (error) {
+                    toast.error(t('cannot-transfer-app'))
+                    console.error(error)
+                    return
+                  }
+                  toast.success(t('app-transferred'))
+                  setTimeout(() => {
+                    router.push('/app/home')
+                  }, 2500)
+                },
+              },
+            ],
+          }
+          displayStore.showDialog = true
+        },
+      })),
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
 </script>
 
 <template>
@@ -416,6 +521,26 @@ async function editPhoto() {
                 :prefix-icon="gearSix"
                 :value="appRef?.retention || 0"
                 :label="t('retention')"
+              />
+              <FormKit
+                type="button"
+                :label="t('transfer-app-ownership')"
+                :help="t('change-app-organisation-owner')"
+                :prefix-icon="transfer"
+                :sections-schema="{
+                  outer: {
+                    $el: 'div',
+                    attrs: {
+                      class: 'flex flex-col-reverse',
+                    },
+                  },
+                  help: {
+                    attrs: {
+                      class: 'block text-neutral-700 text-sm font-bold dark:text-neutral-300 !inline-flex mb-1 formkit-label',
+                    },
+                  },
+                }"
+                @click="transferAppOwnership"
               />
             </div>
           </div>

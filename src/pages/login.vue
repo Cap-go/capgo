@@ -28,6 +28,7 @@ const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallangeId: Ref<string> = ref('')
 const router = useRouter()
 const { t } = useI18n()
+const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 const version = import.meta.env.VITE_APP_VERSION
 
@@ -61,6 +62,9 @@ async function submit(form: { email: string, password: string, code: string }) {
       isLoading.value = false
       console.error('error', error)
       setErrors('login-account', [error.message], {})
+      if (error.message.includes('Invalid login credentials')) {
+        captchaComponent.value?.reset()
+      }
       if (error.message.includes('captcha')) {
         toast.error(t('captcha-fail'))
       }
@@ -310,7 +314,7 @@ onMounted(checkLogin)
                   />
                 </div>
                 <div v-if="!!captchaKey">
-                  <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
                 <FormKitMessages />
                 <div>

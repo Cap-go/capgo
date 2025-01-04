@@ -6,7 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-// import Backward from '~icons/heroicons/backward'
+import Backward from '~icons/heroicons/backward'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -349,6 +349,50 @@ async function onChangeAutoUpdate(event: Event) {
   if (channel.value?.disable_auto_update)
     channel.value.disable_auto_update = value
 }
+
+async function handleRevertToBuiltin() {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+  displayStore.dialogOption = {
+    header: t('revert-to-builtin'),
+    message: t('revert-to-builtin-confirm'),
+    buttons: [
+      {
+        text: t('confirm'),
+        handler: async () => {
+          const { data: revertVersionId, error } = await supabase
+            .rpc('check_revert_to_builtin_version', { appid: packageId.value })
+
+          if (error) {
+            console.error('lazy load revertVersionId fail', error)
+            toast.error(t('error-revert-to-builtin'))
+            return
+          }
+
+          const { error: updateError } = await supabase
+            .from('channels')
+            .update({ version: revertVersionId })
+            .eq('id', id.value)
+
+          if (updateError) {
+            console.error(updateError)
+            toast.error(t('error-revert-to-builtin'))
+            return
+          }
+
+          await getChannel()
+        },
+      },
+      {
+        text: t('cancel'),
+        role: 'cancel',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
 </script>
 
 <template>
@@ -361,10 +405,12 @@ async function onChangeAutoUpdate(event: Event) {
             {{ channel.name }}
           </InfoRow>
           <!-- Bundle Number -->
-          <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'">
+          <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'">
             <div class="flex items-center">
               <span @click="openBundle()">{{ channel.version.name }}</span>
-              <!-- <button v-if="channel && channel.version.storage_provider !== 'revert_to_builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()"><Backward class="w-6 h-6 ml-1" /></button>  -->
+              <button v-if="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()">
+                <Backward class="w-6 h-6 ml-1" />
+              </button>
             </div>
           </InfoRow>
           <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">

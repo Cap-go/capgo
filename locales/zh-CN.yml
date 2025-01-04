@@ -59,6 +59,8 @@ app-info-desc: 您可以在此处更改您的应用程序信息
 app-logo-deleted: 应用图片删除成功
 app-name: 应用名称
 app-perm: 应用程序权限
+app-transferred: 应用程序传输成功
+app-will-be-transferred: 应用程序将转移到 $ORG_ID。请输入应用程序 ID ('$APP_ID') 以确认转移。
 are-u-sure: 你确定吗 ？
 are-you-sure-you-want-to-download: 您确定要下载吗？
 available-in-the-san: 在沙盒应用程序中可用
@@ -110,6 +112,7 @@ cannot-delete-bundles: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
+cannot-delete-unknown-or-builtin: 无法删除未知捆绑包和内置捆绑包
 cannot-determine-platform: 无法确定给定的 UUID 属于 IOS 还是 Android
 cannot-fetch-channels: 无法获取频道。请检查浏览器控制台
 cannot-find-unknown-version: 找不到未知版本，请联系 capgo 支持并检查浏览器日志
@@ -119,6 +122,7 @@ cannot-load-app-settings: 无法加载应用程序设置
 cannot-set-this-vers: 无法设置此版本
 cannot-show: 无法显示该页面
 cannot-test-app-some: 无法测试应用程序发生错误
+cannot-transfer-app: 无法转移组织。请检查浏览器控制台，并将错误报告给 Capgo 支持部门。
 cannot-view-plans: 无法查看计划页面
 cannot-view-usage: 无法查看使用页面
 cannots-sign-off: 无法登录
@@ -126,6 +130,7 @@ captcha: 验证码
 captcha-fail: 验证码验证失败
 change: 改变
 change-api-key-name: 更改 apikey 的名称
+change-app-organisation-owner: 将申请转给其他机构
 change-your-picture: 改变你的图片
 changed-app-name: 更改应用名称成功
 changed-app-retention: 成功更改了应用程序的保留时间
@@ -170,10 +175,12 @@ confirm-public-desc: |-
   将此频道设置为默认频道将使其向您的所有用户发送更新。
 
   其他默认频道将不再默认。
+confirm-transfer: 请确认应用程序转移
 continue: 继续
 copied-to-clipboard: 复制到剪贴板
 copy-account-id: 复制帐户 ID
 copy-command: 复制指令
+copy-organization-id: 复制组织标识
 country: 国家
 create-a-free-accoun: 创建一个免费帐户
 create-new-org: 创建一个新组织
@@ -245,6 +252,7 @@ good: 好的
 here: 这里
 id: ID
 included-in-plan: 包含在计划中
+incorrect-app-id: 你写错了应用程序 ID。
 info: 信息
 init-capgo-in-your-a: 在您的应用中初始化 Capgo
 insert-invite-email: 插入您要邀请的用户的电子邮件
@@ -334,6 +342,7 @@ no-app-icon: 此应用程序没有任何应用程序图标
 no-data: 没有数据
 no-permission: 权限不足
 no-permission-ask-super-admin: 权限不足，请请求超级管理员不安全地删除此捆绑包
+no-super-admin-organizations: 未找到 super_admin 组织
 none: 没有任何
 normal: 正常
 not-found: 未找到
@@ -355,6 +364,7 @@ org-deleted: 组织删除成功
 org-invited-user: 已成功邀请用户加入组织
 org-with-this-name-exists: 您已经使用此名称创建了一个组织！
 organization-email: 组织的管理电子邮件
+organization-id: 组织标识
 organization-name: 机构名称
 organization-settings: 组织设置
 os-version: 操作系统版本
@@ -431,6 +441,8 @@ select-channel: 选择频道
 select-channel-msg: 请选择您希望用于覆盖的频道
 select-default-upload-channel: 请选择默认上传通道
 select-default-upload-channel-header: 选择默认频道
+select-destination-organization: 选择目的地组织
+select-organization-to-transfer: 选择要转换此应用程序的组织
 select-style-of-deletion: 选择删除方式
 select-style-of-deletion-msg: |-
   请选择要删除此频道的方式。
@@ -438,6 +450,7 @@ select-style-of-deletion-msg: |-
   您可以阅读有关区别的信息 $1
 select-user-perms: 选择用户的权限
 select-user-perms-expanded: 选择受邀用户应拥有的权限
+select_all: 全选
 session_key: Iv会话密钥
 set-bundle: 将捆绑包设置为频道
 settings: 设置
@@ -465,6 +478,9 @@ this-page-will-self-: 完成 CLI 入门后，此页面将自动刷新
 to: 至
 to-open-encrypted-bu: 要打开加密包，请使用以下命令：
 top-apps-v2: 应用
+transfer-app-ownership: 转让应用程序所有权
+transfer-app-ownership-requirements: 要在组织间传输应用程序，您必须在源组织和目标组织中都拥有 super_admin 权限。这可确保所有权的安全转移，并防止未经授权的访问。
+transfer-app-ownership-too-soon: 每 32 天只能传输一次应用程序
 trial-left: 剩余天数
 trial-plan-expired: 试用期满
 type-device-id: 输入设备 ID
@@ -515,6 +531,8 @@ wrong-name-org-del: |-
   您应该输入：%1
 yearly: 每年
 'yes': 是的
+you-are-deleting-unsafely: 1警告！！！2 您正在不安全地删除此捆绑包，此操作无法撤销。了解更多信息3这里$4
+you-are-deleting-unsafely-plural: 1警告！！！2您正在不安全地删除这些捆绑包，这是无法撤销的。了解更多信息3这里$4
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制
