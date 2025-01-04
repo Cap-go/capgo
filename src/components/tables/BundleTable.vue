@@ -42,42 +42,52 @@ const filters = ref({
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-async function didCancel(name: string, isPlural = false): Promise<boolean | 'normal' | 'unsafe'> {
+async function didCancel(name: string, isPlural = false, askForMethod = true): Promise<boolean | 'normal' | 'unsafe'> {
   let method: 'normal' | 'unsafe' | null = null
-  displayStore.dialogOption = {
-    header: t('select-style-of-deletion'),
-    message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">${t('here')}</a>`),
-    buttons: [
-      {
-        text: t('normal'),
-        role: 'normal',
-        handler: () => {
-          method = 'normal'
+  if (askForMethod) {
+    displayStore.dialogOption = {
+      header: t('select-style-of-deletion'),
+      message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">${t('here')}</a>`),
+      buttons: [
+        {
+          text: t('normal'),
+          role: 'normal',
+          handler: () => {
+            method = 'normal'
+          },
         },
-      },
-      {
-        text: t('unsafe'),
-        role: 'danger',
-        id: 'unsafe',
-        handler: async () => {
-          if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
-            toast.error(t('no-permission-ask-super-admin'))
-            return
-          }
-          method = 'unsafe'
+        {
+          text: t('unsafe'),
+          role: 'danger',
+          id: 'unsafe',
+          handler: async () => {
+            if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
+              toast.error(t('no-permission-ask-super-admin'))
+              return
+            }
+            method = 'unsafe'
+          },
         },
-      },
-    ],
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss() || !method) {
+      return true
+    }
   }
-  displayStore.showDialog = true
-  if (await displayStore.onDialogDismiss() || !method) {
-    return true
+  else {
+    method = 'unsafe'
   }
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
     message: isPlural
       ? `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`
-      : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`,
+      : askForMethod
+        ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
+        : !isPlural
+            ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\n${t('you-are-deleting-unsafely').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">').replace('$4', '</a>')}.`
+            : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\n${t('you-are-deleting-unsafely-plural').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">').replace('$4', '</a>')}.`,
+
     buttons: [
       {
         text: t('button-cancel'),
@@ -201,9 +211,11 @@ async function deleteOne(one: Element) {
       }
     }
 
-    if (one.deleted)
+    if (one.name === 'unknown' || one.name === 'builtin') {
       return
-    const didCancelRes = await didCancel(t('version'))
+    }
+
+    const didCancelRes = await didCancel(t('version'), false, !one.deleted)
     if (typeof didCancelRes === 'boolean' && didCancelRes === true)
       return
 
@@ -318,7 +330,12 @@ async function massDelete() {
     return
   }
 
-  const didCancelRes = await didCancel(t('version'))
+  if (selectedElements.value.length > 0 && !!selectedElements.value.find(val => val.name === 'unknown' || val.name === 'builtin')) {
+    toast.error(t('cannot-delete-unknown-or-builtin'))
+    return
+  }
+
+  const didCancelRes = await didCancel(t('version'), true, !filters.value.deleted)
   if (typeof didCancelRes === 'boolean' && didCancelRes === true)
     return
 

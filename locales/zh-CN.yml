@@ -110,6 +110,7 @@ cannot-delete-bundles: 无法删除捆绑包
 cannot-delete-channel: 无法删除频道
 cannot-delete-member: 无法删除成员，请检查浏览器控制台
 cannot-delete-owner: 无法从组织中删除所有者
+cannot-delete-unknown-or-builtin: 无法删除未知捆绑包和内置捆绑包
 cannot-determine-platform: 无法确定给定的 UUID 属于 IOS 还是 Android
 cannot-fetch-channels: 无法获取频道。请检查浏览器控制台
 cannot-find-unknown-version: 找不到未知版本，请联系 capgo 支持并检查浏览器日志
@@ -515,6 +516,8 @@ wrong-name-org-del: |-
   您应该输入：%1
 yearly: 每年
 'yes': 是的
+you-are-deleting-unsafely: 1警告！！！2 您正在不安全地删除此捆绑包，此操作无法撤销。了解更多信息3这里$4
+you-are-deleting-unsafely-plural: 1警告！！！2您正在不安全地删除这些捆绑包，这是无法撤销的。了解更多信息3这里$4
 you-can-change-your-: 您可以在此处更改您的个人信息。
 you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制

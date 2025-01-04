@@ -112,6 +112,7 @@ cannot-delete-bundles: Paketler silinemiyor
 cannot-delete-channel: kanal silinemiyor
 cannot-delete-member: Üye silinemiyor, tarayıcı konsolunu kontrol edin
 cannot-delete-owner: Sahibi kuruluştan silinemiyor
+cannot-delete-unknown-or-builtin: Bilinmeyen paket ve yerleşik paket silinemiyor
 cannot-determine-platform: Verilen UUID'nin IOS'a mı yoksa Android'e mi ait olduğu belirlenemiyor
 cannot-fetch-channels: Kanallar getirilemiyor. Lütfen tarayıcı konsolunu kontrol edin
 cannot-find-unknown-version: >-
@@ -534,6 +535,12 @@ wrong-name-org-del: |-
   Şunu yazmanız gerekiyordu: %1
 yearly: Yıllık
 'yes': Evet
+you-are-deleting-unsafely: >-
+  $1Uyarı!!!$2 Bu paketi güvenli olmayan bir şekilde siliyorsunuz, bu işlem geri
+  alınamaz. Daha fazla bilgi $3burada$4
+you-are-deleting-unsafely-plural: >-
+  $1Uyarı!!!$2 Bu paketleri güvenli olmayan bir şekilde siliyorsunuz, bu işlem
+  geri alınamaz. Daha fazlasını öğrenin $3burada$4
 you-can-change-your-: Kişisel bilgilerinizi buradan değiştirebilirsiniz.
 you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanamazsınız
 you-reached-the-limi: Sınıra ulaşıldı
