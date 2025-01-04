@@ -2,6 +2,7 @@
   "version": "4",
   "specifiers": {
     "jsr:@hono/hono@^4.4.3": "4.5.5",
+    "jsr:@hono/hono@^4.6.13": "4.6.14",
     "jsr:@supabase/supabase-js@2.43.4": "2.43.4",
     "npm:@capacitor-community/in-app-review@6": "6.0.0_@capacitor+core@6.1.2",
     "npm:@capacitor-community/keep-awake@^5.0.1": "5.0.1_@capacitor+core@6.1.2",
@@ -77,6 +78,9 @@
   "jsr": {
     "@hono/hono@4.5.5": {
       "integrity": "e5a63b5f535475cd80974b65fed23a138d0cbb91fe1cc9a17a7c7278e835c308"
+    },
+    "@hono/hono@4.6.14": {
+      "integrity": "b39a5488266adf448fb1081bc3071a0d05145e72f3ab3ff83cf140e780c6c1de"
     },
     "@supabase/supabase-js@2.43.4": {
       "integrity": "2e096cfdda4e466b63b0d22081c48668a47953d1c0935991ebf1e3fbb92395d8",

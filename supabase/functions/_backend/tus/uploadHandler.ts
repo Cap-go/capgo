@@ -1,4 +1,4 @@
-import type { Env, R2UploadedPart } from '@cloudflare/workers-types'
+import type { DurableObjectState, Env, R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
 import type { Digester } from './digest.ts'
 import type {
@@ -239,7 +239,7 @@ export class UploadHandler {
     }
 
     const headers = new Headers({
-      'Upload-Offset': offset.toString(),
+      'Upload-Offset': offset?.toString() ?? '0',
       'Upload-Expires': (await this.expirationTime()).toString(),
       'Cache-Control': 'no-store',
       'Tus-Resumable': TUS_VERSION,
@@ -517,7 +517,6 @@ export class UploadHandler {
 
   async r2Put(r2Key: string, bytes: Uint8Array, checksum?: Uint8Array) {
     try {
-      // @ts-expect-error-next-line
       await this.retryBucket.put(r2Key, bytes, checksum)
     }
     catch (e) {
