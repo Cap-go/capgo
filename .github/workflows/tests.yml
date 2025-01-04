@@ -30,7 +30,9 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.1.0
+      - name: Show Supabase CLI version
+        run: supabase --version
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
       - run: supabase test db

@@ -82,3 +82,5 @@ internal/files-api-dev/main.go
 internal/files-api-dev/go.mod
 internal/files-api-dev/go.sum
 ._.DS_Store
+internal/forgr-key.jks
+internal/forgr-key.jks.base64

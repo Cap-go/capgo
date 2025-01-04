@@ -5,7 +5,7 @@ import ky from 'ky'
 import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
-import { countAllApps, countAllUpdates } from '../utils/stats.ts'
+import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 interface PlanTotal { [key: string]: number }
@@ -14,6 +14,7 @@ interface CustomerCount { total: number, yearly: number, monthly: number }
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
+  updates_external: PromiseLike<number>
   updates_last_month: PromiseLike<number>
   users: PromiseLike<number>
   stars: Promise<number>
@@ -38,6 +39,7 @@ function getStats(c: Context): GlobalStats {
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
+    updates_external: countAllUpdatesExternal(c),
     users: supabase
       .from('users')
       .select('*', { count: 'exact' })
@@ -91,6 +93,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const [
       apps,
       updates,
+      updates_external,
       users,
       stars,
       customers,
@@ -102,6 +105,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     ] = await Promise.all([
       res.apps,
       res.updates,
+      res.updates_external,
       res.users,
       res.stars,
       res.customers,
@@ -112,7 +116,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       res.updates_last_month,
     ])
     const not_paying = users - customers.total
-    console.log({ requestId: c.get('requestId'), context: 'All Promises', apps, updates, users, stars, customers, onboarded, need_upgrade, plans })
+    console.log({ requestId: c.get('requestId'), context: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
     // console.log(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
@@ -122,6 +126,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       trial: plans.Trial,
       users,
       updates,
+      updates_external,
       apps_active: actives.apps,
       users_active: actives.users,
       stars,
@@ -164,6 +169,11 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       {
         title: 'Updates',
         value: updates,
+        icon: '📲',
+      },
+      {
+        title: 'Updates on premises',
+        value: updates_external,
         icon: '📲',
       },
       {

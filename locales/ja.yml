@@ -28,6 +28,8 @@ add-member: メンバーを追加
 add-your-first-app-t: 最初のアプリをアカウントに追加して、アップデートをプッシュしましょう!
 admin: 管理者
 alert-2fa-disable: 2FA を無効にすることを確認します
+alert-2fa-required: パスワードのリセットには2FAが必要
+alert-2fa-required-message: 2faコードを入力してください。
 alert-accept-inviation: '%ORG% への招待を受け入れますか?'
 alert-add-new-key: 新しい API キーのタイプを選択します
 alert-confirm-delete: 削除の確認
@@ -57,6 +59,8 @@ app-info-desc: ここでアプリ情報を変更できます
 app-logo-deleted: アプリの画像が正常に削除されました
 app-name: アプリ名
 app-perm: アプリの許可
+app-transferred: アプリの転送に成功
+app-will-be-transferred: アプリは$ORG_IDに転送されます。アプリID('$APP_ID')を入力して転送を確認してください。
 are-u-sure: 本気ですか ？
 are-you-sure-you-want-to-download: 本当にダウンロードしますか？
 available-in-the-san: サンドボックス アプリで利用可能
@@ -101,13 +105,14 @@ cannot-del-org: 組織を削除できません。ブラウザのログを確認�
 cannot-delete-app: アプリを削除できません
 cannot-delete-app-icon: アプリのアイコンを削除できません
 cannot-delete-bundle: バンドルを削除できません
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: バージョンの一括削除はできません。
+cannot-delete-bundle-linked-channel-2: 以下のバージョンは少なくとも1チャンネルでリンクされている：
+cannot-delete-bundle-linked-channel-3: 手動でリンクを解除し、再度お試しください。
+cannot-delete-bundles: バンドルが削除できない
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
+cannot-delete-unknown-or-builtin: 不明なバンドルとビルトインバンドルを削除できない
 cannot-determine-platform: 指定されたUUIDがIOSに属するのかAndroidに属するのか判断できない。
 cannot-fetch-channels: チャンネルを取得できません。ブラウザのコンソールを確認してください。
 cannot-find-unknown-version: 不明なバージョンが見つかりません。capgo サポートに連絡し、ブラウザのログを確認してください。
@@ -117,6 +122,7 @@ cannot-load-app-settings: アプリ設定を読み込めません
 cannot-set-this-vers: このバージョンは設定できません
 cannot-show: このページは表示できません
 cannot-test-app-some: アプリをテストできません
+cannot-transfer-app: 組織を転送できません。ブラウザのコンソールを確認し、Capgoサポートにエラーを報告してください。
 cannot-view-plans: プランページが表示されない
 cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
@@ -124,6 +130,7 @@ captcha: キャプチャ
 captcha-fail: Captcha バリデーションに失敗しました。
 change: 変化
 change-api-key-name: apikey の名前を変更する
+change-app-organisation-owner: 他団体への移籍
 change-your-picture: 写真を変更する
 changed-app-name: アプリ名が正常に変更されました
 changed-app-retention: アプリのリテンション変更に成功
@@ -168,10 +175,12 @@ confirm-public-desc: |-
   このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
 
   他のデフォルト チャネルはデフォルトではなくなります。
+confirm-transfer: アプリの転送を確認してください
 continue: 続く
 copied-to-clipboard: クリップボードにコピーしました
 copy-account-id: アカウントIDをコピーする
 copy-command: コピー コマンド
+copy-organization-id: コピー組織ID
 country: 国
 create-a-free-accoun: 無料アカウントを作成
 create-new-org: 新しい組織を作成する
@@ -209,6 +218,7 @@ discover-module-in-a: Awesome-capacitor でモジュールを発見する
 discover-your-dashbo: あなたのダッシュボードを見つけてください！
 documentation: ドキュメンテーション
 dont-have-an-account: アカウントを持っていませんか？
+downgrade: 格下げ
 download: ダウンロード
 email: Eメール
 enable: 有効にする
@@ -242,6 +252,7 @@ good: 良い
 here: これ
 id: ID
 included-in-plan: プランに含まれるもの
+incorrect-app-id: アプリのIDを間違えています。
 info: 情報
 init-capgo-in-your-a: アプリで Capgo を初期化する
 insert-invite-email: 招待したいユーザーのメールアドレスを入力します
@@ -331,6 +342,7 @@ no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし
 no-permission: 権限が不十分です
 no-permission-ask-super-admin: このバンドルを安全に削除するには、スーパー管理者に依頼してください。
+no-super-admin-organizations: super_admin 組織が見つかりません。
 none: なし
 normal: ノーマル
 not-found: 見つかりません
@@ -352,6 +364,7 @@ org-deleted: 組織は正常に削除されました
 org-invited-user: ユーザーを組織に正常に招待しました
 org-with-this-name-exists: この名前の組織はすでに作成されています。
 organization-email: 組織の管理メール
+organization-id: 組織ID
 organization-name: 組織名
 organization-settings: 組織の設定
 os-version: OSバージョン
@@ -382,6 +395,7 @@ plan-storage: GB ストレージ
 plan-team: 大企業の経営者に最適
 plan-updates: アップデート
 plan-upgrade: 購読者
+plan-upgrade-v2: アップグレード
 plan-whats-included: 含まれるもの
 plans: 予定
 plans-super-only: スーパー管理者のみがプランと請求を表示できます
@@ -427,6 +441,8 @@ select-channel: チャンネル選択
 select-channel-msg: 上書きで使用するチャンネルを選択してください。
 select-default-upload-channel: デフォルトのアップロードチャンネルを選択してください。
 select-default-upload-channel-header: デフォルト・チャンネルを選択
+select-destination-organization: 目的地組織を選択
+select-organization-to-transfer: このアプリを変換する組織を選択します。
 select-style-of-deletion: 削除スタイルの選択
 select-style-of-deletion-msg: |-
   このチャンネルを削除する方法を選択してください。
@@ -434,6 +450,7 @@ select-style-of-deletion-msg: |-
   違いについてはこちらをご覧ください。
 select-user-perms: ユーザーの権限を選択します
 select-user-perms-expanded: 招待されたユーザーにどの権限を持たせるかを選択します
+select_all: すべて選択
 session_key: IvSessionKey
 set-bundle: バンドルをチャネルに設定
 settings: 設定
@@ -461,6 +478,11 @@ this-page-will-self-: このページは、CLI でのオンボーディングが
 to: 請求先
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps-v2: アプリ
+transfer-app-ownership: アプリの所有権を譲渡する
+transfer-app-ownership-requirements: >-
+  組織間でアプリを転送するには、転送元と転送先の両方の組織で super_admin
+  権限が必要です。これにより、所有権の安全な移転が保証され、不正アクセスが防止されます。
+transfer-app-ownership-too-soon: アプリの転送は32日ごと
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 type-device-id: デバイスIDを入力
@@ -511,6 +533,8 @@ wrong-name-org-del: |-
   次のように入力する必要がありました: %1
 yearly: 毎年
 'yes': はい
+you-are-deleting-unsafely: $1警告!!!$2このバンドルは安全に削除されていません。詳細はこちら$3
+you-are-deleting-unsafely-plural: 1警告!!!$2これらのバンドルは安全に削除されていません。詳細はこちら$3
 you-can-change-your-: ここで個人情報を変更できます。
 you-cannot-reuse: このバンドル バージョンは削除後は再利用できません
 you-reached-the-limi: 制限に達しました

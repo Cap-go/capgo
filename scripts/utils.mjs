@@ -11,7 +11,7 @@ export function getRightKey(keyname) {
   // console.log('getRightKey', branch, keyname)
   if (!keys || !keys[keyname])
     return ''
-  if (branch === 'development')
+  if (branch === 'alpha')
     return keys[keyname].development
   else if (branch === 'local')
     return keys[keyname].local

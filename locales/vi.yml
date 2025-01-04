@@ -32,6 +32,8 @@ add-your-first-app-t: >-
   nhật!
 admin: quản trị viên
 alert-2fa-disable: Xác nhận rằng bạn muốn tắt 2FA
+alert-2fa-required: Cần có 2FA để đặt lại mật khẩu
+alert-2fa-required-message: Vui lòng nhập mã 2fa
 alert-accept-inviation: Bạn có chấp nhận lời mời tham gia %ORG% không?
 alert-add-new-key: Chọn loại khóa API mới
 alert-confirm-delete: Xác nhận Xóa
@@ -61,6 +63,10 @@ app-info-desc: Bạn có thể thay đổi thông tin ứng dụng của mình t
 app-logo-deleted: Đã xóa ảnh ứng dụng thành công
 app-name: Tên ứng dụng
 app-perm: Quyền ứng dụng
+app-transferred: Đã chuyển ứng dụng thành công
+app-will-be-transferred: |-
+  Ứng dụng sẽ được chuyển sang $ORG_ID. 
+  Vui lòng nhập ID ứng dụng ('$APP_ID') để xác nhận chuyển.
 are-u-sure: Bạn có chắc không ?
 are-you-sure-you-want-to-download: Bạn có chắc chắn muốn tải xuống không?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
@@ -113,13 +119,14 @@ cannot-del-org: Không thể xóa tổ chức, vui lòng kiểm tra nhật ký t
 cannot-delete-app: Không thể xóa ứng dụng
 cannot-delete-app-icon: Không thể xóa biểu tượng ứng dụng
 cannot-delete-bundle: Không thể xóa gói
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Bạn không thể xóa hàng loạt phiên bản
+cannot-delete-bundle-linked-channel-2: 'Các phiên bản sau được liên kết trong ít nhất 1 kênh:'
+cannot-delete-bundle-linked-channel-3: Vui lòng hủy liên kết chúng theo cách thủ công và thử lại
+cannot-delete-bundles: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
+cannot-delete-unknown-or-builtin: Không thể xóa gói không xác định và gói dựng sẵn
 cannot-determine-platform: Không thể xác định xem UUID đã cho thuộc về iOS hay Android
 cannot-fetch-channels: |-
   Không thể tìm nạp kênh.
@@ -133,6 +140,11 @@ cannot-load-app-settings: Không thể tải cài đặt ứng dụng
 cannot-set-this-vers: Không thể đặt phiên bản này
 cannot-show: Không thể hiển thị trang này
 cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
+cannot-transfer-app: >-
+  Không thể chuyển tổ chức. 
+
+  Vui lòng kiểm tra bảng điều khiển trình duyệt và báo cáo lỗi cho bộ phận hỗ
+  trợ của Capgo.
 cannot-view-plans: Không thể xem trang kế hoạch
 cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
@@ -140,6 +152,7 @@ captcha: hình ảnh xác thực
 captcha-fail: Xác thực hình ảnh xác thực không thành công
 change: Thay đổi
 change-api-key-name: Thay đổi tên của apikey
+change-app-organisation-owner: Chuyển ứng dụng sang tổ chức khác
 change-your-picture: Thay đổi hình ảnh của bạn
 changed-app-name: Đã đổi tên ứng dụng thành công
 changed-app-retention: Đã thay đổi thành công tỷ lệ lưu giữ của ứng dụng
@@ -186,10 +199,12 @@ confirm-public-desc: |-
   Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
 
   Các kênh mặc định khác sẽ không còn mặc định nữa.
+confirm-transfer: Vui lòng xác nhận việc chuyển ứng dụng
 continue: Tiếp tục
 copied-to-clipboard: Sao chép vào clipboard
 copy-account-id: sao chép id tài khoản
 copy-command: Sao chép lệnh
+copy-organization-id: sao chép id tổ chức
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
 create-new-org: Tạo một tổ chức mới
@@ -229,6 +244,7 @@ discover-module-in-a: Khám phá mô-đun trong Awesome-tụ điện
 discover-your-dashbo: Khám phá bảng điều khiển của bạn!
 documentation: tài liệu
 dont-have-an-account: Bạn chưa có tài khoản?
+downgrade: Hạ cấp
 download: Tải xuống
 email: E-mail
 enable: Cho phép
@@ -266,6 +282,7 @@ good: Tốt
 here: đây
 id: NHẬN DẠNG
 included-in-plan: Bao gồm trong kế hoạch
+incorrect-app-id: Bạn đã viết sai id ứng dụng.
 info: Thông tin
 init-capgo-in-your-a: Khởi tạo Capgo trong ứng dụng của bạn
 insert-invite-email: Chèn email của người dùng bạn muốn mời
@@ -359,6 +376,7 @@ no-permission: Không đủ quyền
 no-permission-ask-super-admin: >-
   không đủ quyền, vui lòng yêu cầu quản trị viên cấp cao xóa gói này một cách
   không an toàn
+no-super-admin-organizations: Không tìm thấy tổ chức super_admin nào
 none: Không có
 normal: Bình thường
 not-found: Không tìm thấy
@@ -382,6 +400,7 @@ org-deleted: Đã xóa tổ chức thành công
 org-invited-user: Đã mời thành công người dùng vào tổ chức
 org-with-this-name-exists: Bạn đã tạo một tổ chức có tên này!
 organization-email: Email quản lý của tổ chức
+organization-id: Id tổ chức
 organization-name: tên tổ chức
 organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
@@ -412,6 +431,7 @@ plan-storage: Dung lượng GB
 plan-team: Tốt nhất cho các chủ doanh nghiệp lớn
 plan-updates: cập nhật
 plan-upgrade: Đăng ký
+plan-upgrade-v2: Nâng cấp
 plan-whats-included: Bao gồm những gì
 plans: các kế hoạch
 plans-super-only: Chỉ quản trị viên cấp cao mới được phép xem gói và thanh toán
@@ -463,6 +483,8 @@ select-channel: Chọn kênh
 select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
 select-default-upload-channel: Vui lòng chọn kênh tải lên mặc định
 select-default-upload-channel-header: Chọn kênh mặc định
+select-destination-organization: Chọn tổ chức đích
+select-organization-to-transfer: Chọn tổ chức mà bạn muốn chuyển đổi ứng dụng này
 select-style-of-deletion: Chọn kiểu xóa
 select-style-of-deletion-msg: |-
   Vui lòng chọn cách bạn muốn xóa kênh này.
@@ -472,6 +494,7 @@ select-style-of-deletion-msg: |-
   Bạn có thể đọc về sự khác biệt $1
 select-user-perms: Chọn quyền của người dùng
 select-user-perms-expanded: Chọn quyền mà người dùng được mời sẽ có
+select_all: chọn tất cả
 session_key: IvSessionKey
 set-bundle: Đặt gói thành kênh
 settings: Cài đặt
@@ -499,6 +522,13 @@ this-page-will-self-: Trang này sẽ tự làm mới sau khi bạn hoàn tất 
 to: ĐẾN
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps-v2: Ứng dụng
+transfer-app-ownership: Chuyển quyền sở hữu ứng dụng
+transfer-app-ownership-requirements: >-
+  Để chuyển ứng dụng giữa các tổ chức, bạn phải có đặc quyền super_admin ở cả tổ
+  chức nguồn và tổ chức đích. 
+
+  Điều này đảm bảo chuyển quyền sở hữu an toàn và ngăn chặn truy cập trái phép.
+transfer-app-ownership-too-soon: Bạn chỉ có thể chuyển ứng dụng sau mỗi 32 ngày
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 type-device-id: Nhập ID thiết bị
@@ -551,6 +581,16 @@ wrong-name-org-del: |-
   Bạn phải gõ: %1
 yearly: hàng năm
 'yes': Đúng
+you-are-deleting-unsafely: >-
+  $1Cảnh báo!!!$2 Bạn đang xóa gói này một cách không an toàn, việc này không
+  thể hoàn tác được. 
+
+  Tìm hiểu thêm $3tại đây$4
+you-are-deleting-unsafely-plural: >-
+  $1Cảnh báo!!!$2 Bạn đang xóa các nhóm này một cách không an toàn, việc này
+  không thể hoàn tác được. 
+
+  Tìm hiểu thêm $3tại đây$4
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-cannot-reuse: Bạn không thể sử dụng lại phiên bản gói này sau khi xóa
 you-reached-the-limi: Đạt tới giới hạn

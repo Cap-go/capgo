@@ -30,6 +30,8 @@ add-member: Dodaj członka
 add-your-first-app-t: Dodaj swoją pierwszą aplikację do swojego konta i wysyłajmy aktualizacje!
 admin: Admin
 alert-2fa-disable: Potwierdź, że chcesz wyłączyć 2FA
+alert-2fa-required: 2FA jest wymagane do zresetowania hasła
+alert-2fa-required-message: Wprowadź kod 2fa
 alert-accept-inviation: Czy akceptujesz zaproszenie do %ORG%?
 alert-add-new-key: Wybór typu klucza do wygenerowania
 alert-confirm-delete: Potwierdź usunięcie
@@ -59,6 +61,10 @@ app-info-desc: Tutaj możesz zmienić informacje o swojej aplikacji
 app-logo-deleted: Obraz aplikacji został pomyślnie usunięty
 app-name: Nazwa aplikacji
 app-perm: Zezwolenie na aplikację
+app-transferred: Aplikacja została pomyślnie przesłana
+app-will-be-transferred: >-
+  Aplikacja zostanie przeniesiona do $ORG_ID. Wpisz identyfikator aplikacji
+  ("$APP_ID"), aby potwierdzić transfer.
 are-u-sure: Jesteś pewny ?
 are-you-sure-you-want-to-download: Czy na pewno chcesz pobrać plik?
 available-in-the-san: Dostępne w aplikacji piaskownicy
@@ -105,13 +111,14 @@ cannot-del-org: Nie można usunąć organizacji. Sprawdź dziennik przeglądarki
 cannot-delete-app: Nie można usunąć aplikacji
 cannot-delete-app-icon: Nie można usunąć ikony aplikacji
 cannot-delete-bundle: Nie można usunąć pakietu
-cannot-delete-bundle-linked-channel-1: ''
-cannot-delete-bundle-linked-channel-2: ''
-cannot-delete-bundle-linked-channel-3: ''
-cannot-delete-bundles: ''
+cannot-delete-bundle-linked-channel-1: Nie można masowo usuwać wersji
+cannot-delete-bundle-linked-channel-2: 'Następujące wersje są połączone w co najmniej 1 kanale:'
+cannot-delete-bundle-linked-channel-3: Odłącz je ręcznie i spróbuj ponownie
+cannot-delete-bundles: Nie można usunąć pakietów
 cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
+cannot-delete-unknown-or-builtin: Nie można usunąć nieznanego pakietu i pakietu wbudowanego
 cannot-determine-platform: >-
   Nie można określić, czy dany identyfikator UUID należy do systemu IOS czy
   Android
@@ -125,6 +132,9 @@ cannot-load-app-settings: Nie można załadować ustawień aplikacji
 cannot-set-this-vers: Nie można ustawić tej wersji
 cannot-show: Nie można wyświetlić tej strony
 cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
+cannot-transfer-app: >-
+  Nie można przenieść organizacji. Sprawdź konsolę przeglądarki i zgłoś błąd do
+  pomocy technicznej Capgo.
 cannot-view-plans: Nie można wyświetlić strony planów
 cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
@@ -132,6 +142,7 @@ captcha: Captcha
 captcha-fail: Weryfikacja Captcha nie powiodła się
 change: Zmiana
 change-api-key-name: Zmień nazwę apikey
+change-app-organisation-owner: Przeniesienie aplikacji do innej organizacji
 change-your-picture: Zmień swoje zdjęcie
 changed-app-name: Pomyślnie zmieniono nazwę aplikacji
 changed-app-retention: Pomyślnie zmieniono retencję aplikacji
@@ -179,10 +190,12 @@ confirm-public-desc: >-
   wszystkich Twoich użytkowników.
 
   Inne domyślne kanały nie będą już domyślne.
+confirm-transfer: Potwierdź transfer aplikacji
 continue: Kontynuować
 copied-to-clipboard: Skopiowane do schowka
 copy-account-id: skopiuj identyfikator konta
 copy-command: Kopiuj polecenie
+copy-organization-id: Kopiuj identyfikator organizacji
 country: Kraj
 create-a-free-accoun: Utwórz bezpłatne konto
 create-new-org: Utwórz nową organizację
@@ -222,6 +235,7 @@ discover-module-in-a: Odkryj moduł w Awesome-capacitor
 discover-your-dashbo: Odkryj swój pulpit nawigacyjny!
 documentation: dokumentacja
 dont-have-an-account: Nie masz konta?
+downgrade: Obniżenie oceny
 download: Pobierać
 email: E-mail
 enable: Włączać
@@ -255,6 +269,7 @@ good: Dobry
 here: tutaj
 id: ID
 included-in-plan: Zawarte w planie
+incorrect-app-id: Wpisałeś zły identyfikator aplikacji.
 info: Informacja
 init-capgo-in-your-a: Zainicjuj Capgo w swojej aplikacji
 insert-invite-email: Wpisz adres e-mail użytkownika, którego chcesz zaprosić
@@ -348,6 +363,7 @@ no-permission: Niewystarczające uprawnienia
 no-permission-ask-super-admin: >-
   Niewystarczające uprawnienia, poproś superadministratora o niebezpieczne
   usunięcie tego pakietu
+no-super-admin-organizations: Nie znaleziono organizacji super_admin
 none: Nic
 normal: Normalny
 not-found: Nie znaleziono
@@ -373,6 +389,7 @@ org-deleted: Organizacja została pomyślnie usunięta
 org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
 org-with-this-name-exists: Utworzyłeś już organizację o tej nazwie!
 organization-email: Adres e-mail zarządu organizacji
+organization-id: Identyfikator organizacji
 organization-name: Nazwa organizacji
 organization-settings: Ustawienia organizacji
 os-version: Wersja systemu operacyjnego
@@ -405,6 +422,7 @@ plan-storage: GB pamięci
 plan-team: Najlepsze dla właścicieli dużych firm
 plan-updates: Aktualizacje
 plan-upgrade: Subskrybenci
+plan-upgrade-v2: Aktualizacja
 plan-whats-included: Co jest zawarte
 plans: plany
 plans-super-only: Tylko superadministratorzy mogą przeglądać plany i rozliczenia
@@ -454,6 +472,8 @@ select-channel: Wybierz kanał
 select-channel-msg: Wybierz kanał, którego chcesz użyć podczas nadpisywania.
 select-default-upload-channel: Wybierz domyślny kanał przesyłania
 select-default-upload-channel-header: Wybór domyślnego kanału
+select-destination-organization: Wybór organizacji docelowej
+select-organization-to-transfer: Wybierz organizację, do której chcesz przekształcić tę aplikację.
 select-style-of-deletion: Wybierz styl usuwania
 select-style-of-deletion-msg: |-
   Wybierz sposób, w jaki chcesz usunąć ten kanał.
@@ -461,6 +481,7 @@ select-style-of-deletion-msg: |-
   Możesz przeczytać o różnicy $1
 select-user-perms: Wybierz uprawnienia użytkownika
 select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
+select_all: wybierz wszystko
 session_key: Klucz IVSesji
 set-bundle: Ustaw pakiet na kanał
 settings: Ustawienia
@@ -490,6 +511,12 @@ this-page-will-self-: >-
 to: do
 to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
 top-apps-v2: Aplikacje
+transfer-app-ownership: Przeniesienie własności aplikacji
+transfer-app-ownership-requirements: >-
+  Aby przenieść aplikację między organizacjami, musisz mieć uprawnienia
+  super_admin zarówno w organizacji źródłowej, jak i docelowej. Zapewnia to
+  bezpieczne przeniesienie własności i zapobiega nieautoryzowanemu dostępowi.
+transfer-app-ownership-too-soon: Aplikacje można przenosić tylko co 32 dni
 trial-left: Pozostałe dni
 trial-plan-expired: Wersja czasowa wygasła
 type-device-id: Wprowadź identyfikator urządzenia
@@ -542,6 +569,12 @@ wrong-name-org-del: |-
   Miałeś wpisać: %1
 yearly: Rocznie
 'yes': Tak
+you-are-deleting-unsafely: >-
+  $1Ostrzeżenie!!!$2 Usuwasz ten pakiet niebezpiecznie, nie można tego cofnąć.
+  Dowiedz się więcej $3tutaj$4
+you-are-deleting-unsafely-plural: >-
+  $1Ostrzeżenie!!!$2 Usuwasz te pakiety niebezpiecznie, nie można tego cofnąć.
+  Dowiedz się więcej $3tutaj$4
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-cannot-reuse: Po usunięciu nie można ponownie użyć tej wersji pakietu
 you-reached-the-limi: Limit osiągnięty

@@ -161,13 +161,13 @@ async function presentActionSheet() {
       {
         text: t('button-camera'),
         handler: () => {
-          takePhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
+          takePhoto('update-account', isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
       {
         text: t('button-browse'),
         handler: () => {
-          pickPhoto(isLoading, 'user', t('something-went-wrong-try-again-later'))
+          pickPhoto('update-account', isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
     ],

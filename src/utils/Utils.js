@@ -5,6 +5,13 @@ export function tailwindConfig() {
   return resolveConfig('../../tailwind.config.js')
 }
 
+export function registerWebsiteDomain() {
+  if (import.meta.env.VITE_APP_URL.includes('web.capgo.app')) {
+    return 'https://capgo.app'
+  }
+  return ''
+}
+
 export function hexToRGB(h) {
   let r = 0
   let g = 0

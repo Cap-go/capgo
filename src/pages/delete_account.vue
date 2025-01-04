@@ -10,6 +10,7 @@ import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
 import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
+import { registerWebsiteDomain } from '~/utils/Utils'
 
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
@@ -31,7 +32,7 @@ async function deleteAccount() {
 
           const authUser = await supabase.auth.getUser()
           if (authUser.error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
 
           try {
             const { data: user } = await supabaseClient
@@ -40,7 +41,7 @@ async function deleteAccount() {
               .eq('id', authUser.data.user.id)
               .single()
             if (!user)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
 
             if (user.customer_id) {
               await supabaseClient
@@ -69,7 +70,7 @@ async function deleteAccount() {
           }
           catch (error) {
             console.error(error)
-            return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
           }
         },
       },
@@ -128,7 +129,7 @@ onMounted (() => {
       <div class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <FormKit id="login-account" type="form" :actions="false" @submit="submit">
+            <FormKit id="delete-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
                   type="email" name="email" :disabled="isLoading" enterkeyhint="next"
@@ -176,7 +177,7 @@ onMounted (() => {
                 <div class="text-center">
                   <p class="text-base text-gray-600">
                     {{ t('dont-have-an-account') }} <br> <a
-                      href="https://capgo.app/register/"
+                      :href="`${registerWebsiteDomain()}/register/`"
                       class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}

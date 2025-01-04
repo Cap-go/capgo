@@ -1,8 +1,8 @@
 import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
-import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromStoreAppsCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackVersionUsageCF } from './cloudflare.ts'
+import { backgroundTask } from '../utils/utils.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF } from './cloudflare.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
@@ -32,6 +32,14 @@ export function createStatsVersion(c: Context, version_id: number, app_id: strin
   if (!c.env.VERSION_USAGE)
     return trackVersionUsageSB(c, version_id, app_id, action)
   return trackVersionUsageCF(c, version_id, app_id, action)
+}
+
+export function createStatsLogsExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
+  const lowerDeviceId = device_id.toLowerCase()
+  // This is super important until every device get the version of plugin 6.2.5
+  if (!c.env.APP_LOG_EXTERNAL)
+    return trackLogsSB(c, app_id, lowerDeviceId, action, version_id)
+  return trackLogsCFExternal(c, app_id, lowerDeviceId, action, version_id)
 }
 
 export function createStatsLogs(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {
@@ -111,16 +119,10 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
   // if (statsActions.some(({ action }) => ['set', 'reset', 'app_moved_to_foreground'].includes(action))) // TODO: check if we don't fuck our billing without this
   jobs.push(createStatsDevices(c, device.app_id, device.device_id, device.version, device.platform ?? 'android', device.plugin_version ?? '', device.os_version ?? '', device.version_build ?? '', device.custom_id ?? '', device.is_prod ?? true, device.is_emulator ?? false))
 
-  if (getRuntimeKey() === 'workerd') {
-    c.executionCtx.waitUntil(Promise.all(jobs))
-    return Promise.resolve()
-  }
-  else {
-    return Promise.all(jobs)
-      .catch((error) => {
-        console.log({ requestId: c.get('requestId'), context: '[sendStatsAndDevice] rejected with error', error })
-      })
-  }
+  return backgroundTask(c, Promise.all(jobs)
+    .catch((error) => {
+      console.log({ requestId: c.get('requestId'), context: '[sendStatsAndDevice] rejected with error', error })
+    }))
 }
 
 export async function countAllApps(c: Context): Promise<number> {
@@ -134,13 +136,14 @@ export async function countAllApps(c: Context): Promise<number> {
 }
 
 export async function countAllUpdates(c: Context): Promise<number> {
-  const [storeAppsCount, logsCount] = await Promise.all([
-    countUpdatesFromStoreAppsCF(c),
-    countUpdatesFromLogsCF(c),
-  ])
+  const logsCount = await countUpdatesFromLogsCF(c)
 
-  const res = storeAppsCount + logsCount
-  return res || 14593631
+  return logsCount
+}
+
+export async function countAllUpdatesExternal(c: Context): Promise<number> {
+  const externalCount = await countUpdatesFromLogsExternalCF(c)
+  return externalCount
 }
 
 export async function getUpdateStats(c: Context) {

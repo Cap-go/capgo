@@ -29,7 +29,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
 
     if (!record.customer_id)
-      createStripeCustomer(c, record as any)
+      await createStripeCustomer(c, record as any)
 
     const LogSnag = logsnag(c)
     LogSnag.track({
@@ -43,6 +43,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     return c.json(BRES)
   }
   catch (e) {
+    console.error('Error on_organization_create', c.get('requestId'), e)
     return c.json({ status: 'Cannot handle org creation', error: JSON.stringify(e) }, 500)
   }
 })

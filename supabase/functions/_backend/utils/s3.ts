@@ -30,22 +30,20 @@ export function initS3(c: Context) {
 }
 
 export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  if (!record.bucket_id && !record.r2_path) {
-    console.log({ requestId: c.get('requestId'), context: 'no bucket_id or r2_path' })
+  if (!record.r2_path) {
+    console.log({ requestId: c.get('requestId'), context: 'no r2_path' })
     return null
   }
   if (!record.r2_path && (!record.app_id || !record.user_id || !record.id)) {
     console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id or id' })
     return null
   }
-  // TODO: delete bucket_id in september 2024
-  const vPath = record.bucket_id ? `apps/${record.user_id}/${record.app_id}/versions/${record.bucket_id}` : record.r2_path
-  const exist = vPath ? await checkIfExist(c, vPath) : false
+  const exist = await checkIfExist(c, record.r2_path)
   if (!exist) {
-    console.log({ requestId: c.get('requestId'), context: 'not exist', vPath })
+    console.log({ requestId: c.get('requestId'), context: 'not exist', vPath: record.r2_path })
     return null
   }
-  return vPath
+  return record.r2_path
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
@@ -69,7 +67,10 @@ async function deleteObject(c: Context, fileId: string) {
   return true
 }
 
-async function checkIfExist(c: Context, fileId: string) {
+async function checkIfExist(c: Context, fileId: string | null) {
+  if (!fileId) {
+    return false
+  }
   const client = initS3(c)
   try {
     const command = new HeadObjectCommand({

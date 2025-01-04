@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Export ipa and submit to TestFlight
 
+### ios bump_build_number
+
+```sh
+[bundle exec] fastlane ios bump_build_number
+```
+
+
+
 ----
 
 
@@ -34,23 +42,7 @@ Export ipa and submit to TestFlight
 [bundle exec] fastlane android beta
 ```
 
-
-
-### android build
-
-```sh
-[bundle exec] fastlane android build
-```
-
-
-
-### android prod_release
-
-```sh
-[bundle exec] fastlane android prod_release
-```
-
-
+Deploy a beta version to the Google Play
 
 ----
 

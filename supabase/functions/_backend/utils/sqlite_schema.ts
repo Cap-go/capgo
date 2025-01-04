@@ -1,4 +1,4 @@
-import { customType, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { customType, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 const boolean = customType<{ data: boolean }>({
   dataType() {
@@ -28,7 +28,6 @@ export const app_versions = sqliteTable('app_versions', {
   created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   app_id: text('app_id').notNull().references(() => apps.name),
   name: text('name').notNull(),
-  bucket_id: text('bucket_id'),
   r2_path: text('r2_path'),
   user_id: text('user_id'),
   updated_at: integer('updated_at', { mode: 'timestamp' }),
@@ -53,26 +52,11 @@ export const channels = sqliteTable('channels', {
   public: boolean('public').notNull().default(false),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
   disable_auto_update: text('disable_auto_update', { enum: ['major', 'minor', 'patch', 'version_number', 'none'] }).default('major').notNull(),
-  enable_ab_testing: boolean('enable_ab_testing').notNull().default(false),
-  enable_progressive_deploy: boolean('enable_progressive_deploy').default(false).notNull(),
-  secondary_version_percentage: real('secondary_version_percentage').default(0).notNull(),
-  second_version: integer('second_version', { mode: 'number' }).references(() => app_versions.id),
-  beta: boolean('beta').notNull().default(false),
   ios: boolean('ios').default(true).notNull(),
   android: boolean('android').notNull().default(true),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
   allow_emulator: boolean('allow_emulator').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
-})
-
-export const devices_override = sqliteTable('devices_override', {
-  id: integer('id', { mode: 'number' }).primaryKey().notNull(),
-  owner_org: text('owner_org').notNull(),
-  device_id: text('device_id').notNull(),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
-  version: integer('version', { mode: 'number' }).notNull().references(() => app_versions.id),
-  app_id: text('app_id').notNull().references(() => apps.name),
 })
 
 export const channel_devices = sqliteTable('channel_devices', {

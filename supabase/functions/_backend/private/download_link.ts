@@ -55,11 +55,11 @@ app.post('/', middlewareAuth, async (c: Context) => {
     }
 
     if (body.isManifest) {
-      const manifestEntries = await getManifestUrl(c, bundle)
+      const manifestEntries = getManifestUrl(c, bundle.id, bundle.manifest, userId)
       return c.json({ manifest: manifestEntries })
     }
     else {
-      const data = await getBundleUrl(c, ownerOrg, bundle)
+      const data = await getBundleUrl(c, bundle.id, bundle.r2_path, userId)
       if (!data)
         return c.json({ status: 'Error unknown' }, 500)
 
