@@ -5,6 +5,7 @@ import type { Database } from './supabase.types.ts'
 import type { AppInfos } from './types.ts'
 import {
   format,
+  greaterOrEqual,
   greaterThan,
   lessThan,
   parse,
@@ -199,7 +200,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //   }, 400)
     // }
 
-    if (!version.external_url && !version.r2_path) {
+    if (!version.external_url && !version.r2_path && version.name !== 'builtin') {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -208,7 +209,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    // console.log(c.get('requestId'), 'signedURL', device_id, signedURL, version_name, version.name)
+    // console.log(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
     if (version_name === version.name) {
       console.log({ requestId: c.get('requestId'), context: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
       // TODO: check why this event is send with wrong version_name
@@ -241,7 +242,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           old: version_name,
         }, 200)
       }
-      if (channelData.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_name).major) {
+      if (version.name !== 'builtin' && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_name).major) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
@@ -262,7 +263,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_name).minor) {
+      if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_name).minor) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
@@ -275,7 +276,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       console.log({ requestId: c.get('requestId'), context: 'version', version: version.name, old: version_name })
-      if (channelData.channels.disable_auto_update === 'patch' && !(
+      if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'patch' && !(
         parse(version.name).patch > parse(version_name).patch
         && parse(version.name).major === parse(version_name).major
         && parse(version.name).minor === parse(version_name).minor
@@ -291,7 +292,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (channelData.channels.disable_auto_update === 'version_number') {
+      if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'version_number') {
         const minUpdateVersion = version.min_update_version
 
         // The channel is misconfigured
@@ -321,7 +322,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       // console.log(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
-      if (channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
+      if (version.name !== 'builtin' && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
         return c.json({
@@ -352,6 +353,20 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           old: version_name,
         }, 200)
       }
+    }
+    if (version.name === 'builtin' && greaterOrEqual(parse(plugin_version), parse('6.2.0'))) {
+      if (body.version_name === 'builtin' && version.name === 'builtin') {
+        return c.json({ message: 'Already on builtin' }, 200)
+      }
+      else {
+        return c.json({ version: 'builtin' })
+      }
+    }
+    else if (version.name === 'builtin' && !greaterOrEqual(parse(plugin_version), parse('6.2.0'))) {
+      return c.json({
+        message: 'revert_to_builtin used, but plugin version is too old',
+        error: 'revert_to_builtin_plugin_version_too_old',
+      }, 200)
     }
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []

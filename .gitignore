@@ -73,10 +73,14 @@ temp_cli_test*
 internal/netlify/.env.prod
 internal/supabase/.env.prod
 cloudflare_workers/files/*
+cloudflare_workers/files/.wrangler/*
+cloudflare_workers/plugin/.wrangler/*
+tmp/*
 internal/files-api-dev/files_hash_map.json
 internal/files-api-dev/uploads/*
 internal/files-api-dev/main.go
 internal/files-api-dev/go.mod
 internal/files-api-dev/go.sum
+._.DS_Store
 internal/forgr-key.jks
 internal/forgr-key.jks.base64

@@ -1,4 +1,6 @@
+import type { Context, MiddlewareHandler, Next } from 'hono'
 import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
+import { rateLimit } from '@elithrar/workers-hono-rate-limit'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -20,6 +22,7 @@ import { app as storeTop } from '../../supabase/functions/_backend/private/store
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as verify_replication } from '../../supabase/functions/_backend/private/verify_replication.ts'
+import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as bundle } from '../../supabase/functions/_backend/public/bundle/index.ts'
 import { app as channel } from '../../supabase/functions/_backend/public/channel/index.ts'
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
@@ -44,7 +47,6 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 
 export { AttachmentUploadHandler, UploadHandler as TemporaryKeyHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
@@ -58,6 +60,19 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', (requestId as any)())
 
+export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: number, period: number, method: string }[]) {
+  const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
+    const capgkey_string = c.req.header('capgkey')
+    const apikey_string = c.req.header('authorization')
+    const key = capgkey_string || apikey_string
+    if (!key)
+      return next()
+    await rateLimit(c.env[`API_${rateLimiterAction}_RATE_LIMITER`], () => key)(c, next)
+    await next()
+  }
+  return subMiddlewareKey
+}
+
 // Public API
 app.route('/ok', ok)
 app.route('/apikey', apikey)
@@ -65,6 +80,15 @@ app.route('/bundle', bundle)
 app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
+
+app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.route('/bundle', bundle)
+
+app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.route('/channel', channel)
+
+app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.route('/device', device)
 
 app.route('/on_app_create', on_app_create)
 
@@ -137,8 +161,12 @@ app.get('/test_sentry', (c) => {
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
-  if (e instanceof HTTPException)
+  if (e instanceof HTTPException) {
+    if (e.status === 429) {
+      return c.json({ error: 'you are beeing rate limited' }, 429)
+    }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
+  }
   console.log('app', 'onError', e)
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
