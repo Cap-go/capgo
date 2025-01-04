@@ -150,3 +150,7 @@ function = "statistics"
 [[edge_functions]]
 path = "/statistics"
 function = "statistics"
+
+[[edge_functions]]
+path = "/apikey"
+function = "apikey"

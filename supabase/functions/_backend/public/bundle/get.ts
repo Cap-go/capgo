@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 export interface GetLatest {
@@ -14,7 +14,7 @@ export async function get(c: Context, body: GetLatest, apikey: Database['public'
     if (!body.app_id)
       return c.json({ status: 'Missing app_id' }, 400)
 
-    if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'read')))
+    if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key)))
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
     const fetchOffset = body.page == null ? 0 : body.page

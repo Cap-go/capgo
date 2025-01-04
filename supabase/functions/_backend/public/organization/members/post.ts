@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { hasOrgRight, supabaseApikey } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
 const inviteBodySchema = z.object({
   orgId: z.string(),
@@ -21,7 +21,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
   const body = bodyParsed.data
 
-  if (!(await hasOrgRight(c, body.orgId, apikey.user_id, 'admin')))
+  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', apikey.key)) || !(apikeyHasOrgRight(apikey, body.orgId)))
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
 
   const supabase = supabaseApikey(c, c.get('capgkey') as string)

@@ -329,6 +329,7 @@ export type Database = {
           allow_emulator: boolean
           android: boolean
           app_id: string
+          base_disable_auto_update_on_native: boolean
           created_at: string
           created_by: string | null
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
@@ -347,6 +348,7 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id: string
+          base_disable_auto_update_on_native?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -365,6 +367,7 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id?: string
+          base_disable_auto_update_on_native?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]

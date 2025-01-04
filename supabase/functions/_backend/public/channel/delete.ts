@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export interface ChannelSet {
   app_id: string
@@ -18,7 +18,7 @@ export interface ChannelSet {
 }
 
 export async function deleteChannel(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'admin'))) {
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'admin', apikey.key))) {
     console.log('You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }

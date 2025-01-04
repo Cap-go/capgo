@@ -211,6 +211,31 @@ async function deleteOrganization() {
 
   displayStore.showDialog = true
 }
+
+async function copyOrganizationId() {
+  if (!currentOrganization.value?.gid)
+    return
+  try {
+    await navigator.clipboard.writeText(currentOrganization.value.gid.toString())
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (err) {
+    console.error('Failed to copy: ', err)
+    // Display a modal with the copied key
+    displayStore.dialogOption = {
+      header: t('cannot-copy'),
+      message: currentOrganization.value.gid.toString(),
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    await displayStore.onDialogDismiss()
+  }
+}
 </script>
 
 <template>
@@ -269,6 +294,16 @@ async function deleteOrganization() {
               autofocus
               :label="t('organization-email')"
             />
+          </div>
+          <div class="flex flex-col md:flex-row md:items-center items-left">
+            <p class="text-slate-800 dark:text-white">
+              {{ t('organization-id') }}
+            </p>
+            <div class="md:ml-6">
+              <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+                {{ t('copy-organization-id') }}
+              </button>
+            </div>
           </div>
         </div>
         <footer style="margin-top: auto">

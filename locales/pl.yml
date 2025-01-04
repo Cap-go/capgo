@@ -36,6 +36,8 @@ alert-accept-inviation: Czy akceptujesz zaproszenie do %ORG%?
 alert-add-new-key: Wybór typu klucza do wygenerowania
 alert-confirm-delete: Potwierdź usunięcie
 alert-confirm-invite: Potwierdź zaproszenie
+alert-confirm-org-limit: Ograniczenie klucza API do określonych organizacji
+alert-confirm-org-limit-message: Wybierz organizacje, do których ten klucz API będzie miał dostęp
 alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
 alert-delete-message-plural: Czy na pewno chcesz je usunąć?
@@ -61,6 +63,10 @@ app-info-desc: Tutaj możesz zmienić informacje o swojej aplikacji
 app-logo-deleted: Obraz aplikacji został pomyślnie usunięty
 app-name: Nazwa aplikacji
 app-perm: Zezwolenie na aplikację
+app-transferred: Aplikacja została pomyślnie przesłana
+app-will-be-transferred: >-
+  Aplikacja zostanie przeniesiona do $ORG_ID. Wpisz identyfikator aplikacji
+  ("$APP_ID"), aby potwierdzić transfer.
 are-u-sure: Jesteś pewny ?
 are-you-sure-you-want-to-download: Czy na pewno chcesz pobrać plik?
 available-in-the-san: Dostępne w aplikacji piaskownicy
@@ -114,6 +120,7 @@ cannot-delete-bundles: Nie można usunąć pakietów
 cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
+cannot-delete-unknown-or-builtin: Nie można usunąć nieznanego pakietu i pakietu wbudowanego
 cannot-determine-platform: >-
   Nie można określić, czy dany identyfikator UUID należy do systemu IOS czy
   Android
@@ -127,6 +134,9 @@ cannot-load-app-settings: Nie można załadować ustawień aplikacji
 cannot-set-this-vers: Nie można ustawić tej wersji
 cannot-show: Nie można wyświetlić tej strony
 cannot-test-app-some: Nie można przetestować aplikacji. Wystąpił błąd
+cannot-transfer-app: >-
+  Nie można przenieść organizacji. Sprawdź konsolę przeglądarki i zgłoś błąd do
+  pomocy technicznej Capgo.
 cannot-view-plans: Nie można wyświetlić strony planów
 cannot-view-usage: Nie można wyświetlić strony użytkowania
 cannots-sign-off: Nie można się zalogować
@@ -134,6 +144,7 @@ captcha: Captcha
 captcha-fail: Weryfikacja Captcha nie powiodła się
 change: Zmiana
 change-api-key-name: Zmień nazwę apikey
+change-app-organisation-owner: Przeniesienie aplikacji do innej organizacji
 change-your-picture: Zmień swoje zdjęcie
 changed-app-name: Pomyślnie zmieniono nazwę aplikacji
 changed-app-retention: Pomyślnie zmieniono retencję aplikacji
@@ -181,10 +192,12 @@ confirm-public-desc: >-
   wszystkich Twoich użytkowników.
 
   Inne domyślne kanały nie będą już domyślne.
+confirm-transfer: Potwierdź transfer aplikacji
 continue: Kontynuować
 copied-to-clipboard: Skopiowane do schowka
 copy-account-id: skopiuj identyfikator konta
 copy-command: Kopiuj polecenie
+copy-organization-id: Kopiuj identyfikator organizacji
 country: Kraj
 create-a-free-accoun: Utwórz bezpłatne konto
 create-new-org: Utwórz nową organizację
@@ -258,6 +271,7 @@ good: Dobry
 here: tutaj
 id: ID
 included-in-plan: Zawarte w planie
+incorrect-app-id: Wpisałeś zły identyfikator aplikacji.
 info: Informacja
 init-capgo-in-your-a: Zainicjuj Capgo w swojej aplikacji
 insert-invite-email: Wpisz adres e-mail użytkownika, którego chcesz zaprosić
@@ -289,6 +303,9 @@ last-version: Ostatnia wersja
 latest_version: Najnowszy pakiet
 launch-bundle: Uruchom pakiet
 leaving: Odjazd
+limit-to-org: |-
+  Ograniczenie klucza API do wybranych
+  organizacji?
 live-reload: Przeładowanie na żywo
 log-as: Zacznij podszywać się
 log-in: Zaloguj sie
@@ -351,6 +368,7 @@ no-permission: Niewystarczające uprawnienia
 no-permission-ask-super-admin: >-
   Niewystarczające uprawnienia, poproś superadministratora o niebezpieczne
   usunięcie tego pakietu
+no-super-admin-organizations: Nie znaleziono organizacji super_admin
 none: Nic
 normal: Normalny
 not-found: Nie znaleziono
@@ -376,6 +394,7 @@ org-deleted: Organizacja została pomyślnie usunięta
 org-invited-user: Pomyślnie zaproszono użytkownika do organizacji
 org-with-this-name-exists: Utworzyłeś już organizację o tej nazwie!
 organization-email: Adres e-mail zarządu organizacji
+organization-id: Identyfikator organizacji
 organization-name: Nazwa organizacji
 organization-settings: Ustawienia organizacji
 os-version: Wersja systemu operacyjnego
@@ -458,6 +477,8 @@ select-channel: Wybierz kanał
 select-channel-msg: Wybierz kanał, którego chcesz użyć podczas nadpisywania.
 select-default-upload-channel: Wybierz domyślny kanał przesyłania
 select-default-upload-channel-header: Wybór domyślnego kanału
+select-destination-organization: Wybór organizacji docelowej
+select-organization-to-transfer: Wybierz organizację, do której chcesz przekształcić tę aplikację.
 select-style-of-deletion: Wybierz styl usuwania
 select-style-of-deletion-msg: |-
   Wybierz sposób, w jaki chcesz usunąć ten kanał.
@@ -465,6 +486,7 @@ select-style-of-deletion-msg: |-
   Możesz przeczytać o różnicy $1
 select-user-perms: Wybierz uprawnienia użytkownika
 select-user-perms-expanded: Wybierz, jakie uprawnienia powinien mieć zaproszony użytkownik
+select_all: wybierz wszystko
 session_key: Klucz IVSesji
 set-bundle: Ustaw pakiet na kanał
 settings: Ustawienia
@@ -494,6 +516,12 @@ this-page-will-self-: >-
 to: do
 to-open-encrypted-bu: 'Aby otworzyć zaszyfrowany pakiet, użyj polecenia:'
 top-apps-v2: Aplikacje
+transfer-app-ownership: Przeniesienie własności aplikacji
+transfer-app-ownership-requirements: >-
+  Aby przenieść aplikację między organizacjami, musisz mieć uprawnienia
+  super_admin zarówno w organizacji źródłowej, jak i docelowej. Zapewnia to
+  bezpieczne przeniesienie własności i zapobiega nieautoryzowanemu dostępowi.
+transfer-app-ownership-too-soon: Aplikacje można przenosić tylko co 32 dni
 trial-left: Pozostałe dni
 trial-plan-expired: Wersja czasowa wygasła
 type-device-id: Wprowadź identyfikator urządzenia
@@ -546,6 +574,12 @@ wrong-name-org-del: |-
   Miałeś wpisać: %1
 yearly: Rocznie
 'yes': Tak
+you-are-deleting-unsafely: >-
+  $1Ostrzeżenie!!!$2 Usuwasz ten pakiet niebezpiecznie, nie można tego cofnąć.
+  Dowiedz się więcej $3tutaj$4
+you-are-deleting-unsafely-plural: >-
+  $1Ostrzeżenie!!!$2 Usuwasz te pakiety niebezpiecznie, nie można tego cofnąć.
+  Dowiedz się więcej $3tutaj$4
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-cannot-reuse: Po usunięciu nie można ponownie użyć tej wersji pakietu
 you-reached-the-limi: Limit osiągnięty

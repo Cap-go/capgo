@@ -4,12 +4,14 @@ import { FormKit } from '@formkit/vue'
 import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
 import { useDisplayStore } from '~/stores/display'
+import { useOrganizationStore } from '~/stores/organization'
 
 /*
 * $targetEl: required
 * options: optional
 */
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
 const route = useRoute()
 
 function close(item?: ActionSheetOptionButton) {
@@ -79,7 +81,57 @@ onMounted(() => {
           }"
         >
           <p class="text-base leading-relaxed prose text-gray-500 break-words dark:text-gray-400" :class="displayStore.dialogOption?.textStyle" v-html="displayText(displayStore.dialogOption?.message)" />
+          <div v-if="displayStore.dialogOption?.listOrganizations">
+            <div class="flex flex-col gap-2">
+              <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
+                <div class="flex items-center h-full">
+                  <FormKit
+                    type="checkbox"
+                    :name="`org-${org.gid}`"
+                    :classes="{
+                      outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
+                      inner: '!max-w-[18px]',
+                      wrapper: '!mb-0',
+                    }"
+                    @input="(value) => {
+                      if (value)
+                        displayStore.selectedOrganizations.push(org.gid)
+                      else
+                        displayStore.selectedOrganizations = displayStore.selectedOrganizations.filter(gid => gid !== org.gid)
+                    }"
+                  />
+                </div>
+                <!-- <FormKit
+                  type="checkbox"
+                  :name="`org-${org.gid}`"
+                  v-model="displayStore.dialogCheckbox"
+                  :classes="{
+                    outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
+                    inner: '!max-w-[18px]',
+                    wrapper: '!mb-0',
+                  }"
+                /> -->
+                <img v-if="!!org.logo" :src="org.logo" class="w-[78px] h-[78px] rounded-full">
+                <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                  <span class="font-medium text-gray-300">
+                    N/A
+                  </span>
+                </div>
+                <span :class="{ 'ml-[6.344px]': !!org.logo }">{{ org.name }}</span>
+              </div>
+            </div>
+          </div>
           <img v-if="displayStore.dialogOption?.image" alt="dialog illustration" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
+          <div v-if="displayStore.dialogOption?.checkboxText" class="flex justify-start mb-0 mt-14">
+            <FormKit id="dialog-input" type="form" :actions="false">
+              <FormKit
+                v-model="displayStore.dialogCheckbox"
+                type="checkbox"
+                :label="displayStore.dialogOption?.checkboxText"
+                :classes="{ outer: 'mb-[0px]' }"
+              />
+            </FormKit>
+          </div>
           <div v-if="displayStore.dialogOption?.input" class="w-full">
             <FormKit id="dialog-input" type="form" :actions="false" @submit="submit">
               <FormKit
@@ -97,7 +149,7 @@ onMounted(() => {
             </FormKit>
           </div>
         </div>
-        <div class="modal-action">
+        <div class="modal-action" :class="{ 'mt-0': displayStore.dialogOption?.checkboxText }">
           <div
             class="flex items-center w-full rounded-b dark:border-gray-600"
             :class="{
@@ -116,8 +168,8 @@ onMounted(() => {
                 'ml-auto mr-2': displayStore.dialogOption?.buttonCenter && i === 0 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mr-auto ml-2': displayStore.dialogOption?.buttonCenter && i === (displayStore.dialogOption?.buttons?.length ?? 0) - 1 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mx-auto': displayStore.dialogOption?.buttonCenter && (displayStore.dialogOption?.buttons?.length ?? 0) === 1,
-                'my-1': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
-                'my-4': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
+                'my-1 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
+                'my-4 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
               @click="close(item)"

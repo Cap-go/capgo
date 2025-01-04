@@ -34,6 +34,8 @@ alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
 alert-confirm-delete: 삭제 확인
 alert-confirm-invite: 초대 확인
+alert-confirm-org-limit: API 키를 인증된 조직으로 제한
+alert-confirm-org-limit-message: 이 API 키가 액세스할 수 있는 조직을 선택합니다.
 alert-confirm-regenerate: API 키 재생성 확인
 alert-delete-message: 삭제하시겠습니까?
 alert-delete-message-plural: 정말 삭제하시겠습니까?
@@ -59,6 +61,8 @@ app-info-desc: 여기에서 앱 정보를 변경할 수 있습니다.
 app-logo-deleted: 앱 사진이 삭제되었습니다.
 app-name: 앱 이름
 app-perm: 앱 권한
+app-transferred: 앱이 성공적으로 전송되었습니다.
+app-will-be-transferred: 앱이 $ORG_ID로 전송됩니다. 앱 ID('$APP_ID')를 입력하여 전송을 확인하세요.
 are-u-sure: 확실합니까 ?
 are-you-sure-you-want-to-download: 정말 다운로드하시겠습니까?
 available-in-the-san: 샌드박스 앱에서 사용 가능
@@ -110,6 +114,7 @@ cannot-delete-bundles: 번들을 삭제할 수 없습니다.
 cannot-delete-channel: 채널을 삭제할 수 없습니다.
 cannot-delete-member: 회원을 삭제할 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-delete-owner: 조직에서 소유자를 삭제할 수 없습니다.
+cannot-delete-unknown-or-builtin: 알 수 없는 번들 및 기본 제공 번들을 삭제할 수 없습니다.
 cannot-determine-platform: 주어진 UUID가 IOS 또는 Android에 속하는지 확인할 수 없습니다.
 cannot-fetch-channels: 채널을 가져올 수 없습니다. 브라우저 콘솔을 확인하세요.
 cannot-find-unknown-version: 알 수 없는 버전을 찾을 수 없습니다. capgo 지원팀에 문의하여 브라우저 로그를 확인하세요.
@@ -119,6 +124,7 @@ cannot-load-app-settings: 앱 설정을 로드할 수 없습니다.
 cannot-set-this-vers: 이 버전을 설정할 수 없습니다.
 cannot-show: 이 페이지를 표시할 수 없습니다
 cannot-test-app-some: 앱을 테스트할 수 없습니다. 문제가 발생했습니다.
+cannot-transfer-app: 조직을 전송할 수 없습니다. 브라우저 콘솔을 확인하고 Capgo 지원팀에 오류를 신고하세요.
 cannot-view-plans: 계획 페이지를 볼 수 없습니다
 cannot-view-usage: 사용량 페이지를 볼 수 없습니다
 cannots-sign-off: 로그할 수 없습니다.
@@ -126,6 +132,7 @@ captcha: 캡차
 captcha-fail: 캡차 유효성 검사 실패
 change: 변화
 change-api-key-name: apikey 이름 변경
+change-app-organisation-owner: 애플리케이션을 다른 조직으로 이전
 change-your-picture: 사진을 바꿔보세요
 changed-app-name: 앱 이름이 변경되었습니다.
 changed-app-retention: 앱의 리텐션 변경 성공
@@ -170,10 +177,12 @@ confirm-public-desc: |-
   이 채널을 기본으로 설정하면 모든 사용자에게 업데이트가 전송됩니다.
 
   다른 기본 채널은 더 이상 기본값이 아닙니다.
+confirm-transfer: 앱 이전을 확인해 주세요.
 continue: 계속하다
 copied-to-clipboard: 클립보드에 복사됨
 copy-account-id: 계정 ID 복사
 copy-command: 복사 명령
+copy-organization-id: 조직 ID 복사
 country: 국가
 create-a-free-accoun: 무료 계정 만들기
 create-new-org: 새 조직 만들기
@@ -245,6 +254,7 @@ good: 좋은
 here: 여기
 id: ID
 included-in-plan: 계획에 포함됨
+incorrect-app-id: 앱 ID를 잘못 입력했습니다.
 info: 정보
 init-capgo-in-your-a: 앱에서 Capgo 초기화
 insert-invite-email: 초대하려는 사용자의 이메일을 입력하세요.
@@ -276,6 +286,9 @@ last-version: 마지막 버전
 latest_version: 최신 번들
 launch-bundle: 번들 실행
 leaving: 퇴거
+limit-to-org: |-
+  API 키를 선택한
+  조직으로 제한하시겠습니까?
 live-reload: 라이브 리로드
 log-as: 스푸핑 시작
 log-in: 로그인
@@ -334,6 +347,7 @@ no-app-icon: 이 앱에는 앱 아이콘이 없습니다.
 no-data: 데이터 없음
 no-permission: 권한이 부족합니다.
 no-permission-ask-super-admin: 권한이 충분하지 않은 경우 슈퍼 관리자에게 이 번들을 안전하지 않게 삭제해달라고 요청하세요.
+no-super-admin-organizations: super_admin 조직을 찾을 수 없습니다.
 none: 없음
 normal: 보통
 not-found: 찾을 수 없음
@@ -355,6 +369,7 @@ org-deleted: 조직이 삭제되었습니다.
 org-invited-user: 사용자를 조직에 초대했습니다.
 org-with-this-name-exists: 이미 이 이름을 가진 조직을 만드셨습니다!
 organization-email: 조직의 관리 이메일
+organization-id: 조직 ID
 organization-name: 조직 이름
 organization-settings: 조직 설정
 os-version: OS 버전
@@ -431,6 +446,8 @@ select-channel: 채널 선택
 select-channel-msg: 이 덮어쓰기에 사용할 채널을 선택하세요.
 select-default-upload-channel: 기본 업로드 채널을 선택하세요.
 select-default-upload-channel-header: 기본 채널 선택
+select-destination-organization: 대상 조직 선택
+select-organization-to-transfer: 이 앱을 변환할 조직을 선택합니다.
 select-style-of-deletion: 삭제 스타일 선택
 select-style-of-deletion-msg: |-
   이 채널을 삭제할 방법을 선택하세요.
@@ -438,6 +455,7 @@ select-style-of-deletion-msg: |-
   차이점에 대해 읽을 수 있습니다 $1
 select-user-perms: 사용자 권한 선택
 select-user-perms-expanded: 초대된 사용자가 어떤 권한을 가져야 하는지 선택하세요.
+select_all: 모두 선택
 session_key: IvSessionKey
 set-bundle: 번들을 채널로 설정
 settings: 설정
@@ -465,6 +483,11 @@ this-page-will-self-: CLI 온보딩을 완료하면 이 페이지가 자동으�
 to: To
 to-open-encrypted-bu: 암호화된 번들을 열려면 다음 명령을 사용하십시오.
 top-apps-v2: 앱
+transfer-app-ownership: 앱 소유권 이전
+transfer-app-ownership-requirements: >-
+  조직 간에 앱을 이전하려면 원본 조직과 대상 조직 모두에서 super_admin 권한이 있어야 합니다. 이렇게 하면 소유권을 안전하게
+  이전하고 무단 액세스를 방지할 수 있습니다.
+transfer-app-ownership-too-soon: 32일마다 앱을 전송할 수 있습니다.
 trial-left: 남은 일
 trial-plan-expired: 평가판 만료됨
 type-device-id: 장치 ID 입력
@@ -515,6 +538,8 @@ wrong-name-org-del: |-
   다음을 입력해야 했습니다: %1
 yearly: 매년
 'yes': 예
+you-are-deleting-unsafely: 1경고!!!2 이 번들을 안전하지 않게 삭제하고 있으며, 이 작업은 취소할 수 없습니다. 자세히 알아보기 $3여기$4
+you-are-deleting-unsafely-plural: 1경고!!!2 이 번들을 안전하지 않게 삭제하고 있으며, 이 작업은 취소할 수 없습니다. 자세히 알아보기 $3여기$4
 you-can-change-your-: 여기에서 개인 정보를 변경할 수 있습니다.
 you-cannot-reuse: 삭제 후에는 이 번들 버전을 재사용할 수 없습니다.
 you-reached-the-limi: 한도 도달

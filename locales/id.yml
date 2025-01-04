@@ -34,6 +34,8 @@ alert-accept-inviation: Apakah Anda menerima undangan ke %ORG%?
 alert-add-new-key: Pilih jenis kunci API baru
 alert-confirm-delete: Konfirmasi Hapus
 alert-confirm-invite: Konfirmasikan undangan
+alert-confirm-org-limit: Batasi kunci API untuk organisasi tertentu
+alert-confirm-org-limit-message: Pilih organisasi yang akan diakses oleh kunci API ini
 alert-confirm-regenerate: Konfirmasikan pembuatan ulang kunci API
 alert-delete-message: Apa kamu yakin ingin menghapus ini
 alert-delete-message-plural: Apakah Anda yakin ingin menghapus ini
@@ -59,6 +61,10 @@ app-info-desc: Di sini Anda dapat mengubah informasi aplikasi Anda
 app-logo-deleted: Gambar aplikasi berhasil dihapus
 app-name: Nama aplikasi
 app-perm: Izin aplikasi
+app-transferred: Aplikasi berhasil ditransfer
+app-will-be-transferred: >-
+  Aplikasi akan ditransfer ke $ORG_ID. Ketik ID aplikasi ('$APP_ID') untuk
+  mengonfirmasi transfer.
 are-u-sure: Apa kamu yakin ?
 are-you-sure-you-want-to-download: Apakah Anda yakin ingin mengunduh?
 available-in-the-san: Tersedia di aplikasi kotak pasir
@@ -110,6 +116,7 @@ cannot-delete-bundles: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
+cannot-delete-unknown-or-builtin: Tidak dapat menghapus bundel yang tidak dikenal dan bundel bawaan
 cannot-determine-platform: Tidak dapat menentukan apakah UUID yang diberikan milik iOS atau Android
 cannot-fetch-channels: Tidak dapat mengambil saluran. Silakan periksa konsol browser
 cannot-find-unknown-version: >-
@@ -121,6 +128,9 @@ cannot-load-app-settings: Tidak dapat memuat pengaturan aplikasi
 cannot-set-this-vers: Tidak dapat menyetel versi ini
 cannot-show: Tidak dapat menampilkan halaman ini
 cannot-test-app-some: Tidak dapat menguji aplikasi terjadi kesalahan
+cannot-transfer-app: >-
+  Tidak dapat mentransfer organisasi. Periksa konsol browser dan laporkan
+  kesalahan tersebut ke dukungan Capgo.
 cannot-view-plans: Tidak dapat melihat halaman rencana
 cannot-view-usage: Tidak dapat melihat halaman penggunaan
 cannots-sign-off: Tidak dapat masuk
@@ -128,6 +138,7 @@ captcha: Captcha
 captcha-fail: Validasi captcha gagal
 change: Mengubah
 change-api-key-name: Ubah nama apikey
+change-app-organisation-owner: Mentransfer aplikasi ke organisasi lain
 change-your-picture: Ubah gambar Anda
 changed-app-name: Berhasil mengubah nama aplikasi
 changed-app-retention: Berhasil mengubah retensi aplikasi
@@ -175,10 +186,12 @@ confirm-public-desc: >-
   semua pengguna Anda.
 
   Saluran default lainnya tidak akan menjadi default lagi.
+confirm-transfer: Harap konfirmasi transfer aplikasi
 continue: Melanjutkan
 copied-to-clipboard: Disalin ke papan klip
 copy-account-id: salin id akun
 copy-command: Salin perintah
+copy-organization-id: salin id organisasi
 country: Negara
 create-a-free-accoun: Buat Akun gratis
 create-new-org: Buat organisasi baru
@@ -256,6 +269,7 @@ good: Bagus
 here: di sini
 id: PENGENAL
 included-in-plan: Termasuk dalam rencana
+incorrect-app-id: Anda salah menulis id aplikasi.
 info: Informasi
 init-capgo-in-your-a: Init Capgo di aplikasi Anda
 insert-invite-email: Masukkan email pengguna yang ingin Anda undang
@@ -287,6 +301,9 @@ last-version: Versi terakhir
 latest_version: Paket terbaru
 launch-bundle: Luncurkan bundel
 leaving: Meninggalkan
+limit-to-org: |-
+  Batasi kunci API untuk organisasi tertentu
+  organisasi tertentu?
 live-reload: Muat ulang langsung
 log-as: Mulai melakukan spoofing
 log-in: Gabung
@@ -349,6 +366,7 @@ no-permission: Izin tidak memadai
 no-permission-ask-super-admin: >-
   izin tidak mencukupi, silakan minta admin super untuk menghapus bundel ini
   secara tidak aman
+no-super-admin-organizations: Tidak ditemukan organisasi super_admin
 none: Tidak ada
 normal: Normal
 not-found: Tidak ditemukan
@@ -372,6 +390,7 @@ org-deleted: Organisasi berhasil dihapus
 org-invited-user: Berhasil mengundang pengguna ke org
 org-with-this-name-exists: Anda telah membuat organisasi dengan nama ini!
 organization-email: Email manajemen organisasi
+organization-id: Id organisasi
 organization-name: Nama Organisasi
 organization-settings: Pengaturan organisasi
 os-version: versi OS
@@ -454,6 +473,8 @@ select-channel: Pilih saluran
 select-channel-msg: Pilih saluran yang ingin Anda gunakan dalam penimpaan ini
 select-default-upload-channel: Pilih saluran unggahan default
 select-default-upload-channel-header: Memilih saluran default
+select-destination-organization: Pilih organisasi tujuan
+select-organization-to-transfer: Pilih organisasi yang ingin Anda ubah aplikasi ini
 select-style-of-deletion: Memilih gaya penghapusan
 select-style-of-deletion-msg: |-
   Pilih cara yang Anda inginkan untuk menghapus saluran ini.
@@ -461,6 +482,7 @@ select-style-of-deletion-msg: |-
   Anda dapat membaca tentang perbedaannya di $1
 select-user-perms: Pilih izin pengguna
 select-user-perms-expanded: Pilih izin mana yang harus dimiliki oleh pengguna yang diundang
+select_all: pilih semua
 session_key: IvSessionKey
 set-bundle: Tetapkan bundel ke saluran
 settings: Pengaturan
@@ -490,6 +512,12 @@ this-page-will-self-: >-
 to: Ke
 to-open-encrypted-bu: 'Untuk membuka Bundel terenkripsi gunakan perintah:'
 top-apps-v2: Aplikasi
+transfer-app-ownership: Mentransfer kepemilikan aplikasi
+transfer-app-ownership-requirements: >-
+  Untuk mentransfer aplikasi antar organisasi, Anda harus memiliki hak istimewa
+  super_admin di organisasi sumber dan tujuan. Hal ini memastikan transfer
+  kepemilikan yang aman dan mencegah akses yang tidak sah.
+transfer-app-ownership-too-soon: Anda hanya dapat mentransfer aplikasi setiap 32 hari
 trial-left: hari tersisa
 trial-plan-expired: Masa percobaan sudah habis
 type-device-id: Masukkan ID perangkat
@@ -542,6 +570,12 @@ wrong-name-org-del: |-
   Anda seharusnya mengetik: %1
 yearly: Tahunan
 'yes': Ya
+you-are-deleting-unsafely: >-
+  $1Peringatan!!!$2 Anda menghapus bundel ini dengan tidak aman, ini tidak dapat
+  dibatalkan. Pelajari lebih lanjut $ 3 di sini $ 4
+you-are-deleting-unsafely-plural: >-
+  $1Peringatan!!!$2 Anda menghapus bundel ini dengan tidak aman, ini tidak dapat
+  dibatalkan. Pelajari lebih lanjut $ 3 di sini $ 4
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-cannot-reuse: Anda tidak dapat menggunakan kembali versi bundel ini setelah penghapusan
 you-reached-the-limi: Batas tercapai

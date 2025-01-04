@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
 export async function post(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.device_id || !body.app_id) {
@@ -11,7 +11,7 @@ export async function post(c: Context, body: DeviceLink, apikey: Database['publi
   }
   body.device_id = body.device_id.toLowerCase()
 
-  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write'))) {
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     console.log('You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }

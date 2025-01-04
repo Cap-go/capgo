@@ -3,7 +3,7 @@ import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { useCors } from '../utils/hono.ts'
 import { readStats } from '../utils/stats.ts'
-import { hasAppRight, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
 interface dataStats {
   appId: string
@@ -33,7 +33,7 @@ app.post('/', async (c: Context) => {
         console.log({ requestId: c.get('requestId'), context: 'error', error: _errorUserId, userId })
         return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
       }
-      if (!(await hasAppRight(c, body.appId, userId, 'read'))) {
+      if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string))) {
         console.log({ requestId: c.get('requestId'), context: 'error hasAppRight not found', userId })
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
       }

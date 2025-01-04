@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.8.0-alpha.0",
+  "version": "11.7.36",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -34,6 +34,7 @@
     "dev-ios": "cap sync && cap run ios",
     "local-serve": "BRANCH=local vite",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
+    "lint-fix": "eslint \"src/**/*.{vue,ts,js}\" --fix",
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "lint-sql": "sqlfluff fix --dialect postgres",
     "types": "bun ./scripts/getTypes.mjs",
@@ -118,6 +119,7 @@
     "@capgo/inappbrowser": "^6.9.28",
     "@capgo/native-audio": "^6.4.23",
     "@capgo/native-market": "^6.0.2",
+    "@elithrar/workers-hono-rate-limit": "^0.4.3",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
     "@formkit/i18n": "^1.6.9",
     "@formkit/themes": "1.6.9",

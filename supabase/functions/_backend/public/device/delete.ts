@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export interface DeviceLink {
   app_id: string
@@ -10,7 +10,7 @@ export interface DeviceLink {
 }
 
 export async function deleteOverride(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write')))
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key)))
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
   try {
