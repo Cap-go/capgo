@@ -63,6 +63,10 @@ app-info-desc: Bạn có thể thay đổi thông tin ứng dụng của mình t
 app-logo-deleted: Đã xóa ảnh ứng dụng thành công
 app-name: Tên ứng dụng
 app-perm: Quyền ứng dụng
+app-transferred: Đã chuyển ứng dụng thành công
+app-will-be-transferred: |-
+  Ứng dụng sẽ được chuyển sang $ORG_ID. 
+  Vui lòng nhập ID ứng dụng ('$APP_ID') để xác nhận chuyển.
 are-u-sure: Bạn có chắc không ?
 are-you-sure-you-want-to-download: Bạn có chắc chắn muốn tải xuống không?
 available-in-the-san: Có sẵn trong ứng dụng sandbox
@@ -136,6 +140,11 @@ cannot-load-app-settings: Không thể tải cài đặt ứng dụng
 cannot-set-this-vers: Không thể đặt phiên bản này
 cannot-show: Không thể hiển thị trang này
 cannot-test-app-some: Không thể kiểm tra ứng dụng đã xảy ra sự cố
+cannot-transfer-app: >-
+  Không thể chuyển tổ chức. 
+
+  Vui lòng kiểm tra bảng điều khiển trình duyệt và báo cáo lỗi cho bộ phận hỗ
+  trợ của Capgo.
 cannot-view-plans: Không thể xem trang kế hoạch
 cannot-view-usage: Không thể xem trang sử dụng
 cannots-sign-off: Không thể đăng nhập
@@ -143,6 +152,7 @@ captcha: hình ảnh xác thực
 captcha-fail: Xác thực hình ảnh xác thực không thành công
 change: Thay đổi
 change-api-key-name: Thay đổi tên của apikey
+change-app-organisation-owner: Chuyển ứng dụng sang tổ chức khác
 change-your-picture: Thay đổi hình ảnh của bạn
 changed-app-name: Đã đổi tên ứng dụng thành công
 changed-app-retention: Đã thay đổi thành công tỷ lệ lưu giữ của ứng dụng
@@ -189,10 +199,12 @@ confirm-public-desc: |-
   Đặt kênh này làm mặc định sẽ gửi cập nhật cho tất cả người dùng của bạn.
 
   Các kênh mặc định khác sẽ không còn mặc định nữa.
+confirm-transfer: Vui lòng xác nhận việc chuyển ứng dụng
 continue: Tiếp tục
 copied-to-clipboard: Sao chép vào clipboard
 copy-account-id: sao chép id tài khoản
 copy-command: Sao chép lệnh
+copy-organization-id: sao chép id tổ chức
 country: Quốc gia
 create-a-free-accoun: Tạo một tài khoản miễn phí
 create-new-org: Tạo một tổ chức mới
@@ -270,6 +282,7 @@ good: Tốt
 here: đây
 id: NHẬN DẠNG
 included-in-plan: Bao gồm trong kế hoạch
+incorrect-app-id: Bạn đã viết sai id ứng dụng.
 info: Thông tin
 init-capgo-in-your-a: Khởi tạo Capgo trong ứng dụng của bạn
 insert-invite-email: Chèn email của người dùng bạn muốn mời
@@ -363,6 +376,7 @@ no-permission: Không đủ quyền
 no-permission-ask-super-admin: >-
   không đủ quyền, vui lòng yêu cầu quản trị viên cấp cao xóa gói này một cách
   không an toàn
+no-super-admin-organizations: Không tìm thấy tổ chức super_admin nào
 none: Không có
 normal: Bình thường
 not-found: Không tìm thấy
@@ -386,6 +400,7 @@ org-deleted: Đã xóa tổ chức thành công
 org-invited-user: Đã mời thành công người dùng vào tổ chức
 org-with-this-name-exists: Bạn đã tạo một tổ chức có tên này!
 organization-email: Email quản lý của tổ chức
+organization-id: Id tổ chức
 organization-name: tên tổ chức
 organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
@@ -468,6 +483,8 @@ select-channel: Chọn kênh
 select-channel-msg: Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này
 select-default-upload-channel: Vui lòng chọn kênh tải lên mặc định
 select-default-upload-channel-header: Chọn kênh mặc định
+select-destination-organization: Chọn tổ chức đích
+select-organization-to-transfer: Chọn tổ chức mà bạn muốn chuyển đổi ứng dụng này
 select-style-of-deletion: Chọn kiểu xóa
 select-style-of-deletion-msg: |-
   Vui lòng chọn cách bạn muốn xóa kênh này.
@@ -504,6 +521,13 @@ this-page-will-self-: Trang này sẽ tự làm mới sau khi bạn hoàn tất 
 to: ĐẾN
 to-open-encrypted-bu: 'Để mở Gói được mã hóa, hãy sử dụng lệnh:'
 top-apps-v2: Ứng dụng
+transfer-app-ownership: Chuyển quyền sở hữu ứng dụng
+transfer-app-ownership-requirements: >-
+  Để chuyển ứng dụng giữa các tổ chức, bạn phải có đặc quyền super_admin ở cả tổ
+  chức nguồn và tổ chức đích. 
+
+  Điều này đảm bảo chuyển quyền sở hữu an toàn và ngăn chặn truy cập trái phép.
+transfer-app-ownership-too-soon: Bạn chỉ có thể chuyển ứng dụng sau mỗi 32 ngày
 trial-left: ngày còn lại
 trial-plan-expired: Hết hạn dùng thử
 type-device-id: Nhập ID thiết bị

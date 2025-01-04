@@ -59,6 +59,10 @@ app-info-desc: You can change here your app information
 app-logo-deleted: App picture deleted successfully
 app-name: App name
 app-perm: App permission
+app-transferred: App transferred successfully
+app-will-be-transferred: >-
+  App will be transferred to $ORG_ID. Please type the app ID ('$APP_ID') to
+  confirm the transfer. 
 are-u-sure: Are you sure ?
 are-you-sure-you-want-to-download: Are you sure that you want to download?
 available-in-the-san: Available in the sandbox app
@@ -122,6 +126,9 @@ cannot-load-app-settings: Cannot load app settings
 cannot-set-this-vers: Cannot set this version
 cannot-show: Cannot show this page
 cannot-test-app-some: Cannot test app something wrong happened
+cannot-transfer-app: >-
+  Cannot transfer organization. Please check the browser console and report the
+  error to Capgo support.
 cannot-view-plans: Cannot view the plans page
 cannot-view-usage: Cannot view the usage page
 cannots-sign-off: Cannot log of
@@ -129,6 +136,7 @@ captcha: Captcha
 captcha-fail: Captcha validation failed
 change: Change
 change-api-key-name: Change the apikey's name
+change-app-organisation-owner: Transfer the application to another organisation
 change-your-picture: Change your picture
 changed-app-name: Successfully changed app name
 changed-app-retention: Successfully changed the app's retention
@@ -172,10 +180,12 @@ confirm-password: Confirm password
 confirm-public-desc: |-
   Making this channel default will make it send updates to all yours users.
   Others default channels will not be default anymore.
+confirm-transfer: Please confirm the app transfer
 continue: Continue
 copied-to-clipboard: Copied to clipboard
 copy-account-id: copy account id
 copy-command: Copy command
+copy-organization-id: copy organization id
 country: Country
 create-a-free-accoun: Create a free account
 create-new-org: Create a new organization
@@ -247,6 +257,7 @@ good: Good
 here: here
 id: ID
 included-in-plan: Included in plan
+incorrect-app-id: You wrote the wrong app id.
 info: Information
 init-capgo-in-your-a: Init Capgo in your app
 insert-invite-email: Insert email of the user you want to invite
@@ -332,6 +343,7 @@ no-permission: Insufficient permissions
 no-permission-ask-super-admin: >-
   insufficient permission, please ask a super admin to delete this bundle
   unsafely
+no-super-admin-organizations: No super_admin organizations found
 none: None
 normal: Normal
 not-found: Not found
@@ -355,6 +367,7 @@ org-deleted: Org deleted successfully
 org-invited-user: Successfully invited user to org
 org-with-this-name-exists: You have already created an organization with this name!
 organization-email: Organization's management email
+organization-id: Organization id
 organization-name: Organization Name
 organization-settings: Organization settings
 os-version: OS version
@@ -433,6 +446,8 @@ select-channel: Select channel
 select-channel-msg: Please select the channel that you would like to use in this overwrite
 select-default-upload-channel: Please select the default upload channel
 select-default-upload-channel-header: Select default channel
+select-destination-organization: Select destination organisation
+select-organization-to-transfer: Select the organization to which you want to transform this app
 select-style-of-deletion: Select the style of deletion
 select-style-of-deletion-msg: |-
   Please select the way that you would like to delete this bundle.
@@ -465,6 +480,12 @@ this-page-will-self-: This page will self refresh after you finish onboarding wi
 to: to
 to-open-encrypted-bu: 'To open Encrypted bundle use the command:'
 top-apps-v2: Apps
+transfer-app-ownership: Transfer app ownership
+transfer-app-ownership-requirements: >-
+  To transfer an app between organizations, you must have super_admin privileges
+  in both the source and destination organizations. This ensures secure transfer
+  of ownership and prevents unauthorized access.
+transfer-app-ownership-too-soon: You can only transfer apps every 32 days
 trial-left: days left
 trial-plan-expired: Trial Expired
 type-device-id: Enter device ID

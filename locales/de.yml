@@ -67,6 +67,10 @@ app-info-desc: Hier können Sie Ihre App-Informationen ändern
 app-logo-deleted: App-Bild erfolgreich gelöscht
 app-name: App Name
 app-perm: App-Berechtigung
+app-transferred: App erfolgreich übertragen
+app-will-be-transferred: >-
+  Die App wird auf $ORG_ID übertragen. Bitte geben Sie die App-ID ("$APP_ID")
+  ein, um die Übertragung zu bestätigen.
 are-u-sure: Bist du dir sicher ?
 are-you-sure-you-want-to-download: Sind Sie sicher, dass Sie den Download durchführen möchten?
 available-in-the-san: Verfügbar in der Sandbox-App
@@ -148,6 +152,9 @@ cannot-load-app-settings: App-Einstellungen können nicht geladen werden
 cannot-set-this-vers: Diese Version kann nicht eingestellt werden
 cannot-show: Diese Seite kann nicht angezeigt werden
 cannot-test-app-some: App kann nicht getestet werden, es ist ein Fehler aufgetreten
+cannot-transfer-app: >-
+  Organisation kann nicht übertragen werden. Bitte überprüfen Sie die
+  Browser-Konsole und melden Sie den Fehler dem Capgo-Support.
 cannot-view-plans: Die Seite mit den Plänen kann nicht angezeigt werden
 cannot-view-usage: Die Nutzungsseite kann nicht angezeigt werden
 cannots-sign-off: Protokollierung nicht möglich
@@ -155,6 +162,7 @@ captcha: Captcha
 captcha-fail: Captcha-Validierung fehlgeschlagen
 change: Ändern
 change-api-key-name: Ändern Sie den Namen des Apikeys
+change-app-organisation-owner: Übertragung des Antrags auf eine andere Organisation
 change-your-picture: Ändere dein Bild
 changed-app-name: App-Name erfolgreich geändert
 changed-app-retention: Erfolgreich die Speicherung der App geändert
@@ -203,10 +211,12 @@ confirm-public-desc: >-
 
 
   Andere Standardkanäle sind nicht mehr Standard.
+confirm-transfer: Bitte bestätigen Sie die Übertragung der App
 continue: Weitermachen
 copied-to-clipboard: In die Zwischenablage kopiert
 copy-account-id: Konto-ID kopieren
 copy-command: Befehl kopieren
+copy-organization-id: Organisations-ID kopieren
 country: Land
 create-a-free-accoun: Erstelle einen kostenlosen Account
 create-new-org: Erstellen Sie eine neue Organisation
@@ -284,6 +294,7 @@ good: Gut
 here: hier
 id: AUSWEIS
 included-in-plan: Im Plan enthalten
+incorrect-app-id: Sie haben die falsche App-ID eingegeben.
 info: Information
 init-capgo-in-your-a: Initieren Sie Capgo in Ihrer App
 insert-invite-email: Geben Sie die E-Mail-Adresse des Benutzers ein, den Sie einladen möchten
@@ -379,6 +390,7 @@ no-permission: Nicht ausreichende Berechtigungen
 no-permission-ask-super-admin: >-
   unzureichende Berechtigung, bitte bitten Sie einen Superadministrator, dieses
   Paket unsicher zu löschen
+no-super-admin-organizations: Keine super_admin Organisationen gefunden
 none: Keiner
 normal: Normal
 not-found: Nicht gefunden
@@ -406,6 +418,7 @@ org-deleted: Organisation erfolgreich gelöscht
 org-invited-user: Benutzer wurde erfolgreich zur Organisation eingeladen
 org-with-this-name-exists: Sie haben bereits eine Organisation mit diesem Namen erstellt!
 organization-email: Management-E-Mail der Organisation
+organization-id: Organisations-ID
 organization-name: Name der Organisation
 organization-settings: Organisationseinstellungen
 os-version: OS Version
@@ -498,6 +511,8 @@ select-channel-msg: >-
   möchten
 select-default-upload-channel: Bitte wählen Sie den Standard-Upload-Kanal
 select-default-upload-channel-header: Standard-Kanal auswählen
+select-destination-organization: Zielorganisation auswählen
+select-organization-to-transfer: Wählen Sie die Organisation, in die Sie diese Anwendung umwandeln möchten
 select-style-of-deletion: Wählen Sie die Art der Löschung
 select-style-of-deletion-msg: |-
   Bitte wählen Sie die Art und Weise, wie Sie diesen Kanal löschen möchten.
@@ -534,6 +549,13 @@ this-page-will-self-: >-
 to: Bis
 to-open-encrypted-bu: 'Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:'
 top-apps-v2: Apps
+transfer-app-ownership: App-Eigentum übertragen
+transfer-app-ownership-requirements: >-
+  Um eine App zwischen Organisationen zu übertragen, müssen Sie sowohl in der
+  Quell- als auch in der Zielorganisation über super_admin-Rechte verfügen. Dies
+  gewährleistet eine sichere Übertragung des Eigentums und verhindert unbefugten
+  Zugriff.
+transfer-app-ownership-too-soon: Sie können Anwendungen nur alle 32 Tage übertragen.
 trial-left: Tage übrig
 trial-plan-expired: Probezeit abgelaufen
 type-device-id: Geräte-ID eingeben

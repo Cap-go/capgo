@@ -116,8 +116,8 @@ onMounted(() => {
                 'ml-auto mr-2': displayStore.dialogOption?.buttonCenter && i === 0 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mr-auto ml-2': displayStore.dialogOption?.buttonCenter && i === (displayStore.dialogOption?.buttons?.length ?? 0) - 1 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mx-auto': displayStore.dialogOption?.buttonCenter && (displayStore.dialogOption?.buttons?.length ?? 0) === 1,
-                'my-1': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
-                'my-4': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
+                'my-1 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
+                'my-4 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
               @click="close(item)"

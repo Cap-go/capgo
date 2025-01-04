@@ -59,6 +59,8 @@ app-info-desc: ここでアプリ情報を変更できます
 app-logo-deleted: アプリの画像が正常に削除されました
 app-name: アプリ名
 app-perm: アプリの許可
+app-transferred: アプリの転送に成功
+app-will-be-transferred: アプリは$ORG_IDに転送されます。アプリID('$APP_ID')を入力して転送を確認してください。
 are-u-sure: 本気ですか ？
 are-you-sure-you-want-to-download: 本当にダウンロードしますか？
 available-in-the-san: サンドボックス アプリで利用可能
@@ -120,6 +122,7 @@ cannot-load-app-settings: アプリ設定を読み込めません
 cannot-set-this-vers: このバージョンは設定できません
 cannot-show: このページは表示できません
 cannot-test-app-some: アプリをテストできません
+cannot-transfer-app: 組織を転送できません。ブラウザのコンソールを確認し、Capgoサポートにエラーを報告してください。
 cannot-view-plans: プランページが表示されない
 cannot-view-usage: 利用方法ページが表示されない
 cannots-sign-off: ログに記録できません
@@ -127,6 +130,7 @@ captcha: キャプチャ
 captcha-fail: Captcha バリデーションに失敗しました。
 change: 変化
 change-api-key-name: apikey の名前を変更する
+change-app-organisation-owner: 他団体への移籍
 change-your-picture: 写真を変更する
 changed-app-name: アプリ名が正常に変更されました
 changed-app-retention: アプリのリテンション変更に成功
@@ -171,10 +175,12 @@ confirm-public-desc: |-
   このチャネルをデフォルトにすると、すべてのユーザーに更新が送信されます。
 
   他のデフォルト チャネルはデフォルトではなくなります。
+confirm-transfer: アプリの転送を確認してください
 continue: 続く
 copied-to-clipboard: クリップボードにコピーしました
 copy-account-id: アカウントIDをコピーする
 copy-command: コピー コマンド
+copy-organization-id: コピー組織ID
 country: 国
 create-a-free-accoun: 無料アカウントを作成
 create-new-org: 新しい組織を作成する
@@ -246,6 +252,7 @@ good: 良い
 here: これ
 id: ID
 included-in-plan: プランに含まれるもの
+incorrect-app-id: アプリのIDを間違えています。
 info: 情報
 init-capgo-in-your-a: アプリで Capgo を初期化する
 insert-invite-email: 招待したいユーザーのメールアドレスを入力します
@@ -335,6 +342,7 @@ no-app-icon: このアプリにはアプリアイコンがありません
 no-data: データなし
 no-permission: 権限が不十分です
 no-permission-ask-super-admin: このバンドルを安全に削除するには、スーパー管理者に依頼してください。
+no-super-admin-organizations: super_admin 組織が見つかりません。
 none: なし
 normal: ノーマル
 not-found: 見つかりません
@@ -356,6 +364,7 @@ org-deleted: 組織は正常に削除されました
 org-invited-user: ユーザーを組織に正常に招待しました
 org-with-this-name-exists: この名前の組織はすでに作成されています。
 organization-email: 組織の管理メール
+organization-id: 組織ID
 organization-name: 組織名
 organization-settings: 組織の設定
 os-version: OSバージョン
@@ -432,6 +441,8 @@ select-channel: チャンネル選択
 select-channel-msg: 上書きで使用するチャンネルを選択してください。
 select-default-upload-channel: デフォルトのアップロードチャンネルを選択してください。
 select-default-upload-channel-header: デフォルト・チャンネルを選択
+select-destination-organization: 目的地組織を選択
+select-organization-to-transfer: このアプリを変換する組織を選択します。
 select-style-of-deletion: 削除スタイルの選択
 select-style-of-deletion-msg: |-
   このチャンネルを削除する方法を選択してください。
@@ -466,6 +477,11 @@ this-page-will-self-: このページは、CLI でのオンボーディングが
 to: 請求先
 to-open-encrypted-bu: 暗号化されたバンドルを開くには、次のコマンドを使用します。
 top-apps-v2: アプリ
+transfer-app-ownership: アプリの所有権を譲渡する
+transfer-app-ownership-requirements: >-
+  組織間でアプリを転送するには、転送元と転送先の両方の組織で super_admin
+  権限が必要です。これにより、所有権の安全な移転が保証され、不正アクセスが防止されます。
+transfer-app-ownership-too-soon: アプリの転送は32日ごと
 trial-left: 残りの日数
 trial-plan-expired: 試用期限切れ
 type-device-id: デバイスIDを入力
