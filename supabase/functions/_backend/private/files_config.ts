@@ -20,11 +20,11 @@ app.get('/', (c: Context) => {
   // force partial and tus for 20% of the requests
   // const randomPU = Math.random()
   const randomTUS = Math.random()
-  // const forcePartialUpload = randomPU < 0.5
+  const forcePartialUpload = randomTUS < 0.5
   const forceTUSUpload = randomTUS < 0.3
   return c.json({
     partialUpload: true,
-    partialUploadForced: false,
+    partialUploadForced: forcePartialUpload,
     TUSUpload: true,
     TUSUploadForced: forceTUSUpload,
   })
