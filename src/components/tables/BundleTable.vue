@@ -42,7 +42,7 @@ const filters = ref({
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-async function didCancel(name: string): Promise<boolean | 'normal' | 'unsafe'> {
+async function didCancel(name: string, isPlural = false): Promise<boolean | 'normal' | 'unsafe'> {
   let method: 'normal' | 'unsafe' | null = null
   displayStore.dialogOption = {
     header: t('select-style-of-deletion'),
@@ -75,7 +75,9 @@ async function didCancel(name: string): Promise<boolean | 'normal' | 'unsafe'> {
   }
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`,
+    message: isPlural
+      ? `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`
+      : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -166,7 +168,7 @@ async function deleteOne(one: Element) {
     // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
-      .select()
+      .select('name, version(name)')
       .eq('app_id', one.app_id)
       .eq('version', one.id)
 
@@ -174,7 +176,7 @@ async function deleteOne(one: Element) {
     if ((channelFound && channelFound.length) || errorChannel) {
       displayStore.dialogOption = {
         header: t('want-to-unlink'),
-        message: t('channel-bundle-linked').replace('%', channelFound?.map(ch => ch.name).join(', ') ?? ''),
+        message: t('channel-bundle-linked').replace('%', channelFound?.map(ch => `${ch.name} (${ch.version.name})`).join(', ') ?? ''),
         buttons: [
           {
             text: t('yes'),
@@ -310,39 +312,21 @@ async function reload() {
   }
 }
 
-async function didCancelPlural() {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-delete'),
-        role: 'danger',
-        id: 'confirm-button',
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
-}
-
 async function massDelete() {
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
-  if (await didCancelPlural())
+
+  const didCancelRes = await didCancel(t('version'))
+  if (typeof didCancelRes === 'boolean' && didCancelRes === true)
     return
 
   const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
     return {
       data: (await supabase
         .from('channels')
-        .select()
+        .select('name, version(name)')
         .eq('app_id', element.app_id)
         .eq('version', element.id)),
       element,
@@ -365,7 +349,7 @@ async function massDelete() {
       buttonCenter: true,
       textStyle: 'text-center',
       headerStyle: 'text-center',
-      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => ch.name).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
       buttons: [
         {
           text: t('ok'),
@@ -379,17 +363,33 @@ async function massDelete() {
     return
   }
 
-  const { error: updateError } = await supabase
-    .from('app_versions')
-    .update({ deleted: true })
-    .in('id', selectedElements.value.map(val => val.id))
+  if (didCancelRes === 'normal') {
+    const { error: updateError } = await supabase
+      .from('app_versions')
+      .update({ deleted: true })
+      .in('id', selectedElements.value.map(val => val.id))
 
-  if (updateError) {
-    toast.error(t('cannot-delete-bundles'))
+    if (updateError) {
+      toast.error(t('cannot-delete-bundles'))
+    }
+    else {
+      toast.success(t('bundle-deleted'))
+      await refreshData()
+    }
   }
   else {
-    toast.success(t('bundle-deleted'))
-    await refreshData()
+    const { error: delAppError } = await supabase
+      .from('app_versions')
+      .delete()
+      .in('id', selectedElements.value.map(val => val.id))
+
+    if (delAppError) {
+      toast.error(t('cannot-delete-bundles'))
+    }
+    else {
+      toast.success(t('bundle-deleted'))
+      await refreshData()
+    }
   }
 }
 
