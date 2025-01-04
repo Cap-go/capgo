@@ -21,13 +21,15 @@ import { ALLOWED_HEADERS, ALLOWED_METHODS, AsyncLock, EXPOSED_HEADERS, generateP
 export const TUS_VERSION = '1.0.0'
 
 // uploads larger than this will be rejected
-export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1000
-export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99
+export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
+export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
+export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 
 export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
 
 // how long an unfinished upload lives in ms
-const UPLOAD_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000
+const UPLOAD_EXPIRATION_MS = 1 * 24 * 60 * 60 * 1000 // 1 day
+// TODO: make sure partial unfinished uploads are cleaned up automatically in r2 after 1 day
 
 // how much we'll buffer in memory, must be greater than or equal to R2's min part size
 // https://developers.cloudflare.com/r2/objects/multipart-objects/#limitations
