@@ -81,7 +81,7 @@ export function deviceAppIdRateLimiter(rateLimiterAction: string, _methods: { li
 
 // Plugin API
 app.route('/plugin/ok', ok)
-app.use('/plugin/channel_self', deviceAppIdRateLimiter('CHANNEL_SELF', [{ limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }, { limit: 20, period: 10, method: 'PUT' }, { limit: 20, period: 10, method: 'GET' }]))
+// app.use('/plugin/channel_self', deviceAppIdRateLimiter('CHANNEL_SELF', [{ limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }, { limit: 20, period: 10, method: 'PUT' }, { limit: 20, period: 10, method: 'GET' }]))
 app.route('/plugin/channel_self', channel_self)
 app.route('/plugin/updates', updates)
 app.route('/plugin/updates_v2', updates)
@@ -91,10 +91,10 @@ app.route('/plugin/stats', stats)
 app.route('/plugin/latency_drizzle', latency_drizzle)
 
 // TODO: deprecated remove when everyone use the new endpoint
-app.use('/channel_self', deviceAppIdRateLimiter('CHANNEL_SELF', [{ limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }, { limit: 20, period: 10, method: 'PUT' }, { limit: 20, period: 10, method: 'GET' }]))
+// app.use('/channel_self', deviceAppIdRateLimiter('CHANNEL_SELF', [{ limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }, { limit: 20, period: 10, method: 'PUT' }, { limit: 20, period: 10, method: 'GET' }]))
 app.route('/channel_self', channel_self)
 // Apply rate limiter middleware before routing to ensure it runs first
-app.use('/updates*', deviceAppIdRateLimiter('ALL_UPDATES', [{ limit: 20, period: 10, method: 'POST' }]))
+// app.use('/updates*', deviceAppIdRateLimiter('ALL_UPDATES', [{ limit: 20, period: 10, method: 'POST' }]))
 app.route('/updates', updates)
 app.route('/updates_v2', updates)
 app.route('/updates_debug', updates)
