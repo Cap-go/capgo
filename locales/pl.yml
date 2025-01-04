@@ -36,6 +36,8 @@ alert-accept-inviation: Czy akceptujesz zaproszenie do %ORG%?
 alert-add-new-key: Wybór typu klucza do wygenerowania
 alert-confirm-delete: Potwierdź usunięcie
 alert-confirm-invite: Potwierdź zaproszenie
+alert-confirm-org-limit: Ograniczenie klucza API do określonych organizacji
+alert-confirm-org-limit-message: Wybierz organizacje, do których ten klucz API będzie miał dostęp
 alert-confirm-regenerate: Potwierdź zregenerowanie klucza API
 alert-delete-message: Czy na pewno chcesz to usunąć
 alert-delete-message-plural: Czy na pewno chcesz je usunąć?
@@ -301,6 +303,9 @@ last-version: Ostatnia wersja
 latest_version: Najnowszy pakiet
 launch-bundle: Uruchom pakiet
 leaving: Odjazd
+limit-to-org: |-
+  Ograniczenie klucza API do wybranych
+  organizacji?
 live-reload: Przeładowanie na żywo
 log-as: Zacznij podszywać się
 log-in: Zaloguj sie

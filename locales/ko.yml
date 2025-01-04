@@ -34,6 +34,8 @@ alert-accept-inviation: '%ORG%에 대한 초대를 수락하시겠습니까?'
 alert-add-new-key: 새 API 키 유형 선택
 alert-confirm-delete: 삭제 확인
 alert-confirm-invite: 초대 확인
+alert-confirm-org-limit: API 키를 인증된 조직으로 제한
+alert-confirm-org-limit-message: 이 API 키가 액세스할 수 있는 조직을 선택합니다.
 alert-confirm-regenerate: API 키 재생성 확인
 alert-delete-message: 삭제하시겠습니까?
 alert-delete-message-plural: 정말 삭제하시겠습니까?
@@ -284,6 +286,9 @@ last-version: 마지막 버전
 latest_version: 최신 번들
 launch-bundle: 번들 실행
 leaving: 퇴거
+limit-to-org: |-
+  API 키를 선택한
+  조직으로 제한하시겠습니까?
 live-reload: 라이브 리로드
 log-as: 스푸핑 시작
 log-in: 로그인

@@ -34,6 +34,8 @@ alert-accept-inviation: Do you accept the invitation to %ORG%?
 alert-add-new-key: Select new API key type
 alert-confirm-delete: Confirm Delete
 alert-confirm-invite: Confirm invitation
+alert-confirm-org-limit: Limit the API key to certian organizations
+alert-confirm-org-limit-message: Select the organizations that this API key will have access to
 alert-confirm-regenerate: Confirm regenerating API key
 alert-delete-message: Are you sure you want to delete this
 alert-delete-message-plural: Are you sure you want to delete these
@@ -248,7 +250,7 @@ forgot-check-email: Check your email to get the link to reset your password
 forgot-success: Password updated successfully
 free-trial: Free trial
 from-device: from device
-general-information: General Informations
+general-information: General Information
 generate-device-overwrite: Generate device overwrite
 generate-device-overwrite-msg: You are about to generate a device overwrite. Do you want to continue?
 generated-new-apikey: Generated new API key!
@@ -289,6 +291,9 @@ last-version: Last version
 latest_version: Latest bundle
 launch-bundle: Launch bundle
 leaving: Leaving
+limit-to-org: |-
+  Limit the API key to selected 
+  organizations?
 live-reload: Live reload
 log-as: Start spoofing
 log-in: Log in
@@ -322,7 +327,7 @@ misconfigured-channels: Some channels are misconfigured. Updates will fail for t
 missing-email: Missing email
 missing-name: Missing name
 mo: mo
-modify-org-info: You can modify the organization's informations here.
+modify-org-info: You can modify the organization's information here.
 module-heading: Modules
 monthly-active-users: Monthly active users
 monthly-plan: Monthly Plan

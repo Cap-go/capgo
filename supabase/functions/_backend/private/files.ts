@@ -7,7 +7,7 @@ import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
 import { middlewareKey } from '../utils/hono.ts'
-import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
 import { app as files_config } from './files_config.ts'
@@ -186,7 +186,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     throw new HTTPException(400, { message: 'Error User not found' })
   }
 
-  if (!(await hasAppRight(c, app_id, userId, 'read'))) {
+  if (!(await hasAppRightApikey(c, app_id, userId, 'read', capgkey))) {
     console.log({ requestId: c.get('requestId'), context: 'no read' })
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }

@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 interface ChannelSet {
   app_id: string
@@ -18,7 +18,7 @@ interface ChannelSet {
 }
 
 export async function post(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await hasAppRight(c, body.app_id, apikey.user_id, 'write'))) {
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     console.log('You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }

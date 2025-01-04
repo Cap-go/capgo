@@ -38,6 +38,8 @@ alert-accept-inviation: Accetti l'invito a %ORG%?
 alert-add-new-key: Seleziona il nuovo tipo di chiave API
 alert-confirm-delete: Conferma cancellazione
 alert-confirm-invite: Conferma l'invito
+alert-confirm-org-limit: Limitare la chiave API a determinate organizzazioni
+alert-confirm-org-limit-message: Selezionare le organizzazioni a cui questa chiave API avrà accesso
 alert-confirm-regenerate: Conferma la rigenerazione della chiave API
 alert-delete-message: Sei sicuro di voler cancellare questo
 alert-delete-message-plural: Siete sicuri di voler eliminare questi
@@ -309,6 +311,9 @@ last-version: Ultima versione
 latest_version: Ultimo pacchetto
 launch-bundle: Pacchetto di lancio
 leaving: In partenza
+limit-to-org: |-
+  Limitare la chiave API a organizzazioni
+  organizzazioni selezionate?
 live-reload: Ricarica dal vivo
 log-as: Inizia lo spoofing
 log-in: Login

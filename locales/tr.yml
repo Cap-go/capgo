@@ -34,6 +34,8 @@ alert-accept-inviation: '%ORG% davetini kabul ediyor musunuz?'
 alert-add-new-key: Yeni API anahtarı türünü seçin
 alert-confirm-delete: Silmeyi Onayla
 alert-confirm-invite: Daveti onayla
+alert-confirm-org-limit: API anahtarını belirli kuruluşlarla sınırlayın
+alert-confirm-org-limit-message: Bu API anahtarının erişebileceği kuruluşları seçin
 alert-confirm-regenerate: API anahtarının yeniden oluşturulmasını onaylayın
 alert-delete-message: Bunu silmek istediğinizden emin misiniz
 alert-delete-message-plural: Bunları silmek istediğinizden emin misiniz?
@@ -297,6 +299,9 @@ last-version: Son sürüm
 latest_version: En son paket
 launch-bundle: Paketi başlat
 leaving: Ayrılıyorum
+limit-to-org: |-
+  API anahtarını seçilenle sınırla
+  organizasyonlar?
 live-reload: Canlı yeniden yükleme
 log-as: Sahtelemeye başla
 log-in: Giriş yapmak
