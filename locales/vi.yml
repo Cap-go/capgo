@@ -122,6 +122,7 @@ cannot-delete-bundles: Không thể xóa gói
 cannot-delete-channel: Không thể xóa kênh
 cannot-delete-member: Không thể xóa thành viên, kiểm tra bảng điều khiển trình duyệt
 cannot-delete-owner: Không thể xóa chủ sở hữu khỏi tổ chức
+cannot-delete-unknown-or-builtin: Không thể xóa gói không xác định và gói dựng sẵn
 cannot-determine-platform: Không thể xác định xem UUID đã cho thuộc về iOS hay Android
 cannot-fetch-channels: |-
   Không thể tìm nạp kênh.
@@ -555,6 +556,16 @@ wrong-name-org-del: |-
   Bạn phải gõ: %1
 yearly: hàng năm
 'yes': Đúng
+you-are-deleting-unsafely: >-
+  $1Cảnh báo!!!$2 Bạn đang xóa gói này một cách không an toàn, việc này không
+  thể hoàn tác được. 
+
+  Tìm hiểu thêm $3tại đây$4
+you-are-deleting-unsafely-plural: >-
+  $1Cảnh báo!!!$2 Bạn đang xóa các nhóm này một cách không an toàn, việc này
+  không thể hoàn tác được. 
+
+  Tìm hiểu thêm $3tại đây$4
 you-can-change-your-: Bạn có thể thay đổi thông tin cá nhân của mình tại đây.
 you-cannot-reuse: Bạn không thể sử dụng lại phiên bản gói này sau khi xóa
 you-reached-the-limi: Đạt tới giới hạn

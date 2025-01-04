@@ -120,6 +120,7 @@ cannot-delete-bundles: Impossibile eliminare i bundle
 cannot-delete-channel: Impossibile eliminare il canale
 cannot-delete-member: Impossibile eliminare il membro, controlla la console del browser
 cannot-delete-owner: Impossibile eliminare il proprietario dall'organizzazione
+cannot-delete-unknown-or-builtin: Impossibile cancellare il bundle sconosciuto e il bundle integrato
 cannot-determine-platform: Impossibile determinare se l'UUID dato appartiene a IOS o Android
 cannot-fetch-channels: Impossibile recuperare i canali. Controllare la console del browser
 cannot-find-unknown-version: >-
@@ -552,6 +553,12 @@ wrong-name-org-del: |-
   Avresti dovuto digitare: %1
 yearly: Annuale
 'yes': SÌ
+you-are-deleting-unsafely: >-
+  $1Attenzione!!!$2 Si sta eliminando questo bundle in modo non sicuro, non è
+  possibile annullarlo. Per saperne di più $3qui$4
+you-are-deleting-unsafely-plural: >-
+  $1Attenzione!!!$2 State eliminando questi bundle in modo non sicuro, non è
+  possibile annullarlo. Per saperne di più $3qui$4
 you-can-change-your-: Puoi modificare le tue informazioni personali qui.
 you-cannot-reuse: Non è possibile riutilizzare questa versione del bundle dopo l'eliminazione
 you-reached-the-limi: Limite raggiunto

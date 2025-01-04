@@ -110,6 +110,7 @@ cannot-delete-bundles: Cannot delete bundles
 cannot-delete-channel: Cannot delete channel
 cannot-delete-member: Cannot delete member, check browser console
 cannot-delete-owner: Cannot delete owner from the organization
+cannot-delete-unknown-or-builtin: Cannot delete the unknown bundle and the builtin bundle
 cannot-determine-platform: Cannot determine if the given UUID belongs to IOS or Android
 cannot-fetch-channels: Cannot fetch channels. Please check browser console
 cannot-find-unknown-version: >-
@@ -512,6 +513,12 @@ write-key: Write
 wrong-name-org-del: 'You have not typed the organization name. You were supposed to type: %1'
 yearly: Yearly
 'yes': 'yes'
+you-are-deleting-unsafely: >-
+  $1Warning!!!$2 You are deleting this bundle unsafely, this cannot be undone.
+  Learn more $3here$4
+you-are-deleting-unsafely-plural: >-
+  $1Warning!!!$2 You are deleting these bundles unsafely, this cannot be undone.
+  Learn more $3here$4
 you-can-change-your-: You can change your personal informations here.
 you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached

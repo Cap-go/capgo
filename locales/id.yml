@@ -110,6 +110,7 @@ cannot-delete-bundles: Tidak dapat menghapus bundel
 cannot-delete-channel: Tidak dapat menghapus saluran
 cannot-delete-member: Tidak dapat menghapus anggota, periksa konsol browser
 cannot-delete-owner: Tidak dapat menghapus pemilik dari organisasi
+cannot-delete-unknown-or-builtin: Tidak dapat menghapus bundel yang tidak dikenal dan bundel bawaan
 cannot-determine-platform: Tidak dapat menentukan apakah UUID yang diberikan milik iOS atau Android
 cannot-fetch-channels: Tidak dapat mengambil saluran. Silakan periksa konsol browser
 cannot-find-unknown-version: >-
@@ -542,6 +543,12 @@ wrong-name-org-del: |-
   Anda seharusnya mengetik: %1
 yearly: Tahunan
 'yes': Ya
+you-are-deleting-unsafely: >-
+  $1Peringatan!!!$2 Anda menghapus bundel ini dengan tidak aman, ini tidak dapat
+  dibatalkan. Pelajari lebih lanjut $ 3 di sini $ 4
+you-are-deleting-unsafely-plural: >-
+  $1Peringatan!!!$2 Anda menghapus bundel ini dengan tidak aman, ini tidak dapat
+  dibatalkan. Pelajari lebih lanjut $ 3 di sini $ 4
 you-can-change-your-: Anda dapat mengubah informasi pribadi Anda di sini.
 you-cannot-reuse: Anda tidak dapat menggunakan kembali versi bundel ini setelah penghapusan
 you-reached-the-limi: Batas tercapai

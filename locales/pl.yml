@@ -114,6 +114,7 @@ cannot-delete-bundles: Nie można usunąć pakietów
 cannot-delete-channel: Nie można usunąć kanału
 cannot-delete-member: Nie można usunąć członka. Sprawdź konsolę przeglądarki
 cannot-delete-owner: Nie można usunąć właściciela z organizacji
+cannot-delete-unknown-or-builtin: Nie można usunąć nieznanego pakietu i pakietu wbudowanego
 cannot-determine-platform: >-
   Nie można określić, czy dany identyfikator UUID należy do systemu IOS czy
   Android
@@ -546,6 +547,12 @@ wrong-name-org-del: |-
   Miałeś wpisać: %1
 yearly: Rocznie
 'yes': Tak
+you-are-deleting-unsafely: >-
+  $1Ostrzeżenie!!!$2 Usuwasz ten pakiet niebezpiecznie, nie można tego cofnąć.
+  Dowiedz się więcej $3tutaj$4
+you-are-deleting-unsafely-plural: >-
+  $1Ostrzeżenie!!!$2 Usuwasz te pakiety niebezpiecznie, nie można tego cofnąć.
+  Dowiedz się więcej $3tutaj$4
 you-can-change-your-: Tutaj możesz zmienić swoje dane osobowe.
 you-cannot-reuse: Po usunięciu nie można ponownie użyć tej wersji pakietu
 you-reached-the-limi: Limit osiągnięty

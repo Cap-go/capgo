@@ -132,6 +132,7 @@ cannot-delete-bundles: Impossible de supprimer des lots
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
+cannot-delete-unknown-or-builtin: Impossible de supprimer la liasse inconnue et la liasse intégrée
 cannot-determine-platform: Impossible de déterminer si l'UUID donné appartient à IOS ou Android
 cannot-fetch-channels: >-
   Impossible de récupérer les chaînes. Veuillez vérifier la console du
@@ -560,6 +561,12 @@ write-key: Écrire
 wrong-name-org-del: 'Vous n''avez pas tapé le nom de l''organisation. Vous étiez censé taper : %1'
 yearly: Annuellement
 'yes': oui
+you-are-deleting-unsafely: >-
+  $1Warning!!!$2 Vous supprimez ce paquet de manière dangereuse, cela ne peut
+  pas être annulé. En savoir plus $3ici$4
+you-are-deleting-unsafely-plural: >-
+  $1Warning!!!$2 Vous supprimez ces paquets de manière dangereuse, il n'est pas
+  possible de revenir en arrière. En savoir plus $3ici$4
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du paquet après la suppression
 you-reached-the-limi: Limite atteinte

@@ -136,6 +136,7 @@ cannot-delete-bundles: Bundles können nicht gelöscht werden
 cannot-delete-channel: Kanal kann nicht gelöscht werden
 cannot-delete-member: Mitglied kann nicht gelöscht werden. Überprüfen Sie die Browserkonsole
 cannot-delete-owner: Der Eigentümer kann nicht aus der Organisation gelöscht werden
+cannot-delete-unknown-or-builtin: Das unbekannte Bundle und das eingebaute Bundle können nicht gelöscht werden
 cannot-determine-platform: Kann nicht feststellen, ob die angegebene UUID zu IOS oder Android gehört
 cannot-fetch-channels: Kanäle können nicht abgerufen werden. Bitte überprüfen Sie die Browserkonsole
 cannot-find-unknown-version: >-
@@ -585,6 +586,12 @@ wrong-name-org-del: |-
   Sie sollten Folgendes eingeben: %1
 yearly: Jährlich
 'yes': Ja
+you-are-deleting-unsafely: >-
+  $1Warnung!!!$2 Sie löschen dieses Bundle auf unsichere Weise, dies kann nicht
+  rückgängig gemacht werden. Mehr erfahren $3hier$4
+you-are-deleting-unsafely-plural: >-
+  $1Warnung!!!$2 Sie löschen diese Bundles auf unsichere Weise, dies kann nicht
+  rückgängig gemacht werden. Erfahren Sie mehr $3hier$4
 you-can-change-your-: Hier können Sie Ihre persönlichen Daten ändern.
 you-cannot-reuse: Sie können diese Bundle-Version nach dem Löschen nicht wiederverwenden
 you-reached-the-limi: Limit erreicht

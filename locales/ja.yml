@@ -110,6 +110,7 @@ cannot-delete-bundles: バンドルが削除できない
 cannot-delete-channel: チャンネルを削除できません
 cannot-delete-member: メンバーを削除できません。ブラウザコンソールを確認してください
 cannot-delete-owner: 組織から所有者を削除できません
+cannot-delete-unknown-or-builtin: 不明なバンドルとビルトインバンドルを削除できない
 cannot-determine-platform: 指定されたUUIDがIOSに属するのかAndroidに属するのか判断できない。
 cannot-fetch-channels: チャンネルを取得できません。ブラウザのコンソールを確認してください。
 cannot-find-unknown-version: 不明なバージョンが見つかりません。capgo サポートに連絡し、ブラウザのログを確認してください。
@@ -515,6 +516,8 @@ wrong-name-org-del: |-
   次のように入力する必要がありました: %1
 yearly: 毎年
 'yes': はい
+you-are-deleting-unsafely: $1警告!!!$2このバンドルは安全に削除されていません。詳細はこちら$3
+you-are-deleting-unsafely-plural: 1警告!!!$2これらのバンドルは安全に削除されていません。詳細はこちら$3
 you-can-change-your-: ここで個人情報を変更できます。
 you-cannot-reuse: このバンドル バージョンは削除後は再利用できません
 you-reached-the-limi: 制限に達しました
