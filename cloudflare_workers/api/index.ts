@@ -28,6 +28,7 @@ import { app as channel } from '../../supabase/functions/_backend/public/channel
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
+import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as clear_app_cache } from '../../supabase/functions/_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../../supabase/functions/_backend/triggers/clear_device_cache.ts'
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
@@ -47,7 +48,6 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 
 export { AttachmentUploadHandler, UploadHandler as TemporaryKeyHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
