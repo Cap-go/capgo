@@ -14,7 +14,6 @@ export type Database = {
           created_at: string | null
           id: number
           key: string
-          limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
           updated_at: string | null
@@ -24,7 +23,6 @@ export type Database = {
           created_at?: string | null
           id?: number
           key: string
-          limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
           updated_at?: string | null
@@ -34,7 +32,6 @@ export type Database = {
           created_at?: string | null
           id?: number
           key?: string
-          limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
           name?: string
           updated_at?: string | null
@@ -332,6 +329,7 @@ export type Database = {
           allow_emulator: boolean
           android: boolean
           app_id: string
+          base_disable_auto_update_on_native: boolean
           created_at: string
           created_by: string | null
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
@@ -350,6 +348,7 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id: string
+          base_disable_auto_update_on_native?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -368,6 +367,7 @@ export type Database = {
           allow_emulator?: boolean
           android?: boolean
           app_id?: string
+          base_disable_auto_update_on_native?: boolean
           created_at?: string
           created_by?: string | null
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
@@ -1932,15 +1932,6 @@ export type Database = {
           install: number
           uninstall: number
         }[]
-      }
-      replicate_to_d1: {
-        Args: {
-          record: Json
-          old_record: Json
-          operation: string
-          table_name: string
-        }
-        Returns: undefined
       }
       reset_and_seed_app_data: {
         Args: {

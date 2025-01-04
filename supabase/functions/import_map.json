@@ -1,7 +1,7 @@
 {
   "imports": {
     "vitest": "npm:vitest@2.1.5",
-    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@4.20241112.0",
+    "@cloudflare/workers-types": "npm:@cloudflare/workers-types@4.20241218.0",
     "@hono/sentry": "npm:@hono/sentry@1.2.0",
     "@hono/hono": "jsr:@hono/hono@^4.6.13",
     "hono/netlify": "jsr:@hono/hono@^4.6.13/netlify",

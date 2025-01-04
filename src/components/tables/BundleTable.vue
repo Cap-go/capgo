@@ -42,40 +42,52 @@ const filters = ref({
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-async function didCancel(name: string): Promise<boolean | 'normal' | 'unsafe'> {
+async function didCancel(name: string, isPlural = false, askForMethod = true): Promise<boolean | 'normal' | 'unsafe'> {
   let method: 'normal' | 'unsafe' | null = null
-  displayStore.dialogOption = {
-    header: t('select-style-of-deletion'),
-    message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">${t('here')}</a>`),
-    buttons: [
-      {
-        text: t('normal'),
-        role: 'normal',
-        handler: () => {
-          method = 'normal'
+  if (askForMethod) {
+    displayStore.dialogOption = {
+      header: t('select-style-of-deletion'),
+      message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">${t('here')}</a>`),
+      buttons: [
+        {
+          text: t('normal'),
+          role: 'normal',
+          handler: () => {
+            method = 'normal'
+          },
         },
-      },
-      {
-        text: t('unsafe'),
-        role: 'danger',
-        id: 'unsafe',
-        handler: async () => {
-          if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
-            toast.error(t('no-permission-ask-super-admin'))
-            return
-          }
-          method = 'unsafe'
+        {
+          text: t('unsafe'),
+          role: 'danger',
+          id: 'unsafe',
+          handler: async () => {
+            if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
+              toast.error(t('no-permission-ask-super-admin'))
+              return
+            }
+            method = 'unsafe'
+          },
         },
-      },
-    ],
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss() || !method) {
+      return true
+    }
   }
-  displayStore.showDialog = true
-  if (await displayStore.onDialogDismiss() || !method) {
-    return true
+  else {
+    method = 'unsafe'
   }
   displayStore.dialogOption = {
     header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`,
+    message: isPlural
+      ? `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`
+      : askForMethod
+        ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
+        : !isPlural
+            ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\n${t('you-are-deleting-unsafely').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">').replace('$4', '</a>')}.`
+            : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\n${t('you-are-deleting-unsafely-plural').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">').replace('$4', '</a>')}.`,
+
     buttons: [
       {
         text: t('button-cancel'),
@@ -166,7 +178,7 @@ async function deleteOne(one: Element) {
     // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
-      .select()
+      .select('name, version(name)')
       .eq('app_id', one.app_id)
       .eq('version', one.id)
 
@@ -174,7 +186,7 @@ async function deleteOne(one: Element) {
     if ((channelFound && channelFound.length) || errorChannel) {
       displayStore.dialogOption = {
         header: t('want-to-unlink'),
-        message: t('channel-bundle-linked').replace('%', channelFound?.map(ch => ch.name).join(', ') ?? ''),
+        message: t('channel-bundle-linked').replace('%', channelFound?.map(ch => `${ch.name} (${ch.version.name})`).join(', ') ?? ''),
         buttons: [
           {
             text: t('yes'),
@@ -199,9 +211,11 @@ async function deleteOne(one: Element) {
       }
     }
 
-    if (one.deleted)
+    if (one.name === 'unknown' || one.name === 'builtin') {
       return
-    const didCancelRes = await didCancel(t('version'))
+    }
+
+    const didCancelRes = await didCancel(t('version'), false, !one.deleted)
     if (typeof didCancelRes === 'boolean' && didCancelRes === true)
       return
 
@@ -310,39 +324,26 @@ async function reload() {
   }
 }
 
-async function didCancelPlural() {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-delete'),
-        role: 'danger',
-        id: 'confirm-button',
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
-}
-
 async function massDelete() {
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
-  if (await didCancelPlural())
+
+  if (selectedElements.value.length > 0 && !!selectedElements.value.find(val => val.name === 'unknown' || val.name === 'builtin')) {
+    toast.error(t('cannot-delete-unknown-or-builtin'))
+    return
+  }
+
+  const didCancelRes = await didCancel(t('version'), true, !filters.value.deleted)
+  if (typeof didCancelRes === 'boolean' && didCancelRes === true)
     return
 
   const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
     return {
       data: (await supabase
         .from('channels')
-        .select()
+        .select('name, version(name)')
         .eq('app_id', element.app_id)
         .eq('version', element.id)),
       element,
@@ -365,7 +366,7 @@ async function massDelete() {
       buttonCenter: true,
       textStyle: 'text-center',
       headerStyle: 'text-center',
-      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => ch.name).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
       buttons: [
         {
           text: t('ok'),
@@ -379,17 +380,33 @@ async function massDelete() {
     return
   }
 
-  const { error: updateError } = await supabase
-    .from('app_versions')
-    .update({ deleted: true })
-    .in('id', selectedElements.value.map(val => val.id))
+  if (didCancelRes === 'normal') {
+    const { error: updateError } = await supabase
+      .from('app_versions')
+      .update({ deleted: true })
+      .in('id', selectedElements.value.map(val => val.id))
 
-  if (updateError) {
-    toast.error(t('cannot-delete-bundles'))
+    if (updateError) {
+      toast.error(t('cannot-delete-bundles'))
+    }
+    else {
+      toast.success(t('bundle-deleted'))
+      await refreshData()
+    }
   }
   else {
-    toast.success(t('bundle-deleted'))
-    await refreshData()
+    const { error: delAppError } = await supabase
+      .from('app_versions')
+      .delete()
+      .in('id', selectedElements.value.map(val => val.id))
+
+    if (delAppError) {
+      toast.error(t('cannot-delete-bundles'))
+    }
+    else {
+      toast.success(t('bundle-deleted'))
+      await refreshData()
+    }
   }
 }
 

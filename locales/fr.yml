@@ -69,6 +69,10 @@ app-info-desc: Vous pouvez modifier ici les informations de votre application
 app-logo-deleted: L'image de l'application a été supprimée avec succès
 app-name: Nom de l'application
 app-perm: Autorisation d'application
+app-transferred: L'application a été transférée avec succès
+app-will-be-transferred: >-
+  L'application sera transférée à $ORG_ID. Veuillez saisir l'identifiant de
+  l'application ('$APP_ID') pour confirmer le transfert.
 are-u-sure: Êtes-vous sûr ?
 are-you-sure-you-want-to-download: Êtes-vous sûr que vous voulez télécharger?
 available-in-the-san: Disponible dans l'application sandbox
@@ -134,6 +138,7 @@ cannot-delete-bundles: Impossible de supprimer des lots
 cannot-delete-channel: Impossible de supprimer la chaîne
 cannot-delete-member: Impossible de supprimer le membre, vérifiez la console du navigateur
 cannot-delete-owner: Impossible de supprimer le propriétaire de l'organisation
+cannot-delete-unknown-or-builtin: Impossible de supprimer la liasse inconnue et la liasse intégrée
 cannot-determine-platform: Impossible de déterminer si l'UUID donné appartient à IOS ou Android
 cannot-fetch-channels: >-
   Impossible de récupérer les chaînes. Veuillez vérifier la console du
@@ -147,6 +152,9 @@ cannot-load-app-settings: Impossible de charger les paramètres de l'application
 cannot-set-this-vers: Impossible de définir cette version
 cannot-show: Impossible d'afficher cette page
 cannot-test-app-some: Impossible de tester l'application, quelque chose s'est mal passé
+cannot-transfer-app: >-
+  Impossible de transférer l'organisation. Veuillez vérifier la console du
+  navigateur et signaler l'erreur à l'assistance Capgo.
 cannot-view-plans: Impossible de voir la page des plans
 cannot-view-usage: Impossible de voir la page d'utilisation
 cannots-sign-off: Impossible de se déconnecter
@@ -154,6 +162,7 @@ captcha: Captcha
 captcha-fail: Échec de la validation du Captcha
 change: Changement
 change-api-key-name: Changer le nom de l'apikey
+change-app-organisation-owner: Transférer la demande à une autre organisation
 change-your-picture: Changez votre photo
 changed-app-name: Nom de l'application modifié avec succès
 changed-app-retention: Modification réussie de la rétention de l'application
@@ -201,10 +210,12 @@ confirm-public-desc: >-
   utilisateurs.
 
   Les autres chaînes par défaut ne seront plus par défaut.
+confirm-transfer: Veuillez confirmer le transfert de l'application
 continue: Continuer
 copied-to-clipboard: Copié dans le presse-papiers
 copy-account-id: copier l'identifiant du compte
 copy-command: Commande de copie
+copy-organization-id: copie de l'identifiant de l'organisation
 country: Pays
 create-a-free-accoun: Créez un compte gratuit
 create-new-org: Créez une nouvelle organisation
@@ -282,6 +293,7 @@ good: Bon
 here: ici
 id: ID
 included-in-plan: Inclus dans le plan
+incorrect-app-id: L'identifiant de l'application n'est pas le bon.
 info: Information
 init-capgo-in-your-a: Initialisez Capgo dans votre application
 insert-invite-email: Insérez l'email de l'utilisateur que vous souhaitez inviter
@@ -372,6 +384,7 @@ no-permission: Autorisations insuffisantes
 no-permission-ask-super-admin: >-
   autorisation insuffisante, veuillez demander à un super administrateur de
   supprimer ce paquet de manière non sécurisée
+no-super-admin-organizations: Aucune organisation super_admin trouvée
 none: Aucun
 normal: Normal
 not-found: Non trouvé
@@ -395,6 +408,7 @@ org-deleted: Org supprimée avec succès
 org-invited-user: Utilisateur invité avec succès à l'org
 org-with-this-name-exists: Vous avez déjà créé une organisation avec ce nom !
 organization-email: Email de gestion de l'organisation
+organization-id: Identité de l'organisation
 organization-name: Nom de l'Organisation
 organization-settings: Paramètres de l'organisation
 os-version: version du système d'exploitation
@@ -483,6 +497,10 @@ select-channel: Sélectionnez la chaîne
 select-channel-msg: Veuillez sélectionner le canal que vous souhaitez utiliser dans cet écrasement
 select-default-upload-channel: Veuillez sélectionner le canal de téléchargement par défaut
 select-default-upload-channel-header: Sélection du canal par défaut
+select-destination-organization: Sélectionner l'organisation de destination
+select-organization-to-transfer: >-
+  Sélectionnez l'organisation à laquelle vous souhaitez transférer cette
+  application.
 select-style-of-deletion: Sélectionnez le style de suppression
 select-style-of-deletion-msg: |-
   Veuillez sélectionner la manière dont vous souhaitez supprimer cette chaîne.
@@ -490,6 +508,7 @@ select-style-of-deletion-msg: |-
   Vous pouvez lire sur la différence $1
 select-user-perms: Sélectionnez les autorisations de l'utilisateur
 select-user-perms-expanded: Sélectionnez quelle permission l'utilisateur invité devrait avoir
+select_all: sélectionner tout
 session_key: CléDeSessionIv
 set-bundle: Définir le paquet sur la chaîne
 settings: Paramètres
@@ -517,6 +536,13 @@ this-page-will-self-: >-
 to: à
 to-open-encrypted-bu: 'Pour ouvrir le paquet crypté, utilisez la commande :'
 top-apps-v2: Applications
+transfer-app-ownership: Transférer la propriété de l'application
+transfer-app-ownership-requirements: >-
+  Pour transférer une application d'une organisation à l'autre, vous devez
+  disposer des privilèges super_admin dans l'organisation d'origine et dans
+  l'organisation de destination. Cela permet de sécuriser le transfert de
+  propriété et d'éviter les accès non autorisés.
+transfer-app-ownership-too-soon: Vous ne pouvez transférer des applications que tous les 32 jours
 trial-left: jours restants
 trial-plan-expired: Essai Expiré
 type-device-id: Entrez l'ID de l'appareil
@@ -565,6 +591,12 @@ write-key: Écrire
 wrong-name-org-del: 'Vous n''avez pas tapé le nom de l''organisation. Vous étiez censé taper : %1'
 yearly: Annuellement
 'yes': oui
+you-are-deleting-unsafely: >-
+  $1Warning!!!$2 Vous supprimez ce paquet de manière dangereuse, cela ne peut
+  pas être annulé. En savoir plus $3ici$4
+you-are-deleting-unsafely-plural: >-
+  $1Warning!!!$2 Vous supprimez ces paquets de manière dangereuse, il n'est pas
+  possible de revenir en arrière. En savoir plus $3ici$4
 you-can-change-your-: Vous pouvez modifier vos informations personnelles ici.
 you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du paquet après la suppression
 you-reached-the-limi: Limite atteinte

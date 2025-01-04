@@ -63,6 +63,10 @@ app-info-desc: Você pode alterar aqui as informações do seu aplicativo
 app-logo-deleted: Imagem do aplicativo excluída com sucesso
 app-name: Nome do aplicativo
 app-perm: Permissão do aplicativo
+app-transferred: Aplicação transferida com sucesso
+app-will-be-transferred: >-
+  A aplicação será transferida para $ORG_ID. Introduza o ID da aplicação
+  ('$APP_ID') para confirmar a transferência.
 are-u-sure: Tem certeza ?
 are-you-sure-you-want-to-download: Tem a certeza de que pretende efetuar o download?
 available-in-the-san: Disponível no aplicativo sandbox
@@ -120,6 +124,7 @@ cannot-delete-bundles: Não é possível eliminar pacotes
 cannot-delete-channel: Não é possível excluir o canal
 cannot-delete-member: Não é possível excluir o membro. Verifique o console do navegador
 cannot-delete-owner: Não é possível excluir o proprietário da organização
+cannot-delete-unknown-or-builtin: Não é possível eliminar o pacote desconhecido e o pacote incorporado
 cannot-determine-platform: Não é possível determinar se o UUID fornecido pertence ao IOS ou ao Android
 cannot-fetch-channels: Não é possível obter canais. Verifique a consola do browser
 cannot-find-unknown-version: >-
@@ -131,6 +136,9 @@ cannot-load-app-settings: Não é possível carregar as configurações do aplic
 cannot-set-this-vers: Não é possível definir esta versão
 cannot-show: Não é possível mostrar esta página
 cannot-test-app-some: Não é possível testar o aplicativo, algo errado aconteceu
+cannot-transfer-app: >-
+  Não é possível transferir a organização. Verifique a consola do navegador e
+  comunique o erro ao suporte da Capgo.
 cannot-view-plans: Não é possível visualizar a página de planos
 cannot-view-usage: Não é possível visualizar a página de uso
 cannots-sign-off: Não é possível registrar
@@ -138,6 +146,7 @@ captcha: Captcha
 captcha-fail: A validação do Captcha falhou
 change: Mudar
 change-api-key-name: Alterar o nome do apikey
+change-app-organisation-owner: Transferir o pedido para outra organização
 change-your-picture: Mude sua foto
 changed-app-name: Nome do aplicativo alterado com sucesso
 changed-app-retention: Alterou com êxito a retenção da aplicação
@@ -183,10 +192,12 @@ confirm-public-desc: >-
   seus usuários.
 
   Outros canais padrão não serão mais padrão.
+confirm-transfer: Confirmar a transferência da aplicação
 continue: Continuar
 copied-to-clipboard: Copiado para a área de transferência
 copy-account-id: copiar ID da conta
 copy-command: Copiar comando
+copy-organization-id: copiar o ID da organização
 country: País
 create-a-free-accoun: Criar uma conta gratuita
 create-new-org: Criar uma nova organização
@@ -260,6 +271,7 @@ good: Bom
 here: aqui
 id: EU IA
 included-in-plan: Incluído no plano
+incorrect-app-id: Escreveu o ID da aplicação errado.
 info: Informação
 init-capgo-in-your-a: Inicie o Capgo em seu aplicativo
 insert-invite-email: Insira o e-mail do usuário que você deseja convidar
@@ -356,6 +368,7 @@ no-permission: Permissões insuficientes
 no-permission-ask-super-admin: >-
   permissão insuficiente, por favor peça a um super administrador para eliminar
   este pacote sem segurança
+no-super-admin-organizations: Nenhuma organização super_admin encontrada
 none: Nenhum
 normal: Normal
 not-found: Não encontrado
@@ -381,6 +394,7 @@ org-deleted: Organização excluída com sucesso
 org-invited-user: Usuário convidado para a organização com sucesso
 org-with-this-name-exists: Você já criou uma organização com este nome!
 organization-email: E-mail de gerenciamento da organização
+organization-id: ID da organização
 organization-name: Nome da organização
 organization-settings: Configurações da organização
 os-version: versão do sistema operacional
@@ -463,6 +477,8 @@ select-channel: Selecionar canal
 select-channel-msg: Seleccione o canal que pretende utilizar nesta substituição
 select-default-upload-channel: Selecione o canal de carregamento predefinido
 select-default-upload-channel-header: Selecionar o canal predefinido
+select-destination-organization: Selecionar a organização de destino
+select-organization-to-transfer: Selecione a organização para a qual pretende transformar esta aplicação
 select-style-of-deletion: Selecionar o estilo de eliminação
 select-style-of-deletion-msg: |-
   Seleccione a forma como pretende eliminar este canal.
@@ -470,6 +486,7 @@ select-style-of-deletion-msg: |-
   Pode ler sobre a diferença $1
 select-user-perms: Selecione as permissões do usuário
 select-user-perms-expanded: Selecione qual permissão o usuário convidado deve ter
+select_all: selecionar tudo
 session_key: IvSessionKey
 set-bundle: Definir pacote para canal
 settings: Configurações
@@ -499,6 +516,12 @@ this-page-will-self-: >-
 to: Até
 to-open-encrypted-bu: 'Para abrir o pacote criptografado, use o comando:'
 top-apps-v2: Aplicativos
+transfer-app-ownership: Transferir a propriedade da aplicação
+transfer-app-ownership-requirements: >-
+  Para transferir um aplicativo entre organizações, é necessário ter privilégios
+  super_admin nas organizações de origem e de destino. Isso garante a
+  transferência segura de propriedade e evita o acesso não autorizado.
+transfer-app-ownership-too-soon: Só é possível transferir aplicações a cada 32 dias
 trial-left: dias restantes
 trial-plan-expired: Versao de teste expirada
 type-device-id: Introduzir ID do dispositivo
@@ -549,6 +572,12 @@ wrong-name-org-del: |-
   Você deveria ter digitado:% 1
 yearly: Anual
 'yes': sim
+you-are-deleting-unsafely: >-
+  $1Aviso!!!$2 Está a apagar este pacote de forma insegura, isto não pode ser
+  desfeito. Saiba mais $3aqui$4
+you-are-deleting-unsafely-plural: >-
+  $1Aviso!!!$2 Está a eliminar estes pacotes de forma insegura, isto não pode
+  ser desfeito. Saiba mais $3aqui$4
 you-can-change-your-: Você pode alterar suas informações pessoais aqui.
 you-cannot-reuse: Você não pode reutilizar esta versão do pacote após a exclusão
 you-reached-the-limi: Limite alcançado

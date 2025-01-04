@@ -86,7 +86,7 @@ async function getChannels() {
     .from('channels')
     .select()
     .eq('app_id', version.value.app_id)
-    .eq('version', version.value.id)
+    // .eq('version', version.value.id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
   showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
@@ -466,9 +466,9 @@ function preventInputChangePerm(event: Event) {
               {{ version_meta.fails.toLocaleString() }}
             </InfoRow>
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
-            <InfoRow v-if="channels && channels.length > 0" :label="t('channel')">
+            <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
               <span class="flex justify-end w-full">
-                <span v-for="chn in channels" id="open-channel" :key="chn.id">
+                <span v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id">
                   <span
                     class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
                     @click="openChannel(chn)"
