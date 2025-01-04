@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS channels (
     android BOOLEAN NOT NULL DEFAULT TRUE,
     allow_device_self_set BOOLEAN NOT NULL DEFAULT FALSE,
     allow_emulator BOOLEAN NOT NULL DEFAULT TRUE,
-    allow_dev BOOLEAN NOT NULL DEFAULT TRUE
+    allow_dev BOOLEAN NOT NULL DEFAULT TRUE,
+    base_disable_auto_update_on_native BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Create channel_devices table

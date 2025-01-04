@@ -67,6 +67,7 @@ available-in-the-san: Disponível no aplicativo sandbox
 back-to-login-page: Voltar para a página de login
 bandwith-usage: 'Uso de largura de banda:'
 base: Base
+baseDisableAutoUpdateOnNative: Basear disableAutoUpdate na versão nativa
 best-plan: melhor plano
 bigger-app-size: Tamanho maior do aplicativo
 billed-annually-at: Faturado anualmente em

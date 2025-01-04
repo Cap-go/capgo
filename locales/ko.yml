@@ -65,6 +65,7 @@ available-in-the-san: 샌드박스 앱에서 사용 가능
 back-to-login-page: 로그인 페이지로 돌아가기
 bandwith-usage: '대역폭 사용량:'
 base: 베이스
+baseDisableAutoUpdateOnNative: 기본 버전에서 disableAutoUpdate를 기본 설정합니다.
 best-plan: 최고의 계획
 bigger-app-size: 더 큰 앱 크기
 billed-annually-at: '매년 청구 금액:'

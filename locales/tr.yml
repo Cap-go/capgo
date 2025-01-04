@@ -65,6 +65,7 @@ available-in-the-san: Korumalı alan uygulamasında mevcuttur
 back-to-login-page: Giriş sayfasına geri dön
 bandwith-usage: 'Bant genişliği kullanımı:'
 base: Temel
+baseDisableAutoUpdateOnNative: Yerel sürümde disableAutoUpdate'i temel alın
 best-plan: En iyi plan
 bigger-app-size: Daha büyük uygulama boyutu
 billed-annually-at: Yıllık olarak faturalandırılır

@@ -65,6 +65,7 @@ available-in-the-san: Available in the sandbox app
 back-to-login-page: Back to login page
 bandwith-usage: 'Bandwith usage: '
 base: Base
+baseDisableAutoUpdateOnNative: Base disableAutoUpdate on the native version
 best-plan: Best plan
 bigger-app-size: Bigger app size
 billed-annually-at: Billed annually at

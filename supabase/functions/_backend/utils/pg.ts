@@ -147,6 +147,7 @@ export function requestInfosPostgres(
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
+        base_disable_auto_update_on_native: channelAlias.base_disable_auto_update_on_native,
       },
     },
     )
@@ -183,6 +184,7 @@ export function requestInfosPostgres(
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
+        base_disable_auto_update_on_native: channelAlias.base_disable_auto_update_on_native,
       },
     })
     .from(channelAlias)
@@ -258,6 +260,7 @@ export function requestInfosPostgresV2(
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
+        base_disable_auto_update_on_native: channelAlias.base_disable_auto_update_on_native,
       },
     },
     )
@@ -294,6 +297,7 @@ export function requestInfosPostgresV2(
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
+        base_disable_auto_update_on_native: channelAlias.base_disable_auto_update_on_native,
       },
     })
     .from(channelAlias)

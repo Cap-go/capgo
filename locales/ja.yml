@@ -65,6 +65,7 @@ available-in-the-san: サンドボックス アプリで利用可能
 back-to-login-page: ログインページに戻る
 bandwith-usage: '帯域幅の使用量:'
 base: ベース
+baseDisableAutoUpdateOnNative: ネイティブ・バージョンのdisableAutoUpdateをベースにする。
 best-plan: ベストプラン
 bigger-app-size: アプリのサイズが大きい
 billed-annually-at: 毎年請求されます

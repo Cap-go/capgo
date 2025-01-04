@@ -241,7 +241,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           old: version_name,
         }, 200)
       }
-      if (channelData.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_name).major) {
+      const versionToCompare = !channelData.channels.base_disable_auto_update_on_native ? version_name : version_build
+      if (channelData.channels.disable_auto_update === 'major' && parse(versionToCompare).major > parse(version_name).major) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
@@ -262,7 +263,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_name).minor) {
+      if (channelData.channels.disable_auto_update === 'minor' && parse(versionToCompare).minor > parse(version_name).minor) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
@@ -274,11 +275,11 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      console.log({ requestId: c.get('requestId'), context: 'version', version: version.name, old: version_name })
+      console.log({ requestId: c.get('requestId'), context: 'version', version: version.name, old: version_name, versionToCompare })
       if (channelData.channels.disable_auto_update === 'patch' && !(
-        parse(version.name).patch > parse(version_name).patch
-        && parse(version.name).major === parse(version_name).major
-        && parse(version.name).minor === parse(version_name).minor
+        parse(versionToCompare).patch > parse(version_name).patch
+        && parse(versionToCompare).major === parse(version_name).major
+        && parse(versionToCompare).minor === parse(version_name).minor
       )) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch' }])
@@ -288,6 +289,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           error: 'disable_auto_update_to_patch',
           version: version.name,
           old: version_name,
+          versionToCompare,
         }, 200)
       }
 
@@ -307,7 +309,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }
 
         // Check if the minVersion is greater then the current version
-        if (greaterThan(parse(minUpdateVersion), parse(version_name))) {
+        if (greaterThan(parse(minUpdateVersion), parse(versionToCompare))) {
           console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
           await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata' }])
           return c.json({
@@ -316,6 +318,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
             error: 'disable_auto_update_to_metadata',
             version: version.name,
             old: version_name,
+            versionToCompare,
           }, 200)
         }
       }

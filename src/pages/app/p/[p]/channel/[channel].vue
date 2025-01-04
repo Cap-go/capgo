@@ -112,6 +112,7 @@ async function getChannel() {
           allow_device_self_set,
           disable_auto_update_under_native,
           disable_auto_update,
+          base_disable_auto_update_on_native,
           ios,
           android,
           updated_at
@@ -423,6 +424,12 @@ async function onChangeAutoUpdate(event: Event) {
                 {{ t('none') }}
               </option>
             </select>
+          </InfoRow>
+          <InfoRow :label="t('baseDisableAutoUpdateOnNative')">
+            <Toggle
+              :value="channel?.base_disable_auto_update_on_native"
+              @change="saveChannelChange('base_disable_auto_update_on_native', !channel?.base_disable_auto_update_on_native)"
+            />
           </InfoRow>
           <InfoRow :label="t('allow-develoment-bui')">
             <Toggle

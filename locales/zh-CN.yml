@@ -65,6 +65,7 @@ available-in-the-san: 在沙盒应用程序中可用
 back-to-login-page: 返回登录页面
 bandwith-usage: 带宽使用情况：
 base: 根据
+baseDisableAutoUpdateOnNative: 以本地版本为基础禁用自动更新功能
 best-plan: 最佳计划
 bigger-app-size: 更大的应用程序大小
 billed-annually-at: 每年计费于
