@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
+import { MAX_CHUNK_SIZE_BYTES, MAX_UPLOAD_LENGTH_BYTES } from '../tus/uploadHandler.ts'
 import { useCors } from '../utils/hono.ts'
 
 export const app = new Hono()
@@ -25,6 +26,8 @@ app.get('/', (c: Context) => {
   return c.json({
     partialUpload: true,
     partialUploadForced: forcePartialUpload,
+    maxUploadLength: MAX_UPLOAD_LENGTH_BYTES,
+    maxChunkSize: MAX_CHUNK_SIZE_BYTES,
     TUSUpload: true,
     TUSUploadForced: forceTUSUpload,
   })

@@ -21,7 +21,8 @@ import { ALLOWED_HEADERS, ALLOWED_METHODS, AsyncLock, EXPOSED_HEADERS, generateP
 export const TUS_VERSION = '1.0.0'
 
 // uploads larger than this will be rejected
-export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 100
+export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1000
+export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99
 
 export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
 
