@@ -482,6 +482,7 @@ select-style-of-deletion-msg: |-
   Вы можете прочитать о разнице в $1
 select-user-perms: Выберите права пользователя
 select-user-perms-expanded: Выберите, какие разрешения должен иметь приглашенный пользователь
+select_all: выбрать всё
 session_key: ИвсессионКлюч
 set-bundle: Установить пакет на канал
 settings: Настройки

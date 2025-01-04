@@ -455,6 +455,7 @@ select-style-of-deletion-msg: |-
   You can read about the difference $1
 select-user-perms: Select user's permissions
 select-user-perms-expanded: Select which permission should the invited user have
+select_all: select all
 session_key: IvSessionKey
 set-bundle: Set bundle to channel
 settings: Settings

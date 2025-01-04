@@ -450,6 +450,7 @@ select-style-of-deletion-msg: |-
   您可以阅读有关区别的信息 $1
 select-user-perms: 选择用户的权限
 select-user-perms-expanded: 选择受邀用户应拥有的权限
+select_all: 全选
 session_key: Iv会话密钥
 set-bundle: 将捆绑包设置为频道
 settings: 设置
