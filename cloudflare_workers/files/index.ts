@@ -88,10 +88,10 @@ export function uploadRateLimiter() {
 }
 
 // Apply middleware to all /read/ routes to check if request has key and device_id query params
-// app.use('*/read/*', readRateLimiter())
+app.use('*/read/*', readRateLimiter())
 
 // Apply middleware to all /upload/ routes to check capgkey header and appId
-// app.use('*/upload/*', uploadRateLimiter())
+app.use('*/upload/*', uploadRateLimiter())
 
 // Files API
 app.route('/files', files)

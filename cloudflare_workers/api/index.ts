@@ -85,14 +85,14 @@ app.route('/device', device)
 app.route('/organization', organization)
 app.route('/statistics', statistics)
 
-// app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/bundle', bundle)
 
-// app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.use('/channel')
 app.route('/channel', channel)
 
-// app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/device', device)
 
 app.route('/on_app_create', on_app_create)
