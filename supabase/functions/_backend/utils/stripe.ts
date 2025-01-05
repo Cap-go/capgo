@@ -115,7 +115,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
       allow_redisplay_filters: ['always'],
       payment_method_save: true,
     },
-  
+
     line_items: [
       {
         price: prices.priceId,
