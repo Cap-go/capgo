@@ -242,7 +242,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           old: version_name,
         }, 200)
       }
-      if (version.name !== 'builtin' && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_name).major) {
+      if (version.name !== 'builtin' && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
@@ -250,7 +250,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           message: 'Cannot upgrade major version',
           error: 'disable_auto_update_to_major',
           version: version.name,
-          old: version_name,
+          old: version_build,
         }, 200)
       }
 
@@ -263,7 +263,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_name).minor) {
+      if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_build).minor) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
@@ -271,15 +271,15 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           message: 'Cannot upgrade minor version',
           error: 'disable_auto_update_to_minor',
           version: version.name,
-          old: version_name,
+          old: version_build,
         }, 200)
       }
 
       console.log({ requestId: c.get('requestId'), context: 'version', version: version.name, old: version_name })
       if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'patch' && !(
-        parse(version.name).patch > parse(version_name).patch
-        && parse(version.name).major === parse(version_name).major
-        && parse(version.name).minor === parse(version_name).minor
+        parse(version.name).patch > parse(version_build).patch
+        && parse(version.name).major === parse(version_build).major
+        && parse(version.name).minor === parse(version_build).minor
       )) {
         console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch' }])
@@ -288,7 +288,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           message: 'Cannot upgrade patch version',
           error: 'disable_auto_update_to_patch',
           version: version.name,
-          old: version_name,
+          old: version_build,
         }, 200)
       }
 
@@ -303,12 +303,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
             message: `Channel ${channelData.channels.name} is misconfigured`,
             error: 'misconfigured_channel',
             version: version.name,
-            old: version_name,
+            old: version_build,
           }, 200)
         }
 
         // Check if the minVersion is greater then the current version
-        if (greaterThan(parse(minUpdateVersion), parse(version_name))) {
+        if (greaterThan(parse(minUpdateVersion), parse(version_build))) {
           console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
           await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata' }])
           return c.json({
@@ -316,7 +316,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
             message: 'Cannot upgrade version, min update version > current version',
             error: 'disable_auto_update_to_metadata',
             version: version.name,
-            old: version_name,
+            old: version_build,
           }, 200)
         }
       }
