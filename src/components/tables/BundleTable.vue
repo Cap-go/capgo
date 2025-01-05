@@ -175,7 +175,6 @@ async function deleteOne(one: Element) {
   }
 
   try {
-    // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
       .select('name, version(name)')

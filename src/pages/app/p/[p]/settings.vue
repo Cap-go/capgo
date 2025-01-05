@@ -215,7 +215,6 @@ async function setDefaultChannel() {
 }
 
 const isSuperAdmin = computed(() => {
-  // TODO: check if that is smart to not let admins delete apps
   if (!role.value)
     return false
   return organizationStore.hasPermisisonsInRole(role.value as any, ['super_admin'])

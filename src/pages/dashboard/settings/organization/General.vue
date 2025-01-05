@@ -95,7 +95,6 @@ async function saveChanges(form: { orgName: string, email: string }) {
     .eq('id', gid)
 
   if (error) {
-    // TODO: INFORM USER THAT HE IS NOT ORG OWNER
     console.log(`Cannot save changes: ${error}`)
 
     // Revert the optimistic update
