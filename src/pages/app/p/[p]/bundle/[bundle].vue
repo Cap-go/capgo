@@ -502,6 +502,13 @@ function preventInputChangePerm(event: Event) {
             <InfoRow :label="t('size')" :is-link="true" @click="openDownload()">
               {{ showSize }}
             </InfoRow>
+            <InfoRow v-if="version?.manifest" :label="t('partial-bundle')" :is-link="false">
+              {{ t('enabled') }}
+            </InfoRow>
+            <InfoRow v-if="version?.r2_path" :label="t('zip-bundle')" :is-link="false">
+              {{ t('enabled') }}
+            </InfoRow>
+
             <!-- <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" /> -->
           </dl>
         </div>

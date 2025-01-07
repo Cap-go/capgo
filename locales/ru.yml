@@ -245,6 +245,7 @@ download: Скачать
 email: Электронная почта
 enable: Давать возможность
 enable-2FA: Включить 2FA
+enabled: Включено
 enabled-ab-testing: Включено AB-тестирование
 enabled-progressive-deploy: Включено прогрессивное развертывание
 enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
@@ -402,6 +403,7 @@ organization-name: Название организации
 organization-settings: Настройки организации
 os-version: версия ОС
 pages: Страницы
+partial-bundle: частичный пакет приложения
 password: Пароль
 password-confirmatio: Подтверждение пароля
 password-heading: Придумайте пароль
@@ -588,3 +590,4 @@ you-cannot-reuse: Вы не сможете повторно использова
 you-reached-the-limi: Достигнут предел
 your-settings: Ваши настройки
 your-ussage: 'Ваше использование:'
+zip-bundle: Приложение в формате ZIP

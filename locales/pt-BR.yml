@@ -242,6 +242,7 @@ download: Download
 email: E-mail
 enable: Habilitar
 enable-2FA: Habilitar 2FA
+enabled: Habilitado
 enabled-ab-testing: Teste AB ativado
 enabled-progressive-deploy: Implantação progressiva habilitada
 enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha.
@@ -399,6 +400,7 @@ organization-name: Nome da organização
 organization-settings: Configurações da organização
 os-version: versão do sistema operacional
 pages: Páginas
+partial-bundle: pacote de aplicativo parcial
 password: Senha
 password-confirmatio: ConfirmaÇão Da Senha
 password-heading: Criar senha
@@ -583,3 +585,4 @@ you-cannot-reuse: Você não pode reutilizar esta versão do pacote após a excl
 you-reached-the-limi: Limite alcançado
 your-settings: Suas configurações
 your-ussage: 'Seu uso:'
+zip-bundle: Aplicativo ZIP em pacote

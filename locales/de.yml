@@ -263,6 +263,7 @@ download: Herunterladen
 email: Email
 enable: Aktivieren
 enable-2FA: Aktivieren Sie 2FA
+enabled: Aktiviert
 enabled-ab-testing: AB-Tests aktiviert
 enabled-progressive-deploy: Progressive Bereitstellung aktiviert
 enter-your-email-add: >-
@@ -428,6 +429,7 @@ organization-name: Name der Organisation
 organization-settings: Organisationseinstellungen
 os-version: OS Version
 pages: Seiten
+partial-bundle: teilweises App-Bündel
 password: Passwort
 password-confirmatio: Passwort Bestätigung
 password-heading: Passwort erstellen
@@ -625,3 +627,4 @@ you-cannot-reuse: Sie können diese Bundle-Version nach dem Löschen nicht wiede
 you-reached-the-limi: Limit erreicht
 your-settings: Ihre Einstellungen
 your-ussage: 'Ihre Nutzung:'
+zip-bundle: ZIP-App-Bündel

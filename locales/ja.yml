@@ -225,6 +225,7 @@ download: ダウンロード
 email: Eメール
 enable: 有効にする
 enable-2FA: 2FA を有効にする
+enabled: 有効化された
 enabled-ab-testing: ABテストを有効にしました
 enabled-progressive-deploy: プログレッシブ展開を有効にしました
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
@@ -374,6 +375,7 @@ organization-name: 組織名
 organization-settings: 組織の設定
 os-version: OSバージョン
 pages: ページ
+partial-bundle: 部分的なアプリバンドル
 password: パスワード
 password-confirmatio: パスワードの確認
 password-heading: パスワードの作成
@@ -545,3 +547,4 @@ you-cannot-reuse: このバンドル バージョンは削除後は再利用で�
 you-reached-the-limi: 制限に達しました
 your-settings: あなたの設定
 your-ussage: 'あなたの用途:'
+zip-bundle: ZIPアプリバンドル

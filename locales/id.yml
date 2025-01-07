@@ -236,6 +236,7 @@ download: Unduh
 email: Surel
 enable: Memungkinkan
 enable-2FA: Aktifkan 2FA
+enabled: Diaktifkan
 enabled-ab-testing: Pengujian AB diaktifkan
 enabled-progressive-deploy: Mengaktifkan penerapan progresif
 enter-your-email-add: >-
@@ -395,6 +396,7 @@ organization-name: Nama Organisasi
 organization-settings: Pengaturan organisasi
 os-version: versi OS
 pages: Halaman
+partial-bundle: paket aplikasi parsial
 password: Kata sandi
 password-confirmatio: konfirmasi kata kunci
 password-heading: Buat Kata Sandi
@@ -581,3 +583,4 @@ you-cannot-reuse: Anda tidak dapat menggunakan kembali versi bundel ini setelah 
 you-reached-the-limi: Batas tercapai
 your-settings: Pengaturan Anda
 your-ussage: 'Penggunaan Anda:'
+zip-bundle: Paket bundel aplikasi ZIP

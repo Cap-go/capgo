@@ -236,6 +236,7 @@ download: İndirmek
 email: E-posta
 enable: Olanak vermek
 enable-2FA: 2FA'yı etkinleştir
+enabled: Etkinleştirildi
 enabled-ab-testing: AB testi etkinleştirildi
 enabled-progressive-deploy: Etkin aşamalı dağıtım
 enter-your-email-add: >-
@@ -391,6 +392,7 @@ organization-name: Kuruluş Adı
 organization-settings: Organizasyon ayarları
 os-version: OS sürümü
 pages: Sayfalar
+partial-bundle: kısmi uygulama paketi
 password: Şifre
 password-confirmatio: Şifre onayı
 password-heading: Şifre oluştur
@@ -573,3 +575,4 @@ you-cannot-reuse: Bu paket sürümünü silme işleminden sonra yeniden kullanam
 you-reached-the-limi: Sınıra ulaşıldı
 your-settings: Ayarlarınız
 your-ussage: 'Kullanımınız:'
+zip-bundle: ZIP uygulama paketi
