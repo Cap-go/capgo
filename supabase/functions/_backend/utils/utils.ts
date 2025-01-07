@@ -116,6 +116,9 @@ export function isLimited(c: Context, id: string) {
 }
 
 export function backgroundTask(c: Context, p: any) {
+  if (getEnv(c, 'CAPGO_PREVENT_BACKGROUND_FUNCTIONS') === 'true') {
+    return p
+  }
   if (getRuntimeKey() === 'workerd') {
     c.executionCtx.waitUntil(p)
     return Promise.resolve(null)
