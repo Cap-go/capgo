@@ -329,7 +329,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
     if (day.utc().startOf('day').isAfter(today.utc().endOf('day')))
       continue
     finalStats[i] = {
-      mau: mau[i], 
+      mau: mau[i],
       storage: storage[i],
       bandwidth: bandwidth[i],
       date: day.toISOString(),
