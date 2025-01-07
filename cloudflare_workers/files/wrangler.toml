@@ -31,7 +31,7 @@ simple = { limit = 200, period = 10 }
 [[unsafe.bindings]]
 name = "FILES_UPLOAD_RATE_LIMITER"
 type = "ratelimit"
-namespace_id = "1001"
+namespace_id = "1002"
 simple = { limit = 200, period = 10 }
 
 [env.preprod]

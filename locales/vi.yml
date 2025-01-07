@@ -251,6 +251,7 @@ download: Tải xuống
 email: E-mail
 enable: Cho phép
 enable-2FA: Kích hoạt 2FA
+enabled: Đã bật
 enabled-ab-testing: Đã bật thử nghiệm AB
 enabled-progressive-deploy: Đã bật triển khai lũy tiến
 enter-your-email-add: >-
@@ -411,6 +412,7 @@ organization-name: tên tổ chức
 organization-settings: Cài đặt tổ chức
 os-version: phiên bản của hệ điều hành
 pages: trang
+partial-bundle: gói ứng dụng bộ phận
 password: Mật khẩu
 password-confirmatio: xác nhận mật khẩu
 password-heading: Tạo mật khẩu
@@ -602,3 +604,4 @@ you-cannot-reuse: Bạn không thể sử dụng lại phiên bản gói này sa
 you-reached-the-limi: Đạt tới giới hạn
 your-settings: Cài đặt của bạn
 your-ussage: 'Cách sử dụng của bạn:'
+zip-bundle: Gói ứng dụng ZIP

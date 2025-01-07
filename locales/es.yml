@@ -250,6 +250,7 @@ download: Descargar
 email: Correo electrónico
 enable: Permitir
 enable-2FA: Habilitar 2FA
+enabled: Habilitado
 enabled-ab-testing: Pruebas AB habilitadas
 enabled-progressive-deploy: Implementación progresiva habilitada
 enter-your-email-add: >-
@@ -411,6 +412,7 @@ organization-name: Nombre de la Organización
 organization-settings: Configuración de la organización
 os-version: versión del sistema operativo
 pages: Paginas
+partial-bundle: paquete de aplicación parcial
 password: Contraseña
 password-confirmatio: confirmación de contraseña
 password-heading: Crear contraseña
@@ -602,3 +604,4 @@ you-cannot-reuse: No puedes reutilizar esta versión del paquete después de eli
 you-reached-the-limi: Límite alcanzado
 your-settings: Tu configuración
 your-ussage: 'Su uso:'
+zip-bundle: Aplicación de paquete ZIP

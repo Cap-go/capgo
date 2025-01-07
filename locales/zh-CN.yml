@@ -225,6 +225,7 @@ download: 下载
 email: 电子邮件
 enable: 使能够
 enable-2FA: 启用 2FA
+enabled: 已启用
 enabled-ab-testing: 启用AB测试
 enabled-progressive-deploy: 启用渐进式部署
 enter-your-email-add: 输入您的电子邮件地址，我们将向您发送一个链接以重置您的密码。
@@ -374,6 +375,7 @@ organization-name: 机构名称
 organization-settings: 组织设置
 os-version: 操作系统版本
 pages: 页数
+partial-bundle: 部分应用程序包
 password: 密码
 password-confirmatio: 确认密码
 password-heading: 创建密码
@@ -543,3 +545,4 @@ you-cannot-reuse: 删除后您无法重复使用此捆绑包版本
 you-reached-the-limi: 达到限制
 your-settings: 您的设置
 your-ussage: 您的使用情况：
+zip-bundle: ZIP应用程序包

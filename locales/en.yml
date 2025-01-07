@@ -230,6 +230,7 @@ download: Download
 email: Email
 enable: Enable
 enable-2FA: Enable 2FA
+enabled: Enabled
 enabled-ab-testing: Enabled AB testing
 enabled-progressive-deploy: Enabled progressive deploy
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
@@ -377,6 +378,7 @@ organization-name: Organization Name
 organization-settings: Organization settings
 os-version: OS version
 pages: Pages
+partial-bundle: partial app bundle
 password: Password
 password-confirmatio: Password confirmation
 password-heading: Create Password
@@ -551,3 +553,4 @@ you-cannot-reuse: You cannot reuse this bundle version after deletion
 you-reached-the-limi: Limit reached
 your-settings: Your settings
 your-ussage: 'Your usage:'
+zip-bundle: Zip app bundle
