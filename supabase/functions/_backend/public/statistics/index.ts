@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from '@hono/hono'
 import * as d3 from 'd3'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono/tiny'
 import { JSDOM } from 'jsdom'
 import { svgPathProperties } from 'svg-path-properties'
@@ -8,6 +9,8 @@ import { z } from 'zod'
 import { useCors } from '../../utils/hono.ts'
 import { hasAppRight, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
+
+dayjs.extend(utc)
 
 interface AuthInfo {
   userId: string
@@ -317,19 +320,22 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
   // eslint-disable-next-line style/max-statements-per-line
   bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  const baseDay = dayjs(from)
+  const baseDay = dayjs(from).utc()
 
   const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number }[]
+  const today = dayjs().utc()
   for (let i = 0; i < graphDays; i++) {
     const day = baseDay.add(i, 'day')
+    if (day.utc().startOf('day').isAfter(today.utc().endOf('day')))
+      continue
     finalStats[i] = {
-      mau: mau[i],
+      mau: mau[i], 
       storage: storage[i],
       bandwidth: bandwidth[i],
       date: day.toISOString(),
     }
   }
-  return { data: finalStats, error: null }
+  return { data: finalStats.filter(x => !!x), error: null }
 }
 
 async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseAdmin>) {
