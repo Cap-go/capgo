@@ -102,7 +102,7 @@ app.get('/app/:app_id', async (c: Context) => {
       return c.json({ status: 'You can\'t access this app' }, 400)
 
     const supabase = supabaseAdmin(c)
-    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
+    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth').authType === 'jwt') : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
     if (error)
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
 
@@ -138,7 +138,7 @@ app.get('/org/:org_id', async (c: Context) => {
       return c.json({ status: 'You can\'t access this organization' }, 400)
 
     const { data: finalStats, error } = (body.graph === undefined)
-      ? await getNormalStats(null, orgId, body.from, body.to, supabase)
+      ? await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth').authType === 'jwt')
       : await drawGraphForNormalStats(null, orgId, body.from, body.to, body.graph, supabase)
 
     if (error)
@@ -210,7 +210,7 @@ app.get('/user', async (c: Context) => {
   const uniqueOrgs = Array.from(
     new Map(orgs.data.map(org => [org.org_id, org])).values(),
   )
-  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase)))
+  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0)
     return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
@@ -231,7 +231,7 @@ app.get('/user', async (c: Context) => {
   return c.json({ status: 'ok', statistics: finalStats })
 })
 
-async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
+async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -258,6 +258,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   let mau = createUndefinedArray(graphDays) as number[]
   let storage = createUndefinedArray(graphDays) as number[]
   let bandwidth = createUndefinedArray(graphDays) as number[]
+  let gets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
 
   // Group metrics by app_id
   let metricsByApp = metrics.reduce((acc, metric) => {
@@ -297,6 +298,10 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
             bandwidth[dayNumber] += bandwidthVal
           else
             bandwidth[dayNumber] = bandwidthVal
+
+          if (isDashboard) {
+            gets[dayNumber] = item.get
+          }
         }
       })
     })
@@ -320,9 +325,13 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
   // eslint-disable-next-line style/max-statements-per-line
   bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  if (isDashboard) {
+    // eslint-disable-next-line style/max-statements-per-line
+    gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  }
   const baseDay = dayjs(from).utc()
 
-  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number }[]
+  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number, get: number | undefined }[]
   const today = dayjs().utc()
   for (let i = 0; i < graphDays; i++) {
     const day = baseDay.add(i, 'day')
@@ -332,6 +341,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
       mau: mau[i],
       storage: storage[i],
       bandwidth: bandwidth[i],
+      get: isDashboard ? gets[i] : undefined,
       date: day.toISOString(),
     }
   }
