@@ -242,6 +242,7 @@ download: Pobierać
 email: E-mail
 enable: Włączać
 enable-2FA: Włącz 2FA
+enabled: Włączony
 enabled-ab-testing: Włączono testy AB
 enabled-progressive-deploy: Włączono wdrażanie progresywne
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
@@ -399,6 +400,7 @@ organization-name: Nazwa organizacji
 organization-settings: Ustawienia organizacji
 os-version: Wersja systemu operacyjnego
 pages: Strony
+partial-bundle: częściowy pakiet aplikacji
 password: Hasło
 password-confirmatio: Potwierdzenie hasła
 password-heading: Stwórz hasło
@@ -585,3 +587,4 @@ you-cannot-reuse: Po usunięciu nie można ponownie użyć tej wersji pakietu
 you-reached-the-limi: Limit osiągnięty
 your-settings: Twoje ustawienia
 your-ussage: 'Twoje wykorzystanie:'
+zip-bundle: Paczka aplikacji ZIP

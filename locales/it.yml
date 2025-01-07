@@ -248,6 +248,7 @@ download: Scaricamento
 email: E-mail
 enable: Abilitare
 enable-2FA: Abilita 2FA
+enabled: Abilitato
 enabled-ab-testing: Test AB abilitato
 enabled-progressive-deploy: Abilitata la distribuzione progressiva
 enter-your-email-add: >-
@@ -405,6 +406,7 @@ organization-name: Nome dell'organizzazione
 organization-settings: Impostazioni dell'organizzazione
 os-version: Versione del sistema operativo
 pages: Pagine
+partial-bundle: pacchetto parziale dell'app
 password: Parola d'ordine
 password-confirmatio: conferma password
 password-heading: Crea password
@@ -592,3 +594,4 @@ you-cannot-reuse: Non è possibile riutilizzare questa versione del bundle dopo 
 you-reached-the-limi: Limite raggiunto
 your-settings: Le tue impostazioni
 your-ussage: 'Il tuo utilizzo:'
+zip-bundle: Pacchetto app ZIP

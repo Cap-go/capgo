@@ -258,6 +258,7 @@ download: Télécharger
 email: Courriel
 enable: Activer
 enable-2FA: Activer 2FA
+enabled: Activé
 enabled-ab-testing: AB testing activé
 enabled-progressive-deploy: Déploiement progressif activé
 enter-your-email-add: >-
@@ -413,6 +414,7 @@ organization-name: Nom de l'Organisation
 organization-settings: Paramètres de l'organisation
 os-version: version du système d'exploitation
 pages: Pages
+partial-bundle: bundle d'application partiel
 password: Mot de passe
 password-confirmatio: Confirmation du mot de passe
 password-heading: Créer un mot de passe
@@ -602,3 +604,4 @@ you-cannot-reuse: Vous ne pouvez pas réutiliser cette version du paquet après 
 you-reached-the-limi: Limite atteinte
 your-settings: Vos paramètres
 your-ussage: 'Votre utilisation :'
+zip-bundle: Paquet d'application Zip

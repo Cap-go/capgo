@@ -225,6 +225,7 @@ download: 다운로드
 email: 이메일
 enable: 할 수 있게 하다
 enable-2FA: 2FA 활성화
+enabled: 활성화됨
 enabled-ab-testing: AB 테스트 활성화
 enabled-progressive-deploy: 점진적 배포 활성화
 enter-your-email-add: 이메일 주소를 입력하시면 비밀번호를 재설정할 수 있는 링크를 보내드립니다.
@@ -374,6 +375,7 @@ organization-name: 조직 이름
 organization-settings: 조직 설정
 os-version: OS 버전
 pages: 페이지
+partial-bundle: 부분 앱 번들
 password: 비밀번호
 password-confirmatio: 비밀번호 확인
 password-heading: 비밀번호 만들기
@@ -545,3 +547,4 @@ you-cannot-reuse: 삭제 후에는 이 번들 버전을 재사용할 수 없습�
 you-reached-the-limi: 한도 도달
 your-settings: 귀하의 설정
 your-ussage: '귀하의 사용량:'
+zip-bundle: ZIP 앱 번들
