@@ -4,6 +4,7 @@ import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import { reset } from '~/services/bento'
+import { getCurrentDayMonth } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import {
   findBestPlan,
@@ -80,8 +81,9 @@ export const useMainStore = defineStore('main', () => {
       const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
       dashboard.value = dashboardRes.global
       dashboardByapp.value = dashboardRes.byApp
-      totalDevices.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.mau, 0)
-      totalDownload.value = dashboard.value.reduce((acc: number, cur: any) => acc + cur.get, 0)
+      const monthDay = getCurrentDayMonth()
+      totalDevices.value = dashboard.value[monthDay]?.mau ?? 0
+      totalDownload.value = dashboard.value[monthDay]?.get ?? 0
       totalStorage.value = await getTotalStorage()
       totalStats.value = getTotalStats()
       bestPlan.value = await findBestPlan(totalStats.value)
@@ -99,11 +101,13 @@ export const useMainStore = defineStore('main', () => {
   }
 
   const getTotalStatsByApp = (appId: string) => {
-    return dashboardByapp.value.filter(d => d.app_id === appId).reduce((acc: number, cur) => acc + cur.get, 0)
+    const monthDay = getCurrentDayMonth()
+    return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.get ?? 0
   }
   const getTotalMauByApp = (appId: string) => {
     // dashboardByapp add up all the mau for the appId and return it
-    return dashboardByapp.value.filter(d => d.app_id === appId).reduce((acc: number, cur) => acc + cur.mau, 0)
+    const monthDay = getCurrentDayMonth()
+    return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.mau ?? 0
   }
 
   const awaitInitialLoad = () => {
