@@ -123,7 +123,7 @@ onMounted(async () => {
 })
 
 async function loadData() {
-  await organizationStore.awaitInitialLoad()
+  await Promise.all([organizationStore.awaitInitialLoad(), main.awaitInitialLoad()])
   const gid = organizationStore?.currentOrganization?.gid ?? ''
 
   if (planUsageMap.value.has(gid) || isLoading.value)
