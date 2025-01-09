@@ -448,7 +448,7 @@ async function handleRevertToBuiltin() {
           <InfoRow :label="t('disable-auto-downgra')">
             <Toggle
               :value="channel?.disable_auto_update_under_native"
-              @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update)"
+              @change="saveChannelChange('disable_auto_update_under_native', !channel?.disable_auto_update_under_native)"
             />
           </InfoRow>
           <InfoRow :label="t('disableAutoUpdateToMajor')">
