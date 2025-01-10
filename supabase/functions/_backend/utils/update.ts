@@ -36,7 +36,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
     res.session_key = version.session_key || ''
   if (greaterThan(pluginVersion, parse('4.4.0')))
     res.checksum = version.checksum
-  if (greaterThan(pluginVersion, parse('6.2.0')) && manifest.length > 0)
+  if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
     res.manifest = manifest
   return res
 }
@@ -396,7 +396,15 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       sendStatsAndDevice(c, device, [{ action: 'get' }]),
     ]))
     console.log({ requestId: c.get('requestId'), context: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
-    return c.json(resToVersion(plugin_version, signedURL, version as any, manifest), 200)
+    const res = resToVersion(plugin_version, signedURL, version as any, manifest)
+    if (!res.url && !res.manifest) {
+      console.log({ requestId: c.get('requestId'), context: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
+      return c.json({
+        message: 'No url or manifest',
+        error: 'no_url_or_manifest',
+      }, 200)
+    }
+    return c.json(res, 200)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), context: 'update', error: JSON.stringify(e), body })
