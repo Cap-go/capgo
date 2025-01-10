@@ -143,7 +143,7 @@ async function post(c: Context, body: AppStats) {
       .single()
     console.log({ requestId: c.get('requestId'), context: `appVersion ${JSON.stringify(appVersion)}` })
     if (!appVersion) {
-      console.error({ requestId: c.get('requestId'), context: 'switch to onprem', app_id })
+      console.log({ requestId: c.get('requestId'), context: 'switch to onprem', app_id })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
