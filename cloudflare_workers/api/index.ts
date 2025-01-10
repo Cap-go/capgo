@@ -1,6 +1,6 @@
-import type { Context, MiddlewareHandler, Next } from 'hono'
+// import type { Context, MiddlewareHandler, Next } from 'hono'
 import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
-import { rateLimit } from '@elithrar/workers-hono-rate-limit'
+// import { rateLimit } from '@elithrar/workers-hono-rate-limit'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -61,20 +61,20 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', (requestId as any)())
 
-export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: number, period: number, method: string }[]) {
-  const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
-    const capgkey_string = c.req.header('capgkey')
-    const apikey_string = c.req.header('authorization')
-    const key = capgkey_string || apikey_string
-    if (!key)
-      return next()
-    const rateLimiterKey = `API_${rateLimiterAction}_RATE_LIMITER`
-    if (c.env[rateLimiterKey])
-      await rateLimit(c.env[rateLimiterKey], () => key)(c, next)
-    await next()
-  }
-  return subMiddlewareKey
-}
+// export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: number, period: number, method: string }[]) {
+//   const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
+//     const capgkey_string = c.req.header('capgkey')
+//     const apikey_string = c.req.header('authorization')
+//     const key = capgkey_string || apikey_string
+//     if (!key)
+//       return next()
+//     const rateLimiterKey = `API_${rateLimiterAction}_RATE_LIMITER`
+//     if (c.env[rateLimiterKey])
+//       await rateLimit(c.env[rateLimiterKey], () => key)(c, next)
+//     await next()
+//   }
+//   return subMiddlewareKey
+// }
 
 // Public API
 app.route('/ok', ok)
