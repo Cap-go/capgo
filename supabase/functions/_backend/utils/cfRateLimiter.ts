@@ -49,7 +49,8 @@ export function rateLimit(rateLimitBinding: RateLimitBinding, keyFunc: RateLimit
         // });
         if (!customMessage) {
           console.warn(`The rate limit has been reached for key: ${key} and rate limit binding: ${rateLimit}`)
-        } else {
+        }
+        else {
           console.warn(`The rate limit has been reached for key: ${key} and rate limit binding: ${rateLimit}. Custom message: ${customMessage}`)
         }
       }
