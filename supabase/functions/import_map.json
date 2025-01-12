@@ -9,6 +9,7 @@
     "hono/request-id": "jsr:@hono/hono@^4.6.13/request-id",
     "hono/cors": "jsr:@hono/hono@^4.6.13/cors",
     "hono/tiny": "jsr:@hono/hono@^4.6.13/tiny",
+    "hono/factory": "jsr:@hono/hono@^4.6.13/factory",
     "hono/http-exception": "jsr:@hono/hono@^4.6.13/http-exception",
     "hono/adapter": "jsr:@hono/hono@^4.6.13/adapter",
     "hono/utils/buffer": "jsr:@hono/hono@^4.6.13/utils/buffer",
