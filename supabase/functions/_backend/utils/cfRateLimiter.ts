@@ -33,7 +33,7 @@ export interface RateLimitKeyFunc {
   (c: Context): string
 }
 
-export function rateLimit(rateLimitBinding: RateLimitBinding, keyFunc: RateLimitKeyFunc, rateLimit: string = '') {
+export function rateLimit(rateLimitBinding: RateLimitBinding, keyFunc: RateLimitKeyFunc, rateLimit: string = '', customMessage: string = '') {
   return createMiddleware(async (c: Context, next: Next) => {
     const key = keyFunc(c)
     if (!key) {
@@ -47,7 +47,11 @@ export function rateLimit(rateLimitBinding: RateLimitBinding, keyFunc: RateLimit
         // throw new HTTPException(STATUS_TOO_MANY_REQUESTS, {
         //   res: c.text("rate limited", { status: STATUS_TOO_MANY_REQUESTS }),
         // });
-        console.warn(`The rate limit has been reached for key: ${key} and rate limit binding: ${rateLimit}`)
+        if (!customMessage) {
+          console.warn(`The rate limit has been reached for key: ${key} and rate limit binding: ${rateLimit}`)
+        } else {
+          console.warn(`The rate limit has been reached for key: ${key} and rate limit binding: ${rateLimit}. Custom message: ${customMessage}`)
+        }
       }
     }
 
