@@ -198,6 +198,9 @@ delete: 消去
 delete-account: アカウントを削除する
 delete-account-0: アカウントを削除する
 delete-app: アプリを削除する
+delete-old-bundle-on-delete: アップロード時に古いバンドルを削除する
+delete-old-bundle-warning: >-
+  有効にすると、このチャンネルに新しいバンドルをアップロードした後、CLIはこのチャンネルに以前リンクされていたバンドルを自動的に削除します。この削除は破壊的で、元に戻すことはできません。
 delete-org: 組織の削除
 delete-your-account: アカウントを削除する
 deleted: 削除された

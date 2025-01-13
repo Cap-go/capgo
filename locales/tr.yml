@@ -207,6 +207,11 @@ delete: Silmek
 delete-account: Hesabı sil
 delete-account-0: Hesabı sil
 delete-app: Uygulamayı sil
+delete-old-bundle-on-delete: Yükleme sırasında eski paketi silme
+delete-old-bundle-warning: >-
+  Etkinleştirildiğinde, bu kanala yeni bir paket yüklendikten sonra, CLI daha
+  önce bu kanala bağlanmış olan paketi otomatik olarak siler. Bu silme işlemi
+  yıkıcıdır ve geri alınamaz.
 delete-org: Kuruluşu sil
 delete-your-account: Hesabını sil
 deleted: silindi

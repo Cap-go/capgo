@@ -221,6 +221,11 @@ delete: Borrar
 delete-account: Borrar cuenta
 delete-account-0: Borrar cuenta
 delete-app: Eliminar aplicación
+delete-old-bundle-on-delete: Eliminar el paquete antiguo al cargarlo
+delete-old-bundle-warning: >-
+  Cuando se activa, después de cargar un nuevo paquete a este canal, la CLI
+  eliminará automáticamente el paquete que estaba previamente vinculado a este
+  canal. Esta eliminación es destructiva y no se puede deshacer.
 delete-org: Eliminar organización
 delete-your-account: Elimina tu cuenta
 deleted: eliminado

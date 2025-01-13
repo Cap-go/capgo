@@ -222,6 +222,12 @@ delete: Xóa bỏ
 delete-account: Xóa tài khoản
 delete-account-0: Xóa tài khoản
 delete-app: Xóa ứng dụng
+delete-old-bundle-on-delete: Xóa gói cũ khi tải lên
+delete-old-bundle-warning: >-
+  Khi được bật, sau khi tải gói mới lên kênh này, CLI sẽ tự động xóa gói đã được
+  liên kết trước đó với kênh này. 
+
+  Việc xóa này có tính chất phá hoại và không thể hoàn tác.
 delete-org: Xóa tổ chức
 delete-your-account: Xóa tài khoản của bạn
 deleted: đã xóa

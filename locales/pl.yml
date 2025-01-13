@@ -213,6 +213,11 @@ delete: Usuwać
 delete-account: Usuń konto
 delete-account-0: Usuń konto
 delete-app: Usuń aplikację
+delete-old-bundle-on-delete: Usuń stary pakiet podczas przesyłania
+delete-old-bundle-warning: >-
+  Po włączeniu tej opcji, po przesłaniu nowego pakietu do tego kanału, CLI
+  automatycznie usunie pakiet, który był wcześniej połączony z tym kanałem. To
+  usunięcie jest destrukcyjne i nie można go cofnąć.
 delete-org: Usuń organizację
 delete-your-account: Usuń swoje konto
 deleted: usunięte

@@ -203,6 +203,11 @@ delete: Delete
 delete-account: Delete Account
 delete-account-0: Delete account
 delete-app: Delete app
+delete-old-bundle-on-delete: Delete old bundle on upload
+delete-old-bundle-warning: >-
+  When enabled, after uploading a new bundle to this channel, the CLI will
+  automatically delete the bundle that was previously linked to this channel.
+  This deletion is destructive and cannot be undone.
 delete-org: Delete organization
 delete-your-account: Delete your account
 deleted: deleted

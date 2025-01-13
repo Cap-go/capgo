@@ -231,6 +231,12 @@ delete: Supprimer
 delete-account: Supprimer le compte
 delete-account-0: Supprimer le compte
 delete-app: Supprimer l'application
+delete-old-bundle-on-delete: Supprimer l'ancien paquet lors du téléchargement
+delete-old-bundle-warning: >-
+  Lorsque cette option est activée, après avoir téléchargé un nouveau paquet sur
+  ce canal, l'interface de gestion supprime automatiquement le paquet qui était
+  précédemment lié à ce canal. Cette suppression est destructive et ne peut être
+  annulée.
 delete-org: Supprimer l'organisation
 delete-your-account: Supprimez votre compte
 deleted: supprimé

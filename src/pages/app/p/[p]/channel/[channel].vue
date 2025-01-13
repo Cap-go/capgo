@@ -34,6 +34,7 @@ const loading = ref(true)
 const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
+const deleteOldBundleOnDelete = ref(false)
 
 const role = ref<OrganizationRole | null>(null)
 watch(channel, async (channel) => {
@@ -44,6 +45,7 @@ watch(channel, async (channel) => {
 
   await organizationStore.awaitInitialLoad()
   role.value = await organizationStore.getCurrentRoleForApp(channel.app_id)
+  deleteOldBundleOnDelete.value = channel?.delete_old_bundle_on_delete
   console.log(role.value)
 })
 
@@ -112,6 +114,7 @@ async function getChannel() {
           allow_device_self_set,
           disable_auto_update_under_native,
           disable_auto_update,
+          delete_old_bundle_on_delete,
           ios,
           android,
           updated_at
@@ -393,6 +396,41 @@ async function handleRevertToBuiltin() {
   }
   displayStore.showDialog = true
 }
+
+async function handleDeleteOldBundleOnDeleteSwitch(event: Event) {
+  if (!channel.value)
+    return
+  // If currently off, show warning before enabling
+  if (!channel.value.delete_old_bundle_on_delete) {
+    deleteOldBundleOnDelete.value = false
+    displayStore.dialogOption = {
+      header: t('are-u-sure'),
+      message: t('delete-old-bundle-warning'),
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button-confirm'),
+          role: 'danger',
+          id: 'confirm-button',
+          handler: () => {
+            saveChannelChange('delete_old_bundle_on_delete', true)
+            deleteOldBundleOnDelete.value = true
+          },
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    return;
+  }
+  else {
+    // If currently on, directly disable
+    saveChannelChange('delete_old_bundle_on_delete', false)
+    deleteOldBundleOnDelete.value = false
+  }
+}
 </script>
 
 <template>
@@ -444,6 +482,12 @@ async function handleRevertToBuiltin() {
               :value="channel?.android"
               @change="saveChannelChange('android', !channel?.android)"
             />
+          </InfoRow>
+          <InfoRow :label="t('delete-old-bundle-on-delete')">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input @change="handleDeleteOldBundleOnDeleteSwitch" type="checkbox" class="sr-only peer" v-model="deleteOldBundleOnDelete">
+              <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:border-gray-300 dark:border-gray-600 after:rounded-full after:bg-white dark:bg-gray-700 peer-checked:bg-blue-600 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
+            </label>
           </InfoRow>
           <InfoRow :label="t('disable-auto-downgra')">
             <Toggle

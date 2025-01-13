@@ -207,6 +207,11 @@ delete: Menghapus
 delete-account: Hapus akun
 delete-account-0: Hapus akun
 delete-app: Hapus aplikasi
+delete-old-bundle-on-delete: Menghapus bundel lama saat mengunggah
+delete-old-bundle-warning: >-
+  Jika diaktifkan, setelah mengunggah bundel baru ke saluran ini, CLI akan
+  secara otomatis menghapus bundel yang sebelumnya ditautkan ke saluran ini.
+  Penghapusan ini bersifat merusak dan tidak dapat dibatalkan.
 delete-org: Hapus organisasi
 delete-your-account: Hapus akun anda
 deleted: dihapus
