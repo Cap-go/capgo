@@ -416,9 +416,6 @@ async function handleRevertToBuiltin() {
           <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
             {{ channel.version.min_update_version ?? t('undefined-fail') }}
           </InfoRow>
-          <InfoRow :label="t('bundle-number')" :is-link="true" @click="openBundle()">
-            {{ channel.version.name }}
-          </InfoRow>
           <!-- Created At -->
           <InfoRow :label="t('created-at')">
             {{ formatDate(channel.created_at) }}
