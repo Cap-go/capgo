@@ -32,12 +32,13 @@ export function readRateLimiter() {
     const urlElements = c.req.url.split('/')
     const appsElementIndex = urlElements.findIndex(element => element === 'apps')
     const appId = urlElements.at(appsElementIndex + 1)
+    const filePath = urlElements.slice(appsElementIndex + 2).join('/').split('?')[0] ?? ''
   
     if (!appId) {
       return next()
     }
 
-    const key = `${appId}/${deviceId}`
+    const key = `${appId}/${deviceId}/${filePath}`
 
     const rateLimiterKey = `FILES_READ_RATE_LIMITER`
     if (c.env[rateLimiterKey])
