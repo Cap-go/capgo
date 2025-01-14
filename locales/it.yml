@@ -217,6 +217,11 @@ delete: Eliminare
 delete-account: Eliminare l'account
 delete-account-0: Eliminare l'account
 delete-app: Elimina l'app
+delete-old-bundle-on-delete: Cancellare il vecchio bundle al momento del caricamento
+delete-old-bundle-warning: >-
+  Se abilitata, dopo aver caricato un nuovo bundle su questo canale, la CLI
+  cancellerà automaticamente il bundle che era precedentemente collegato a
+  questo canale. Questa cancellazione è distruttiva e non può essere annullata.
 delete-org: Elimina organizzazione
 delete-your-account: cancella il tuo account
 deleted: cancellato

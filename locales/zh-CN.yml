@@ -198,6 +198,8 @@ delete: 删除
 delete-account: 删除帐户
 delete-account-0: 删除帐户
 delete-app: 删除应用程序
+delete-old-bundle-on-delete: 上传时删除旧捆绑包
+delete-old-bundle-warning: 启用后，在向该通道上传新的捆绑包后，CLI 将自动删除之前链接到该通道的捆绑包。这种删除是破坏性的，无法撤销。
 delete-org: 删除组织
 delete-your-account: 删除您的帐户
 deleted: 删除

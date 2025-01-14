@@ -234,6 +234,12 @@ delete: Löschen
 delete-account: Konto löschen
 delete-account-0: Konto löschen
 delete-app: App löschen
+delete-old-bundle-on-delete: Altes Bundle beim Hochladen löschen
+delete-old-bundle-warning: >-
+  Wenn diese Option aktiviert ist, löscht die Befehlszeilenschnittstelle nach
+  dem Hochladen eines neuen Bundles in diesen Channel automatisch das Bundle,
+  das zuvor mit diesem Channel verknüpft war. Diese Löschung ist destruktiv und
+  kann nicht rückgängig gemacht werden.
 delete-org: Organisation löschen
 delete-your-account: Lösche deinen Account
 deleted: gelöscht

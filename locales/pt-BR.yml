@@ -213,6 +213,11 @@ delete: Excluir
 delete-account: Deletar conta
 delete-account-0: Deletar conta
 delete-app: Excluir aplicativo
+delete-old-bundle-on-delete: Eliminar o pacote antigo no carregamento
+delete-old-bundle-warning: >-
+  Quando ativado, depois de carregar um novo pacote para este canal, o CLI
+  elimina automaticamente o pacote que estava anteriormente ligado a este canal.
+  Essa exclusão é destrutiva e não pode ser desfeita.
 delete-org: Excluir organização
 delete-your-account: Deletar sua conta
 deleted: excluído
