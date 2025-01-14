@@ -80,6 +80,7 @@ bulk-upload: Bulk upload
 bundle: Bundle
 bundle-deleted: Bundle deleted
 bundle-is-linked-device: Bundle is linked in device, unlink it first
+bundle-link-dialog-header: Select bundle
 bundle-number: Bundle number
 bundles: Bundles
 button-back: Back
@@ -236,7 +237,9 @@ enabled-progressive-deploy: Enabled progressive deploy
 enter-your-email-add: Enter your email address and we'll send you a link to reset your password.
 enter-your-new-passw: Enter your new password and confirm
 error: Error
+error-fetching-versions: Error fetching versions! Please check the browser console and contact support
 error-revert-to-builtin: Cannot revert to builtin
+error-update-channel: Cannot update channel
 fail: Install failed
 failed: Failed
 failed-to-get-user: Failed to load the user
@@ -295,6 +298,7 @@ leaving: Leaving
 limit-to-org: |-
   Limit the API key to selected 
   organizations?
+linked-bundle: Bundle linked successfully!
 live-reload: Live reload
 log-as: Start spoofing
 log-in: Log in

@@ -84,6 +84,7 @@ bulk-upload: Tải lên hàng loạt
 bundle: Bó
 bundle-deleted: Đã xóa gói
 bundle-is-linked-device: Gói được liên kết trong thiết bị, trước tiên hãy hủy liên kết gói đó
+bundle-link-dialog-header: Chọn gói
 bundle-number: số gói
 bundles: Bó
 button-back: Mặt sau
@@ -259,7 +260,11 @@ enter-your-email-add: >-
   mật khẩu của bạn.
 enter-your-new-passw: Nhập mật khẩu mới của bạn và xác nhận
 error: Lỗi
+error-fetching-versions: |-
+  Lỗi tìm nạp phiên bản! 
+  Vui lòng kiểm tra bảng điều khiển trình duyệt và liên hệ với bộ phận hỗ trợ
 error-revert-to-builtin: Không thể hoàn nguyên về nội dung sẵn
+error-update-channel: Không thể cập nhật kênh
 fail: Cài đặt không thành công
 failed: Thất bại
 failed-to-get-user: Không tải được người dùng
@@ -321,6 +326,7 @@ limit-to-org: |-
   Giới hạn khóa API ở mức đã chọn 
 
   tổ chức?
+linked-bundle: Đã liên kết gói thành công!
 live-reload: tải lại trực tiếp
 log-as: Bắt đầu giả mạo
 log-in: Đăng nhập

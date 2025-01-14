@@ -88,6 +88,7 @@ bulk-upload: Téléchargement en masse
 bundle: Paquet
 bundle-deleted: Paquet supprimé
 bundle-is-linked-device: Le paquet est lié à l'appareil, déliez-le d'abord
+bundle-link-dialog-header: Sélectionner l'offre
 bundle-number: Numéro de paquet
 bundles: Paquets
 button-back: Dos
@@ -266,7 +267,11 @@ enter-your-email-add: >-
   votre mot de passe.
 enter-your-new-passw: Entrez votre nouveau mot de passe et confirmez
 error: Erreur
+error-fetching-versions: >-
+  Erreur dans la recherche des versions ! Veuillez vérifier la console du
+  navigateur et contacter le support
 error-revert-to-builtin: Impossible de revenir à la version intégrée
+error-update-channel: Impossible de mettre à jour le canal
 fail: L'installation a échoué
 failed: Échoué
 failed-to-get-user: Échec du chargement de l'utilisateur
@@ -329,6 +334,7 @@ leaving: Partir
 limit-to-org: |-
   Limiter la clé API à des organisations
   sélectionnées ?
+linked-bundle: L'offre groupée a été reliée avec succès !
 live-reload: Rechargement en direct
 log-as: Commencez le spoofing
 log-in: Se connecter

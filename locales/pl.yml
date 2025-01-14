@@ -82,6 +82,7 @@ bulk-upload: Przesyłanie zbiorcze
 bundle: Pakiet
 bundle-deleted: Pakiet usunięty
 bundle-is-linked-device: Pakiet jest połączony z urządzeniem, najpierw odłącz go
+bundle-link-dialog-header: Wybierz pakiet
 bundle-number: Numer pakietu
 bundles: Wiązki
 button-back: Z powrotem
@@ -248,7 +249,11 @@ enabled-progressive-deploy: Włączono wdrażanie progresywne
 enter-your-email-add: Wpisz swój adres e-mail, a wyślemy Ci link do zresetowania hasła.
 enter-your-new-passw: Wprowadź nowe hasło i potwierdź
 error: Błąd
+error-fetching-versions: >-
+  Błąd pobierania wersji! Sprawdź konsolę przeglądarki i skontaktuj się z pomocą
+  techniczną
 error-revert-to-builtin: Nie można przywrócić wbudowanego
+error-update-channel: Nie można zaktualizować kanału
 fail: Instalacja nie powiodła się
 failed: Przegrany
 failed-to-get-user: Nie udało się załadować użytkownika
@@ -307,6 +312,7 @@ leaving: Odjazd
 limit-to-org: |-
   Ograniczenie klucza API do wybranych
   organizacji?
+linked-bundle: Pakiet został pomyślnie połączony!
 live-reload: Przeładowanie na żywo
 log-as: Zacznij podszywać się
 log-in: Zaloguj sie

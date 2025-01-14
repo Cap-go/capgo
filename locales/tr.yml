@@ -80,6 +80,7 @@ bulk-upload: toplu yükleme
 bundle: paket
 bundle-deleted: Paket silindi
 bundle-is-linked-device: Paket cihaza bağlı, önce bağlantısını kaldırın
+bundle-link-dialog-header: Paket seçin
 bundle-number: paket numarası
 bundles: Paketler
 button-back: Geri
@@ -244,7 +245,11 @@ enter-your-email-add: >-
   gönderelim.
 enter-your-new-passw: Yeni şifrenizi girin ve onaylayın
 error: Hata
+error-fetching-versions: >-
+  Sürümler alınırken hata oluştu! Lütfen tarayıcı konsolunu kontrol edin ve
+  destek ekibiyle iletişime geçin
 error-revert-to-builtin: Yerleşik sisteme geri dönülemez
+error-update-channel: Kanal güncellenemiyor
 fail: Yükleme başarısız
 failed: Arızalı
 failed-to-get-user: Kullanıcı yüklenemedi
@@ -303,6 +308,7 @@ leaving: Ayrılıyorum
 limit-to-org: |-
   API anahtarını seçilenle sınırla
   organizasyonlar?
+linked-bundle: Paket başarıyla bağlandı!
 live-reload: Canlı yeniden yükleme
 log-as: Sahtelemeye başla
 log-in: Giriş yapmak

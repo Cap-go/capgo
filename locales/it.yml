@@ -84,6 +84,7 @@ bulk-upload: Caricamento collettivo
 bundle: Fascio
 bundle-deleted: Pacchetto eliminato
 bundle-is-linked-device: Il pacchetto è collegato nel dispositivo, prima scollegalo
+bundle-link-dialog-header: Selezionare il pacchetto
 bundle-number: Numero di pacco
 bundles: gruppi
 button-back: Indietro
@@ -256,7 +257,11 @@ enter-your-email-add: >-
   password.
 enter-your-new-passw: Inserisci la tua nuova password e conferma
 error: Errore
+error-fetching-versions: >-
+  Errore nel recupero delle versioni! Controllare la console del browser e
+  contattare l'assistenza
 error-revert-to-builtin: Non è possibile tornare al programma integrato
+error-update-channel: Impossibile aggiornare il canale
 fail: Installazione non riuscita
 failed: Fallito
 failed-to-get-user: Impossibile caricare l'utente
@@ -315,6 +320,7 @@ leaving: In partenza
 limit-to-org: |-
   Limitare la chiave API a organizzazioni
   organizzazioni selezionate?
+linked-bundle: Pacchetto collegato con successo!
 live-reload: Ricarica dal vivo
 log-as: Inizia lo spoofing
 log-in: Login

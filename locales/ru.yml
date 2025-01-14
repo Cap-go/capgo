@@ -84,6 +84,7 @@ bulk-upload: Массовая загрузка
 bundle: Пучок
 bundle-deleted: Группа удалена
 bundle-is-linked-device: Пакет привязан к устройству, сначала отсоедините его.
+bundle-link-dialog-header: Выберите пакет
 bundle-number: Номер пакета
 bundles: Пакеты
 button-back: Назад
@@ -251,7 +252,11 @@ enabled-progressive-deploy: Включено прогрессивное разв
 enter-your-email-add: Введите адрес электронной почты, и мы вышлем вам ссылку для сброса пароля.
 enter-your-new-passw: Введите новый пароль и подтвердите
 error: Ошибка
+error-fetching-versions: >-
+  Ошибка при получении версий! Проверьте консоль браузера и обратитесь в службу
+  поддержки
 error-revert-to-builtin: Невозможно вернуться к встроенному
+error-update-channel: Невозможно обновить канал
 fail: Установка не удалась
 failed: Неуспешный
 failed-to-get-user: Не удалось загрузить пользователя
@@ -310,6 +315,7 @@ leaving: Уход
 limit-to-org: |-
   Ограничить доступ к ключу API для выбранных
   организаций?
+linked-bundle: Пакет успешно подключен!
 live-reload: Живая перезагрузка
 log-as: Начать подделку
 log-in: Авторизоваться

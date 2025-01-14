@@ -88,6 +88,7 @@ bulk-upload: Bulk-Upload
 bundle: Bündeln
 bundle-deleted: Bündel gelöscht
 bundle-is-linked-device: Bundle ist im Gerät verknüpft, heben Sie zuerst die Verknüpfung auf
+bundle-link-dialog-header: Bündel auswählen
 bundle-number: Bündelnummer
 bundles: Bündel
 button-back: Zurück
@@ -271,7 +272,11 @@ enter-your-email-add: >-
   Zurücksetzen Ihres Passworts.
 enter-your-new-passw: Geben Sie Ihr neues Passwort ein und bestätigen Sie es
 error: Fehler
+error-fetching-versions: >-
+  Fehler beim Abrufen von Versionen! Bitte prüfen Sie die Browserkonsole und
+  kontaktieren Sie den Support
 error-revert-to-builtin: Kann nicht auf Built-in zurückgreifen
+error-update-channel: Kanal kann nicht aktualisiert werden
 fail: Installation fehlgeschlagen
 failed: Fehlgeschlagen
 failed-to-get-user: Der Benutzer konnte nicht geladen werden
@@ -332,6 +337,7 @@ leaving: Verlassen
 limit-to-org: |-
   Beschränken Sie den API-Schlüssel auf ausgewählte
   Organisationen?
+linked-bundle: Bündel erfolgreich verlinkt!
 live-reload: Live-Neuladen
 log-as: Beginnen Sie mit dem Spoofing
 log-in: Anmeldung

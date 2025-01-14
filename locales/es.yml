@@ -86,6 +86,7 @@ bulk-upload: Carga masiva
 bundle: Manojo
 bundle-deleted: Paquete eliminado
 bundle-is-linked-device: El paquete está vinculado en el dispositivo, desvincúlelo primero
+bundle-link-dialog-header: Seleccionar paquete
 bundle-number: Número de paquete
 bundles: manojos
 button-back: Atrás
@@ -258,7 +259,11 @@ enter-your-email-add: >-
   restablecer su contraseña.
 enter-your-new-passw: Ingrese su nueva contraseña y confirme
 error: Error
+error-fetching-versions: >-
+  Error en la búsqueda de versiones Compruebe la consola del navegador y póngase
+  en contacto con el servicio de asistencia
 error-revert-to-builtin: No se puede volver al sistema incorporado
+error-update-channel: No se puede actualizar el canal
 fail: Instalación fallida
 failed: Fallido
 failed-to-get-user: No se pudo cargar el usuario
@@ -319,6 +324,7 @@ leaving: Partida
 limit-to-org: |-
   Limitar la clave API a determinadas
   seleccionadas?
+linked-bundle: Paquete enlazado correctamente.
 live-reload: recarga en vivo
 log-as: Comienza a falsificar
 log-in: Acceso

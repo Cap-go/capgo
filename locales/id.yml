@@ -80,6 +80,7 @@ bulk-upload: Unggahan massal
 bundle: Bundel
 bundle-deleted: Bundel dihapus
 bundle-is-linked-device: Bundel ditautkan di perangkat, batalkan tautannya terlebih dahulu
+bundle-link-dialog-header: Pilih bundel
 bundle-number: Nomor bundel
 bundles: bundel
 button-back: Kembali
@@ -244,7 +245,11 @@ enter-your-email-add: >-
   ulang kata sandi Anda.
 enter-your-new-passw: Masukkan kata sandi baru Anda dan konfirmasi
 error: Kesalahan
+error-fetching-versions: >-
+  Kesalahan pengambilan versi! Silakan periksa konsol browser dan hubungi
+  dukungan
 error-revert-to-builtin: Tidak dapat kembali ke bawaan
+error-update-channel: Tidak dapat memperbarui saluran
 fail: Instal gagal
 failed: Gagal
 failed-to-get-user: Gagal memuat pengguna
@@ -305,6 +310,7 @@ leaving: Meninggalkan
 limit-to-org: |-
   Batasi kunci API untuk organisasi tertentu
   organisasi tertentu?
+linked-bundle: Bundel berhasil ditautkan!
 live-reload: Muat ulang langsung
 log-as: Mulai melakukan spoofing
 log-in: Gabung

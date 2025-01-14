@@ -82,6 +82,7 @@ bulk-upload: upload em massa
 bundle: Pacote
 bundle-deleted: Pacote excluído
 bundle-is-linked-device: O pacote está vinculado no dispositivo, desvincule-o primeiro
+bundle-link-dialog-header: Selecionar pacote
 bundle-number: Número do pacote
 bundles: Pacotes
 button-back: Voltar
@@ -248,7 +249,11 @@ enabled-progressive-deploy: Implantação progressiva habilitada
 enter-your-email-add: Digite seu endereço de e-mail e enviaremos um link para redefinir sua senha.
 enter-your-new-passw: Digite sua nova senha e confirme
 error: Erro
+error-fetching-versions: >-
+  Erro ao procurar versões! Verifique a consola do navegador e contacte o
+  suporte
 error-revert-to-builtin: Não é possível reverter para a versão incorporada
+error-update-channel: Não é possível atualizar o canal
 fail: Falha na instalação
 failed: Fracassado
 failed-to-get-user: Falha ao carregar o usuário
@@ -307,6 +312,7 @@ leaving: Saindo
 limit-to-org: |-
   Limitar a chave API a organizações
   organizações selecionadas?
+linked-bundle: Pacote ligado com sucesso!
 live-reload: Recarregamento ao vivo
 log-as: Comece a falsificar
 log-in: Conecte-se

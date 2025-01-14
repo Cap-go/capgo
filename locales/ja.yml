@@ -78,6 +78,7 @@ bulk-upload: 一括アップロード
 bundle: バンドル
 bundle-deleted: バンドルを削除しました
 bundle-is-linked-device: バンドルはデバイスにリンクされています。最初にリンクを解除してください
+bundle-link-dialog-header: バンドル選択
 bundle-number: バンドル番号
 bundles: バンドル
 button-back: 戻る
@@ -231,7 +232,9 @@ enabled-progressive-deploy: プログレッシブ展開を有効にしました
 enter-your-email-add: メールアドレスを入力すると、パスワードをリセットするためのリンクが送信されます。
 enter-your-new-passw: 新しいパスワードを入力して確認します
 error: エラー
+error-fetching-versions: バージョンの取得にエラーが発生しました！ブラウザのコンソールを確認し、サポートに連絡してください。
 error-revert-to-builtin: ビルトインに戻せない
+error-update-channel: チャンネルを更新できない
 fail: インストールに失敗しました
 failed: 失敗した
 failed-to-get-user: ユーザーのロードに失敗しました
@@ -290,6 +293,7 @@ leaving: 出発
 limit-to-org: |-
   APIキーを選択した
   組織ですか？
+linked-bundle: バンドルは正常にリンクされました！
 live-reload: ライブリロード
 log-as: スプーフィングを開始する
 log-in: ログイン
