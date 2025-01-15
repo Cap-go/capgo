@@ -12,6 +12,7 @@ declare module 'vue' {
     AppCard: typeof import('./components/dashboard/AppCard.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
+    BundleLinkDialog: typeof import('./components/BundleLinkDialog.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
     Dashboard: typeof import('./components/dashboard/Dashboard.vue')['default']
