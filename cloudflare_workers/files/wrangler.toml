@@ -10,7 +10,8 @@ compatibility_date = "2024-09-23"
 main = "./index.ts"
 compatibility_flags = [ "nodejs_compat_v2" ]
 workers_dev = false
-observability = { enabled = true }
+observability = { enabled = false }
+upload_source_maps = true
 r2_buckets = [ { binding = "ATTACHMENT_BUCKET", bucket_name = "capgo", preview_bucket_name = "capgo" } ]
 
 durable_objects.bindings = [ { name = "ATTACHMENT_UPLOAD_HANDLER", class_name = "AttachmentUploadHandler" } ]

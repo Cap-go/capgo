@@ -35,6 +35,8 @@ jobs:
         run: bun install
       - name: Lint
         run: bun lint && bun lint-backend
+      - name: Lint I18n
+        run: bunx @inlang/cli lint --project project.inlang
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
