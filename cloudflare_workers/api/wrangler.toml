@@ -5,7 +5,8 @@ main = "./index.ts"
 compatibility_flags = [ "nodejs_compat_v2" ]
 placement = { mode = "smart" }
 workers_dev = false
-observability = { enabled = true }
+observability = { enabled = false }
+upload_source_maps = true
 analytics_engine_datasets = [
   { binding = "DEVICE_USAGE", dataset = "device_usage" },
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage" },

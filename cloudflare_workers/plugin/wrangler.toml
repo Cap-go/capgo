@@ -12,7 +12,8 @@ main = "./index.ts"
 compatibility_flags = [ "nodejs_compat_v2" ]
 placement = { mode = "smart" }
 workers_dev = false
-observability = { enabled = true }
+observability = { enabled = false }
+upload_source_maps = true
 analytics_engine_datasets = [
   { binding = "DEVICE_USAGE", dataset = "device_usage" },
   { binding = "BANDWIDTH_USAGE", dataset = "bandwidth_usage" },
@@ -93,8 +94,6 @@ hyperdrive = [ { binding = "HYPERDRIVE_DB", id = "0f1d77550db142fbb17cb6b3ee659a
 # type = "ratelimit"
 # namespace_id = "1002"
 # simple = { limit = 1, period = 10 }
-
-
 
 # durable_objects.bindings = [ { name = "DB_REPLICATE", class_name = "ReplicateHandler" } ]
 
