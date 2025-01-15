@@ -1,9 +1,8 @@
 {
   "i18n-ally.keystyle": "nested",
-  "i18n-ally.localesPaths": "locales",
+  "i18n-ally.localesPaths": "messages",
   "i18n-ally.sortKeys": true,
   "i18n-ally.keepFulfilled": true,
-  "prettier.enable": false,
   "typescript.tsdk": "node_modules/typescript/lib",
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
@@ -14,7 +13,6 @@
   "editor.formatOnSave": false,
   "deno.enable": true,
   "deno.lint": true,
-  "deno.unstable": true,
   "deno.cacheOnSave": true,
   "editor.defaultFormatter": "denoland.vscode-deno",
   "deno.enablePaths": [

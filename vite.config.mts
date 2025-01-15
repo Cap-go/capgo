@@ -30,7 +30,7 @@ function getUrl(key = 'base_domain'): string {
 }
 
 const locales: string[] = []
-readdirSync('./locales/')
+readdirSync('./messages/')
   .forEach((file) => {
     if (file.split('.')[0] !== 'README')
       locales.push(file.split('.')[0])
