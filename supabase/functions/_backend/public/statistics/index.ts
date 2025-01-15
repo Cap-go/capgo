@@ -1,4 +1,5 @@
 import type { Context, MiddlewareHandler } from '@hono/hono'
+import type { Database } from '../../utils/supabase.types.ts'
 import * as d3 from 'd3'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -9,7 +10,6 @@ import { z } from 'zod'
 import { useCors } from '../../utils/hono.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
-import { Database } from '../../utils/supabase.types.ts';
 
 dayjs.extend(utc)
 
@@ -106,8 +106,9 @@ app.get('/app/:app_id', async (c: Context) => {
       if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
         return c.json({ status: 'You can\'t access this app' }, 400)
     }
-    else if (!await hasAppRight(c, appId, auth.userId, 'read'))
+    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
       return c.json({ status: 'You can\'t access this app' }, 400)
+    }
 
     const supabase = supabaseAdmin(c)
     const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth').authType === 'jwt') : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
@@ -186,8 +187,9 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
       if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
         return c.json({ status: 'You can\'t access this app' }, 400)
     }
-    else if (!await hasAppRight(c, appId, auth.userId, 'read'))
+    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
       return c.json({ status: 'You can\'t access this app' }, 400)
+    }
 
     const supabase = supabaseAdmin(c)
     const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, useDashbord, supabase))
