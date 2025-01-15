@@ -407,7 +407,7 @@ function openSelectVersion() {
   displayStore.showBundleLinkDialogCallbacks = {
     onRevert: handleRevertToBuiltin,
     onUnlink: async () => {
-      await openPannel()
+      openPannel()
     },
     onLink: async (appVersion: Database['public']['Tables']['app_versions']['Row']) => {
       await handleLink(appVersion)
