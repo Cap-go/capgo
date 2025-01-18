@@ -14,7 +14,7 @@ const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const route = useRoute()
 
-const calculateAcronym = (name: string) => {
+function calculateAcronym(name: string) {
   const words = name?.split(' ') || []
   let res = name?.slice(0, 2) || 'AP'
   if (words?.length > 2)

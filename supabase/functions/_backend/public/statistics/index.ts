@@ -151,7 +151,7 @@ app.get('/org/:org_id', async (c: Context) => {
     }
 
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-      return c.json({ status: 'You can\'t access this organization. This API key is limited to these apps: ' + auth.apikey!.limited_to_apps.join(', '), error: 'You can\'t access this organization. This API key is limited to these apps: ' + auth.apikey!.limited_to_apps.join(', ') }, 401)
+      return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
     const { data: finalStats, error } = (body.graph === undefined)
