@@ -1,7 +1,8 @@
+import type { D1Database } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { backgroundTask } from '../utils/utils.ts'
+// import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono()
 
@@ -36,7 +37,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           const values = Object.values(cleanRecord).map(v =>
             v === null ? 'NULL' : typeof v === 'string' ? `'${v}'` : v,
           )
-          queries.push(`BEGIN; INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')}); COMMIT;`)
+          queries.push(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});`)
           break
         }
         case 'UPDATE': {
@@ -45,16 +46,15 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
               `${key} = ${value === null ? 'NULL' : typeof value === 'string' ? `'${value}'` : value}`,
             )
             .join(', ')
-          queries.push(`BEGIN; UPDATE ${table} SET ${setClause} WHERE id = '${old_record.id}'; COMMIT;`)
+          queries.push(`UPDATE ${table} SET ${setClause} WHERE id = '${old_record.id}';`)
           break
         }
         case 'DELETE':
-          queries.push(`BEGIN; DELETE FROM ${table} WHERE id = '${old_record.id}'; COMMIT;`)
+          queries.push(`DELETE FROM ${table} WHERE id = '${old_record.id}';`)
           break
       }
     }
     console.log('operations', operations.length)
-    console.log('queries', queries.length, queries[0])
     const all = []
 
     // Execute batch operations in chunks to stay under 100kb
@@ -65,7 +65,16 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log(`Chunk ${i}, size ${CHUNK_SIZE}`)
       all.push(d1.exec(query))
     }
-    await asyncWrap(c, await Promise.all(all))
+    await Promise.all(all).catch((e) => {
+      // await backgroundTask(c, Promise.all(all).catch((e) => {
+      const errorMessage = e instanceof Error ? e.message : String(e)
+      console.error({ requestId: c.get('requestId'), context: 'Error exec replicateData', error: JSON.stringify(e), errorMessage })
+      // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
+      if (e.message.includes('UNIQUE constraint failed')) {
+        console.log('Object exist already')
+      }
+    })
+    // }))
     return c.json(BRES)
   }
   catch (e) {
@@ -90,22 +99,6 @@ export function cleanFieldsAppVersions(record: any, table: string) {
     record.device_id = record.device_id.toLowerCase()
     delete record.device_id_lower
   }
-  if (table === 'devices_override') {
-    record.device_id = record.device_id.toLowerCase()
-    delete record.device_id_lower
-  }
 
   return record
-}
-
-// function to c.executionCtx.waitUntil the db operation and catch issue who insert in job_queue as failed job
-function asyncWrap(c: Context, promise: Promise<any>) {
-  return backgroundTask(c, promise.catch((e) => {
-    const errorMessage = e instanceof Error ? e.message : String(e)
-    console.error({ requestId: c.get('requestId'), context: 'Error exec replicateData', error: JSON.stringify(e), errorMessage })
-    // if error is { "error": "D1_ERROR: UNIQUE constraint failed: apps.name: SQLITE_CONSTRAINT" } or any Unique constraint failed return as success
-    if (e.message.includes('UNIQUE constraint failed')) {
-      console.log('Object exist already')
-    }
-  }))
 }
