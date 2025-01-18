@@ -15,6 +15,7 @@
     "stripe": "npm:stripe@17.4.0",
     "zod": "https://esm.sh/zod@3.24.1?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.13?target=deno",
+    "dayjs/plugin/utc": "https://esm.sh/dayjs@1.11.13/plugin/utc?target=deno",
     "ky": "https://esm.sh/ky@1.7.3",
     "@logsnag/node": "https://esm.sh/@logsnag/node@1.0.1?target=deno",
     "cron-schedule": "https://esm.sh/cron-schedule@5.0.4?target=deno",

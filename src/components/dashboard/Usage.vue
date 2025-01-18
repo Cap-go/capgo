@@ -70,9 +70,9 @@ async function getUsages() {
     cycleDay = currentDay
   }
   else {
-    const cycleStartDay = cycleStart.getDate()
-    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
-    cycleDay = (currentDay - cycleStartDay + 1 + daysInMonth) % daysInMonth
+    const cycleStartDay = cycleStart.getUTCDate()
+    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
+    cycleDay = (currentDate.getUTCDate() - cycleStartDay + 1 + daysInMonth) % daysInMonth
     if (cycleDay === 0)
       cycleDay = daysInMonth
   }

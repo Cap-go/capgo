@@ -1,17 +1,22 @@
 import type { Context, MiddlewareHandler } from '@hono/hono'
+import type { Database } from '../../utils/supabase.types.ts'
 import * as d3 from 'd3'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono/tiny'
 import { JSDOM } from 'jsdom'
 import { svgPathProperties } from 'svg-path-properties'
 import { z } from 'zod'
 import { useCors } from '../../utils/hono.ts'
-import { hasAppRight, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
+import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
+
+dayjs.extend(utc)
 
 interface AuthInfo {
   userId: string
   authType: 'apikey' | 'jwt'
+  apikey: Database['public']['Tables']['apikeys']['Row'] | null
 }
 
 const useAuth: MiddlewareHandler<{
@@ -32,6 +37,7 @@ const useAuth: MiddlewareHandler<{
     c.set('auth', {
       userId: user.user?.id,
       authType: 'jwt',
+      apikey: null,
     } as AuthInfo)
   }
   else if (capgkey) {
@@ -43,6 +49,7 @@ const useAuth: MiddlewareHandler<{
     c.set('auth', {
       userId: apikey.user_id,
       authType: 'apikey',
+      apikey,
     } as AuthInfo)
   }
   else {
@@ -94,12 +101,17 @@ app.get('/app/:app_id', async (c: Context) => {
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
-    const auth = c.get('auth')
-    if (!await hasAppRight(c, appId, auth.userId, 'read'))
+    const auth = c.get('auth') as AuthInfo
+    if (auth.authType === 'apikey') {
+      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
+        return c.json({ status: 'You can\'t access this app' }, 400)
+    }
+    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
       return c.json({ status: 'You can\'t access this app' }, 400)
+    }
 
     const supabase = supabaseAdmin(c)
-    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase) : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
+    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth').authType === 'jwt') : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
     if (error)
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
 
@@ -130,12 +142,16 @@ app.get('/org/:org_id', async (c: Context) => {
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
-    const auth = c.get('auth')
+    const auth = c.get('auth') as AuthInfo
     if (!(await hasOrgRight(c, orgId, auth.userId, 'read')))
       return c.json({ status: 'You can\'t access this organization' }, 400)
+    if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
+      if (!auth.apikey!.limited_to_orgs.includes(orgId))
+        return c.json({ status: 'You can\'t access this organization' }, 400)
+    }
 
     const { data: finalStats, error } = (body.graph === undefined)
-      ? await getNormalStats(null, orgId, body.from, body.to, supabase)
+      ? await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth').authType === 'jwt')
       : await drawGraphForNormalStats(null, orgId, body.from, body.to, body.graph, supabase)
 
     if (error)
@@ -166,9 +182,14 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
 
-    const auth = c.get('auth')
-    if (!await hasAppRight(c, appId, auth.userId, 'read'))
+    const auth = c.get('auth') as AuthInfo
+    if (auth.authType === 'apikey') {
+      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
+        return c.json({ status: 'You can\'t access this app' }, 400)
+    }
+    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
       return c.json({ status: 'You can\'t access this app' }, 400)
+    }
 
     const supabase = supabaseAdmin(c)
     const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, useDashbord, supabase))
@@ -199,7 +220,11 @@ app.get('/user', async (c: Context) => {
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
   const body = bodyParsed.data
 
-  const orgs = await supabase.from('org_users').select('*').eq('user_id', auth.userId)
+  const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
+    orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
+  }
+  const orgs = await orgsReq
   if (orgs.error)
     return c.json({ status: 'User not found', error: JSON.stringify(orgs.error) }, 404)
 
@@ -207,7 +232,9 @@ app.get('/user', async (c: Context) => {
   const uniqueOrgs = Array.from(
     new Map(orgs.data.map(org => [org.org_id, org])).values(),
   )
-  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase)))
+  if (uniqueOrgs.length === 0)
+    return c.json({ status: 'No organizations found', error: 'No organizations found' }, 404)
+  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0)
     return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
@@ -228,7 +255,7 @@ app.get('/user', async (c: Context) => {
   return c.json({ status: 'ok', statistics: finalStats })
 })
 
-async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
+async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -248,13 +275,14 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   const createUndefinedArray = (length: number) => {
     const arr: any[] = [] as any[]
     for (let i = 0; i < length; i++)
-      arr.push(undefined)
+      arr.push(0)
     return arr
   }
 
   let mau = createUndefinedArray(graphDays) as number[]
   let storage = createUndefinedArray(graphDays) as number[]
   let bandwidth = createUndefinedArray(graphDays) as number[]
+  let gets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
 
   // Group metrics by app_id
   let metricsByApp = metrics.reduce((acc, metric) => {
@@ -294,6 +322,10 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
             bandwidth[dayNumber] += bandwidthVal
           else
             bandwidth[dayNumber] = bandwidthVal
+
+          if (isDashboard) {
+            gets[dayNumber] = item.get
+          }
         }
       })
     })
@@ -317,19 +349,27 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
   // eslint-disable-next-line style/max-statements-per-line
   bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-  const baseDay = dayjs(from)
+  if (isDashboard) {
+    // eslint-disable-next-line style/max-statements-per-line
+    gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+  }
+  const baseDay = dayjs(from).utc()
 
-  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number }[]
+  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number, get: number | undefined }[]
+  const today = dayjs().utc()
   for (let i = 0; i < graphDays; i++) {
     const day = baseDay.add(i, 'day')
+    if (day.utc().startOf('day').isAfter(today.utc().endOf('day')))
+      continue
     finalStats[i] = {
       mau: mau[i],
       storage: storage[i],
       bandwidth: bandwidth[i],
+      get: isDashboard ? gets[i] : undefined,
       date: day.toISOString(),
     }
   }
-  return { data: finalStats, error: null }
+  return { data: finalStats.filter(x => !!x), error: null }
 }
 
 async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseAdmin>) {

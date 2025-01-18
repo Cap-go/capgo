@@ -36,6 +36,16 @@ export const useDisplayStore = defineStore('display', () => {
   const toastOption = ref<ActionSheetOption>()
   const dialogCanceled = ref<boolean>(false)
   const showDialog = ref<boolean>(false)
+  const showBundleLinkDialogChannel = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
+  const showBundleLinkDialogCallbacks = ref<{
+    onUnlink: () => Promise<void>
+    onRevert: () => Promise<void>
+    onLink: (appVersion: Database['public']['Tables']['app_versions']['Row']) => Promise<void>
+  }>({
+        onUnlink: () => Promise.resolve(),
+        onRevert: () => Promise.resolve(),
+        onLink: () => Promise.resolve(),
+      })
   const NavTitle = ref<string>('')
   const defaultBack = ref<string>('')
   const messageToast = ref<string[]>([])
@@ -71,6 +81,8 @@ export const useDisplayStore = defineStore('display', () => {
     dialogInputText,
     dialogCheckbox,
     selectedOrganizations,
+    showBundleLinkDialogChannel,
+    showBundleLinkDialogCallbacks,
   }
 })
 

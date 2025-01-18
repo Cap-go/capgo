@@ -5,6 +5,7 @@ import { posthogLoader } from '~/services/posthog'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
+const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleLinkDialog.vue'))
 onMounted(() => {
   bentoLoader()
   posthogLoader()
@@ -16,5 +17,6 @@ onMounted(() => {
     <RouterView class="h-full overflow-hidden" />
     <Toast />
     <Dialog />
+    <BundleLinkDialog />
   </div>
 </template>

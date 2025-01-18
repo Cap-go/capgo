@@ -43,7 +43,7 @@ console.log('Environment variables', customEnv)
 const secrets = JSON.stringify(customEnv, null, 2)
 
 // Construct the command to execute
-const command = `echo '${secrets.replace(/'/g, '\'\\\'\'')}' | npx wrangler secret bulk --name ${envName}`
+const command = `echo '${secrets.replace(/'/g, '\'\\\'\'')}' | bunx wrangler secret bulk --name ${envName}`
 
 try {
   // Execute the command

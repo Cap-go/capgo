@@ -83,11 +83,13 @@ describe('[POST] /updates parallel tests', () => {
 
   it('disable auto update to major', async () => {
     const baseData = getBaseData(APPNAME)
+    baseData.version_build = '0.0.0'
     baseData.version_name = '0.0.0'
 
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
+    console.log('json', json)
     expect(json.error).toBe('disable_auto_update_to_major')
   })
 
