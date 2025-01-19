@@ -13,7 +13,7 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
-import { openMessenger } from '~/services/bento'
+import { openSupport } from '~/services/support'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
 import { registerWebsiteDomain } from '~/utils/Utils'
@@ -33,7 +33,7 @@ const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const version = import.meta.env.VITE_APP_VERSION
 
 function openSupport() {
-  openMessenger()
+  openSupport()
 }
 
 async function nextLogin() {

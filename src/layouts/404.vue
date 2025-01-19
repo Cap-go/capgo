@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { openMessenger } from '~/services/bento'
+import { openSupport } from '~/services/support'
 </script>
 
 <template>
@@ -16,7 +16,7 @@ import { openMessenger } from '~/services/bento'
           </p>
           <div class="flex justify-center mt-10 space-x-3">
             <a href="/" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-sm bg-cornflower-600 hover:bg-cornflower-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cornflower-500"> Go back home </a>
-            <a href="#" class="inline-flex items-center px-4 py-2 text-sm font-medium border border-transparent rounded-md text-cornflower-700 bg-cornflower-100 hover:bg-cornflower-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cornflower-500" @click="openMessenger"> Contact support </a>
+            <a href="#" class="inline-flex items-center px-4 py-2 text-sm font-medium border border-transparent rounded-md text-cornflower-700 bg-cornflower-100 hover:bg-cornflower-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cornflower-500" @click="openSupport"> Contact support </a>
           </div>
         </div>
       </main>

@@ -8,15 +8,15 @@ import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { openMessenger } from '~/services/bento'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 function openSupport() {
-  openMessenger()
+  openSupport()
 }
 
 const { t } = useI18n()
