@@ -1,6 +1,6 @@
-// import type { Context, MiddlewareHandler, Next } from 'hono'
+import type { Context, MiddlewareHandler, Next } from 'hono'
 import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
-// import { rateLimit } from '@elithrar/workers-hono-rate-limit'
+import { rateLimit } from '../../supabase/functions/_backend/utils/cfRateLimiter.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -61,20 +61,20 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', (requestId as any)())
 
-// export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: number, period: number, method: string }[]) {
-//   const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
-//     const capgkey_string = c.req.header('capgkey')
-//     const apikey_string = c.req.header('authorization')
-//     const key = capgkey_string || apikey_string
-//     if (!key)
-//       return next()
-//     const rateLimiterKey = `API_${rateLimiterAction}_RATE_LIMITER`
-//     if (c.env[rateLimiterKey])
-//       await rateLimit(c.env[rateLimiterKey], () => key)(c, next)
-//     await next()
-//   }
-//   return subMiddlewareKey
-// }
+export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: number, period: number, method: string }[]) {
+  const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
+    const capgkey_string = c.req.header('capgkey')
+    const apikey_string = c.req.header('authorization')
+    const key = capgkey_string || apikey_string
+    if (!key)
+      return next()
+    const rateLimiterKey = `API_${rateLimiterAction}_RATE_LIMITER`
+    if (c.env[rateLimiterKey])
+      await rateLimit(c.env[rateLimiterKey], () => key, rateLimiterKey, key)(c, next)
+    await next()
+  }
+  return subMiddlewareKey
+}
 
 // Public API
 app.route('/ok', ok)
@@ -85,14 +85,14 @@ app.route('/device', device)
 app.route('/organization', organization)
 app.route('/statistics', statistics)
 
-// app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/bundle', bundle)
 
-// app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.use('/channel')
 app.route('/channel', channel)
 
-// app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
+app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/device', device)
 
 app.route('/on_app_create', on_app_create)
