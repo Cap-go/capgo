@@ -331,10 +331,10 @@ async function showAddNewKeyModal() {
         text: t('key-read'),
         id: 'read-button',
       },
-      // {
-      //   text: t('key-upload'),
-      //   id: 'upload-button',
-      // },
+      {
+        text: t('key-upload'),
+        id: 'upload-button',
+      },
       {
         text: t('write-key'),
         id: 'write-button',
