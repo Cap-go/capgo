@@ -120,15 +120,16 @@ export type Part = IntermediatePart | FinalPart | ErrorPart
 // containing whatever was read before the error was encountered.
 export async function* generateParts(body: ReadableStream<Uint8Array>, mem: WritableStreamBuffer): AsyncGenerator<Part> {
   try {
-    for await (let chunk of body) {
-      while (chunk.byteLength > 0) {
-        const copied = mem.writeUpTo(chunk)
-        chunk = chunk.subarray(copied, chunk.byteLength)
+    for await (const chunk of body) {
+      let chunkOffset = 0
+      while (chunkOffset < chunk.byteLength) {
+        const copied = mem.writeUpTo(chunk.subarray(chunkOffset))
+        chunkOffset += copied
 
         // When we've filled mem, we want to emit a part. But we should only do it if we know
         // there's more body to write. Otherwise, if the upload size is exactly the part size
         // we would end up emitting an empty 'final' part which is unnecessary.
-        if (chunk.byteLength > 0 && mem.offset >= mem.buf.byteLength) {
+        if (chunk.byteLength > chunkOffset && mem.offset >= mem.buf.byteLength) {
           // the memory buffer's position is at its total length
           yield { kind: 'intermediate', bytes: mem.view() }
           mem.reset()
