@@ -111,7 +111,7 @@ onMounted(() => {
                     wrapper: '!mb-0',
                   }"
                 /> -->
-                <img v-if="!!org.logo" :src="org.logo" class="w-[78px] h-[78px] rounded-full">
+                <img v-if="!!org.logo" :src="org.logo" :alt="org.name" class="w-[78px] h-[78px] rounded-full">
                 <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
                   <span class="font-medium text-gray-300">
                     N/A
