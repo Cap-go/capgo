@@ -114,10 +114,3 @@ BEGIN
     ));
 End;
 $$;
-
--- Grant permissions for new functions - only to service_role
-GRANT ALL ON FUNCTION is_allowed_action_org_action(uuid, action_type[]) TO service_role;
-GRANT ALL ON FUNCTION is_paying_and_good_plan_org_action(uuid, action_type[]) TO service_role;
-
-REVOKE ALL ON FUNCTION is_allowed_action_org_action(uuid, action_type[]) FROM authenticated, anon;
-REVOKE ALL ON FUNCTION is_paying_and_good_plan_org_action(uuid, action_type[]) FROM authenticated, anon;

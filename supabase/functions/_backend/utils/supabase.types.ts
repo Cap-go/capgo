@@ -1433,6 +1433,13 @@ export type Database = {
         }
         Returns: string
       }
+      get_organization_cli_warnings: {
+        Args: {
+          orgid: string
+          cli_version: string
+        }
+        Returns: Json[]
+      }
       get_orgs_v5:
         | {
             Args: Record<PropertyKey, never>
