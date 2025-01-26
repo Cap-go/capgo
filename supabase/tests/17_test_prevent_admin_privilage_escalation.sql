@@ -30,7 +30,7 @@ BEGIN
     WHEN OTHERS THEN
       -- Mark the test as passed if an exception is caught as expected
       rls_failed := TRUE;
-      RAISE NOTICE 'Expected exception caught successfully';
+      -- RAISE NOTICE 'Expected exception caught successfully';
 END;
 
 RETURN NEXT IS(rls_failed, true, 'Expect admin -> super_admin to fail');
@@ -47,7 +47,7 @@ BEGIN
     WHEN OTHERS THEN
       -- Mark the test as passed if an exception is caught as expected
       rls_failed := TRUE;
-      RAISE NOTICE 'Expected exception caught successfully';
+      -- RAISE NOTICE 'Expected exception caught successfully';
 END;
 
 RETURN NEXT IS(rls_failed, true, 'Expect admin -> invite_super_admin to fail');
