@@ -138,18 +138,3 @@ CREATE INDEX IF NOT EXISTS idx_apps_user_id ON apps(user_id);
 CREATE INDEX IF NOT EXISTS idx_orgs_created_by ON orgs(created_by);
 CREATE INDEX IF NOT EXISTS idx_orgs_customer_id ON orgs(customer_id);
 
--- -- drop all tables;
--- DROP TABLE IF EXISTS app_versions;
--- DROP TABLE IF EXISTS devices_override;
--- DROP TABLE IF EXISTS channels;
--- DROP TABLE IF EXISTS channel_devices;
--- DROP TABLE IF EXISTS apps;
--- DROP TABLE IF EXISTS orgs;
-
--- count each
--- SELECT COUNT(*) FROM app_versions;
--- SELECT COUNT(*) FROM devices_override;
--- SELECT COUNT(*) FROM channels;
--- SELECT COUNT(*) FROM channel_devices;
--- SELECT COUNT(*) FROM apps;
--- SELECT COUNT(*) FROM orgs;

@@ -15,6 +15,8 @@ interface AppInfo {
 gplay.memoized()
 
 async function getAppInfo(appId: string, country = 'en') {
+  // IOS: https://itunes.apple.com/lookup?bundleId=APP_ID
+  // ANDROID: https://play.google.com/store/apps/details?id=APP_ID
   const item = await gplay.app({
     appId,
     // throttle: 50,
