@@ -118,13 +118,6 @@ appTriggers.route('/cron_plan', cron_plan)
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
 
-app.get('/test_sentry', (c) => {
-  if (Math.random() < 0.5)
-    return c.text('Success!')
-
-  throw new Error('Failed!')
-})
-
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException) {

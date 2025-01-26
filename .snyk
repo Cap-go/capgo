@@ -1,3 +1,5 @@
 ignore:
   - supabase/tests/**
   - tests/**
+  - scriptable/**
+  - scripts/**
