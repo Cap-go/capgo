@@ -71,6 +71,23 @@ export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) 
   return backgroundTask(c, client.end())
 }
 
+export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string, actions: ('mau' | 'storage' | 'bandwidth')[]): Promise<boolean> {
+  try {
+    const sqls = [sql`SELECT is_allowed_action_org_action(${orgId}, ARRAY[`]
+    actions.forEach((action, index) => index !== actions.length - 1 ? sqls.push(sql`${action},`) : sqls.push(sql`${action}`))
+    sqls.push(sql`]::action_type[]) AS is_allowed`)
+
+    const result = await drizzleCient.execute<{ is_allowed: boolean }>(
+      sql.join(sqls)
+    )
+    return result[0]?.is_allowed || false
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
+  }
+  return false
+}
+
 export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
   try {
     // Assuming you have a way to get your database connection string

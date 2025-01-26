@@ -16,7 +16,7 @@ import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1, getPgClient, isAllowedActionOrgPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
+import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1, getPgClient, isAllowedActionOrgActionPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver } from './utils.ts'
 
@@ -127,7 +127,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       updated_at: new Date().toISOString(),
     }
     const start = performance.now()
-    const planValid = isV2 ? true : await isAllowedActionOrgPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id)
+    const planValid = isV2 ? true : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
     if (!planValid) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
       await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
