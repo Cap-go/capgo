@@ -209,7 +209,7 @@
     "husky": "^9.1.7",
     "miniflare": "^3.20250124.0",
     "postcss": "^8.5.1",
-    "sass": "1.83.3",
+    "sass": "1.83.4",
     "tailwindcss": "^3.4.17",
     "typescript": "5.7.3",
     "unplugin-icons": "22.0.0",
