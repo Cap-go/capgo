@@ -150,6 +150,10 @@ app.get('/org/:org_id', async (c: Context) => {
         return c.json({ status: 'You can\'t access this organization' }, 400)
     }
 
+    if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+      return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
+    }
+
     const { data: finalStats, error } = (body.graph === undefined)
       ? await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth').authType === 'jwt')
       : await drawGraphForNormalStats(null, orgId, body.from, body.to, body.graph, supabase)
@@ -223,6 +227,9 @@ app.get('/user', async (c: Context) => {
   const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
     orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
+  }
+  else if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+    orgsReq.in('app_id', auth.apikey!.limited_to_apps)
   }
   const orgs = await orgsReq
   if (orgs.error)

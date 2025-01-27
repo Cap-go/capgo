@@ -14,6 +14,16 @@ const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const route = useRoute()
 
+function calculateAcronym(name: string) {
+  const words = name?.split(' ') || []
+  let res = name?.slice(0, 2) || 'AP'
+  if (words?.length > 2)
+    res = words[0][0] + words[1][0]
+  else if (words?.length > 1)
+    res = words[0][0] + words[1][0]
+  return res.toUpperCase()
+}
+
 function close(item?: ActionSheetOptionButton) {
   console.log('close', item)
   if (displayStore?.dialogOption)
@@ -121,8 +131,48 @@ onMounted(() => {
               </div>
             </div>
           </div>
+          <div v-if="displayStore.dialogOption?.listApps">
+            <div class="flex flex-col gap-2">
+              <div v-for="app in displayStore.dialogOption.listApps" :key="app.id!" class="flex items-center gap-2">
+                <div class="flex items-center h-full">
+                  <FormKit
+                    type="checkbox"
+                    :name="`app-${app.id}`"
+                    :classes="{
+                      outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
+                      inner: '!max-w-[18px]',
+                      wrapper: '!mb-0',
+                    }"
+                    @input="(value) => {
+                      if (value)
+                        displayStore.selectedApps.push(app)
+                      else
+                        displayStore.selectedApps = displayStore.selectedApps.filter(filterApp => filterApp.app_id !== app.app_id)
+                    }"
+                  />
+                </div>
+                <!-- <FormKit
+                  type="checkbox"
+                  :name="`org-${org.gid}`"
+                  v-model="displayStore.dialogCheckbox"
+                  :classes="{
+                    outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
+                    inner: '!max-w-[18px]',
+                    wrapper: '!mb-0',
+                  }"
+                /> -->
+                <img v-if="!!app.icon_url" :src="app.icon_url" class="w-[78px] h-[78px] rounded-full">
+                <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                  <span class="font-medium text-gray-300">
+                    {{ calculateAcronym(app.name ?? 'Unknown App') }}
+                  </span>
+                </div>
+                <span :class="{ 'ml-[6.344px]': !!app.icon_url }">{{ app.name }}</span>
+              </div>
+            </div>
+          </div>
           <img v-if="displayStore.dialogOption?.image" alt="dialog illustration" :src="displayStore.dialogOption?.image" class="ml-auto mr-auto">
-          <div v-if="displayStore.dialogOption?.checkboxText" class="flex justify-start mb-0 mt-14">
+          <div v-if="displayStore.dialogOption?.checkboxText" class="flex justify-start" :class="displayStore.dialogOption?.checkboxStyle">
             <FormKit id="dialog-input" type="form" :actions="false">
               <FormKit
                 v-model="displayStore.dialogCheckbox"

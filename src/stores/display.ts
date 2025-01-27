@@ -22,6 +22,8 @@ export interface ActionSheetOption {
   buttonVertical?: boolean
   preventAccidentalClose?: boolean
   checkboxText?: string
+  checkboxStyle?: string
+  listApps?: Database['public']['Tables']['apps']['Row'][]
   listOrganizations?: boolean
   buttons?: ActionSheetOptionButton[]
 }
@@ -52,6 +54,7 @@ export const useDisplayStore = defineStore('display', () => {
   const durationToast = ref<number>(2000)
   const lastButtonRole = ref<string>('')
   const selectedOrganizations = ref<string[]>([])
+  const selectedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
   const dialogInputText = ref('')
   const dialogCheckbox = ref<boolean>(false)
   const onDialogDismiss = (): Promise<boolean> => {
@@ -67,6 +70,10 @@ export const useDisplayStore = defineStore('display', () => {
     })
   }
 
+  const unsetDialogCheckbox = () => {
+    dialogCheckbox.value = false
+  }
+
   return {
     onDialogDismiss,
     dialogCanceled,
@@ -80,6 +87,8 @@ export const useDisplayStore = defineStore('display', () => {
     defaultBack,
     dialogInputText,
     dialogCheckbox,
+    unsetDialogCheckbox,
+    selectedApps,
     selectedOrganizations,
     showBundleLinkDialogChannel,
     showBundleLinkDialogCallbacks,
