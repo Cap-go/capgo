@@ -129,7 +129,7 @@
     "@intlify/unplugin-vue-i18n": "^6.0.3",
     "@logsnag/node": "1.0.1",
     "@netlify/functions": "^3.0.0",
-    "@revenuecat/purchases-capacitor": "9.2.0",
+    "@revenuecat/purchases-capacitor": "9.2.1",
     "@sentry/cli": "^2.41.1",
     "@std/assert": "npm:@jsr/std__assert@1.0.6",
     "@std/semver": "npm:@jsr/std__semver@1.0.3",
