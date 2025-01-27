@@ -13,9 +13,9 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
-import { openSupport } from '~/services/support'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
 const route = useRoute('/login')
@@ -31,10 +31,6 @@ const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 const version = import.meta.env.VITE_APP_VERSION
-
-function openSupport() {
-  openSupport()
-}
 
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {

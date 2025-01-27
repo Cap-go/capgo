@@ -9,8 +9,8 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
-import { openSupport } from '~/services/support'
 import { useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
 const router = useRouter()
@@ -19,10 +19,6 @@ const { t } = useI18n()
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
-
-function openSupport() {
-  openSupport()
-}
 
 if (registerWebsiteDomain() === 'https://capgo.app') {
   // do not allow to register on webapp on production

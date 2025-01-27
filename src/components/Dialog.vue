@@ -3,7 +3,6 @@ import type { ActionSheetOptionButton } from '~/stores/display'
 import { FormKit } from '@formkit/vue'
 import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
-import IconSearch from '~icons/ic/round-search?raw'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 /*

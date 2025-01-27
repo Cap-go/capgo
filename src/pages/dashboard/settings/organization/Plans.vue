@@ -15,10 +15,6 @@ import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-function openSupport() {
-  openSupport()
-}
-
 const { t } = useI18n()
 const mainStore = useMainStore()
 
