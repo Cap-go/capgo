@@ -78,7 +78,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
   <section class="flex w-full min-h-screen py-10 my-auto overflow-y-auto lg:py-8 sm:py-8">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="max-w-2xl mx-auto text-center">
-        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">
+        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded-sm invert dark:invert-0">
 
         <h1 class="text-3xl font-bold leading-tight text-black lg:text-5xl sm:text-4xl dark:text-white">
           {{ t("register-heading") }}
@@ -102,7 +102,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                     validation="required:trim|email"
                     :label="t('email')"
                     :classes="{
-                      outer: '!mb-0',
+                      outer: 'mb-0!',
                     }"
                   />
                 </div>
@@ -153,7 +153,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                     <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                   </div>
                   <button
-                    :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
+                    :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
                   >
                     <span v-if="!isLoading" class="rounded-4xl">
                       {{ t("register-next") }}

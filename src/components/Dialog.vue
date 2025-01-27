@@ -3,9 +3,9 @@ import type { ActionSheetOptionButton } from '~/stores/display'
 import { FormKit } from '@formkit/vue'
 import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
+import IconSearch from '~icons/ic/round-search?raw'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-
 /*
 * $targetEl: required
 * options: optional
@@ -97,11 +97,12 @@ onMounted(() => {
                 <div class="flex items-center h-full">
                   <FormKit
                     type="checkbox"
+                    decorator-icon="check"
                     :name="`org-${org.gid}`"
                     :classes="{
-                      outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
-                      inner: '!max-w-[18px]',
-                      wrapper: '!mb-0',
+                      outer: 'mb-0! ml-0 grow-0! h-[18px]!',
+                      inner: 'max-w-[18px]!',
+                      wrapper: 'mb-0!',
                     }"
                     @input="(value) => {
                       if (value)
@@ -111,16 +112,6 @@ onMounted(() => {
                     }"
                   />
                 </div>
-                <!-- <FormKit
-                  type="checkbox"
-                  :name="`org-${org.gid}`"
-                  v-model="displayStore.dialogCheckbox"
-                  :classes="{
-                    outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
-                    inner: '!max-w-[18px]',
-                    wrapper: '!mb-0',
-                  }"
-                /> -->
                 <img v-if="!!org.logo" :src="org.logo" :alt="org.name" class="w-[78px] h-[78px] rounded-full">
                 <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
                   <span class="font-medium text-gray-300">
@@ -137,11 +128,12 @@ onMounted(() => {
                 <div class="flex items-center h-full">
                   <FormKit
                     type="checkbox"
+                    decorator-icon="check"
                     :name="`app-${app.id}`"
                     :classes="{
-                      outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
-                      inner: '!max-w-[18px]',
-                      wrapper: '!mb-0',
+                      outer: 'mb-0! ml-0 grow-0! h-[18px]!',
+                      inner: 'max-w-[18px]!',
+                      wrapper: 'mb-0!',
                     }"
                     @input="(value) => {
                       if (value)
@@ -151,16 +143,6 @@ onMounted(() => {
                     }"
                   />
                 </div>
-                <!-- <FormKit
-                  type="checkbox"
-                  :name="`org-${org.gid}`"
-                  v-model="displayStore.dialogCheckbox"
-                  :classes="{
-                    outer: '!mb-0 ml-0 !grow-0 !h-[18px]',
-                    inner: '!max-w-[18px]',
-                    wrapper: '!mb-0',
-                  }"
-                /> -->
                 <img v-if="!!app.icon_url" :src="app.icon_url" class="w-[78px] h-[78px] rounded-full">
                 <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
                   <span class="font-medium text-gray-300">
@@ -177,8 +159,9 @@ onMounted(() => {
               <FormKit
                 v-model="displayStore.dialogCheckbox"
                 type="checkbox"
+                decorator-icon="check"
                 :label="displayStore.dialogOption?.checkboxText"
-                :classes="{ outer: 'mb-[0px]' }"
+                :classes="{ outer: 'mb-[0px]', inner: 'max-w-[18px]!' }"
               />
             </FormKit>
           </div>
@@ -191,7 +174,7 @@ onMounted(() => {
                 enterkeyhint="next"
                 validation="required:trim"
                 :classes="{
-                  outer: '!mb-0',
+                  outer: 'mb-0!',
                   input: 'text-center',
                   message: 'text-center',
                 }"
@@ -213,13 +196,13 @@ onMounted(() => {
               :key="i"
               :class="{
                 'btn btn-warning text-white': item.role === 'danger',
-                'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800': item.role !== 'cancel' && item.role !== 'danger',
-                'text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 border border-gray-200 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600': item.role === 'cancel',
+                'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800': item.role !== 'cancel' && item.role !== 'danger',
+                'text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-hidden focus:ring-blue-300 border border-gray-200 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600': item.role === 'cancel',
                 'ml-auto mr-2': displayStore.dialogOption?.buttonCenter && i === 0 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mr-auto ml-2': displayStore.dialogOption?.buttonCenter && i === (displayStore.dialogOption?.buttons?.length ?? 0) - 1 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mx-auto': displayStore.dialogOption?.buttonCenter && (displayStore.dialogOption?.buttons?.length ?? 0) === 1,
-                'my-1 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
-                'my-4 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
+                'my-1 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
+                'my-4 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
               @click="close(item)"
@@ -230,6 +213,6 @@ onMounted(() => {
         </div>
       </div>
     </dialog>
-    <div v-if="displayStore.showDialog" class="fixed inset-0 z-40 bg-black bg-opacity-50" @click="close()" />
+    <div v-if="displayStore.showDialog" class="fixed inset-0 z-40 bg-black/50" @click="close()" />
   </div>
 </template>

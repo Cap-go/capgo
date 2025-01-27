@@ -46,7 +46,7 @@ const { t } = useI18n()
         <!-- Header: Left side -->
         <div class="flex items-center">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
-            <button class="flex p-2 rounded hover:bg-slate-600 dark:hover:bg-slate-50 hover:text-white dark:hover:text-slate-500 text-slate-500 dark:text-white" @click="back()">
+            <button class="flex p-2 rounded-sm hover:bg-slate-600 dark:hover:bg-slate-50 hover:text-white dark:hover:text-slate-500 text-slate-500 dark:text-white" @click="back()">
               <IconBack class="w-6 h-6 fill-current" />
               <span class="hidden md:block">{{ t('button-back') }}</span>
             </button>

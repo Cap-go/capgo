@@ -3,7 +3,7 @@ import { Toaster } from 'vue-sonner'
 
 const toastOptions = ref({
   classes: {
-    toast: '!top-safe',
+    toast: 'top-safe!',
   },
 })
 </script>

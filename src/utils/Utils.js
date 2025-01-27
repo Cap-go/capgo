@@ -1,10 +1,3 @@
-import resolveConfig from 'tailwindcss/resolveConfig'
-
-export function tailwindConfig() {
-  // Tailwind config
-  return resolveConfig('../../tailwind.config.js')
-}
-
 export function registerWebsiteDomain() {
   if (import.meta.env.VITE_APP_URL.includes('web.capgo.app')) {
     return 'https://capgo.app'

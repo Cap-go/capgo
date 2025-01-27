@@ -347,7 +347,7 @@ const hightLights = computed<Stat[]>(() => ([
           <div class="flex items-center" @click="segmentVal = 'm'">
             <input
               id="monthly" type="radio" name="pricing-plans"
-              class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
               :checked="segmentVal === 'm'"
             >
             <label for="monthly" class="block ml-3 text-sm font-medium sm:text-base">
@@ -358,7 +358,7 @@ const hightLights = computed<Stat[]>(() => ([
           <div class="flex items-center" @click="segmentVal = 'y'">
             <input
               id="yearly" type="radio" name="pricing-plans"
-              class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
               :checked="segmentVal === 'y'"
             >
             <label for="yearly" class="block ml-3 text-sm font-medium sm:text-base">
@@ -370,7 +370,7 @@ const hightLights = computed<Stat[]>(() => ([
           </div>
         </div>
         <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-sm md:mt-0" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
+          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
             <div v-if="isRecommended(p)" class="absolute top-0 right-0 flex items-start -mt-8">
               <svg
                 class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -430,7 +430,7 @@ const hightLights = computed<Stat[]>(() => ([
               </h3>
               <ul class="mt-6 space-y-4">
                 <li v-for="(f, indexx) in planFeatures(p)" :key="indexx" class="flex space-x-3">
-                  <svg class="flex-shrink-0 w-5 h-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg class="w-5 h-5 text-green-500 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                   </svg>
                   <span class="text-sm text-gray-500 dark:text-gray-100">{{ f }}</span>
@@ -563,9 +563,9 @@ const hightLights = computed<Stat[]>(() => ([
                       </div>
                     </div>
 
-                    <div class="!mx-auto mt-10 md:mt-0">
+                    <div class="mx-auto! mt-10 md:mt-0">
                       <button
-                        class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
+                        class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black"
                         @click="openSupport()"
                       >
                         Get quote now

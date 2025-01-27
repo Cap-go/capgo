@@ -45,7 +45,7 @@ watchEffect(async () => {
         <TopApps :apps="props.apps" :header="t('top-apps-v2')" :delete-button="true" />
       </div>
     </div>
-    <button v-if="!stepsOpen && !isMobile" class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
+    <button v-if="!stepsOpen && !isMobile" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
       <plusOutline />
     </button>
   </div>

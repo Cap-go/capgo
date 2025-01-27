@@ -385,16 +385,16 @@ displayStore.defaultBack = '/app/home'
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
             <InfoRow v-for="key in keys" :key="key.id" :label="key.name" :value="key.mode.toUpperCase()" :is-link="false">
-              <button class="mx-1 text-center bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
+              <button class="mx-1 text-center bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
                 <ArrowPath class="mx-auto text-lg" />
               </button>
-              <button class="mx-1 bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="changeName(key)">
+              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="changeName(key)">
                 <Pencil class="mx-auto text-lg" />
               </button>
-              <button class="mx-1 bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="copyKey(key)">
+              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="copyKey(key)">
                 <Clipboard class="mx-auto text-lg" />
               </button>
-              <button class="mx-1 bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="deleteKey(key)">
+              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="deleteKey(key)">
                 <Trash class="mx-auto text-lg text-red-600" />
               </button>
             </InfoRow>
@@ -412,7 +412,7 @@ displayStore.defaultBack = '/app/home'
           </a>
         </div>
       </div>
-      <button class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
+      <button class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
         <plusOutline />
       </button>
     </div>
