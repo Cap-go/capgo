@@ -180,7 +180,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "3.14.0",
+    "@antfu/eslint-config": "3.16.0",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
     "@cloudflare/workers-types": "4.20250109.0",
