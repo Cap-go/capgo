@@ -41,8 +41,8 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 function getCaches() {
-  if (typeof globalThis['caches'] === 'object') {
-    return (globalThis['caches'] as any).default as {
+  if (typeof globalThis.caches === 'object') {
+    return (globalThis.caches as any).default as {
       match: (request: Request) => Promise<Response | undefined>
       put: (request: Request, response: Response) => Promise<void>
     }
@@ -68,7 +68,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       is_prod = true,
     } = body
     device_id = device_id.toLowerCase()
-
 
     const cache = getCaches()
     if (cache) {
