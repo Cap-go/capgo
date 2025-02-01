@@ -14,6 +14,8 @@ import { useOrganizationStore } from '~/stores/organization'
 import { useSupabase } from '~/services/supabase'
 import { Database } from '~/types/supabase.types'
 import { openCheckoutForOneOff } from '~/services/stripe'
+import { useRouter } from 'vue-router'
+import dayjs from 'dayjs'
 
 const pageType = 'mau'
 
@@ -26,9 +28,23 @@ const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const tokensHistory = ref<Database['public']['Functions']['get_tokens_history']['Returns']>([])
 const tokensSteps = ref<Database['public']['Tables']['capgo_tokens_steps']['Row'][]>([])
+const router = useRouter()
+const historyPage = ref(true)
+const expandedHashset = ref<Set<string>>(new Set())
+
 const totalTokens = computed(() => {
   return tokensHistory.value.reduce((acc, token) => acc + token.sum, 0)
 })
+
+const thankYouPage = ref(router.currentRoute.value.query.thankYou === 'true')
+
+const computedPrice = computed(() => {
+  return computePrice(tokensToBuy.value)
+})
+const computedPriceUp = computed(() => {
+  return Math.ceil(computedPrice.value)
+})
+
 
 Chart.register(
   Tooltip,
@@ -118,7 +134,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   },
 }))
 
-onMounted(async () => {
+async function loadData() {
   await organizationStore.fetchOrganizations()
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId) {
@@ -138,6 +154,14 @@ onMounted(async () => {
   }
   tokensHistory.value = tokensHistoryValue.data
   tokensSteps.value = tokensStepsValue.data
+}
+
+onMounted(async () => {
+  await loadData()
+})
+
+watch(thankYouPage, async () => {
+  await loadData()
 })
 
 function computePrice(howMany: number) {
@@ -159,6 +183,36 @@ function computePrice(howMany: number) {
   }
 }
 
+function computeTokens(euros: number): number {
+  if (euros <= 0 || !tokensSteps.value || tokensSteps.value.length === 0) {
+    return 0
+  }
+
+  let remainingEuros = euros
+  let totalTokens = 0
+  let i = 0
+
+  while (remainingEuros > 0 && i < tokensSteps.value.length) {
+    const step = tokensSteps.value[i]
+    const tokensInStep = step.step_max - step.step_min
+    const costForStep = tokensInStep * step.price_per_unit
+
+    if (remainingEuros >= costForStep) {
+      // Can buy all tokens in this step
+      totalTokens += tokensInStep
+      remainingEuros -= costForStep
+      i++
+    } else {
+      // Can only buy some tokens in this step
+      const tokensCanBuy = Math.floor(remainingEuros / step.price_per_unit)
+      totalTokens += tokensCanBuy
+      break
+    }
+  }
+
+  return totalTokens
+}
+
 async function buyTokens(howMany: number) {
   const orgId = organizationStore.currentOrganization!.gid
   if (!orgId) {
@@ -170,9 +224,17 @@ async function buyTokens(howMany: number) {
   openCheckoutForOneOff("", 'https://capgo.app', 'https://capgo.app', orgId, howMany)
 }
 
+function toMilion(price: number) {
+  return `${price / 1000000}M`
+}
+
+function formatTokens(tokens: number) {
+  return tokens % 1000000 === 0 && tokens > 0 ? toMilion(tokens) : tokens % 1000 === 0 && tokens > 0 ? `${tokens / 1000}K` : `${tokens}`
+}
+
 </script>
 <template>
-  <div class="h-full pb-8 overflow-y-auto grow md:pb-0">
+  <div v-if="!thankYouPage && !historyPage" class="h-full pb-8 overflow-y-auto grow md:pb-0">
     <div class="px-4 pt-6 mx-autolg:px-8 sm:px-6">
         <div class="sm:align-center sm:flex md:flex-col">
           <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
@@ -258,43 +320,28 @@ async function buyTokens(howMany: number) {
                     </div>
                     <div class="w-full flex-1 flex flex-col mt-4">
                       <div class="w-full h-fit flex flex-col items-center">
-                        <h2 class="text-sm 2xl:text-base font-semibold text-center">
+                        <h2 class="text-base 2xl:text-lg font-semibold text-center">
                           {{ t('how-many-tokens') }}
                         </h2>
-                      <input v-model="tokensToBuy" type="number" min="1" step="1" @input="tokensToBuy = Math.max(1, Math.floor(Math.abs(tokensToBuy)))" class="mt-2 bg-gray-700 rounded-full text-center text-white" />
-                        <div class="w-full flex flex-row items-center justify-center">
-                          <h2 class="mt-2 text-sm 2xl:text-base font-semibold text-center">
-                            {{ t('tokens-cost') }} {{ computePrice(tokensToBuy) }}$
-                          </h2>
-                        </div>
+                        <input v-model="tokensToBuy" type="number" min="1" step="1" @input="tokensToBuy = Math.max(1, Math.floor(Math.abs(tokensToBuy)))" class="mt-2 bg-gray-700 rounded-full text-center text-white" />
                       </div>
                       <div class="my-[9px] w-[70%] h-[3px] bg-base-100 mx-auto"></div>
-                      <div class="w-full h-full flex flex-col">
-                        <h2 class="text-sm 2xl:text-base font-semibold text-center">
-                          {{ t('this-will-allow-you-to') }}
-                        </h2>
-                        <ul class="mt-3 list-disc list-inside text-sm text-center">
-                          <li>
-                            {{ t('increase-mau-limit-by') }} {{ tokensToBuy * 1000 }}
-                          </li>
-                          <h3 class="text-xs text-center">
-                            {{ t('or') }}
-                          </h3>
-                          <li>
-                            {{ t('increase-storage-limit-by') }} {{ tokensToBuy * 10 }}{{ t('gb') }}
-                          </li>
-                          <h3 class="text-xs text-center">
-                            {{ t('or') }}
-                          </h3>
-                          <li>
-                            {{ t('increase-bandwidth-limit-by') }} {{ tokensToBuy * 15 }}{{ t('gb') }}
-                          </li>
-                        </ul>
+                      <div class="w-full h-full flex flex-row">
+                        <div class="w-full h-full mt-2 flex flex-col items-center">
+                          <h2 class="text-base 2xl:text-lg font-semibold text-center">
+                            {{ t('tokens-cost') }} {{ computedPriceUp }}$
+                          </h2>
+                          <div class="flex flex-row justify-center items-center">
+                            <h2 class="text-base 2xl:text-lg font-semibold text-center">
+                              {{ t(`it-will-increase-your-${pageType}-by`) }} {{ computeTokens(computedPriceUp) }}
+                            </h2>
+                            <CurrencyIcon class="ml-2 w-[30px] h-[30px]" />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div class="w-full h-full flex flex-col"></div>
                     <div class="flex items-center justify-center h-fit">
-                      <button class="bg-[#f8b324] text-white p-3 rounded-full aspect-square transform transition-transform hover:scale-120" @click="() => { buyTokens(tokensToBuy) }">
+                      <button class="bg-[#f8b324] text-white p-3 rounded-full aspect-square transform transition-transform hover:scale-120" @click="() => { buyTokens(computeTokens(computedPriceUp)) }">
                         <ShoppingCartIcon class="w-6 h-6" />
                       </button>
                     </div>
@@ -316,6 +363,61 @@ async function buyTokens(howMany: number) {
       </div>
     </div>
   </div>
+  <div v-else-if="thankYouPage" class="relative w-full overflow-hidden ">
+    <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
+      <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+      {{ t('thank-you-for-money') }}
+      <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
+      <router-link class="mt-[39.2vh]" to="/app/home">
+        <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
+      </router-link>
+      <button class="mx-auto mt-2" @click="() => { thankYouPage = false }">
+        <IconBack class="rotate-180 mb-2"></IconBack>
+      </button>
+    </div>
+  </div>
+  <div v-else-if="historyPage" class="w-full h-full">
+    <div class="px-4 pt-6 mx-autolg:px-8 sm:px-6 flex flex-col items-center h-full">
+      <div class="sm:align-center sm:flex md:flex-col">
+          <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
+            {{ t(`capgo-tokens-${pageType}-history`) }}
+          </h1>
+          <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
+          {{ t(`see-your`) }} {{ t(`tokens-key-${pageType}`) }} {{ t(`history`) }}<br>
+        </p>
+      </div>
+      <div class="w-full h-full flex flex-col items-center bg-base-100 rounded-4xl mt-3 mb-6 max-w-[38rem] overflow-y-auto">
+        <ol class="w-full my-6">
+          <li v-for="token in tokensHistory.toReversed()" :key="token.id">
+            <div class="flex flex-column justify-between bg-gray-800 mx-4 rounded-2xl mb-2" :class="{ 'h-14': !expandedHashset.has(token.id.toString()), 'h-24': expandedHashset.has(token.id.toString()) }" @click="() => { if (expandedHashset.has(token.id.toString())) { expandedHashset.delete(token.id.toString()) } else { expandedHashset.add(token.id.toString()) } }">
+              <div class="flex flex-col w-full">
+                <div class="flex flex-row w-full h-14 justify-between">
+                  <div class="flex items-center h-14">
+                    <h2 class="ml-2 text-base 2xl:text-lg font-semibold text-center" :class="[token.sum > 0 ? 'text-green-500' : 'text-red-500']">{{ token.sum > 0 ? '+' : '-'}}{{ formatTokens(token.sum) }}</h2>
+                  </div>
+                  <div class="flex items-center h-14">
+                    <h2 class="mx-auto text-base 2xl:text-lg font-semibold text-center">{{ token.reason }}</h2>
+                  </div>
+                  <div class="flex items-center h-14">
+                    <h2 class="mr-2 text-base 2xl:text-lg font-semibold text-center">{{ dayjs(token.created_at).format('DD/MM/YYYY') }}</h2>
+                  </div>
+                </div>
+                <div v-if="expandedHashset.has(token.id.toString())" class="flex flex-col w-full h-10 justify-between">
+                  <div class="flex flex-row items-center h-10">
+                    <h2 class="ml-2 text-base 2xl:text-lg font-semibold text-center">{{ t('total-tokens') }}: {{ formatTokens(token.running_total) }}</h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </div>
+      <button class="mx-auto mt-1 mb-2" @click="() => { thankYouPage = false }">
+        <IconBack class="rotate-180 mb-2"></IconBack>
+      </button>
+    </div>
+  </div>
+  <div v-else></div>
 </template>
 
 <route lang="yaml">
