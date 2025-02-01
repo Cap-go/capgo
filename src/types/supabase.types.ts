@@ -304,6 +304,71 @@ export type Database = {
         }
         Relationships: []
       }
+      capgo_tokens_history: {
+        Row: {
+          created_at: string
+          id: number
+          org_id: string
+          reason: string
+          sum: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          org_id: string
+          reason: string
+          sum: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          org_id?: string
+          reason?: string
+          sum?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capgo_tokens_history_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      capgo_tokens_steps: {
+        Row: {
+          created_at: string
+          id: number
+          price_id: string
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          price_id: string
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          price_id?: string
+          price_per_unit?: number
+          step_max?: number
+          step_min?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channel_devices: {
         Row: {
           app_id: string
@@ -1552,6 +1617,18 @@ export type Database = {
         Returns: {
           last_run: string
           next_run: string
+        }[]
+      }
+      get_tokens_history: {
+        Args: {
+          orgid: string
+        }
+        Returns: {
+          id: number
+          sum: number
+          reason: string
+          created_at: string
+          running_total: number
         }[]
       }
       get_total_app_storage_size_orgs: {

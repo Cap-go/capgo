@@ -20,9 +20,9 @@ const style = computed(() => ({ background: props.background }))
 
 <template>
   <div>
-    <div class="relative lg:mx-auto lg:max-w-5xl" :class="{ 'mt-12 lg:mt-20': !props.mini, 'mt-6 lg:mt-12': props.mini }">
+    <div class="relative lg:mx-auto lg:max-w-5xl" :class="{ 'mt-12 lg:mt-20': !props.mini && !props.rotate, 'mt-6 lg:mt-12': props.mini }">
       <div class="absolute -inset-2">
-        <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg animate_rotate" :style="style" />
+        <div class="w-full h-full mx-auto rounded-lg opacity-30 blur-lg" :style="style" :class="{ 'animate_rotate': props.rotate }" />
       </div>
 
       <div class="absolute rounded-xl from-cyan-500 to-purple-500 bg-linear-to-r -inset-px" />

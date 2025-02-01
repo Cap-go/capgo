@@ -14,6 +14,7 @@ import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 import type { FunctionalComponent } from 'vue'
 import type { SVGAttributes } from '@vue/runtime-dom'
+import CurrencyIcon from '~icons/heroicons/currency-euro'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -96,7 +97,7 @@ watchEffect(() => {
     organizationTabs.value.push(
       {
         label: 'tokens',
-        icon: IconCapgoToken,
+        icon: CurrencyIcon,
         key: '/dashboard/settings/organization/tokens',
       },
     )
@@ -142,22 +143,6 @@ function gotoMainSettings() {
 }
 
 displayStore.NavTitle = t('settings')
-
-const IconCapgoToken: FunctionalComponent<SVGAttributes> = () => h('svg', {
-  width: '200mm',
-  height: '200mm',
-  viewBox: '0 0 200 200',
-  xmlns: 'http://www.w3.org/2000/svg'
-}, [
-  h('path', {
-    d: 'M 114.10226,181.50245 V 18.497553',
-    style: 'fill:none;stroke:#90a1b9;stroke-width:25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers'
-  }),
-  h('path', {
-    d: 'M 156.73547,39.376185 C 110.69299,39.3761 54.204562,66.518336 54.204569,99.999995 54.204571,133.48166 110.693,160.6239 156.73547,160.62382',
-    style: 'fill:none;stroke:#90a1b9;stroke-width:25;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers'
-  })
-])
 </script>
 
 <template>

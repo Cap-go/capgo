@@ -30,6 +30,16 @@ select
     cron.schedule('Update insights', '22 1 * * *', $$SELECT http_post_helper('logsnag_insights', 'cloudflare', '{}'::jsonb)$$);
 SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_helper('cron_good_plan', '', '{}'::jsonb)$$);
 
+-- Seed the capgo_tokens_steps table with initial pricing tiers
+-- INSERT INTO capgo_tokens_steps (step_min, step_max, price_per_unit, price_id) VALUES
+--     (0, 100, 1.00, 'price_1QnHc0GH46eYKnWweRZjvNWL'),
+--     (100, 250, 0.80, 'price_1QnID2GH46eYKnWweJ1VAw0h'),
+--     (250, 2147483647, 0.50, 'price_1QnIDGGH46eYKnWwRc1HMo6h');
+INSERT INTO capgo_tokens_steps (step_min, step_max, price_per_unit, price_id) VALUES
+    (0, 1000000, 0.003, 'price_1QnNw3GH46eYKnWwZeX9U7pj'),
+    (1000000, 2000000,0.0024, 'price_1QnNwaGH46eYKnWwdJcMNxk5'),
+    (2000000, 3000000,0.0022, 'price_1QnNwxGH46eYKnWwEziZZzuR');
+
 -- Seed data
 select reset_and_seed_data();
 select reset_and_seed_stats_data();

@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
+import Stripe from 'stripe'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
@@ -20,6 +21,47 @@ app.post('/', async (c: Context) => {
     // event.headers
     const body = await c.req.text()
     const stripeEvent = await parseStripeEvent(c, body, signature!)
+    
+    // Special handling for one-off charges
+    if (stripeEvent.type === 'payment_intent.succeeded') {
+      const paymentIntent = stripeEvent.data.object as Stripe.PaymentIntent
+      if (paymentIntent.object === 'payment_intent') {
+        // Get the customer details
+        const customerId = typeof paymentIntent.customer === 'string' ? paymentIntent.customer : paymentIntent.customer?.id
+        const { data: org, error: orgError } = await supabaseAdmin(c)
+          .from('orgs')
+          .select('id')
+          .eq('customer_id', customerId ?? '')
+          .single()
+
+        if (!org || orgError) {
+          console.log({ requestId: c.get('requestId'), context: 'no org found for payment intent', paymentIntent })
+          return c.json({ received: false })
+        }
+
+        const howMany = paymentIntent.metadata?.howMany
+        if (!howMany) {
+          console.log({ requestId: c.get('requestId'), context: 'no howMany found for payment intent', paymentIntent })
+          return c.json({ received: false })
+        }
+
+        // Log the purchase
+        await LogSnag.track({
+          channel: 'usage', 
+          event: 'One-off Purchase',
+          icon: '💰',
+          user_id: org.id,
+          notify: true,
+          tags: {
+            amount: `${paymentIntent.amount / 100} ${paymentIntent.currency.toUpperCase()}`,
+            payment_intent: paymentIntent.id,
+          },
+        }).catch()
+
+        return c.json({ received: true })
+      }
+    }
+
     const stripeDataEvent = extractDataEvent(c, stripeEvent)
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '')

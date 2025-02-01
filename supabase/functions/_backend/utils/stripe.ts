@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
 import { existInEnv, getEnv } from './utils.ts'
+import { supabaseAdmin } from './supabase.ts';
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
@@ -119,13 +120,68 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     line_items: [
       {
         price: prices.priceId,
-        quantity: 1,
+        quantity: howMany ?? 1,
       },
       ...prices.meteredIds.map(priceId => ({
         price: priceId,
       })),
     ],
   })
+  return { url: session.url }
+}
+
+export async function createCheckoutForOneOff(c: Context, customerId: string, successUrl: string, cancelUrl: string, howMany: number) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { url: '' }
+  const { data: tokensSteps, error } = await supabaseAdmin(c).from('capgo_tokens_steps').select('*').order('step_min', { ascending: true })
+  if (error)
+    return { url: '' }
+
+  let i = 0
+  const prices = []
+
+  while (true) {
+    const step = tokensSteps[i]
+    const howManyInStep = Math.min(howMany, step.step_max) - Math.max(0, step.step_min)
+    prices.push({
+      quantity: 1,
+      price_data: {
+        unit_amount: step.price_per_unit * howManyInStep * 100,
+        currency: 'usd',
+        product_data: {
+          name: `${howManyInStep} tokens`,
+          description: `Price per token: ${step.price_per_unit} between ${step.step_min} and ${step.step_max}`,
+        },
+      },
+    })
+    if (howMany >= step.step_min && howMany <= step.step_max) {
+      break
+    }
+    i++
+  }
+
+  console.log({ requestId: c.get('requestId'), context: 'prices', prices })
+
+  const req = {
+    customer: customerId,
+    success_url: successUrl,
+    mode: 'payment',
+    cancel_url: cancelUrl,
+    automatic_tax: { enabled: true },
+    customer_update: {
+      address: 'auto',
+      name: 'auto',
+    },
+    payment_method_types: ['card'],
+    payment_intent_data: {
+      metadata: {
+        howMany,
+      },
+    },
+    line_items: prices,
+  }
+  console.log({ requestId: c.get('requestId'), context: 'req', req })
+  const session = await getStripe(c).checkout.sessions.create(req)
   return { url: session.url }
 }
 
