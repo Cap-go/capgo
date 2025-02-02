@@ -17,8 +17,13 @@ app.get('/', async (c: Context) => {
       .select()
       .eq('date_id', date_id)
       .single()
-    if (data && !error)
-      return c.json(data)
+    if (data && !error) {
+      return c.json({
+        apps: data.apps,
+        updates: (data.updates_last_month ?? 0) + (data.updates_external ?? 0),
+        stars: data.stars,
+      })
+    }
     console.log({ requestId: c.get('requestId'), context: 'Supabase error:', error })
     return c.json({
       apps: 750,

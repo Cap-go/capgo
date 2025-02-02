@@ -22,7 +22,7 @@ BEGIN
   select count(*) from daily_bandwidth where app_id='com.demo.app' into bandwidth_count;
   RETURN NEXT ok(bandwidth_count > 0, 'Demo app bandwith is > 0');
 
-  raise notice '%', mau_count;
+  -- raise notice '%', mau_count;
 
   FOR plan IN
     SELECT * FROM plans

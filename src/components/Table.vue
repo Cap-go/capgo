@@ -185,13 +185,13 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
   <div class="pb-4 overflow-x-auto md:pb-0 min-h-[300px]">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
+        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('reset')">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
         <div v-if="filterText && filterList.length" class="dropdown">
-          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700">
+          <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               <!-- uppercase first letter in tailwind -->
               {{ filterActivated }}
@@ -200,20 +200,20 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden m-1 ml-2 md:block" />
           </button>
-          <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow">
+          <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-1 w-52 p-2 shadow">
             <li v-for="(f, i) in filterList" :key="i">
-              <div class="flex items-center p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
+              <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">
-                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
+                <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
               </div>
             </li>
           </ul>
         </div>
       </div>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class="self-end ml-auto mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
+      <button v-if="props.massSelect && selectedRows.find(val => val)" class="self-end ml-auto mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
         <span class="text-sm">{{ t('select_all') }}</span>
       </button>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('massDelete')">
+      <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
       <!-- </div> -->
@@ -224,8 +224,8 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
           :prefix-icon="IconSearch" :disabled="isLoading"
           enterkeyhint="send"
           :classes="{
-            outer: '!mb-0 md:w-96',
-            inner: '!rounded-full',
+            outer: 'mb-0! md:w-96',
+            inner: 'rounded-full!',
           }"
         />
       </div>
@@ -286,7 +286,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         </tbody>
       </table>
     </div>
-    <!-- <kList class="block !my-0 md:hidden">
+    <!-- <kList class="block my-0! md:hidden">
       <kListItem
         v-for="(elem, i) in elementList" :key="i"
         :title="displayValueKey(elem, findMobileCol('title'))"

@@ -2,7 +2,8 @@ const API_TOKEN = '***'
 const API_SECRET = '***'
 
 // Recreating a basic auth with Scriptable lib
-const auth = `Basic ${btoa(`${API_TOKEN}:${API_SECRET}`)}`
+const authToken = `${API_TOKEN}:${API_SECRET}`
+const auth = `Basic ${btoa(authToken)}`
 const currentYear = new Date().getFullYear()
 const startDate = `${currentYear}-01-01`
 const endDate = `${currentYear}-12-31`

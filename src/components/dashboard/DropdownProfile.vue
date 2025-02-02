@@ -4,8 +4,8 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { openMessenger } from '~/services/bento'
 import { isSpoofed, saveSpoof, unspoofUser, useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -25,10 +25,6 @@ const acronym = computed(() => {
   return res.toUpperCase()
 })
 const isLoading = ref(false)
-
-function openSupport() {
-  openMessenger()
-}
 
 async function openLogAsDialog() {
   let userId = ''

@@ -6,7 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import Backward from '~icons/heroicons/backward'
+import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
@@ -153,8 +153,10 @@ async function saveChannelChange(key: string, val: any) {
       .update(update)
       .eq('id', id.value)
     reload()
-    if (error)
+    if (error) {
+      toast.error(t('error-update-channel'))
       console.error('no channel update', error)
+    }
   }
   catch (error) {
     console.error(error)
@@ -287,7 +289,7 @@ async function openPannel() {
     return
   }
   displayStore.dialogOption = {
-    header: t('unlink-bundle'),
+    header: `${t('unlink-bundle')} ${channel.value.version.name}`,
     headerStyle: 'w-full text-center',
     size: 'max-w-fit px-12',
     buttonCenter: true,
@@ -393,6 +395,26 @@ async function handleRevertToBuiltin() {
   }
   displayStore.showDialog = true
 }
+
+async function handleLink(appVersion: Database['public']['Tables']['app_versions']['Row']) {
+  if (!channel.value)
+    return
+  await saveChannelChange('version', appVersion.id)
+  toast.success(t('linked-bundle'))
+}
+
+function openSelectVersion() {
+  displayStore.showBundleLinkDialogCallbacks = {
+    onRevert: handleRevertToBuiltin,
+    onUnlink: async () => {
+      openPannel()
+    },
+    onLink: async (appVersion: Database['public']['Tables']['app_versions']['Row']) => {
+      await handleLink(appVersion)
+    },
+  }
+  displayStore.showBundleLinkDialogChannel = channel.value as any // YOLO, if this doesn't work, we don't care
+}
 </script>
 
 <template>
@@ -408,16 +430,13 @@ async function handleRevertToBuiltin() {
           <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'">
             <div class="flex items-center">
               <span @click="openBundle()">{{ channel.version.name }}</span>
-              <button v-if="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'" @click="handleRevertToBuiltin()">
-                <Backward class="w-6 h-6 ml-1" />
+              <button v-if="channel" @click="openSelectVersion()">
+                <Settings class="w-6 h-6 ml-1 text-[#3B82F6]" />
               </button>
             </div>
           </InfoRow>
           <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
             {{ channel.version.min_update_version ?? t('undefined-fail') }}
-          </InfoRow>
-          <InfoRow :label="t('bundle-number')" :is-link="true" @click="openBundle()">
-            {{ channel.version.name }}
           </InfoRow>
           <!-- Created At -->
           <InfoRow :label="t('created-at')">

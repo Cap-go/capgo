@@ -13,9 +13,9 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
-import { openMessenger } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { autoAuth, useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
 const route = useRoute('/login')
@@ -31,10 +31,6 @@ const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 const version = import.meta.env.VITE_APP_VERSION
-
-function openSupport() {
-  openMessenger()
-}
 
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {
@@ -284,7 +280,7 @@ onMounted(checkLogin)
   <section class="flex w-full h-full py-10 my-auto overflow-y-auto lg:py-2 sm:py-8">
     <div class="px-4 mx-auto my-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="max-w-2xl mx-auto text-center">
-        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded invert dark:invert-0">
+        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded-sm invert dark:invert-0">
         <h1 class="text-3xl font-bold leading-tight text-black lg:text-5xl sm:text-4xl dark:text-white">
           {{ t('welcome-to') }} <p class="inline font-prompt">
             Capgo
@@ -331,7 +327,7 @@ onMounted(checkLogin)
                     </svg>
                     <button
                       v-if="!isLoading" type="submit"
-                      class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
+                      class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
                     >
                       {{ t('log-in') }}
                     </button>
@@ -412,7 +408,7 @@ onMounted(checkLogin)
                     </svg>
                     <button
                       v-if="!isLoading" type="submit"
-                      class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-none"
+                      class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
                     >
                       {{ t('verify') }}
                     </button>

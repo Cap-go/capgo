@@ -163,9 +163,9 @@ async function createNewOrg() {
         <div class="w-4/5 text-left truncate">
           {{ currentOrganization?.name }}
         </div>
-        <IconDown class="flex-shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
+        <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
-      <ul class="dropdown-content dark:bg-base-100 bg-white rounded-box z-[1] w-52 p-2 shadow" @click="closeDropdown()">
+      <ul class="dropdown-content dark:bg-base-100 bg-white rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
         <li v-for="org in organizationStore.organizations" :key="org.gid" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
           <a
             class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"

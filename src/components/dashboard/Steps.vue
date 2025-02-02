@@ -3,7 +3,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
-import { pushEvent } from '~/services/bento'
+import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
@@ -228,7 +228,7 @@ watchEffect(async () => {
 
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
-              <div class="inline-flex items-center justify-center flex-shrink-0 text-xl font-bold text-white font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
+              <div class="inline-flex items-center justify-center shrink-0 text-xl font-bold text-white font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
@@ -244,7 +244,7 @@ watchEffect(async () => {
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
-                  <button v-else-if="s.link" class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-none focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" @click="openExt(s.link)">
+                  <button v-else-if="s.link" class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" @click="openExt(s.link)">
                     {{ t('open') }}
                   </button>
                 </div>
@@ -256,7 +256,7 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <button v-if="!onboarding" class="fixed z-20 bg-gray-800 btn btn-lg btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
+  <button v-if="!onboarding" class="fixed z-20 bg-gray-800 btn btn-xl btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
     <arrowBack />
   </button>
 </template>

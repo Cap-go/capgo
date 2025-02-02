@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
-import { bentoLoader } from '~/services/bento'
 import { posthogLoader } from '~/services/posthog'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
+const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleLinkDialog.vue'))
 onMounted(() => {
-  bentoLoader()
   posthogLoader()
 })
 </script>
@@ -16,5 +15,6 @@ onMounted(() => {
     <RouterView class="h-full overflow-hidden" />
     <Toast />
     <Dialog />
+    <BundleLinkDialog />
   </div>
 </template>

@@ -1,5 +1,4 @@
 import type { UserModule } from '~/types'
-import { setUser } from '~/services/bento'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -63,11 +62,6 @@ async function guard(next: any, to: string, from: string) {
       user_id: main.user.id,
       notify: false,
     }).catch()
-    setUser(main.user.id, {
-      nickname: `${main.user.first_name ?? ''} ${main.user.last_name ?? ''}`,
-      email: main.user.email,
-      avatar: main.user.image_url || '',
-    })
 
     if ((!main.auth?.user_metadata?.activation || !main.auth?.user_metadata?.activation.legal) && !to.includes('/onboarding') && !from.includes('/onboarding'))
       next('/onboarding/activation')

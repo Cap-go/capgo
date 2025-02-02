@@ -1,8 +1,10 @@
-@import url(https://fonts.bunny.net/css?family=inter:100,200,300,400,500,600,700,800,900|prompt:100,200,300,400,500,600,700,800,900);
+@import url(https://fonts.bunny.net/css?family=inter:100,200,300,400,500,600,700,800,900|prompt:100,200,300,400,500,600,700,800,900)
+layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@plugin "daisyui";
+
+@config '../../tailwind.config.js';
 
 
 @font-face {
@@ -49,7 +51,7 @@ html {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: theme('colors.gray.900');
+  background-color: var(--color-gray-900);
   z-index: 100;
   background-image: url('/capgo.webp');
   background-repeat: no-repeat;
@@ -59,8 +61,8 @@ html {
 }
 
 #confirm-button {
-  background-color: theme('colors.red.500');
-  color: theme('colors.white');
+  background-color: var(--color-red-500);
+  color: var(--color-white);
 }
 
 #the-stunning-bar p {

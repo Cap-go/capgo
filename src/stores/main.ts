@@ -3,7 +3,6 @@ import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
-import { reset } from '~/services/bento'
 import { getCurrentDayMonth } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import {

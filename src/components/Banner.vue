@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import type { Organization } from '~/stores/organization'
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { urlToAppId } from '~/services/conversion'
 
+import { urlToAppId } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
-import { type Organization, useOrganizationStore } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 defineProps({
   text: { type: String, default: '' },

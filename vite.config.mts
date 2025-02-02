@@ -1,6 +1,7 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import VueI18n from '@intlify/unplugin-vue-i18n/vite'
+import tailwindcss from '@tailwindcss/vite'
 import Vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import formkit from 'unplugin-formkit/vite'
@@ -30,7 +31,7 @@ function getUrl(key = 'base_domain'): string {
 }
 
 const locales: string[] = []
-readdirSync('./locales/')
+readdirSync('./messages/')
   .forEach((file) => {
     if (file.split('.')[0] !== 'README')
       locales.push(file.split('.')[0])
@@ -46,6 +47,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    tailwindcss(),
     formkit({}),
 
     VueMacros({

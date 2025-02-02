@@ -22,6 +22,8 @@ export interface ActionSheetOption {
   buttonVertical?: boolean
   preventAccidentalClose?: boolean
   checkboxText?: string
+  checkboxStyle?: string
+  listApps?: Database['public']['Tables']['apps']['Row'][]
   listOrganizations?: boolean
   buttons?: ActionSheetOptionButton[]
 }
@@ -36,12 +38,23 @@ export const useDisplayStore = defineStore('display', () => {
   const toastOption = ref<ActionSheetOption>()
   const dialogCanceled = ref<boolean>(false)
   const showDialog = ref<boolean>(false)
+  const showBundleLinkDialogChannel = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
+  const showBundleLinkDialogCallbacks = ref<{
+    onUnlink: () => Promise<void>
+    onRevert: () => Promise<void>
+    onLink: (appVersion: Database['public']['Tables']['app_versions']['Row']) => Promise<void>
+  }>({
+        onUnlink: () => Promise.resolve(),
+        onRevert: () => Promise.resolve(),
+        onLink: () => Promise.resolve(),
+      })
   const NavTitle = ref<string>('')
   const defaultBack = ref<string>('')
   const messageToast = ref<string[]>([])
   const durationToast = ref<number>(2000)
   const lastButtonRole = ref<string>('')
   const selectedOrganizations = ref<string[]>([])
+  const selectedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
   const dialogInputText = ref('')
   const dialogCheckbox = ref<boolean>(false)
   const onDialogDismiss = (): Promise<boolean> => {
@@ -57,6 +70,10 @@ export const useDisplayStore = defineStore('display', () => {
     })
   }
 
+  const unsetDialogCheckbox = () => {
+    dialogCheckbox.value = false
+  }
+
   return {
     onDialogDismiss,
     dialogCanceled,
@@ -70,7 +87,11 @@ export const useDisplayStore = defineStore('display', () => {
     defaultBack,
     dialogInputText,
     dialogCheckbox,
+    unsetDialogCheckbox,
+    selectedApps,
     selectedOrganizations,
+    showBundleLinkDialogChannel,
+    showBundleLinkDialogCallbacks,
   }
 })
 

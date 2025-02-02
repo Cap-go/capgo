@@ -15,8 +15,10 @@ app.post('/', middlewareKey(['all']), async (c) => {
   }
 
   const orgId = c.req.query('org_id')
-  if (!orgId) {
-    return c.json({ error: 'Org ID is required' }, 400)
+  const appId = c.req.query('app_id')
+
+  if (!orgId && !appId) {
+    return c.json({ error: 'Org ID or App ID is required' }, 400)
   }
 
   const mode = c.req.query('mode')
@@ -29,25 +31,49 @@ app.post('/', middlewareKey(['all']), async (c) => {
   }
 
   const supabase = supabaseAdmin(c)
-  const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
-  if (!org || error) {
-    return c.json({ error: 'Org not found', supabaseError: error }, 404)
+  if (orgId) {
+    const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
+    if (!org || error) {
+      return c.json({ error: 'Org not found', supabaseError: error }, 404)
+    }
+
+    const apikey = crypto.randomUUID()
+    const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys').insert({
+      user_id: key.user_id,
+      key: apikey,
+      mode,
+      name: '',
+      limited_to_orgs: [org.id],
+    }).select().single()
+
+    if (apikeyError) {
+      return c.json({ error: 'Failed to create API key', supabaseError: apikeyError }, 500)
+    }
+
+    return c.json({ apikey: apikeyData })
   }
+  else if (appId) {
+    const { data: app, error } = await supabase.from('apps').select('*').eq('id', appId).single()
+    if (!app || error) {
+      return c.json({ error: 'App not found', supabaseError: error }, 404)
+    }
 
-  const apikey = crypto.randomUUID()
-  const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys').insert({
-    user_id: key.user_id,
-    key: apikey,
-    mode,
-    name: '',
-    limited_to_orgs: [org.id],
-  }).select().single()
+    const apikey = crypto.randomUUID()
+    const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys').insert({
+      user_id: key.user_id,
+      key: apikey,
+      mode,
+      name: '',
+      limited_to_orgs: [app.owner_org],
+      limited_to_apps: [app.app_id],
+    }).select().single()
 
-  if (apikeyError) {
-    return c.json({ error: 'Failed to create API key', supabaseError: apikeyError }, 500)
+    if (apikeyError) {
+      return c.json({ error: 'Failed to create API key', supabaseError: apikeyError }, 500)
+    }
+
+    return c.json({ apikey: apikeyData })
   }
-
-  return c.json({ apikey: apikeyData })
 })
 
 app.delete('/:id', middlewareKey(['all']), async (c) => {
