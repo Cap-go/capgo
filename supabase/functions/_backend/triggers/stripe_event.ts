@@ -40,8 +40,23 @@ app.post('/', async (c: Context) => {
         }
 
         const howMany = paymentIntent.metadata?.howMany
-        if (!howMany) {
+        const parsedHowMany = parseInt(howMany ?? '0')
+        if (!howMany || Number.isNaN(parsedHowMany)) {
           console.log({ requestId: c.get('requestId'), context: 'no howMany found for payment intent', paymentIntent })
+          return c.json({ received: false })
+        }
+
+        const { error: dbError } = await supabaseAdmin(c)
+          .from('capgo_tokens_history')
+          .insert({
+            sum: Number(parsedHowMany),
+            reason: 'MAU purchase',
+            org_id: org.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        if (dbError) {
+          console.log({ requestId: c.get('requestId'), context: 'error inserting capgo_tokens_history', dbError })
           return c.json({ received: false })
         }
 

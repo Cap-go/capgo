@@ -129,6 +129,9 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   })
   return { url: session.url }
 }
+function toMilion(price: number) {
+  return `${price / 1000000}M`
+}
 
 export async function createCheckoutForOneOff(c: Context, customerId: string, successUrl: string, cancelUrl: string, howMany: number) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
@@ -143,14 +146,27 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
   while (true) {
     const step = tokensSteps[i]
     const howManyInStep = Math.min(howMany, step.step_max) - Math.max(0, step.step_min)
+    const description = step.step_min > 0
+      ? step.step_max !== 9223372036854775807
+        ? `Price per token: ${step.price_per_unit} between ${toMilion(step.step_min)} and ${toMilion(step.step_max)}`
+        : `Price per token: ${step.price_per_unit} after ${toMilion(step.step_min)}`
+      : `Price per token: ${step.price_per_unit} up to ${toMilion(step.step_max)}`
+
+    const formatedAmmount = 
+      howManyInStep % 1000000 === 0 && howManyInStep > 0 ? 
+        toMilion(howManyInStep) : 
+        howManyInStep % 1000 === 0 && howManyInStep > 0 ? 
+          `${howManyInStep / 1000}K` : 
+          `${howManyInStep}`
+
     prices.push({
       quantity: 1,
       price_data: {
-        unit_amount: step.price_per_unit * howManyInStep * 100,
+        unit_amount: Math.ceil(step.price_per_unit * howManyInStep * 100),
         currency: 'usd',
         product_data: {
-          name: `${howManyInStep} tokens`,
-          description: `Price per token: ${step.price_per_unit} between ${step.step_min} and ${step.step_max}`,
+          name: `${formatedAmmount} tokens`,
+          description,
         },
       },
     })
@@ -160,19 +176,21 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
     i++
   }
 
+  const totalPrice = prices.reduce((acc, price) => acc + price.price_data.unit_amount, 0)
+  if (totalPrice % 100 !== 0) {
+    console.log({ requestId: c.get('requestId'), context: 'totalPrice', error: 'totalPrice is not divisible by 100' })
+    return { url: '' }
+  }
+
   console.log({ requestId: c.get('requestId'), context: 'prices', prices })
 
   const req = {
     customer: customerId,
     success_url: successUrl,
-    mode: 'payment',
+    mode: 'payment' as const,
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
-    customer_update: {
-      address: 'auto',
-      name: 'auto',
-    },
-    payment_method_types: ['card'],
+    payment_method_types: ['card' as const],
     payment_intent_data: {
       metadata: {
         howMany,

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import CurrencyIcon from '~icons/heroicons/currency-euro'
 import ShoppingCartIcon from '~icons/heroicons/shopping-cart'
 import CalculatorIcon from '~icons/heroicons/calculator'
 
@@ -36,8 +35,8 @@ const { t } = useI18n();
     <div class="flex-grow"></div>
     <div class="flex items-center justify-center h-fit mb-[10%]">
       <button @click="$emit('click')" class="bg-[#f8b324] text-white p-3 rounded-full aspect-square transform transition-transform hover:scale-120">
-        <CalculatorIcon v-if="custom" class="w-6 h-6" />
-        <ShoppingCartIcon v-else class="w-6 h-6" />
+        <CalculatorIcon v-if="custom" class="w-6 h-6 text-black" />
+        <ShoppingCartIcon v-else class="w-6 h-6 text-black" />
       </button>
     </div>
   </div>

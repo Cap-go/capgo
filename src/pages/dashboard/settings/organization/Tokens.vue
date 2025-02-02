@@ -15,8 +15,11 @@ import { useSupabase } from '~/services/supabase'
 import { Database } from '~/types/supabase.types'
 import { openCheckoutForOneOff } from '~/services/stripe'
 import { useRouter } from 'vue-router'
+import IcBaselineInfo from '~icons/ic/baseline-info'
 import dayjs from 'dayjs'
+import { useDisplayStore } from '~/stores/display'
 
+// Hiragino Sans Bold is the font for the icon of MAU
 const pageType = 'mau'
 
 const { t } = useI18n()
@@ -29,8 +32,9 @@ const supabase = useSupabase()
 const tokensHistory = ref<Database['public']['Functions']['get_tokens_history']['Returns']>([])
 const tokensSteps = ref<Database['public']['Tables']['capgo_tokens_steps']['Row'][]>([])
 const router = useRouter()
-const historyPage = ref(true)
+const historyPage = ref(false)
 const expandedHashset = ref<Set<string>>(new Set())
+const displayStore = useDisplayStore()
 
 const totalTokens = computed(() => {
   return tokensHistory.value.reduce((acc, token) => acc + token.sum, 0)
@@ -98,9 +102,11 @@ watch(tokensHistory, () => {
   
   // Iterate through each day
   for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
-    const change = tokensChanges.find(token => token.date.getDate() === d.getDate() && token.date.getMonth() === d.getMonth() && token.date.getFullYear() === d.getFullYear())
+    const change = tokensChanges
+      .filter(token => token.date.getDate() === d.getDate() && token.date.getMonth() === d.getMonth() && token.date.getFullYear() === d.getFullYear())
+      .reduce((acc, token) => acc + token.change, 0)
     if (change) {
-      lastToken += change.change
+      lastToken += change
     }
     data.push(lastToken)
   }
@@ -162,6 +168,10 @@ onMounted(async () => {
 
 watch(thankYouPage, async () => {
   await loadData()
+})
+
+watch(tokensHistory, async () => {
+  expandedHashset.value = new Set()
 })
 
 function computePrice(howMany: number) {
@@ -229,27 +239,47 @@ function toMilion(price: number) {
 }
 
 function formatTokens(tokens: number) {
-  return tokens % 1000000 === 0 && tokens > 0 ? toMilion(tokens) : tokens % 1000 === 0 && tokens > 0 ? `${tokens / 1000}K` : `${tokens}`
+  return tokens % 1000000 === 0 && tokens !== 0 ? toMilion(tokens) : tokens % 1000 === 0 && tokens !== 0 ? `${tokens / 1000}K` : `${tokens}`
+}
+
+function explainTokens() {
+  displayStore.dialogOption = {
+    header: t(`tokens-explanation-${pageType}`),
+    message: t(`tokens-explanation-message-${pageType}`),
+    textStyle: 'mb-2',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+    ],
+  }
+  displayStore.showDialog = true
 }
 
 </script>
 <template>
   <div v-if="!thankYouPage && !historyPage" class="h-full pb-8 overflow-y-auto grow md:pb-0">
     <div class="px-4 pt-6 mx-autolg:px-8 sm:px-6">
-        <div class="sm:align-center sm:flex md:flex-col">
+        <div class="sm:align-center flex flex-col">
           <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
             {{ t(`capgo-tokens-${pageType}`) }}
           </h1>
-          <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
-          {{ t(`manage-your`) }} {{ t(`capgo-tokens-${pageType}`) }} {{ t(`here`) }}<br>
-        </p>
+          <div class="flex flex-row items-center justify-center mt-5">
+            <p class="text-xl text-gray-700 sm:text-center dark:text-white">
+              {{ t(`manage-your`) }} {{ t(`capgo-tokens-${pageType}`) }} {{ t(`here`) }}
+            </p>
+            <button @click="() => { explainTokens() }">
+              <IcBaselineInfo class="w-5 h-5 ml-2" />
+            </button>
+          </div>
       </div>
       <div class="flex items-center justify-center mt-12 space-x-6">
         <BlurBg background="linear-gradient(90deg, #44ff9a -0.55%, #44b0ff 22.86%, #8b44ff 48.36%, #ff6644 73.33%, #ebff70 99.34%)" rotate>
           <div class="flex items-center justify-center p-5">
             <CurrencyIcon class="w-32 h-32" />
             <h1 class="ml-7 text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
-              {{ totalTokens }}
+              {{ formatTokens(totalTokens) }}
             </h1>
           </div>
         </BlurBg>
@@ -267,7 +297,7 @@ function formatTokens(tokens: number) {
               <div class="w-[90%] h-96 mt-[1rem] mx-auto">
                 <Line :data="chartData" :options="chartOptions"></Line>
               </div>
-              <button class="w-48 h-8 mt-4 text-gray-900 rounded-full mx-auto bg-[#f8b324]">
+              <button class="w-48 h-8 mt-4 text-gray-900 rounded-full mx-auto bg-[#f8b324]" @click="() => { historyPage = true }">
                 <div class="flex items-center justify-center">
                   {{ t('show-full-history') }}
                   <BookOpen class="w-4 h-4 ml-2" />
@@ -289,7 +319,7 @@ function formatTokens(tokens: number) {
           <div class="w-full bg-gray-700  rounded-br-4xl rounded-bl-4xl " @click.capture="() => { if (!buyTokensExpanded) buyTokensExpanded = !buyTokensExpanded }">
             <ArrowDown v-if="!buyTokensExpanded" class="mx-auto"></ArrowDown>
             <div v-else class="flex flex-col h-[32rem]">
-              <div class="w-[90%] h-[26rem] mt-[1rem] flex flex-row mx-auto">
+              <div class="w-[90%] h-[27rem] mt-[1rem] flex flex-row mx-auto">
                 <template v-if="!calculatorOpen">
                   <div class="w-1/2 h-full mr-3">
                     <div class="flex flex-col h-full w-full">
@@ -341,8 +371,11 @@ function formatTokens(tokens: number) {
                       </div>
                     </div>
                     <div class="flex items-center justify-center h-fit">
-                      <button class="bg-[#f8b324] text-white p-3 rounded-full aspect-square transform transition-transform hover:scale-120" @click="() => { buyTokens(computeTokens(computedPriceUp)) }">
-                        <ShoppingCartIcon class="w-6 h-6" />
+                      <button class="w-24 h-8 mt-4 text-gray-900 rounded-full mx-auto bg-[#f8b324] transform transition-transform hover:scale-120" @click="() => { historyPage = true }">
+                        <div class="flex items-center justify-center">
+                          {{ t('buy') }}
+                          <ShoppingCartIcon class="w-4 h-4 ml-2" />
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -378,7 +411,7 @@ function formatTokens(tokens: number) {
   </div>
   <div v-else-if="historyPage" class="w-full h-full">
     <div class="px-4 pt-6 mx-autolg:px-8 sm:px-6 flex flex-col items-center h-full">
-      <div class="sm:align-center sm:flex md:flex-col">
+      <div class="sm:align-center sm:flex md:flex-col mb-2">
           <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
             {{ t(`capgo-tokens-${pageType}-history`) }}
           </h1>
@@ -386,14 +419,14 @@ function formatTokens(tokens: number) {
           {{ t(`see-your`) }} {{ t(`tokens-key-${pageType}`) }} {{ t(`history`) }}<br>
         </p>
       </div>
-      <div class="w-full h-full flex flex-col items-center bg-base-100 rounded-4xl mt-3 mb-6 max-w-[38rem] overflow-y-auto">
-        <ol class="w-full my-6">
+      <div class="w-full h-full flex flex-col items-center bg-base-100 rounded-4xl border-12 border-base-100 py-2 max-w-[38rem] overflow-y-auto">
+        <ol v-if="tokensHistory.length > 0" class="w-full">
           <li v-for="token in tokensHistory.toReversed()" :key="token.id">
             <div class="flex flex-column justify-between bg-gray-800 mx-4 rounded-2xl mb-2" :class="{ 'h-14': !expandedHashset.has(token.id.toString()), 'h-24': expandedHashset.has(token.id.toString()) }" @click="() => { if (expandedHashset.has(token.id.toString())) { expandedHashset.delete(token.id.toString()) } else { expandedHashset.add(token.id.toString()) } }">
               <div class="flex flex-col w-full">
                 <div class="flex flex-row w-full h-14 justify-between">
                   <div class="flex items-center h-14">
-                    <h2 class="ml-2 text-base 2xl:text-lg font-semibold text-center" :class="[token.sum > 0 ? 'text-green-500' : 'text-red-500']">{{ token.sum > 0 ? '+' : '-'}}{{ formatTokens(token.sum) }}</h2>
+                    <h2 class="ml-2 text-base 2xl:text-lg font-semibold text-center" :class="[token.sum > 0 ? 'text-green-500' : 'text-red-500']">{{ token.sum > 0 ? '+' : ''}}{{ formatTokens(token.sum) }}</h2>
                   </div>
                   <div class="flex items-center h-14">
                     <h2 class="mx-auto text-base 2xl:text-lg font-semibold text-center">{{ token.reason }}</h2>
@@ -411,8 +444,13 @@ function formatTokens(tokens: number) {
             </div>
           </li>
         </ol>
+        <div v-else class="w-full h-full flex flex-col items-center justify-center">
+          <h1 class="text-2xl font-bold text-gray-900 sm:text-center dark:text-white">
+            {{ t('no-tokens-history') }}
+          </h1>
+        </div>
       </div>
-      <button class="mx-auto mt-1 mb-2" @click="() => { thankYouPage = false }">
+      <button class="mx-auto mt-4 mb-2" @click="() => { historyPage = false }">
         <IconBack class="rotate-180 mb-2"></IconBack>
       </button>
     </div>

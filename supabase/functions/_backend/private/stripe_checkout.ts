@@ -51,7 +51,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     console.log({ requestId: c.get('requestId'), context: 'user', org })
     const checkout = !body.howMany ? 
       await createCheckout(c, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
-      : await createCheckoutForOneOff(c, org.customer_id, body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.howMany)
+      : await createCheckoutForOneOff(c, org.customer_id, body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/dashboard/settings/organization/tokens?thankYou=true`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.howMany)
     return c.json({ url: checkout.url })
   }
   catch (error) {
