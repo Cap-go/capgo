@@ -83,10 +83,9 @@ $$;
 -- Create the capgo_tokens_steps table
 CREATE TABLE IF NOT EXISTS capgo_tokens_steps (
     id BIGSERIAL PRIMARY KEY,
-    step_min INTEGER NOT NULL,
-    step_max INTEGER NOT NULL,
+    step_min bigint NOT NULL,
+    step_max bigint NOT NULL,
     price_per_unit FLOAT NOT NULL,
-    price_id TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT step_range_check CHECK (step_min < step_max)
@@ -100,7 +99,6 @@ COMMENT ON COLUMN capgo_tokens_steps.id IS 'The unique identifier for the pricin
 COMMENT ON COLUMN capgo_tokens_steps.step_min IS 'The minimum number of tokens for this tier';
 COMMENT ON COLUMN capgo_tokens_steps.step_max IS 'The maximum number of tokens for this tier';
 COMMENT ON COLUMN capgo_tokens_steps.price_per_unit IS 'The price per token in this tier';
-COMMENT ON COLUMN capgo_tokens_steps.price_id IS 'The Stripe price ID associated with this tier';
 COMMENT ON COLUMN capgo_tokens_steps.created_at IS 'Timestamp when the tier was created';
 COMMENT ON COLUMN capgo_tokens_steps.updated_at IS 'Timestamp when the tier was last updated';
 
@@ -119,4 +117,74 @@ CREATE POLICY "Anyone can read capgo_tokens_steps" ON capgo_tokens_steps
     FOR SELECT
     TO public
     USING (true);
+
+-- Function to get total extra MAU tokens for an organization within their current billing cycle
+CREATE OR REPLACE FUNCTION get_extra_mau_for_org(orgid UUID)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    cycle_info RECORD;
+    total_extra INTEGER;
+BEGIN
+    -- Get the current billing cycle information
+    SELECT * INTO cycle_info FROM get_cycle_info_org(orgid);
+    
+    -- Sum up all MAU limit increase tokens within the billing cycle and make it positive
+    SELECT COALESCE(ABS(SUM(sum)), 0)
+    INTO total_extra
+    FROM capgo_tokens_history
+    WHERE org_id = orgid
+    AND reason = 'MAU limit increased'
+    AND created_at >= cycle_info.subscription_anchor_start
+    AND created_at < cycle_info.subscription_anchor_end;
+    
+    RETURN total_extra;
+END;
+$$;
+
+-- Add a comment to the function
+COMMENT ON FUNCTION get_extra_mau_for_org IS 'Returns the absolute total sum of extra MAU tokens purchased within the current billing cycle for an organization. Only callable by service role.';
+
+-- Revoke from public and grant to service_role
+REVOKE ALL PRIVILEGES ON FUNCTION get_extra_mau_for_org(UUID) FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION get_extra_mau_for_org(UUID) FROM authenticated;
+REVOKE ALL PRIVILEGES ON FUNCTION get_extra_mau_for_org(UUID) FROM anon;
+GRANT EXECUTE ON FUNCTION get_extra_mau_for_org(UUID) TO service_role;
+
+-- Function to get total MAU tokens for an organization for the past year
+CREATE OR REPLACE FUNCTION get_total_mau_tokens(orgid UUID)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    total_tokens INTEGER;
+BEGIN    
+    -- Sum up all MAU tokens within the past year
+    SELECT COALESCE(ABS(SUM(sum)), 0)
+    INTO total_tokens
+    FROM capgo_tokens_history
+    WHERE org_id = orgid
+    AND reason = 'MAU limit increased'
+    AND created_at >= NOW() - INTERVAL '1 year'
+    AND created_at < NOW();
+    
+    RETURN total_tokens;
+END;
+$$;
+
+-- Add a comment to the function
+COMMENT ON FUNCTION get_total_mau_tokens IS 'Returns the absolute total sum of MAU tokens for the past year for an organization. Only callable by service role.';
+
+-- Remove all existing grants
+REVOKE ALL PRIVILEGES ON FUNCTION get_total_mau_tokens(UUID) FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION get_total_mau_tokens(UUID) FROM authenticated;
+REVOKE ALL PRIVILEGES ON FUNCTION get_total_mau_tokens(UUID) FROM anon;
+
+-- Grant only to service_role
+GRANT EXECUTE ON FUNCTION get_total_mau_tokens(UUID) TO service_role;
 
