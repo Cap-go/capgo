@@ -478,7 +478,7 @@ export class UploadHandler {
     if (this.multipart != null) {
       return this.parts
         .map(p => p.length)
-        .reduce((a, b) => a + b)
+        .reduce((a, b) => a + b, 0)
     }
 
     let partOffset = 0

@@ -81,8 +81,8 @@ async function refreshfilteredVersions() {
   <div>
     <dialog id="my_modal_1" class="modal" :open="open">
       <div class="bg-white modal-box dark:bg-base-100 max-h-[80vh]" :class="displayStore.dialogOption?.size ?? ''">
-        <div class="flex flex-col absolute right-2 top-2">
-          <button class="btn btn-sm btn-circle btn-ghost ml-auto" @click="() => { open = false; displayStore.showBundleLinkDialogChannel = null }">
+        <div class="absolute flex flex-col right-2 top-2">
+          <button class="ml-auto btn btn-sm btn-circle btn-ghost" @click="() => { open = false; displayStore.showBundleLinkDialogChannel = null }">
             ✕
           </button>
         </div>
@@ -95,8 +95,8 @@ async function refreshfilteredVersions() {
             :prefix-icon="IconSearch"
             enterkeyhint="send"
             :classes="{
-              outer: '!mb-0 w-full',
-              inner: '!rounded-full',
+              outer: 'mb-0! w-full',
+              inner: 'rounded-full!',
             }"
           />
         </div>
@@ -104,23 +104,23 @@ async function refreshfilteredVersions() {
           <div
             class="flex flex-col items-center w-full rounded-b dark:border-gray-600"
           >
-            <div v-for="version in versions" :key="version.id" class="h-11 px-8 w-full" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onLink(version); open = false }">
+            <div v-for="version in versions" :key="version.id" class="w-full px-8 h-11" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onLink(version); open = false }">
               <div
-                class="text-center dark:hover:bg-gray-400 hover:bg-gray-200 h-full flex items-center justify-center" :class="{
+                class="flex items-center justify-center h-full text-center dark:hover:bg-gray-400 hover:bg-gray-200" :class="{
                   'dark:bg-gray-700 bg-gray-400 cursor-not-allowed': showBundleLinkDialogChannel && (showBundleLinkDialogChannel?.version as any).id === version.id,
                 }"
               >
                 {{ version.name }}
               </div>
             </div>
-            <div v-if="searchVal === ''" class="h-11 px-8 w-full">
-              <div class="text-center dark:hover:bg-gray-400 hover:bg-gray-200 h-full flex items-center justify-center relative" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onUnlink(); open = false }">
+            <div v-if="searchVal === ''" class="w-full px-8 h-11">
+              <div class="relative flex items-center justify-center h-full text-center dark:hover:bg-gray-400 hover:bg-gray-200" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onUnlink(); open = false }">
                 <span>{{ t('unlink-bundle') }}</span>
                 <LinkSlash class="absolute left-[calc(50%-80px)] w-6 h-6 text-[#3B82F6]" />
               </div>
             </div>
-            <div v-if="searchVal === ''" class="h-11 px-8 w-full" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onRevert(); open = false }">
-              <div class="text-center dark:hover:bg-gray-400 hover:bg-gray-200 h-full flex items-center justify-center relative">
+            <div v-if="searchVal === ''" class="w-full px-8 h-11" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onRevert(); open = false }">
+              <div class="relative flex items-center justify-center h-full text-center dark:hover:bg-gray-400 hover:bg-gray-200">
                 <span>{{ t('revert-to-builtin') }}</span>
                 <Backward class="absolute left-[calc(50%-90px)] w-6 h-6 text-[#3B82F6]" />
               </div>
@@ -131,13 +131,13 @@ async function refreshfilteredVersions() {
               :key="i"
               :class="{
                 'btn btn-warning text-white': item.role === 'danger',
-                'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800': item.role !== 'cancel' && item.role !== 'danger',
-                'text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 border border-gray-200 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600': item.role === 'cancel',
+                'text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800': item.role !== 'cancel' && item.role !== 'danger',
+                'text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-hidden focus:ring-blue-300 border border-gray-200 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600': item.role === 'cancel',
                 'ml-auto mr-2': displayStore.dialogOption?.buttonCenter && i === 0 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mr-auto ml-2': displayStore.dialogOption?.buttonCenter && i === (displayStore.dialogOption?.buttons?.length ?? 0) - 1 && (displayStore.dialogOption?.buttons?.length ?? 0) > 1,
                 'mx-auto': displayStore.dialogOption?.buttonCenter && (displayStore.dialogOption?.buttons?.length ?? 0) === 1,
-                'my-1 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
-                'my-4 !mx-auto': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
+                'my-1 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role !== 'cancel',
+                'my-4 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
               @click="displayStore.showBundleLinkDialog = false"
@@ -148,6 +148,6 @@ async function refreshfilteredVersions() {
         </div>
       </div>
     </dialog>
-    <div v-if="open" class="fixed inset-0 z-40 bg-black bg-opacity-50" @click="open = false" />
+    <div v-if="open" class="fixed inset-0 z-40 bg-black/50" @click="open = false" />
   </div>
 </template>

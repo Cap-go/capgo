@@ -74,7 +74,7 @@ watchEffect(async () => {
   <!-- Row -->
   <tr class="text-gray-500 cursor-pointer md:table-row dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-700" @click="openPackage(app.app_id)">
     <td class="table-cell w-1/5 p-2 md:hidden">
-      <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">
+      <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="mr-2 rounded-sm shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">
       <div v-else class="p-2 mr-2 text-xl bg-gray-700 mask mask-squircle">
         <span class="font-medium text-gray-300">
           {{ acronym }}
@@ -83,7 +83,7 @@ watchEffect(async () => {
     </td>
     <td class="w-1/4 p-2">
       <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
-        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="hidden mr-2 rounded md:block shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">
+        <img v-if="app.icon_url" :src="app.icon_url" :alt="`App icon ${app.name}`" class="hidden mr-2 rounded-sm md:block shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">
         <div v-else class="p-2 mr-2 text-xl bg-gray-700 mask mask-squircle">
           <span class="font-medium text-gray-300">
             {{ acronym }}

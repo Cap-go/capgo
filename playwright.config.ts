@@ -1,18 +1,17 @@
-/* eslint-disable n/prefer-global/process */
-import * as os from 'node:os'
 import type { PlaywrightTestConfig } from '@playwright/test'
+import * as os from 'node:os'
+import { env } from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
  */
-// require('dotenv').config();
-const headless = !!process.env.CI || !!process.env.PLAYWRIGHT_HEADLESS
+const headless = !!env.CI || !!env.PLAYWRIGHT_HEADLESS
 
 const webServer: PlaywrightTestConfig['webServer'] = []
 
-if (!process.env.SKIP_BACKEND_START) {
+if (!env.SKIP_BACKEND_START) {
   webServer.push({
     command: 'ENV=local bun run backend',
     port: 54321,
@@ -40,7 +39,7 @@ export default defineConfig({
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
-  forbidOnly: !!process.env.CI,
+  forbidOnly: !!env.CI,
   /* Never retry, the entire thing is stateful and retries will never succed becouse of the modifications to supabase in the previous attempt */
   retries: 0,
   /* Opt out of parallel tests on CI. */

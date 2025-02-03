@@ -70,11 +70,14 @@ async function addNewApiKey() {
 
   let selectedOrganizations = [] as string[]
   if (displayStore.dialogCheckbox) {
+    displayStore.unsetDialogCheckbox()
     displayStore.dialogOption = {
       header: t('alert-confirm-org-limit'),
       message: t('alert-confirm-org-limit-message'),
       textStyle: 'mb-5',
       listOrganizations: true,
+      checkboxText: t('limit-to-app'),
+      checkboxStyle: 'mb-0 mt-10',
       buttons: [
         {
           text: t('button-cancel'),
@@ -90,6 +93,57 @@ async function addNewApiKey() {
     if (await displayStore.onDialogDismiss())
       return
     selectedOrganizations = displayStore.selectedOrganizations
+    if (selectedOrganizations.length === 0) {
+      toast.error(t('alert-no-org-selected'))
+      return
+    }
+  }
+
+  let selectedApps = [] as Database['public']['Tables']['apps']['Row'][]
+  // check if the users wants to limit the api key to a specific app
+  if (displayStore.dialogCheckbox) {
+    displayStore.unsetDialogCheckbox()
+    const { data: apps, error } = await supabase.from('apps').select('*').in('owner_org', selectedOrganizations)
+    if (error) {
+      console.error('Cannot get apps for api key', error)
+      return
+    }
+
+    if (error) {
+      toast.error(t('cannot-get-apps'))
+      console.error('Cannot get apps for api key', error)
+      return
+    }
+
+    if (apps.length === 0) {
+      toast.error(selectedOrganizations.length === 1 ? t('no-apps-found') : t('no-apps-found-plural'))
+      return
+    }
+
+    displayStore.dialogOption = {
+      header: t('alert-confirm-appid-limit'),
+      message: t('alert-confirm-appid-limit-message'),
+      listApps: apps,
+      textStyle: 'mb-5',
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button-confirm'),
+          id: 'confirm-button',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss())
+      return
+    selectedApps = displayStore.selectedApps
+    if (selectedApps.length === 0) {
+      toast.error(t('alert-no-app-selected'))
+      return
+    }
   }
 
   const newApiKey = crypto.randomUUID()
@@ -102,7 +156,14 @@ async function addNewApiKey() {
 
   const { data, error } = await supabase
     .from('apikeys')
-    .upsert({ user_id: user.id, key: newApiKey, mode: databaseKeyType, name: '', limited_to_orgs: selectedOrganizations.length > 0 ? selectedOrganizations : null })
+    .upsert({
+      user_id: user.id,
+      key: newApiKey,
+      mode: databaseKeyType as 'read' | 'write' | 'all' | 'upload',
+      name: '',
+      limited_to_orgs: selectedOrganizations.length > 0 ? selectedOrganizations : null,
+      limited_to_apps: selectedApps.length > 0 ? selectedApps.map(app => app.app_id) : null,
+    })
     .select()
 
   if (error)
@@ -270,10 +331,10 @@ async function showAddNewKeyModal() {
         text: t('key-read'),
         id: 'read-button',
       },
-      // {
-      //   text: t('key-upload'),
-      //   id: 'upload-button',
-      // },
+      {
+        text: t('key-upload'),
+        id: 'upload-button',
+      },
       {
         text: t('write-key'),
         id: 'write-button',
@@ -284,6 +345,7 @@ async function showAddNewKeyModal() {
       },
     ],
     checkboxText: t('limit-to-org'),
+    checkboxStyle: 'mb-0 mt-14',
   }
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
@@ -323,16 +385,16 @@ displayStore.defaultBack = '/app/home'
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
             <InfoRow v-for="key in keys" :key="key.id" :label="key.name" :value="key.mode.toUpperCase()" :is-link="false">
-              <button class="mx-1 text-center bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
+              <button class="mx-1 text-center bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
                 <ArrowPath class="mx-auto text-lg" />
               </button>
-              <button class="mx-1 bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="changeName(key)">
+              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="changeName(key)">
                 <Pencil class="mx-auto text-lg" />
               </button>
-              <button class="mx-1 bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="copyKey(key)">
+              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="copyKey(key)">
                 <Clipboard class="mx-auto text-lg" />
               </button>
-              <button class="mx-1 bg-transparent rounded w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="deleteKey(key)">
+              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="deleteKey(key)">
                 <Trash class="mx-auto text-lg text-red-600" />
               </button>
             </InfoRow>
@@ -350,7 +412,7 @@ displayStore.defaultBack = '/app/home'
           </a>
         </div>
       </div>
-      <button class="fixed z-20 bg-gray-800 btn btn-circle btn-lg btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
+      <button class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
         <plusOutline />
       </button>
     </div>

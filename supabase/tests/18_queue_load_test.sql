@@ -97,7 +97,7 @@ BEGIN
     PERFORM process_function_queue('on_version_delete');
     
     -- Debug response details
-    RAISE NOTICE 'Response details:';
+    -- RAISE NOTICE 'Response details:';
     SELECT status_code, error_msg, id INTO msg
     FROM net._http_response 
     LIMIT 1;

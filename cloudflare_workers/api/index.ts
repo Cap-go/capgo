@@ -1,6 +1,4 @@
-// import type { Context, MiddlewareHandler, Next } from 'hono'
 import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
-// import { rateLimit } from '@elithrar/workers-hono-rate-limit'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -34,7 +32,6 @@ import { app as clear_device_cache } from '../../supabase/functions/_backend/tri
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cron_plan.ts'
-import { app as cron_scrapper } from '../../supabase/functions/_backend/triggers/cron_scrapper.ts'
 import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
@@ -61,21 +58,6 @@ app.use('*', sentry({
 app.use('*', logger())
 app.use('*', (requestId as any)())
 
-// export function publicRateLimiter(rateLimiterAction: string, _methods: { limit: number, period: number, method: string }[]) {
-//   const subMiddlewareKey: MiddlewareHandler<{}> = async (c: Context, next: Next) => {
-//     const capgkey_string = c.req.header('capgkey')
-//     const apikey_string = c.req.header('authorization')
-//     const key = capgkey_string || apikey_string
-//     if (!key)
-//       return next()
-//     const rateLimiterKey = `API_${rateLimiterAction}_RATE_LIMITER`
-//     if (c.env[rateLimiterKey])
-//       await rateLimit(c.env[rateLimiterKey], () => key)(c, next)
-//     await next()
-//   }
-//   return subMiddlewareKey
-// }
-
 // Public API
 app.route('/ok', ok)
 app.route('/apikey', apikey)
@@ -85,14 +67,11 @@ app.route('/device', device)
 app.route('/organization', organization)
 app.route('/statistics', statistics)
 
-// app.use('/bundle', publicRateLimiter('BUNDLE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/bundle', bundle)
 
-// app.use('/channel', publicRateLimiter('CHANNEL', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.use('/channel')
 app.route('/channel', channel)
 
-// app.use('/device', publicRateLimiter('DEVICE', [{ limit: 20, period: 10, method: 'GET' }, { limit: 20, period: 10, method: 'POST' }, { limit: 20, period: 10, method: 'DELETE' }]))
 app.route('/device', device)
 
 app.route('/on_app_create', on_app_create)
@@ -119,7 +98,6 @@ appFront.route('/events', events)
 appTriggers.route('/clear_app_cache', clear_app_cache)
 appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
-appTriggers.route('/cron_scrapper', cron_scrapper)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/on_channel_update', on_channel_update)
@@ -137,32 +115,6 @@ appTriggers.route('/cron_plan', cron_plan)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appFront)
-
-app.get('/test_sentry', (c) => {
-  if (Math.random() < 0.5)
-    return c.text('Success!')
-
-  throw new Error('Failed!')
-})
-
-// app.post('/test_analytics', middlewareAPISecret, async (c) => {
-//   try {
-//     const body = await c.req.json()
-//     if (body.request) {
-//       const res = await rawAnalyticsQuery(c, body.request)
-
-//       console.log('test_analytics res', res)
-//       return c.json({ res })
-//     }
-//     else {
-//       return c.json({ error: 'Missing request' })
-//     }
-//   }
-//   catch (e) {
-//     console.error('Error test_analytics', e)
-//     return c.json({ error: 'Error', e: JSON.stringify(e) })
-//   }
-// })
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)

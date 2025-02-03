@@ -39,6 +39,7 @@ export type Database = {
           created_at: string | null
           id: number
           key: string
+          limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
@@ -49,6 +50,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           key: string
+          limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode: Database["public"]["Enums"]["key_mode"]
           name: string
@@ -59,6 +61,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           key?: string
+          limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
           mode?: Database["public"]["Enums"]["key_mode"]
           name?: string
@@ -1374,6 +1377,21 @@ export type Database = {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
           org_id: string
+        }
+        Returns: string
+      }
+      get_identity_org_allowed: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          org_id: string
+        }
+        Returns: string
+      }
+      get_identity_org_appid: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          org_id: string
+          app_id: string
         }
         Returns: string
       }
