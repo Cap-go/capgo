@@ -11,6 +11,9 @@ import {
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
+  set_bandwidth_exceeded,
+  set_mau_exceeded,
+  set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
 
@@ -141,6 +144,24 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         // }
         // else
         if (planToInt(best_plan) > planToInt(current_plan)) {
+          const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c).from('plans').select('*').eq('name', current_plan).single()
+          if (currentPlanError) {
+            console.error({ requestId: c.get('requestId'), context: 'currentPlanError', error: currentPlanError })
+          }
+
+
+          console.log(get_total_stats)
+          if (get_total_stats.mau > (currentPlan?.mau || 0)) {
+            await set_mau_exceeded(c, orgId, true)
+          }
+          if (get_total_stats.storage > (currentPlan?.storage || 0)) {
+            await set_storage_exceeded(c, orgId, true)
+          }
+
+          if (get_total_stats.bandwidth > (currentPlan?.bandwidth || 0)) {
+            await set_bandwidth_exceeded(c, orgId, true)
+          }
+
           const sent = await sendNotifOrg(c, `user:upgrade_to_${bestPlanKey}`, { best_plan: bestPlanKey, plan_name: current_plan }, orgId, orgId, '0 0 * * 1')
           if (sent) {
           // await addEventPerson(user.email, {}, `user:upgrade_to_${bestPlanKey}`, 'red')
@@ -218,7 +239,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       .from('stripe_info')
       .update({
         is_good_plan,
-        plan_usage: Math.round(percentUsage.total_percent),
+        plan_usage: Math.round(percentUsage.total_percent)
       })
       .eq('customer_id', org.customer_id!)
       .then()

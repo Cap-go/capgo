@@ -939,14 +939,17 @@ export type Database = {
       }
       stripe_info: {
         Row: {
+          bandwidth_exceeded: boolean | null
           canceled_at: string | null
           created_at: string
           customer_id: string
           is_good_plan: boolean | null
+          mau_exceeded: boolean | null
           plan_usage: number | null
           price_id: string | null
           product_id: string
           status: Database["public"]["Enums"]["stripe_status"] | null
+          storage_exceeded: boolean | null
           subscription_anchor_end: string
           subscription_anchor_start: string
           subscription_id: string | null
@@ -955,14 +958,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bandwidth_exceeded?: boolean | null
           canceled_at?: string | null
           created_at?: string
           customer_id: string
           is_good_plan?: boolean | null
+          mau_exceeded?: boolean | null
           plan_usage?: number | null
           price_id?: string | null
           product_id: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
+          storage_exceeded?: boolean | null
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
@@ -971,14 +977,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bandwidth_exceeded?: boolean | null
           canceled_at?: string | null
           created_at?: string
           customer_id?: string
           is_good_plan?: boolean | null
+          mau_exceeded?: boolean | null
           plan_usage?: number | null
           price_id?: string | null
           product_id?: string
           status?: Database["public"]["Enums"]["stripe_status"] | null
+          storage_exceeded?: boolean | null
           subscription_anchor_end?: string
           subscription_anchor_start?: string
           subscription_id?: string | null
@@ -1732,6 +1741,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_allowed_action_org_action: {
+        Args: {
+          orgid: string
+          actions: Database["public"]["Enums"]["action_type"][]
+        }
+        Returns: boolean
+      }
       is_allowed_capgkey:
         | {
             Args: {
@@ -1769,6 +1785,12 @@ export type Database = {
             }
             Returns: boolean
           }
+      is_bandwidth_exceeded_by_org: {
+        Args: {
+          org_id: string
+        }
+        Returns: boolean
+      }
       is_canceled_org: {
         Args: {
           orgid: string
@@ -1778,6 +1800,12 @@ export type Database = {
       is_good_plan_v5_org: {
         Args: {
           orgid: string
+        }
+        Returns: boolean
+      }
+      is_mau_exceeded_by_org: {
+        Args: {
+          org_id: string
         }
         Returns: boolean
       }
@@ -1831,9 +1859,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_paying_and_good_plan_org_action: {
+        Args: {
+          orgid: string
+          actions: Database["public"]["Enums"]["action_type"][]
+        }
+        Returns: boolean
+      }
       is_paying_org: {
         Args: {
           orgid: string
+        }
+        Returns: boolean
+      }
+      is_storage_exceeded_by_org: {
+        Args: {
+          org_id: string
         }
         Returns: boolean
       }
@@ -1972,6 +2013,27 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      set_bandwidth_exceeded_by_org: {
+        Args: {
+          org_id: string
+          disabled: boolean
+        }
+        Returns: undefined
+      }
+      set_mau_exceeded_by_org: {
+        Args: {
+          org_id: string
+          disabled: boolean
+        }
+        Returns: undefined
+      }
+      set_storage_exceeded_by_org: {
+        Args: {
+          org_id: string
+          disabled: boolean
+        }
+        Returns: undefined
+      }
       transfer_app: {
         Args: {
           p_app_id: string
@@ -1985,6 +2047,7 @@ export type Database = {
       }
     }
     Enums: {
+      action_type: "mau" | "storage" | "bandwidth"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
