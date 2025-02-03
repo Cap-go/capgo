@@ -150,7 +150,6 @@
     "dompurify": "^3.2.3",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.4",
-    "envfile": "^7.1.0",
     "firebase": "11.1.0",
     "jsdom": "^26.0.0",
     "ky": "^1.7.4",
