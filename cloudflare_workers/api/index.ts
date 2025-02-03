@@ -32,7 +32,6 @@ import { app as clear_device_cache } from '../../supabase/functions/_backend/tri
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
 import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cron_plan.ts'
-import { app as cron_scrapper } from '../../supabase/functions/_backend/triggers/cron_scrapper.ts'
 import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
@@ -99,7 +98,6 @@ appFront.route('/events', events)
 appTriggers.route('/clear_app_cache', clear_app_cache)
 appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
-appTriggers.route('/cron_scrapper', cron_scrapper)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/on_channel_update', on_channel_update)

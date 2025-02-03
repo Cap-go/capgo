@@ -26,7 +26,6 @@
     "npm:@capawesome/capacitor-screen-orientation@^6.0.1": "6.0.1_@capacitor+core@6.1.2",
     "npm:@capgo/capacitor-flash@^6.0.3": "6.0.3_@capacitor+core@6.1.2",
     "npm:@capgo/capacitor-mute@^6.0.3": "6.0.3_@capacitor+core@6.1.2",
-    "npm:@capgo/google-play-scraper@^9.1.2": "9.1.2",
     "npm:@capgo/native-market@^6.0.2": "6.0.2",
     "npm:@hono/sentry@1.1.0": "1.1.0_hono@4.6.2",
     "npm:@hono/sentry@^1.2.0": "1.2.0_hono@4.6.2",
@@ -58,7 +57,6 @@
     "npm:dayjs@1.11.13": "1.11.13",
     "npm:dotenv@^16.4.5": "16.4.5",
     "npm:envfile@^7.1.0": "7.1.0",
-    "npm:google-play-scraper@^9.2.0": "9.2.0",
     "npm:http-server@^14.1.1": "14.1.1",
     "npm:https-localhost@4.7.1": "4.7.1",
     "npm:husky@^9.1.6": "9.1.6",
@@ -247,16 +245,6 @@
       "integrity": "sha512-zhp1oxmKyC41MasTiZeLireACfuQecQdREXnKdYhGwCSjknXbPgXYZp61vdf5hCovs3KTxgrQy2KZhfjtVyy0w==",
       "dependencies": [
         "@capacitor/core"
-      ]
-    },
-    "@capgo/google-play-scraper@9.1.2": {
-      "integrity": "sha512-vPDAK6PhA3W4GDNG7+gYWZO8dBK4JmxvVZpx7Nro+yX0SJ6Z/oBrAzKPLjMJzlBhCS+z8eVy+5/ZXj9TvigKHg==",
-      "dependencies": [
-        "cheerio",
-        "debug@3.2.7",
-        "got@12.6.1",
-        "memoizee",
-        "ramda"
       ]
     },
     "@capgo/native-market@6.0.2": {
@@ -1253,16 +1241,6 @@
         "minipass",
         "package-json-from-dist",
         "path-scurry"
-      ]
-    },
-    "google-play-scraper@9.2.0": {
-      "integrity": "sha512-LpXaaSxwmWBqvmfYVIXCkD97BLAmWhxP9QBriVwtz7ypgCizKv01HKLbmhFcUpjPpET1WQZekoYi4gxmDg0cXw==",
-      "dependencies": [
-        "cheerio",
-        "debug@3.2.7",
-        "got@11.8.6",
-        "memoizee",
-        "ramda"
       ]
     },
     "gopd@1.0.1": {
@@ -3351,7 +3329,6 @@
         "npm:@capgo/capacitor-native-biometric@^6.0.4",
         "npm:@capgo/capacitor-screen-recorder@8.1.82",
         "npm:@capgo/capacitor-updater@^6.3.18",
-        "npm:@capgo/google-play-scraper@^9.1.2",
         "npm:@capgo/inappbrowser@^6.9.14",
         "npm:@capgo/native-audio@^6.4.23",
         "npm:@capgo/native-market@^6.0.2",
@@ -3410,7 +3387,6 @@
         "npm:envfile@^7.1.0",
         "npm:eslint@9.15.0",
         "npm:firebase@11.0.2",
-        "npm:google-play-scraper@^9.2.0",
         "npm:http-server@^14.1.1",
         "npm:https-localhost@4.7.1",
         "npm:husky@^9.1.6",
