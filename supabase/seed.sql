@@ -37,8 +37,7 @@ SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_helper('cron
 --     (250, 2147483647, 0.50, 'price_1QnIDGGH46eYKnWwRc1HMo6h');
 INSERT INTO capgo_tokens_steps (step_min, step_max, price_per_unit) VALUES
     (0, 1000000, 0.003),
-    (1000000, 2000000,0.0024),
-    (2000000, 3000000,0.0022),
+    (1000000, 3000000,0.0022),
     (3000000, 10000000,0.0016),
     (10000000, 15000000,0.0014),
     (15000000, 25000000,0.00115),
