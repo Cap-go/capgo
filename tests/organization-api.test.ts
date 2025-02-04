@@ -54,7 +54,7 @@ describe('[GET] /organization/members', () => {
       uid: z.string(),
       email: z.string(),
       image_url: z.string(),
-      role: z.string()
+      role: z.string(),
     }))
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
@@ -179,6 +179,7 @@ describe('[PUT] /organization', () => {
   })
 })
 
+// TODO: Fix this test
 describe.todo('[DELETE] /organization', () => {
   it.todo('delete organization', async () => {
     const id = randomUUID()

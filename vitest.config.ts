@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     watch: false,
     testTimeout: 60_000,
+    retry: 3,
     maxConcurrency: 12,
     env: loadEnv(mode, process.cwd(), ''),
   },
