@@ -345,7 +345,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
 }
 
 export async function set_mau_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc("set_mau_exceeded_by_org", { org_id: orgId, disabled })
+  const { error } = await supabaseAdmin(c).rpc('set_mau_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'set_mau_exceeded error', orgId, error })
     return false
@@ -354,7 +354,7 @@ export async function set_mau_exceeded(c: Context, orgId: string, disabled: bool
 }
 
 export async function set_storage_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc("set_storage_exceeded_by_org", { org_id: orgId, disabled })
+  const { error } = await supabaseAdmin(c).rpc('set_storage_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'set_download_disabled error', orgId, error })
     return false
@@ -363,7 +363,7 @@ export async function set_storage_exceeded(c: Context, orgId: string, disabled: 
 }
 
 export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc("set_bandwidth_exceeded_by_org", { org_id: orgId, disabled })
+  const { error } = await supabaseAdmin(c).rpc('set_bandwidth_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'set_bandwidth_exceeded error', orgId, error })
     return false

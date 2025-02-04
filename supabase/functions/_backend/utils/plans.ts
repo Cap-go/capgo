@@ -149,7 +149,6 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
             console.error({ requestId: c.get('requestId'), context: 'currentPlanError', error: currentPlanError })
           }
 
-
           console.log(get_total_stats)
           if (get_total_stats.mau > (currentPlan?.mau || 0)) {
             await set_mau_exceeded(c, orgId, true)
@@ -239,7 +238,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       .from('stripe_info')
       .update({
         is_good_plan,
-        plan_usage: Math.round(percentUsage.total_percent)
+        plan_usage: Math.round(percentUsage.total_percent),
       })
       .eq('customer_id', org.customer_id!)
       .then()
