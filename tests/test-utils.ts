@@ -117,3 +117,12 @@ export async function getUpdate(data: ReturnType<typeof updateAndroidBaseData>):
 export function getUpdateBaseData(appId: string): ReturnType<typeof updateAndroidBaseData> {
   return JSON.parse(JSON.stringify(updateAndroidBaseData(appId)))
 }
+
+export async function postUpdate(data: object) {
+  const response = await fetch(`${BASE_URL}/updates`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  })
+  return response
+}

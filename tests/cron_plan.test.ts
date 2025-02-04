@@ -20,7 +20,7 @@ beforeEach(async () => {
       {
         subscription_id: 'sub_2',
         customer_id: STRIPE_INFO_CUSTOMER_ID, // this is the stripe info that I will be using
-        status: 'succeeded' as const, 
+        status: 'succeeded' as const,
         product_id: 'prod_LQIregjtNduh4q',
         trial_at: new Date(0).toISOString(),
         is_good_plan: true,
@@ -33,7 +33,8 @@ beforeEach(async () => {
         bandwidth_exceeded: false,
       },
     ], { onConflict: 'customer_id' })
-  if (error) throw error
+  if (error)
+    throw error
 
   const { error: orgError } = await supabase.from('orgs').upsert([
     {
@@ -41,20 +42,22 @@ beforeEach(async () => {
       customer_id: 'cus_Q38uE91NP8Ufq1',
       name: 'Test Org V2',
       created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
-      management_email: 'test@example.com'
-    }
+      management_email: 'test@example.com',
+    },
   ], { onConflict: 'id' })
-  if (orgError) throw orgError
+  if (orgError)
+    throw orgError
 
   const { error: appError } = await supabase.from('apps').upsert([
     {
       owner_org: ORG_ID,
       name: 'Test App V2',
       app_id: APPNAME,
-      icon_url: 'https://example.com/icon.png'
-    }
+      icon_url: 'https://example.com/icon.png',
+    },
   ], { onConflict: 'app_id' })
-  if (appError) throw appError
+  if (appError)
+    throw appError
 
   // app_versions update
   const { error: appVersionsError, data: appVersionsData } = await supabase.from('app_versions').insert([{
@@ -62,9 +65,10 @@ beforeEach(async () => {
     name: `1.0.0-${new Date().toISOString()}`,
     owner_org: ORG_ID,
   }]).select('*')
-  if (appVersionsError) throw appVersionsError
+  if (appVersionsError)
+    throw appVersionsError
 
-  const { error: appVersionMetaError } = await supabase.from('app_versions_meta').upsert(appVersionsData.map(version => {
+  const { error: appVersionMetaError } = await supabase.from('app_versions_meta').upsert(appVersionsData.map((version) => {
     return {
       id: version.id,
       app_id: APPNAME,
@@ -73,13 +77,15 @@ beforeEach(async () => {
       owner_org: ORG_ID,
     }
   }), { onConflict: 'id' })
-  if (appVersionMetaError) throw appVersionMetaError
+  if (appVersionMetaError)
+    throw appVersionMetaError
 
   const { error: appVersionMetaError2 } = await supabase
-  .from('app_versions_meta')
-  .update({ size: 0 })
-  .eq('app_id', APPNAME)
-  if (appVersionMetaError2) throw appVersionMetaError2
+    .from('app_versions_meta')
+    .update({ size: 0 })
+    .eq('app_id', APPNAME)
+  if (appVersionMetaError2)
+    throw appVersionMetaError2
 
   const { error: mauError } = await supabase
     .from('daily_mau')
@@ -129,7 +135,8 @@ describe('[POST] /triggers/cron_plan', () => {
       .from('stripe_info')
       .update({ is_good_plan: true, trial_at: new Date(0).toISOString() })
       .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
-    if (error) throw error
+    if (error)
+      throw error
 
     const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
       method: 'POST',
@@ -144,7 +151,7 @@ describe('[POST] /triggers/cron_plan', () => {
       .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
       .single()
     expect(stripeInfoData?.is_good_plan).toBe(false)
-    
+
     const { data: mauExceeded, error: mauExceededError } = await supabase
       .rpc('is_mau_exceeded_by_org', { org_id: ORG_ID })
     expect(mauExceededError).toBeFalsy()
@@ -169,7 +176,6 @@ describe('[POST] /triggers/cron_plan', () => {
       .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['storage'] as const })
     expect(isAllowedActionStorageError).toBeFalsy()
     expect(isAllowedActionStorage).toBe(true)
-
 
     const { data: isAllowedActionBandwidth, error: isAllowedActionBandwidthError } = await supabase
       .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['bandwidth'] as const })
@@ -197,7 +203,8 @@ describe('[POST] /triggers/cron_plan', () => {
       .from('stripe_info')
       .update({ is_good_plan: true, trial_at: new Date(0).toISOString() })
       .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
-    if (error) throw error
+    if (error)
+      throw error
 
     const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
       method: 'POST',
@@ -212,7 +219,7 @@ describe('[POST] /triggers/cron_plan', () => {
       .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
       .single()
     expect(stripeInfoData?.is_good_plan).toBe(false)
-    
+
     const { data: mauExceeded, error: mauExceededError } = await supabase
       .rpc('is_mau_exceeded_by_org', { org_id: ORG_ID })
     expect(mauExceededError).toBeFalsy()
@@ -234,12 +241,12 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(isAllowedActionStorage).toBe(false)
 
     const { data: isAllowedActionMau, error: isAllowedActionMauError } = await supabase
-    .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['mau'] as const })
+      .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['mau'] as const })
     expect(isAllowedActionMauError).toBeFalsy()
     expect(isAllowedActionMau).toBe(true)
 
     const { data: isAllowedActionBandwidth, error: isAllowedActionBandwidthError } = await supabase
-    .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['bandwidth'] as const })
+      .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['bandwidth'] as const })
     expect(isAllowedActionBandwidthError).toBeFalsy()
     expect(isAllowedActionBandwidth).toBe(true)
 
@@ -273,7 +280,8 @@ describe('[POST] /triggers/cron_plan', () => {
       .from('stripe_info')
       .update({ is_good_plan: true, trial_at: new Date(0).toISOString() })
       .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
-    if (error) throw error
+    if (error)
+      throw error
 
     const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
       method: 'POST',
@@ -288,7 +296,7 @@ describe('[POST] /triggers/cron_plan', () => {
       .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
       .single()
     expect(stripeInfoData?.is_good_plan).toBe(false)
-    
+
     const { data: mauExceeded, error: mauExceededError } = await supabase
       .rpc('is_mau_exceeded_by_org', { org_id: ORG_ID })
     expect(mauExceededError).toBeFalsy()
@@ -314,7 +322,6 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(isAllowedActionStorageError).toBeFalsy()
     expect(isAllowedActionStorage).toBe(true)
 
-
     const { data: isAllowedActionBandwidth, error: isAllowedActionBandwidthError } = await supabase
       .rpc('is_allowed_action_org_action', { orgid: ORG_ID, actions: ['bandwidth'] as const })
     expect(isAllowedActionBandwidthError).toBeFalsy()
@@ -326,4 +333,4 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(updateResponse.status).toBe(200)
     expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('need_plan_upgrade')
   })
-}) 
+})

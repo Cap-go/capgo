@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
-import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData } from './test-utils.ts'
+import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.updates'
 
@@ -19,15 +19,6 @@ const updateNewScheme = z.object({
   url: z.string(),
   version: z.string(),
 })
-
-async function postUpdate(data: object) {
-  const response = await fetch(`${BASE_URL}/updates`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  })
-  return response
-}
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -252,7 +243,7 @@ describe('update scenarios', () => {
 
     await getSupabaseClient().from('channel_devices').insert({
       device_id: uuid,
-      channel_id: channelId,
+      channel_id: channelId as number,
       app_id: APPNAME,
       owner_org: '00000000-0000-0000-0000-000000000000',
     })
