@@ -78,7 +78,7 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
     sqls.push(sql`]::action_type[]) AS is_allowed`)
 
     const result = await drizzleCient.execute<{ is_allowed: boolean }>(
-      sql.join(sqls)
+      sql.join(sqls),
     )
     return result[0]?.is_allowed || false
   }
