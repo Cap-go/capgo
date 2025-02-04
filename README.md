@@ -151,22 +151,18 @@ Started supabase local development setup.
 service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
 ```
 
-#### Start Supabase DB and Functions Locally
+#### Seed Supabase DB Locally
 
 You need make sure Docker is running.
 ```bash
-bun install
-bun backend
+supabase db reset
 ```
 
 #### Start Frontend Locally
 
-Before starting the frontend, make sure you replace the value of `supa_anon.local` inside the file `configs.json` with the value of `anon key`. If `supabase` is already running, you can also obtain `anon key` from the output of `supabase status`.
-
-In another terminal, run the server with the necessary Netlify functions:
-
 ```bash
-bun serve
+bun install
+bun serve-dev
 ```
 
 #### Login
