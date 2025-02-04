@@ -634,7 +634,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
 
 export async function readActiveAppsCF(c: Context) {
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get'`
+  const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get' GROUP BY app_id`
   console.log({ requestId: c.get('requestId'), context: 'readActiveAppsCF query', query })
   try {
     const response = await runQueryToCF<{ app_id: string }>(c, query)
