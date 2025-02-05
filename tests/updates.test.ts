@@ -80,7 +80,6 @@ describe('[POST] /updates parallel tests', () => {
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
-    console.log('json', json)
     expect(json.error).toBe('disable_auto_update_to_major')
   })
 

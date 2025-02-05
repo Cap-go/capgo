@@ -200,7 +200,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //   }, 400)
     // }
 
-    if (!version.external_url && !version.r2_path && version.name !== 'builtin') {
+    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && !version.manifest) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -370,25 +370,29 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
-    if (version.r2_path && !version.external_url) {
-      const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
-      if (res) {
-        signedURL = res.url
-        // only count the size of the bundle if it's not external
-        await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
+    if (!version.external_url) {
+      if (version.r2_path) {
+        const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
+        if (res) {
+          signedURL = res.url
+          // only count the size of the bundle if it's not external
+          await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
+        }
       }
-      if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = getManifestUrl(c, version.id, version.manifest as any, device_id)
-      }
+      manifest = getManifestUrl(c, version.id, version.manifest as any, device_id)
     }
     //  check signedURL and if it's url
-    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
+    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://')) && !version.manifest) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
         message: 'Cannot get bundle url',
         error: 'no_bundle_url',
       }, 200)
+    }
+    if (version.manifest && !signedURL) {
+      // TODO: remove this when all plugin acccept no URL
+      signedURL = 'https://404.capgo.app/no.zip'
     }
     // console.log(c.get('requestId'), 'save stats', device_id)
     await backgroundTask(c, Promise.all([
