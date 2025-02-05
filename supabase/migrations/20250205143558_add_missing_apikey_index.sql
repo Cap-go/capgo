@@ -1,0 +1,1 @@
+CREATE INDEX finx_apikeys_user_id ON public.apikeys USING btree (user_id)
