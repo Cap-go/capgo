@@ -335,19 +335,6 @@ export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
   return data || false
 }
 
-export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['Row'][]> {
-  const { data, error } = await useSupabase()
-    .from('orgs')
-    .select('*')
-
-  if (error) {
-    console.error('getOrgs error', error.message)
-    throw error
-  }
-
-  return data || []
-}
-
 export async function isTrialOrg(orgId: string): Promise<number> {
   const { data, error } = await useSupabase()
     .rpc('is_trial_org', { orgid: orgId })

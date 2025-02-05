@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconMenu from '~icons/material-symbols/menu-rounded'
 import { useDisplayStore } from '~/stores/display'
-import { useMainStore } from '~/stores/main'
-import { getOrgs } from '../services/supabase'
 import Banner from './Banner.vue'
 
 const props = defineProps({
@@ -18,14 +16,7 @@ const props = defineProps({
 })
 
 defineEmits(['toggleSidebar'])
-const main = useMainStore()
 const isMobile = ref(Capacitor.isNativePlatform())
-
-const orgs = ref()
-onMounted(async () => {
-  if (main.user)
-    orgs.value = await getOrgs()
-})
 
 const router = useRouter()
 
