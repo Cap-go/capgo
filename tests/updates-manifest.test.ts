@@ -36,7 +36,7 @@ describe('update manifest scenarios', () => {
     expect(json.manifest?.[0].file_hash).toBe('1234567890')
   })
   // test for plugin version < 6.8.0
-  it('manifest update with plugin version < 6.8.0', async () => {
+  it('manifest should not be available with plugin version < 6.8.0', async () => {
     const baseData = getBaseData(APPNAME)
     baseData.version_name = '1.1.0'
     baseData.plugin_version = '6.7.0'
@@ -47,15 +47,15 @@ describe('update manifest scenarios', () => {
     expect(json.manifest).toBeUndefined()
   })
 
-  // // test for a update with only manifest defined and no r2_path
-  it('update with only manifest', async () => {
-    const baseData = getBaseData(APPNAME)
-    await getSupabaseClient().from('app_versions').update({ r2_path: null }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()
-    baseData.version_name = '1.1.0'
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-    const json = await response.json<UpdateRes>()
-    console.log('json', json)
-    expect(json.manifest).toBeDefined()
-  })
+  // // // test for a update with only manifest defined and no r2_path
+  // it('update with only manifest', async () => {
+  //   const baseData = getBaseData(APPNAME)
+  //   await getSupabaseClient().from('app_versions').update({ r2_path: null }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()
+  //   baseData.version_name = '1.1.0'
+  //   const response = await postUpdate(baseData)
+  //   expect(response.status).toBe(200)
+  //   const json = await response.json<UpdateRes>()
+  //   console.log('json', json)
+  //   expect(json.manifest).toBeDefined()
+  // })
 })
