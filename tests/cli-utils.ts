@@ -1,9 +1,8 @@
 import type { ExecSyncOptions } from 'node:child_process'
-import type { Readable } from 'node:stream'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cwd, env, stderr, stdout } from 'node:process'
+import { cwd, env } from 'node:process'
 import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST, BASE_URL } from './test-utils'
 
@@ -132,7 +131,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
 
     if (logOutput) {
       console.log('CLI execution successful')
-      stdout.write(output)
+      console.log(output)
     }
 
     return output.toString()
@@ -140,8 +139,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
   catch (error: any) {
     if (logOutput) {
       console.error('CLI execution failed')
-      stderr.write(error.stderr)
-      stdout.write(error.stdout)
+      console.log(error.stdout)
     }
 
     return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message
