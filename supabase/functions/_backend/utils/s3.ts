@@ -22,6 +22,9 @@ export function initS3(c: Context) {
     // not apply in supabase local
     forcePathStyle: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
     signingEscapePath: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
+    credentialDefaultProvider: () => () => Promise.reject(
+      new Error('Credential loading disabled'),
+    ),
   }
 
   console.log({ requestId: c.get('requestId'), context: 'initS3', params })
