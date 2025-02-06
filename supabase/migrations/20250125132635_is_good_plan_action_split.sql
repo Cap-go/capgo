@@ -57,9 +57,9 @@ $$;
 GRANT ALL ON FUNCTION is_mau_exceeded_by_org(uuid) TO authenticated, service_role;
 GRANT ALL ON FUNCTION is_storage_exceeded_by_org(uuid) TO authenticated, service_role;
 GRANT ALL ON FUNCTION is_bandwidth_exceeded_by_org(uuid) TO authenticated, service_role;
-GRANT ALL ON FUNCTION set_mau_exceeded_by_org(uuid, boolean) TO service_role;
-GRANT ALL ON FUNCTION set_storage_exceeded_by_org(uuid, boolean) TO service_role;
-GRANT ALL ON FUNCTION set_bandwidth_exceeded_by_org(uuid, boolean) TO service_role;
+GRANT ALL ON FUNCTION set_mau_exceeded_by_org(uuid, boolean) TO authenticated, service_role;
+GRANT ALL ON FUNCTION set_storage_exceeded_by_org(uuid, boolean) TO authenticated, service_role;
+GRANT ALL ON FUNCTION set_bandwidth_exceeded_by_org(uuid, boolean) TO authenticated, service_role;
 
 
 -- Create type for action enum
