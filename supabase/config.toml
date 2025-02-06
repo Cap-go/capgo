@@ -153,10 +153,7 @@ verify_jwt = false
 [functions.apikey]
 verify_jwt = false
 
-# SCRAPPING ENDPOINTS
-
-[functions.scrapping]
-verify_jwt = false
+# FILES ENDPOINTS
 
 [functions.files]
 verify_jwt = false
