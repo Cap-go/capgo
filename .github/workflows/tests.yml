@@ -48,11 +48,14 @@ jobs:
         run: bun install   
       - name: Start Supabase Edge Functions
         run: |
+          mkfifo function_logs.txt
           supabase functions serve > function_logs.txt 2>&1 &
           echo $! > functions.pid
           echo "Waiting for Edge Functions to start..."
           sleep 5
-          tail -f function_logs.txt & 
+          cat function_logs.txt &
+          cat_pid=$!
+          echo $cat_pid > cat.pid
       - name: Check if edge functions are ready
         run: |
           response=$(curl -s -w "\n%{http_code}" http://localhost:54321/functions/v1/ok/)
@@ -67,5 +70,6 @@ jobs:
         if: always()
         run: |
           kill $(cat functions.pid) || true
-          pkill tail || true
+          kill $(cat cat.pid) || true
+          rm function_logs.txt
 
