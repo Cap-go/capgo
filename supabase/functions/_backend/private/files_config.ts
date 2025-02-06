@@ -25,7 +25,7 @@ app.get('/', (c: Context) => {
   // const randomPU = Math.random()
   const randomTUS = Math.random()
   const forcePartialUpload = randomTUS < 0.5
-  const forceTUSUpload = randomTUS < 0.3
+  // const forceTUSUpload = randomTUS < 0.3
   return c.json({
     partialUpload: true,
     partialUploadForced: forcePartialUpload,
@@ -33,6 +33,6 @@ app.get('/', (c: Context) => {
     maxChunkSize: MAX_CHUNK_SIZE_BYTES,
     alertUploadSize: ALERT_UPLOAD_SIZE_BYTES,
     TUSUpload: true,
-    TUSUploadForced: forceTUSUpload,
+    TUSUploadForced: true, // TODO: remove this when fix the issue with normal upload
   })
 })
