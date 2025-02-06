@@ -3,7 +3,7 @@ import type { Readable } from 'node:stream'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import { cwd, env, stderr, stdout } from 'node:process'
 import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST, BASE_URL } from './test-utils'
 
@@ -130,20 +130,20 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
   try {
     const output = execSync(command, options)
 
-    if (logOutput)
-      console.log('CLI execution successful:\n', output)
+    if (logOutput) {
+      console.log('CLI execution successful')
+      stdout.write(output)
+    }
 
     return output.toString()
   }
   catch (error: any) {
-    console.log('CLI execution failed with error:', error)
-    const errorOutput = error.stdout?.toString() ?? ''
-    const errorMessage = error.stderr?.toString() ?? ''
-    const fullError = `Command: ${command}\nStdout: ${errorOutput}\nStderr: ${errorMessage}\nError: ${error.message}`
+    if (logOutput) {
+      console.error('CLI execution failed')
+      stderr.write(error.stderr)
+      stdout.write(error.stdout)
+    }
 
-    if (logOutput)
-      console.error('CLI execution failed:\n', fullError)
-
-    return fullError
+    return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message
   }
 }
