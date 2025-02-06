@@ -35,6 +35,8 @@ jobs:
         run: supabase --version
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
+      - name: Run Supabase Test DB
+        run: supabase test db
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -46,13 +48,28 @@ jobs:
       - name: Install dependencies
         run: bun install   
       - uses: JarvusInnovations/background-action@v1
-        name: Start Edge Functions
+        name: Bootstrap Edge server
         with:
-          run: supabase functions serve
+          run: supabase functions serve &
           wait-on: |
-            http://localhost:54321/functions/v1/ok/
-          tail: true
-          wait-for: 15s
+            http-get://127.0.0.1:54321/functions/v1/ok
+          # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
+          # See wait-on section below for all resource types and prefixes
+
+          tail: stderr,stdout  # true = stderr,stdout
+          # This will allow you to monitor the progress live
+
+          log-output-resume: stderr,stdout 
+          # Eliminates previously output stderr log entries from post-run output
+
+          wait-for: 1m
+
+          log-output: stderr,stdout # same as true
+
+          log-output-if: true
+          # failure = exit-early or timeout
+
+          working-directory: .
       - name: Run tests
         run: bun run test:all
 
