@@ -35,7 +35,6 @@ jobs:
         run: supabase --version
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
-      - run: supabase test db
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -46,30 +45,12 @@ jobs:
         run: bunx @capgo/cli@latest -v  
       - name: Install dependencies
         run: bun install   
-      - name: Start Supabase Edge Functions
-        run: |
-          mkfifo function_logs.txt
-          supabase functions serve > function_logs.txt 2>&1 &
-          echo $! > functions.pid
-          echo "Waiting for Edge Functions to start..."
-          sleep 5
-          cat function_logs.txt &
-          cat_pid=$!
-          echo $cat_pid > cat.pid
-      - name: Check if edge functions are ready
-        run: |
-          response=$(curl -s -w "\n%{http_code}" http://localhost:54321/functions/v1/ok/)
-          status_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n1)
-          if [ "$status_code" != "200" ] || [ "$body" != '{"status":"ok"}' ]; then
-            echo "Invalid response: $response"
-            exit 1
-          fi
-      - run: bun run test:all
-      - name: Cleanup
-        if: always()
-        run: |
-          kill $(cat functions.pid) || true
-          kill $(cat cat.pid) || true
-          rm function_logs.txt
+      - uses: JarvusInnovations/background-action@v1
+        name: Start Edge Functions
+        with:
+          run: supabase functions serve
+          wait-on: http://localhost:54321/functions/v1/ok/
+          wait-for: '{"status":"ok"}'
+      - name: Run tests
+        run: bun run test:all
 
