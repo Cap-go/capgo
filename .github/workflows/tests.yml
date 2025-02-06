@@ -46,6 +46,13 @@ jobs:
         run: bunx @capgo/cli@latest -v  
       - name: Install dependencies
         run: bun install   
+      - name: Start Supabase Edge Functions
+        run: |
+          supabase functions serve > function_logs.txt 2>&1 &
+          echo $! > functions.pid
+          echo "Waiting for Edge Functions to start..."
+          sleep 5
+          tail -f function_logs.txt & 
       - name: Check if edge functions are ready
         run: |
           response=$(curl -s -w "\n%{http_code}" http://localhost:54321/functions/v1/ok/)
@@ -56,4 +63,9 @@ jobs:
             exit 1
           fi
       - run: bun run test:all
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $(cat functions.pid) || true
+          pkill tail || true
 
