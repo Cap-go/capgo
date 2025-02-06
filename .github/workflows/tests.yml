@@ -49,8 +49,10 @@ jobs:
         name: Start Edge Functions
         with:
           run: supabase functions serve
-          wait-on: http://localhost:54321/functions/v1/ok/
-          wait-for: '{"status":"ok"}'
+          wait-on: |
+            http://localhost:54321/functions/v1/ok/
+          tail: true
+          wait-for: 15s
       - name: Run tests
         run: bun run test:all
 
