@@ -1,8 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
-import { getSignedUrl as getSignedUrlSDK } from '@aws-sdk/s3-request-presigner'
-import ky from 'ky'
+import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { getEnv } from './utils.ts'
 
 export function initS3(c: Context) {
@@ -10,26 +8,20 @@ export function initS3(c: Context) {
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const useSsl = getEnv(c, 'S3_SSL') !== 'false'
-
   const storageRegion = getEnv(c, 'S3_REGION')
-  const params = {
-    credentials: {
-      accessKeyId: access_key_id,
-      secretAccessKey: access_key_secret,
-    },
-    endpoint: `${useSsl ? 'https' : 'http'}://${storageEndpoint}`,
+
+  console.log({ requestId: c.get('requestId'), context: 'initS3' })
+
+  return new S3Client({
+    endPoint: storageEndpoint,
+    port: undefined,
+    useSSL: useSsl,
+    accessKey: access_key_id,
+    secretKey: access_key_secret,
     region: storageRegion ?? 'us-east-1',
-    // not apply in supabase local
-    forcePathStyle: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
-    signingEscapePath: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
-    credentialDefaultProvider: () => () => Promise.reject(
-      new Error('Credential loading disabled'),
-    ),
-  }
-
-  console.log({ requestId: c.get('requestId'), context: 'initS3', params })
-
-  return new S3Client(params)
+    bucket: getEnv(c, 'S3_BUCKET'),
+    pathStyle: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
+  })
 }
 
 export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
@@ -51,22 +43,12 @@ export async function getPath(c: Context, record: Database['public']['Tables']['
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
   const client = initS3(c)
-
-  const command = new PutObjectCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-  })
-  const url = await getSignedUrlSDK(client, command, { expiresIn: expirySeconds })
-  return url
+  return client.presignedGetObject(fileId, { expirySeconds })
 }
 
 async function deleteObject(c: Context, fileId: string) {
   const client = initS3(c)
-  const command = new DeleteObjectCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-  })
-  await client.send(command)
+  await client.deleteObject(fileId)
   return true
 }
 
@@ -76,11 +58,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
   }
   const client = initS3(c)
   try {
-    const command = new HeadObjectCommand({
-      Bucket: getEnv(c, 'S3_BUCKET'),
-      Key: fileId,
-    })
-    await client.send(command)
+    await client.statObject(fileId)
     return true
   }
   catch (error) {
@@ -91,26 +69,14 @@ async function checkIfExist(c: Context, fileId: string | null) {
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   const client = initS3(c)
-  const command = new GetObjectCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-  })
-  const url = await getSignedUrlSDK(client, command, { expiresIn: expirySeconds })
-  return url
+  return client.presignedGetObject(fileId, { expirySeconds })
 }
 
 async function getSize(c: Context, fileId: string) {
   const client = initS3(c)
-  const command = new HeadObjectCommand({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-  })
   try {
-    const url = await getSignedUrlSDK(client, command)
-    const response = await ky.head(url)
-    const contentLength = response.headers.get('content-length')
-    const size = contentLength ? Number.parseInt(contentLength, 10) : 0
-    return size
+    const stat = await client.statObject(fileId)
+    return stat.size
   }
   catch (error) {
     console.log({ requestId: c.get('requestId'), context: 'getSize', error })
