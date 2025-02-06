@@ -48,6 +48,12 @@ jobs:
         run: bun install   
       - name: Check if edge functions are ready
         run: |
-          curl --retry 5 --retry-delay 2 -i http://localhost:54321/functions/v1/ok/
+          response=$(curl -s -w "\n%{http_code}" http://localhost:54321/functions/v1/ok/)
+          status_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n1)
+          if [ "$status_code" != "200" ] || [ "$body" != '{"status":"ok"}' ]; then
+            echo "Invalid response: $response"
+            exit 1
+          fi
       - run: bun run test:all
 
