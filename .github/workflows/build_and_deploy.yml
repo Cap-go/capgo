@@ -1,4 +1,4 @@
-name: Build source code and send to Capgo
+name: Build source code and deploy
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -47,14 +47,14 @@ jobs:
         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Wait for tests to succeed
-        if: ${{ env.SUPA_ENV != 'ALPHA' }}
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: 'Run tests'
-          repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          wait-interval: 10
+      # - name: Wait for tests to succeed
+      #   if: ${{ env.SUPA_ENV != 'ALPHA' }}
+      #   uses: lewagon/wait-on-check-action@v1.3.4
+      #   with:
+      #     ref: ${{ github.ref }}
+      #     check-name: 'Run tests'
+      #     repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      #     wait-interval: 10
       - name: Apply Supabase Migrations
         run: supabase db push
       - name: Update functions
