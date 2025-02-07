@@ -54,13 +54,17 @@ export async function resetAndSeedAppDataStats(appId: string) {
 }
 
 export function getSupabaseClient(): SupabaseClient<Database> {
-  const supabaseUrl = env.SUPABASE_URL ?? ''
-  const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
-  return createClient<Database>(supabaseUrl, supabaseServiceKey)
+  const supabaseUrl = env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
+  const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
+    db: {
+      schema: 'public'
+    }
+  })
 }
 
 export async function seedTestData(supabase: SupabaseClient, appId: string) {
-  const { error } = await supabase.rpc('seed_test_data', { p_app_id: appId })
+  const { error } = await supabase.rpc('reset_and_seed_app_data', { p_app_id: appId })
   if (error)
     throw error
 }

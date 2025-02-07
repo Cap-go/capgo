@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { getBaseData, getSupabaseClient, resetAndSeedAppData } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.channel_deletion'
-const FUNCTIONS_URL = 'http://127.0.0.1:54321/functions/v1'
+const FUNCTIONS_URL = process.env.FUNCTIONS_URL ?? 'http://127.0.0.1:54321/functions/v1'
 
 async function setupChannel(channelName: string, allowSelfSet: boolean) {
   const { error } = await getSupabaseClient()
