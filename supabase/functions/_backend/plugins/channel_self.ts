@@ -1,8 +1,9 @@
 // channel self old function
-import { Context, Hono } from '@hono/hono'
+import type { Context } from '@hono/hono'
 import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
+import { Hono } from '@hono/hono'
 import { format, tryParse } from '@std/semver'
 import { z } from 'zod'
 import { BRES, getBody } from '../utils/hono.ts'
