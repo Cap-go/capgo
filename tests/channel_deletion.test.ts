@@ -62,6 +62,13 @@ beforeAll(async () => {
 
   await resetAndSeedAppData(APPNAME)
   
+  // Debug: Check all channels after seeding
+  const { data: allChannels } = await getSupabaseClient()
+    .from('channels')
+    .select('*')
+    .eq('app_id', APPNAME)
+  console.log('All channels after seeding:', allChannels)
+  
   const { data: channels, error: findError } = await getSupabaseClient()
     .from('channels')
     .select('*')

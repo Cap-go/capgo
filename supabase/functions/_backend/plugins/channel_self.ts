@@ -1,10 +1,9 @@
 // channel self old function
-import type { Context } from '@hono/hono'
+import { Context, Hono } from '@hono/hono'
 import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
-import { Hono } from '@hono/hono'
 import { z } from 'zod'
 import { BRES, getBody } from '../utils/hono.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -49,7 +48,7 @@ export const jsonRequestSchema = z.object({
   return val
 })
 
-async function post(c: Context, body: DeviceLink): Promise<Response> {
+async function post(c: Context<any, any, {}>, body: DeviceLink): Promise<Response> {
   console.log({ requestId: c.get('requestId'), context: 'post channel self body', body })
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
@@ -265,7 +264,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   return c.json(BRES)
 }
 
-async function put(c: Context, body: DeviceLink): Promise<Response> {
+async function put(c: Context<any, any, {}>, body: DeviceLink): Promise<Response> {
   console.log({ requestId: c.get('requestId'), context: 'put channel self body', body })
   let {
     version_name,
@@ -408,7 +407,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   }, 400)
 }
 
-async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
+async function deleteOverride(c: Context<any, any, {}>, body: DeviceLink): Promise<Response> {
   console.log({ requestId: c.get('requestId'), context: 'delete channel self body', body })
   let {
     version_build,
