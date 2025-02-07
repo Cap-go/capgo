@@ -48,7 +48,7 @@ export const jsonRequestSchema = z.object({
   return val
 })
 
-async function post(c: Context<any, any, {}>, body: DeviceLink): Promise<Response> {
+async function post(c: Context<any, any, unknown>, body: DeviceLink): Promise<Response> {
   console.log({ requestId: c.get('requestId'), context: 'post channel self body', body })
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
@@ -264,7 +264,7 @@ async function post(c: Context<any, any, {}>, body: DeviceLink): Promise<Respons
   return c.json(BRES)
 }
 
-async function put(c: Context<any, any, {}>, body: DeviceLink): Promise<Response> {
+async function put(c: Context<any, any, unknown>, body: DeviceLink): Promise<Response> {
   console.log({ requestId: c.get('requestId'), context: 'put channel self body', body })
   let {
     version_name,
@@ -407,7 +407,7 @@ async function put(c: Context<any, any, {}>, body: DeviceLink): Promise<Response
   }, 400)
 }
 
-async function deleteOverride(c: Context<any, any, {}>, body: DeviceLink): Promise<Response> {
+async function deleteOverride(c: Context<any, any, unknown>, body: DeviceLink): Promise<Response> {
   console.log({ requestId: c.get('requestId'), context: 'delete channel self body', body })
   let {
     version_build,
