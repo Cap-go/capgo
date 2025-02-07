@@ -62,18 +62,12 @@ beforeAll(async () => {
 
   await resetAndSeedAppData(APPNAME)
   
-  // Debug: Check all channels after seeding
-  const { data: allChannels } = await getSupabaseClient()
-    .from('channels')
-    .select('*')
-    .eq('app_id', APPNAME)
-  console.log('All channels after seeding:', allChannels)
-  
   const { data: channels, error: findError } = await getSupabaseClient()
     .from('channels')
     .select('*')
     .eq('name', 'production')
     .eq('app_id', APPNAME)
+    .eq('owner_org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
     .limit(1)
   
   if (findError || !channels || channels.length === 0) {
