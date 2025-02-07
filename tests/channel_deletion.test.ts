@@ -104,6 +104,7 @@ describe('channel deletion tests', () => {
         .from('channels')
         .select('id, name, allow_device_self_set')
         .eq('id', productionChannelId)
+        .eq('owner_org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
         .single()
       
       expect(initialError).toBeNull()
@@ -176,6 +177,7 @@ describe('channel deletion tests', () => {
         .from('channels')
         .select('id, name, allow_device_self_set')
         .eq('id', productionChannelId)
+        .eq('owner_org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
         .single()
 
       expect(initialError).toBeNull()
@@ -202,6 +204,7 @@ describe('channel deletion tests', () => {
         .from('channels')
         .select('id, name, allow_device_self_set')
         .eq('id', productionChannelId)
+        .eq('owner_org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
         .single()
 
       expect(channelAfterUnsetError).toBeNull()
