@@ -137,6 +137,9 @@
         "pattern": "api-preprod.capgo.app",
         "custom_domain": true
       },
+      "observability": {
+        "enabled": true
+      },
       "analytics_engine_datasets": [
         {
           "binding": "DEVICE_USAGE",
@@ -182,6 +185,9 @@
       "route": {
         "pattern": "api-alpha.capgo.app",
         "custom_domain": true
+      },
+      "observability": {
+        "enabled": true
       },
       "analytics_engine_datasets": [
         {

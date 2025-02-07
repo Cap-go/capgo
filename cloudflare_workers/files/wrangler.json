@@ -85,6 +85,9 @@
   "env": {
     "preprod": {
       "name": "capgo_files-preprod",
+      "observability": {
+        "enabled": true
+      },
       "routes": [
         {
           "pattern": "files-preprod.capgo.app",
@@ -121,6 +124,9 @@
     },
     "alpha": {
       "name": "capgo_files-alpha",
+      "observability": {
+        "enabled": true
+      },
       "routes": [
         {
           "pattern": "files-alpha.capgo.app",

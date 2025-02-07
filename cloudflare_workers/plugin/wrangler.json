@@ -152,6 +152,9 @@
           "zone_name": "capgo.app"
         }
       ],
+      "observability": {
+        "enabled": true
+      },
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
@@ -200,6 +203,9 @@
     },
     "alpha": {
       "name": "capgo_plugin-alpha",
+      "observability": {
+        "enabled": true
+      },
       "routes": [
         {
           "pattern": "plugin-alpha.capgo.app",
