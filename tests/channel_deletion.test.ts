@@ -11,6 +11,7 @@ async function setupChannel(channelName: string, allowSelfSet: boolean) {
     .update({ allow_device_self_set: allowSelfSet })
     .eq('name', channelName)
     .eq('app_id', APPNAME)
+    .eq('owner_org', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
   
   if (error) {
     throw new Error(`Failed to setup channel: ${error.message}`)
