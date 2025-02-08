@@ -226,6 +226,28 @@ export function requestInfosPostgres(
     })
 }
 
+function transformManifest(manifest: string | null) {
+  if (!manifest)
+    return null
+  try {
+    const parsed = JSON.parse(manifest)
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+      // Convert back from optimized format [prefix, [file_name, file_hash], ...] to original format
+      const [prefix, ...files] = parsed
+      return files.map(([file_name, file_hash]: [string, string]) => ({
+        file_name,
+        file_hash,
+        s3_path: prefix + file_name,
+      }))
+    }
+    return parsed
+  }
+  catch (e) {
+    console.error('Failed to parse manifest:', e)
+    return null
+  }
+}
+
 export function requestInfosPostgresV2(
   platform: string,
   app_id: string,
@@ -261,7 +283,7 @@ export function requestInfosPostgresV2(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(transformManifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -297,7 +319,7 @@ export function requestInfosPostgresV2(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(transformManifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,

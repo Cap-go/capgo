@@ -153,25 +153,12 @@ app.get('/', async (c: Context) => {
       ),
     )
     console.log({ requestId: c.get('requestId'), context: 'pgCounts', pgCounts })
-    const diffChannelDevices = {
-      d1: 0,
-      supabase: 0,
-      percent: 0,
-    }
     const diff = await tables.reduce(async (acc: Promise<Record<string, { d1: number, supabase: number, percent: number }>>, table: string, index: number) => {
       const result = await acc
       const d1Count = (d1Counts[index]?.count as number) || 0
       const pgCount = pgCounts[index]?.count || 0
       const percent = (pgCount - d1Count) / d1Count
-      if (table !== 'channel_devices') {
-        result[table] = { d1: d1Count, supabase: pgCount, percent }
-      }
-      else {
-        diffChannelDevices.d1 = d1Count
-        diffChannelDevices.supabase = pgCount
-        diffChannelDevices.percent = percent
-        return result
-      }
+      result[table] = { d1: d1Count, supabase: pgCount, percent }
       if (d1Count <= pgCount) {
         console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table}` })
         await backgroundTask(c, syncMissingRows(c, table))
@@ -190,11 +177,10 @@ app.get('/', async (c: Context) => {
         status: 'ok',
         diff,
         diffPercentage,
-        diffChannelDevices,
       })
     }
     else {
-      return c.json({ status: 'Mismatch found', diff, diffChannelDevices, diffPercentage }, 200)
+      return c.json({ status: 'Mismatch found', diff, diffPercentage }, 200)
     }
   }
   catch (e) {
