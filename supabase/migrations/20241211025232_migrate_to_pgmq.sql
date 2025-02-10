@@ -522,7 +522,7 @@ $$;
 -- Clean up job run details for frequent jobs
 SELECT cron.schedule(
     'cleanup-frequent-job-details',
-    '1 hour', -- Run every hour
+    '0 * * * *', -- Run every hour
     $$
     DELETE FROM cron.job_run_details 
     WHERE job_id IN (
@@ -533,6 +533,3 @@ SELECT cron.schedule(
     AND end_time < now() - interval '1 hour'
     $$
 );
-
--- alter system set pg_net.batch_size to 2000;
--- select net.worker_restart();
