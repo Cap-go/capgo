@@ -154,3 +154,13 @@ CREATE INDEX IF NOT EXISTS idx_orgs_id ON orgs(id);
 CREATE INDEX IF NOT EXISTS idx_orgs_created_by ON orgs(created_by);
 CREATE INDEX IF NOT EXISTS idx_orgs_customer_id ON orgs(customer_id);
 
+CREATE TABLE IF NOT EXISTS stripe_info (
+    id PRIMARY KEY,
+    customer_id TEXT,
+    status TEXT,
+    trial_at TEXT,
+    is_good_plan BOOLEAN,
+    mau_exceeded BOOLEAN,
+    storage_exceeded BOOLEAN,
+    bandwidth_exceeded BOOLEAN
+);

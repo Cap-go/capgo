@@ -97,11 +97,6 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
         }
       }
     }
-    // only 27194 app_versions
-    // only 25170 app_versions
-    console.log('operations', operations.length)
-    console.log('statements', statements.length)
-
     // Execute all statements in batch
     if (statements.length > 0) {
       console.log({
@@ -194,6 +189,16 @@ const TABLE_SCHEMAS: Record<string, TableSchema> = {
     management_email: 'TEXT',
     customer_id: 'TEXT',
   },
+  stripe_info: {
+    id: 'INTEGER',
+    customer_id: 'TEXT',
+    status: 'TEXT',
+    trial_at: 'TEXT',
+    is_good_plan: 'BOOLEAN',
+    mau_exceeded: 'BOOLEAN',
+    storage_exceeded: 'BOOLEAN',
+    bandwidth_exceeded: 'BOOLEAN',
+  },
 }
 
 function convertValue(value: any, type: string): any {
@@ -255,7 +260,7 @@ export function cleanFieldsAppVersions(record: any, table: string) {
 
     const type = schema[key]
     const convertedValue = convertValue(value, type)
-    if (convertedValue !== null) {
+    if (convertedValue !== null && convertedValue !== undefined) {
       // Make UUIDs lowercase
       if (UUID_COLUMNS.has(key) && typeof convertedValue === 'string') {
         cleanRecord[key] = convertedValue.toLowerCase()
