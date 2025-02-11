@@ -88,6 +88,32 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
   return false
 }
 
+export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: ReturnType<typeof getDrizzleClientD1>, orgId: string, actions: ('mau' | 'storage' | 'bandwidth')[]): Promise<boolean> {
+  try {
+    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
+    const subQuery = sql<boolean>`EXISTS (
+      SELECT 1
+      FROM ${schemaV2.stripe_info}
+      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${orgId})
+      AND (
+        (date(trial_at) > date('now'))
+        OR (
+          status = 'succeeded'
+          AND is_good_plan = 1
+          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
+        )
+      )
+    )`
+    const fullQuery = drizzleCient.select({ is_allowed: subQuery }).from(sql`(SELECT 1)`)
+    const result = await fullQuery
+    return result[0]?.is_allowed || false
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrgActionD1', error })
+  }
+  return false
+}
+
 export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
   try {
     // Assuming you have a way to get your database connection string

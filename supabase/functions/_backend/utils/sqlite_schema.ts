@@ -72,4 +72,15 @@ export const orgs = sqliteTable('orgs', {
   customer_id: text('customer_id'),
 })
 
+export const stripe_info = sqliteTable('stripe_info', {
+  id: text('id').primaryKey().notNull(),
+  customer_id: text('customer_id'),
+  status: text('status'),
+  trial_at: text('trial_at'),
+  is_good_plan: boolean('is_good_plan'),
+  mau_exceeded: boolean('mau_exceeded'),
+  storage_exceeded: boolean('storage_exceeded'),
+  bandwidth_exceeded: boolean('bandwidth_exceeded'),
+})
+
 export type AppVersionsType = typeof app_versions.$inferInsert

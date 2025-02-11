@@ -164,3 +164,7 @@ CREATE TABLE IF NOT EXISTS stripe_info (
     storage_exceeded BOOLEAN,
     bandwidth_exceeded BOOLEAN
 );
+CREATE INDEX IF NOT EXISTS idx_stripe_info_customer_id ON stripe_info(customer_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_info_status_is_good_plan ON stripe_info(status, is_good_plan);
+CREATE INDEX IF NOT EXISTS idx_stripe_info_trial_at ON stripe_info(trial_at);
+CREATE INDEX IF NOT EXISTS idx_stripe_info_exceeded ON stripe_info(mau_exceeded, storage_exceeded, bandwidth_exceeded);
