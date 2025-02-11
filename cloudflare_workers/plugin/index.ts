@@ -27,8 +27,6 @@ app.route('/plugin/ok', ok)
 app.route('/plugin/channel_self', channel_self)
 app.route('/plugin/updates', updates)
 app.route('/plugin/updates_v2', updates)
-app.route('/plugin/updates_stats', update_stats)
-app.route('/plugin/updates_debug', updates)
 app.route('/plugin/stats', stats)
 app.route('/plugin/latency_drizzle', latency_drizzle)
 
@@ -36,7 +34,6 @@ app.route('/plugin/latency_drizzle', latency_drizzle)
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
 app.route('/updates_v2', updates)
-app.route('/updates_debug', updates)
 app.route('/stats', stats)
 
 app.onError((e, c) => {
