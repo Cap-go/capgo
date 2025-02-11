@@ -4,7 +4,7 @@ CREATE EXTENSION "basejump-supabase_test_helpers";
 
 -- + 2 is for the count(*)
 -- -1 is for the pay as you go if statenent
-SELECT plan(((SELECT count(*) FROM plans)::integer * 13) + 2 - 2);
+SELECT plan(((SELECT count(*) FROM plans)::integer * 13) + 6);
 
 CREATE OR REPLACE FUNCTION my_tests(
 ) RETURNS SETOF text AS $$
@@ -15,6 +15,69 @@ DECLARE
   mau_count bigint;
   bandwidth_count bigint;
 BEGIN
+
+  -- Test action_type checks
+  UPDATE stripe_info 
+  SET mau_exceeded = false, storage_exceeded = false, bandwidth_exceeded = false, 
+      status = 'succeeded', is_good_plan = true,
+      trial_at = now() - interval '1 year'
+  WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
+  
+  RETURN NEXT ok(
+    is_paying_and_good_plan_org_action('046a36ac-e03c-4590-9257-bd6c9dba9ee8', ARRAY['mau']::action_type[]), 
+    'Should allow mau action when no limits exceeded and good plan'
+  );
+
+  -- Test individual MAU limit
+  UPDATE stripe_info 
+  SET mau_exceeded = true, storage_exceeded = false, bandwidth_exceeded = false
+  WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
+  
+  RETURN NEXT ok(
+    NOT is_paying_and_good_plan_org_action('046a36ac-e03c-4590-9257-bd6c9dba9ee8', ARRAY['mau']::action_type[]), 
+    'Should block mau action when only mau exceeded'
+  );
+
+  -- Test individual Storage limit
+  UPDATE stripe_info 
+  SET mau_exceeded = false, storage_exceeded = true, bandwidth_exceeded = false
+  WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
+  
+  RETURN NEXT ok(
+    NOT is_paying_and_good_plan_org_action('046a36ac-e03c-4590-9257-bd6c9dba9ee8', ARRAY['storage']::action_type[]), 
+    'Should block storage action when only storage exceeded'
+  );
+
+  -- Test individual Bandwidth limit
+  UPDATE stripe_info 
+  SET mau_exceeded = false, storage_exceeded = false, bandwidth_exceeded = true
+  WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
+  
+  RETURN NEXT ok(
+    NOT is_paying_and_good_plan_org_action('046a36ac-e03c-4590-9257-bd6c9dba9ee8', ARRAY['bandwidth']::action_type[]), 
+    'Should block bandwidth action when only bandwidth exceeded'
+  );
+
+  UPDATE stripe_info 
+  SET storage_exceeded = true, bandwidth_exceeded = true
+  WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
+  
+  RETURN NEXT ok(
+    NOT is_paying_and_good_plan_org_action('046a36ac-e03c-4590-9257-bd6c9dba9ee8', ARRAY['mau', 'storage', 'bandwidth']::action_type[]), 
+    'Should block all actions when all limits exceeded'
+  );
+
+  -- Test trial period
+  UPDATE stripe_info 
+  SET trial_at = now() + interval '1 day',
+      mau_exceeded = true, storage_exceeded = true, bandwidth_exceeded = true,
+      is_good_plan = false
+  WHERE customer_id = 'cus_Q38uE91NP8Ufqc';
+  
+  RETURN NEXT ok(
+    is_paying_and_good_plan_org_action('046a36ac-e03c-4590-9257-bd6c9dba9ee8', ARRAY['mau', 'storage', 'bandwidth']::action_type[]), 
+    'Should allow all actions during trial period regardless of limits'
+  );
 
   select count(*) from daily_mau where app_id='com.demo.app' into mau_count;
   RETURN NEXT ok(mau_count > 0, 'Demo app mau is > 0');

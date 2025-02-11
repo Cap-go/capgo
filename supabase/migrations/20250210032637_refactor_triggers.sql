@@ -1,6 +1,5 @@
 
 DROP TRIGGER IF EXISTS replicate_app_versions ON public.app_versions;
-DROP TRIGGER IF EXISTS replicate_devices_override ON public.devices_override;
 DROP TRIGGER IF EXISTS replicate_channels ON public.channels;
 DROP TRIGGER IF EXISTS replicate_channel_devices ON public.channel_devices;
 DROP TRIGGER IF EXISTS replicate_apps ON public.apps;
@@ -9,12 +8,6 @@ DROP TRIGGER IF EXISTS replicate_orgs ON public.orgs;
 -- Trigger for app_versions table
 CREATE TRIGGER replicate_app_versions
     AFTER INSERT OR UPDATE OR DELETE ON public.app_versions
-    FOR EACH ROW
-    EXECUTE FUNCTION public.trigger_http_queue_post_to_function_d1();
-
--- Trigger for devices_override table
-CREATE TRIGGER replicate_devices_override
-    AFTER INSERT OR UPDATE OR DELETE ON public.devices_override
     FOR EACH ROW
     EXECUTE FUNCTION public.trigger_http_queue_post_to_function_d1();
 
@@ -41,6 +34,9 @@ CREATE TRIGGER replicate_orgs
     AFTER INSERT OR UPDATE OR DELETE ON public.orgs
     FOR EACH ROW
     EXECUTE FUNCTION public.trigger_http_queue_post_to_function_d1();
+
+-- add id in stripe_info not primary key
+ALTER TABLE stripe_info ADD COLUMN id SERIAL;
 
 CREATE TRIGGER replicate_stripe_info
     AFTER INSERT OR UPDATE OR DELETE ON public.stripe_info
@@ -88,10 +84,3 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER replicate_apps
-    AFTER INSERT OR UPDATE OR DELETE ON public.apps
-    FOR EACH ROW
-    EXECUTE FUNCTION public.trigger_http_queue_post_to_function_d1('replicate_data', 'cloudflare_pp');
-
--- add id in stripe_info not primary key
-ALTER TABLE stripe_info ADD COLUMN id SERIAL;
