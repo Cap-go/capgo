@@ -110,7 +110,7 @@ describe('invalids /channel_self tests', () => {
   it('[POST] with a channel that does not allow self assign', async () => {
     const data = getBaseData(APPNAME)
 
-    const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
+    const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel || '').eq('app_id', APPNAME).select('id').single()
 
     expect(error).toBeNull()
 
@@ -122,7 +122,7 @@ describe('invalids /channel_self tests', () => {
       expect(responseError).toBe('channel_set_from_plugin_not_allowed')
     }
     finally {
-      const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
+      const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', data.channel || '').eq('app_id', APPNAME).select('id').single()
 
       expect(error).toBeNull()
     }
