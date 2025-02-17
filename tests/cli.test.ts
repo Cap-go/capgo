@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
-import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, responseOk } from './test-utils'
+import { getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, responseOk } from './test-utils'
 
 describe('tests CLI upload', () => {
   const id = randomUUID()
@@ -130,7 +130,7 @@ describe('tests CLI upload options in parallel', () => {
       .throwOnError()
 
     expect(error).toBeNull()
-    expect(data?.minUpdateVersion).not.toBe('1.0.0')
+    expect(data?.min_update_version).not.toBe('1.0.0')
   })
   it.concurrent('test --encrypted-checksum with external upload', async () => {
     const semver = getSemver()
@@ -212,7 +212,7 @@ describe('tests CLI upload options in parallel', () => {
 
       try {
         await supabase.from('org_users')
-          .insert({ user_id: testUserId, org_id: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', user_right: 'upload' })
+          .insert({ user_id: testUserId, org_id: ORG_ID, user_right: 'upload' })
           .throwOnError()
 
         try {
@@ -224,7 +224,7 @@ describe('tests CLI upload options in parallel', () => {
           await supabase.from('org_users')
             .delete()
             .eq('user_id', testUserId)
-            .eq('org_id', '046a36ac-e03c-4590-9257-bd6c9dba9ee8')
+            .eq('org_id', ORG_ID)
             .eq('user_right', 'upload')
             .throwOnError()
         }

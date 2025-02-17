@@ -5,6 +5,13 @@ import { createClient } from '@supabase/supabase-js'
 
 export const BASE_URL = `${env.SUPABASE_URL}/functions/v1`
 export const APIKEY_TEST = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
+export const ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+export const USER_ID = '6aa76066-55ef-4238-ade6-0b32334a4097'
+export const USER_EMAIL = 'test@capgo.app'
+export const TEST_EMAIL = 'test@test.com'
+export const PRODUCT_ID = 'prod_LQIregjtNduh4q'
+export const USER_ADMIN_EMAIL = 'admin@capgo.app'
+export const APP_NAME = 'com.demo.app'
 export const headers = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_TEST,

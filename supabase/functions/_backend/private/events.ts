@@ -22,7 +22,7 @@ app.post('/', async (c: Context) => {
     if (apikey_string) {
       const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, apikey_string, supabase, ['read'])
       if (!apikey)
-        return c.json({ status: 'Invalid apikey' }, 400)
+        return c.json({ status: 'Invalid apikey' }, 401)
     }
     else if (authorization) {
       const { data: auth, error } = await supabase.auth.getUser(

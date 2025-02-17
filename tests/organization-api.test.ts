@@ -2,21 +2,25 @@ import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
 
-const ORG_ID = '00000000-0000-0000-0000-000000000000'
+const ORG_ID = randomUUID()
+const id = randomUUID()
+const name = `Test Organization ${id}`
+
+console.log('ORG_ID', ORG_ID)
 
 beforeEach(async () => {
-  // await resetAndSeedAppData(APPNAME)
   const { data } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
   if (data) {
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   }
+  console.log('name', name)
   const { error } = await getSupabaseClient().from('orgs').insert({
     id: ORG_ID,
-    name: 'Test Organization',
-    management_email: 'test@test.com',
-    created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
+    name,
+    management_email: TEST_EMAIL,
+    created_by: USER_ID,
   })
   if (error)
     throw error
@@ -40,7 +44,7 @@ describe('[GET] /organization', () => {
     const type = z.object({ id: z.string(), name: z.string() })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data).toEqual({ id: ORG_ID, name: 'Test Organization' })
+    expect(safe.data).toEqual({ id: ORG_ID, name })
   })
 })
 
@@ -59,8 +63,8 @@ describe('[GET] /organization/members', () => {
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
     expect(safe.data?.length).toBe(1)
-    expect(safe.data?.[0].uid).toBe('6aa76066-55ef-4238-ade6-0b32334a4097')
-    expect(safe.data?.[0].email).toBe('test@capgo.app')
+    expect(safe.data?.[0].uid).toBe(USER_ID)
+    expect(safe.data?.[0].email).toBe(USER_EMAIL)
     expect(safe.data?.[0].role).toBe('super_admin')
   })
 })
@@ -72,7 +76,7 @@ describe('[POST] /organization/members', () => {
       method: 'POST',
       body: JSON.stringify({
         orgId: ORG_ID,
-        email: 'admin@capgo.app',
+        email: USER_ADMIN_EMAIL,
         invite_type: 'read',
       }),
     })
@@ -86,10 +90,10 @@ describe('[POST] /organization/members', () => {
     expect(safe.success).toBe(true)
     expect(safe.data?.status).toBe('OK')
 
-    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', 'admin@capgo.app').single()
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userError).toBeNull()
     expect(userData).toBeTruthy()
-    expect(userData?.email).toBe('admin@capgo.app')
+    expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
     const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
     expect(error).toBeNull()
@@ -101,10 +105,10 @@ describe('[POST] /organization/members', () => {
 
 describe('[DELETE] /organization/members', () => {
   it('delete organization member', async () => {
-    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', 'admin@capgo.app').single()
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userError).toBeNull()
     expect(userData).toBeTruthy()
-    expect(userData?.email).toBe('admin@capgo.app')
+    expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
     const { error } = await getSupabaseClient().from('org_users').insert({
       org_id: ORG_ID,
@@ -113,7 +117,7 @@ describe('[DELETE] /organization/members', () => {
     })
     expect(error).toBeNull()
 
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=admin@capgo.app`, {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
       headers,
       method: 'DELETE',
     })
@@ -186,8 +190,8 @@ describe.todo('[DELETE] /organization', () => {
     const { error } = await getSupabaseClient().from('orgs').insert({
       id,
       name: `Test Organization ${new Date().toISOString()}`,
-      management_email: 'test@test.com',
-      created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
     })
     expect(error).toBeNull()
 

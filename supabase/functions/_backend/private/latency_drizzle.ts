@@ -1,24 +1,16 @@
 import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { BRES } from '../utils/hono.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import * as schema from '../utils/postgress_schema.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
 
 export const app = new Hono()
 
 app.get('/', async (c: Context) => {
   try {
     const pgClient = getPgClient(c)
-    const drizzleCient = getDrizzleClient(pgClient as any)
-    const data = await drizzleCient
-      .select({
-        id: schema.apps.id,
-      })
-      .from(schema.apps)
-      .limit(1)
-      .then(data => data[0])
+    const res = await pgClient`select 1`
     closeClient(c, pgClient)
-    if (!data)
+    if (!res)
       return c.json({ status: 'Cannot post ok', error: 'Cannot get apps' }, 400)
     return c.json(BRES)
   }

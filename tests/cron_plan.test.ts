@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppDataStats } from './test-utils.ts'
+import { BASE_URL, getBaseData, getSupabaseClient, postUpdate, PRODUCT_ID, resetAndSeedAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.cron_plan'
 const ORG_ID = '046a36ac-e03c-4190-9257-bd6c9dba9ee9'
@@ -21,7 +21,7 @@ beforeEach(async () => {
         subscription_id: 'sub_2',
         customer_id: STRIPE_INFO_CUSTOMER_ID, // this is the stripe info that I will be using
         status: 'succeeded' as const,
-        product_id: 'prod_LQIregjtNduh4q',
+        product_id: PRODUCT_ID,
         trial_at: new Date(0).toISOString(),
         is_good_plan: true,
         plan_usage: 2,
@@ -39,10 +39,10 @@ beforeEach(async () => {
   const { error: orgError } = await supabase.from('orgs').upsert([
     {
       id: ORG_ID,
-      customer_id: 'cus_Q38uE91NP8Ufq1',
+      customer_id: STRIPE_INFO_CUSTOMER_ID,
       name: 'Test Org V2',
-      created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
-      management_email: 'test@example.com',
+      created_by: USER_ID,
+      management_email: TEST_EMAIL,
     },
   ], { onConflict: 'id' })
   if (orgError)

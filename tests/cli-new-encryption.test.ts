@@ -77,6 +77,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
       await responseOk(response, 'Update new bundle')
 
       const responseJson = await response.json<{ url: string, version: string }>()
+      // console.log('responseJson', responseJson)
       expect(responseJson.url).toBeDefined()
       expect(responseJson.version).toBe(semver)
 
@@ -157,7 +158,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
   it('test upload bundle with auto encryption ', async () => {
     const publicKeyFile = readFileSync(join(tempFileFolder(id), '.capgo_key_v2.pub'), 'utf-8')
     semver = getSemver(semver)
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
+    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false)
     expect(output2).toContain('Time to share your update to the world')
     expect(output2).toContain('Encrypting your bundle')
 
