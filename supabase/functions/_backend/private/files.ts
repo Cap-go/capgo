@@ -1,4 +1,5 @@
 import type { Context, Next } from '@hono/hono'
+import { getRuntimeKey } from 'hono/adapter'
 import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import { app as ok } from '../public/ok.ts'
@@ -39,6 +40,16 @@ app.all('*', (c) => {
 
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
+  // console.log('fileId', requestId)
+  if (getRuntimeKey() !== 'workerd') {
+    // serve file from supabase storage using they sdk
+    const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(requestId)
+
+    // console.log('publicUrl', data.publicUrl)
+    const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
+    // console.log('url', url)
+    return c.redirect(url)
+  }
 
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
 

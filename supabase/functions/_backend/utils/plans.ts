@@ -151,13 +151,16 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
 
           console.log(get_total_stats)
           if (get_total_stats.mau > (currentPlan?.mau || 0)) {
+            console.log({ requestId: c.get('requestId'), context: 'set_mau_exceeded', orgId, get_total_stats, currentPlan })
             await set_mau_exceeded(c, orgId, true)
           }
           if (get_total_stats.storage > (currentPlan?.storage || 0)) {
+            console.log({ requestId: c.get('requestId'), context: 'set_storage_exceeded', orgId, get_total_stats, currentPlan })
             await set_storage_exceeded(c, orgId, true)
           }
 
           if (get_total_stats.bandwidth > (currentPlan?.bandwidth || 0)) {
+            console.log({ requestId: c.get('requestId'), context: 'set_bandwidth_exceeded', orgId, get_total_stats, currentPlan })
             await set_bandwidth_exceeded(c, orgId, true)
           }
 

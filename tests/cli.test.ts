@@ -130,7 +130,7 @@ describe('tests CLI upload options in parallel', () => {
       .throwOnError()
 
     expect(error).toBeNull()
-    expect(data?.min_update_version).not.toBe('1.0.0')
+    expect(data?.min_update_version).toBe('1.0.0')
   })
   it.concurrent('test --encrypted-checksum with external upload', async () => {
     const semver = getSemver()

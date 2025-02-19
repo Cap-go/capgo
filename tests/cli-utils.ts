@@ -13,13 +13,20 @@ export const BASE_PACKAGE_JSON = `{
   "description": "An Amazing Test App",
   "dependencies": %DEPENDENCIES%,
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
+    "@capacitor/cli": "^7.0.0",
     "typescript": "^5.2.2"
   },
   "author": ""
 }`
 export const BASE_DEPENDENCIES = {
+  '@capacitor/android': '^7.0.0',
+  '@capacitor/core': '7.0.0',
+  '@capgo/capacitor-updater': '7.0.0',
+}
+export const BASE_DEPENDENCIES_OLD = {
   '@capacitor/android': '^6.0.0',
+  '@capacitor/core': '6.0.0',
+  '@capgo/capacitor-updater': '6.0.0',
 }
 export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
 
@@ -76,7 +83,7 @@ export function getSemver(semver = `1.0.${Date.now()}`) {
   return newSemver
 }
 
-export async function prepareCli(appId: string, id: string) {
+export async function prepareCli(appId: string, id: string, old = false) {
   const defaultConfig = generateCliConfig(appId)
   deleteTempFolders(id)
   mkdirSync(tempFileFolder(id), { recursive: true })
@@ -87,7 +94,7 @@ export async function prepareCli(appId: string, id: string) {
   mkdirSync(join(tempFileFolder(id), 'dist'), { recursive: true })
   writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(join(tempFileFolder(id), 'dist', 'index.html'), '')
-  setDependencies(BASE_DEPENDENCIES, id, appId)
+  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, id, appId)
 
   npmInstall(id)
 }

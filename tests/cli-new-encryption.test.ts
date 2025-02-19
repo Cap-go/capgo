@@ -160,7 +160,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     semver = getSemver(semver)
     const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false)
     expect(output2).toContain('Time to share your update to the world')
-    expect(output2).toContain('Encrypting your bundle')
+    expect(output2).toContain('Encrypting your bundle with V2')
 
     await testEncryption(publicKeyFile, output2)
   })
@@ -170,7 +170,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     const privateKeyFile = readFileSync(join(tempFileFolder(id), '.capgo_key_v2'), 'utf-8')
     const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-data-v2', `'${privateKeyFile}'`], id, false)
     expect(output4).toContain('Time to share your update to the world')
-    expect(output4).toContain('Encrypting your bundle')
+    expect(output4).toContain('Encrypting your bundle with V2')
 
     await testEncryption(privateKeyFile, output4, true)
   })
@@ -186,7 +186,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     semver = getSemver(semver)
     const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'wierd_file'], id, false)
     expect(output3).toContain('Time to share your update to the world')
-    expect(output3).toContain('Encrypting your bundle')
+    expect(output3).toContain('Encrypting your bundle with V2')
 
     await testEncryption(privateKeyFile, output3, true)
   })
@@ -216,11 +216,11 @@ describe('tests CLI upload no encryption', () => {
     semver = getSemver(semver)
     const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], id, false)
     expect(output2).toContain('Time to share your update to the world')
-    expect(output2).not.toContain('Encrypting your bundle')
+    expect(output2).not.toContain('Encrypting your bundle with V2')
 
     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1) as string
     expect(checksum).toBeDefined()
-    expect(checksum?.length).toBe(8)
+    expect(checksum?.length).toBe(64)
 
     const supabase = getSupabaseClient()
     const { data, error } = await supabase

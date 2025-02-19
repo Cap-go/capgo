@@ -3,6 +3,7 @@ import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
+import { app as files } from '../_backend/private/files.ts'
 import { app as files_config } from '../_backend/private/files_config.ts'
 
 const functionName = 'files'
@@ -19,6 +20,6 @@ if (sentryDsn) {
 appGlobal.use('*', logger())
 appGlobal.use('*', requestId())
 
-appGlobal.route('/config', files_config)
+appGlobal.route('/', files)
 
 Deno.serve(appGlobal.fetch)
