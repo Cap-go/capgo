@@ -79,34 +79,38 @@ CREATE OR REPLACE FUNCTION is_paying_and_good_plan_org_action(orgid uuid, action
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
-    org_customer_id text;
     exceeded boolean := false;
+    action action_type;
 BEGIN
-    -- Get customer_id once
-    SELECT o.customer_id INTO org_customer_id
-    FROM orgs o WHERE o.id = orgid;
+    -- Get exceeded status based on action type
+    FOREACH action IN ARRAY actions LOOP
+        CASE action
+            WHEN 'mau' THEN
+                SELECT mau_exceeded INTO exceeded FROM stripe_info 
+                WHERE customer_id = (SELECT customer_id FROM orgs WHERE id = orgid);
+            WHEN 'storage' THEN
+                SELECT storage_exceeded INTO exceeded FROM stripe_info
+                WHERE customer_id = (SELECT customer_id FROM orgs WHERE id = orgid);
+            WHEN 'bandwidth' THEN
+                SELECT bandwidth_exceeded INTO exceeded FROM stripe_info
+                WHERE customer_id = (SELECT customer_id FROM orgs WHERE id = orgid);
+        END CASE;
 
-    -- Check if any action is exceeded
-    SELECT 
-        CASE 
-            WHEN 'mau' = ANY(actions) AND mau_exceeded THEN true
-            WHEN 'storage' = ANY(actions) AND storage_exceeded THEN true
-            WHEN 'bandwidth' = ANY(actions) AND bandwidth_exceeded THEN true
-            ELSE false
-        END INTO exceeded
-    FROM stripe_info
-    WHERE customer_id = org_customer_id;
+        IF exceeded THEN
+            EXIT;
+        END IF;
+    END LOOP;
 
-    -- Return final check
-    RETURN EXISTS (
+    RETURN (SELECT EXISTS (
         SELECT 1
         FROM stripe_info
-        WHERE customer_id = org_customer_id
+        WHERE customer_id = (SELECT customer_id FROM orgs WHERE id = orgid)
         AND (
-            trial_at::date > now()::date
-            OR (status = 'succeeded' AND is_good_plan = true)
-            OR (is_good_plan = false AND NOT exceeded)
+            (status = 'succeeded' AND is_good_plan = true)
+            OR (subscription_id = 'free')
+            OR (trial_at::date - (now())::date > 0)
+            OR (is_good_plan = false AND exceeded = false) -- Allow if specific action is not exceeded
         )
-    );
-END;
+    ));
+End;
 $$;
