@@ -10,15 +10,15 @@ BEGIN
     FROM orgs o WHERE o.id = orgid;
 
     -- Check if any action is exceeded
-    SELECT 
-        CASE 
-            WHEN 'mau' = ANY(actions) AND mau_exceeded THEN true
-            WHEN 'storage' = ANY(actions) AND storage_exceeded THEN true
-            WHEN 'bandwidth' = ANY(actions) AND bandwidth_exceeded THEN true
-            ELSE false
-        END INTO exceeded
-    FROM stripe_info
-    WHERE customer_id = org_customer_id;
+    SELECT EXISTS (
+        SELECT 1 FROM stripe_info
+        WHERE customer_id = org_customer_id
+        AND (
+            ('mau' = ANY(actions) AND mau_exceeded)
+            OR ('storage' = ANY(actions) AND storage_exceeded)
+            OR ('bandwidth' = ANY(actions) AND bandwidth_exceeded)
+        )
+    ) INTO exceeded;
 
     -- Return final check
     RETURN EXISTS (
@@ -26,9 +26,9 @@ BEGIN
         FROM stripe_info
         WHERE customer_id = org_customer_id
         AND (
-            trial_at::date > now()::date
+            trial_at::date - (now())::date > 0
             OR (status = 'succeeded' AND is_good_plan = true)
-            OR (is_good_plan = false AND NOT exceeded)
+            OR (status = 'succeeded' AND is_good_plan = false AND NOT exceeded)
         )
     );
 END;
