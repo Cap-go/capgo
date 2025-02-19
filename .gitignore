@@ -83,3 +83,4 @@ internal/files-api-dev/go.sum
 ._.DS_Store
 internal/forgr-key.jks
 internal/forgr-key.jks.base64
+internal/electric/.env.prod
