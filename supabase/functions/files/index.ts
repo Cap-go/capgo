@@ -4,7 +4,6 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app as files } from '../_backend/private/files.ts'
-import { app as files_config } from '../_backend/private/files_config.ts'
 
 const functionName = 'files'
 const appGlobal = new Hono().basePath(`/${functionName}`)
