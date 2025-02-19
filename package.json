@@ -214,7 +214,7 @@
     "vite-plugin-pwa": "0.21.1",
     "vite-plugin-vue-layouts": "0.11.0",
     "vitest": "3.0.4",
-    "vue-tsc": "2.2.0",
+    "vue-tsc": "2.2.2",
     "wrangler": "^3.105.1"
   },
   "husky": {
