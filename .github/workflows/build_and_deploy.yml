@@ -12,7 +12,7 @@ on:
 jobs:
   supabase_deploy:
     runs-on: ubuntu-latest
-    name: "Build code and deploy to Supabase"
+    name: Build code and deploy to Supabase
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
         uses: lewagon/wait-on-check-action@v1.3.4
         with:
           ref: ${{ github.ref }}
-          check-name: 'Run tests'
+          check-name: Run tests
           repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           wait-interval: 10
       - name: Apply Supabase Migrations
