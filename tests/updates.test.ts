@@ -51,7 +51,7 @@ describe('[POST] /updates', () => {
   })
 })
 
-describe.only('[POST] /updates parallel tests', () => {
+describe('[POST] /updates parallel tests', () => {
   it('with new device', async () => {
     const uuid = randomUUID().toLowerCase()
 
