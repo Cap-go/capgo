@@ -108,10 +108,10 @@ beforeAll(async () => {
   await resetAndSeedAppDataStats(APP_NAME_STATS)
 })
 
-// afterAll(async () => {
-//   await resetAppData(APP_NAME_STATS)
-//   await resetAppDataStats(APP_NAME_STATS)
-// })
+afterAll(async () => {
+  await resetAppData(APP_NAME_STATS)
+  await resetAppDataStats(APP_NAME_STATS)
+})
 
 describe('stats Action Types', () => {
   it('test ALL_STATS_ACTIONS should contain all possible stats actions', () => {
