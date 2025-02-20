@@ -2,7 +2,7 @@
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
-import { ref, shallowRef, watch, watchEffect } from 'vue'
+import { ref, shallowRef, watch, watchEffect, h } from 'vue'
 import { useRouter } from 'vue-router'
 import IconPlans from '~icons/material-symbols/price-change'
 import IconNotification from '~icons/mdi/message-notification'
@@ -12,6 +12,9 @@ import IconBilling from '~icons/mingcute/bill-fill'
 import { openPortal } from '~/services/stripe'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+import type { FunctionalComponent } from 'vue'
+import type { SVGAttributes } from '@vue/runtime-dom'
+import CurrencyIcon from '~icons/heroicons/currency-euro'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -81,13 +84,26 @@ watchEffect(() => {
     organizationTabs.value.push(
       {
         label: 'plans',
-        icon: shallowRef(IconPlans),
+        icon: IconPlans,
         key: '/dashboard/settings/organization/plans',
       },
     )
   }
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
+  }
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+    && !organizationTabs.value.find(tab => tab.label === 'tokens')) {
+    organizationTabs.value.push(
+      {
+        label: 'tokens',
+        icon: CurrencyIcon,
+        key: '/dashboard/settings/organization/tokens',
+      },
+    )
+  }
+  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'tokens')
   }
   if (!Capacitor.isNativePlatform()
     && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
@@ -109,7 +125,7 @@ watchEffect(() => {
     // push it 2 before the last tab
     organizationTabs.value.splice(tabs.value.length - 2, 0, {
       label: 'usage',
-      icon: shallowRef(IconPlans) as any,
+      icon: IconPlans as any,
       key: '/dashboard/settings/usage',
     })
   }
