@@ -2,7 +2,7 @@ import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, getBaseData, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, BASE_URL, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APP_NAME_STATS = `${APP_NAME}.${id}`
@@ -71,11 +71,6 @@ const POSSIBLE_STATS_ACTIONS = [
 
 const ALL_STATS_ACTIONS = [...POSSIBLE_STATS_ACTIONS]
 
-function getVersionFromAction(action: string): string {
-  // 1.0.0-action format
-  return `1.0.0-${action}.1`
-}
-
 async function postStats(data: object) {
   const response = await fetch(`${BASE_URL}/stats`, {
     method: 'POST',
@@ -83,24 +78,6 @@ async function postStats(data: object) {
     body: JSON.stringify(data),
   })
   return response
-}
-
-async function createAppVersions(version: string) {
-  const supabase = getSupabaseClient()
-  const { error, data } = await supabase.from('app_versions').upsert({
-    app_id: APP_NAME_STATS,
-    name: version,
-    owner_org: ORG_ID,
-  }, {
-    onConflict: 'app_id,name',
-  }).select('id,name').single()
-  if (error) {
-    console.error(`Error creating app_version for ${version}:`, error)
-  }
-  if (!data) {
-    throw new Error(`Error creating app_version for ${version}: no data`)
-  }
-  return data
 }
 
 beforeAll(async () => {
@@ -140,7 +117,7 @@ describe('test valid and invalid cases of version_build', () => {
 
     // Test valid version_build
     baseData.version_build = getVersionFromAction('set')
-    const version = await createAppVersions(baseData.version_build)
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
 
     let response = await postStats(baseData)
@@ -183,7 +160,7 @@ describe('[POST] /stats', () => {
     baseData.action = 'set'
     baseData.version_build = getVersionFromAction('set')
 
-    const version = await createAppVersions(baseData.version_build)
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
     const response = await postStats(baseData)
     expect(response.status).toBe(200)
@@ -217,7 +194,7 @@ describe('[POST] /stats', () => {
     for (const action of ALL_STATS_ACTIONS) {
       baseData.action = action
       baseData.version_build = getVersionFromAction(action)
-      const version = await createAppVersions(baseData.version_build)
+      const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
       baseData.version_name = version.name
       versionId = version.id
 
@@ -265,7 +242,7 @@ describe('[POST] /stats', () => {
     baseData.app_id = 'does.not.exist'
     baseData.action = 'get'
     baseData.version_build = getVersionFromAction('get')
-    const version = await createAppVersions(baseData.version_build)
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
     baseData.version_name = version.name
 
     const response = await postStats(baseData)
@@ -280,7 +257,7 @@ describe('[POST] /stats', () => {
   //   const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
   //   baseData.action = 'invalid_action' as StatsAction
   //   baseData.version_build = getVersionFromAction('invalid_action')
-  //   const version = await createAppVersions(baseData.version_build)
+  //   const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
   //   baseData.version_name = version.name
 
   //   const response = await postStats(baseData)

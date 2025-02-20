@@ -679,6 +679,7 @@ export function trackMetaSB(
 }
 
 export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  console.log({ requestId: c.get('requestId'), context: 'trackDevicesSB', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
   return supabaseAdmin(c)
     .from('devices')
     .upsert(
@@ -695,9 +696,8 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
         is_prod,
         is_emulator,
       },
-      { onConflict: 'device_id, app_id' },
+      { onConflict: 'device_id,app_id' },
     )
-    .eq('device_id', device_id.toLowerCase())
 }
 
 export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {

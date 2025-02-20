@@ -33,6 +33,28 @@ export function makeBaseData(appId: string) {
     is_prod: true,
   }
 }
+export function getVersionFromAction(action: string): string {
+  // 1.0.0-action format
+  return `1.0.0-${action}.1`
+}
+
+export async function createAppVersions(version: string, appId: string) {
+  const supabase = getSupabaseClient()
+  const { error, data } = await supabase.from('app_versions').upsert({
+    app_id: appId,
+    name: version,
+    owner_org: ORG_ID,
+  }, {
+    onConflict: 'app_id,name',
+  }).select('id,name').single()
+  if (error) {
+    console.error(`Error creating app_version for ${version}:`, error)
+  }
+  if (!data) {
+    throw new Error(`Error creating app_version for ${version}: no data`)
+  }
+  return data
+}
 
 export function getBaseData(appId: string): Partial<ReturnType<typeof makeBaseData>> {
   return structuredClone(makeBaseData(appId))

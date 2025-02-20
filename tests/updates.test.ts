@@ -3,10 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
-import { APP_NAME, getBaseData, getSupabaseClient, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
-const APP_NAME_UPDATE = `${APP_NAME}.updates.${id}`
+const APP_NAME_UPDATE = `${APP_NAME}.${id}`
 
 interface UpdateRes {
   error?: string
@@ -52,16 +52,21 @@ describe('[POST] /updates', () => {
 })
 
 describe.only('[POST] /updates parallel tests', () => {
-  it.only('with new device', async () => {
+  it('with new device', async () => {
     const uuid = randomUUID().toLowerCase()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.version_name = '1.1.0'
+    baseData.version_build = getVersionFromAction('get')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_UPDATE)
+    baseData.version_name = version.name
     baseData.device_id = uuid
+    console.log('uuid', uuid)
 
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
-    expect((await response.json<UpdateRes>()).checksum).toBe('3885ee49')
+    const jsonResponse = await response.json<UpdateRes>()
+    expect(jsonResponse.checksum).toBe('3885ee49')
+    console.log('response', jsonResponse)
 
     const { error, data } = await getSupabaseClient().from('devices').select().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE).single()
     console.log('error', error)
