@@ -1,9 +1,11 @@
 import type { ManifestEntry } from 'supabase/functions/_backend/utils/downloadUrl.ts'
 
-import { beforeAll, describe, expect, it } from 'vitest'
-import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData } from './test-utils.ts'
+import { randomUUID } from 'node:crypto'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.updates'
+const id = randomUUID()
+const APPNAME = `com.demo.app.updates.${id}`
 
 const manifest = [{ file_name: 'test', s3_path: '/test_file.html', file_hash: '1234567890' }]
 
@@ -18,6 +20,10 @@ interface UpdateRes {
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
+})
+afterAll(async () => {
+  await resetAppData(APPNAME)
+  await resetAppDataStats(APPNAME)
 })
 
 describe('update manifest scenarios', () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, setDependencies } from './cli-utils'
-import { resetAndSeedAppData } from './test-utils'
+import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
 describe('tests CLI metadata', () => {
   const id = randomUUID()
@@ -10,6 +10,11 @@ describe('tests CLI metadata', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
   it('should test compatibility table', async () => {
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id, false)
@@ -45,5 +50,4 @@ describe('tests CLI metadata', () => {
     // well, the local version doesn't exist, so I expect an empty string ???
     await assertCompatibilityTableColumns('@capacitor/android', '', '7.0.0', '❌')
   })
-  cleanupCli(id)
 })

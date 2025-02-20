@@ -1,10 +1,14 @@
-import { beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats } from './test-utils.ts'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const APPNAME_DEVICE = `${APP_NAME}.device`
 
 beforeAll(async () => {
   await Promise.all([resetAndSeedAppData(APPNAME_DEVICE), resetAndSeedAppDataStats(APPNAME_DEVICE)])
+})
+afterAll(async () => {
+  await resetAppData(APPNAME_DEVICE)
+  await resetAppDataStats(APPNAME_DEVICE)
 })
 
 describe('[GET] /device operations', () => {

@@ -1,10 +1,14 @@
-import { beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchBundle, headers, resetAndSeedAppData } from './test-utils.ts'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BASE_URL, fetchBundle, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.bundle'
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
+})
+afterAll(async () => {
+  await resetAppData(APPNAME)
+  await resetAppDataStats(APPNAME)
 })
 
 describe('[GET] /bundle operations', () => {

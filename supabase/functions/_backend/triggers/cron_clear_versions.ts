@@ -76,7 +76,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
           checksum: checksum ?? '',
           size,
           owner_org: version.owner_org,
-        })
+        }, { onConflict: 'id' })
     }
     catch (errorSize) {
       console.error({ requestId: c.get('requestId'), context: 'errorSize', notFound, v2Path, error: errorSize })

@@ -23,6 +23,7 @@
     "netlify:dev": "bunx netlify dev --port 8881",
     "test:front": "playwright test",
     "test:all": "vitest --bail=1 --mode=test tests/*",
+    "test:updates": "vitest --bail=1 --mode=test tests/updates*",
     "test:all:local": "LOCAL_CLI_PATH=true vitest --bail=1 --mode=test tests/*",
     "test:backend": "vitest --bail=1 --mode=test --exclude=tests/cli*",
     "test:cli": "vitest --bail=1 --mode=test tests/cli*",

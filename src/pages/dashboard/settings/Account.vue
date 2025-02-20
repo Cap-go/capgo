@@ -205,7 +205,7 @@ async function submit(form: { first_name: string, last_name: string, email: stri
 
   const { data: usr, error: dbError } = await supabase
     .from('users')
-    .upsert(updateData)
+    .upsert(updateData, { onConflict: 'id' })
     .select()
     .single()
 

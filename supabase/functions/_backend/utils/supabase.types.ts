@@ -2006,6 +2006,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      reset_app_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
+      reset_app_stats_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
       reset_and_seed_app_stats_data: {
         Args: {
           p_app_id: string

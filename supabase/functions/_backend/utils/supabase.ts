@@ -695,6 +695,7 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
         is_prod,
         is_emulator,
       },
+      { onConflict: 'device_id, app_id' },
     )
     .eq('device_id', device_id.toLowerCase())
 }

@@ -11,7 +11,7 @@ export const USER_EMAIL = 'test@capgo.app'
 export const TEST_EMAIL = 'test@test.com'
 export const PRODUCT_ID = 'prod_LQIregjtNduh4q'
 export const USER_ADMIN_EMAIL = 'admin@capgo.app'
-export const APP_NAME = 'com.demo.app'
+export const APP_NAME = 'com.demo'
 export const headers = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_TEST,
@@ -28,7 +28,7 @@ export function makeBaseData(appId: string) {
     version_code: '1',
     version_os: '13',
     version_name: '1.0.0',
-    plugin_version: '5.2.1',
+    plugin_version: '7.0.0',
     is_emulator: false,
     is_prod: true,
   }
@@ -53,9 +53,19 @@ export async function resetAndSeedAppData(appId: string) {
   if (error)
     throw error
 }
+export async function resetAppData(appId: string) {
+  const { error } = await getSupabaseClient().rpc('reset_app_data', { p_app_id: appId })
+  if (error)
+    throw error
+}
 
 export async function resetAndSeedAppDataStats(appId: string) {
   const { error } = await getSupabaseClient().rpc('reset_and_seed_app_stats_data', { p_app_id: appId })
+  if (error)
+    throw error
+}
+export async function resetAppDataStats(appId: string) {
+  const { error } = await getSupabaseClient().rpc('reset_app_stats_data', { p_app_id: appId })
   if (error)
     throw error
 }

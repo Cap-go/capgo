@@ -251,7 +251,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           channel_id: dataChannel.id,
           app_id,
           owner_org: dataChannel.owner_org,
-        })
+        }, { onConflict: 'device_id, app_id' })
       if (dbErrorDev) {
         console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
         return c.json({

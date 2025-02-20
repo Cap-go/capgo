@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
-import { APP_NAME, getBaseData, getSupabaseClient, ORG_ID, postUpdate, resetAndSeedAppData } from './test-utils.ts'
+import { APP_NAME, getBaseData, getSupabaseClient, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APP_NAME_UPDATE = `${APP_NAME}.updates`
+const id = randomUUID()
+const APP_NAME_UPDATE = `${APP_NAME}.updates.${id}`
 
 interface UpdateRes {
   error?: string
@@ -22,6 +23,10 @@ const updateNewScheme = z.object({
 
 beforeAll(async () => {
   await resetAndSeedAppData(APP_NAME_UPDATE)
+})
+afterAll(async () => {
+  await resetAppData(APP_NAME_UPDATE)
+  await resetAppDataStats(APP_NAME_UPDATE)
 })
 
 describe('[POST] /updates', () => {
@@ -46,8 +51,8 @@ describe('[POST] /updates', () => {
   })
 })
 
-describe('[POST] /updates parallel tests', () => {
-  it('with new device', async () => {
+describe.only('[POST] /updates parallel tests', () => {
+  it.only('with new device', async () => {
     const uuid = randomUUID().toLowerCase()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
@@ -59,6 +64,7 @@ describe('[POST] /updates parallel tests', () => {
     expect((await response.json<UpdateRes>()).checksum).toBe('3885ee49')
 
     const { error, data } = await getSupabaseClient().from('devices').select().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE).single()
+    console.log('error', error)
     expect(error).toBeNull()
     expect(data).toBeTruthy()
     expect(data?.app_id).toBe(baseData.app_id)

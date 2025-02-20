@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { fetch } from 'undici'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_TEST, getSupabaseClient, ORG_ID, resetAndSeedAppData, USER_ID } from './test-utils'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { APIKEY_TEST, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
 interface UploadResponse {
   url: string
@@ -14,6 +14,10 @@ describe('upload_link', async () => {
   const APPNAME = `com.demo.app.cli_${id}`
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
+  })
+  afterAll(async () => {
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
 
   it('should get upload url from supabase', async () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli } from './cli-utils'
-import { resetAndSeedAppData } from './test-utils'
+import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
 describe('tests CLI old checksum', () => {
   const id = randomUUID()
@@ -11,6 +11,11 @@ describe('tests CLI old checksum', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id, true)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
 
   it('test upload bundle with auto encryption ', async () => {
@@ -23,6 +28,4 @@ describe('tests CLI old checksum', () => {
     expect(checksum).toBeDefined()
     expect(checksum?.length).toBe(8)
   })
-
-  cleanupCli(id)
 })

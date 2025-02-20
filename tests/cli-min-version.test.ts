@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli } from './cli-utils'
-import { getSupabaseClient, resetAndSeedAppData } from './test-utils'
+import { getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
 describe('tests min version', () => {
   const id = randomUUID()
@@ -10,6 +10,11 @@ describe('tests min version', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
   it('should test auto min version flag', async () => {
     const supabase = getSupabaseClient()
@@ -54,5 +59,4 @@ describe('tests min version', () => {
     const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], id)
     expect(output2).toContain('it\'s your first upload with compatibility check')
   })
-  cleanupCli(id)
 })

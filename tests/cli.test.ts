@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
-import { getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, responseOk } from './test-utils'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
+import { getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk } from './test-utils'
 
 describe('tests CLI upload', () => {
   const id = randomUUID()
@@ -13,6 +13,11 @@ describe('tests CLI upload', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
 
   let semver = getSemver()

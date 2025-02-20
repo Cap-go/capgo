@@ -3,9 +3,9 @@ import { createDecipheriv, createHash, publicDecrypt, randomUUID } from 'node:cr
 import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
-import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, responseOk } from './test-utils'
+import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk } from './test-utils'
 
 describe('test key generation', () => {
   const id = randomUUID()
@@ -13,6 +13,11 @@ describe('test key generation', () => {
   beforeEach(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
 
   it('test key generation', async () => {
@@ -36,7 +41,6 @@ describe('test key generation', () => {
     expect(publicKeyData.length).toBeGreaterThan(1)
     expect(publicKeyData).toContain('PUBLIC KEY')
   })
-  cleanupCli(id)
 })
 
 describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
@@ -47,6 +51,9 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
   })
   async function testEncryption(publicKey: string, output2: string, skipUpdate = false) {
     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1) as string
@@ -190,7 +197,6 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
 
     await testEncryption(privateKeyFile, output3, true)
   })
-  cleanupCli(id)
 })
 
 describe('tests CLI upload no encryption', () => {
@@ -201,6 +207,9 @@ describe('tests CLI upload no encryption', () => {
   beforeEach(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
   })
 
   it('test upload without encryption NEW', async () => {
@@ -251,5 +260,4 @@ describe('tests CLI upload no encryption', () => {
 
     expect(zipEntries.length).toBe(2)
   })
-  cleanupCli(id)
 })

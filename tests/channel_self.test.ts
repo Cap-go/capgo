@@ -1,7 +1,7 @@
 import type { HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData } from './test-utils.ts'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.self_assign'
 
@@ -29,6 +29,10 @@ async function getResponseError(response: Response) {
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
+})
+afterAll(async () => {
+  await resetAppData(APPNAME)
+  await resetAppDataStats(APPNAME)
 })
 
 describe('invalids /channel_self tests', () => {
@@ -109,6 +113,8 @@ describe('invalids /channel_self tests', () => {
 
   it('[POST] with a channel that does not allow self assign', async () => {
     const data = getBaseData(APPNAME)
+    if (!data.channel)
+      throw new Error('channel is undefined')
 
     const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
 
@@ -244,7 +250,7 @@ it('[POST] /channel_self with default channel', async () => {
       channel_id: noAccessData!.id,
       device_id: data.device_id,
       owner_org: noAccessData!.owner_org,
-    })
+    }, { onConflict: 'device_id, app_id' })
 
     expect(overwriteUpsertError).toBeNull()
 
@@ -305,7 +311,7 @@ it('[PUT] /channel_self (with overwrite)', async () => {
     channel_id: noAccessId,
     device_id: data.device_id,
     owner_org: ownerOrg,
-  })
+  }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
 
@@ -397,7 +403,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     channel_id: productionId,
     device_id: data.device_id,
     owner_org: ownerOrg,
-  })
+  }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
 

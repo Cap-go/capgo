@@ -127,7 +127,7 @@ async function addNewApiKey() {
   }
   const { error } = await supabase
     .from('apikeys')
-    .upsert({ user_id: user.id, key: newApiKey, mode: 'all' })
+    .upsert({ user_id: user.id, key: newApiKey, mode: 'all', name: '' })
     .select()
 
   if (error)
@@ -228,7 +228,7 @@ watchEffect(async () => {
 
           <div :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-start sm:items-center">
-              <div class="inline-flex items-center justify-center shrink-0 text-xl font-bold text-white font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
+              <div class="inline-flex items-center justify-center text-xl font-bold text-white shrink-0 font-pj h-14 w-14 rounded-xl bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>

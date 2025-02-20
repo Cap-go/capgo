@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, postUpdate, PRODUCT_ID, resetAndSeedAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { BASE_URL, getBaseData, getSupabaseClient, postUpdate, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.cron_plan'
 const ORG_ID = '046a36ac-e03c-4190-9257-bd6c9dba9ee9'
@@ -98,6 +98,10 @@ beforeEach(async () => {
     .update({ bandwidth: 0 })
     .eq('app_id', APPNAME)
   expect(bandwidthError).toBeFalsy()
+})
+afterAll(async () => {
+  await resetAppData(APPNAME)
+  await resetAppDataStats(APPNAME)
 })
 
 describe('[POST] /triggers/cron_plan', () => {

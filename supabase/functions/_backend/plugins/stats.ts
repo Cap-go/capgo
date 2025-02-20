@@ -61,13 +61,15 @@ export const jsonRequestSchema = z.object({
 async function post(c: Context, body: AppStats) {
   try {
     if (isLimited(c, body.app_id)) {
+      console.log({ requestId: c.get('requestId'), context: 'Too many requests' })
       return c.json({
         message: 'Too many requests',
         error: 'too_many_requests',
-      }, 200)
+      }, 400)
     }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
+      console.log({ requestId: c.get('requestId'), context: `Cannot parse json: ${parseResult.error}` })
       return c.json({
         error: `Cannot parse json: ${parseResult.error}`,
       }, 400)
@@ -100,13 +102,14 @@ async function post(c: Context, body: AppStats) {
 
     if (coerce)
       version_build = format(coerce)
-    console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}` })
+    console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       app_id,
       plugin_version,
+      version_build,
       os_version: version_os,
       version: 0,
       is_emulator: is_emulator == null ? false : is_emulator,
@@ -131,7 +134,7 @@ async function post(c: Context, body: AppStats) {
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
-      }, 200)
+      }, 400)
     }
     const statsActions: StatsActions[] = []
 
@@ -147,13 +150,13 @@ async function post(c: Context, body: AppStats) {
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
-      }, 200)
+      }, 400)
     }
     if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
       return c.json({
         message: 'Action not allowed',
         error: 'action_not_allowed',
-      }, 200)
+      }, 400)
     }
     device.version = appVersion.id
     if (action === 'set' && !device.is_emulator && device.is_prod) {
@@ -186,6 +189,7 @@ async function post(c: Context, body: AppStats) {
     return c.json(BRES)
   }
   catch (e) {
+    console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
     return c.json({
       status: 'Error unknow',
       error: JSON.stringify(e),
@@ -202,6 +206,7 @@ app.post('/', async (c: Context) => {
     return post(c, body)
   }
   catch (e) {
+    console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
     return c.json({ status: 'Cannot post stats', error: JSON.stringify(e) }, 500)
   }
 })

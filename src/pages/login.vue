@@ -240,7 +240,7 @@ async function checkLogin() {
           .upsert({
             id,
             email,
-          })
+          }, { onConflict: 'id' })
           .select()
           .single()
       }
