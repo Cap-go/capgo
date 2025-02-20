@@ -27,8 +27,7 @@ BEGIN
         WHERE customer_id = org_customer_id
         AND (
             trial_at::date - (now())::date > 0
-            OR (status = 'succeeded' AND is_good_plan = true)
-            OR (status = 'succeeded' AND is_good_plan = false AND NOT exceeded)
+            OR (status = 'succeeded' AND NOT exceeded)
         )
     );
 END;
