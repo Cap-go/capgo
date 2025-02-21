@@ -427,7 +427,7 @@ export async function update(c: Context, body: AppInfos) {
   }
   if (!isV2 && getRuntimeKey() === 'workerd') {
     // make 20% chance to be v2
-    isV2 = Math.random() < 0.1
+    isV2 = Math.random() < 0.3
   }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
