@@ -20,6 +20,10 @@
     {
       "pattern": "api.capgo.app/stats",
       "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "updater.spencer.co/*",
+      "zone_name": "capgo.app"
     }
   ],
   "compatibility_date": "2024-09-23",

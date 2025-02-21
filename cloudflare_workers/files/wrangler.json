@@ -20,6 +20,10 @@
     {
       "pattern": "api.capgo.app/private/download_link",
       "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "updater.spencer.co/files*",
+      "zone_name": "capgo.app"
     }
   ],
   "compatibility_date": "2024-09-23",
@@ -180,4 +184,4 @@
       ]
     }
   }
-} 
+}
