@@ -60,16 +60,13 @@ describe('[POST] /updates parallel tests', () => {
     const version = await createAppVersions(baseData.version_build, APP_NAME_UPDATE)
     baseData.version_name = version.name
     baseData.device_id = uuid
-    console.log('uuid', uuid)
 
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
     const jsonResponse = await response.json<UpdateRes>()
     expect(jsonResponse.checksum).toBe('3885ee49')
-    console.log('response', jsonResponse)
 
     const { error, data } = await getSupabaseClient().from('devices').select().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE).single()
-    console.log('error', error)
     expect(error).toBeNull()
     expect(data).toBeTruthy()
     expect(data?.app_id).toBe(baseData.app_id)
