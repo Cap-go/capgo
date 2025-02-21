@@ -117,7 +117,7 @@ BEGIN
         -- Send request using http_post_helper
         PERFORM http_post_helper(
             'replicate_data',
-            'cloudflare_pp',
+            'cloudflare',
             jsonb_build_object('operations', batch_operations)
         );
         
