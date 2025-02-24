@@ -4,7 +4,7 @@
     "pattern": "api.capgo.app",
     "custom_domain": true
   },
-  "compatibility_date": "2024-09-23",
+  "compatibility_date": "2025-02-13",
   "main": "./index.ts",
   "compatibility_flags": ["nodejs_compat_v2"],
   "placement": {

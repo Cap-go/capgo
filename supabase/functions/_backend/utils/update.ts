@@ -425,10 +425,10 @@ export async function update(c: Context, body: AppInfos) {
   if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
     isV2 = true
   }
-  if (!isV2 && getRuntimeKey() === 'workerd') {
-    // make 20% chance to be v2
-    isV2 = Math.random() < 0.3
-  }
+  // if (!isV2 && getRuntimeKey() === 'workerd') {
+  //   // make 20% chance to be v2
+  //   isV2 = Math.random() < 0.3
+  // }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
     console.log({ requestId: c.get('requestId'), context: 'update2', isV2 })
