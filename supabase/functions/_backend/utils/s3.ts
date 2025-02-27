@@ -14,7 +14,7 @@ async function initS3(c: Context) {
     region: storageRegion ?? 'us-east-1',
     accessKeyId: access_key_id,
     secretAccessKey: access_key_secret,
-    endpoint: storageEndpoint,
+    url: `https://${storageEndpoint}`,
     plugins: [import('@aws-lite/s3')],
   })
   // console.log({ requestId: c.get('requestId'), context: 'initS3', client })
@@ -85,6 +85,7 @@ async function getSize(c: Context, fileId: string) {
       Bucket: getEnv(c, 'S3_BUCKET'),
       Key: fileId,
     })
+    console.log({ requestId: c.get('requestId'), context: 'getSize', stat, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })
     return stat.ContentLength ?? 0
   }
   catch (error) {
