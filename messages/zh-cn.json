@@ -101,6 +101,7 @@
   "by-clicking-on-them": "通过点击它们。",
   "canceled-delete": "已取消捆绑包删除，无法删除链接的捆绑包",
   "canceled-photo-selection": "您取消了图片选择",
+  "cannot-calculate-size-of-partial-bundle": "没有可用的部分捆绑包大小",
   "cannot-change-default-upload-channel": "无法更改默认上传通道，请检查浏览器控制台",
   "cannot-change-name": "无法更改名称，请检查浏览器控制台",
   "cannot-change-permission": "无法更改权限，请检查浏览器控制台",

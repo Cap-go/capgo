@@ -101,6 +101,7 @@
   "by-clicking-on-them": "bằng cách nhấp vào chúng.",
   "canceled-delete": "Đã hủy xóa gói, không thể xóa gói được liên kết",
   "canceled-photo-selection": "Bạn đã hủy việc chọn ảnh",
+  "cannot-calculate-size-of-partial-bundle": "Không có kích cỡ nào cho gói hàng một phần",
   "cannot-change-default-upload-channel": "Không thể thay đổi kênh tải lên mặc định, vui lòng kiểm tra bảng điều khiển trình duyệt",
   "cannot-change-name": "Không thể thay đổi tên, vui lòng kiểm tra bảng điều khiển trình duyệt",
   "cannot-change-permission": "Không thể thay đổi quyền, kiểm tra bảng điều khiển trình duyệt",

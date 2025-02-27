@@ -101,6 +101,7 @@
   "by-clicking-on-them": "indem Sie darauf klicken.",
   "canceled-delete": "Das Löschen des Bundles wurde abgebrochen. Ein verknüpftes Bundle kann nicht gelöscht werden",
   "canceled-photo-selection": "Sie haben die Bildauswahl abgebrochen",
+  "cannot-calculate-size-of-partial-bundle": "Keine Größe verfügbar für teilweises Bündel",
   "cannot-change-default-upload-channel": "Standard-Upload-Kanal kann nicht geändert werden, bitte überprüfen Sie die Browser-Konsole",
   "cannot-change-name": "Der Name kann nicht geändert werden. Bitte überprüfen Sie die Browserkonsole",
   "cannot-change-permission": "Berechtigungen können nicht geändert werden. Überprüfen Sie die Browserkonsole",

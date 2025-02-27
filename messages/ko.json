@@ -101,6 +101,7 @@
   "by-clicking-on-them": "그들을 클릭하여.",
   "canceled-delete": "번들 삭제가 취소되었습니다. 연결된 번들을 삭제할 수 없습니다.",
   "canceled-photo-selection": "사진 선택을 취소했습니다.",
+  "cannot-calculate-size-of-partial-bundle": "부분 번들에 사용 가능한 크기가 없습니다.",
   "cannot-change-default-upload-channel": "기본 업로드 채널을 변경할 수 없으니 브라우저 콘솔에서 확인하세요.",
   "cannot-change-name": "이름을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.",
   "cannot-change-permission": "권한을 변경할 수 없습니다. 브라우저 콘솔을 확인하세요.",

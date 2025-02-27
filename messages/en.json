@@ -7,6 +7,7 @@
   "Bandwidth": "Bandwidth",
   "Current": "Current",
   "Storage": "Storage",
+  "cannot-calculate-size-of-partial-bundle": "No size available for partial bundle",
   "ab-testing-progressive-deploy-conflict": "AB testing and progressive deploy cannot be enabled at the same time",
   "account": "account",
   "account-error": "Error while updating your account",

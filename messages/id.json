@@ -101,6 +101,7 @@
   "by-clicking-on-them": "dengan mengkliknya.",
   "canceled-delete": "Penghapusan paket dibatalkan, tidak dapat menghapus paket tertaut",
   "canceled-photo-selection": "Anda membatalkan pemilihan gambar",
+  "cannot-calculate-size-of-partial-bundle": "Tidak ada ukuran tersedia untuk bundel sebagian",
   "cannot-change-default-upload-channel": "Tidak dapat mengubah saluran unggahan default, silakan periksa konsol browser",
   "cannot-change-name": "Tidak dapat mengubah nama, silakan periksa konsol browser",
   "cannot-change-permission": "Tidak dapat mengubah izin, periksa konsol browser",

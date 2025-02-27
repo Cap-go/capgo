@@ -101,6 +101,7 @@
   "by-clicking-on-them": "en cliquant sur eux.",
   "canceled-delete": "Annulation de la suppression du paquet, impossible de supprimer un paquet lié",
   "canceled-photo-selection": "Vous avez annulé la sélection de l'image",
+  "cannot-calculate-size-of-partial-bundle": "Aucune taille disponible pour le lot partiel",
   "cannot-change-default-upload-channel": "Impossible de changer le canal de téléchargement par défaut, veuillez vérifier la console du navigateur",
   "cannot-change-name": "Impossible de changer le nom, veuillez vérifier la console du navigateur",
   "cannot-change-permission": "Impossible de modifier les autorisations, vérifiez la console du navigateur",

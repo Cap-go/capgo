@@ -101,6 +101,7 @@
   "by-clicking-on-them": "üzerlerine tıklayarak.",
   "canceled-delete": "Paket silme işlemi iptal edildi, bağlantılı paket silinemiyor",
   "canceled-photo-selection": "Resim seçimini iptal ettiniz",
+  "cannot-calculate-size-of-partial-bundle": "Kısmi paket için uygun boyut yok",
   "cannot-change-default-upload-channel": "Varsayılan yükleme kanalı değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin",
   "cannot-change-name": "Ad değiştirilemiyor, lütfen tarayıcı konsolunu kontrol edin",
   "cannot-change-permission": "İzinler değiştirilemiyor, tarayıcı konsolunu kontrol edin",

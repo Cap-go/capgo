@@ -101,6 +101,7 @@
   "by-clicking-on-them": "それらをクリックして。",
   "canceled-delete": "バンドルの削除がキャンセルされました。リンクされたバンドルは削除できません",
   "canceled-photo-selection": "画像の選択をキャンセルしました",
+  "cannot-calculate-size-of-partial-bundle": "部分的なバンドルに利用可能なサイズがありません",
   "cannot-change-default-upload-channel": "デフォルトのアップロードチャンネルを変更できません。",
   "cannot-change-name": "名前を変更できません。ブラウザコンソールを確認してください。",
   "cannot-change-permission": "権限を変更できません。ブラウザコンソールを確認してください",

@@ -499,8 +499,11 @@ function preventInputChangePerm(event: Event) {
               {{ version.external_url }}
             </InfoRow>
             <!-- size -->
-            <InfoRow :label="t('size')" :is-link="true" @click="openDownload()">
+            <InfoRow v-if="version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
               {{ showSize }}
+            </InfoRow>
+            <InfoRow v-if="!version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
+              {{ t('cannot-calculate-size-of-partial-bundle') }}
             </InfoRow>
             <InfoRow v-if="version?.manifest" :label="t('partial-bundle')" :is-link="false">
               {{ t('enabled') }}

@@ -101,6 +101,7 @@
   "by-clicking-on-them": "haciendo clic en ellos.",
   "canceled-delete": "Eliminación de paquete cancelada, no se puede eliminar un paquete vinculado",
   "canceled-photo-selection": "Cancelaste la selección de fotos.",
+  "cannot-calculate-size-of-partial-bundle": "No hay tamaño disponible para el paquete parcial",
   "cannot-change-default-upload-channel": "No se puede cambiar el canal de carga por defecto, por favor, compruebe la consola del navegador",
   "cannot-change-name": "No se puede cambiar el nombre, verifique la consola del navegador",
   "cannot-change-permission": "No se pueden cambiar los permisos, verifique la consola del navegador",
