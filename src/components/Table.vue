@@ -200,7 +200,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden m-1 ml-2 md:block" />
           </button>
-          <ul tabindex="0" class="dropdown-content menu dark:bg-base-100 bg-white rounded-box z-1 w-52 p-2 shadow">
+          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-100 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">
@@ -210,7 +210,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
           </ul>
         </div>
       </div>
-      <button v-if="props.massSelect && selectedRows.find(val => val)" class="self-end ml-auto mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
+      <button v-if="props.massSelect && selectedRows.find(val => val)" class="inline-flex items-center self-end px-3 py-2 ml-auto mr-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="selectedRows = selectedRows.map(() => true); emit('selectRow', selectedRows)">
         <span class="text-sm">{{ t('select_all') }}</span>
       </button>
       <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="emit('massDelete')">
@@ -260,7 +260,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
             }"
           >
             <template v-if="true">
-              <th v-if="props.massSelect" class="pl-4 pr-0">
+              <th v-if="props.massSelect" class="pl-4 pr-2">
                 <input
                   id="select-rows" :checked="selectedRows[i]" class="scale-checkbox" type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
                 >
@@ -270,7 +270,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                   {{ displayValueKey(elem, col) }}
                 </th>
                 <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
-                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4">
+                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4">
                   {{ displayValueKey(elem, col) }}
                 </td>
               </template>
