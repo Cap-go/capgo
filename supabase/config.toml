@@ -304,6 +304,9 @@ verify_jwt = false
 [functions.channel]
 verify_jwt = false
 
+[functions.organization]
+verify_jwt = false
+
 # PLUGIN ENDPOINTS
 
 [functions.channel_self]

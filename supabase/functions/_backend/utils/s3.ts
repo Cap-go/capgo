@@ -9,12 +9,12 @@ async function initS3(c: Context) {
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const storageRegion = getEnv(c, 'S3_REGION')
-
+  const useSSL = getEnv(c, 'S3_SSL') === 'true'
   const client = await awsLite({
     region: storageRegion ?? 'us-east-1',
     accessKeyId: access_key_id,
     secretAccessKey: access_key_secret,
-    url: `https://${storageEndpoint}`,
+    url: `${useSSL ? 'https' : 'http'}://${storageEndpoint}`,
     plugins: [import('@aws-lite/s3')],
   })
   // console.log({ requestId: c.get('requestId'), context: 'initS3', client })
