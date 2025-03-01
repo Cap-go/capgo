@@ -81,6 +81,7 @@
   "dependencies": {
     "@aws-lite/client": "^0.23.0",
     "@aws-lite/s3": "^0.2.6",
+    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client",
     "@capacitor-community/in-app-review": "^6.0.0",
     "@capacitor-community/keep-awake": "^5.0.1",
     "@capacitor/action-sheet": "^6.0.3",

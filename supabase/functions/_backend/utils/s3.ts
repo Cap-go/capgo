@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
-import awsLite from '@aws-lite/client'
+import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 
@@ -9,16 +9,26 @@ async function initS3(c: Context) {
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const storageRegion = getEnv(c, 'S3_REGION')
+  const bucket = getEnv(c, 'S3_BUCKET')
+  const useSSL = getEnv(c, 'S3_SSL') === 'true'
+  // slip path from endpoint, path should start with /
+  const splitted = storageEndpoint.split('/')
+  // get all path after /
+  const endPoint = splitted.shift() ?? ''
+  const pathPrefix = splitted.length > 0 ? `/${splitted.join('/')}` : ''
 
-  const client = await awsLite({
+  console.log({ requestId: c.get('requestId'), context: 'initS3', pathPrefix, endPoint })
+  const client = new S3Client({
     region: storageRegion ?? 'us-east-1',
-    accessKeyId: access_key_id,
-    secretAccessKey: access_key_secret,
-    url: `https://${storageEndpoint}`,
-    plugins: [import('@aws-lite/s3')],
+    bucket,
+    accessKey: access_key_id,
+    useSSL,
+    secretKey: access_key_secret,
+    endPoint,
+    pathPrefix,
   })
   // console.log({ requestId: c.get('requestId'), context: 'initS3', client })
-  return client.S3
+  return client
 }
 
 export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
@@ -48,10 +58,7 @@ async function getUploadUrl(c: Context, fileId: string, _expirySeconds = 1200) {
 
 async function deleteObject(c: Context, fileId: string) {
   const client = await initS3(c)
-  await client.DeleteObject({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-  })
+  await client.deleteObject(fileId)
   return true
 }
 
@@ -62,11 +69,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
   const client = await initS3(c)
 
   try {
-    await client.HeadObject({
-      Bucket: getEnv(c, 'S3_BUCKET'),
-      Key: fileId,
-    })
-    return true
+    return (await client.statObject(fileId)).size > 0
   }
   catch {
     // console.log({ requestId: c.get('requestId'), context: 'checkIfExist', fileId, error })
@@ -81,12 +84,9 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
 async function getSize(c: Context, fileId: string) {
   const client = await initS3(c)
   try {
-    const stat = await client.HeadObject({
-      Bucket: getEnv(c, 'S3_BUCKET'),
-      Key: fileId,
-    })
+    const stat = await client.statObject(fileId)
     console.log({ requestId: c.get('requestId'), context: 'getSize', stat, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })
-    return stat.ContentLength ?? 0
+    return stat.size ?? 0
   }
   catch (error) {
     console.log({ requestId: c.get('requestId'), context: 'getSize', error })
