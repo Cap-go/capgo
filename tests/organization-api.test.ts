@@ -8,14 +8,14 @@ const ORG_ID = randomUUID()
 const id = randomUUID()
 const name = `Test Organization ${id}`
 
-console.log('ORG_ID', ORG_ID)
+// console.log('ORG_ID', ORG_ID)
 
 beforeEach(async () => {
   const { data } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
   if (data) {
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   }
-  console.log('name', name)
+  // console.log('name', name)
   const { error } = await getSupabaseClient().from('orgs').insert({
     id: ORG_ID,
     name,

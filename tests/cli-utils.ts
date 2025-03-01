@@ -67,7 +67,7 @@ export function setDependencies(dependencies: Record<string, string>, id: string
   writeFileSync(pathPack, res)
 }
 export function deleteAllTempFolders() {
-  console.log('Deleting all temp folders')
+  // console.log('Deleting all temp folders')
   rimrafSync(TEMP_DIR_NAME)
 }
 
@@ -137,7 +137,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
     const output = execSync(command, options)
 
     if (logOutput) {
-      console.log('CLI execution successful')
+      // console.log('CLI execution successful')
       console.log(output)
     }
 
@@ -146,7 +146,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
   catch (error: any) {
     if (logOutput) {
       console.error('CLI execution failed')
-      console.log(error.stdout)
+      console.error(error.stdout)
     }
 
     return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message

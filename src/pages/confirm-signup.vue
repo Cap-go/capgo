@@ -6,7 +6,6 @@ import IconLoader from '~icons/lucide/loader-2'
 const route = useRoute()
 const isRedirecting = ref(true)
 const error = ref('')
-
 onMounted(() => {
   const confirmationUrl = route.query.confirmation_url as string
 

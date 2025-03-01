@@ -4,6 +4,7 @@ import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getCurrentDayMonth } from '~/services/date'
+import { reset } from '~/services/posthog'
 import { useSupabase } from '~/services/supabase'
 import {
   findBestPlan,
