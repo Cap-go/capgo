@@ -165,3 +165,19 @@ export async function postUpdate(data: object) {
   })
   return response
 }
+
+export interface DeviceLink {
+  channel?: string
+  platform?: string
+  device_id?: string
+  app_id?: string
+  custom_id?: string
+  version_build?: string
+  version_code?: string
+  version_os?: string
+  version_name?: string
+  plugin_version?: string
+  is_emulator?: boolean
+  is_prod?: boolean
+  defaultChannel?: string
+}

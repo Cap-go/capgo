@@ -1,4 +1,4 @@
-import type { HttpMethod } from './test-utils.ts'
+import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
@@ -334,6 +334,35 @@ it('[PUT] /channel_self (with overwrite)', async () => {
 
     expect(error).toBeNull()
   }
+})
+
+it('[PUT] /channel_self with defaultChannel parameter', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  const data = getBaseData(APPNAME) as DeviceLink
+  data.device_id = randomUUID().toLowerCase()
+  data.defaultChannel = 'no_access'
+
+  const response = await fetchEndpoint('PUT', data)
+  expect(response.ok).toBe(true)
+
+  const responseJSON = await response.json<{ channel: string, status: string }>()
+  expect(responseJSON.channel).toBe('no_access')
+  expect(responseJSON.status).toBe('default')
+})
+
+it('[PUT] /channel_self with non-existent defaultChannel', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  const data = getBaseData(APPNAME) as DeviceLink
+  data.device_id = randomUUID().toLowerCase()
+  data.defaultChannel = 'non_existent_channel'
+
+  const response = await fetchEndpoint('PUT', data)
+  expect(response.ok).toBe(false)
+
+  const error = await getResponseError(response)
+  expect(error).toBe('channel_not_found')
 })
 
 it('[POST] /channel_self ok', async () => {

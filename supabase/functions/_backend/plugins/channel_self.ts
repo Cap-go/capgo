@@ -348,7 +348,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .from('channels')
     .select()
     .eq('app_id', app_id)
-    .eq('public', true)
+    .eq(body.defaultChannel ? 'name' : 'public', body.defaultChannel || true)
 
   const { data: dataChannelOverride } = await supabaseAdmin(c)
     .from('channel_devices')
@@ -366,7 +366,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .single()
   if (dataChannelOverride && dataChannelOverride.channel_id) {
     const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
-
+    await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
     return c.json({
       channel: channelId.name,
       status: 'override',
@@ -375,37 +375,38 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   }
   if (errorChannel)
     console.error({ requestId: c.get('requestId'), context: 'Cannot find channel default', errorChannel })
-  if (dataChannel) {
-    await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
-
-    const devicePlatform = devicePlatformScheme.safeParse(platform)
-    if (!devicePlatform.success) {
-      return c.json({
-        message: 'Invalid device platform',
-        error: 'invalid_platform',
-      }, 400)
-    }
-
-    const finalChannel = dataChannel.find(channel => channel[devicePlatform.data] === true)
-
-    if (!finalChannel) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
-      return c.json({
-        message: 'Cannot find channel',
-        error: 'channel_not_found',
-      }, 400)
-    }
-
+  if (!dataChannel) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
     return c.json({
-      channel: finalChannel.name,
-      status: 'default',
-    })
+      message: 'Cannot find channel',
+      error: 'channel_not_found',
+    }, 400)
   }
-  console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
+
+  const devicePlatform = devicePlatformScheme.safeParse(platform)
+  if (!devicePlatform.success) {
+    return c.json({
+      message: 'Invalid device platform',
+      error: 'invalid_platform',
+    }, 400)
+  }
+
+  const finalChannel = body.defaultChannel
+    ? dataChannel.find(channel => channel.name === body.defaultChannel)
+    : dataChannel.find(channel => channel[devicePlatform.data] === true)
+
+  if (!finalChannel) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
+    return c.json({
+      message: 'Cannot find channel',
+      error: 'channel_not_found',
+    }, 400)
+  }
+  await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
   return c.json({
-    message: 'Cannot find channel',
-    error: 'channel_not_found',
-  }, 400)
+    channel: finalChannel.name,
+    status: 'default',
+  })
 }
 
 async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {

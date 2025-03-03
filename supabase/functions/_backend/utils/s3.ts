@@ -1,7 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
-import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 
 async function initS3(c: Context) {
@@ -41,18 +40,15 @@ export async function getPath(c: Context, record: Database['public']['Tables']['
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
-  // if supabase storage is used, use the supabase storage url
-  if (getEnv(c, 'S3_ENDPOINT').includes('/storage/v1/s3')) {
-    const bucket = getEnv(c, 'S3_BUCKET')
-    const { data, error } = await supabaseAdmin(c).storage.from(bucket).createSignedUploadUrl(fileId)
-    if (error)
-      throw error
-    return data.signedUrl.replace('http://kong:8000', 'http://localhost:54321')
-  }
-
   const client = await initS3(c)
-  const url = await client.presignedGetObject(fileId, {
+  const url = await client.getPresignedUrl('PUT', fileId, {
     expirySeconds,
+    parameters: {
+      'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
+      'x-amz-checksum-crc32': 'AAAAAA==',
+      'x-amz-sdk-checksum-algorithm': 'CRC32',
+      'x-id': 'PutObject',
+    },
   })
   return url
 }
