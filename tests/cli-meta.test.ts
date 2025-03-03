@@ -21,8 +21,8 @@ describe('tests CLI metadata', () => {
     expect(output).toContain('Bundle uploaded')
 
     const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-      const output = await runCli(['bundle', 'compatibility', '-c', 'production'], id)
-      const androidPackage = output.split('\n').find(l => l.includes('@capacitor/android'))
+      const output = await runCli(['bundle', 'compatibility', '-c', 'production'], id, false)
+      const androidPackage = output.split('\n').find(l => l.includes('│ @capacitor/android'))
       expect(androidPackage).toBeDefined()
 
       const columns = androidPackage!.split('│').slice(2, -1)
@@ -49,5 +49,46 @@ describe('tests CLI metadata', () => {
 
     // well, the local version doesn't exist, so I expect an empty string ???
     await assertCompatibilityTableColumns('@capacitor/android', '', '7.0.0', '❌')
+
+    // Test different version formats
+    setDependencies({
+      '@capacitor/android': '^7.0.0',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+
+    setDependencies({
+      '@capacitor/android': '~7.0.0',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+
+    setDependencies({
+      '@capacitor/android': '7.0.0-beta.1',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0-beta.1', '7.0.0', '❌')
+
+    setDependencies({
+      '@capacitor/android': 'jsr:@capacitor/android@7.0.0',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', 'jsr:@capacitor/android@7.0.0', '7.0.0', '❌')
+
+    setDependencies({
+      '@capacitor/android': 'npm:@capacitor/android@7.0.0',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', 'npm:@capacitor/android@7.0.0', '7.0.0', '❌')
+
+    setDependencies({
+      '@capacitor/android': 'file:../capacitor-android',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', 'file:../capacitor-android', '7.0.0', '❌')
+
+    setDependencies({
+      '@capacitor/android': 'github:capacitorjs/capacitor#main',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', 'github:capacitorjs/capacitor#main', '7.0.0', '❌')
+
+    setDependencies({
+      '@capacitor/android': 'git+https://github.com/capacitorjs/capacitor.git#main',
+    }, id, APPNAME)
+    await assertCompatibilityTableColumns('@capacitor/android', 'git+https://github.com/capacitorjs/capacitor.git#main', '7.0.0', '❌')
   })
 })
