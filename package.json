@@ -79,8 +79,7 @@
     "size": "bunx vite-bundle-visualizer"
   },
   "dependencies": {
-    "@aws-lite/client": "^0.23.0",
-    "@aws-lite/s3": "^0.2.6",
+    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.0",
     "@capacitor-community/in-app-review": "^6.0.0",
     "@capacitor-community/keep-awake": "^5.0.1",
     "@capacitor/action-sheet": "^6.0.3",
@@ -176,7 +175,6 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "4.1.0",
-    "@aws-lite/s3-types": "^0.2.6",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
     "@cloudflare/workers-types": "4.20250109.0",

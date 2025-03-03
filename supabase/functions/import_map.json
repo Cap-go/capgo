@@ -28,7 +28,6 @@
     "postgres": "https://deno.land/x/postgresjs@v3.4.5/mod.js",
     "adm-zip": "https://esm.sh/adm-zip@0.5.16?target=deno",
     "@std/semver": "jsr:@std/semver@1.0.3",
-    "@aws-lite/client": "npm:@aws-lite/client@0.23.0",
-    "@aws-lite/s3": "npm:@aws-lite/s3@0.2.6"
+    "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.0"
   }
 }

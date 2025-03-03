@@ -43,7 +43,7 @@ describe('tests CLI metadata', () => {
     setDependencies({
       '@capacitor/android': '7.0.0',
     }, id, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '^7.0.0', '✅')
+    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
 
     setDependencies({}, id, APPNAME)
 

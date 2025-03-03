@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
-import awsLite from '@aws-lite/client'
+import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 
@@ -8,17 +8,19 @@ async function initS3(c: Context) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
-  const storageRegion = getEnv(c, 'S3_REGION')
+  const storageRegion = getEnv(c, 'S3_REGION') || 'us-east-1'
   const useSSL = getEnv(c, 'S3_SSL') === 'true'
-  const client = await awsLite({
-    region: storageRegion ?? 'us-east-1',
-    accessKeyId: access_key_id,
-    secretAccessKey: access_key_secret,
-    url: `${useSSL ? 'https' : 'http'}://${storageEndpoint}`,
-    plugins: [import('@aws-lite/s3')],
+  const bucket = getEnv(c, 'S3_BUCKET')
+  const endPoint = useSSL ? `https://${storageEndpoint}` : `http://${storageEndpoint}`
+  const client = new S3Client({
+    endPoint,
+    accessKey: access_key_id,
+    pathStyle: true,
+    secretKey: access_key_secret,
+    region: storageRegion,
+    bucket,
   })
-  // console.log({ requestId: c.get('requestId'), context: 'initS3', client })
-  return client.S3
+  return client
 }
 
 export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
@@ -38,20 +40,26 @@ export async function getPath(c: Context, record: Database['public']['Tables']['
   return record.r2_path
 }
 
-async function getUploadUrl(c: Context, fileId: string, _expirySeconds = 1200) {
-  const bucket = getEnv(c, 'S3_BUCKET')
-  const { data, error } = await supabaseAdmin(c).storage.from(bucket).createSignedUploadUrl(fileId)
-  if (error)
-    throw error
-  return data.signedUrl.replace('http://kong:8000', 'http://localhost:54321')
+async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
+  // if supabase storage is used, use the supabase storage url
+  if (getEnv(c, 'S3_ENDPOINT').includes('/storage/v1/s3')) {
+    const bucket = getEnv(c, 'S3_BUCKET')
+    const { data, error } = await supabaseAdmin(c).storage.from(bucket).createSignedUploadUrl(fileId)
+    if (error)
+      throw error
+    return data.signedUrl.replace('http://kong:8000', 'http://localhost:54321')
+  }
+
+  const client = await initS3(c)
+  const url = await client.presignedGetObject(fileId, {
+    expirySeconds,
+  })
+  return url
 }
 
 async function deleteObject(c: Context, fileId: string) {
   const client = await initS3(c)
-  await client.DeleteObject({
-    Bucket: getEnv(c, 'S3_BUCKET'),
-    Key: fileId,
-  })
+  await client.deleteObject(fileId)
   return true
 }
 
@@ -62,11 +70,8 @@ async function checkIfExist(c: Context, fileId: string | null) {
   const client = await initS3(c)
 
   try {
-    await client.HeadObject({
-      Bucket: getEnv(c, 'S3_BUCKET'),
-      Key: fileId,
-    })
-    return true
+    const file = await client.statObject(fileId)
+    return file.size > 0
   }
   catch {
     // console.log({ requestId: c.get('requestId'), context: 'checkIfExist', fileId, error })
@@ -81,12 +86,9 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
 async function getSize(c: Context, fileId: string) {
   const client = await initS3(c)
   try {
-    const stat = await client.HeadObject({
-      Bucket: getEnv(c, 'S3_BUCKET'),
-      Key: fileId,
-    })
-    console.log({ requestId: c.get('requestId'), context: 'getSize', stat, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })
-    return stat.ContentLength ?? 0
+    const file = await client.statObject(fileId)
+    console.log({ requestId: c.get('requestId'), context: 'getSize', file, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })
+    return file.size ?? 0
   }
   catch (error) {
     console.log({ requestId: c.get('requestId'), context: 'getSize', error })
