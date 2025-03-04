@@ -221,7 +221,7 @@ describe('[POST] /stats', () => {
       expect(statsData?.device_id).toBe(uuid)
     }
 
-    console.log({ versionId, uuid })
+    // console.log({ versionId, uuid })
     // Verify final device state
     const lastAction = ALL_STATS_ACTIONS[ALL_STATS_ACTIONS.length - 1]
     const { error: deviceError, data: deviceData } = await getSupabaseClient().from('devices').select().eq('device_id', uuid).eq('app_id', APP_NAME_STATS).single()
@@ -248,7 +248,7 @@ describe('[POST] /stats', () => {
     const response = await postStats(baseData)
     expect(response.status).toBe(400)
     const json = await response.json<StatsRes>()
-    console.log({ json })
+    // console.log({ json })
     expect(json.error).toBe('app_not_found')
   })
 

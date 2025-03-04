@@ -45,8 +45,6 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
     expirySeconds,
     parameters: {
       'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
-      'x-amz-checksum-crc32': 'AAAAAA==',
-      'x-amz-sdk-checksum-algorithm': 'CRC32',
       'x-id': 'PutObject',
     },
   })
@@ -76,7 +74,16 @@ async function checkIfExist(c: Context, fileId: string | null) {
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  return getUploadUrl(c, fileId, expirySeconds)
+  // return getUploadUrl(c, fileId, expirySeconds)
+  const client = await initS3(c)
+  const url = await client.getPresignedUrl('GET', fileId, {
+    expirySeconds,
+    parameters: {
+      'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
+      'x-id': 'PutObject',
+    },
+  })
+  return url
 }
 
 async function getSize(c: Context, fileId: string) {
