@@ -27,7 +27,6 @@ async function getKeys(retry = true): Promise<void> {
     .from('apikeys')
     .select()
     .eq('user_id', main.user?.id || '')
-    .neq('mode', 'upload')
   if (data && data.length)
     keys.value = data
 
