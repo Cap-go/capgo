@@ -212,5 +212,5 @@ const chartOptions = ref<ChartOptions & { plugins: { inlineAnnotationPlugin: Ann
 </script>
 
 <template>
-  <Line :data="chartData" height="auto" :options="chartOptions" :plugins="[inlineAnnotationPlugin]" />
+  <Line :data="chartData" height="auto" :options="(chartOptions as any)" :plugins="[inlineAnnotationPlugin]" />
 </template>

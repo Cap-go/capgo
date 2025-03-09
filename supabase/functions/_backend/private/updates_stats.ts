@@ -1,17 +1,15 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { useCors } from '../utils/hono.ts'
+import { honoFactory, useCors } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { getUpdateStats } from '../utils/stats.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
 app.use('/', useCors)
 
-app.get('/', async (c: Context) => {
+app.get('/', async (c) => {
   try {
-    const updateStats = await getUpdateStats(c)
-    const LogSnag = logsnag(c)
+    const updateStats = await getUpdateStats(c as any)
+    const LogSnag = logsnag(c as any)
     await LogSnag.track({
       channel: 'updates-stats',
       event: 'Updates Stats',
@@ -24,6 +22,7 @@ app.get('/', async (c: Context) => {
     return c.json(updateStats)
   }
   catch (e) {
+    console.error({ requestId: c.get('requestId'), context: 'error', error: e })
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })

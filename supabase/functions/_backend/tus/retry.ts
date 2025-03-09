@@ -87,7 +87,7 @@ export class RetryBucket {
     checksum?: string | ArrayBuffer,
   ): ReturnType<R2Bucket['put']> {
     return retry(
-      () => this.bucket.put(key, value, { sha256: checksum }),
+      () => this.bucket.put(key, value as any, { sha256: checksum }),
       {
         params: this.params,
         shouldRetry: error => !isR2ChecksumError(error),
@@ -115,7 +115,7 @@ export class RetryMultipartUpload {
 
   // don't allow streaming writes so the operation can be safely retried
   async uploadPart(partNumber: number, value: (ArrayBuffer | ArrayBufferView) | string | Blob): Promise<R2UploadedPart> {
-    return retry(() => this.r2MultipartUpload.uploadPart(partNumber, value), this.retryOptions())
+    return retry(() => this.r2MultipartUpload.uploadPart(partNumber, value as any), this.retryOptions())
   }
 
   async abort(): ReturnType<R2MultipartUpload['abort']> {

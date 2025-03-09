@@ -443,7 +443,7 @@ function preventInputChangePerm(event: Event) {
               v-if="showBundleMetadataInput" id="metadata-bundle"
               :label="t('min-update-version')" editable
               :readonly="organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write']) === false"
-              @click="guardMinAutoUpdate" @update:value="saveCustomId" @keydown="preventInputChangePerm"
+              @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
             >
               {{ version.min_update_version }}
             </InfoRow>

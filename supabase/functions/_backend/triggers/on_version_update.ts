@@ -1,8 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -78,9 +77,9 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   return c.json(BRES)
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<UpdatePayload<typeof table>>()
@@ -105,10 +104,10 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
     // // check if not deleted it's present in s3 storage
     if (record.deleted && record.deleted !== body.old_record.deleted)
-      return deleteIt(c, body.record as any)
+      return deleteIt(c as any, body.record as any)
 
     console.log({ requestId: c.get('requestId'), context: 'Update but not deleted' })
-    return updateIt(c, body)
+    return updateIt(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot update version', error: JSON.stringify(e) }, 500)

@@ -1,7 +1,5 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 const thresholds = {
@@ -59,9 +57,9 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
   return funComparisons[comparison][index]
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const { email, appId } = await c.req.json()
 
@@ -69,7 +67,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json({ status: 'Missing email or appId' }, 400)
     }
 
-    const supabase = await supabaseAdmin(c)
+    const supabase = await supabaseAdmin(c as any)
 
     const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
       app_id: appId,
@@ -106,7 +104,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
     }
 
-    await trackBentoEvent(c, email, metadata, 'user:weekly_stats')
+    await trackBentoEvent(c as any, email, metadata, 'user:weekly_stats')
 
     return c.json(BRES)
   }

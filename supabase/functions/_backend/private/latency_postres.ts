@@ -1,13 +1,11 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { BRES } from '../utils/hono.ts'
+import { BRES, honoFactory } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.get('/', async (c: Context) => {
+app.get('/', async (c) => {
   try {
-    const { data, error: dbError } = await supabaseAdmin(c)
+    const { data, error: dbError } = await supabaseAdmin(c as any)
       .from('apps')
       .select('id')
       .limit(1)

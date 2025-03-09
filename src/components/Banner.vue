@@ -25,7 +25,7 @@ const isOrgOwner = ref(false)
 watchEffect(async () => {
   try {
     if (route.path.includes('/app') && !route.path.includes('home')) {
-      const appIdRaw = route.params.p as string || route.params.package as string
+      const appIdRaw = route.params.package as string
       if (!appIdRaw) {
         console.error('cannot get app id. Parms:', route.params)
         return

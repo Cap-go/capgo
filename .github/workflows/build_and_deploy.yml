@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 jobs:
   supabase_deploy:
@@ -35,6 +35,8 @@ jobs:
         run: bun install
       - name: Lint
         run: bun lint && bun lint-backend
+      - name: Typecheck
+        run: bun typecheck
       - name: Lint I18n
         run: bunx @inlang/cli lint --project project.inlang
       - name: Install Supabase CLI

@@ -1,9 +1,8 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
 import ky from 'ky'
 import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -85,11 +84,11 @@ function getStats(c: Context): GlobalStats {
   }
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
-    const res = getStats(c)
+    const res = getStats(c as any)
     const [
       apps,
       updates,
@@ -139,12 +138,12 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       updates_last_month,
     }
     console.log({ requestId: c.get('requestId'), context: 'newData', newData })
-    const { error } = await supabaseAdmin(c)
+    const { error } = await supabaseAdmin(c as any)
       .from('global_stats')
       .upsert(newData)
     if (error)
       console.error({ requestId: c.get('requestId'), context: 'insert global_stats error', error })
-    await logsnag(c).track({
+    await logsnag(c as any).track({
       channel: 'updates-stats',
       event: 'Updates last month',
       user_id: 'admin',
@@ -155,7 +154,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }).catch((e) => {
       console.error({ requestId: c.get('requestId'), context: 'insights error', e })
     })
-    await logsnagInsights(c, [
+    await logsnagInsights(c as any, [
       {
         title: 'Apps',
         value: apps,

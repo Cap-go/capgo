@@ -1,13 +1,11 @@
-import type { Context } from '@hono/hono'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'apps'
     const body = await c.req.json<InsertPayload<typeof table>>()
@@ -27,7 +25,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     }
 
-    const LogSnag = logsnag(c)
+    const LogSnag = logsnag(c as any)
     LogSnag.track({
       channel: 'app-created',
       event: 'App Created',

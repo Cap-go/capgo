@@ -1,9 +1,8 @@
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
-import { Hono } from 'hono/tiny'
+import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../package.json'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as files } from '../../supabase/functions/_backend/private/files.ts'
@@ -11,7 +10,7 @@ import { app as upload_link } from '../../supabase/functions/_backend/private/up
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = honoFactory.createApp()
 
 app.use('*', sentry({
   release: version,
@@ -35,7 +34,7 @@ app.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
   }
-  
+
   console.log('app', 'onError', e)
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })

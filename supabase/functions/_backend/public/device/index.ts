@@ -1,20 +1,20 @@
-import type { Context } from '@hono/hono'
+import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
-import { Hono } from 'hono/tiny'
-import { getBody, middlewareKey } from '../../utils/hono.ts'
+import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
+app.post('/', middlewareKey(['all', 'write']), async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    const apikey = c.get('apikey')
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+
     console.log('body', body)
     console.log('apikey', apikey)
-    return post(c, body, apikey)
+    return post(c as any, body, apikey)
   }
   catch (e) {
     console.log('Cannot post devices', e)
@@ -22,13 +22,13 @@ app.post('/', middlewareKey(['all', 'write']), async (c: Context) => {
   }
 })
 
-app.get('/', middlewareKey(['all', 'write', 'read']), async (c: Context) => {
+app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c)
-    const apikey = c.get('apikey')
+    const body = await getBody<DeviceLink>(c as any)
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
     console.log('body', body)
     console.log('apikey', apikey)
-    return get(c, body, apikey)
+    return get(c as any, body, apikey)
   }
   catch (e) {
     console.log('Cannot get devices', e)
@@ -36,13 +36,13 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c: Context) => {
   }
 })
 
-app.delete('/', middlewareKey(['all', 'write']), async (c: Context) => {
+app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c)
-    const apikey = c.get('apikey')
+    const body = await getBody<DeviceLink>(c as any)
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
     console.log('body', body)
     console.log('apikey', apikey)
-    return deleteOverride(c, body, apikey)
+    return deleteOverride(c as any, body, apikey)
   }
   catch (e) {
     console.log('Cannot delete devices', e)

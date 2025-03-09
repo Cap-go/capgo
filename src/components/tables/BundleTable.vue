@@ -145,7 +145,7 @@ async function getData() {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
-    elements.value.push(...(await enhenceVersionElems(dataVersions)))
+    elements.value.push(...(await enhenceVersionElems(dataVersions) as any))
     // console.log('count', count)
     total.value = count || 0
   }
@@ -194,7 +194,7 @@ async function deleteOne(one: Element) {
             id: 'yes',
             handler: () => {
               if (channelFound)
-                unlink = channelFound
+                unlink = channelFound as any
             },
           },
           {
@@ -330,7 +330,7 @@ async function massDelete() {
     return
   }
 
-  if (selectedElements.value.length > 0 && !!selectedElements.value.find(val => val.name === 'unknown' || val.name === 'builtin')) {
+  if (selectedElements.value.length > 0 && !!(selectedElements.value as any).find((val: Element) => val.name === 'unknown' || val.name === 'builtin')) {
     toast.error(t('cannot-delete-unknown-or-builtin'))
     return
   }
@@ -339,7 +339,7 @@ async function massDelete() {
   if (typeof didCancelRes === 'boolean' && didCancelRes === true)
     return
 
-  const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
+  const linkedChannels = (await Promise.all((selectedElements.value as any).map(async (element: Element) => {
     return {
       data: (await supabase
         .from('channels')
@@ -366,7 +366,7 @@ async function massDelete() {
       buttonCenter: true,
       textStyle: 'text-center',
       headerStyle: 'text-center',
-      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
       buttons: [
         {
           text: t('ok'),
@@ -384,7 +384,7 @@ async function massDelete() {
     const { error: updateError } = await supabase
       .from('app_versions')
       .update({ deleted: true })
-      .in('id', selectedElements.value.map(val => val.id))
+      .in('id', (selectedElements.value as any).map((val: Element) => val.id))
 
     if (updateError) {
       toast.error(t('cannot-delete-bundles'))
@@ -398,7 +398,7 @@ async function massDelete() {
     const { error: delAppError } = await supabase
       .from('app_versions')
       .delete()
-      .in('id', selectedElements.value.map(val => val.id))
+      .in('id', (selectedElements.value as any).map((val: Element) => val.id))
 
     if (delAppError) {
       toast.error(t('cannot-delete-bundles'))
@@ -412,7 +412,7 @@ async function massDelete() {
 
 function selectedElementsFilter(val: boolean[]) {
   console.log('selectedElementsFilter', val)
-  selectedElements.value = elements.value.filter((_, i) => val[i])
+  selectedElements.value = (elements.value as any).filter((_: any, i: number) => val[i])
 }
 
 async function openOne(one: Element) {

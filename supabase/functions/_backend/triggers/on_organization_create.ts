@@ -1,14 +1,12 @@
-import type { Context } from '@hono/hono'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { createStripeCustomer } from '../utils/supabase.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'orgs'
     const body = await c.req.json<InsertPayload<typeof table>>()
@@ -20,7 +18,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log({ requestId: c.get('requestId'), context: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
-    const record = body.record
+    const record = body.record as Database['public']['Tables']['orgs']['Row']
     console.log({ requestId: c.get('requestId'), context: 'record', record })
 
     if (!record.id) {
@@ -29,9 +27,9 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
 
     if (!record.customer_id)
-      await createStripeCustomer(c, record as any)
+      await createStripeCustomer(c as any, record as any)
 
-    const LogSnag = logsnag(c)
+    const LogSnag = logsnag(c as any)
     LogSnag.track({
       channel: 'org-created',
       event: 'Org Created',

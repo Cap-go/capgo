@@ -17,6 +17,7 @@ export type Bindings = {
   DB_STOREAPPS: D1Database
   DB_REPLICATE: D1Database
   HYPERDRIVE_DB: Hyperdrive
+  ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
 }
 
 const DEFAULT_LIMIT = 1000

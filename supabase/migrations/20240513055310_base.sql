@@ -807,7 +807,7 @@ $$;
 
 ALTER FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_metered_usage"() RETURNS double precision
+CREATE OR REPLACE FUNCTION "public"."get_metered_usage"() RETURNS "public"."stats_table"
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
@@ -1998,10 +1998,10 @@ BEGIN
     ('00000000-0000-0000-0000-000000000000', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'authenticated', 'authenticated', 'test2@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsytt', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_user2"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
     INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
-    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 5000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
-    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 499, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 40000, 'Best for scalling enterprises', 0.05, 0.1, 0.0006, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
-    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 500, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
-    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 10000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
+    (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
+    (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 0.05, 0.1, 0.0002, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
+    (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
+    (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, now(), now(), 't'),

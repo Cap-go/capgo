@@ -1,6 +1,4 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { middlewareAPISecret, useCors } from '../utils/hono.ts'
+import { honoFactory, middlewareAPISecret, useCors } from '../utils/hono.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -10,18 +8,18 @@ interface dataToGet {
   todayOnly?: boolean
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const body = await c.req.json<dataToGet>()
     console.log({ requestId: c.get('requestId'), context: 'postcron stats body', body })
     if (!body.appId || !body.orgId)
       return c.json({ status: 'No appId' }, 400)
 
-    const supabase = supabaseAdmin(c)
+    const supabase = supabaseAdmin(c as any)
 
     // get the period of the billing of the organization
     const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
@@ -34,12 +32,12 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const endDate = cycleInfo.subscription_anchor_end
 
     // get mau
-    let mau = await readStatsMau(c, body.appId, startDate, endDate)
+    let mau = await readStatsMau(c as any, body.appId, startDate, endDate)
     // get bandwidth
-    let bandwidth = await readStatsBandwidth(c, body.appId, startDate, endDate)
+    let bandwidth = await readStatsBandwidth(c as any, body.appId, startDate, endDate)
     // get storage
-    let storage = await readStatsStorage(c, body.appId, startDate, endDate)
-    let versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
+    let storage = await readStatsStorage(c as any, body.appId, startDate, endDate)
+    let versionUsage = await readStatsVersion(c as any, body.appId, startDate, endDate)
 
     if (body.todayOnly) {
       // take only the last day

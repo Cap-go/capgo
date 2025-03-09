@@ -4,9 +4,8 @@ import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { BRES, getBody } from '../utils/hono.ts'
+import { BRES, getBody, honoFactory } from '../utils/hono.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
@@ -470,43 +469,43 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   return c.json(BRES)
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'post body', body })
-    return post(c, body)
+    return post(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.put('/', async (c: Context) => {
+app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
   try {
     const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'put body', body })
-    return put(c, body)
+    return put(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self get channel', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.delete('/', async (c: Context) => {
+app.delete('/', async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c)
+    const body = await getBody<DeviceLink>(c as any)
     // const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'delete body', body })
-    return deleteOverride(c, body)
+    return deleteOverride(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   return c.json({ status: 'ok' })
 })

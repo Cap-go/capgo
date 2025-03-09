@@ -1,19 +1,20 @@
 import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
+import type { TableNames } from '../triggers/replicate_data.ts'
 import { cleanFieldsAppVersions } from '../triggers/replicate_data.ts'
+import { honoFactory } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
 // function to generate lastID for all table is 0 but for apps and orgs it's uuid 00000000-0000-0000-0000-000000000000
-function generateLastId(table: string) {
+function generateLastId(table: TableNames) {
   if (table === 'apps' || table === 'orgs')
     return '00000000-0000-0000-0000-000000000000'
   return 0
 }
 
-async function deleteExtraRows(c: Context, table: string) {
+async function deleteExtraRows(c: Context, table: TableNames) {
   const d1 = c.env.DB_REPLICATE as D1Database
   const supabase = supabaseAdmin(c)
   const batchSize = 1000
@@ -56,7 +57,7 @@ async function deleteExtraRows(c: Context, table: string) {
   }
 }
 
-async function syncMissingRows(c: Context, table: string) {
+async function syncMissingRows(c: Context, table: TableNames) {
   const d1 = c.env.DB_REPLICATE as D1Database
   const supabase = supabaseAdmin(c)
   const batchSize = 1000
@@ -65,24 +66,24 @@ async function syncMissingRows(c: Context, table: string) {
   while (true) {
     try {
       console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} from id ${lastId}` })
-      const pgData = await supabase
-        .from(table as any)
+      const { data, error } = await supabase
+        .from(table)
         .select('*')
         .order('id', { ascending: true })
         .gt('id', lastId)
         .limit(batchSize)
 
-      console.log({ requestId: c.get('requestId'), context: `Found ${pgData.data?.length} missing rows for table ${table} from id ${lastId}` })
-      if (pgData.error) {
-        console.error({ requestId: c.get('requestId'), context: `Error in syncMissingRows for table ${table}:`, error: pgData.error })
+      console.log({ requestId: c.get('requestId'), context: `Found ${data?.length} missing rows for table ${table} from id ${lastId}` })
+      if (error) {
+        console.error({ requestId: c.get('requestId'), context: `Error in syncMissingRows for table ${table}:`, error })
         break
       }
-      if (pgData.data.length === 0) {
+      if (data.length === 0) {
         console.log({ requestId: c.get('requestId'), context: `No missing rows found for table ${table}` })
         break
       }
-      console.log({ requestId: c.get('requestId'), context: `Looping through ${pgData.data.length} missing rows for table ${table}` })
-      for (const row of pgData.data) {
+      console.log({ requestId: c.get('requestId'), context: `Looping through ${data.length} missing rows for table ${table}` })
+      for (const row of data) {
         try {
           console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table} starting from id ${lastId}` })
           const existingRow = await d1.prepare(`SELECT * FROM ${table} WHERE id = ?`).bind(row.id).first()
@@ -101,14 +102,14 @@ async function syncMissingRows(c: Context, table: string) {
               await d1.prepare(updateQuery).bind(...updates.map(([_, value]) => value), row.id).run()
             }
           }
-          lastId = row.id
+          lastId = row.id as number | string
         }
         catch (e) {
           console.error({ requestId: c.get('requestId'), context: `Error in deleteExtraRows for table ${table}:`, error: e })
           break
         }
       }
-      if (pgData.data.length < batchSize) {
+      if (data.length < batchSize) {
         console.log({ requestId: c.get('requestId'), context: `Finished syncing all missing rows for table ${table}` })
         break
       }
@@ -120,10 +121,10 @@ async function syncMissingRows(c: Context, table: string) {
   }
 }
 
-app.get('/', async (c: Context) => {
+app.get('/', async (c) => {
   try {
     // Tables to compare
-    const tables = [
+    const tables: TableNames[] = [
       'apps',
       'app_versions',
       'channels',
@@ -143,8 +144,8 @@ app.get('/', async (c: Context) => {
     // Count from update.ts (PostgreSQL database)
     const pgCounts = await Promise.all(
       tables.map(table =>
-        supabaseAdmin(c)
-          .from(table as any)
+        supabaseAdmin(c as any)
+          .from(table)
           .select('*', { count: 'exact', head: true })
           .then((v) => {
             console.log({ requestId: c.get('requestId'), context: 'v', v })
@@ -153,7 +154,7 @@ app.get('/', async (c: Context) => {
       ),
     )
     console.log({ requestId: c.get('requestId'), context: 'pgCounts', pgCounts })
-    const diff = await tables.reduce(async (acc: Promise<Record<string, { d1: number, supabase: number, percent: number }>>, table: string, index: number) => {
+    const diff = await tables.reduce(async (acc: Promise<Record<TableNames, { d1: number, supabase: number, percent: number }>>, table: TableNames, index: number) => {
       const result = await acc
       const d1Count = (d1Counts[index]?.count as number) || 0
       const pgCount = pgCounts[index]?.count || 0
@@ -161,11 +162,11 @@ app.get('/', async (c: Context) => {
       result[table] = { d1: d1Count, supabase: pgCount, percent }
       if (d1Count <= pgCount) {
         console.log({ requestId: c.get('requestId'), context: `Syncing missing rows for table ${table}` })
-        await backgroundTask(c, syncMissingRows(c, table))
+        await backgroundTask(c as any, syncMissingRows(c as any, table))
       }
       else if (d1Count > pgCount) {
         console.log({ requestId: c.get('requestId'), context: `Deleting extra rows for table ${table}` })
-        await backgroundTask(c, deleteExtraRows(c, table))
+        await backgroundTask(c as any, deleteExtraRows(c as any, table))
       }
       return result
     }, Promise.resolve({} as Record<string, { d1: number, supabase: number, percent: number }>))

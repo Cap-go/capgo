@@ -1,32 +1,20 @@
-import type { Context, MiddlewareHandler } from '@hono/hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { useCors } from '../../utils/hono.ts'
+import { honoFactory, useCors } from '../../utils/hono.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
 
 dayjs.extend(utc)
 
-interface AuthInfo {
-  userId: string
-  authType: 'apikey' | 'jwt'
-  apikey: Database['public']['Tables']['apikeys']['Row'] | null
-}
-
-const useAuth: MiddlewareHandler<{
-  Variables: {
-    auth: AuthInfo
-  }
-}> = async (c, next) => {
+const useAuth = honoFactory.createMiddleware(async (c, next) => {
   const authToken = c.req.header('authorization')
   const capgkey = c.req.header('capgkey')
 
   if (authToken) {
     // JWT auth
-    const supabaseClient = useSupabaseClient(c, authToken)
+    const supabaseClient = useSupabaseClient(c as any, authToken)
     const { data: user, error: userError } = await supabaseClient.auth.getUser()
     if (userError)
       return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
@@ -39,7 +27,7 @@ const useAuth: MiddlewareHandler<{
   }
   else if (capgkey) {
     // API key auth
-    const apikey = await checkKey(c, capgkey, supabaseAdmin(c), ['all'])
+    const apikey = await checkKey(c as any, capgkey, supabaseAdmin(c as any), ['all'])
     if (!apikey)
       return c.json({ status: 'Unauthorized', error: 'Invalid API key' }, 401)
 
@@ -54,9 +42,9 @@ const useAuth: MiddlewareHandler<{
   }
 
   await next()
-}
+})
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 app.use('*', useCors)
 app.use('*', useAuth)
 
@@ -89,7 +77,7 @@ interface appUsageByVersion {
   uninstall: number | null
 }
 
-app.get('/app/:app_id', async (c: Context) => {
+app.get('/app/:app_id', async (c) => {
   try {
     const appId = c.req.param('app_id')
     const query = c.req.query()
@@ -100,15 +88,15 @@ app.get('/app/:app_id', async (c: Context) => {
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
+      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key))
         return c.json({ status: 'You can\'t access this app' }, 400)
     }
-    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
+    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c)
-    const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth').authType === 'jwt')
+    const supabase = supabaseAdmin(c as any)
+    const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error)
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
@@ -121,13 +109,13 @@ app.get('/app/:app_id', async (c: Context) => {
   }
 })
 
-app.get('/org/:org_id', async (c: Context) => {
+app.get('/org/:org_id', async (c) => {
   try {
     const orgId = c.req.param('org_id')
     const query = c.req.query()
 
     // Check if user has access to this organization
-    const supabase = supabaseAdmin(c)
+    const supabase = supabaseAdmin(c as any)
 
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success)
@@ -135,7 +123,7 @@ app.get('/org/:org_id', async (c: Context) => {
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
-    if (!(await hasOrgRight(c, orgId, auth.userId, 'read')))
+    if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read')))
       return c.json({ status: 'You can\'t access this organization' }, 400)
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
       if (!auth.apikey!.limited_to_orgs.includes(orgId))
@@ -146,7 +134,7 @@ app.get('/org/:org_id', async (c: Context) => {
       return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
-    const { data: finalStats, error } = await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth').authType === 'jwt')
+    const { data: finalStats, error } = await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error)
       return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
@@ -159,7 +147,7 @@ app.get('/org/:org_id', async (c: Context) => {
   }
 })
 
-app.get('/app/:app_id/bundle_usage', async (c: Context) => {
+app.get('/app/:app_id/bundle_usage', async (c) => {
   try {
     const appId = c.req.param('app_id')
     const query = c.req.query()
@@ -172,14 +160,14 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
+      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key))
         return c.json({ status: 'You can\'t access this app' }, 400)
     }
-    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
+    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c)
+    const supabase = supabaseAdmin(c as any)
     const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
     if (error)
@@ -193,9 +181,9 @@ app.get('/app/:app_id/bundle_usage', async (c: Context) => {
   }
 })
 
-app.get('/user', async (c: Context) => {
+app.get('/user', async (c) => {
   const auth = c.get('auth') as AuthInfo
-  const supabase = supabaseAdmin(c)
+  const supabase = supabaseAdmin(c as any)
 
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)

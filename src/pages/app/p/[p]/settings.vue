@@ -16,7 +16,7 @@ import { useSupabase } from '~/services/supabase'
 
 const isLoading = ref(false)
 const isFirstLoading = ref(true)
-const route = useRoute()
+const route = useRoute('/app/p/[p]/settings')
 const router = useRouter()
 const supabase = useSupabase()
 const appId = ref('')
@@ -345,8 +345,11 @@ async function editPhoto() {
 }
 
 async function transferAppOwnership() {
-  const lastTransfer = appRef.value?.transfer_history.length > 0
-    ? appRef.value?.transfer_history?.sort((a, b) =>
+  const transferHistory: { transferred_at: string }[] = (appRef.value as any) ?? []
+  if (!transferHistory || transferHistory.length === 0)
+    return
+  const lastTransfer = transferHistory.length > 0
+    ? transferHistory.sort((a, b) =>
       new Date(b.transferred_at).getTime() - new Date(a.transferred_at).getTime(),
     )[0]
     : null
@@ -501,13 +504,13 @@ async function transferAppOwnership() {
                   :sections-schema="{
                     suffix: {
                       children: [
-                        '$slots.magic',
+                        '$slots.suffix',
                       ],
                     },
                   }"
                   :disabled="true"
                 >
-                  <template #magic>
+                  <template #suffix>
                     <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultChannel">
                       <Pencil width="24px" height="24px" />
                     </button>

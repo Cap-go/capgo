@@ -34,8 +34,8 @@ export function makeBaseData(appId: string) {
   }
 }
 export function getVersionFromAction(action: string): string {
-  // 1.0.0-action format
-  return `1.0.0-${action}.1`
+  const sanitizedAction = action.replace(/[^0-9a-z-]/gi, '-')
+  return `1.0.0-${sanitizedAction}.1`
 }
 
 export async function createAppVersions(version: string, appId: string) {

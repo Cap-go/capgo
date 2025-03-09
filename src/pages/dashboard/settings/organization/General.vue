@@ -194,7 +194,7 @@ async function deleteOrganization() {
 
           const { error } = await supabase.from('orgs')
             .delete()
-            .eq('id', currentOrganization.value?.gid ?? 0)
+            .eq('id', currentOrganization.value?.gid as string)
 
           if (error) {
             toast.error(t('cannot-del-org'))

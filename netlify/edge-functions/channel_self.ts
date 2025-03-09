@@ -14,4 +14,4 @@ if (sentryDsn) {
 app.use('*', logger())
 app.use('*', requestId())
 
-export default handle(app as any)
+export default handle(app)

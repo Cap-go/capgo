@@ -9,14 +9,18 @@ const bodySchema = z.object({
 
 export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
-  if (!bodyParsed.success)
+  if (!bodyParsed.success) {
+    console.error('Invalid body', bodyParsed.error)
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+  }
   const body = bodyParsed.data
 
   const userId = apikey.user_id
   const { data, error } = await supabaseAdmin(c).from('users').select('*').eq('id', userId).single()
-  if (error)
+  if (error) {
+    console.error('Cannot get user', error)
     return c.json({ status: 'Cannot get user', error: error.message }, 500)
+  }
 
   const { data: dataOrg, error: errorOrg } = await supabaseAdmin(c)
     .from('orgs')

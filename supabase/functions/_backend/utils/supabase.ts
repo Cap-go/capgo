@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 
+import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
@@ -110,7 +111,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   console.log({ requestId: c.get('requestId'), context: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     console.log({ requestId: c.get('requestId'), context: 'missing app_id, name, or created_by' })
-    return Promise.reject(new Error('missing app_id, name, or created_by'))
+    return Promise.resolve({ error: new Error('missing app_id, name, or created_by'), requestId: c.get('requestId') })
   }
 
   const { data: existingChannel } = await supabaseAdmin(c)
@@ -127,7 +128,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     )
     if (!fieldsDiffer) {
       console.log({ requestId: c.get('requestId'), context: 'No fields differ, no update needed' })
-      return Promise.resolve()
+      return Promise.resolve({ error: null, requestId: c.get('requestId') })
     }
   }
 
@@ -201,7 +202,7 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
   return data
 }
 
-export async function hasAppRightApikey(c: Context, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
   if (!appId)
     return false
 

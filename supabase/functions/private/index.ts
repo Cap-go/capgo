@@ -1,8 +1,6 @@
-import type { MiddlewareHandler } from '@hono/hono'
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
-import { Hono } from 'hono/tiny'
 
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
@@ -22,15 +20,16 @@ import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
+import { honoFactory } from '../_backend/utils/hono.ts'
 
 const functionName = 'private'
-const appGlobal = new Hono().basePath(`/${functionName}`)
+const appGlobal = honoFactory.createApp().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
 if (sentryDsn) {
   appGlobal.use('*', sentry({
     dsn: sentryDsn,
-  }) as unknown as MiddlewareHandler)
+  }))
 }
 
 appGlobal.use('*', logger())

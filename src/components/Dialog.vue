@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ActionSheetOptionButton } from '~/stores/display'
+import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
@@ -136,9 +137,9 @@ onMounted(() => {
                     }"
                     @input="(value) => {
                       if (value)
-                        displayStore.selectedApps.push(app)
+                        displayStore.selectedApps.push(app as any)
                       else
-                        displayStore.selectedApps = displayStore.selectedApps.filter(filterApp => filterApp.app_id !== app.app_id)
+                        displayStore.selectedApps = (displayStore.selectedApps as any).filter((filterApp: Database['public']['Tables']['apps']['Row']) => filterApp.app_id !== app.app_id)
                     }"
                   />
                 </div>

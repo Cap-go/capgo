@@ -135,17 +135,28 @@ describe('test valid and invalid cases of version_build', () => {
     baseData.version_build = 'invalid_version'
 
     //  count devices
-    const { data: deviceCountData } = await getSupabaseClient()
+    const deviceCountData = await getSupabaseClient()
       .from('devices')
       .select('*', { count: 'exact' })
       .eq('app_id', APP_NAME_STATS)
-      .single()
-    const total = deviceCountData?.count ?? 0
+      .then((v) => {
+        // console.log({ v })
+        return v.count
+      })
     baseData.device_id = randomUUID().toLowerCase()
     response = await postStats(baseData)
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(400)
     responseData = await response.json<StatsRes>()
-    expect(responseData.status).toBe('ok')
+    expect(responseData.error).toBe('invalid_version_build')
+    const deviceCountData2 = await getSupabaseClient()
+      .from('devices')
+      .select('*', { count: 'exact' })
+      .eq('app_id', APP_NAME_STATS)
+      .then((v) => {
+        // console.log({ v })
+        return v.count
+      })
+    expect(deviceCountData2).toBe(deviceCountData)
 
     // Clean up
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
@@ -203,8 +214,9 @@ describe('[POST] /stats', () => {
       baseData.custom_id = 'test2'
 
       const response = await postStats(baseData)
+      const responseData = await response.json<StatsRes>()
       expect(response.status).toBe(200)
-      expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+      expect(responseData.status).toBe('ok')
 
       // Verify stats entry
       const { error: statsError, data: statsData } = await getSupabaseClient()

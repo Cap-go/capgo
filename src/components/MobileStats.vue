@@ -41,7 +41,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
     legend: { display: false },
     title: { display: false },
   },
-}))
+} as any))
 
 const chartData = ref<any>(null)
 

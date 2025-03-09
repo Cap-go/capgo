@@ -1410,7 +1410,7 @@ export type Database = {
       get_metered_usage:
         | {
             Args: Record<PropertyKey, never>
-            Returns: number
+            Returns: Database["public"]["CompositeTypes"]["stats_table"]
           }
         | {
             Args: {
@@ -2039,24 +2039,50 @@ export type Database = {
           uninstall: number
         }[]
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_app_id: string
-        }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: {
-          p_app_id: string
-        }
-        Returns: undefined
-      }
+      reset_and_seed_app_data:
+        | {
+            Args: {
+              p_app_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_app_id: string
+            }
+            Returns: undefined
+          }
+      reset_and_seed_app_stats_data:
+        | {
+            Args: {
+              p_app_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_app_id: string
+            }
+            Returns: undefined
+          }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
       reset_and_seed_stats_data: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_app_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
+      reset_app_stats_data: {
+        Args: {
+          p_app_id: string
+        }
         Returns: undefined
       }
       set_bandwidth_exceeded_by_org: {

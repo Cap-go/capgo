@@ -90,6 +90,8 @@ async function addChannel(name: string) {
   try {
     console.log('addChannel', name, versionId.value, main.user)
     const currentGid = organizationStore.currentOrganization?.gid
+    if (!currentGid)
+      return
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }
     const { data: dataChannel } = await supabase
       .from('channels')
@@ -97,8 +99,8 @@ async function addChannel(name: string) {
         {
           name,
           app_id: props.appId,
-          version: versionId.value,
-          owner_org: currentGid,
+          version: versionId.value as number,
+          owner_org: currentGid as string,
         },
       ])
       .select()

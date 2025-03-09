@@ -1,9 +1,8 @@
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
-import { Hono } from 'hono/tiny'
+import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../package.json'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
@@ -21,6 +20,7 @@ import { app as stripe_checkout } from '../../supabase/functions/_backend/privat
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as verify_replication } from '../../supabase/functions/_backend/private/verify_replication.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
+import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
 import { app as bundle } from '../../supabase/functions/_backend/public/bundle/index.ts'
 import { app as channel } from '../../supabase/functions/_backend/public/channel/index.ts'
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
@@ -46,11 +46,9 @@ import { app as on_version_update } from '../../supabase/functions/_backend/trig
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 
-export { AttachmentUploadHandler, UploadHandler as TemporaryKeyHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
-
-const app = new Hono<{ Bindings: Bindings }>()
-const appTriggers = new Hono<{ Bindings: Bindings }>()
-const appFront = new Hono<{ Bindings: Bindings }>()
+const app = honoFactory.createApp()
+const appTriggers = honoFactory.createApp()
+const appPrivate = honoFactory.createApp()
 
 app.use('*', sentry({
   release: version,
@@ -66,41 +64,33 @@ app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
 app.route('/statistics', statistics)
-
-app.route('/bundle', bundle)
-
-app.use('/channel')
-app.route('/channel', channel)
-
-app.route('/device', device)
-
-app.route('/on_app_create', on_app_create)
+app.route('/app', appEndpoint)
 
 // Private API
-appFront.route('/plans', plans)
-appFront.route('/store_top', storeTop)
-appFront.route('/website_stats', publicStats)
-appFront.route('/config', config)
-appFront.route('/devices', devices_priv)
-appFront.route('/log_as', log_as)
-appFront.route('/stats', stats_priv)
-appFront.route('/stripe_checkout', stripe_checkout)
-appFront.route('/stripe_portal', stripe_portal)
-appFront.route('/delete_failed_version', deleted_failed_version)
-appFront.route('/latency', latency)
-appFront.route('/latency_postres', latency_postres)
-appFront.route('/verify_replication', verify_replication)
-appFront.route('/create_device', create_device)
-appFront.route('/events', events)
+appPrivate.route('/plans', plans)
+appPrivate.route('/store_top', storeTop)
+appPrivate.route('/website_stats', publicStats)
+appPrivate.route('/config', config)
+appPrivate.route('/devices', devices_priv)
+appPrivate.route('/log_as', log_as)
+appPrivate.route('/stats', stats_priv)
+appPrivate.route('/stripe_checkout', stripe_checkout)
+appPrivate.route('/stripe_portal', stripe_portal)
+appPrivate.route('/delete_failed_version', deleted_failed_version)
+appPrivate.route('/latency', latency)
+appPrivate.route('/latency_postres', latency_postres)
+appPrivate.route('/verify_replication', verify_replication)
+appPrivate.route('/create_device', create_device)
+appPrivate.route('/events', events)
 
 // Triggers
-
 appTriggers.route('/clear_app_cache', clear_app_cache)
 appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/on_channel_update', on_channel_update)
+appTriggers.route('/on_app_create', on_app_create)
 appTriggers.route('/on_user_create', on_user_create)
 appTriggers.route('/on_user_update', on_user_update)
 appTriggers.route('/on_user_delete', on_user_delete)
@@ -114,7 +104,7 @@ appTriggers.route('/cron_stats', cron_stats)
 appTriggers.route('/cron_plan', cron_plan)
 
 app.route('/triggers', appTriggers)
-app.route('/private', appFront)
+app.route('/private', appPrivate)
 
 app.onError((e, c) => {
   c.get('sentry').captureException(e)
@@ -131,3 +121,4 @@ app.onError((e, c) => {
 export default {
   fetch: app.fetch,
 }
+export { AttachmentUploadHandler, UploadHandler as TemporaryKeyHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'

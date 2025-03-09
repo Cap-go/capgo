@@ -1,15 +1,14 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { BRES } from '../utils/hono.ts'
+import { BRES, honoFactory } from '../utils/hono.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.get('/', async (c: Context) => {
+app.get('/', async (c) => {
   try {
-    const pgClient = getPgClient(c)
+    const pgClient = getPgClient(c as any)
     const res = await pgClient`select 1`
-    closeClient(c, pgClient)
+
+    closeClient(c as any, pgClient)
     if (!res)
       return c.json({ status: 'Cannot post ok', error: 'Cannot get apps' }, 400)
     return c.json(BRES)

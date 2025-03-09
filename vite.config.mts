@@ -22,6 +22,7 @@ import Layouts from 'vite-plugin-vue-layouts'
 import WebfontDownload from 'vite-plugin-webfont-dl'
 import pack from './package.json'
 import { branch, getRightKey } from './scripts/utils.mjs'
+import 'vitest/config'
 
 function getUrl(key = 'base_domain'): string {
   if (branch === 'local')

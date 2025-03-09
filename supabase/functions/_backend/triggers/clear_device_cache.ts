@@ -1,12 +1,10 @@
 // DO nothing it's only for cache
 
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.get('/', middlewareAPISecret, (c: Context) => {
+app.get('/', middlewareAPISecret, (c) => {
   try {
     return c.json(BRES)
   }

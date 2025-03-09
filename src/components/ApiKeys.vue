@@ -138,7 +138,7 @@ async function addNewApiKey() {
     displayStore.showDialog = true
     if (await displayStore.onDialogDismiss())
       return
-    selectedApps = displayStore.selectedApps
+    selectedApps = displayStore.selectedApps as any as Database['public']['Tables']['apps']['Row'][]
     if (selectedApps.length === 0) {
       toast.error(t('alert-no-app-selected'))
       return

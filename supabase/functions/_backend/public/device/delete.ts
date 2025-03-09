@@ -10,8 +10,10 @@ export interface DeviceLink {
 }
 
 export async function deleteOverride(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key)))
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
+    console.error('Cannot delete override', 'You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+  }
 
   try {
     const { error: errorChannel } = await supabaseAdmin(c)
@@ -19,10 +21,13 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
       .delete()
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id.toLowerCase())
-    if (errorChannel)
+    if (errorChannel) {
+      console.error('Cannot delete channel override', errorChannel)
       return c.json({ status: 'Cannot delete channel override', error: JSON.stringify(errorChannel) }, 400)
+    }
   }
   catch (e) {
+    console.error('Cannot delete override', e)
     return c.json({ status: 'Cannot delete override', error: JSON.stringify(e) }, 500)
   }
   return c.json(BRES)

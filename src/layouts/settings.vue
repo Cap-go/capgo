@@ -81,7 +81,7 @@ watchEffect(() => {
     organizationTabs.value.push(
       {
         label: 'plans',
-        icon: shallowRef(IconPlans),
+        icon: shallowRef(IconPlans) as any,
         key: '/dashboard/settings/organization/plans',
       },
     )

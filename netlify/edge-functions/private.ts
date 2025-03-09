@@ -2,8 +2,8 @@ import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { handle } from 'hono/netlify'
 import { requestId } from 'hono/request-id'
-import { Hono } from 'hono/tiny'
 
+import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
@@ -20,7 +20,7 @@ import { app as stripe_portal } from '../../supabase/functions/_backend/private/
 import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
 
 const functionName = 'private'
-const appGlobal = new Hono().basePath(`/${functionName}`)
+const appGlobal = honoFactory.createApp().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_NETLIFY')
 if (sentryDsn) {
@@ -49,4 +49,4 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
 
-export default handle(appGlobal as any)
+export default handle(appGlobal)

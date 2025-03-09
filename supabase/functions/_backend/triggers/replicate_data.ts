@@ -1,7 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types'
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 // import { backgroundTask } from '../utils/utils.ts'
 
 function isValidValue(value: any): boolean {
@@ -16,9 +14,9 @@ function isValidValue(value: any): boolean {
   return true
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const body = await c.req.json<{ operations: Array<{
       table: string
@@ -41,7 +39,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
     for (const op of operations) {
       const { table, type, record, old_record } = op
-      const cleanRecord = cleanFieldsAppVersions(record, table)
+      const cleanRecord = cleanFieldsAppVersions(record, table as TableNames)
 
       switch (type) {
         case 'INSERT':
@@ -129,8 +127,9 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
 
 type SQLiteType = 'INTEGER' | 'TEXT' | 'BOOLEAN' | 'JSON'
 type TableSchema = Record<string, SQLiteType>
+export type TableNames = 'app_versions' | 'channels' | 'channel_devices' | 'apps' | 'orgs' | 'stripe_info'
 
-const TABLE_SCHEMAS: Record<string, TableSchema> = {
+export const TABLE_SCHEMAS: Record<TableNames, TableSchema> = {
   app_versions: {
     id: 'INTEGER',
     owner_org: 'TEXT',
@@ -240,7 +239,7 @@ const UUID_COLUMNS = new Set([
 ])
 
 // clean fields that are not in the d1 table
-export function cleanFieldsAppVersions(record: any, table: string) {
+export function cleanFieldsAppVersions(record: any, table: TableNames) {
   if (!record)
     return record
 

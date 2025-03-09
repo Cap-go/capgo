@@ -42,7 +42,7 @@ const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
   const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2]
-  const diff = total.value - oldTotal
+  const diff = (total.value as number) - oldTotal
   const res = diff / (arr.length > 2 ? oldTotal : diff) * 100
   return res
 })

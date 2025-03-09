@@ -1,16 +1,14 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
 import { bytesToGb } from '../utils/conversion.ts'
-import { useCors } from '../utils/hono.ts'
+import { honoFactory, useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
 app.use('/', useCors)
 
-app.get('/', async (c: Context) => {
+app.get('/', async (c) => {
   try {
-    const { data: plans } = await supabaseAdmin(c)
+    const { data: plans } = await supabaseAdmin(c as any)
       .from('plans')
       .select()
       .order('price_m')

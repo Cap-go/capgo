@@ -1,6 +1,4 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { middlewareKey } from '../utils/hono.ts'
+import { honoFactory, middlewareKey } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
@@ -10,29 +8,29 @@ interface dataUpload {
   name: string
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) => {
+app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   try {
     const body = await c.req.json<dataUpload>()
     console.log({ requestId: c.get('requestId'), context: 'delete failed version body', body })
     const apikey = c.get('apikey')
-    const capgkey = c.get('capgkey')
+    const capgkey = c.get('capgkey') as string
     console.log({ requestId: c.get('requestId'), context: 'apikey', apikey })
     console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
-    const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+    const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
       .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
     if (_errorUserId) {
       console.log({ requestId: c.get('requestId'), context: '_errorUserId', error: _errorUserId })
       return c.json({ status: 'Error User not found' }, 500)
     }
 
-    if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
+    if (!(await hasAppRightApikey(c as any, body.app_id, userId, 'read', capgkey))) {
       console.log({ requestId: c.get('requestId'), context: 'not has app right', userId, app_id: body.app_id })
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
-    const { error: errorApp } = await supabaseAdmin(c)
+    const { error: errorApp } = await supabaseAdmin(c as any)
       .from('apps')
       .select('app_id, owner_org')
       .eq('app_id', body.app_id)
@@ -47,7 +45,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       return c.json({ status: 'Error app_id or bundle name missing' }, 500)
     }
 
-    const { data: version, error: errorVersion } = await supabaseAdmin(c)
+    const { data: version, error: errorVersion } = await supabaseAdmin(c as any)
       .from('app_versions')
       .select('*')
       .eq('name', body.name)
@@ -67,7 +65,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
 
     // check if object exist in r2
     if (version.r2_path) {
-      const exist = await s3.checkIfExist(c, version.r2_path)
+      const exist = await s3.checkIfExist(c as any, version.r2_path)
       if (exist) {
         console.log({ requestId: c.get('requestId'), context: 'exist', exist })
         return c.json({ status: 'Error already uploaded to S3, delete is unsafe use the webapp to delete it' }, 500)
@@ -75,7 +73,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
     }
 
     // delete the version
-    const { error: errorDelete } = await supabaseAdmin(c)
+    const { error: errorDelete } = await supabaseAdmin(c as any)
       .from('app_versions')
       .delete()
       .eq('id', version.id)
@@ -85,7 +83,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c: Context) =>
       return c.json({ status: 'Error deleting version' }, 500)
     }
 
-    const LogSnag = logsnag(c)
+    const LogSnag = logsnag(c as any)
     await LogSnag.track({
       channel: 'upload-failed',
       event: 'Failed to upload a bundle',

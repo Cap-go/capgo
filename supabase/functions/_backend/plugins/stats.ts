@@ -3,11 +3,10 @@ import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES } from '../utils/hono.ts'
+import { BRES, honoFactory } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { createStatsLogsExternal, createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
@@ -100,8 +99,15 @@ async function post(c: Context, body: AppStats) {
       .eq('app_id', app_id)
       .single()
 
-    if (coerce)
+    if (coerce) {
       version_build = format(coerce)
+    }
+    else {
+      return c.json({
+        message: 'Invalid version build',
+        error: 'invalid_version_build',
+      }, 400)
+    }
     console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
@@ -197,13 +203,13 @@ async function post(c: Context, body: AppStats) {
   }
 }
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppStats>()
     console.log({ requestId: c.get('requestId'), context: 'post plugin/stats body', body })
-    return post(c, body)
+    return post(c as any, body)
   }
   catch (e) {
     console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
@@ -211,6 +217,6 @@ app.post('/', async (c: Context) => {
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   return c.json({ status: 'ok' })
 })

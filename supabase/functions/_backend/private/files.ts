@@ -1,13 +1,12 @@
-import type { Context, Next } from '@hono/hono'
+import type { Context } from '@hono/hono'
 import { getRuntimeKey } from 'hono/adapter'
 import { HTTPException } from 'hono/http-exception'
-import { Hono } from 'hono/tiny'
 import { app as ok } from '../public/ok.ts'
 import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
-import { middlewareKey } from '../utils/hono.ts'
+import { honoFactory, middlewareKey } from '../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
@@ -18,25 +17,7 @@ const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
 const ATTACHMENT_PREFIX = 'attachments'
 
-export const app = new Hono()
-
-app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
-
-app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, getHandler)
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
-
-app.route('/config', files_config)
-app.route('/download_link', download_link)
-app.route('/upload_link', upload_link)
-app.route('/ok', ok)
-
-app.all('*', (c) => {
-  console.log('all files', c.req.url)
-  return c.json({ error: 'Not Found' }, 404)
-})
+export const app = honoFactory.createApp()
 
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
@@ -122,7 +103,7 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
-function optionsHandler(c: Context): Response {
+const optionsHandler = honoFactory.createHandlers((c) => {
   console.log('optionsHandler files', 'optionsHandler')
   return c.newResponse(null, 204, {
     'Access-Control-Allow-Origin': '*',
@@ -134,11 +115,11 @@ function optionsHandler(c: Context): Response {
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
     'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
   })
-}
+})
 
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
-async function uploadHandler(c: Context): Promise<Response> {
-  const requestId = c.get('fileId')
+const uploadHandler = honoFactory.createHandlers(async (c) => {
+  const requestId = c.get('fileId') as string
   // make requestId  safe
   console.log('files req', 'uploadHandler', requestId, c.req.method, c.req.url)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
@@ -156,9 +137,9 @@ async function uploadHandler(c: Context): Promise<Response> {
     headers: c.req.raw.headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   })
-}
+})
 
-async function setKeyFromMetadata(c: Context, next: Next) {
+const setKeyFromMetadata = honoFactory.createMiddleware(async (c, next) => {
   const fileId = parseUploadMetadata(c.req.raw.headers).filename
   if (fileId == null) {
     console.log({ requestId: c.get('requestId'), context: 'fileId is null' })
@@ -166,9 +147,9 @@ async function setKeyFromMetadata(c: Context, next: Next) {
   }
   c.set('fileId', fileId)
   await next()
-}
+})
 
-async function setKeyFromIdParam(c: Context, next: Next) {
+const setKeyFromIdParam = honoFactory.createMiddleware(async (c, next) => {
   const fileId = c.req.param('id')
   if (fileId == null) {
     console.log({ requestId: c.get('requestId'), context: 'fileId is null' })
@@ -176,10 +157,10 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   }
   c.set('fileId', fileId)
   await next()
-}
+})
 
-async function checkWriteAppAccess(c: Context, next: Next) {
-  const requestId = c.get('fileId')
+const checkWriteAppAccess = honoFactory.createMiddleware(async (c, next) => {
+  const requestId = c.get('fileId') as string
   const [orgs, owner_org, apps, app_id] = requestId.split('/')
   if (orgs !== 'orgs' || apps !== 'apps') {
     throw new HTTPException(400, { message: 'Invalid requestId' })
@@ -188,21 +169,21 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     throw new HTTPException(400, { message: 'Invalid requestId' })
   }
   console.log('checkWriteAppAccess', app_id, owner_org)
-  const capgkey = c.get('capgkey')
+  const capgkey = c.get('capgkey') as string
   console.log({ requestId: c.get('requestId'), context: 'capgkey', capgkey })
-  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+  const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
     .rpc('get_user_id', { apikey: capgkey, app_id })
   if (_errorUserId) {
     console.log({ requestId: c.get('requestId'), context: '_errorUserId', error: _errorUserId })
     throw new HTTPException(400, { message: 'Error User not found' })
   }
 
-  if (!(await hasAppRightApikey(c, app_id, userId, 'read', capgkey))) {
+  if (!(await hasAppRightApikey(c as any, app_id, userId, 'read', capgkey))) {
     console.log({ requestId: c.get('requestId'), context: 'no read' })
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
 
-  const { data: app, error: errorApp } = await supabaseAdmin(c)
+  const { data: app, error: errorApp } = await supabaseAdmin(c as any)
     .from('apps')
     .select('app_id, owner_org')
     .eq('app_id', app_id)
@@ -216,4 +197,22 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
   await next()
-}
+})
+
+app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler as any)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler as any)
+
+app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler as any)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, getHandler as any)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler as any)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, uploadHandler as any)
+
+app.route('/config', files_config)
+app.route('/download_link', download_link)
+app.route('/upload_link', upload_link)
+app.route('/ok', ok)
+
+app.all('*', (c) => {
+  console.log('all files', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
+})

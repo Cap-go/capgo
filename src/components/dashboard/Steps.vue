@@ -166,7 +166,7 @@ watchEffect(async () => {
     mySubscription.value = supabase
       .channel('table-db-changes')
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         {
           event: 'INSERT',
           schema: 'public',

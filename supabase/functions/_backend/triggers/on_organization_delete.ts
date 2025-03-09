@@ -1,13 +1,11 @@
-import type { Context } from '@hono/hono'
 import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'orgs'
     const body = await c.req.json<DeletePayload<typeof table>>()
@@ -28,7 +26,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
 
     console.log({ requestId: c.get('requestId'), context: 'org delete', record })
-    cancelSubscription(c, record.customer_id)
+    cancelSubscription(c as any, record.customer_id)
     return c.json(BRES)
   }
   catch (e) {

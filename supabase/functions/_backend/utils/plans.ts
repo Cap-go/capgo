@@ -51,7 +51,6 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
 export async function getMeterdUsage(c: Context, orgId: string): Promise<Database['public']['CompositeTypes']['stats_table']> {
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_metered_usage', { orgid: orgId })
-    .single()
 
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'getMeterdUsage', error })

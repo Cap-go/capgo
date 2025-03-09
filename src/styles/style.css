@@ -2,10 +2,216 @@
 layer(base);
 
 @import 'tailwindcss';
-@plugin "daisyui";
+@plugin "@tailwindcss/typography";
+/* @plugin "tailwind-capacitor/safe-areas"; */ /* TODO: fix the plugin for tailwind 4 */
+@plugin "@tailwindcss/aspect-ratio";
+@plugin "@tailwindcss/container-queries";
 
-@config '../../tailwind.config.js';
+@plugin "daisyui" {
+  themes: capgotheme --default, dark --prefersdark;
+  logs: false;
+}
 
+@plugin "daisyui/theme" {
+  name: "capgotheme";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-primary: #515271;
+  --color-secondary: #119eff;
+  --color-accent: #1FB2A5;
+  --color-neutral: #191D24;
+  --color-base-100: #2A303C;
+  --color-info: #3ABFF8;
+  --color-success: #88d4a6;
+  --color-warning: #ff7211;
+  --color-error: #456b9a;
+  --border-btn: 0.5px;
+}
+
+@theme {
+  --font-sans: Inter, 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  
+  /* Primary colors */
+  --color-primary-500: #515271;
+  --color-secondary-500: #119eff;
+  --color-tertiary-500: #6876e1;
+  --color-success-500: #88d4a6;
+  --color-warning-500: #ff7211;
+  --color-danger-500: #456b9a;
+  --color-accent-500: #1FB2A5;
+  --color-neutral-500: #191D24;
+
+  /* Black */
+  --color-black: #000000;
+  --color-black-light: #333333;
+  --color-black-dark: #373738;
+  
+  /* White */
+  --color-white: #ffffff;
+  
+  /* Grey */
+  --color-grey-500: #999999;
+  --color-grey-medium: #1e1e1e;
+  --color-grey-dark: #515271;
+  
+  /* Green */
+  --color-green-500: #88D4A6;
+  
+  /* Pumpkin Orange */
+  --color-pumpkin-orange-50: #ffa443;
+  --color-pumpkin-orange-100: #ff9a39;
+  --color-pumpkin-orange-200: #ff902f;
+  --color-pumpkin-orange-300: #ff8625;
+  --color-pumpkin-orange-400: #ff7c1b;
+  --color-pumpkin-orange-500: #ff7211;
+  --color-pumpkin-orange-600: #f56807;
+  --color-pumpkin-orange-700: #eb5e00;
+  --color-pumpkin-orange-800: #e15400;
+  --color-pumpkin-orange-900: #d74a00;
+  
+  /* Muted Blue */
+  --color-muted-blue-50: #779dcc;
+  --color-muted-blue-100: #6d93c2;
+  --color-muted-blue-200: #6389b8;
+  --color-muted-blue-300: #597fae;
+  --color-muted-blue-400: #4f75a4;
+  --color-muted-blue-500: #456b9a;
+  --color-muted-blue-600: #3b6190;
+  --color-muted-blue-700: #315786;
+  --color-muted-blue-800: #274d7c;
+  --color-muted-blue-900: #1d4372;
+  
+  /* Azure */
+  --color-azure-50: #43d0ff;
+  --color-azure-100: #39c6ff;
+  --color-azure-200: #2fbcff;
+  --color-azure-300: #25b2ff;
+  --color-azure-400: #1ba8ff;
+  --color-azure-500: #119eff;
+  --color-azure-600: #0794f5;
+  --color-azure-700: #008aeb;
+  --color-azure-800: #0080e1;
+  --color-azure-900: #0076d7;
+  
+  /* Dusk */
+  --color-dusk-50: #8384a3;
+  --color-dusk-100: #797a99;
+  --color-dusk-200: #6f708f;
+  --color-dusk-300: #656685;
+  --color-dusk-400: #5b5c7b;
+  --color-dusk-500: #515271;
+  --color-dusk-600: #474867;
+  --color-dusk-700: #3d3e5d;
+  --color-dusk-800: #333453;
+  --color-dusk-900: #292a49;
+  
+  /* Vista Blue */
+  --color-vista-blue-50: #baffd8;
+  --color-vista-blue-100: #b0fcce;
+  --color-vista-blue-200: #a6f2c4;
+  --color-vista-blue-300: #9ce8ba;
+  --color-vista-blue-400: #92deb0;
+  --color-vista-blue-500: #88d4a6;
+  --color-vista-blue-600: #7eca9c;
+  --color-vista-blue-700: #74c092;
+  --color-vista-blue-800: #6ab688;
+  --color-vista-blue-900: #60ac7e;
+  
+  /* Cornflower */
+  --color-cornflower-50: #9aa8ff;
+  --color-cornflower-100: #909eff;
+  --color-cornflower-200: #8694ff;
+  --color-cornflower-300: #7c8af5;
+  --color-cornflower-400: #7280eb;
+  --color-cornflower-500: #6876e1;
+  --color-cornflower-600: #5e6cd7;
+  --color-cornflower-700: #5462cd;
+  --color-cornflower-800: #4a58c3;
+  --color-cornflower-900: #404eb9;
+  
+  /* Misty Rose */
+  --color-misty-rose-50: #ffffff;
+  --color-misty-rose-100: #ffffff;
+  --color-misty-rose-200: #fffff9;
+  --color-misty-rose-300: #fff8ef;
+  --color-misty-rose-400: #ffeee5;
+  --color-misty-rose-500: #f8e4db;
+  --color-misty-rose-600: #eedad1;
+  --color-misty-rose-700: #e4d0c7;
+  --color-misty-rose-800: #dac6bd;
+  --color-misty-rose-900: #d0bcb3;
+  
+  /* Box Shadows */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.01);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.01);
+  
+  /* Font Sizes */
+  --text-tiny: .4rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5715;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5;
+  --text-base--letter-spacing: -0.01em;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.5;
+  --text-lg--letter-spacing: -0.01em;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.5;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.33;
+  --text-2xl--letter-spacing: -0.01em;
+  --text-3xl: 1.88rem;
+  --text-3xl--line-height: 1.33;
+  --text-3xl--letter-spacing: -0.01em;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 1.25;
+  --text-4xl--letter-spacing: -0.02em;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1.25;
+  --text-5xl--letter-spacing: -0.02em;
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 1.2;
+  --text-6xl--letter-spacing: -0.02em;
+  
+  /* Screens */
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* Min Width */
+  --min-width-36: 9rem;
+  --min-width-44: 11rem;
+  --min-width-56: 14rem;
+  --min-width-60: 15rem;
+  --min-width-72: 18rem;
+  --min-width-80: 20rem;
+  
+  /* Max Width */
+  --max-width-8xl: 88rem;
+  --max-width-9xl: 96rem;
+  
+  /* Z-index */
+  --z-index-60: 60;
+  --z-index-70: 70;
+  --z-index-80: 80;
+  --z-index-90: 90;
+  --z-index-100: 100;
+  
+  /* Border Width */
+  --border-width-3: 3px;
+}
 
 @font-face {
   font-family: 'AirbnbCerealLight';

@@ -1,9 +1,8 @@
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
-import { Hono } from 'hono/tiny'
+import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../package.json'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
@@ -13,7 +12,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = honoFactory.createApp()
 
 app.use('*', sentry({
   release: version,
