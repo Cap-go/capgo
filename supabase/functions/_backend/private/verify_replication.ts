@@ -1,8 +1,8 @@
 import type { Context } from '@hono/hono'
 import type { TableNames } from '../triggers/replicate_data.ts'
-import { cleanFieldsAppVersions } from '../triggers/replicate_data.ts'
-import { Hono } from 'hono/tiny'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { cleanFieldsAppVersions } from '../triggers/replicate_data.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 

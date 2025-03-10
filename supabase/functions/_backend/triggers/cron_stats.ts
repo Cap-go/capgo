@@ -1,6 +1,6 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, useCors } from '../utils/hono.ts'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 

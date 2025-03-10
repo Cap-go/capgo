@@ -1,8 +1,8 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
 import { useCors } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { getUpdateStats } from '../utils/stats.ts'
-import { Hono } from 'hono/tiny'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 

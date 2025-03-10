@@ -1,8 +1,8 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
 const thresholds = {
   // Number of updates in plain number

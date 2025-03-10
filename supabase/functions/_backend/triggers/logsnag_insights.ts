@@ -1,13 +1,13 @@
 import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { Hono } from 'hono/tiny'
 import ky from 'ky'
 import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { Hono } from 'hono/tiny'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }

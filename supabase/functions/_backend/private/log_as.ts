@@ -1,8 +1,8 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
-import { Hono } from 'hono/tiny'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
 const bodySchema = z.object({
   user_id: z.string(),
