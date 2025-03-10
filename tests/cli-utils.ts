@@ -26,7 +26,7 @@ export const BASE_DEPENDENCIES = {
 export const BASE_DEPENDENCIES_OLD = {
   '@capacitor/android': '^6.0.0',
   '@capacitor/core': '6.0.0',
-  '@capgo/capacitor-updater': '6.14.28',
+  '@capgo/capacitor-updater': '6.14.16',
 }
 export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
 
