@@ -1,178 +1,179 @@
-name: Build source code and deploy
+# name: Build source code and deploy
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
-on:
-  push:
-    tags:
-      - "*"
+# on:
+#   push:
+#     tags:
+#       - "*"
 
-jobs:
-  supabase_deploy:
-    runs-on: ubuntu-latest
-    name: Build code and deploy to Supabase
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Set environment variable
-        run: |
-          if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "SUPA_ENV=ALPHA" >> $GITHUB_ENV
-          else
-            echo "SUPA_ENV=PROD" >> $GITHUB_ENV
-          fi
-      - name: Set Supabase credentials
-        run: |
-          echo "SUPABASE_DB_PASSWORD=${{ secrets[format('SUPABASE_DB_PASS_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
-          echo "SUPABASE_PROJECT_ID=${{ secrets[format('SUPABASE_PROJECT_ID_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
-      - name: Install dependencies
-        run: bun install
-      - name: Lint
-        run: bun lint && bun lint-backend
-      - name: Typecheck
-        run: bun typecheck
-      - name: Lint I18n
-        run: bunx @inlang/cli lint --project project.inlang
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.15.8
-      - name: Show Supabase CLI version
-        run: supabase --version
-      - name: Prepare Supabase
-        run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-      - name: Wait for tests to succeed
-        if: ${{ env.SUPA_ENV != 'ALPHA' }}
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: Run tests
-          repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          wait-interval: 10
-      - name: Apply Supabase Migrations
-        run: supabase db push
-      - name: Update functions
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-        run: supabase functions deploy --use-api
+# #  Break deploy as we have bug in files upload CF worker
+# jobs:
+#   supabase_deploy:
+#     runs-on: ubuntu-latest
+#     name: Build code and deploy to Supabase
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#       - name: Setup bun
+#         uses: oven-sh/setup-bun@v2
+#         with:
+#           bun-version: latest
+#       - name: Set environment variable
+#         run: |
+#           if [[ ${{ github.ref }} == *-alpha* ]]; then
+#             echo "SUPA_ENV=ALPHA" >> $GITHUB_ENV
+#           else
+#             echo "SUPA_ENV=PROD" >> $GITHUB_ENV
+#           fi
+#       - name: Set Supabase credentials
+#         run: |
+#           echo "SUPABASE_DB_PASSWORD=${{ secrets[format('SUPABASE_DB_PASS_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
+#           echo "SUPABASE_PROJECT_ID=${{ secrets[format('SUPABASE_PROJECT_ID_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
+#       - name: Install dependencies
+#         run: bun install
+#       - name: Lint
+#         run: bun lint && bun lint-backend
+#       - name: Typecheck
+#         run: bun typecheck
+#       - name: Lint I18n
+#         run: bunx @inlang/cli lint --project project.inlang
+#       - name: Install Supabase CLI
+#         uses: supabase/setup-cli@v1
+#         with:
+#           version: 2.15.8
+#       - name: Show Supabase CLI version
+#         run: supabase --version
+#       - name: Prepare Supabase
+#         run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+#         env:
+#           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+#       - name: Wait for tests to succeed
+#         if: ${{ env.SUPA_ENV != 'ALPHA' }}
+#         uses: lewagon/wait-on-check-action@v1.3.4
+#         with:
+#           ref: ${{ github.ref }}
+#           check-name: Run tests
+#           repo-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+#           wait-interval: 10
+#       - name: Apply Supabase Migrations
+#         run: supabase db push
+#       - name: Update functions
+#         env:
+#           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+#         run: supabase functions deploy --use-api
 
-  deploy_webapp:
-    needs: supabase_deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install
-      - name: Set environment variable
-        run: |
-          if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp-alpha" >> $GITHUB_ENV
-            echo "CHANNEL=alpha" >> $GITHUB_ENV
-          else
-            echo "ENV=prod" >> $GITHUB_ENV
-            echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
-            echo "CHANNEL=production" >> $GITHUB_ENV
-          fi
-      - name: Build
-        run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
-        env:
-          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
-          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-      - name: Publish CF webapp
-        run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Deploy to Capgo
-        run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
-        env:
-          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
+#   deploy_webapp:
+#     needs: supabase_deploy
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#       - name: Setup bun
+#         uses: oven-sh/setup-bun@v2
+#         with:
+#           bun-version: latest
+#       - name: Install dependencies
+#         run: bun install
+#       - name: Set environment variable
+#         run: |
+#           if [[ ${{ github.ref }} == *-alpha* ]]; then
+#             echo "ENV=alpha" >> $GITHUB_ENV
+#             echo "PROJECT_NAME=capgo-webapp-alpha" >> $GITHUB_ENV
+#             echo "CHANNEL=alpha" >> $GITHUB_ENV
+#           else
+#             echo "ENV=prod" >> $GITHUB_ENV
+#             echo "PROJECT_NAME=capgo-webapp" >> $GITHUB_ENV
+#             echo "CHANNEL=production" >> $GITHUB_ENV
+#           fi
+#       - name: Build
+#         run: bun ${{ env.ENV == 'prod' && 'mobile' || 'dev-mobile' }}
+#         env:
+#           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+#           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+#       - name: Publish CF webapp
+#         run: bunx wrangler@latest pages deploy dist --project-name ${{ env.PROJECT_NAME }} --branch main
+#         env:
+#           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#       - name: Deploy to Capgo
+#         run: bunx @capgo/cli@latest bundle upload -a ${{ secrets.CAPGO_TOKEN }} --channel ${{ env.CHANNEL }}  --partial --tus
+#         env:
+#           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
 
-  deploy_api:
-    needs: supabase_deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install
-      - name: Set environment variable
-        run: |
-          if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
-          else
-            echo "ENV=prod" >> $GITHUB_ENV
-          fi
-      - name: Deploy CF Worker API
-        run: bun run deploy:cloudflare:api:${{ env.ENV }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#   deploy_api:
+#     needs: supabase_deploy
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#       - name: Setup bun
+#         uses: oven-sh/setup-bun@v2
+#         with:
+#           bun-version: latest
+#       - name: Install dependencies
+#         run: bun install
+#       - name: Set environment variable
+#         run: |
+#           if [[ ${{ github.ref }} == *-alpha* ]]; then
+#             echo "ENV=alpha" >> $GITHUB_ENV
+#           else
+#             echo "ENV=prod" >> $GITHUB_ENV
+#           fi
+#       - name: Deploy CF Worker API
+#         run: bun run deploy:cloudflare:api:${{ env.ENV }}
+#         env:
+#           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  deploy_files:
-    needs: supabase_deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install
-      - name: Set environment variable
-        run: |
-          if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
-          else
-            echo "ENV=prod" >> $GITHUB_ENV
-          fi
-      - name: Deploy CF Worker Files
-        run: bun run deploy:cloudflare:files:${{ env.ENV }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#   deploy_files:
+#     needs: supabase_deploy
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#       - name: Setup bun
+#         uses: oven-sh/setup-bun@v2
+#         with:
+#           bun-version: latest
+#       - name: Install dependencies
+#         run: bun install
+#       - name: Set environment variable
+#         run: |
+#           if [[ ${{ github.ref }} == *-alpha* ]]; then
+#             echo "ENV=alpha" >> $GITHUB_ENV
+#           else
+#             echo "ENV=prod" >> $GITHUB_ENV
+#           fi
+#       - name: Deploy CF Worker Files
+#         run: bun run deploy:cloudflare:files:${{ env.ENV }}
+#         env:
+#           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  deploy_plugin:
-    needs: supabase_deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install dependencies
-        run: bun install
-      - name: Set environment variable
-        run: |
-          if [[ ${{ github.ref }} == *-alpha* ]]; then
-            echo "ENV=alpha" >> $GITHUB_ENV
-          else
-            echo "ENV=prod" >> $GITHUB_ENV
-          fi
-      - name: Deploy CF Worker Plugin
-        run: bun run deploy:cloudflare:plugin:${{ env.ENV }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+#   deploy_plugin:
+#     needs: supabase_deploy
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+#       - name: Setup bun
+#         uses: oven-sh/setup-bun@v2
+#         with:
+#           bun-version: latest
+#       - name: Install dependencies
+#         run: bun install
+#       - name: Set environment variable
+#         run: |
+#           if [[ ${{ github.ref }} == *-alpha* ]]; then
+#             echo "ENV=alpha" >> $GITHUB_ENV
+#           else
+#             echo "ENV=prod" >> $GITHUB_ENV
+#           fi
+#       - name: Deploy CF Worker Plugin
+#         run: bun run deploy:cloudflare:plugin:${{ env.ENV }}
+#         env:
+#           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+#           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
