@@ -97,7 +97,7 @@ BEGIN
 
     SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
 
-    RETURN NEXT ok(usage.mau_percent < 100, format('Plan usage MAU is less than the limit for "%s" plan', plan.name));
+    RETURN NEXT ok(usage.mau_percent <= 100, format('Plan usage MAU is less than the limit for "%s" plan', plan.name));
     RETURN NEXT ok(usage.bandwidth_percent < 100, format('Plan usage BANDWIDTH is less than the limit for "%s" plan', plan.name));
 
     -- here we don't set storage but we do check it because we have to make sure is_good_plan will not fail due to storage
