@@ -1,12 +1,14 @@
 import { z } from 'zod'
-import { honoFactory, middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
+import { Hono } from 'hono/tiny'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
 const bodySchema = z.object({
   user_id: z.string(),
 })
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

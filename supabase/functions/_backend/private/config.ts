@@ -1,7 +1,9 @@
-import { honoFactory, useCors } from '../utils/hono.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { useCors } from '../utils/hono.ts'
 import { getEnv } from '../utils/utils.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

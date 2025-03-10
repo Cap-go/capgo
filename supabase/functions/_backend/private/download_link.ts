@@ -1,5 +1,7 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
-import { honoFactory, middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
 interface DataDownload {
@@ -10,7 +12,7 @@ interface DataDownload {
   isManifest?: boolean
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

@@ -1,8 +1,10 @@
-import { honoFactory, useCors } from '../utils/hono.ts'
+import { useCors } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { getUpdateStats } from '../utils/stats.ts'
+import { Hono } from 'hono/tiny'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

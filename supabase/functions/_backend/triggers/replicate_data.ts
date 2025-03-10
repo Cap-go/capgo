@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types'
-import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
-// import { backgroundTask } from '../utils/utils.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 
 function isValidValue(value: any): boolean {
   if (value === undefined || value === null || value === '')
@@ -14,7 +15,7 @@ function isValidValue(value: any): boolean {
   return true
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   try {

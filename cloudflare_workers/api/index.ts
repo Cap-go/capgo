@@ -1,8 +1,9 @@
+import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
-import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
+import { Hono } from 'hono/tiny'
 import { version } from '../../package.json'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
@@ -46,9 +47,9 @@ import { app as on_version_update } from '../../supabase/functions/_backend/trig
 import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 
-const app = honoFactory.createApp()
-const appTriggers = honoFactory.createApp()
-const appPrivate = honoFactory.createApp()
+const app = new Hono<MiddlewareKeyVariables>()
+const appTriggers = new Hono<MiddlewareKeyVariables>()
+const appPrivate = new Hono<MiddlewareKeyVariables>()
 
 app.use('*', sentry({
   release: version,
@@ -107,6 +108,7 @@ app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
 
 app.onError((e, c) => {
+  console.log('app onError', e)
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException) {
     if (e.status === 429) {
@@ -114,7 +116,6 @@ app.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
   }
-  console.log('app', 'onError', e)
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 

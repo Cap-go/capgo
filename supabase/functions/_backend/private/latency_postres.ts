@@ -1,7 +1,9 @@
-import { BRES, honoFactory } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { BRES } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
   try {

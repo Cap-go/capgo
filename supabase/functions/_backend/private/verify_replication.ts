@@ -1,11 +1,12 @@
 import type { Context } from '@hono/hono'
 import type { TableNames } from '../triggers/replicate_data.ts'
 import { cleanFieldsAppVersions } from '../triggers/replicate_data.ts'
-import { honoFactory } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 // function to generate lastID for all table is 0 but for apps and orgs it's uuid 00000000-0000-0000-0000-000000000000
 function generateLastId(table: TableNames) {

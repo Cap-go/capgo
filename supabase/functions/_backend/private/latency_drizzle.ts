@@ -1,7 +1,9 @@
-import { BRES, honoFactory } from '../utils/hono.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { BRES } from '../utils/hono.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
   try {

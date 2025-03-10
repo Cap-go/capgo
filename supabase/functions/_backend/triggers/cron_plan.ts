@@ -1,11 +1,13 @@
-import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { checkPlanOrg } from '../utils/plans.ts'
 
 interface orgToGet {
   orgId?: string
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   try {

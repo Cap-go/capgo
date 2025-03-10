@@ -1,8 +1,10 @@
 import { HTTPError } from 'ky'
-import { honoFactory, middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { createCheckout } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { Hono } from 'hono/tiny'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 
 interface PortalData {
   priceId: string
@@ -13,7 +15,7 @@ interface PortalData {
   orgId: string
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

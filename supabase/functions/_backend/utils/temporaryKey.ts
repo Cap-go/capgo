@@ -1,8 +1,7 @@
 import type { Context } from '@hono/hono'
-import type { Hono } from 'hono/tiny'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from './hono'
-import { honoFactory } from './hono'
+import { Hono } from 'hono/tiny'
 
 const KEY_EXPIRATION_TIME = 20 * 60 * 1000 // 20 minutes
 
@@ -18,7 +17,7 @@ export class TemporaryKeyHandler {
   constructor(state: DurableObjectState, env: Env) {
     this.state = state
     this.env = env
-    this.router = honoFactory.createApp()
+    this.router = new Hono<MiddlewareKeyVariables>()
 
     this.router.post('/create', this.createKey.bind(this) as any)
     this.router.get('/validate', this.validateKey.bind(this) as any)

@@ -1,9 +1,10 @@
+import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { handle } from 'hono/netlify'
-import { requestId } from 'hono/request-id'
 
-import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
+import { requestId } from 'hono/request-id'
+import { Hono } from 'hono/tiny'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
@@ -20,7 +21,7 @@ import { app as stripe_portal } from '../../supabase/functions/_backend/private/
 import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
 
 const functionName = 'private'
-const appGlobal = honoFactory.createApp().basePath(`/${functionName}`)
+const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_NETLIFY')
 if (sentryDsn) {

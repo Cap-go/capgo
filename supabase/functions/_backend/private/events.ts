@@ -1,11 +1,13 @@
 import type { TrackOptions } from '@logsnag/node'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { BRES, honoFactory, useCors } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { BRES, useCors } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { checkKey } from '../utils/utils.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

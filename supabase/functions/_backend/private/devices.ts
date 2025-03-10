@@ -1,5 +1,7 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
-import { honoFactory, middlewareAuth, useCors } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
@@ -15,7 +17,7 @@ interface dataDevice {
   rangeEnd?: number
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 

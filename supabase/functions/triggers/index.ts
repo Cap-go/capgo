@@ -1,7 +1,9 @@
+import type { MiddlewareKeyVariables } from '../_backend/utils/hono.ts'
 // Triggers API
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
+import { Hono } from 'hono/tiny'
 import { app as clear_app_cache } from '../_backend/triggers/clear_app_cache.ts'
 import { app as clear_device_cache } from '../_backend/triggers/clear_device_cache.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
@@ -20,10 +22,9 @@ import { app as on_version_create } from '../_backend/triggers/on_version_create
 import { app as on_version_delete } from '../_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
-import { honoFactory } from '../_backend/utils/hono.ts'
 
 const functionName = 'triggers'
-const appGlobal = honoFactory.createApp().basePath(`/${functionName}`)
+const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
 if (sentryDsn) {

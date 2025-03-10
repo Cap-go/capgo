@@ -1,7 +1,8 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
+import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { honoFactory } from '../utils/hono.ts'
 import { update } from '../utils/update.ts'
 import {
   deviceIdRegex,
@@ -65,7 +66,7 @@ const jsonRequestSchema = z.object({
   return val
 })
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
   try {

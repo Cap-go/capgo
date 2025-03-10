@@ -1,4 +1,6 @@
-import { honoFactory, middlewareKey } from '../utils/hono.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { middlewareKey } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
@@ -8,7 +10,7 @@ interface dataUpload {
   name: string
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   try {

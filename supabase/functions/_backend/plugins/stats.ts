@@ -1,12 +1,14 @@
 import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
+import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES, honoFactory } from '../utils/hono.ts'
+import { BRES } from '../utils/hono.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { createStatsLogsExternal, createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
@@ -203,7 +205,7 @@ async function post(c: Context, body: AppStats) {
   }
 }
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
   try {

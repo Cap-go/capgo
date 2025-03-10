@@ -1,9 +1,11 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { BRES, honoFactory, middlewareAPISecret } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
+import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { createApiKey } from '../utils/supabase.ts'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   try {

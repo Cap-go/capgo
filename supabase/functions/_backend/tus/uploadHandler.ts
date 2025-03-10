@@ -1,6 +1,5 @@
 import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
-import type { Hono } from 'hono/tiny'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Digester } from './digest.ts'
@@ -10,7 +9,7 @@ import type {
 import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
-import { honoFactory } from '../utils/hono.ts'
+import { Hono } from 'hono/tiny'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
 import {
@@ -59,7 +58,7 @@ interface StoredUploadInfo {
   multipartUploadId?: string
 }
 
-const optionsHandler = honoFactory.createHandlers((c) => {
+function optionsHandler(c: Context) {
   console.log('in DO', 'optionsHandler')
   return c.newResponse(null, 204, {
     'Access-Control-Allow-Origin': '*',
@@ -69,7 +68,7 @@ const optionsHandler = honoFactory.createHandlers((c) => {
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
     'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
   })
-})
+}
 
 interface Env {
   ATTACHMENT_BUCKET: R2Bucket
@@ -93,7 +92,7 @@ export class UploadHandler {
     this.parts = []
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
-    this.router = honoFactory.createApp()
+    this.router = new Hono<MiddlewareKeyVariables>()
     this.router.use('*', logger())
     this.router.options('/files/upload/:bucket', optionsHandler as any)
     this.router.post('/files/upload/:bucket', this.exclusive(this.create) as any)
@@ -106,12 +105,11 @@ export class UploadHandler {
     this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler as any)
     this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
     this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
-    this.router.all('*', c => c.notFound())
+    // this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
-      console.log('in DO', 'onError', e)
+      console.log('in DO onError', e)
       if (e instanceof HTTPException)
         return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
-      console.log('app', 'onError', e)
       return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
     })
   }

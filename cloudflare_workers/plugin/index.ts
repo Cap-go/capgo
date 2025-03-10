@@ -1,8 +1,9 @@
+import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
-import { honoFactory } from 'supabase/functions/_backend/utils/hono.ts'
+import { Hono } from 'hono/tiny'
 import { version } from '../../package.json'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
@@ -12,7 +13,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = honoFactory.createApp()
+const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('*', sentry({
   release: version,
@@ -35,6 +36,7 @@ app.route('/updates_v2', updates)
 app.route('/stats', stats)
 
 app.onError((e, c) => {
+  console.log('app onError', e)
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException) {
     if (e.status === 429) {
@@ -42,7 +44,6 @@ app.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
   }
-  console.log('app', 'onError', e)
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 

@@ -1,12 +1,14 @@
-import type { Context } from '@hono/hono'
+import type { Context, Next } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { HTTPException } from 'hono/http-exception'
+import { Hono } from 'hono/tiny'
 import { app as ok } from '../public/ok.ts'
 import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
-import { honoFactory, middlewareKey } from '../utils/hono.ts'
+import { middlewareKey } from '../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
@@ -17,7 +19,7 @@ const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
 const ATTACHMENT_PREFIX = 'attachments'
 
-export const app = honoFactory.createApp()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
@@ -103,7 +105,7 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
-const optionsHandler = honoFactory.createHandlers((c) => {
+function optionsHandler(c: Context) {
   console.log('optionsHandler files', 'optionsHandler')
   return c.newResponse(null, 204, {
     'Access-Control-Allow-Origin': '*',
@@ -115,10 +117,10 @@ const optionsHandler = honoFactory.createHandlers((c) => {
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
     'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
   })
-})
+}
 
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
-const uploadHandler = honoFactory.createHandlers(async (c) => {
+async function uploadHandler(c: Context) {
   const requestId = c.get('fileId') as string
   // make requestId  safe
   console.log('files req', 'uploadHandler', requestId, c.req.method, c.req.url)
@@ -137,9 +139,9 @@ const uploadHandler = honoFactory.createHandlers(async (c) => {
     headers: c.req.raw.headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   })
-})
+}
 
-const setKeyFromMetadata = honoFactory.createMiddleware(async (c, next) => {
+async function setKeyFromMetadata(c: Context, next: Next) {
   const fileId = parseUploadMetadata(c.req.raw.headers).filename
   if (fileId == null) {
     console.log({ requestId: c.get('requestId'), context: 'fileId is null' })
@@ -147,9 +149,9 @@ const setKeyFromMetadata = honoFactory.createMiddleware(async (c, next) => {
   }
   c.set('fileId', fileId)
   await next()
-})
+}
 
-const setKeyFromIdParam = honoFactory.createMiddleware(async (c, next) => {
+async function setKeyFromIdParam(c: Context, next: Next) {
   const fileId = c.req.param('id')
   if (fileId == null) {
     console.log({ requestId: c.get('requestId'), context: 'fileId is null' })
@@ -157,9 +159,9 @@ const setKeyFromIdParam = honoFactory.createMiddleware(async (c, next) => {
   }
   c.set('fileId', fileId)
   await next()
-})
+}
 
-const checkWriteAppAccess = honoFactory.createMiddleware(async (c, next) => {
+async function checkWriteAppAccess(c: Context, next: Next) {
   const requestId = c.get('fileId') as string
   const [orgs, owner_org, apps, app_id] = requestId.split('/')
   if (orgs !== 'orgs' || apps !== 'apps') {
@@ -197,15 +199,15 @@ const checkWriteAppAccess = honoFactory.createMiddleware(async (c, next) => {
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
   await next()
-})
+}
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler as any)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata, checkWriteAppAccess, uploadHandler as any)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload']), setKeyFromMetadata as any, checkWriteAppAccess as any, uploadHandler as any)
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler as any)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, getHandler as any)
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler as any)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam, checkWriteAppAccess, uploadHandler as any)
+app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam as any, checkWriteAppAccess as any, getHandler as any)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam as any, getHandler as any)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload']), setKeyFromIdParam as any, checkWriteAppAccess as any, uploadHandler as any)
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)
