@@ -21,12 +21,12 @@ export const BASE_PACKAGE_JSON = `{
 export const BASE_DEPENDENCIES = {
   '@capacitor/android': '^7.0.0',
   '@capacitor/core': '7.0.0',
-  '@capgo/capacitor-updater': '7.0.0',
+  '@capgo/capacitor-updater': '7.0.28',
 }
 export const BASE_DEPENDENCIES_OLD = {
   '@capacitor/android': '^6.0.0',
   '@capacitor/core': '6.0.0',
-  '@capgo/capacitor-updater': '6.0.0',
+  '@capgo/capacitor-updater': '6.14.28',
 }
 export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
 

@@ -1,5 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { deleteOrg } from './delete.ts'
 import { get } from './get.ts'
 import { deleteMember } from './members/delete.ts'
 import { get as getMembers } from './members/get.ts'
@@ -39,6 +40,17 @@ app.post('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   }
   catch (e) {
     return c.json({ status: 'Cannot create organization', error: JSON.stringify(e) }, 500)
+  }
+})
+
+app.delete('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+  try {
+    const body = await getBody<any>(c as any)
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+    return deleteOrg(c as any, body, apikey)
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot delete organization', error: JSON.stringify(e) }, 500)
   }
 })
 

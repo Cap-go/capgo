@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export interface CreateApp {
   name: string
@@ -8,19 +8,18 @@ export interface CreateApp {
   owner_org: string
 }
 
-export async function post(c: Context, body: CreateApp, _apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context, body: CreateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.name) {
     console.error('Missing name')
     return c.json({ status: 'Missing name' }, 400)
   }
 
   // Check if the user is allowed to create an app in this organization
-  const userId = _apikey.user_id
-  const { data: isAllowed, error: permError } = await supabaseAdmin(c)
-    .rpc('is_member_of_org', {
-      user_id: userId,
-      org_id: body.owner_org,
-    })
+  const userId = apikey.user_id
+  if (body.owner_org && !(await hasOrgRightApikey(c, body.owner_org, userId, 'read', c.get('capgkey') as string))) {
+    console.error('You can\'t access this organization', body.owner_org)
+    return c.json({ status: 'You can\'t access this organization', orgId: body.owner_org }, 403)
+  }
 
   const { data: isOwner, error: ownerError } = await supabaseAdmin(c)
     .rpc('is_owner_of_org', {
@@ -28,12 +27,12 @@ export async function post(c: Context, body: CreateApp, _apikey: Database['publi
       org_id: body.owner_org,
     })
 
-  if (permError || ownerError) {
-    console.error('Error checking organization permissions', permError || ownerError)
+  if (ownerError) {
+    console.error('Error checking organization permissions', ownerError)
     return c.json({ status: 'Error checking organization permissions' }, 500)
   }
 
-  if (!isAllowed && !isOwner) {
+  if (!isOwner) {
     console.error('User not authorized to create app in this organization')
     return c.json({ status: 'Not authorized to create app in this organization' }, 403)
   }

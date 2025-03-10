@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { BASE_URL, headers, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 describe('[DELETE] /app operations', () => {
   const id = randomUUID()

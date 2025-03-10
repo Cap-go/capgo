@@ -40,5 +40,5 @@
       "@vue-macros/volar/define-slots"
     ]
   },
-  "exclude": ["dist", "node_modules", "scripts", "supabase/functions/_script", "cypress", "vite.config.mts"]
+  "exclude": ["dist", "node_modules", "scripts", "supabase/functions/_script", "cypress", "vite.config.mts", "temp_cli_test"]
 }

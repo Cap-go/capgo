@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
-import { getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk } from './test-utils'
+import { getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk, USER_ID_2 } from './test-utils'
 
 describe('tests CLI upload', () => {
   const id = randomUUID()
@@ -216,7 +216,7 @@ describe('tests CLI upload options in parallel', () => {
     const { id } = await prepareApp()
     let semver = getSemver()
     const testApiKey = randomUUID()
-    const testUserId = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
+    const testUserId = USER_ID_2
     const supabase = getSupabaseClient()
 
     try {
