@@ -1,9 +1,9 @@
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
+import { honoFactory } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-import { honoFactory } from '../utils/hono.ts'
 
 export const app = honoFactory.createApp()
 
