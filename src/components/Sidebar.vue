@@ -12,7 +12,7 @@ import IconDashboard from '~icons/ic/round-space-dashboard'
 import IconApiKey from '~icons/mdi/shield-key'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 
-const props = defineProps < {
+const props = defineProps <{
   sidebarOpen: boolean
 }>()
 
