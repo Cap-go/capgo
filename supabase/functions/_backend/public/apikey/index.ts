@@ -1,7 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { middlewareKey } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
-import { honoFactory } from '../../utils/hono.ts'
 
 const app = honoFactory.createApp()
 

@@ -1,6 +1,7 @@
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { z } from 'zod'
+import { honoFactory } from '../utils/hono.ts'
 import { update } from '../utils/update.ts'
 import {
   deviceIdRegex,
@@ -21,7 +22,6 @@ import {
   NON_STRING_VERSION_NAME,
   reverseDomainRegex,
 } from '../utils/utils.ts'
-import { honoFactory } from '../utils/hono.ts'
 
 const jsonRequestSchema = z.object({
   app_id: z.string({
