@@ -3,8 +3,12 @@ import type { GetLatest } from './get.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
+import { app as updateMetadataApp } from './update_metadata.ts'
 
 export const app = honoFactory.createApp()
+
+// Add the route for updating bundle metadata
+app.route('/metadata', updateMetadataApp)
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   try {

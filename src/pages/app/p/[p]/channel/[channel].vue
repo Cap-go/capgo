@@ -10,6 +10,7 @@ import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import HistoryTable from '~/components/tables/HistoryTable.vue'
 import { urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -545,4 +546,17 @@ function openSelectVersion() {
     :app-id="channel.version.app_id"
     :channel="channel"
   />
+  <div
+    v-if="channel && ActiveTab === 'history'"
+    class="flex flex-col"
+  >
+    <div
+      class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+    >
+      <HistoryTable
+        :channel-id="id"
+        :app-id="channel.app_id"
+      />
+    </div>
+  </div>
 </template>

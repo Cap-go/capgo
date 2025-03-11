@@ -498,6 +498,19 @@ function preventInputChangePerm(event: Event) {
             >
               {{ version.external_url }}
             </InfoRow>
+            <!-- Bundle Link -->
+            <InfoRow
+              v-if="version.link" :label="t('bundle-link')" :is-link="true"
+              @click="window.open(version.link, '_blank')"
+            >
+              {{ version.link }}
+            </InfoRow>
+            <!-- Bundle Comment -->
+            <InfoRow
+              v-if="version.comment" :label="t('bundle-comment')"
+            >
+              {{ version.comment }}
+            </InfoRow>
             <!-- size -->
             <InfoRow v-if="version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">
               {{ showSize }}
