@@ -382,7 +382,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       manifest = getManifestUrl(c, version.id, version.manifest as any, device_id)
     }
     //  check signedURL and if it's url
-    if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://')) && !version.manifest) {
+    if (!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://'))) && !version.manifest) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
