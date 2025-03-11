@@ -117,6 +117,7 @@
     "@capgo/inappbrowser": "^6.9.36",
     "@capgo/native-audio": "^6.4.23",
     "@capgo/native-market": "^6.0.2",
+    "@capgo/tailwind-capacitor": "^1.0.10",
     "@formkit/auto-animate": "1.0.0-pre-alpha.3",
     "@formkit/i18n": "^1.6.9",
     "@formkit/themes": "1.6.9",

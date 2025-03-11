@@ -6,6 +6,7 @@ layer(base);
 /* @plugin "tailwind-capacitor/safe-areas"; */ /* TODO: fix the plugin for tailwind 4 */
 @plugin "@tailwindcss/aspect-ratio";
 @plugin "@tailwindcss/container-queries";
+@plugin "@capgo/tailwind-capacitor";
 
 @plugin "daisyui" {
   themes: capgotheme --default, dark --prefersdark;
