@@ -2,21 +2,9 @@
 -- Prevents channel deletion when setting and unsetting channel from device
 -- Fixes issue #1011
 
--- Step 1: Create a function to prevent channel deletion when channel_devices are deleted
-CREATE OR REPLACE FUNCTION public.prevent_channel_deletion()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- This function is triggered before DELETE on channel_devices
-    -- It prevents cascade deletion of channels
-    RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
--- Step 2: Create a trigger to call the function before DELETE on channel_devices
-CREATE TRIGGER prevent_channel_deletion_trigger
-BEFORE DELETE ON public.channel_devices
-FOR EACH ROW
-EXECUTE FUNCTION public.prevent_channel_deletion();
+-- We don't need a trigger function since we're using RESTRICT constraint
+-- The RESTRICT constraint will prevent deletion of channels that have references
+-- This is a more direct and reliable approach than using triggers
 
 -- Step 3: Drop the existing foreign key constraint with CASCADE DELETE
 ALTER TABLE ONLY public.channel_devices
