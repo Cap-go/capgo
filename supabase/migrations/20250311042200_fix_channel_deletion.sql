@@ -2,6 +2,28 @@
 -- This migration changes the ON DELETE CASCADE constraint to ON DELETE RESTRICT
 -- for the channel_devices table's foreign key reference to channels
 
+-- Create a function to prevent channel deletion when channel_devices are deleted
+CREATE OR REPLACE FUNCTION prevent_channel_deletion()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- If trying to delete a channel that has device overrides, prevent it
+    IF EXISTS (
+        SELECT 1 FROM public.channel_devices 
+        WHERE channel_id = OLD.id
+    ) THEN
+        RAISE EXCEPTION 'Cannot delete channel with device overrides';
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a trigger to prevent channel deletion when channel_devices exist
+DROP TRIGGER IF EXISTS prevent_channel_deletion_trigger ON public.channels;
+CREATE TRIGGER prevent_channel_deletion_trigger
+BEFORE DELETE ON public.channels
+FOR EACH ROW
+EXECUTE FUNCTION prevent_channel_deletion();
+
 -- First, drop the existing constraint
 ALTER TABLE ONLY "public"."channel_devices"
     DROP CONSTRAINT IF EXISTS "channel_devices_channel_id_fkey";
