@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import ArrowPath from '~icons/heroicons/arrow-path'
 import Clipboard from '~icons/heroicons/clipboard-document'
@@ -19,19 +19,145 @@ const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
 const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const orgNames = ref<Map<string, string>>(new Map())
+const appNames = ref<Map<string, string>>(new Map())
 const magicVal = ref(0)
 const organizationStore = useOrganizationStore()
+
+// Memoized helper functions to avoid repeated lookups
+const getOrgName = computed(() => {
+  return (orgId: string): string => {
+    return orgNames.value.get(orgId) || orgId.slice(0, 8)
+  }
+})
+
+const getAppName = computed(() => {
+  return (appId: string): string => {
+    return appNames.value.get(appId) || appId.slice(0, 8)
+  }
+})
+
+// Function to hide API key for security while showing identifiable parts
+function hideApiKey(key: string): string {
+  const first = key.slice(0, 5)
+  const last = key.slice(-5)
+  return `${first}...${last}`
+}
+
+/**
+ * Optimized function to fetch organization names with caching
+ * @param orgIds Array of organization IDs to fetch
+ * @returns Map of organization IDs to names
+ */
+async function getOrgNames(orgIds: string[]): Promise<Map<string, string>> {
+  if (!orgIds || orgIds.length === 0)
+    return new Map()
+
+  // Filter out IDs that we already have cached
+  const uncachedIds = orgIds.filter(id => !orgNames.value.has(id))
+
+  // If all IDs are already cached, return the current cache
+  if (uncachedIds.length === 0)
+    return orgNames.value
+
+  // Only fetch uncached IDs
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('id, name')
+    .in('id', uncachedIds)
+
+  if (error || !data) {
+    console.error('Error fetching organization names:', error)
+    return orgNames.value
+  }
+
+  // Create a new map with both existing and new data
+  const newMap = new Map(orgNames.value)
+  data.forEach(org => newMap.set(org.id, org.name))
+
+  return newMap
+}
+
+/**
+ * Optimized function to fetch application names with caching
+ * @param appIds Array of application IDs to fetch
+ * @returns Map of application IDs to names
+ */
+async function getAppNames(appIds: string[]): Promise<Map<string, string>> {
+  if (!appIds || appIds.length === 0)
+    return new Map()
+
+  // Filter out IDs that we already have cached
+  const uncachedIds = appIds.filter(id => !appNames.value.has(id))
+
+  // If all IDs are already cached, return the current cache
+  if (uncachedIds.length === 0)
+    return appNames.value
+
+  // Only fetch uncached IDs
+  const { data, error } = await supabase
+    .from('apps')
+    .select('app_id, name')
+    .in('app_id', uncachedIds)
+
+  if (error || !data) {
+    console.error('Error fetching app names:', error)
+    return appNames.value
+  }
+
+  // Create a new map with both existing and new data
+  const newMap = new Map(appNames.value)
+  data.forEach(app => newMap.set(app.app_id, app.name))
+
+  return newMap
+}
+
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')
     .select()
     .eq('user_id', main.user?.id || '')
-  if (data && data.length)
+
+  if (data && data.length) {
     keys.value = data
 
-  else if (retry && main.user?.id)
+    // Collect all unique org and app IDs
+    const orgIds = new Set<string>()
+    const appIds = new Set<string>()
+
+    data.forEach((key) => {
+      if (key.limited_to_orgs) {
+        key.limited_to_orgs.forEach(orgId => orgIds.add(orgId))
+      }
+      if (key.limited_to_apps) {
+        key.limited_to_apps.forEach(appId => appIds.add(appId))
+      }
+    })
+
+    // Fetch names for orgs and apps in parallel
+    const fetchPromises = []
+
+    if (orgIds.size > 0) {
+      fetchPromises.push(getOrgNames(Array.from(orgIds)).then((names) => {
+        orgNames.value = names
+      }))
+    }
+
+    if (appIds.size > 0) {
+      fetchPromises.push(getAppNames(Array.from(appIds)).then((names) => {
+        appNames.value = names
+      }))
+    }
+
+    // Wait for all fetches to complete
+    if (fetchPromises.length > 0) {
+      await Promise.all(fetchPromises)
+    }
+  }
+  else if (retry && main.user?.id) {
     return getKeys(false)
+  }
 
   isLoading.value = false
 }
@@ -384,6 +510,21 @@ displayStore.defaultBack = '/app/home'
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
             <InfoRow v-for="key in keys" :key="key.id" :label="key.name" :value="key.mode.toUpperCase()" :is-link="false">
+              <template #start>
+                <div class="flex flex-wrap gap-1 items-center mr-2">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ hideApiKey(key.key) }}</span>
+                  <div v-if="key.limited_to_orgs && key.limited_to_orgs.length > 0" class="flex flex-wrap gap-1 mt-1 md:mt-0">
+                    <span v-for="orgId in key.limited_to_orgs" :key="orgId" class="badge badge-primary text-xs">
+                      {{ getOrgName.value(orgId) }}
+                    </span>
+                  </div>
+                  <div v-if="key.limited_to_apps && key.limited_to_apps.length > 0" class="flex flex-wrap gap-1 mt-1 md:mt-0">
+                    <span v-for="appId in key.limited_to_apps" :key="appId" class="badge badge-secondary text-xs">
+                      {{ getAppName.value(appId) }}
+                    </span>
+                  </div>
+                </div>
+              </template>
               <button class="mx-1 text-center bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
                 <ArrowPath class="mx-auto text-lg" />
               </button>
