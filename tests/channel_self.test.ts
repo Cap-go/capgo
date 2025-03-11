@@ -454,3 +454,128 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     throw e
   }
 })
+
+it('should not delete channel when setting and unsetting channel from device', async () => {
+  await resetAndSeedAppData(APPNAME)
+  
+  // Get owner org for creating a test channel
+  const { data: appData, error: appError } = await getSupabaseClient()
+    .from('apps')
+    .select('owner_org, user_id')
+    .eq('app_id', APPNAME)
+    .single()
+  
+  expect(appError).toBeNull()
+  expect(appData).toBeTruthy()
+  
+  const ownerOrg = appData!.owner_org
+  const userId = appData!.user_id
+  
+  // Get production version ID for the test channel
+  const { data: versionData, error: versionError } = await getSupabaseClient()
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', APPNAME)
+    .eq('name', 'production')
+    .single()
+  
+  expect(versionError).toBeNull()
+  expect(versionData).toBeTruthy()
+  
+  const productionVersionId = versionData!.id
+  
+  // Create a test channel
+  const channelName = `test-channel-${Date.now()}`
+  const { data: channel, error: channelError } = await getSupabaseClient()
+    .from('channels')
+    .insert({
+      name: channelName,
+      app_id: APPNAME,
+      owner_org: ownerOrg,
+      created_by: userId,
+      allow_device_self_set: true,
+      version: productionVersionId,
+      ios: true,
+      android: true,
+      web: true,
+    })
+    .select()
+    .single()
+  
+  expect(channelError).toBeNull()
+  expect(channel).not.toBeNull()
+  
+  try {
+    // Set channel for device
+    const deviceId = `test-device-${Date.now()}`
+    const response1 = await fetch(`${BASE_URL}/channel_self`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        device_id: deviceId,
+        app_id: APPNAME,
+        channel: channelName,
+        platform: 'ios',
+        version_build: '1.0.0',
+      }),
+    })
+    
+    expect(response1.status).toBe(200)
+    
+    // Verify channel is set
+    const { data: channelDevice1, error: channelDeviceError1 } = await getSupabaseClient()
+      .from('channel_devices')
+      .select()
+      .eq('device_id', deviceId.toLowerCase())
+      .eq('app_id', APPNAME)
+    
+    expect(channelDeviceError1).toBeNull()
+    expect(channelDevice1).toHaveLength(1)
+    
+    // Unset channel for device
+    const response2 = await fetch(`${BASE_URL}/channel_self`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        device_id: deviceId,
+        app_id: APPNAME,
+        version_build: '1.0.0',
+      }),
+    })
+    
+    expect(response2.status).toBe(200)
+    
+    // Verify channel device is removed
+    const { data: channelDevice2, error: channelDeviceError2 } = await getSupabaseClient()
+      .from('channel_devices')
+      .select()
+      .eq('device_id', deviceId.toLowerCase())
+      .eq('app_id', APPNAME)
+    
+    expect(channelDeviceError2).toBeNull()
+    expect(channelDevice2).toHaveLength(0)
+    
+   // Verify channel still exists
+    const { data: channelAfter, error: channelAfterError } = await getSupabaseClient()
+      .from('channels')
+      .select()
+      .eq('id', channel!.id)
+      .single()
+    
+    expect(channelAfterError).toBeNull()
+    expect(channelAfter).not.toBeNull()
+    expect(channelAfter!.name).toBe(channelName)
+  } finally {
+    // Clean up
+    if (channel) {
+      await getSupabaseClient()
+        .from('channels')
+        .delete()
+        .eq('id', channel.id)
+    }
+  }
+})
