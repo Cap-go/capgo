@@ -406,6 +406,15 @@ it('[DELETE] /channel_self (no overwrite)', async () => {
   const data = getBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
+  // Make sure there are no channel_devices records for this device
+  const { error: cleanupError } = await getSupabaseClient()
+    .from('channel_devices')
+    .delete()
+    .eq('device_id', data.device_id)
+    .eq('app_id', APPNAME)
+  
+  expect(cleanupError).toBeNull()
+
   const response = await fetchEndpoint('DELETE', data)
   expect(response.status).toBe(400)
 
