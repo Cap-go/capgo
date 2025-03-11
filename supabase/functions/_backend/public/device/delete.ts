@@ -16,14 +16,25 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
   }
 
   try {
-    const { error: errorChannel } = await supabaseAdmin(c)
+    // Get the channel device record with its ID to ensure precise deletion
+    const { data: channelDeviceData } = await supabaseAdmin(c)
       .from('channel_devices')
-      .delete()
+      .select('id')
       .eq('app_id', body.app_id)
       .eq('device_id', body.device_id.toLowerCase())
-    if (errorChannel) {
-      console.error('Cannot delete channel override', errorChannel)
-      return c.json({ status: 'Cannot delete channel override', error: JSON.stringify(errorChannel) }, 400)
+
+    if (channelDeviceData && channelDeviceData.length > 0) {
+      // Delete each record by its ID to prevent cascade deletion
+      for (const record of channelDeviceData) {
+        const { error: errorChannel } = await supabaseAdmin(c)
+          .from('channel_devices')
+          .delete()
+          .eq('id', record.id)
+        if (errorChannel) {
+          console.error('Cannot delete channel override', errorChannel)
+          return c.json({ status: 'Cannot delete channel override', error: JSON.stringify(errorChannel) }, 400)
+        }
+      }
     }
   }
   catch (e) {
