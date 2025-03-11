@@ -454,3 +454,47 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     throw e
   }
 })
+it('[DELETE] /channel_self (verify channel not deleted)', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  const data = getBaseData(APPNAME)
+  data.device_id = randomUUID().toLowerCase()
+
+  const { data: productionChannel, error: productionChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'production').eq('app_id', APPNAME).single()
+
+  expect(productionChannelError).toBeNull()
+  expect(productionChannel).toBeTruthy()
+
+  const productionId = productionChannel!.id
+  const ownerOrg = productionChannel!.owner_org
+
+  // Create a channel device override
+  const { error: createError } = await getSupabaseClient().from('channel_devices').upsert({
+    app_id: APPNAME,
+    channel_id: productionId,
+    device_id: data.device_id,
+    owner_org: ownerOrg,
+  }, { onConflict: 'device_id, app_id' })
+
+  expect(createError).toBeNull()
+
+  try {
+    // Delete the override
+    const response = await fetchEndpoint('DELETE', data)
+    expect(response.ok).toBe(true)
+    expect(await response.json()).toEqual({ status: 'ok' })
+
+    // Verify the channel still exists
+    const { data: channelAfterDelete, error: channelError } = await getSupabaseClient().from('channels').select('*').eq('id', productionId)
+
+    expect(channelError).toBeNull()
+    expect(channelAfterDelete).toBeTruthy()
+    expect(channelAfterDelete).toHaveLength(1)
+  }
+  catch (e) {
+    const { error } = await getSupabaseClient().from('channel_devices').delete().eq('device_id', data.device_id).eq('app_id', APPNAME)
+
+    expect(error).toBeNull()
+    throw e
+  }
+})

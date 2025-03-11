@@ -208,19 +208,31 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 
     const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
     if (mainChannelName && mainChannelName === channel) {
-      const { error: dbErrorDev } = await supabaseAdmin(c)
+      // Check if override exists before deleting
+      const { data: existingOverride } = await supabaseAdmin(c)
         .from('channel_devices')
-        .delete()
+        .select('id')
         .eq('app_id', app_id)
         .eq('device_id', device_id.toLowerCase())
-      if (dbErrorDev) {
-        console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
-        return c.json({
-          message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
-          error: 'override_not_allowed',
-        }, 400)
+        .single()
+
+      if (existingOverride) {
+        const { error: dbErrorDev } = await supabaseAdmin(c)
+          .from('channel_devices')
+          .delete()
+          .eq('id', existingOverride.id)
+        if (dbErrorDev) {
+          console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
+          return c.json({
+            message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
+            error: 'override_not_allowed',
+          }, 400)
+        }
+        console.log({ requestId: c.get('requestId'), context: 'main channel set, removing override' })
       }
-      console.log({ requestId: c.get('requestId'), context: 'main channel set, removing override' })
+      else {
+        console.log({ requestId: c.get('requestId'), context: 'no override to remove' })
+      }
     }
     else {
       // if dataChannelOverride is same from dataChannel and exist then do nothing
@@ -232,17 +244,29 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 
       console.log({ requestId: c.get('requestId'), context: 'setting channel' })
       if (dataChannelOverride) {
-        const { error: dbErrorDev } = await supabaseAdmin(c)
+        // Get the specific record ID to prevent cascade effects
+        const { data: existingOverride } = await supabaseAdmin(c)
           .from('channel_devices')
-          .delete()
+          .select('id')
           .eq('app_id', app_id)
           .eq('device_id', device_id.toLowerCase())
-        if (dbErrorDev) {
-          console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
-          return c.json({
-            message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
-            error: 'override_not_allowed',
-          }, 400)
+          .single()
+
+        if (existingOverride) {
+          const { error: dbErrorDev } = await supabaseAdmin(c)
+            .from('channel_devices')
+            .delete()
+            .eq('id', existingOverride.id)
+          if (dbErrorDev) {
+            console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
+            return c.json({
+              message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
+              error: 'override_not_allowed',
+            }, 400)
+          }
+        }
+        else {
+          console.log({ requestId: c.get('requestId'), context: 'no override to remove' })
         }
       }
       const { error: dbErrorDev } = await supabaseAdmin(c)
@@ -456,11 +480,26 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
       error: 'cannot_override',
     }, 400)
   }
+  // Get the specific record ID to prevent cascade effects
+  const { data: existingOverride } = await supabaseAdmin(c)
+    .from('channel_devices')
+    .select('id')
+    .eq('app_id', app_id)
+    .eq('device_id', device_id.toLowerCase())
+    .single()
+
+  if (!existingOverride) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find channel device override to delete', app_id, device_id })
+    return c.json({
+      message: 'Cannot find channel device override to delete',
+      error: 'override_not_found',
+    }, 400)
+  }
+
   const { error } = await supabaseAdmin(c)
     .from('channel_devices')
     .delete()
-    .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
+    .eq('id', existingOverride.id)
   if (error) {
     console.error({ requestId: c.get('requestId'), context: 'Cannot delete channel override', error })
     return c.json({
