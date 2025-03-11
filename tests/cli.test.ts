@@ -70,6 +70,9 @@ describe('tests CLI upload', () => {
 
     expect(error).toBeNull()
     expect(data?.external_url).toBe('https://example.com')
+    // New fields should exist but can be null
+    expect(data).toHaveProperty('link')
+    expect(data).toHaveProperty('comment')
   })
 })
 describe('tests CLI upload options in parallel', () => {
