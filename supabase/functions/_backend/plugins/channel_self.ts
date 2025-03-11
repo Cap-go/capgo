@@ -216,7 +216,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
         .eq('app_id', app_id)
         .eq('device_id', device_id.toLowerCase())
         .single()
-      
+
       if (existingOverride) {
         const { error: dbErrorDev } = await supabaseAdmin(c)
           .from('channel_devices')
@@ -224,7 +224,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           .eq('app_id', app_id)
           .eq('device_id', device_id.toLowerCase())
           .eq('id', existingOverride.id) // Add id to ensure we only delete the specific record
-        
+
         if (dbErrorDev) {
           console.error({ requestId: c.get('requestId'), context: 'Cannot remove channel override', dbErrorDev })
           return c.json({
@@ -233,7 +233,8 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           }, 400)
         }
         console.log({ requestId: c.get('requestId'), context: 'main channel set, removing override' })
-      } else {
+      }
+      else {
         console.log({ requestId: c.get('requestId'), context: 'no override to remove' })
       }
     }
@@ -253,7 +254,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           .eq('app_id', app_id)
           .eq('device_id', device_id.toLowerCase())
           .single()
-        
+
         if (existingOverride) {
           const { error: dbErrorDev } = await supabaseAdmin(c)
             .from('channel_devices')
@@ -261,7 +262,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
             .eq('app_id', app_id)
             .eq('device_id', device_id.toLowerCase())
             .eq('id', existingOverride.id) // Add id to ensure we only delete the specific record
-          
+
           if (dbErrorDev) {
             console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
             return c.json({
@@ -489,7 +490,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id.toLowerCase())
     .single()
-  
+
   if (!existingOverride) {
     console.error({ requestId: c.get('requestId'), context: 'Cannot find channel override to delete' })
     return c.json({
@@ -497,7 +498,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
       error: 'override_not_found',
     }, 400)
   }
-  
+
   const { error } = await supabaseAdmin(c)
     .from('channel_devices')
     .delete()
