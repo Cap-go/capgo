@@ -19,21 +19,88 @@ const main = useMainStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
 const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>()
+const orgNames = ref<Map<string, string>>(new Map())
+const appNames = ref<Map<string, string>>(new Map())
 const magicVal = ref(0)
 const organizationStore = useOrganizationStore()
+
+function getOrgName(orgId: string): string {
+  return orgNames.value.get(orgId) || orgId.slice(0, 8)
+}
+
+function getAppName(appId: string): string {
+  return appNames.value.get(appId) || appId.slice(0, 8)
+}
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')
     .select()
     .eq('user_id', main.user?.id || '')
-  if (data && data.length)
+  if (data && data.length) {
     keys.value = data
 
-  else if (retry && main.user?.id)
+    // Collect all unique org and app IDs
+    const orgIds = new Set<string>()
+    const appIds = new Set<string>()
+
+    data.forEach((key) => {
+      if (key.limited_to_orgs) {
+        key.limited_to_orgs.forEach(orgId => orgIds.add(orgId))
+      }
+      if (key.limited_to_apps) {
+        key.limited_to_apps.forEach(appId => appIds.add(appId))
+      }
+    })
+
+    // Fetch names for orgs and apps
+    if (orgIds.size > 0) {
+      orgNames.value = await getOrgNames(Array.from(orgIds))
+    }
+
+    if (appIds.size > 0) {
+      appNames.value = await getAppNames(Array.from(appIds))
+    }
+  }
+  else if (retry && main.user?.id) {
     return getKeys(false)
+  }
 
   isLoading.value = false
+}
+
+async function getOrgNames(orgIds: string[]): Promise<Map<string, string>> {
+  if (!orgIds || orgIds.length === 0)
+    return new Map()
+
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('id, name')
+    .in('id', orgIds)
+
+  if (error || !data) {
+    console.error('Error fetching organization names:', error)
+    return new Map()
+  }
+
+  return new Map(data.map(org => [org.id, org.name]))
+}
+
+async function getAppNames(appIds: string[]): Promise<Map<string, string>> {
+  if (!appIds || appIds.length === 0)
+    return new Map()
+
+  const { data, error } = await supabase
+    .from('apps')
+    .select('app_id, name')
+    .in('app_id', appIds)
+
+  if (error || !data) {
+    console.error('Error fetching app names:', error)
+    return new Map()
+  }
+
+  return new Map(data.map(app => [app.app_id, app.name]))
 }
 displayStore.NavTitle = ''
 getKeys()
@@ -375,6 +442,12 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
 }
 displayStore.NavTitle = t('api-keys')
 displayStore.defaultBack = '/app/home'
+
+function hideApiKey(key: string): string {
+  const first = key.slice(0, 5)
+  const last = key.slice(-5)
+  return `${first}...${last}`
+}
 </script>
 
 <template>
@@ -384,6 +457,21 @@ displayStore.defaultBack = '/app/home'
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
             <InfoRow v-for="key in keys" :key="key.id" :label="key.name" :value="key.mode.toUpperCase()" :is-link="false">
+              <template #start>
+                <div class="flex flex-wrap gap-1 items-center mr-2">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ hideApiKey(key.key) }}</span>
+                  <div v-if="key.limited_to_orgs && key.limited_to_orgs.length > 0" class="flex flex-wrap gap-1 mt-1 md:mt-0">
+                    <span v-for="orgId in key.limited_to_orgs" :key="orgId" class="badge badge-primary text-xs">
+                      {{ getOrgName(orgId) }}
+                    </span>
+                  </div>
+                  <div v-if="key.limited_to_apps && key.limited_to_apps.length > 0" class="flex flex-wrap gap-1 mt-1 md:mt-0">
+                    <span v-for="appId in key.limited_to_apps" :key="appId" class="badge badge-secondary text-xs">
+                      {{ getAppName(appId) }}
+                    </span>
+                  </div>
+                </div>
+              </template>
               <button class="mx-1 text-center bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
                 <ArrowPath class="mx-auto text-lg" />
               </button>
