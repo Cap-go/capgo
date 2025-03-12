@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS deploy_history (
   link TEXT,
   comment TEXT,
   is_current BOOLEAN DEFAULT TRUE,
-  owner_org TEXT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  owner_org UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
