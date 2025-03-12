@@ -1,3 +1,27 @@
+-- Create deploy_history table if it doesn't exist
+CREATE TABLE IF NOT EXISTS "public"."deploy_history" (
+    "id" BIGSERIAL PRIMARY KEY,
+    "channel_id" BIGINT NOT NULL,
+    "app_id" VARCHAR NOT NULL,
+    "version_id" BIGINT NOT NULL,
+    "deployed_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+    "is_current" BOOLEAN NOT NULL DEFAULT FALSE,
+    "owner_org" UUID NOT NULL,
+    "link" TEXT,
+    "comment" TEXT
+);
+
+-- Add RLS policies
+ALTER TABLE "public"."deploy_history" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow read access for users in the same organization" ON "public"."deploy_history"
+    FOR SELECT
+    USING (
+        auth.uid() IN (
+            SELECT user_id FROM org_users WHERE org_id = owner_org
+        )
+    );
+
 -- Add composite indexes for common query patterns
 CREATE INDEX IF NOT EXISTS deploy_history_channel_app_idx ON "public"."deploy_history" (channel_id, app_id);
 CREATE INDEX IF NOT EXISTS deploy_history_app_deployed_at_idx ON "public"."deploy_history" (app_id, deployed_at);
