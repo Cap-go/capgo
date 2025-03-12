@@ -2071,10 +2071,10 @@ BEGIN
     (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't'),
     (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't');
 
-    INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "link", "comment", "is_current", "owner_org") VALUES
-    (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0', 'Initial production release', TRUE, '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', 'https://github.com/Cap-go/capgo/releases/tag/v1.361.0', 'Beta channel release', TRUE, '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
-    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0', 'Secondary channel deployment', TRUE, '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+    INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
+    (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
+    (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
+    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
@@ -2281,7 +2281,7 @@ BEGIN
         RETURNING id, name, version
     )
     -- Insert deploy history data
-    INSERT INTO "public"."deploy_history" ("created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "link", "comment", "is_current", "owner_org")
+    INSERT INTO "public"."deploy_history" ("created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by")
     SELECT
         now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
         now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
@@ -2289,18 +2289,8 @@ BEGIN
         p_app_id,
         c.version,
         now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
-        CASE 
-            WHEN c.name = 'production' THEN 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0'
-            WHEN c.name = 'beta' THEN 'https://github.com/Cap-go/capgo/releases/tag/v1.361.0'
-            ELSE 'https://github.com/Cap-go/capgo/releases/tag/v1.359.0'
-        END,
-        CASE 
-            WHEN c.name = 'production' THEN 'Initial production release'
-            WHEN c.name = 'beta' THEN 'Beta channel release'
-            ELSE 'Development channel deployment'
-        END,
-        TRUE,
-        org_id
+        org_id,
+        c.created_by
     FROM inserted_channels c;
 
 END;

@@ -10,11 +10,18 @@ interface DeployHistory {
   deployed_at: string
   link?: string
   comment?: string
+  created_by: string
   version: {
     id: number
     name: string
     app_id: string
     created_at: string
+    link?: string
+    comment?: string
+  }
+  user?: {
+    id: string
+    email: string
   }
 }
 
@@ -107,6 +114,12 @@ const columns = computed<TableColumn[]>(() => [
     displayFunction: item => formatDate(item.deployed_at),
   },
   {
+    label: t('deployed-by'),
+    key: 'created_by',
+    mobile: false,
+    displayFunction: item => item.user?.email || '-',
+  },
+  {
     label: t('link'),
     key: 'link',
     mobile: false,
@@ -155,7 +168,14 @@ async function fetchDeployHistory() {
           id,
           name,
           app_id,
-          created_at
+          created_at,
+          link,
+          comment
+        ),
+        user:created_by (
+          id,
+          first_name,
+          last_name
         )
       `, { count: 'exact' })
       .eq('channel_id', props.channelId)
@@ -286,17 +306,18 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
             <td class="px-6 py-4">{{ item.version.name }}</td>
             <td class="px-6 py-4 hidden md:table-cell">{{ formatDate(item.version.created_at) }}</td>
             <td class="px-6 py-4">{{ formatDate(item.deployed_at) }}</td>
+            <td class="px-6 py-4 hidden md:table-cell">{{ `${item.user?.first_name} ${item.user?.last_name}` }}</td>
             <td class="px-6 py-4 hidden md:table-cell">
               <span 
-                v-if="item.link" 
+                v-if="item.version.link" 
                 class="text-blue-500 underline cursor-pointer"
-                @click="openLink(item.link)"
+                @click="openLink(item.version.link)"
               >
-                {{ item.link }}
+                {{ item.version.link }}
               </span>
               <span v-else>-</span>
             </td>
-            <td class="px-6 py-4 hidden md:table-cell">{{ item.comment || '-' }}</td>
+            <td class="px-6 py-4 hidden md:table-cell">{{ item.version.comment || '-' }}</td>
             <td class="px-6 py-4 text-center hidden md:table-cell">
               <span v-if="isCurrentVersion(item)">Current</span>
               <span 

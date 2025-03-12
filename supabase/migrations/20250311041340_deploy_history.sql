@@ -7,9 +7,7 @@ CREATE TABLE IF NOT EXISTS "public"."deploy_history" (
     "app_id" character varying NOT NULL,
     "version_id" bigint NOT NULL REFERENCES app_versions(id),
     "deployed_at" timestamp with time zone DEFAULT NOW(),
-    "link" text,
-    "comment" text,
-    "is_current" boolean DEFAULT FALSE,
+    "created_by" uuid NOT NULL REFERENCES public.users(id),
     "owner_org" uuid NOT NULL
 );
 
@@ -32,6 +30,9 @@ WITH CHECK (
         WHERE org_id = owner_org 
         AND (user_right = 'write' OR user_right = 'admin' OR user_right = 'super_admin')
     )
+    OR
+    -- Allow apikey insertions
+    (is_allowed_capgkey(get_apikey(), '{all}', app_id))
 );
 
 CREATE POLICY "Allow users with write permissions to update deploy history" ON "public"."deploy_history"
@@ -56,17 +57,17 @@ INSERT INTO public.deploy_history (
     channel_id,
     app_id,
     version_id,
-    is_current,
     owner_org,
-    deployed_at
+    deployed_at,
+    created_by
 )
 SELECT 
     c.id,
     c.app_id,
     c.version,
-    TRUE,
     c.owner_org,
-    c.updated_at
+    c.updated_at,
+    coalesce(c.created_by, get_identity())
 FROM 
     public.channels c
 WHERE 
@@ -81,25 +82,20 @@ AS $function$
 BEGIN
     -- If version is changing, record the deployment
     IF OLD.version <> NEW.version THEN
-        -- Set all previous records for this channel to is_current = false
-        UPDATE deploy_history
-        SET is_current = FALSE
-        WHERE channel_id = NEW.id;
-        
         -- Insert new record
         INSERT INTO deploy_history (
             channel_id, 
             app_id, 
             version_id, 
-            is_current,
-            owner_org
+            owner_org,
+            created_by
         )
         VALUES (
             NEW.id,
             NEW.app_id,
             NEW.version,
-            TRUE,
-            NEW.owner_org
+            NEW.owner_org,
+            get_identity()
         );
     END IF;
     

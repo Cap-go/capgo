@@ -429,6 +429,7 @@
   "revert-to-builtin": "Revert to builtin",
   "revert-to-builtin-confirm": "Are you sure that you want to revert to builtin version? While the channel is reverted, capgo will not distribue updates thru it.",
   "save": "Saves",
+  "deployed-by": "Deployed by",
   "save-changes": "Save Changes",
   "search-bundle-id": "Search by bundle ID",
   "search-by-device-id": "Search by device ID or Custom ID",
