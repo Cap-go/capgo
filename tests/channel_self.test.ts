@@ -28,14 +28,7 @@ async function getResponseError(response: Response) {
 }
 
 beforeAll(async () => {
-  try {
-    console.log('resetAndSeedAppData', APPNAME)
     await resetAndSeedAppData(APPNAME)
-    console.log('resetAndSeedAppData done', APPNAME)
-  }
-  catch (e) {
-    console.error('resetAndSeedAppData error', e)
-  }
 })
 afterAll(async () => {
   await resetAppData(APPNAME)
@@ -251,7 +244,6 @@ it('[POST] /channel_self with default channel', async () => {
     .eq('name', 'no_access').eq('app_id', APPNAME)
     .select('id, owner_org, public').single()
 
-  console.log('channelUpdateError', channelUpdateError)
   expect(channelUpdateError).toBeNull()
   expect(noAccessData).toBeTruthy()
   expect(noAccessData!.public).toBeFalsy()

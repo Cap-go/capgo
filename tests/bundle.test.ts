@@ -13,9 +13,7 @@ afterAll(async () => {
 
 describe('[GET] /bundle operations', () => {
   it('valid app_id', async () => {
-    console.log('fetchBundle', APPNAME)
     const { response, data } = await fetchBundle(APPNAME)
-    console.log('fetchBundle done', APPNAME)
     expect(response.status).toBe(200)
     expect(Array.isArray(data)).toBe(true)
   })
