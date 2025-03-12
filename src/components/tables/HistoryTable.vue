@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import type { TableColumn, TableSort } from '~/components/comp_def'
 
+import { useI18n } from 'petite-vue-i18n'
+import { computed, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
+import IconReload from '~icons/tabler/reload'
+import { formatDate } from '~/services/date'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
+import { useOrganizationStore } from '~/stores/organization'
+
 // Define custom type for deploy_history since it doesn't exist in Database types
 interface DeployHistory {
   id: number
@@ -17,18 +26,6 @@ interface DeployHistory {
     created_at: string
   }
 }
-
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import IconRollback from '~icons/heroicons/backward'
-import IconComment from '~icons/heroicons/chat-bubble-left'
-import IconLink from '~icons/heroicons/link'
-import IconReload from '~icons/tabler/reload'
-import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
-import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   channelId: number
@@ -72,12 +69,7 @@ async function fetchCurrentVersion() {
   }
 }
 
-// Handle row click - block action for current version
-function handleRowClick(item: DeployHistory) {
-  if (item.version_id !== currentVersionId.value) {
-    handleRollback(item)
-  }
-}
+// No unused functions here
 
 // Check if an item is the current version
 function isCurrentVersion(item: DeployHistory): boolean {
@@ -90,7 +82,8 @@ function openLink(url?: string): void {
     // Using window from global scope
     const win = window.open(url, '_blank')
     // Add some security with noopener
-    if (win) win.opener = null
+    if (win)
+      win.opener = null
   }
 }
 
@@ -154,7 +147,7 @@ async function fetchDeployHistory() {
   loading.value = true
   try {
     await fetchCurrentVersion()
-    
+
     // Using "deploy_history" as a string rather than a type reference
     const { data, error, count } = await supabase
       .from('deploy_history')
@@ -235,13 +228,18 @@ async function handleRollback(item: DeployHistory) {
   displayStore.showDialog = true
 }
 
-watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDeployHistory, { immediate: true })
+// Watch for changes and refetch data
+watch(
+  [() => props.channelId, () => props.appId, sort, page, pageSize, search],
+  fetchDeployHistory,
+  { immediate: true }
+)
 </script>
 
 <template>
   <div>
     <div class="flex justify-between p-2">
-      <button 
+      <button
         class="flex items-center p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
         @click="fetchDeployHistory"
       >
@@ -256,11 +254,11 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
           type="text"
         >
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <span v-html="'<svg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'1.5\' stroke=\'currentColor\' class=\'w-5 h-5 text-gray-500 dark:text-gray-400\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z\' /></svg>'" />
+          <IconSearch class="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </div>
       </div>
     </div>
-    
+
     <!-- Custom table rendering to handle rollback column -->
     <div class="block">
       <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -280,12 +278,18 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
         </thead>
         <tbody v-if="!loading && deployHistory.length > 0">
           <tr v-for="item in deployHistory" :key="item.id" class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600">
-            <td class="px-6 py-4">{{ item.version.name }}</td>
-            <td class="px-6 py-4 hidden md:table-cell">{{ formatDate(item.version.created_at) }}</td>
-            <td class="px-6 py-4">{{ formatDate(item.deployed_at) }}</td>
+            <td class="px-6 py-4">
+              {{ item.version.name }}
+            </td>
             <td class="px-6 py-4 hidden md:table-cell">
-              <span 
-                v-if="item.link" 
+              {{ formatDate(item.version.created_at) }}
+            </td>
+            <td class="px-6 py-4">
+              {{ formatDate(item.deployed_at) }}
+            </td>
+            <td class="px-6 py-4 hidden md:table-cell">
+              <span
+                v-if="item.link"
                 class="text-blue-500 underline cursor-pointer"
                 @click="openLink(item.link)"
               >
@@ -293,15 +297,17 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
               </span>
               <span v-else>-</span>
             </td>
-            <td class="px-6 py-4 hidden md:table-cell">{{ item.comment || '-' }}</td>
+            <td class="px-6 py-4 hidden md:table-cell">
+              {{ item.comment || '-' }}
+            </td>
             <td class="px-6 py-4 text-center hidden md:table-cell">
-              <span v-if="isCurrentVersion(item)">Current</span>
+              <span v-if="isCurrentVersion(item)">{{ t('current') }}</span>
               <span 
                 v-else 
                 class="text-blue-500 underline cursor-pointer"
                 @click="handleRollback(item)"
               >
-                Rollback
+                {{ t('rollback') }}
               </span>
             </td>
           </tr>
@@ -309,13 +315,13 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
         <tbody v-else>
           <tr v-for="i in 5" :key="i" class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 animate-pulse">
             <td v-for="col in columns" :key="col.key" class="px-6 py-4" :class="{ 'hidden md:table-cell': !col.mobile }">
-              <div class="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
+              <div class="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-full" />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    
+
     <div v-if="!loading && deployHistory.length === 0" class="flex flex-col items-center justify-center p-8">
       <p class="text-gray-500 dark:text-gray-400">
         {{ t('no-deploy-history') }}
@@ -325,11 +331,11 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
     <!-- Pagination -->
     <nav class="flex items-center justify-between p-4" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
-        Showing {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} of {{ total }}
+        {{ t('showing') }} {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} {{ t('of') }} {{ total }}
       </span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
-          <button 
+          <button
             class="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page === 1"
             @click="page = 1"
@@ -338,7 +344,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page === 1"
             @click="page = Math.max(1, page - 1)"
@@ -347,14 +353,14 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
           >
             {{ page }}
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page >= Math.ceil(total / pageSize)"
             @click="page = Math.min(Math.ceil(total / pageSize), page + 1)"
@@ -363,7 +369,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page >= Math.ceil(total / pageSize)"
             @click="page = Math.ceil(total / pageSize)"

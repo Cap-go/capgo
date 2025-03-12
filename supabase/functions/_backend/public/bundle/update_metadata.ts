@@ -10,6 +10,17 @@ interface UpdateMetadataBody {
   comment?: string
 }
 
+// Helper function to validate URL
+function isValidUrl(url: string): boolean {
+  try {
+    new URL(url)
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
   try {
     const body = await getBody<UpdateMetadataBody>(c as any)
@@ -19,9 +30,19 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       return c.json({ status: 'Missing required fields', error: 'app_id and version_id are required' }, 400)
     }
 
+    // Validate that at least one field to update is provided
+    if (body.link === undefined && body.comment === undefined) {
+      return c.json({ status: 'No fields to update' }, 400)
+    }
+
+    // Validate link URL if provided
+    if (body.link !== undefined && body.link !== null && body.link !== '' && !isValidUrl(body.link)) {
+      return c.json({ status: 'Invalid link URL', error: 'The provided link is not a valid URL' }, 400)
+    }
+
     const { data: version, error: versionError } = await supabaseAdmin(c as any)
       .from('app_versions')
-      .select('*')
+      .select('id') // Only select the id field to reduce data transfer
       .eq('app_id', body.app_id)
       .eq('id', body.version_id)
       .single()
@@ -31,7 +52,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       return c.json({ status: 'Cannot find version', error: versionError }, 400)
     }
 
-    const updateData: any = {}
+    const updateData: Record<string, string | null> = {}
 
     if (body.link !== undefined) {
       updateData.link = body.link
@@ -41,10 +62,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       updateData.comment = body.comment
     }
 
-    if (Object.keys(updateData).length === 0) {
-      return c.json({ status: 'No fields to update' }, 400)
-    }
-
+    // Update version metadata
     const { error: updateError } = await supabaseAdmin(c as any)
       .from('app_versions')
       .update(updateData)
@@ -55,6 +73,20 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       console.error('Cannot update version metadata', updateError)
       return c.json({ status: 'Cannot update version metadata', error: updateError }, 400)
     }
+
+    // Also update any deploy_history records for this version
+    // This ensures consistency between app_versions and deploy_history
+    await supabaseAdmin(c as any)
+      .from('deploy_history')
+      .update(updateData)
+      .eq('app_id', body.app_id)
+      .eq('version_id', body.version_id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Warning: Could not update deploy_history records', error)
+          // Don't fail the request if this update fails
+        }
+      })
 
     return c.json({ status: 'success' })
   }
