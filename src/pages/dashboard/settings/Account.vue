@@ -75,13 +75,6 @@ async function deleteAccount() {
               return
             }
 
-            if (user.customer_id) {
-              await supabaseClient
-                .from('stripe_info')
-                .delete()
-                .eq('customer_id', user.customer_id)
-            }
-
             const hashedEmail = await hashEmail(authUser.data.user.email!)
 
             await supabaseClient
@@ -89,13 +82,6 @@ async function deleteAccount() {
               .insert({
                 email: hashedEmail,
               })
-
-            await supabaseClient
-              .from('users')
-              .delete()
-              .eq('id', user.id)
-
-            await deleteUser()
 
             await main.logout()
             router.replace('/login')

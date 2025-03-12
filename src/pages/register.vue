@@ -9,7 +9,7 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
-import { useSupabase } from '~/services/supabase'
+import { hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
@@ -29,8 +29,9 @@ async function submit(form: { first_name: string, last_name: string, password: s
   if (isLoading.value)
     return
 
+  const hashedEmail = await hashEmail(form.email)
   const { data: deleted, error: errorDeleted } = await supabase
-    .rpc('is_not_deleted', { email_check: form.email })
+    .rpc('is_not_deleted', { email_check: hashedEmail })
   if (errorDeleted)
     console.error(errorDeleted)
   if (!deleted) {
