@@ -9,22 +9,21 @@ ALTER TABLE ONLY public.channel_devices
 ALTER TABLE ONLY public.org_users
     DROP CONSTRAINT IF EXISTS org_users_channel_id_fkey;
 
--- Step 2: Add new foreign key constraints with CASCADE
--- We'll rely on the plugin code to prevent unintended channel deletion
--- This allows tests to clean up channels properly
+-- Step 2: Add new foreign key constraints with RESTRICT
+-- This ensures channels are never deleted when channel_devices are deleted
 ALTER TABLE ONLY public.channel_devices
     ADD CONSTRAINT channel_devices_channel_id_fkey 
     FOREIGN KEY (channel_id) REFERENCES public.channels(id) 
-    ON DELETE CASCADE;
+    ON DELETE RESTRICT;
 
 ALTER TABLE ONLY public.org_users
     ADD CONSTRAINT org_users_channel_id_fkey 
     FOREIGN KEY (channel_id) REFERENCES public.channels(id) 
-    ON DELETE CASCADE;
+    ON DELETE RESTRICT;
 
 -- Step 3: Add comments to explain the purpose of these migrations
 COMMENT ON CONSTRAINT channel_devices_channel_id_fkey ON public.channel_devices IS 
-'Maintains CASCADE for test compatibility. Channel deletion prevention is handled in application code.';
+'Prevents channel deletion when channel_devices are deleted. Uses RESTRICT to ensure channels are never deleted.';
 
 COMMENT ON CONSTRAINT org_users_channel_id_fkey ON public.org_users IS 
-'Maintains CASCADE for test compatibility. Channel deletion prevention is handled in application code.';
+'Prevents channel deletion when org_users are deleted. Uses RESTRICT to ensure channels are never deleted.';
