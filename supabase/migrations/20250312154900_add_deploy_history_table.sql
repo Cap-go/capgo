@@ -18,6 +18,37 @@ CREATE TABLE IF NOT EXISTS deploy_history (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Update reset_app_data function to handle deploy_history table
+CREATE OR REPLACE FUNCTION "public"."reset_app_data"("p_app_id" character varying) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    max_version_id bigint;
+    max_channel_id bigint;
+BEGIN
+    -- Delete from deploy_history table
+    DELETE FROM deploy_history WHERE app_id = p_app_id;
+    
+    -- Delete existing data for the specified app_id
+    DELETE FROM channels WHERE app_id = p_app_id;
+    DELETE FROM app_versions WHERE app_id = p_app_id;
+    DELETE FROM apps WHERE app_id = p_app_id;
+
+    -- Get the current max ids and reset the sequences
+    SELECT COALESCE(MAX(id), 0) + 1 INTO max_version_id FROM app_versions;
+    SELECT COALESCE(MAX(id), 0) + 1 INTO max_channel_id FROM channels;
+    
+    -- Reset both sequences
+    PERFORM setval('app_versions_id_seq', max_version_id, false);
+    PERFORM setval('channel_id_seq', max_channel_id, false);
+END;
+$$;
+
+-- Restore function permissions
+ALTER FUNCTION "public"."reset_app_data"("p_app_id" character varying) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."reset_app_data"("p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reset_app_data"("p_app_id" character varying) TO "service_role";
+
 -- Add indexes for improved query performance
 CREATE INDEX IF NOT EXISTS deploy_history_app_id_idx ON deploy_history(app_id);
 CREATE INDEX IF NOT EXISTS deploy_history_channel_id_idx ON deploy_history(channel_id);
