@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import type { TableColumn, TableSort } from '~/components/comp_def'
 
+import { useI18n } from 'petite-vue-i18n'
+import { computed, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
+import IconReload from '~icons/tabler/reload'
+import { formatDate } from '~/services/date'
+import { useSupabase } from '~/services/supabase'
+import { useDisplayStore } from '~/stores/display'
+import { useOrganizationStore } from '~/stores/organization'
+
 // Define custom type for deploy_history since it doesn't exist in Database types
 interface DeployHistory {
   id: number
@@ -24,15 +33,6 @@ interface DeployHistory {
     email: string
   }
 }
-
-import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import IconReload from '~icons/tabler/reload'
-import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
-import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   channelId: number
@@ -87,7 +87,8 @@ function openLink(url?: string): void {
     // Using window from global scope
     const win = window.open(url, '_blank')
     // Add some security with noopener
-    if (win) win.opener = null
+    if (win)
+      win.opener = null
   }
 }
 
@@ -158,7 +159,7 @@ async function fetchDeployHistory() {
   try {
     deployHistory.value.length = 0
     await fetchCurrentVersion()
-    
+
     // Using "deploy_history" as a string rather than a type reference
     let query = supabase
       .from('deploy_history')
@@ -181,12 +182,12 @@ async function fetchDeployHistory() {
       .eq('channel_id', props.channelId)
       .eq('app_id', props.appId)
       .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
-    
+
     // Apply search filter on version name if search value exists
     if (search.value) {
       query = query.like('version.name', `%${search.value}%`)
     }
-    
+
     const { data, error, count } = await query
       .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
 
@@ -264,7 +265,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
 <template>
   <div>
     <div class="flex justify-between p-2">
-      <button 
+      <button
         class="flex items-center p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
         @click="fetchDeployHistory"
       >
@@ -283,7 +284,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
         </div>
       </div>
     </div>
-    
+
     <!-- Custom table rendering to handle rollback column -->
     <div class="block">
       <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
@@ -320,8 +321,8 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
             <td class="px-6 py-4 hidden md:table-cell">{{ item.version.comment || '-' }}</td>
             <td class="px-6 py-4 text-center hidden md:table-cell">
               <span v-if="isCurrentVersion(item)">Current</span>
-              <span 
-                v-else 
+              <span
+                v-else
                 class="text-blue-500 underline cursor-pointer"
                 @click="handleRollback(item)"
               >
@@ -333,13 +334,13 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
         <tbody v-else>
           <tr v-for="i in 5" :key="i" class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 animate-pulse">
             <td v-for="col in columns" :key="col.key" class="px-6 py-4" :class="{ 'hidden md:table-cell': !col.mobile }">
-              <div class="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
+              <div class="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-full" />
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    
+
     <div v-if="!loading && deployHistory.length === 0" class="flex flex-col items-center justify-center p-8">
       <p class="text-gray-500 dark:text-gray-400">
         {{ t('no-deploy-history') }}
@@ -353,7 +354,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
       </span>
       <ul class="inline-flex items-center -space-x-px">
         <li>
-          <button 
+          <button
             class="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page === 1"
             @click="page = 1"
@@ -362,7 +363,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page === 1"
             @click="page = Math.max(1, page - 1)"
@@ -371,14 +372,14 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
           >
             {{ page }}
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page >= Math.ceil(total / pageSize)"
             @click="page = Math.min(Math.ceil(total / pageSize), page + 1)"
@@ -387,7 +388,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
           </button>
         </li>
         <li>
-          <button 
+          <button
             class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
             :disabled="page >= Math.ceil(total / pageSize)"
             @click="page = Math.ceil(total / pageSize)"

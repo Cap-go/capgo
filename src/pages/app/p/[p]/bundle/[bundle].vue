@@ -52,7 +52,8 @@ function openLink(url?: string): void {
     // Using window from global scope
     const win = window.open(url, '_blank')
     // Add some security with noopener
-    if (win) win.opener = null
+    if (win)
+      win.opener = null
   }
 }
 
