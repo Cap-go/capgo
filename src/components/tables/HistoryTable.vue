@@ -4,9 +4,9 @@ import type { TableColumn, TableSort } from '~/components/comp_def'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import IconLoading from '~icons/tabler/loader'
 import IconReload from '~icons/tabler/reload'
 import IconSearch from '~icons/tabler/search'
-import IconLoading from '~icons/tabler/loader'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -181,13 +181,13 @@ async function fetchDeployHistory() {
       .eq('channel_id', props.channelId)
       .eq('app_id', props.appId)
       .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
-    
+
     // Add search filter if search term is provided
     if (search.value.trim()) {
       // Search in version name, link, and comment fields
       query.or(`version.name.ilike.%${search.value.trim()}%,link.ilike.%${search.value.trim()}%,comment.ilike.%${search.value.trim()}%`)
     }
-    
+
     const { data, error, count } = await query.range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
 
     if (error) {
