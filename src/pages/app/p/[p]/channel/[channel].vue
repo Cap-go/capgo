@@ -6,11 +6,11 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconHistory from '~icons/heroicons/clock'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
-import IconHistory from '~icons/heroicons/clock'
 import HistoryTable from '~/components/tables/HistoryTable.vue'
 import { urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -43,7 +43,8 @@ function openLink(url?: string): void {
     // Using window from global scope
     const win = window.open(url, '_blank')
     // Add some security with noopener
-    if (win) win.opener = null
+    if (win)
+      win.opener = null
   }
 }
 
@@ -456,16 +457,16 @@ function openSelectVersion() {
             {{ channel.version.min_update_version ?? t('undefined-fail') }}
           </InfoRow>
           <!-- Bundle Link -->
-          <InfoRow 
-            :label="t('bundle-link')" 
+          <InfoRow
             v-if="channel.version.link"
+            :label="t('bundle-link')"
             :is-link="channel.version.link ? true : false"
             @click="channel.version.link ? openLink(channel.version.link) : null"
           >
             {{ channel.version.link }}
           </InfoRow>
           <!-- Bundle Comment -->
-          <InfoRow :label="t('bundle-comment')" v-if="channel.version.comment">
+          <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
             {{ channel.version.comment }}
           </InfoRow>
           <!-- Created At -->
