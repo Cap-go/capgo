@@ -232,7 +232,7 @@ async function handleRollback(item: DeployHistory) {
 watch(
   [() => props.channelId, () => props.appId, sort, page, pageSize, search],
   fetchDeployHistory,
-  { immediate: true }
+  { immediate: true },
 )
 </script>
 
@@ -302,8 +302,8 @@ watch(
             </td>
             <td class="px-6 py-4 text-center hidden md:table-cell">
               <span v-if="isCurrentVersion(item)">{{ t('current') }}</span>
-              <span 
-                v-else 
+              <span
+                v-else
                 class="text-blue-500 underline cursor-pointer"
                 @click="handleRollback(item)"
               >
