@@ -8,6 +8,7 @@ import Clipboard from '~icons/heroicons/clipboard-document'
 import Pencil from '~icons/heroicons/pencil'
 import Trash from '~icons/heroicons/trash'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
+import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -40,7 +41,8 @@ const truncatedKeys = computed(() => {
   }))
 })
 
-// Cache for organization and app names
+// Cache for organization and app names with size limits
+const MAX_CACHE_SIZE = 1000
 const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
 
@@ -83,63 +85,104 @@ const getOrgName = computed(() => {
 const getAppName = computed(() => {
   return (appId: string) => appCache.value.get(appId) || 'Unknown'
 })
+
+// Helper function to limit cache size
+function limitCacheSize(cache: Map<string, string>) {
+  if (cache.size > MAX_CACHE_SIZE) {
+    // Remove oldest entries (first 20% of entries)
+    const entriesToRemove = Math.floor(MAX_CACHE_SIZE * 0.2)
+    const keys = Array.from(cache.keys()).slice(0, entriesToRemove)
+    keys.forEach(key => cache.delete(key))
+  }
+}
 // Function to fetch organization and app names in parallel
 async function fetchOrgAndAppNames() {
   if (!keys.value)
     return
 
-  // Collect unique organization and app IDs that aren't already cached
-  const uncachedOrgIds = Array.from(uniqueOrgIds.value).filter(id => !orgCache.value.has(id))
-  const uncachedAppIds = Array.from(uniqueAppIds.value).filter(id => !appCache.value.has(id))
+  // Create AbortController for timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-  // Fetch organization names in parallel
-  if (uncachedOrgIds.length > 0) {
-    const orgPromises = uncachedOrgIds.map(async (orgId) => {
-      try {
-        const { data, error } = await supabase
-          .from('orgs')
-          .select('id, name')
-          .eq('id', orgId)
-          .single()
+  try {
+    // Collect unique organization and app IDs that aren't already cached
+    const uncachedOrgIds = Array.from(uniqueOrgIds.value).filter(id => !orgCache.value.has(id))
+    const uncachedAppIds = Array.from(uniqueAppIds.value).filter(id => !appCache.value.has(id))
 
-        if (error)
-          throw error
-        if (data)
-          orgCache.value.set(orgId, data.name)
-        return { id: orgId, name: data?.name }
-      }
-      catch (err) {
-        console.error(`Error fetching org name for ${orgId}:`, err)
-        return { id: orgId, name: 'Unknown' }
-      }
-    })
+    // Fetch organization names in parallel
+    if (uncachedOrgIds.length > 0) {
+      const orgPromises = uncachedOrgIds.map(async (orgId) => {
+        try {
+          const { data, error } = await supabase
+            .from('orgs')
+            .select('id, name')
+            .eq('id', orgId)
+            .single()
 
-    await Promise.all(orgPromises)
+          if (error)
+            throw error
+          if (data) {
+            orgCache.value.set(orgId, data.name)
+            limitCacheSize(orgCache.value)
+          }
+          return { id: orgId, name: data?.name }
+        }
+        catch (err) {
+          console.error(`Error fetching organization name for ID ${orgId}:`, err)
+          toast.error(t('error-fetching-organization-name'))
+          orgCache.value.set(orgId, 'Unknown')
+          return { id: orgId, name: 'Unknown' }
+        }
+      })
+
+      await Promise.all(orgPromises.map(promise =>
+        Promise.race([
+          promise,
+          new Promise((_, reject) => {
+            controller.signal.addEventListener('abort', () => reject(new Error('Org fetch timed out')))
+          }),
+        ]),
+      ))
+    }
+
+    // Fetch app names in parallel
+    if (uncachedAppIds.length > 0) {
+      const appPromises = uncachedAppIds.map(async (appId) => {
+        try {
+          const { data, error } = await supabase
+            .from('apps')
+            .select('app_id, name')
+            .eq('app_id', appId)
+            .single()
+
+          if (error)
+            throw error
+          if (data && data.name) {
+            appCache.value.set(appId, data.name)
+            limitCacheSize(appCache.value)
+          }
+          return { id: appId, name: data?.name }
+        }
+        catch (err) {
+          console.error(`Error fetching app name for ID ${appId}:`, err)
+          toast.error(t('error-fetching-app-name'))
+          appCache.value.set(appId, 'Unknown')
+          return { id: appId, name: 'Unknown' }
+        }
+      })
+
+      await Promise.all(appPromises.map(promise =>
+        Promise.race([
+          promise,
+          new Promise((_, reject) => {
+            controller.signal.addEventListener('abort', () => reject(new Error('App fetch timed out')))
+          }),
+        ]),
+      ))
+    }
   }
-
-  // Fetch app names in parallel
-  if (uncachedAppIds.length > 0) {
-    const appPromises = uncachedAppIds.map(async (appId) => {
-      try {
-        const { data, error } = await supabase
-          .from('apps')
-          .select('app_id, name')
-          .eq('app_id', appId)
-          .single()
-
-        if (error)
-          throw error
-        if (data && data.name)
-          appCache.value.set(appId, data.name)
-        return { id: appId, name: data?.name }
-      }
-      catch (err) {
-        console.error(`Error fetching app name for ${appId}:`, err)
-        return { id: appId, name: 'Unknown' }
-      }
-    })
-
-    await Promise.all(appPromises)
+  finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -506,7 +549,10 @@ displayStore.defaultBack = '/app/home'
   <div>
     <div class="w-full h-full px-4 py-8 mx-auto max-w-9xl lg:px-8 sm:px-6">
       <div class="flex flex-col">
-        <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
+        <div v-if="isLoading" class="flex items-center justify-center h-64 md:mx-auto md:mt-5 md:w-2/3">
+          <Spinner size="w-40 h-40" />
+        </div>
+        <div v-else class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
             <InfoRow v-for="key in truncatedKeys" :key="key.id" :label="key.name" :is-link="false">
               <template #start>
