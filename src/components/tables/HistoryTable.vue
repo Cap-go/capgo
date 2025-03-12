@@ -1,20 +1,20 @@
 <script setup lang="ts">
+import { formatDate } from '@/modules/date'
+import { useOrganizationStore } from '@/stores/organization'
+import { useSupabaseClient } from '@supabase/auth-helpers-vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSupabaseClient } from '@supabase/auth-helpers-vue'
 import { useToast } from 'vue-toastification'
-import { useOrganizationStore } from '@/stores/organization'
-import { formatDate } from '@/modules/date'
-
-const { t } = useI18n()
-const supabase = useSupabaseClient()
-const toast = useToast()
-const orgStore = useOrganizationStore()
 
 const props = defineProps<{
   appId: string
   channelId: number
 }>()
+
+const { t } = useI18n()
+const supabase = useSupabaseClient()
+const toast = useToast()
+const orgStore = useOrganizationStore()
 
 // Pagination and sorting state
 const page = ref(1)
@@ -26,7 +26,7 @@ const deployHistory = ref<any[]>([])
 const currentVersion = ref<any>(null)
 
 // Memoized current version check for better performance
-const isCurrentVersion = computed(() => {
+const _isCurrentVersion = computed(() => {
   const currentVersionId = currentVersion.value?.id
   return (versionId: number) => currentVersionId === versionId
 })
@@ -38,18 +38,20 @@ async function fetchData() {
     // Use Promise.all to fetch both in parallel
     const [historyResponse, currentVersionResponse] = await Promise.all([
       fetchDeployHistory(),
-      fetchCurrentVersion()
+      fetchCurrentVersion(),
     ])
-    
+
     // Process history response
     const { data, error, count } = historyResponse
-    if (error) throw error
+    if (error)
+      throw error
     deployHistory.value = data || []
     totalItems.value = count || 0
-    
+
     // Process current version response
     const { data: versionData, error: versionError } = currentVersionResponse
-    if (versionError) throw versionError
+    if (versionError)
+      throw versionError
     currentVersion.value = versionData?.version
   }
   catch (error) {
@@ -65,15 +67,15 @@ async function fetchData() {
 async function fetchDeployHistory() {
   // Use the database function for better performance if available
   try {
-    const { data, error, count } = await supabase.rpc('get_deploy_history', {
+    const { data, error, count: _count } = await supabase.rpc('get_deploy_history', {
       p_channel_id: props.channelId,
       p_app_id: props.appId,
       p_page: page.value,
       p_page_size: pageSize.value,
       p_sort_field: Object.keys(sort.value)[0],
-      p_sort_direction: Object.values(sort.value)[0]
+      p_sort_direction: Object.values(sort.value)[0],
     })
-    
+
     if (data) {
       return { data, error, count: data[0]?.total_count || 0 }
     }
@@ -82,7 +84,7 @@ async function fetchDeployHistory() {
     // Fall back to regular query if RPC fails
     console.warn('Falling back to regular query:', e)
   }
-  
+
   // Regular query as fallback
   return await supabase
     .from('deploy_history')
@@ -124,18 +126,19 @@ async function rollbackToVersion(item: any) {
     toast.error(t('no_permission'))
     return
   }
-  
+
   try {
     loading.value = true
     const { error } = await supabase
       .from('channels')
       .update({
-        version: item.version_id
+        version: item.version_id,
       })
       .eq('id', props.channelId)
-    
-    if (error) throw error
-    
+
+    if (error)
+      throw error
+
     toast.success(t('rollback_success'))
     await fetchData()
   }
@@ -155,7 +158,7 @@ watch([page, pageSize, sort], () => {
 
 // Expose methods for parent components
 defineExpose({
-  refresh: fetchData
+  refresh: fetchData,
 })
 </script>
 
@@ -175,13 +178,15 @@ defineExpose({
         <tbody v-if="loading">
           <tr v-for="i in 3" :key="`skeleton-${i}`">
             <td v-for="j in 5" :key="`skeleton-${i}-${j}`">
-              <div class="skeleton h-4 w-full"></div>
+              <div class="skeleton h-4 w-full" />
             </td>
           </tr>
         </tbody>
         <tbody v-else-if="deployHistory.length === 0">
           <tr>
-            <td colspan="5" class="text-center py-4">{{ t('no_deploy_history') }}</td>
+            <td colspan="5" class="text-center py-4">
+              {{ t('no_deploy_history') }}
+            </td>
           </tr>
         </tbody>
         <tbody v-else>
@@ -195,11 +200,11 @@ defineExpose({
             </td>
             <td>{{ item.comment }}</td>
             <td>
-              <button 
-                v-if="!item.is_current" 
+              <button
+                v-if="!item.is_current"
                 class="btn btn-sm btn-primary"
-                @click="rollbackToVersion(item)"
                 :disabled="!orgStore.hasPermisisonsInRole(['write', 'admin', 'super_admin'])"
+                @click="rollbackToVersion(item)"
               >
                 {{ t('rollback') }}
               </button>
@@ -209,23 +214,25 @@ defineExpose({
         </tbody>
       </table>
     </div>
-    
+
     <!-- Pagination -->
     <div class="flex justify-between items-center mt-4">
       <div>
         <span>{{ t('showing') }} {{ deployHistory.length }} {{ t('of') }} {{ totalItems }}</span>
       </div>
       <div class="join">
-        <button 
-          class="join-item btn btn-sm" 
+        <button
+          class="join-item btn btn-sm"
           :disabled="page === 1"
           @click="page--"
         >
           «
         </button>
-        <button class="join-item btn btn-sm">{{ page }}</button>
-        <button 
-          class="join-item btn btn-sm" 
+        <button class="join-item btn btn-sm">
+          {{ page }}
+        </button>
+        <button
+          class="join-item btn btn-sm"
           :disabled="page * pageSize >= totalItems"
           @click="page++"
         >
