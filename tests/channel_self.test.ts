@@ -435,6 +435,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
+  let channelDeviceDeleted = false
 
   try {
     const response = await fetchEndpoint('DELETE', data)
@@ -446,11 +447,13 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     expect(channelDeviceError).toBeNull()
     expect(channelDevice).toBeTruthy()
     expect(channelDevice).toHaveLength(0)
+    channelDeviceDeleted = true
   }
-  catch (e) {
-    const { error } = await getSupabaseClient().from('channel_devices').delete().eq('device_id', data.device_id).eq('app_id', APPNAME).eq('owner_org', ownerOrg).eq('channel_id', productionId).single()
-
-    expect(error).toBeNull()
-    throw e
+  finally {
+    // Only try to delete if it wasn't already deleted by the test
+    if (!channelDeviceDeleted) {
+      const { error } = await getSupabaseClient().from('channel_devices').delete().eq('device_id', data.device_id).eq('app_id', APPNAME).eq('owner_org', ownerOrg).eq('channel_id', productionId).single()
+      expect(error).toBeNull()
+    }
   }
 })
