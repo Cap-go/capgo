@@ -4,12 +4,25 @@ CREATE TABLE IF NOT EXISTS "public"."deploy_history" (
     "created_at" timestamp with time zone DEFAULT NOW(),
     "updated_at" timestamp with time zone DEFAULT NOW(),
     "channel_id" bigint NOT NULL REFERENCES channels(id),
-    "app_id" character varying NOT NULL,
+    "app_id" character varying NOT NULL REFERENCES apps(app_id),
     "version_id" bigint NOT NULL REFERENCES app_versions(id),
     "deployed_at" timestamp with time zone DEFAULT NOW(),
     "created_by" uuid NOT NULL REFERENCES public.users(id),
     "owner_org" uuid NOT NULL
 );
+
+-- Set created_by for channels where it's NULL
+UPDATE public.channels
+SET created_by = (
+    SELECT o.created_by
+    FROM orgs o
+    WHERE o.id = channels.owner_org
+)::uuid
+WHERE created_by IS NULL;
+
+-- Make sure created_by in channels is not NULL
+ALTER TABLE IF EXISTS "public"."channels" 
+    ALTER COLUMN "created_by" SET NOT NULL;
 
 -- Add RLS policies
 ALTER TABLE "public"."deploy_history" ENABLE ROW LEVEL SECURITY;
@@ -35,22 +48,10 @@ WITH CHECK (
     (is_allowed_capgkey(get_apikey(), '{all}', app_id))
 );
 
-CREATE POLICY "Allow users with write permissions to update deploy history" ON "public"."deploy_history"
+CREATE POLICY "Prevent update on deploy history" ON "public"."deploy_history"
 FOR UPDATE
-USING (
-    auth.uid() IN (
-        SELECT user_id FROM org_users 
-        WHERE org_id = owner_org 
-        AND (user_right = 'write' OR user_right = 'admin' OR user_right = 'super_admin')
-    )
-)
-WITH CHECK (
-    auth.uid() IN (
-        SELECT user_id FROM org_users 
-        WHERE org_id = owner_org 
-        AND (user_right = 'write' OR user_right = 'admin' OR user_right = 'super_admin')
-    )
-);
+USING (false)
+WITH CHECK (false);
 
 -- Initialize deploy_history with current versions for existing channels
 INSERT INTO public.deploy_history (
@@ -67,7 +68,7 @@ SELECT
     c.version,
     c.owner_org,
     c.updated_at,
-    coalesce(c.created_by, get_identity())
+    c.created_by
 FROM 
     public.channels c
 WHERE 
@@ -95,7 +96,7 @@ BEGIN
             NEW.app_id,
             NEW.version,
             NEW.owner_org,
-            get_identity()
+            coalesce(get_identity()::uuid, NEW.created_by)
         );
     END IF;
     
@@ -105,6 +106,7 @@ $function$;
 
 -- Create trigger to record deployment history when channel version changes
 DROP TRIGGER IF EXISTS record_deployment_history_trigger ON channels;
+
 CREATE TRIGGER record_deployment_history_trigger
 AFTER UPDATE OF version ON channels
 FOR EACH ROW

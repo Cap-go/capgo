@@ -121,7 +121,9 @@ async function getChannel() {
             app_id,
             created_at,
             min_update_version,
-            storage_provider
+            storage_provider,
+            link,
+            comment
           ),
           created_at,
           app_id,
@@ -456,6 +458,14 @@ function openSelectVersion() {
           <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
             {{ channel.version.min_update_version ?? t('undefined-fail') }}
           </InfoRow>
+          <!-- Created At -->
+          <InfoRow :label="t('created-at')">
+            {{ formatDate(channel.created_at) }}
+          </InfoRow>
+          <!-- Last Update -->
+          <InfoRow :label="t('last-update')">
+            {{ formatDate(channel.updated_at) }}
+          </InfoRow>
           <!-- Bundle Link -->
           <InfoRow
             v-if="channel.version.link"
@@ -468,14 +478,6 @@ function openSelectVersion() {
           <!-- Bundle Comment -->
           <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
             {{ channel.version.comment }}
-          </InfoRow>
-          <!-- Created At -->
-          <InfoRow :label="t('created-at')">
-            {{ formatDate(channel.created_at) }}
-          </InfoRow>
-          <!-- Last Update -->
-          <InfoRow :label="t('last-update')">
-            {{ formatDate(channel.updated_at) }}
           </InfoRow>
           <InfoRow :label="t('channel-is-public')">
             <Toggle

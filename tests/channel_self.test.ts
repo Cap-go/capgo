@@ -28,7 +28,14 @@ async function getResponseError(response: Response) {
 }
 
 beforeAll(async () => {
-  await resetAndSeedAppData(APPNAME)
+  try {
+    console.log('resetAndSeedAppData', APPNAME)
+    await resetAndSeedAppData(APPNAME)
+    console.log('resetAndSeedAppData done', APPNAME)
+  }
+  catch (e) {
+    console.error('resetAndSeedAppData error', e)
+  }
 })
 afterAll(async () => {
   await resetAppData(APPNAME)
@@ -238,8 +245,13 @@ it('[POST] /channel_self with default channel', async () => {
   const data = getBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
-  const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', 'no_access').eq('app_id', APPNAME).select('id, owner_org, public').single()
+  const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient()
+    .from('channels')
+    .update({ allow_device_self_set: true })
+    .eq('name', 'no_access').eq('app_id', APPNAME)
+    .select('id, owner_org, public').single()
 
+  console.log('channelUpdateError', channelUpdateError)
   expect(channelUpdateError).toBeNull()
   expect(noAccessData).toBeTruthy()
   expect(noAccessData!.public).toBeFalsy()
@@ -259,7 +271,11 @@ it('[POST] /channel_self with default channel', async () => {
     expect(response.ok).toBeTruthy()
     expect(await response.json()).toEqual({ status: 'ok' })
 
-    const { data: channelDevice, error: channelDeviceError } = await getSupabaseClient().from('channel_devices').select('*').eq('device_id', data.device_id).eq('app_id', APPNAME)
+    const { data: channelDevice, error: channelDeviceError } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', data.device_id)
+      .eq('app_id', APPNAME)
 
     expect(channelDeviceError).toBeNull()
     expect(channelDevice).toBeTruthy()
@@ -453,4 +469,69 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     expect(error).toBeNull()
     throw e
   }
+})
+
+it('Verify channel stays after deleting channel_device', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  // 1. Get a channel to use for the test
+  const { data: channel, error: channelError } = await getSupabaseClient()
+    .from('channels')
+    .select('id, name, owner_org')
+    .eq('name', 'production')
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(channelError).toBeNull()
+  expect(channel).toBeTruthy()
+  const channelId = channel!.id
+  const channelName = channel!.name
+  const ownerOrg = channel!.owner_org
+
+  // 2. Create a device linked to this channel
+  const deviceId = randomUUID().toLowerCase()
+  const { error: insertError } = await getSupabaseClient()
+    .from('channel_devices')
+    .insert({
+      channel_id: channelId,
+      device_id: deviceId,
+      app_id: APPNAME,
+      owner_org: ownerOrg
+    })
+
+  expect(insertError).toBeNull()
+
+  // 3. Verify the device exists
+  const { data: deviceBefore, error: deviceBeforeError } = await getSupabaseClient()
+    .from('channel_devices')
+    .select('*')
+    .eq('device_id', deviceId)
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(deviceBeforeError).toBeNull()
+  expect(deviceBefore).toBeTruthy()
+  expect(deviceBefore!.channel_id).toBe(channelId)
+
+  // 4. Delete the device
+  const { error: deleteError } = await getSupabaseClient()
+    .from('channel_devices')
+    .delete()
+    .eq('device_id', deviceId)
+    .eq('app_id', APPNAME)
+
+  expect(deleteError).toBeNull()
+
+  // 5. Verify the channel still exists
+  const { data: channelAfter, error: channelAfterError } = await getSupabaseClient()
+    .from('channels')
+    .select('id, name')
+    .eq('id', channelId)
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(channelAfterError).toBeNull()
+  expect(channelAfter).toBeTruthy()
+  expect(channelAfter!.id).toBe(channelId)
+  expect(channelAfter!.name).toBe(channelName)
 })

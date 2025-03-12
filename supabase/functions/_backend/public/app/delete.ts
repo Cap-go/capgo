@@ -99,6 +99,11 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
         .eq('app_id', appId),
     ])
 
+    await supabaseAdmin(c)
+      .from('deploy_history')
+      .delete()
+      .eq('app_id', appId)
+
     // Delete versions (last)
     await supabaseAdmin(c)
       .from('app_versions')

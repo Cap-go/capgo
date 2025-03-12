@@ -2066,15 +2066,15 @@ BEGIN
     (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
     (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev") VALUES
-    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't'),
-    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't'),
-    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't');
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
+    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
 
     INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
-    (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
-    (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
-    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
+    (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
@@ -2205,6 +2205,7 @@ DECLARE
 BEGIN
     -- Delete existing data for the specified app_id
     DELETE FROM deploy_history WHERE app_id = p_app_id;
+    DELETE FROM channel_devices WHERE app_id = p_app_id;
     DELETE FROM channels WHERE app_id = p_app_id;
     DELETE FROM app_versions WHERE app_id = p_app_id;
     DELETE FROM apps WHERE app_id = p_app_id;
@@ -2256,7 +2257,7 @@ BEGIN
     ),
     inserted_channels AS (
         -- Insert channels using the version IDs from the CTE
-        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
+        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by")
         SELECT 
             now(),
             c.name,
@@ -2270,15 +2271,17 @@ BEGIN
             c.android,
             't',
             't',
-            't'
+            't',
+            c.created_by
         FROM (
             VALUES 
-                ('production', '1.0.0', true, false, true),
-                ('beta', '1.361.0', false, true, true),
-                ('development', '1.359.0', true, true, false)
-        ) as c(name, version_name, is_public, ios, android)
+                ('production', '1.0.0', true, false, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+                ('beta', '1.361.0', false, true, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+                ('development', '1.359.0', true, true, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+                ('no_access', '1.361.0', false, false, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid)
+        ) as c(name, version_name, is_public, ios, android, created_by)
         JOIN inserted_versions v ON v.name = c.version_name
-        RETURNING id, name, version
+        RETURNING id, name, version, created_by
     )
     -- Insert deploy history data
     INSERT INTO "public"."deploy_history" ("created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by")
@@ -4117,40 +4120,40 @@ Requires:
   - pg_tle: https://github.com/aws/pg_tle
   - pgsql-http: https://github.com/pramsey/pgsql-http
 -- */
-create extension if not exists http with schema extensions;
-create extension if not exists pg_tle;
-drop extension if exists "supabase-dbdev";
-select pgtle.uninstall_extension_if_exists('supabase-dbdev');
-select
-    pgtle.install_extension(
-        'supabase-dbdev',
-        resp.contents ->> 'version',
-        'PostgreSQL package manager',
-        resp.contents ->> 'sql'
-    )
-from http(
-    (
-        'GET',
-        'https://api.database.dev/rest/v1/'
-        || 'package_versions?select=sql,version'
-        || '&package_name=eq.supabase-dbdev'
-        || '&order=version.desc'
-        || '&limit=1',
-        array[
-            ('apiKey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyYndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzIsImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJrzM0AQKsu_5k134s')::http_header
-        ],
-        null,
-        null
-    )
-) x,
-lateral (
-    select
-        ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
-) resp(contents);
-create extension "supabase-dbdev";
-select dbdev.install('supabase-dbdev');
-drop extension if exists "supabase-dbdev";
-create extension "supabase-dbdev";
+-- create extension if not exists http with schema extensions;
+-- create extension if not exists pg_tle;
+-- drop extension if exists "supabase-dbdev";
+-- select pgtle.uninstall_extension_if_exists('supabase-dbdev');
+-- select
+--     pgtle.install_extension(
+--         'supabase-dbdev',
+--         resp.contents ->> 'version',
+--         'PostgreSQL package manager',
+--         resp.contents ->> 'sql'
+--     )
+-- from http(
+--     (
+--         'GET',
+--         'https://api.database.dev/rest/v1/'
+--         || 'package_versions?select=sql,version'
+--         || '&package_name=eq.supabase-dbdev'
+--         || '&order=version.desc'
+--         || '&limit=1',
+--         array[
+--             ('apiKey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyYndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzIsImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJrzM0AQKsu_5k134s')::http_header
+--         ],
+--         null,
+--         null
+--     )
+-- ) x,
+-- lateral (
+--     select
+--         ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
+-- ) resp(contents);
+-- create extension "supabase-dbdev";
+-- select dbdev.install('supabase-dbdev');
+-- drop extension if exists "supabase-dbdev";
+-- create extension "supabase-dbdev";
 
-select dbdev.install('basejump-supabase_test_helpers');
+-- select dbdev.install('basejump-supabase_test_helpers');
 
