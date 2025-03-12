@@ -51,6 +51,28 @@ WITH CHECK (
     )
 );
 
+-- Initialize deploy_history with current versions for existing channels
+INSERT INTO public.deploy_history (
+    channel_id,
+    app_id,
+    version_id,
+    is_current,
+    owner_org,
+    deployed_at
+)
+SELECT 
+    c.id,
+    c.app_id,
+    c.version,
+    TRUE,
+    c.owner_org,
+    c.updated_at
+FROM 
+    public.channels c
+WHERE 
+    c.version IS NOT NULL
+ON CONFLICT DO NOTHING;
+
 -- Create function to record deployment history
 CREATE OR REPLACE FUNCTION public.record_deployment_history()
 RETURNS TRIGGER

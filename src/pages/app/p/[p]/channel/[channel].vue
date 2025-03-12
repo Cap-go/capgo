@@ -37,6 +37,16 @@ const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
 
+// Function to open link in a new tab
+function openLink(url?: string): void {
+  if (url) {
+    // Using window from global scope
+    const win = window.open(url, '_blank')
+    // Add some security with noopener
+    if (win) win.opener = null
+  }
+}
+
 const role = ref<OrganizationRole | null>(null)
 watch(channel, async (channel) => {
   if (!channel) {
@@ -51,17 +61,17 @@ watch(channel, async (channel) => {
 
 const tabs: Tab[] = [
   {
-    label: t('info'),
+    label: 'info',
     icon: IconInformations,
     key: 'info',
   },
   {
-    label: t('channel-forced-devices'),
+    label: 'channel-forced-devices',
     icon: IconDevice,
     key: 'devices',
   },
   {
-    label: t('history'),
+    label: 'deploy-history',
     icon: IconHistory,
     key: 'history',
   },
@@ -444,6 +454,18 @@ function openSelectVersion() {
           </InfoRow>
           <InfoRow v-if="channel.disable_auto_update === 'version_number'" :label="t('min-update-version')">
             {{ channel.version.min_update_version ?? t('undefined-fail') }}
+          </InfoRow>
+          <!-- Bundle Link -->
+          <InfoRow 
+            :label="t('bundle-link')" 
+            :is-link="channel.version.link ? true : false"
+            @click="channel.version.link ? openLink(channel.version.link) : null"
+          >
+            {{ channel.version.link || t('not-set') }}
+          </InfoRow>
+          <!-- Bundle Comment -->
+          <InfoRow :label="t('bundle-comment')">
+            {{ channel.version.comment || t('not-set') }}
           </InfoRow>
           <!-- Created At -->
           <InfoRow :label="t('created-at')">

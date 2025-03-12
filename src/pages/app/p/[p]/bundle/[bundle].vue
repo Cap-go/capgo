@@ -46,6 +46,16 @@ watch(version, async (version) => {
   console.log(role.value)
 })
 
+// Function to open link in a new tab
+function openLink(url?: string): void {
+  if (url) {
+    // Using window from global scope
+    const win = window.open(url, '_blank')
+    // Add some security with noopener
+    if (win) win.opener = null
+  }
+}
+
 async function copyToast(text: string) {
   try {
     await navigator.clipboard.writeText(text)
@@ -72,7 +82,7 @@ async function copyToast(text: string) {
 
 const tabs: Tab[] = [
   {
-    label: t('info'),
+    label: 'info',
     icon: IconInformations,
     key: 'info',
   },
@@ -501,7 +511,7 @@ function preventInputChangePerm(event: Event) {
             <!-- Bundle Link -->
             <InfoRow
               v-if="version.link" :label="t('bundle-link')" :is-link="true"
-              @click="window.open(version.link, '_blank')"
+              @click="openLink(version.link)"
             >
               {{ version.link }}
             </InfoRow>
