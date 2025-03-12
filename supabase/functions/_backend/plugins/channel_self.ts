@@ -208,6 +208,11 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 
     const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
     if (mainChannelName && mainChannelName === channel) {
+      // Check if override exists before attempting to delete
+      if (!dataChannelOverride || !dataChannelOverride.channel_id) {
+        console.log({ requestId: c.get('requestId'), context: 'No channel override to delete' })
+        return c.json(BRES)
+      }
       const { error: dbErrorDev } = await supabaseAdmin(c)
         .from('channel_devices')
         .delete()
@@ -456,6 +461,8 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
       error: 'cannot_override',
     }, 400)
   }
+  // We already checked for dataChannelOverride and channel_id earlier in the function
+
   const { error } = await supabaseAdmin(c)
     .from('channel_devices')
     .delete()
