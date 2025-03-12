@@ -5,6 +5,11 @@ CREATE INDEX IF NOT EXISTS deploy_history_version_id_idx ON "public"."deploy_his
 CREATE INDEX IF NOT EXISTS deploy_history_deployed_at_idx ON "public"."deploy_history" (deployed_at);
 CREATE INDEX IF NOT EXISTS deploy_history_is_current_idx ON "public"."deploy_history" (is_current);
 
+-- Add composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS deploy_history_channel_app_idx ON "public"."deploy_history" (channel_id, app_id);
+CREATE INDEX IF NOT EXISTS deploy_history_app_version_idx ON "public"."deploy_history" (app_id, version_id);
+CREATE INDEX IF NOT EXISTS deploy_history_channel_deployed_idx ON "public"."deploy_history" (channel_id, deployed_at);
+
 -- Optimize the record_deployment_history trigger function
 CREATE OR REPLACE FUNCTION public.record_deployment_history()
 RETURNS TRIGGER
@@ -18,12 +23,19 @@ BEGIN
         UPDATE deploy_history
         SET is_current = FALSE
         WHERE channel_id = NEW.id
-        AND is_current = TRUE;
+        AND is_current = TRUE
+        -- Add this condition to avoid unnecessary updates
+        AND version_id <> NEW.version;
         
-        -- Insert new record
-        INSERT INTO deploy_history (
-            channel_id, 
-            app_id, 
+        -- Only insert if this is actually a new version for this channel
+        IF NOT EXISTS (
+            SELECT 1 FROM deploy_history 
+            WHERE channel_id = NEW.id AND version_id = NEW.version
+        ) THEN
+            -- Insert new record
+            INSERT INTO deploy_history (
+                channel_id, 
+                app_id, 
             version_id, 
             is_current,
             owner_org

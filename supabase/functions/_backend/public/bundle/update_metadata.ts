@@ -13,8 +13,10 @@ interface UpdateMetadataBody {
 // Helper function to validate URL
 function isValidUrl(url: string): boolean {
   try {
-    // Fix linting error by assigning the URL to a variable
-    const _ = new URL(url)
+    // Create a new URL object to validate the URL
+    // This will throw an error if the URL is invalid
+    // eslint-disable-next-line no-new
+    new URL(url)
     return true
   }
   catch {
@@ -77,17 +79,22 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
     // Also update any deploy_history records for this version
     // This ensures consistency between app_versions and deploy_history
-    await supabaseAdmin(c as any)
-      .from('deploy_history')
-      .update(updateData)
-      .eq('app_id', body.app_id)
-      .eq('version_id', body.version_id)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Warning: Could not update deploy_history records', error)
-          // Don't fail the request if this update fails
-        }
-      })
+    try {
+      const { error } = await supabaseAdmin(c as any)
+        .from('deploy_history')
+        .update(updateData)
+        .eq('app_id', body.app_id)
+        .eq('version_id', body.version_id)
+
+      if (error) {
+        console.error('Warning: Could not update deploy_history records', error)
+        // Don't fail the request if this update fails
+      }
+    }
+    catch (updateHistoryError) {
+      console.error('Error updating deploy_history records', updateHistoryError)
+      // Don't fail the request if this update fails
+    }
 
     return c.json({ status: 'success' })
   }

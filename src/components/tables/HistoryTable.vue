@@ -5,6 +5,8 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import IconReload from '~icons/tabler/reload'
+import IconSearch from '~icons/tabler/search'
+import IconLoading from '~icons/tabler/loader'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -43,10 +45,20 @@ const sort = ref<TableSort>({
   deployed_at: 'desc',
 })
 const search = ref('')
+// Debounced search to prevent excessive API calls
+const debouncedSearch = ref('')
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const currentVersionId = ref<number | null>(null)
+
+// Debounce search input
+watch(search, (newValue) => {
+  const timeoutId = setTimeout(() => {
+    debouncedSearch.value = newValue
+  }, 300)
+  return () => clearTimeout(timeoutId)
+})
 
 // Fetch current channel's version_id
 async function fetchCurrentVersion() {
@@ -149,21 +161,34 @@ async function fetchDeployHistory() {
     await fetchCurrentVersion()
 
     // Using "deploy_history" as a string rather than a type reference
-    const { data, error, count } = await supabase
+    const query = supabase
       .from('deploy_history')
       .select(`
-        *,
+        id,
+        version_id,
+        app_id,
+        channel_id,
+        deployed_at,
+        link,
+        comment,
+        is_current,
         version:version_id (
           id,
           name,
-          app_id,
           created_at
         )
       `, { count: 'exact' })
       .eq('channel_id', props.channelId)
       .eq('app_id', props.appId)
       .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
-      .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
+    
+    // Add search filter if search term is provided
+    if (search.value.trim()) {
+      // Search in version name, link, and comment fields
+      query.or(`version.name.ilike.%${search.value.trim()}%,link.ilike.%${search.value.trim()}%,comment.ilike.%${search.value.trim()}%`)
+    }
+    
+    const { data, error, count } = await query.range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
 
     if (error) {
       console.error('Error fetching deploy history:', error)
@@ -230,7 +255,7 @@ async function handleRollback(item: DeployHistory) {
 
 // Watch for changes and refetch data
 watch(
-  [() => props.channelId, () => props.appId, sort, page, pageSize, search],
+  [() => props.channelId, () => props.appId, sort, page, pageSize, debouncedSearch],
   fetchDeployHistory,
   { immediate: true },
 )
@@ -252,9 +277,11 @@ watch(
           class="w-full pl-10 pr-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700"
           :placeholder="t('search')"
           type="text"
+          :disabled="loading"
         >
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <IconSearch class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <IconSearch v-if="!loading" class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <IconLoading v-else class="w-5 h-5 text-gray-500 dark:text-gray-400 animate-spin" />
         </div>
       </div>
     </div>
