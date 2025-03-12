@@ -406,6 +406,15 @@ it('[DELETE] /channel_self (no overwrite)', async () => {
   const data = getBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
+  // Create a test channel device to ensure we don't have foreign key issues
+  const { data: productionChannel, error: productionChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'production').eq('app_id', APPNAME).single()
+  expect(productionChannelError).toBeNull()
+  expect(productionChannel).toBeTruthy()
+
+  // We need to ensure no channel_devices exist for this test to avoid foreign key constraint violations
+  const { error: cleanupError } = await getSupabaseClient().from('channel_devices').delete().eq('app_id', APPNAME)
+  expect(cleanupError).toBeNull()
+
   const response = await fetchEndpoint('DELETE', data)
   expect(response.status).toBe(400)
 
