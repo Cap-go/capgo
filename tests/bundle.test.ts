@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchBundle, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { BASE_URL, createAppVersions, fetchBundle, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const APPNAME = 'com.demo.app.bundle'
 
@@ -21,6 +21,98 @@ describe('[GET] /bundle operations', () => {
   it('invalid app_id', async () => {
     const { response } = await fetchBundle('invalid_app')
     expect(response.status).toBe(400)
+  })
+})
+
+describe('[POST] /bundle/metadata operations', () => {
+  let versionId: number
+  
+  beforeAll(async () => {
+    // Create a test version to update
+    const version = await createAppVersions('1.0.0-test-metadata', APPNAME)
+    versionId = version.id
+  })
+
+  it('should update bundle metadata successfully', async () => {
+    const testLink = 'https://example.com/docs'
+    const testComment = 'Test bundle comment'
+    
+    const response = await fetch(`${BASE_URL}/bundle/metadata`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version_id: versionId,
+        link: testLink,
+        comment: testComment
+      }),
+    })
+    
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('success')
+
+    // Verify the data was updated in the database
+    const supabase = getSupabaseClient()
+    const { data: version, error } = await supabase
+      .from('app_versions')
+      .select('id,name,link,comment')
+      .eq('id', versionId)
+      .eq('app_id', APPNAME)
+      .single()
+
+    expect(error).toBeNull()
+    expect(version).toBeTruthy()
+    expect(version.link).toBe(testLink)
+    expect(version.comment).toBe(testComment)
+  })
+
+  it('should handle missing required fields', async () => {
+    const response = await fetch(`${BASE_URL}/bundle/metadata`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        // Missing app_id
+        version_id: versionId,
+        link: 'https://example.com'
+      }),
+    })
+    
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string, error: string }
+    expect(data.status).toBe('Missing required fields')
+  })
+
+  it('should handle invalid version_id', async () => {
+    const response = await fetch(`${BASE_URL}/bundle/metadata`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version_id: 999999, // Non-existent version ID
+        link: 'https://example.com'
+      }),
+    })
+    
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string }
+    expect(data.status).toBe('Cannot find version')
+  })
+
+  it('should handle invalid app_id', async () => {
+    const response = await fetch(`${BASE_URL}/bundle/metadata`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: 'invalid_app',
+        version_id: versionId,
+        link: 'https://example.com'
+      }),
+    })
+    
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string }
+    expect(data.status).toBe('Cannot find version')
   })
 })
 

@@ -39,15 +39,17 @@ export function getVersionFromAction(action: string): string {
   return `1.0.0-${sanitizedAction}.1`
 }
 
-export async function createAppVersions(version: string, appId: string) {
+export async function createAppVersions(version: string, appId: string, metadata?: { link?: string, comment?: string }) {
   const supabase = getSupabaseClient()
   const { error, data } = await supabase.from('app_versions').upsert({
     app_id: appId,
     name: version,
     owner_org: ORG_ID,
+    link: metadata?.link,
+    comment: metadata?.comment
   }, {
     onConflict: 'app_id,name',
-  }).select('id,name').single()
+  }).select('id,name,link,comment').single()
   if (error) {
     console.error(`Error creating app_version for ${version}:`, error)
   }

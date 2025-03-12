@@ -1,0 +1,17 @@
+{
+  "version": "Version",
+  "deployed_at": "Deployed At",
+  "link": "Link",
+  "comment": "Comment",
+  "actions": "Actions",
+  "rollback": "Rollback",
+  "current": "Current",
+  "no_deploy_history": "No deployment history available",
+  "showing": "Showing",
+  "of": "of",
+  "view_release": "View Release",
+  "rollback_success": "Successfully rolled back to selected version",
+  "rollback_error": "Error rolling back to selected version",
+  "no_permission": "You don't have permission to perform this action",
+  "error_fetching_data": "Error fetching deployment history"
+}
