@@ -1,0 +1,15 @@
+{
+  "deploy-history": "Bereitstellungsverlauf",
+  "deploy-date": "Bereitstellungsdatum",
+  "bundle-link": "Bundle-Link",
+  "bundle-comment": "Bundle-Kommentar",
+  "rollback-to-version": "Zurück zur Version",
+  "rollback-to-this-version": "Zurücksetzen",
+  "confirm-rollback-desc": "Sind Sie sicher, dass Sie zu dieser Version zurückkehren möchten? Dies aktualisiert den Kanal, um diese Version zu verwenden.",
+  "rollback-success": "Erfolgreich zur vorherigen Version zurückgekehrt",
+  "error-rollback": "Fehler beim Zurückkehren zur vorherigen Version",
+  "add-bundle-link-comment": "Bundle-Link und Kommentar hinzufügen",
+  "bundle-link-comment-added": "Bundle-Link und Kommentar erfolgreich hinzugefügt",
+  "error-fetching-deploy-history": "Fehler beim Abrufen des Bereitstellungsverlaufs",
+  "no-deploy-history": "Kein Bereitstellungsverlauf gefunden"
+}

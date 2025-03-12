@@ -1,0 +1,15 @@
+{
+  "deploy-history": "Historial de despliegue",
+  "deploy-date": "Fecha de despliegue",
+  "bundle-link": "Enlace del paquete",
+  "bundle-comment": "Comentario del paquete",
+  "rollback-to-version": "Volver a la versión",
+  "rollback-to-this-version": "Restaurar",
+  "confirm-rollback-desc": "¿Está seguro de que desea volver a esta versión? Esto actualizará el canal para usar esta versión.",
+  "rollback-success": "Se ha vuelto a la versión anterior con éxito",
+  "error-rollback": "Error al volver a la versión anterior",
+  "add-bundle-link-comment": "Añadir enlace y comentario al paquete",
+  "bundle-link-comment-added": "Enlace y comentario del paquete añadidos con éxito",
+  "error-fetching-deploy-history": "Error al obtener el historial de despliegue",
+  "no-deploy-history": "No se ha encontrado historial de despliegue"
+}

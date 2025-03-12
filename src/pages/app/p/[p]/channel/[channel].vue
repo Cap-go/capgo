@@ -6,6 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconHistory from '~icons/heroicons/clock'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
@@ -57,6 +58,11 @@ const tabs: Tab[] = [
     label: t('channel-forced-devices'),
     icon: IconDevice,
     key: 'devices',
+  },
+  {
+    label: t('deploy-history'),
+    icon: IconHistory,
+    key: 'history',
   },
 ]
 function openBundle() {
@@ -545,4 +551,14 @@ function openSelectVersion() {
     :app-id="channel.version.app_id"
     :channel="channel"
   />
+
+  <!-- Deploy History Tab -->
+  <div v-if="channel && ActiveTab === 'history'" class="flex flex-col overflow-y-auto h-[calc(100vh-200px)]">
+    <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-5/6 md:border dark:border-slate-900 md:rounded-lg dark:bg-slate-800 p-4">
+      <HistoryTable
+        :channel-id="id"
+        :app-id="channel.app_id"
+      />
+    </div>
+  </div>
 </template>

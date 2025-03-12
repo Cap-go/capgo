@@ -57,10 +57,12 @@ export type Database = {
         Row: {
           app_id: string
           checksum: string | null
+          comment: string | null
           created_at: string | null
           deleted: boolean
           external_url: string | null
           id: number
+          link: string | null
           manifest:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
