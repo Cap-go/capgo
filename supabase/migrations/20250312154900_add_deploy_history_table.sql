@@ -26,19 +26,19 @@ DECLARE
     max_version_id bigint;
     max_channel_id bigint;
 BEGIN
-    -- Delete from deploy_history table
+    -- Delete from deploy_history table first (new table)
     DELETE FROM deploy_history WHERE app_id = p_app_id;
     
-    -- Delete existing data for the specified app_id
+    -- Delete existing data for the specified app_id (original functionality)
     DELETE FROM channels WHERE app_id = p_app_id;
     DELETE FROM app_versions WHERE app_id = p_app_id;
     DELETE FROM apps WHERE app_id = p_app_id;
 
-    -- Get the current max ids and reset the sequences
+    -- Get the current max ids and reset the sequences (original functionality)
     SELECT COALESCE(MAX(id), 0) + 1 INTO max_version_id FROM app_versions;
     SELECT COALESCE(MAX(id), 0) + 1 INTO max_channel_id FROM channels;
     
-    -- Reset both sequences
+    -- Reset both sequences (original functionality)
     PERFORM setval('app_versions_id_seq', max_version_id, false);
     PERFORM setval('channel_id_seq', max_channel_id, false);
 END;
