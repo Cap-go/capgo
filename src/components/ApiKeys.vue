@@ -129,7 +129,7 @@ async function fetchOrgAndAppNames() {
 
         if (error)
           throw error
-        if (data)
+        if (data && data.name)
           appCache.value.set(appId, data.name)
         return { id: appId, name: data?.name }
       }
@@ -508,23 +508,27 @@ displayStore.defaultBack = '/app/home'
       <div class="flex flex-col">
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow v-for="key in truncatedKeys" :key="key.id" :label="key.name" :value="key.mode.toUpperCase()" :is-link="false">
+            <InfoRow v-for="key in truncatedKeys" :key="key.id" :label="key.name" :is-link="false">
               <template #start>
-                <!-- Truncated API Key -->
-                <div class="text-sm text-gray-600 dark:text-gray-300">
-                  {{ key.truncatedKey }}
-                </div>
-
-                <!-- Organization and App Badges -->
-                <div v-if="key.limited_to_orgs && key.limited_to_orgs.length > 0" class="flex flex-wrap gap-1 mt-1">
-                  <div v-for="orgId in key.limited_to_orgs" :key="orgId" class="badge badge-primary">
-                    {{ getOrgName(orgId) }}
+                <!-- Key information with better alignment -->
+                <div class="flex flex-col w-full">
+                  <!-- Truncated API Key with key type -->
+                  <div class="flex items-center">
+                    <span class="font-medium">{{ key.mode.toUpperCase() }}</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300 ml-1">{{ key.truncatedKey }}</span>
                   </div>
-                </div>
 
-                <div v-if="key.limited_to_apps && key.limited_to_apps.length > 0" class="flex flex-wrap gap-1 mt-1">
-                  <div v-for="appId in key.limited_to_apps" :key="appId" class="badge badge-secondary">
-                    {{ getAppName(appId) }}
+                  <!-- Organization and App Badges -->
+                  <div v-if="key.limited_to_orgs && key.limited_to_orgs.length > 0" class="flex flex-wrap gap-1 mt-2">
+                    <div v-for="orgId in key.limited_to_orgs" :key="orgId" class="badge badge-primary">
+                      {{ getOrgName(orgId) }}
+                    </div>
+                  </div>
+
+                  <div v-if="key.limited_to_apps && key.limited_to_apps.length > 0" class="flex flex-wrap gap-1 mt-1">
+                    <div v-for="appId in key.limited_to_apps" :key="appId" class="badge badge-secondary">
+                      {{ getAppName(appId) }}
+                    </div>
                   </div>
                 </div>
               </template>
