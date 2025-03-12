@@ -10,6 +10,7 @@ import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import IconHistory from '~icons/heroicons/clock'
 import HistoryTable from '~/components/tables/HistoryTable.vue'
 import { urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -58,6 +59,11 @@ const tabs: Tab[] = [
     label: t('channel-forced-devices'),
     icon: IconDevice,
     key: 'devices',
+  },
+  {
+    label: t('history'),
+    icon: IconHistory,
+    key: 'history',
   },
 ]
 function openBundle() {

@@ -1987,6 +1987,7 @@ BEGIN
     TRUNCATE TABLE "public"."app_versions" CASCADE;
     TRUNCATE TABLE "public"."app_versions_meta" CASCADE;
     TRUNCATE TABLE "public"."channels" CASCADE;
+    TRUNCATE TABLE "public"."deploy_history" CASCADE;
 
     -- Insert seed data
     -- (Include all your INSERT statements here)
@@ -2049,14 +2050,14 @@ BEGIN
     (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
     (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
 
-    INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org", "user_id") VALUES
-    (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL),
-    (2, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL),
-    (3, now(), 'com.demo.app', '1.0.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.0.0.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL),
-    (4, now(), 'com.demo.app', '1.0.1', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.0.1.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
-    (5, now(), 'com.demo.app', '1.361.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.361.0.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL),
-    (6, now(), 'com.demo.app', '1.360.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.360.0.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL),
-    (7, now(), 'com.demo.app', '1.359.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.359.0.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL);
+    INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org", "user_id", "comment", "link") VALUES
+    (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
+    (2, now(), 'com.demo.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
+    (3, now(), 'com.demo.app', '1.0.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.0.0.zip', now(), 'f', NULL, '3885ee49', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, 'its a test', 'https://capgo.app'),
+    (4, now(), 'com.demo.app', '1.0.1', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.0.1.zip', now(), 'f', NULL, '', NULL, 'r2-direct', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
+    (5, now(), 'com.demo.app', '1.361.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.361.0.zip', now(), 'f', NULL, '9d4f798a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, 'its a test', 'https://capgo.app'),
+    (6, now(), 'com.demo.app', '1.360.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.360.0.zip', now(), 'f', NULL, '44913a9f', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, 'its a test', 'https://capgo.app'),
+    (7, now(), 'com.demo.app', '1.359.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.359.0.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, 'its a test', 'https://capgo.app');
 
     INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size", "devices") VALUES
     (4,now(), 'com.demo.app', now(), '', 0, 10),
@@ -2070,11 +2071,17 @@ BEGIN
     (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't'),
     (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't');
 
+    INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "link", "comment", "is_current", "owner_org") VALUES
+    (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0', 'Initial production release', TRUE, '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', 'https://github.com/Cap-go/capgo/releases/tag/v1.361.0', 'Beta channel release', TRUE, '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0', 'Secondary channel deployment', TRUE, '046a36ac-e03c-4590-9257-bd6c9dba9ee8');
+
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
     PERFORM setval('apikeys_id_seq', 10, false);
     PERFORM setval('app_versions_id_seq', 8, false);
     PERFORM setval('channel_id_seq', 4, false);
+    PERFORM setval('deploy_history_id_seq', 4, false);
 END;
 $_$;
 
@@ -2197,6 +2204,7 @@ DECLARE
     max_channel_id bigint;
 BEGIN
     -- Delete existing data for the specified app_id
+    DELETE FROM deploy_history WHERE app_id = p_app_id;
     DELETE FROM channels WHERE app_id = p_app_id;
     DELETE FROM app_versions WHERE app_id = p_app_id;
     DELETE FROM apps WHERE app_id = p_app_id;
@@ -2228,47 +2236,72 @@ BEGIN
     LOCK TABLE app_versions, channels IN EXCLUSIVE MODE;
 
     PERFORM reset_app_data(p_app_id);
-
+    
     -- Insert new app data
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id")
     VALUES (now(), p_app_id, '', 'Seeded App', '1.0.0', now(), org_id, user_id);
 
     -- Insert app versions in a single statement
     WITH inserted_versions AS (
-        INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org")
+        INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org", "comment", "link")
         VALUES 
-            (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
-            (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id),
-            (now(), p_app_id, '1.0.1', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.1.zip', now(), 'f', NULL, '', 'r2-direct', org_id),
-            (now(), p_app_id, '1.0.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.0.zip', now(), 'f', NULL, '3885ee49', 'r2', org_id),
-            (now(), p_app_id, '1.361.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.361.0.zip', now(), 'f', NULL, '9d4f798a', 'r2', org_id),
-            (now(), p_app_id, '1.360.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.360.0.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id),
-            (now(), p_app_id, '1.359.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.359.0.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id)
+            (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id, NULL, NULL),
+            (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id, NULL, NULL),
+            (now(), p_app_id, '1.0.1', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.1.zip', now(), 'f', NULL, '', 'r2-direct', org_id, 'Bug fixes and minor improvements', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.1'),
+            (now(), p_app_id, '1.0.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.0.zip', now(), 'f', NULL, '3885ee49', 'r2', org_id, 'Initial release', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0'),
+            (now(), p_app_id, '1.361.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.361.0.zip', now(), 'f', NULL, '9d4f798a', 'r2', org_id, 'Major version update with new features', 'https://github.com/Cap-go/capgo/releases/tag/v1.361.0'),
+            (now(), p_app_id, '1.360.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.360.0.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id, 'Pre-release version with experimental features', 'https://github.com/Cap-go/capgo/releases/tag/v1.360.0'),
+            (now(), p_app_id, '1.359.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.359.0.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id, 'Stability improvements', 'https://github.com/Cap-go/capgo/releases/tag/v1.359.0')
         RETURNING id, name
+    ),
+    inserted_channels AS (
+        -- Insert channels using the version IDs from the CTE
+        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
+        SELECT 
+            now(),
+            c.name,
+            p_app_id,
+            v.id,
+            now(),
+            c.is_public,
+            't',
+            'major',
+            c.ios,
+            c.android,
+            't',
+            't',
+            't'
+        FROM (
+            VALUES 
+                ('production', '1.0.0', true, false, true),
+                ('beta', '1.361.0', false, true, true),
+                ('development', '1.359.0', true, true, false)
+        ) as c(name, version_name, is_public, ios, android)
+        JOIN inserted_versions v ON v.name = c.version_name
+        RETURNING id, name, version
     )
-    -- Insert channels using the version IDs from the CTE
-    INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev")
-    SELECT 
-        now(),
-        c.name,
+    -- Insert deploy history data
+    INSERT INTO "public"."deploy_history" ("created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "link", "comment", "is_current", "owner_org")
+    SELECT
+        now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
+        now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
+        c.id,
         p_app_id,
-        v.id,
-        now(),
-        c.is_public,
-        't',
-        'major',
-        c.ios,
-        c.android,
-        't',
-        't',
-        't'
-    FROM (
-        VALUES 
-            ('production', '1.0.0', true, false, true),
-            ('no_access', '1.361.0', false, true, true),
-            ('two_default', '1.0.0', true, true, false)
-    ) as c(name, version_name, is_public, ios, android)
-    JOIN inserted_versions v ON v.name = c.version_name;
+        c.version,
+        now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
+        CASE 
+            WHEN c.name = 'production' THEN 'https://github.com/Cap-go/capgo/releases/tag/v1.0.0'
+            WHEN c.name = 'beta' THEN 'https://github.com/Cap-go/capgo/releases/tag/v1.361.0'
+            ELSE 'https://github.com/Cap-go/capgo/releases/tag/v1.359.0'
+        END,
+        CASE 
+            WHEN c.name = 'production' THEN 'Initial production release'
+            WHEN c.name = 'beta' THEN 'Beta channel release'
+            ELSE 'Development channel deployment'
+        END,
+        TRUE,
+        org_id
+    FROM inserted_channels c;
 
 END;
 $$;

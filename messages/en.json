@@ -1,6 +1,7 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "2fa": "Manage 2FA",
+  "rollback-to-this-version": "Rollback to this version",
   "2fa-code": "2FA authentication code",
   "2fa-disabled": "Disabled 2FA",
   "6-characters-minimum": "6 characters minimum, 1 uppercase, 1 lowercase, 1 special character",

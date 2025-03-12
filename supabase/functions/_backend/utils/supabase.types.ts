@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikeys: {
@@ -57,10 +82,12 @@ export type Database = {
         Row: {
           app_id: string
           checksum: string | null
+          comment: string | null
           created_at: string | null
           deleted: boolean
           external_url: string | null
           id: number
+          link: string | null
           manifest:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
@@ -77,10 +104,12 @@ export type Database = {
         Insert: {
           app_id: string
           checksum?: string | null
+          comment?: string | null
           created_at?: string | null
           deleted?: boolean
           external_url?: string | null
           id?: number
+          link?: string | null
           manifest?:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
@@ -97,10 +126,12 @@ export type Database = {
         Update: {
           app_id?: string
           checksum?: string | null
+          comment?: string | null
           created_at?: string | null
           deleted?: boolean
           external_url?: string | null
           id?: number
+          link?: string | null
           manifest?:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
@@ -511,7 +542,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -520,6 +551,63 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      deploy_history: {
+        Row: {
+          app_id: string
+          channel_id: number
+          comment: string | null
+          created_at: string | null
+          deployed_at: string | null
+          id: number
+          is_current: boolean | null
+          link: string | null
+          owner_org: string
+          updated_at: string | null
+          version_id: number
+        }
+        Insert: {
+          app_id: string
+          channel_id: number
+          comment?: string | null
+          created_at?: string | null
+          deployed_at?: string | null
+          id?: number
+          is_current?: boolean | null
+          link?: string | null
+          owner_org: string
+          updated_at?: string | null
+          version_id: number
+        }
+        Update: {
+          app_id?: string
+          channel_id?: number
+          comment?: string | null
+          created_at?: string | null
+          deployed_at?: string | null
+          id?: number
+          is_current?: boolean | null
+          link?: string | null
+          owner_org?: string
+          updated_at?: string | null
+          version_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deploy_history_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deploy_history_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       device_usage: {
         Row: {
@@ -814,6 +902,7 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           bandwidth: number
@@ -836,6 +925,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           bandwidth?: number
@@ -858,6 +948,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1092,10 +1183,6 @@ export type Database = {
         }
         Returns: string
       }
-      calculate_daily_app_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_min_rights:
         | {
             Args: {
@@ -1168,10 +1255,6 @@ export type Database = {
         Returns: number
       }
       count_all_onboarded: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      count_all_paying: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
@@ -1306,19 +1389,6 @@ export type Database = {
           subscription_anchor_end: string
         }[]
       }
-      get_daily_version: {
-        Args: {
-          app_id_param: string
-          start_date_param?: string
-          end_date_param?: string
-        }
-        Returns: {
-          date: string
-          app_id: string
-          version_id: number
-          percent: number
-        }[]
-      }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1394,18 +1464,6 @@ export type Database = {
           app_id: string
         }
         Returns: string
-      }
-      get_infos: {
-        Args: {
-          appid: string
-          deviceid: string
-          versionname: string
-        }
-        Returns: {
-          current_version_id: number
-          versiondata: Json
-          channel: Json
-        }[]
       }
       get_metered_usage:
         | {
@@ -1634,20 +1692,6 @@ export type Database = {
               uninstall: number
             }[]
           }
-      get_total_storage_size:
-        | {
-            Args: {
-              appid: string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              userid: string
-              appid: string
-            }
-            Returns: number
-          }
       get_total_storage_size_org: {
         Args: {
           org_id: string
@@ -1696,10 +1740,12 @@ export type Database = {
         Returns: {
           app_id: string
           checksum: string | null
+          comment: string | null
           created_at: string | null
           deleted: boolean
           external_url: string | null
           id: number
+          link: string | null
           manifest:
             | Database["public"]["CompositeTypes"]["manifest_entry"][]
             | null
@@ -1749,14 +1795,6 @@ export type Database = {
         Returns: boolean
       }
       http_post_helper: {
-        Args: {
-          function_name: string
-          function_type: string
-          body: Json
-        }
-        Returns: number
-      }
-      http_post_helper_preprod: {
         Args: {
           function_name: string
           function_type: string
@@ -2039,32 +2077,27 @@ export type Database = {
           uninstall: number
         }[]
       }
-      reset_and_seed_app_data:
-        | {
-            Args: {
-              p_app_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_app_id: string
-            }
-            Returns: undefined
-          }
-      reset_and_seed_app_stats_data:
-        | {
-            Args: {
-              p_app_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_app_id: string
-            }
-            Returns: undefined
-          }
+      replicate_to_d1: {
+        Args: {
+          record: Json
+          old_record: Json
+          operation: string
+          table_name: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: {
+          p_app_id: string
+        }
+        Returns: undefined
+      }
       reset_and_seed_data: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -2113,33 +2146,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      update_app_usage:
-        | {
-            Args: Record<PropertyKey, never>
-            Returns: undefined
-          }
-        | {
-            Args: {
-              minutes_interval: number
-            }
-            Returns: undefined
-          }
-      update_notification: {
-        Args: {
-          p_event: string
-          p_uniq_id: string
-          p_owner_org: string
-        }
-        Returns: undefined
-      }
-      upsert_notification: {
-        Args: {
-          p_event: string
-          p_uniq_id: string
-          p_owner_org: string
-        }
-        Returns: undefined
-      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -2147,10 +2153,8 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -2206,7 +2210,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2226,9 +2230,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      match_plan: {
-        name: string | null
       }
       orgs_table: {
         id: string | null
@@ -2350,3 +2351,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
