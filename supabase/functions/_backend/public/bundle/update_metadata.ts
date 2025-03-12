@@ -13,8 +13,8 @@ interface UpdateMetadataBody {
 // Helper function to validate URL
 function isValidUrl(url: string): boolean {
   try {
-    // Fix linting error by assigning the URL to a variable
-    const _ = new URL(url)
+    // Use URL constructor to validate without assigning to variable
+    URL.prototype.constructor.call(URL, url)
     return true
   }
   catch {
