@@ -21,9 +21,6 @@ interface DeployHistory {
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import IconRollback from '~icons/heroicons/backward'
-import IconComment from '~icons/heroicons/chat-bubble-left'
-import IconLink from '~icons/heroicons/link'
 import IconReload from '~icons/tabler/reload'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -69,13 +66,6 @@ async function fetchCurrentVersion() {
   }
   catch (error) {
     console.error('Error fetching current version:', error)
-  }
-}
-
-// Handle row click - block action for current version
-function handleRowClick(item: DeployHistory) {
-  if (item.version_id !== currentVersionId.value) {
-    handleRollback(item)
   }
 }
 
@@ -153,10 +143,11 @@ const columns = computed<TableColumn[]>(() => [
 async function fetchDeployHistory() {
   loading.value = true
   try {
+    deployHistory.value.length = 0
     await fetchCurrentVersion()
     
     // Using "deploy_history" as a string rather than a type reference
-    const { data, error, count } = await supabase
+    let query = supabase
       .from('deploy_history')
       .select(`
         *,
@@ -170,6 +161,13 @@ async function fetchDeployHistory() {
       .eq('channel_id', props.channelId)
       .eq('app_id', props.appId)
       .order(Object.keys(sort.value)[0], { ascending: Object.values(sort.value)[0] === 'asc' })
+    
+    // Apply search filter on version name if search value exists
+    if (search.value) {
+      query = query.like('version.name', `%${search.value}%`)
+    }
+    
+    const { data, error, count } = await query
       .range((page.value - 1) * pageSize.value, page.value * pageSize.value - 1)
 
     if (error) {
@@ -177,8 +175,13 @@ async function fetchDeployHistory() {
       toast.error(t('error-fetching-deploy-history'))
       return
     }
+    // filter out data with no version name
+    const filteredData = data.filter((item) => {
+      return item?.version !== null
+    }) as unknown as DeployHistory[]
 
-    deployHistory.value = data as unknown as DeployHistory[]
+    deployHistory.value = filteredData
+
     total.value = count || 0
   }
   catch (error) {
@@ -235,7 +238,7 @@ async function handleRollback(item: DeployHistory) {
   displayStore.showDialog = true
 }
 
-watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDeployHistory, { immediate: true })
+watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], fetchDeployHistory, { immediate: true })
 </script>
 
 <template>
@@ -252,7 +255,7 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize], fetchDep
         <input
           v-model="search"
           class="w-full pl-10 pr-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700"
-          :placeholder="t('search')"
+          :placeholder="t('search-by-name')"
           type="text"
         >
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

@@ -458,14 +458,15 @@ function openSelectVersion() {
           <!-- Bundle Link -->
           <InfoRow 
             :label="t('bundle-link')" 
+            v-if="channel.version.link"
             :is-link="channel.version.link ? true : false"
             @click="channel.version.link ? openLink(channel.version.link) : null"
           >
-            {{ channel.version.link || t('not-set') }}
+            {{ channel.version.link }}
           </InfoRow>
           <!-- Bundle Comment -->
-          <InfoRow :label="t('bundle-comment')">
-            {{ channel.version.comment || t('not-set') }}
+          <InfoRow :label="t('bundle-comment')" v-if="channel.version.comment">
+            {{ channel.version.comment }}
           </InfoRow>
           <!-- Created At -->
           <InfoRow :label="t('created-at')">
