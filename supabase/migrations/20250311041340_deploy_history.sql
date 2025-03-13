@@ -89,23 +89,32 @@ SET search_path = public
 LANGUAGE plpgsql
 AS $function$
 BEGIN
-    -- If version is changing, record the deployment
-    IF OLD.version <> NEW.version THEN
-        -- Insert new record
-        INSERT INTO deploy_history (
-            channel_id, 
-            app_id, 
-            version_id, 
-            owner_org,
-            created_by
-        )
-        VALUES (
-            NEW.id,
-            NEW.app_id,
-            NEW.version,
-            NEW.owner_org,
-            coalesce(get_identity()::uuid, NEW.created_by)
-        );
+    -- Only record deployment if version is changing and both OLD and NEW versions exist
+    IF OLD.version IS NOT NULL AND NEW.version IS NOT NULL AND OLD.version <> NEW.version THEN
+        -- Check if this version was already deployed to this channel recently
+        -- to avoid duplicate entries for rapid updates
+        IF NOT EXISTS (
+            SELECT 1 FROM deploy_history 
+            WHERE channel_id = NEW.id 
+            AND version_id = NEW.version 
+            AND deployed_at > NOW() - INTERVAL '1 minute'
+        ) THEN
+            -- Insert new record
+            INSERT INTO deploy_history (
+                channel_id, 
+                app_id, 
+                version_id, 
+                owner_org,
+                created_by
+            )
+            VALUES (
+                NEW.id,
+                NEW.app_id,
+                NEW.version,
+                NEW.owner_org,
+                coalesce(get_identity()::uuid, NEW.created_by)
+            );
+        END IF;
     END IF;
     
     RETURN NEW;

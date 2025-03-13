@@ -1,5 +1,6 @@
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
+import { isValidUrl } from '../../utils/validators/url'
 
 export const app = honoFactory.createApp()
 
@@ -34,6 +35,10 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     const updateData: any = {}
 
     if (body.link !== undefined) {
+      // Validate URL if it's not empty
+      if (body.link && !isValidUrl(body.link)) {
+        return c.json({ status: 'Invalid URL format', error: 'Link must be a valid http or https URL' }, 400)
+      }
       updateData.link = body.link
     }
 
