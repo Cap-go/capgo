@@ -46,6 +46,17 @@ watch(version, async (version) => {
   console.log(role.value)
 })
 
+// Function to open link in a new tab
+function openLink(url?: string): void {
+  if (url) {
+    // Using window from global scope
+    const win = window.open(url, '_blank')
+    // Add some security with noopener
+    if (win)
+      win.opener = null
+  }
+}
+
 async function copyToast(text: string) {
   try {
     await navigator.clipboard.writeText(text)
@@ -72,7 +83,7 @@ async function copyToast(text: string) {
 
 const tabs: Tab[] = [
   {
-    label: t('info'),
+    label: 'info',
     icon: IconInformations,
     key: 'info',
   },
@@ -497,6 +508,19 @@ function preventInputChangePerm(event: Event) {
               @click="copyToast(version?.external_url || '')"
             >
               {{ version.external_url }}
+            </InfoRow>
+            <!-- Bundle Link -->
+            <InfoRow
+              v-if="version.link" :label="t('bundle-link')" :is-link="true"
+              @click="openLink(version.link)"
+            >
+              {{ version.link }}
+            </InfoRow>
+            <!-- Bundle Comment -->
+            <InfoRow
+              v-if="version.comment" :label="t('bundle-comment')"
+            >
+              {{ version.comment }}
             </InfoRow>
             <!-- size -->
             <InfoRow v-if="version?.r2_path" :label="t('size')" :is-link="true" @click="openDownload()">

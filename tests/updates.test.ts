@@ -106,7 +106,7 @@ describe('[POST] /updates parallel tests', () => {
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.device_id = uuid;
-    (baseData as any).defaultChannel = 'no_access'
+    (baseData as any).defaultChannel = 'beta'
 
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
@@ -248,12 +248,14 @@ describe('update scenarios', () => {
     expect(data).toBeTruthy()
     const channelId = data?.id
 
-    await getSupabaseClient().from('channel_devices').insert({
+    const { data: data2 } = await getSupabaseClient().from('channel_devices').insert({
       device_id: uuid,
       channel_id: channelId as number,
       app_id: APP_NAME_UPDATE,
       owner_org: ORG_ID,
-    })
+    }).select()
+
+    expect(data2?.length).toBe(1)
 
     await getSupabaseClient().from('channels').update({ disable_auto_update: 'none', allow_dev: true, allow_emulator: true, android: true }).eq('name', 'no_access').eq('app_id', APP_NAME_UPDATE)
 

@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
-import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
+import { hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
@@ -43,13 +43,6 @@ async function deleteAccount() {
             if (!user)
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
 
-            if (user.customer_id) {
-              await supabaseClient
-                .from('stripe_info')
-                .delete()
-                .eq('customer_id', user.customer_id)
-            }
-
             const hashedEmail = await hashEmail(authUser.data.user.email!)
 
             await supabaseClient
@@ -57,13 +50,6 @@ async function deleteAccount() {
               .insert({
                 email: hashedEmail,
               })
-
-            await supabaseClient
-              .from('users')
-              .delete()
-              .eq('id', user.id)
-
-            await deleteUser()
 
             await supabase.auth.signOut()
             router.replace('/login')

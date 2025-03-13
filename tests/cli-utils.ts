@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
 import { sync as rimrafSync } from 'rimraf'
-import { APIKEY_TEST, BASE_URL } from './test-utils'
+import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -123,7 +123,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
     localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath || '@capgo/cli@latest',
     ...params,
-    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
+    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
   ].join(' ')
 
   const options: ExecSyncOptions = {

@@ -5,7 +5,9 @@ import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
-import { getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk, USER_ID_2 } from './test-utils'
+import { APIKEY_TEST_UPLOAD, getSupabaseClient, getUpdate, getUpdateBaseData, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk, USER_ID, USER_ID_2 } from './test-utils'
+
+//  only user USER_ID_2 for separate test in the parallel tests as it modifies the database
 
 describe('tests CLI upload', () => {
   const id = randomUUID()
@@ -70,6 +72,9 @@ describe('tests CLI upload', () => {
 
     expect(error).toBeNull()
     expect(data?.external_url).toBe('https://example.com')
+    // New fields should exist but can be null
+    expect(data).toHaveProperty('link')
+    expect(data).toHaveProperty('comment')
   })
 })
 describe('tests CLI upload options in parallel', () => {
@@ -92,6 +97,7 @@ describe('tests CLI upload options in parallel', () => {
     await prepareCli(APPNAME_one, id_one)
   })
   afterAll(async () => {
+    console.log('cleanupApp', APPNAME_one)
     await cleanupApp(APPNAME_one)
   })
 
@@ -101,7 +107,6 @@ describe('tests CLI upload options in parallel', () => {
     writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
     expect(output).toContain('notifyAppReady() is missing in')
-    await cleanupApp(id)
   })
   it.concurrent('test --iv-session-key with cloud upload', async () => {
     const semver = getSemver()
@@ -170,7 +175,6 @@ describe('tests CLI upload options in parallel', () => {
     rmSync(join(tempFileFolder(id), 'dist', 'index.html'))
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
     expect(output).toContain('index.html is missing')
-    await cleanupApp(id)
   })
   it.concurrent('test --no-code-check', async () => {
     const { id } = await prepareApp()
@@ -179,7 +183,6 @@ describe('tests CLI upload options in parallel', () => {
     semver = getSemver(semver)
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-code-check'], id, false)
     expect(output).toContain('Time to share your update to the world')
-    await cleanupApp(id)
   })
   it.concurrent('cannot upload with wrong api key', async () => {
     const { id } = await prepareApp()
@@ -187,29 +190,27 @@ describe('tests CLI upload options in parallel', () => {
     const semver = getSemver()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
     expect(output).toContain('Invalid API key or insufficient permissions.')
-    await cleanupApp(id)
   })
 
   it.concurrent('should test selectable disallow upload', async () => {
     const { id, APPNAME } = await prepareApp()
     const supabase = getSupabaseClient()
     const semver = getSemver()
-    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'production').eq('app_id', APPNAME).throwOnError()
+    await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'no_access').eq('app_id', APPNAME).throwOnError()
 
     // test if is set correctly
-    const { data: channel } = await supabase.from('channels').select('*').eq('name', 'production').eq('app_id', APPNAME).single().throwOnError()
+    const { data: channel } = await supabase.from('channels').select('*').eq('name', 'no_access').eq('app_id', APPNAME).single().throwOnError()
     expect(channel?.disable_auto_update).toBe('version_number')
 
     try {
-      const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id)
+      const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'no_access'], id)
       expect(output1).toContain('to provide a min-update-version')
 
-      const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--min-update-version', 'invalid', '--ignore-metadata-check'], id)
+      const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'no_access', '--min-update-version', 'invalid', '--ignore-metadata-check'], id)
       expect(output2).toContain('should follow semver convention')
     }
     finally {
-      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('name', 'production').eq('app_id', APPNAME).throwOnError()
-      await cleanupApp(id)
+      await supabase.from('channels').update({ disable_auto_update: 'major' }).eq('name', 'no_access').eq('app_id', APPNAME).throwOnError()
     }
   })
   it.concurrent('should test upload with organization', async () => {
@@ -258,7 +259,210 @@ describe('tests CLI upload options in parallel', () => {
         .eq('key', testApiKey)
         .eq('user_id', testUserId)
         .throwOnError()
-      await cleanupApp(id)
+    }
+  })
+  it.concurrent('should not allow setting channel with APIKEY_TEST_UPLOAD but allow upload', async () => {
+    const { id, APPNAME } = await prepareApp()
+    const semver = getSemver()
+
+    const supabase = getSupabaseClient()
+    // Get channel version before upload
+    const { data: channelBefore } = await supabase
+      .from('channels')
+      .select('version')
+      .eq('name', 'production')
+      .eq('app_id', APPNAME)
+      .single()
+      .throwOnError()
+
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, APIKEY_TEST_UPLOAD)
+    expect(output).toContain('The upload key is not allowed to set the version in the channel')
+    expect(output).toContain('Bundle uploaded')
+
+    // Verify channel version hasn't changed
+    const { data: channelAfter } = await supabase
+      .from('channels')
+      .select('version')
+      .eq('name', 'production')
+      .eq('app_id', APPNAME)
+      .single()
+      .throwOnError()
+
+    expect(channelAfter.version).toBe(channelBefore.version)
+  })
+  it.concurrent('should test upload with org-limited API key', async () => {
+    const { id } = await prepareApp()
+    const semver = getSemver()
+    const testApiKey = randomUUID()
+    const testUserId = USER_ID
+    const supabase = getSupabaseClient()
+
+    try {
+      await supabase.from('apikeys')
+        .insert({
+          key: testApiKey,
+          user_id: testUserId,
+          mode: 'all',
+          name: 'test',
+          limited_to_orgs: [ORG_ID],
+        })
+        .throwOnError()
+
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
+      expect(output).toContain('Bundle uploaded')
+    }
+    finally {
+      await supabase.from('apikeys')
+        .delete()
+        .eq('key', testApiKey)
+        .throwOnError()
+    }
+  })
+
+  it.concurrent('should test upload with app-limited API key', async () => {
+    const { id, APPNAME } = await prepareApp()
+    const semver = getSemver()
+    const testApiKey = randomUUID()
+    const testUserId = USER_ID
+    const supabase = getSupabaseClient()
+
+    try {
+      await supabase.from('apikeys')
+        .insert({
+          key: testApiKey,
+          user_id: testUserId,
+          mode: 'upload',
+          name: 'test',
+          limited_to_apps: [APPNAME],
+        })
+        .throwOnError()
+
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
+      expect(output).toContain('Bundle uploaded')
+    }
+    finally {
+      await supabase.from('apikeys')
+        .delete()
+        .eq('key', testApiKey)
+        .throwOnError()
+    }
+  })
+
+  it.concurrent('should fail upload with wrong org-limited API key', async () => {
+    const { id, APPNAME } = await prepareApp()
+    const semver = getSemver()
+    const testApiKey = randomUUID()
+    const wrongOrgId = randomUUID()
+    const testUserId = USER_ID
+    const supabase = getSupabaseClient()
+
+    try {
+      await supabase.from('apikeys')
+        .insert({
+          key: testApiKey,
+          user_id: testUserId,
+          mode: 'upload',
+          name: 'test',
+          limited_to_orgs: [wrongOrgId],
+        })
+        .throwOnError()
+
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      expect(output).toContain(`Cannot get organization id for app id ${APPNAME}`)
+    }
+    finally {
+      await supabase.from('apikeys')
+        .delete()
+        .eq('key', testApiKey)
+        .throwOnError()
+    }
+  })
+
+  it.concurrent('should fail upload with wrong app-limited API key', async () => {
+    const { id, APPNAME } = await prepareApp()
+    const semver = getSemver()
+    const testApiKey = randomUUID()
+    const wrongAppId = 'com.wrong.app'
+    const testUserId = USER_ID
+    const supabase = getSupabaseClient()
+
+    try {
+      await supabase.from('apikeys')
+        .insert({
+          key: testApiKey,
+          user_id: testUserId,
+          mode: 'upload',
+          name: 'test',
+          limited_to_apps: [wrongAppId],
+        })
+        .throwOnError()
+
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      expect(output).toContain(`Cannot get organization id for app id ${APPNAME}`)
+    }
+    finally {
+      await supabase.from('apikeys')
+        .delete()
+        .eq('key', testApiKey)
+        .throwOnError()
+    }
+  })
+
+  it.concurrent('should fail upload when using read-only API key with org limitation', async () => {
+    const { id } = await prepareApp()
+    const semver = getSemver()
+    const testApiKey = randomUUID()
+    const testUserId = USER_ID
+    const supabase = getSupabaseClient()
+
+    try {
+      await supabase.from('apikeys')
+        .insert({
+          key: testApiKey,
+          user_id: testUserId,
+          mode: 'read',
+          name: 'test',
+          limited_to_orgs: [ORG_ID],
+        })
+        .throwOnError()
+
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      expect(output).toContain('Invalid API key or insufficient permissions.')
+    }
+    finally {
+      await supabase.from('apikeys')
+        .delete()
+        .eq('key', testApiKey)
+        .throwOnError()
+    }
+  })
+
+  it.concurrent('should fail upload when using read-only API key with app limitation', async () => {
+    const { id, APPNAME } = await prepareApp()
+    const semver = getSemver()
+    const testApiKey = randomUUID()
+    const testUserId = USER_ID
+    const supabase = getSupabaseClient()
+
+    try {
+      await supabase.from('apikeys')
+        .insert({
+          key: testApiKey,
+          user_id: testUserId,
+          mode: 'read',
+          name: 'test',
+          limited_to_apps: [APPNAME],
+        })
+        .throwOnError()
+
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      expect(output).toContain('Invalid API key or insufficient permissions.')
+    }
+    finally {
+      await supabase.from('apikeys')
+        .delete()
+        .eq('key', testApiKey)
+        .throwOnError()
     }
   })
 })

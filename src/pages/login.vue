@@ -14,7 +14,7 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
-import { autoAuth, useSupabase } from '~/services/supabase'
+import { autoAuth, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
@@ -47,6 +47,15 @@ async function nextLogin() {
 async function submit(form: { email: string, password: string, code: string }) {
   isLoading.value = true
   if (stauts.value === 'login') {
+    const hashedEmail = await hashEmail(form.email)
+    const { data: deleted, error: errorDeleted } = await supabase
+      .rpc('is_not_deleted', { email_check: hashedEmail })
+    if (errorDeleted)
+      console.error(errorDeleted)
+    if (!deleted) {
+      toast.error(t('used-to-create'))
+      return
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,

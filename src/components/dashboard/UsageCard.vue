@@ -32,10 +32,12 @@ function sum(arr: number[]) {
 }
 const total = computed(() => {
   // remove undefined values
-  if (!props.accumulated)
-    return props.datas[props.datas.length - 1] || 0 as number
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
+  console.log('arrWithoutUndefined', arrWithoutUndefined)
+  if (!props.accumulated) {
+    return arrWithoutUndefined[arrWithoutUndefined.length - 1] || 0 as number
+  }
   return sum(arrWithoutUndefined as number[])
 })
 const lastDayEvolution = computed(() => {

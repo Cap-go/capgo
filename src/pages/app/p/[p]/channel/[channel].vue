@@ -6,10 +6,12 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconHistory from '~icons/heroicons/clock'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import HistoryTable from '~/components/tables/HistoryTable.vue'
 import { urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -35,6 +37,17 @@ const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const ActiveTab = ref('info')
 
+// Function to open link in a new tab
+function openLink(url?: string): void {
+  if (url) {
+    // Using window from global scope
+    const win = window.open(url, '_blank')
+    // Add some security with noopener
+    if (win)
+      win.opener = null
+  }
+}
+
 const role = ref<OrganizationRole | null>(null)
 watch(channel, async (channel) => {
   if (!channel) {
@@ -49,14 +62,19 @@ watch(channel, async (channel) => {
 
 const tabs: Tab[] = [
   {
-    label: t('info'),
+    label: 'info',
     icon: IconInformations,
     key: 'info',
   },
   {
-    label: t('channel-forced-devices'),
+    label: 'channel-forced-devices',
     icon: IconDevice,
     key: 'devices',
+  },
+  {
+    label: 'deploy-history',
+    icon: IconHistory,
+    key: 'history',
   },
 ]
 function openBundle() {
@@ -103,7 +121,9 @@ async function getChannel() {
             app_id,
             created_at,
             min_update_version,
-            storage_provider
+            storage_provider,
+            link,
+            comment
           ),
           created_at,
           app_id,
@@ -446,6 +466,19 @@ function openSelectVersion() {
           <InfoRow :label="t('last-update')">
             {{ formatDate(channel.updated_at) }}
           </InfoRow>
+          <!-- Bundle Link -->
+          <InfoRow
+            v-if="channel.version.link"
+            :label="t('bundle-link')"
+            :is-link="channel.version.link ? true : false"
+            @click="channel.version.link ? openLink(channel.version.link) : null"
+          >
+            {{ channel.version.link }}
+          </InfoRow>
+          <!-- Bundle Comment -->
+          <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
+            {{ channel.version.comment }}
+          </InfoRow>
           <InfoRow :label="t('channel-is-public')">
             <Toggle
               :value="channel?.public"
@@ -545,4 +578,17 @@ function openSelectVersion() {
     :app-id="channel.version.app_id"
     :channel="channel"
   />
+  <div
+    v-if="channel && ActiveTab === 'history'"
+    class="flex flex-col"
+  >
+    <div
+      class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+    >
+      <HistoryTable
+        :channel-id="id"
+        :app-id="channel.app_id"
+      />
+    </div>
+  </div>
 </template>

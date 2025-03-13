@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.13.2",
+  "version": "11.13.6",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -15,7 +15,7 @@
     "sync:ios": "cap sync ios",
     "sync:android": "cap sync android",
     "serve": "vite",
-    "serve-dev": "ENV=local vite",
+    "serve:dev": "ENV=local vite",
     "backend": "supabase start && supabase functions serve",
     "reset": "supabase db reset",
     "dev-back": "wrangler dev cloudflare_workers/index.ts",
@@ -38,7 +38,8 @@
     "lint-backend": "eslint \"supabase/**/*.{vue,ts,js}\"",
     "lint-sql": "sqlfluff fix --dialect postgres",
     "types": "bun ./scripts/getTypes.mjs",
-    "dev-types": "BRANCH=development bun ./scripts/getTypes.mjs",
+    "types:dev": "BRANCH=development bun ./scripts/getTypes.mjs",
+    "types:local": "BRANCH=local bun ./scripts/getTypes.mjs",
     "typecheck": "vue-tsc --noEmit",
     "ionic:build": "vite build",
     "ionic:serve": "vite",

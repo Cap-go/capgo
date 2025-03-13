@@ -13,7 +13,7 @@ import iconFlag from '~icons/ph/flag?raw'
 import iconName from '~icons/ph/user?raw'
 import IconVersion from '~icons/radix-icons/update'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
+import { hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -75,13 +75,6 @@ async function deleteAccount() {
               return
             }
 
-            if (user.customer_id) {
-              await supabaseClient
-                .from('stripe_info')
-                .delete()
-                .eq('customer_id', user.customer_id)
-            }
-
             const hashedEmail = await hashEmail(authUser.data.user.email!)
 
             await supabaseClient
@@ -89,13 +82,6 @@ async function deleteAccount() {
               .insert({
                 email: hashedEmail,
               })
-
-            await supabaseClient
-              .from('users')
-              .delete()
-              .eq('id', user.id)
-
-            await deleteUser()
 
             await main.logout()
             router.replace('/login')
