@@ -450,6 +450,7 @@
   "search-by-device-id-": "Cerca per ID dispositivo o azione",
   "search-by-device-id-0": "Cerca per ID dispositivo",
   "search-by-name": "Ricerca per nome",
+  "search-by-name-or-bundle-id": "Ricerca per nome o ID bundle",
   "see-usage": "Vedi utilizzo",
   "select-channel": "Selezionare il canale",
   "select-channel-msg": "Selezionare il canale che si desidera utilizzare per la sovrascrittura.",

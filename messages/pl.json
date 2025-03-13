@@ -450,6 +450,7 @@
   "search-by-device-id-": "Szukaj według identyfikatora urządzenia lub akcji",
   "search-by-device-id-0": "Wyszukaj według identyfikatora urządzenia",
   "search-by-name": "Szukaj według nazwy",
+  "search-by-name-or-bundle-id": "Szukaj według nazwy lub identyfikatora pakietu",
   "see-usage": "Zobacz użycie",
   "select-channel": "Wybierz kanał",
   "select-channel-msg": "Wybierz kanał, którego chcesz użyć podczas nadpisywania.",

@@ -450,6 +450,7 @@
   "search-by-device-id-": "Suche nach Geräte-ID oder Aktion",
   "search-by-device-id-0": "Suche nach Geräte-ID",
   "search-by-name": "Suche mit Name",
+  "search-by-name-or-bundle-id": "Suche mit Name oder Bundle-ID",
   "see-usage": "Siehe Verwendung",
   "select-channel": "Kanal auswählen",
   "select-channel-msg": "Bitte wählen Sie den Kanal aus, den Sie für das Überschreiben verwenden möchten",
