@@ -34,19 +34,39 @@ const total = computed(() => {
   // remove undefined values
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
-  console.log('arrWithoutUndefined', arrWithoutUndefined)
-  if (!props.accumulated) {
-    return arrWithoutUndefined[arrWithoutUndefined.length - 1] || 0 as number
+
+  if (arrWithoutUndefined.length === 0) {
+    return 0
   }
-  return sum(arrWithoutUndefined as number[])
+
+  if (!props.accumulated) {
+    return arrWithoutUndefined[arrWithoutUndefined.length - 1] || 0
+  }
+  return sum(arrWithoutUndefined)
 })
 const lastDayEvolution = computed(() => {
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
-  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2]
+
+  if (arrWithoutUndefined.length < 2) {
+    return 0
+  }
+
+  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] || 0
   const diff = (total.value as number) - oldTotal
-  const res = diff / (arr.length > 2 ? oldTotal : diff) * 100
-  return res
+
+  // Prevent division by zero
+  if (oldTotal === 0 && diff === 0) {
+    return 0
+  }
+
+  const denominator = arr.length > 2 ? oldTotal : diff
+  // Prevent division by zero
+  if (denominator === 0) {
+    return diff > 0 ? 100 : -100
+  }
+
+  return diff / denominator * 100
 })
 
 function lastRunDate() {
