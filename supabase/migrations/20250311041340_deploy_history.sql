@@ -35,23 +35,18 @@ USING (
     )
 );
 
-CREATE POLICY "Allow users with write permissions to insert deploy history" ON "public"."deploy_history"
-FOR INSERT
-WITH CHECK (
-    auth.uid() IN (
-        SELECT user_id FROM org_users 
-        WHERE org_id = owner_org 
-        AND (user_right = 'write' OR user_right = 'admin' OR user_right = 'super_admin')
-    )
-    OR
-    -- Allow apikey insertions
-    (is_allowed_capgkey(get_apikey(), '{all}', app_id))
-);
-
 CREATE POLICY "Prevent update on deploy history" ON "public"."deploy_history"
 FOR UPDATE
 USING (false)
 WITH CHECK (false);
+
+CREATE POLICY "Allow users with write permissions to insert deploy history" ON "public"."deploy_history"
+FOR INSERT
+WITH CHECK (false);
+
+CREATE POLICY "Deny delete on deploy history" ON "public"."deploy_history"
+FOR DELETE
+USING (false);
 
 -- Initialize deploy_history with current versions for existing channels
 INSERT INTO public.deploy_history (
@@ -78,6 +73,8 @@ ON CONFLICT DO NOTHING;
 -- Create function to record deployment history
 CREATE OR REPLACE FUNCTION public.record_deployment_history()
 RETURNS TRIGGER
+SECURITY DEFINER
+SET search_path = public
 LANGUAGE plpgsql
 AS $function$
 BEGIN
@@ -111,3 +108,9 @@ CREATE TRIGGER record_deployment_history_trigger
 AFTER UPDATE OF version ON channels
 FOR EACH ROW
 EXECUTE FUNCTION record_deployment_history();
+
+
+-- Make the function only accessible to postgres
+REVOKE ALL ON FUNCTION public.record_deployment_history() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.record_deployment_history() TO postgres;
+

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { fetch } from 'undici'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_TEST, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
+import { APIKEY_TEST_ALL, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
 interface UploadResponse {
   url: string
@@ -76,7 +76,7 @@ describe('upload_link', async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'capgkey': APIKEY_TEST,
+        'capgkey': APIKEY_TEST_ALL,
       },
       body: JSON.stringify(body),
     })
@@ -114,7 +114,7 @@ describe('upload_link', async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'capgkey': APIKEY_TEST,
+        'capgkey': APIKEY_TEST_ALL,
       },
       body: JSON.stringify({ fileId: '' }),
     })
