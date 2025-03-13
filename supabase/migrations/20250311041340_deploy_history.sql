@@ -11,6 +11,17 @@ CREATE TABLE IF NOT EXISTS "public"."deploy_history" (
     "owner_org" uuid NOT NULL
 );
 
+-- Add indexes to improve query performance on deploy_history table
+CREATE INDEX IF NOT EXISTS deploy_history_channel_id_idx ON "public"."deploy_history" (channel_id);
+CREATE INDEX IF NOT EXISTS deploy_history_app_id_idx ON "public"."deploy_history" (app_id);
+CREATE INDEX IF NOT EXISTS deploy_history_version_id_idx ON "public"."deploy_history" (version_id);
+CREATE INDEX IF NOT EXISTS deploy_history_deployed_at_idx ON "public"."deploy_history" (deployed_at);
+
+-- Add composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS deploy_history_channel_app_idx ON "public"."deploy_history" (channel_id, app_id);
+CREATE INDEX IF NOT EXISTS deploy_history_app_version_idx ON "public"."deploy_history" (app_id, version_id);
+CREATE INDEX IF NOT EXISTS deploy_history_channel_deployed_idx ON "public"."deploy_history" (channel_id, deployed_at);
+
 -- Set created_by for channels where it's NULL
 UPDATE public.channels
 SET created_by = (
