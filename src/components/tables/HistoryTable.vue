@@ -305,13 +305,21 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
         </thead>
         <tbody v-if="!loading && deployHistory.length > 0">
           <tr v-for="item in deployHistory" :key="item.id" class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600">
-            <td class="px-6 py-4">{{ item.version.name }}</td>
-            <td class="px-6 py-4 hidden md:table-cell">{{ formatDate(item.version.created_at) }}</td>
-            <td class="px-6 py-4">{{ formatDate(item.deployed_at) }}</td>
-            <td class="px-6 py-4 hidden md:table-cell">{{ `${item.user?.first_name} ${item.user?.last_name}` }}</td>
+            <td class="px-6 py-4">
+              {{ item.version.name }}
+            </td>
             <td class="px-6 py-4 hidden md:table-cell">
-              <span 
-                v-if="item.version.link" 
+              {{ formatDate(item.version.created_at) }}
+            </td>
+            <td class="px-6 py-4">
+              {{ formatDate(item.deployed_at) }}
+            </td>
+            <td class="px-6 py-4 hidden md:table-cell">
+              {{ `${item.user?.first_name} ${item.user?.last_name}` }}
+            </td>
+            <td class="px-6 py-4 hidden md:table-cell">
+              <span
+                v-if="item.version.link"
                 class="text-blue-500 underline cursor-pointer"
                 @click="openLink(item.version.link)"
               >
@@ -319,7 +327,9 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
               </span>
               <span v-else>-</span>
             </td>
-            <td class="px-6 py-4 hidden md:table-cell">{{ item.version.comment || '-' }}</td>
+            <td class="px-6 py-4 hidden md:table-cell">
+              {{ item.version.comment || '-' }}
+            </td>
             <td class="px-6 py-4 text-center hidden md:table-cell">
               <span v-if="isCurrentVersion(item)">Current</span>
               <span

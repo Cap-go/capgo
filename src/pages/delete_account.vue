@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
-import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
+import { hashEmail, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
