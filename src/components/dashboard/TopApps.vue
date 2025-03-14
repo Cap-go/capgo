@@ -2,11 +2,13 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth?raw'
 import Table from '~/components/Table.vue'
 import { appIdToUrl } from '~/services/conversion'
+import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
@@ -18,6 +20,24 @@ const router = useRouter()
 const search = ref('')
 const currentPage = ref(1)
 const filters = ref({})
+const main = useMainStore()
+const organizationStore = useOrganizationStore()
+const mauNumbers = ref<Record<string, number>>({})
+
+async function loadMauNumbers() {
+  const promises = props.apps.map(async (app) => {
+    if (app.app_id) {
+      const mau = await main.getTotalMauByApp(app.app_id, organizationStore.currentOrganization?.subscription_start)
+      mauNumbers.value[app.app_id] = mau
+    }
+  })
+  await Promise.all(promises)
+}
+
+watchEffect(async () => {
+  if (props.apps.length > 0)
+    await loadMauNumbers()
+})
 
 const columns = ref<TableColumn[]>([
   {
@@ -57,11 +77,19 @@ const columns = ref<TableColumn[]>([
     label: t('mau'),
     key: 'mau',
     mobile: false,
+    displayFunction: item => mauNumbers.value[item.app_id] || 0,
   },
   {
     label: t('app-perm'),
     key: 'perm',
     mobile: false,
+    displayFunction: (item) => {
+      if (item.name) {
+        const org = organizationStore.getOrgByAppId(item.app_id)
+        return org?.role ?? t('unknown')
+      }
+      return t('unknown')
+    },
   },
   {
     label: '',

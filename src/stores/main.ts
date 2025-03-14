@@ -3,7 +3,7 @@ import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getCurrentDayMonth } from '~/services/date'
+import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
 import { useSupabase } from '~/services/supabase'
 import {
@@ -76,12 +76,21 @@ export const useMainStore = defineStore('main', () => {
     })
   }
 
+  const calculateMonthDay = (subscriptionStart: string | undefined) => {
+    const startDate = subscriptionStart ? new Date(subscriptionStart) : new Date()
+    const currentDate = new Date()
+    const daysInMonth = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() + 1, 0)).getUTCDate()
+    return (getDaysBetweenDates(startDate, currentDate) % daysInMonth || daysInMonth) - 1
+  }
+
   const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
     try {
       const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
       dashboard.value = dashboardRes.global
       dashboardByapp.value = dashboardRes.byApp
-      const monthDay = getCurrentDayMonth()
+
+      const monthDay = calculateMonthDay(rangeStart)
+
       totalDevices.value = dashboard.value[monthDay]?.mau ?? 0
       totalDownload.value = dashboard.value[monthDay]?.get ?? 0
       totalStorage.value = await getTotalStorage()
@@ -100,13 +109,12 @@ export const useMainStore = defineStore('main', () => {
     return dashboardByapp.value.filter(d => d.app_id === appId)
   }
 
-  const getTotalStatsByApp = (appId: string) => {
-    const monthDay = getCurrentDayMonth()
+  const getTotalStatsByApp = async (appId: string, subscriptionStart?: string) => {
+    const monthDay = calculateMonthDay(subscriptionStart)
     return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.get ?? 0
   }
-  const getTotalMauByApp = (appId: string) => {
-    // dashboardByapp add up all the mau for the appId and return it
-    const monthDay = getCurrentDayMonth()
+  const getTotalMauByApp = async (appId: string, subscriptionStart?: string) => {
+    const monthDay = calculateMonthDay(subscriptionStart)
     return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.mau ?? 0
   }
 

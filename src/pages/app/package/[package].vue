@@ -9,6 +9,7 @@ import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 
 const id = ref('')
 const { t } = useI18n()
@@ -20,6 +21,7 @@ const channelsNb = ref(0)
 const capgoVersion = ref('')
 const canShowMobileStats = ref(true)
 const main = useMainStore()
+const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
@@ -35,8 +37,9 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
     const promises = []
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
-    updatesNb.value = main.getTotalStatsByApp(id.value)
-    devicesNb.value = main.getTotalMauByApp(id.value)
+
+    updatesNb.value = await main.getTotalStatsByApp(id.value, organizationStore.currentOrganization?.subscription_start)
+    devicesNb.value = await main.getTotalMauByApp(id.value, organizationStore.currentOrganization?.subscription_start)
 
     promises.push(
       supabase
