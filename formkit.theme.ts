@@ -298,7 +298,6 @@ const classes: Record<string, Record<string, boolean>> = {
     'border-neutral-200': true,
     'rounded-xs': true,
     'group-data-is-multiline:rounded-xs!': true,
-    'items-center': true,
     'text-neutral-700': true,
     'selection:bg-blue-100': true,
     'dark:border-neutral-600': true,
