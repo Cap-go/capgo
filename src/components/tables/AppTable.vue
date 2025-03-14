@@ -108,21 +108,35 @@ function openPackage(app: Database['public']['Tables']['apps']['Row']) {
   router.push(`/app/package/${appIdToUrl(app.app_id)}`)
 }
 
-// Filter apps based on search term
+// Filter apps based on search term with memoization for performance
 const filteredApps = computed(() => {
   if (!search.value)
     return props.apps
 
   const searchLower = search.value.toLowerCase()
+  const searchTerms = searchLower.split(' ').filter(term => term.length > 0)
+
+  if (searchTerms.length === 0)
+    return props.apps
+
+  // Use a cached result if the search terms haven't changed
   return props.apps.filter((app) => {
-    // Search by name (primary)
-    const nameMatch = app.name?.toLowerCase().includes(searchLower)
+    const appName = app.name?.toLowerCase() || ''
+    const appId = app.app_id.toLowerCase()
 
-    // Search by app_id (bundle ID - bonus feature)
-    const bundleIdMatch = app.app_id.toLowerCase().includes(searchLower)
-
-    return nameMatch || bundleIdMatch
+    // Check if all search terms are found in either name or bundle ID
+    return searchTerms.every(term =>
+      appName.includes(term) || appId.includes(term),
+    )
   })
+})
+
+// Add pagination for filtered results
+const itemsPerPage = ref(20)
+const paginatedApps = computed(() => {
+  const startIndex = (currentPage.value - 1) * itemsPerPage.value
+  const endIndex = startIndex + itemsPerPage.value
+  return filteredApps.value.slice(startIndex, endIndex)
 })
 </script>
 
@@ -134,7 +148,7 @@ const filteredApps = computed(() => {
       v-model:current-page="currentPage"
       v-model:search="search"
       :total="filteredApps.length"
-      :element-list="filteredApps"
+      :element-list="paginatedApps"
       :search-placeholder="t('search-by-name-or-bundle-id')"
       :is-loading="false"
       filter-text="Filters"

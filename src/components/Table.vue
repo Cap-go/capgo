@@ -103,10 +103,16 @@ if (props.filters) {
   })
 }
 
+const isSearching = ref(false)
+
 watch(searchVal, useDebounceFn(() => {
+  isSearching.value = true
   emit('update:search', searchVal.value)
   emit('reload')
-}, 500))
+  setTimeout(() => {
+    isSearching.value = false
+  }, 100) // Short timeout to ensure UI updates
+}, 300))
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -221,7 +227,9 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
-          :prefix-icon="IconSearch" :disabled="isLoading"
+          :prefix-icon="IconSearch"
+          :disabled="isLoading"
+          :suffix-icon="isSearching ? 'spinner' : ''"
           enterkeyhint="send"
           :classes="{
             outer: 'mb-0! md:w-96',
