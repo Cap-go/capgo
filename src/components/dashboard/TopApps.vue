@@ -145,6 +145,7 @@ const filteredApps = computed(() => {
         :search-placeholder="t('search-by-name-or-bundle-id')"
         :is-loading="false"
         filter-text="Filters"
+        class="cursor-pointer"
         @row-click="openPackage"
       />
     </div>
