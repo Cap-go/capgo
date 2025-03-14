@@ -72,9 +72,9 @@ const tabs = ref<Tab[]>([
   <div>
     <!-- Sidebar backdrop (mobile only) -->
     <div
-      class="fixed inset-0 z-40 transition-opacity duration-200 bg-slate-900/50 lg:hidden"
+      class="fixed inset-0 z-40 transition-opacity duration-200 lg:hidden"
       :class="{
-        'bg-slate-900': props.sidebarOpen,
+        'bg-slate-900/50': props.sidebarOpen,
         'bg-slate-900/0 pointer-events-none': !props.sidebarOpen,
       }"
       aria-hidden="true"
