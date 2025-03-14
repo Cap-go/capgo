@@ -78,7 +78,7 @@ onMounted(() => {
 <template>
   <div>
     <dialog id="my_modal_1" class="modal" :open="displayStore.showDialog">
-      <div class="bg-white modal-box dark:bg-base-100" :class="displayStore.dialogOption?.size ?? ''">
+      <div class="bg-white modal-box dark:bg-base-200" :class="displayStore.dialogOption?.size ?? ''">
         <button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" @click="close()">
           ✕
         </button>

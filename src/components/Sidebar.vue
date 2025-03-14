@@ -132,7 +132,7 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- User menu -->
-      <div class="px-3 py-4 mt-auto border-t border-slate-800">
+      <div class="px-3 py-4 mt-auto">
         <div v-if="main.user" class="flex items-center">
           <UserMenu class="w-full" />
         </div>

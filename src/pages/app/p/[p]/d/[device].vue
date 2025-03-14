@@ -328,7 +328,7 @@ function openChannel() {
 
 <template>
   <div>
-    <div v-if="device" class="h-full md:py-4">
+    <div v-if="device">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
         <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
@@ -361,7 +361,7 @@ function openChannel() {
           </dl>
         </div>
       </div>
-      <div v-else-if="ActiveTab === 'logs'" id="devices" class="h-full md:py-4">
+      <div v-else-if="ActiveTab === 'logs'" id="devices">
         <div class="flex flex-col mx-auto overflow-y-auto bg-white shadow-lg border-slate-300 md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
           <LogTable
             class="p-3"

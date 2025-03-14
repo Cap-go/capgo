@@ -200,7 +200,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden m-1 ml-2 md:block" />
           </button>
-          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-100 rounded-box z-1 w-52">
+          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">

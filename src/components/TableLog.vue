@@ -202,7 +202,7 @@ onMounted(async () => {
             <IconClock class="mr-1" />
             <span class="hidden md:block">{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
           </button>
-          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-100 rounded-box z-1 w-52">
+          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-minutes') }}</a></li>
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 15 }" @click="setTime(15)">{{ t('last-15-minutes') }}</a></li>

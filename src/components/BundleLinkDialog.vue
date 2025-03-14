@@ -80,7 +80,7 @@ async function refreshfilteredVersions() {
 <template>
   <div>
     <dialog id="my_modal_1" class="modal" :open="open">
-      <div class="bg-white modal-box dark:bg-base-100 max-h-[80vh]" :class="displayStore.dialogOption?.size ?? ''">
+      <div class="bg-white modal-box dark:bg-base-200 max-h-[80vh]" :class="displayStore.dialogOption?.size ?? ''">
         <div class="absolute flex flex-col right-2 top-2">
           <button class="ml-auto btn btn-sm btn-circle btn-ghost" @click="() => { open = false; displayStore.showBundleLinkDialogChannel = null }">
             ✕

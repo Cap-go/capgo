@@ -6,6 +6,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconHistory from '~icons/heroicons/clock'
+import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
 import Spinner from '~/components/Spinner.vue'
@@ -37,6 +38,11 @@ const tabs: Tab[] = [
     label: 'overview',
     icon: IconChart,
     key: 'overview',
+  },
+  {
+    label: 'bundles',
+    icon: IconCube,
+    key: 'bundles',
   },
   {
     label: 'channels',
@@ -156,6 +162,12 @@ watchEffect(async () => {
             <StatsBar :stats="stats" />
           </template>
         </BlurBg>
+      </div>
+
+      <div v-if="ActiveTab === 'bundles'" class="mt-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+          <BundleTable :app-id="id" />
+        </div>
       </div>
 
       <div v-if="ActiveTab === 'channels'" class="mt-4">

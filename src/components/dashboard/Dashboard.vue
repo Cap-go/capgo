@@ -16,7 +16,6 @@ const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
 const stepsOpen = ref(false)
-const { t } = useI18n()
 
 function onboardingDone() {
   stepsOpen.value = !stepsOpen.value
@@ -40,8 +39,6 @@ watchEffect(async () => {
       <Usage v-if="!isLoading" />
 
       <div class="grid grid-cols-12 gap-6">
-        <!-- Line chart (Acme Plus) -->
-        <!-- Table (Top Channels) -->
         <AppTable :apps="props.apps" :delete-button="true" />
       </div>
     </div>

@@ -426,7 +426,7 @@ function preventInputChangePerm(event: Event) {
 
 <template>
   <div>
-    <div v-if="version" class="h-full md:py-4">
+    <div v-if="version">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
         <div
