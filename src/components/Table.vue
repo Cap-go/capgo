@@ -267,11 +267,21 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
                 <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                  {{ displayValueKey(elem, col) }}
+                  <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
+                  <template v-else>
+                    {{ displayValueKey(elem, col) }}
+                  </template>
                 </th>
-                <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+                <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                  <button
+                    class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white" v-html="col.icon"
+                  />
+                </td>
                 <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4">
-                  {{ displayValueKey(elem, col) }}
+                  <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
+                  <template v-else>
+                    {{ displayValueKey(elem, col) }}
+                  </template>
                 </td>
               </template>
             </template>

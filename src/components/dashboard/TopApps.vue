@@ -3,8 +3,10 @@ import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import IconSettings from '~icons/heroicons/cog-8-tooth?raw'
 import Table from '~/components/Table.vue'
-import AppCard from './AppCard.vue'
+import { appIdToUrl } from '~/services/conversion'
 
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
@@ -12,11 +14,11 @@ const props = defineProps<{
   deleteButton: boolean
 }>()
 const { t } = useI18n()
-
-// Add search functionality
+const router = useRouter()
 const search = ref('')
 const currentPage = ref(1)
 const filters = ref({})
+
 const columns = ref<TableColumn[]>([
   {
     label: t('name'),
@@ -24,6 +26,20 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
+    allowHtml: true,
+    displayFunction: (item) => {
+      return `
+        <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
+          ${item.icon_url
+              ? `<img src="${item.icon_url}" alt="App icon ${item.name}" class="mr-2 rounded-sm shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">`
+              : `<div class="p-2 mr-2 text-xl bg-gray-700 mask mask-squircle">
+                <span class="font-medium text-gray-300">${item.name?.slice(0, 2).toUpperCase() || 'AP'}</span>
+              </div>`
+          }
+          <div class="max-w-max">${item.name}</div>
+        </div>
+      `
+    },
   },
   {
     label: t('last-version'),
@@ -47,7 +63,23 @@ const columns = ref<TableColumn[]>([
     key: 'perm',
     mobile: false,
   },
+  {
+    label: '',
+    key: 'actions',
+    mobile: true,
+    onClick: item => openSettngs(item),
+    icon: IconSettings,
+  },
 ])
+
+function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
+  router.push(`/app/p/${appIdToUrl(app.app_id)}/settings`)
+}
+
+function openPackage(app: Database['public']['Tables']['apps']['Row']) {
+  console.log('openPackage', app)
+  router.push(`/app/package/${appIdToUrl(app.app_id)}`)
+}
 
 // Filter apps based on search term
 const filteredApps = computed(() => {
@@ -75,7 +107,6 @@ const filteredApps = computed(() => {
       </h2>
     </header>
     <div>
-      <!-- Table with search functionality -->
       <Table
         v-model:filters="filters"
         v-model:columns="columns"
@@ -86,21 +117,8 @@ const filteredApps = computed(() => {
         :search-placeholder="t('search-by-name-or-bundle-id')"
         :is-loading="false"
         filter-text="Filters"
-      >
-        <template #default>
-          <!-- Table body -->
-          <tbody class="text-sm font-medium divide-y divide-slate-200 dark:divide-slate-500">
-            <!-- Row -->
-            <AppCard
-              v-for="(app, i) in filteredApps"
-              :key="app.app_id + i"
-              :delete-button="deleteButton"
-              :app="app"
-              channel=""
-            />
-          </tbody>
-        </template>
-      </Table>
+        @row-click="openPackage"
+      />
     </div>
   </div>
 </template>

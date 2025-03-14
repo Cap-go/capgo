@@ -16,13 +16,14 @@ export interface TableSort {
 export interface TableColumn {
   label: string
   key: string
-  mobile: boolean
-  displayFunction?: (elem: any) => string
-  sortable?: 'asc' | 'desc' | boolean
+  mobile?: boolean
+  sortable?: boolean | 'asc' | 'desc'
   head?: boolean
+  icon?: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
   class?: string
-  icon?: FunctionalComponent
-  onClick?: (elem: any | undefined) => void
+  allowHtml?: boolean
+  displayFunction?: (item: any) => string | any
+  onClick?: (item: any) => void
 }
 
 export interface Tab {
