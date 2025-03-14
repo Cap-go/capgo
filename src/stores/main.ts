@@ -10,6 +10,7 @@ import {
   findBestPlan,
   getAllDashboard,
   getTotalStorage,
+  getAppMetrics as supabaseGetAppMetrics,
   unspoofUser,
 } from './../services/supabase'
 
@@ -118,6 +119,16 @@ export const useMainStore = defineStore('main', () => {
     return dashboardByapp.value.filter(d => d.app_id === appId)[monthDay]?.mau ?? 0
   }
 
+  const getAppMetrics = async (orgId: string, startDate?: string, endDate?: string) => {
+    try {
+      return await supabaseGetAppMetrics(orgId, startDate, endDate)
+    }
+    catch (error) {
+      console.error('Error fetching app metrics:', error)
+      return []
+    }
+  }
+
   const awaitInitialLoad = () => {
     return _initialLoadPromise.value.promise
   }
@@ -139,6 +150,7 @@ export const useMainStore = defineStore('main', () => {
     awaitInitialLoad,
     dashboardByapp,
     getTotalMauByApp,
+    getAppMetrics,
     getTotalStatsByApp,
     user,
     path,

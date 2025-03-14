@@ -22,20 +22,46 @@ const filters = ref({})
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const mauNumbers = ref<Record<string, number>>({})
+const mauNumbersLoaded = ref(false)
+const isLoadingMau = ref(false)
 
 async function loadMauNumbers() {
-  const promises = props.apps.map(async (app) => {
-    if (app.app_id) {
-      const mau = await main.getTotalMauByApp(app.app_id, organizationStore.currentOrganization?.subscription_start)
-      mauNumbers.value[app.app_id] = mau
-    }
-  })
-  await Promise.all(promises)
+  if (props.apps.length === 0 || mauNumbersLoaded.value)
+    return
+
+  isLoadingMau.value = true
+  try {
+    const orgId = organizationStore.currentOrganization?.id
+    if (!orgId)
+      return
+
+    const startDate = organizationStore.currentOrganization?.subscription_start
+    const metrics = await main.getAppMetrics(orgId, startDate)
+
+    // Update mauNumbers with data from bulk API call
+    props.apps.forEach((app) => {
+      if (app.app_id) {
+        mauNumbers.value[app.app_id] = metrics.find(m => m.app_id === app.app_id)?.mau || 0
+      }
+    })
+    mauNumbersLoaded.value = true
+  }
+  catch (error) {
+    console.error('Error loading MAU numbers:', error)
+  }
+  finally {
+    isLoadingMau.value = false
+  }
 }
 
 watchEffect(async () => {
-  if (props.apps.length > 0)
+  if (props.apps.length > 0 && !mauNumbersLoaded.value) {
     await loadMauNumbers()
+  }
+  else if (props.apps.length === 0) {
+    // Reset loaded state when apps list is empty
+    mauNumbersLoaded.value = false
+  }
 })
 
 const columns = ref<TableColumn[]>([
@@ -76,7 +102,11 @@ const columns = ref<TableColumn[]>([
     label: t('mau'),
     key: 'mau',
     mobile: false,
-    displayFunction: item => mauNumbers.value[item.app_id] || 0,
+    displayFunction: (item) => {
+      if (isLoadingMau.value)
+        return '...'
+      return mauNumbers.value[item.app_id] || 0
+    },
   },
   {
     label: t('app-perm'),
