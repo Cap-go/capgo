@@ -34,7 +34,7 @@ const total = computed(() => {
   // remove undefined values
   const arr = props.datas as number[]
   const arrWithoutUndefined = arr.filter((val: any) => val !== undefined)
-  console.log('arrWithoutUndefined', arrWithoutUndefined)
+  // console.log('arrWithoutUndefined', arrWithoutUndefined)
   if (!props.accumulated) {
     return arrWithoutUndefined[arrWithoutUndefined.length - 1] || 0 as number
   }
