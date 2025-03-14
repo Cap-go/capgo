@@ -12,7 +12,6 @@ import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
-  header: string
   deleteButton: boolean
 }>()
 const { t } = useI18n()
@@ -129,25 +128,18 @@ const filteredApps = computed(() => {
 
 <template>
   <div id="my_apps" class="bg-white border rounded-lg shadow-lg col-span-full border-slate-300 xl:col-span-16 dark:border-slate-800 dark:bg-gray-800">
-    <header class="px-5 py-4 rounded-t-lg">
-      <h2 class="font-semibold text-slate-800 dark:text-white">
-        {{ header }}
-      </h2>
-    </header>
-    <div>
-      <Table
-        v-model:filters="filters"
-        v-model:columns="columns"
-        v-model:current-page="currentPage"
-        v-model:search="search"
-        :total="filteredApps.length"
-        :element-list="filteredApps"
-        :search-placeholder="t('search-by-name-or-bundle-id')"
-        :is-loading="false"
-        filter-text="Filters"
-        class="cursor-pointer"
-        @row-click="openPackage"
-      />
-    </div>
+    <Table
+      v-model:filters="filters"
+      v-model:columns="columns"
+      v-model:current-page="currentPage"
+      v-model:search="search"
+      :total="filteredApps.length"
+      :element-list="filteredApps"
+      :search-placeholder="t('search-by-name-or-bundle-id')"
+      :is-loading="false"
+      filter-text="Filters"
+      class="cursor-pointer"
+      @row-click="openPackage"
+    />
   </div>
 </template>

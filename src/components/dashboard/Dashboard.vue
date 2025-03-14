@@ -5,7 +5,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
-import TopApps from '~/components/dashboard/TopApps.vue'
+import AppTable from '~/components/tables/AppTable.vue'
 import WelcomeBanner from './WelcomeBanner.vue'
 
 const props = defineProps<{
@@ -42,7 +42,7 @@ watchEffect(async () => {
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->
         <!-- Table (Top Channels) -->
-        <TopApps :apps="props.apps" :header="t('top-apps-v2')" :delete-button="true" />
+        <AppTable :apps="props.apps" :delete-button="true" />
       </div>
     </div>
     <button v-if="!stepsOpen && !isMobile" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
