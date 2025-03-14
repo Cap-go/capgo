@@ -42,7 +42,7 @@ declare module 'vue' {
     TabSidebar: typeof import('./components/TabSidebar.vue')['default']
     Toast: typeof import('./components/Toast.vue')['default']
     Toggle: typeof import('./components/Toggle.vue')['default']
-    TopApps: typeof import('./components/tables/AppTable.vue'default']
+    TopApps: typeof import('./components/tables/AppTable.vue')['default']
     Usage: typeof import('./components/dashboard/Usage.vue')['default']
     UsageCard: typeof import('./components/dashboard/UsageCard.vue')['default']
     WelcomeBanner: typeof import('./components/dashboard/WelcomeBanner.vue')['default']
