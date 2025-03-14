@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
@@ -16,7 +15,7 @@ const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
 const stepsOpen = ref(false)
-const { t } = useI18n()
+// const { t } = useI18n()
 
 function onboardingDone() {
   stepsOpen.value = !stepsOpen.value

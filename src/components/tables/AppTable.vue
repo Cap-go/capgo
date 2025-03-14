@@ -23,20 +23,8 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const mauNumbers = ref<Record<string, number>>({})
 
-async function loadMauNumbers() {
-  const promises = props.apps.map(async (app) => {
-    if (app.app_id) {
-      const mau = await main.getTotalMauByApp(app.app_id, organizationStore.currentOrganization?.subscription_start)
-      mauNumbers.value[app.app_id] = mau
-    }
-  })
-  await Promise.all(promises)
-}
-
-watchEffect(async () => {
-  if (props.apps.length > 0)
-    await loadMauNumbers()
-})
+// Cache for MAU numbers to avoid redundant API calls
+const mauCache = ref<Record<string, number>>({})
 
 const columns = ref<TableColumn[]>([
   {
@@ -108,21 +96,61 @@ function openPackage(app: Database['public']['Tables']['apps']['Row']) {
   router.push(`/app/package/${appIdToUrl(app.app_id)}`)
 }
 
-// Filter apps based on search term
+// Filter apps based on search terms
 const filteredApps = computed(() => {
   if (!search.value)
     return props.apps
 
-  const searchLower = search.value.toLowerCase()
+  // Split search into terms for more precise filtering
+  const searchTerms = search.value.toLowerCase().split(' ').filter(term => term.length > 0)
+
   return props.apps.filter((app) => {
-    // Search by name (primary)
-    const nameMatch = app.name?.toLowerCase().includes(searchLower)
+    // If no search terms, return all apps
+    if (searchTerms.length === 0)
+      return true
 
-    // Search by app_id (bundle ID - bonus feature)
-    const bundleIdMatch = app.app_id.toLowerCase().includes(searchLower)
+    // Check if all search terms match either name or bundle ID (AND logic)
+    return searchTerms.every((term) => {
+      // Check if term is specifically targeting bundleID with "bundle:" or "id:" prefix
+      if (term.startsWith('bundle:') || term.startsWith('id:')) {
+        const bundleSearchTerm = term.split(':')[1]
+        return app.app_id.toLowerCase().includes(bundleSearchTerm)
+      }
 
-    return nameMatch || bundleIdMatch
+      // Regular search - match either name or bundleID
+      const nameMatch = app.name?.toLowerCase().includes(term)
+      const bundleIdMatch = app.app_id.toLowerCase().includes(term)
+
+      return nameMatch || bundleIdMatch
+    })
   })
+})
+
+// Only load MAU numbers for apps that don't already have them
+async function loadMauNumbers(appsToLoad: Database['public']['Tables']['apps']['Row'][]) {
+  // Only load MAU for apps that aren't already in the cache
+  const appsNeedingMAU = appsToLoad.filter(app =>
+    app.app_id && mauCache.value[app.app_id] === undefined,
+  )
+
+  if (appsNeedingMAU.length === 0)
+    return
+
+  const promises = appsNeedingMAU.map(async (app) => {
+    if (app.app_id) {
+      const mau = await main.getTotalMauByApp(app.app_id, organizationStore.currentOrganization?.subscription_start)
+      mauCache.value[app.app_id] = mau
+      mauNumbers.value[app.app_id] = mau
+    }
+  })
+
+  await Promise.all(promises)
+}
+
+// Load MAU numbers for visible apps when they change
+watchEffect(async () => {
+  if (filteredApps.value.length > 0)
+    await loadMauNumbers(filteredApps.value)
 })
 </script>
 
@@ -135,7 +163,7 @@ const filteredApps = computed(() => {
       v-model:search="search"
       :total="filteredApps.length"
       :element-list="filteredApps"
-      :search-placeholder="t('search-by-name-or-bundle-id')"
+      :search-placeholder="`${t('search-by-name-or-bundle-id')} (use bundle:id to filter by bundle ID)`"
       :is-loading="false"
       filter-text="Filters"
       class="cursor-pointer"
