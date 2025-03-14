@@ -477,7 +477,7 @@ async function transferAppOwnership() {
                 </span>
               </div>
             </div>
-            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="editPhoto">
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800 cursor-pointer" @click="editPhoto">
               {{ t('change') }}
             </button>
           </div>
@@ -539,7 +539,17 @@ async function transferAppOwnership() {
                   },
                   help: {
                     attrs: {
-                      class: 'block text-neutral-700 text-sm font-bold dark:text-neutral-300 inline-flex! mb-1 formkit-label',
+                      class: 'block text-neutral-700 text-sm dark:text-neutral-300 mb-1',
+                    },
+                  },
+                  input: {
+                    attrs: {
+                      class: 'inline-flex items-center px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800 cursor-pointer',
+                    },
+                  },
+                  prefix: {
+                    attrs: {
+                      class: 'w-4 h-4 mr-2',
                     },
                   },
                 }"
