@@ -13,10 +13,22 @@ import { useOrganizationStore } from '~/stores/organization'
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
   deleteButton: boolean
+  search?: string
 }>()
+
+const emit = defineEmits(['update:search'])
 const { t } = useI18n()
 const router = useRouter()
-const search = ref('')
+const search = ref(props.search || '')
+
+watch(() => props.search, (newVal) => {
+  if (newVal !== undefined && newVal !== search.value)
+    search.value = newVal
+})
+
+watch(search, (newVal) => {
+  emit('update:search', newVal)
+})
 const currentPage = ref(1)
 const filters = ref({})
 const main = useMainStore()
@@ -24,7 +36,15 @@ const organizationStore = useOrganizationStore()
 const mauNumbers = ref<Record<string, number>>({})
 
 async function loadMauNumbers() {
-  const promises = props.apps.map(async (app) => {
+  // Only load MAU numbers for apps that don't already have them
+  const appsToLoad = props.apps.filter(app =>
+    app.app_id && mauNumbers.value[app.app_id] === undefined,
+  )
+
+  if (appsToLoad.length === 0)
+    return
+
+  const promises = appsToLoad.map(async (app) => {
     if (app.app_id) {
       const mau = await main.getTotalMauByApp(app.app_id, organizationStore.currentOrganization?.subscription_start)
       mauNumbers.value[app.app_id] = mau
@@ -108,20 +128,25 @@ function openPackage(app: Database['public']['Tables']['apps']['Row']) {
   router.push(`/app/package/${appIdToUrl(app.app_id)}`)
 }
 
-// Filter apps based on search term
+// Filter apps based on search term with memoization for performance
 const filteredApps = computed(() => {
   if (!search.value)
     return props.apps
 
   const searchLower = search.value.toLowerCase()
+  const searchTerms = searchLower.split(' ').filter(term => term.length > 0)
+
+  if (searchTerms.length === 0)
+    return props.apps
+
   return props.apps.filter((app) => {
-    // Search by name (primary)
-    const nameMatch = app.name?.toLowerCase().includes(searchLower)
+    const appName = app.name?.toLowerCase() || ''
+    const appId = app.app_id.toLowerCase()
 
-    // Search by app_id (bundle ID - bonus feature)
-    const bundleIdMatch = app.app_id.toLowerCase().includes(searchLower)
-
-    return nameMatch || bundleIdMatch
+    // Check if all search terms are found in either name or bundle ID
+    return searchTerms.every(term =>
+      appName.includes(term) || appId.includes(term),
+    )
   })
 })
 </script>

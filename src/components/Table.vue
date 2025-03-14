@@ -106,7 +106,7 @@ if (props.filters) {
 watch(searchVal, useDebounceFn(() => {
   emit('update:search', searchVal.value)
   emit('reload')
-}, 500))
+}, 300))
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)

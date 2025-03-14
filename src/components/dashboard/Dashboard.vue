@@ -16,6 +16,7 @@ const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
 const stepsOpen = ref(false)
+const search = ref('')
 const { t: _t } = useI18n()
 
 function onboardingDone() {
@@ -42,7 +43,11 @@ watchEffect(async () => {
       <div class="grid grid-cols-12 gap-6">
         <!-- Line chart (Acme Plus) -->
         <!-- Table (Top Channels) -->
-        <AppTable :apps="props.apps" :delete-button="true" />
+        <AppTable
+          v-model:search="search"
+          :apps="props.apps"
+          :delete-button="true"
+        />
       </div>
     </div>
     <button v-if="!stepsOpen && !isMobile" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
