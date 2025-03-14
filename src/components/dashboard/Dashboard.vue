@@ -16,7 +16,7 @@ const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
 const route = useRoute()
 const stepsOpen = ref(false)
-const { t } = useI18n()
+const { t: _t } = useI18n()
 
 function onboardingDone() {
   stepsOpen.value = !stepsOpen.value
