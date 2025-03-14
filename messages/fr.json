@@ -450,6 +450,7 @@
   "search-by-device-id-": "Recherche par identifiant de l'appareil ou action",
   "search-by-device-id-0": "Recherche par ID de l'appareil",
   "search-by-name": "Recherche par nom",
+  "search-by-name-or-bundle-id": "Recherche par nom ou ID du paquet",
   "see-usage": "Voir l'utilisation",
   "select-channel": "Sélectionnez la chaîne",
   "select-channel-msg": "Veuillez sélectionner le canal que vous souhaitez utiliser dans cet écrasement",

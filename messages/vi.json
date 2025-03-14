@@ -450,6 +450,7 @@
   "search-by-device-id-": "Tìm kiếm theo ID thiết bị hoặc hành động",
   "search-by-device-id-0": "Tìm kiếm theo ID thiết bị",
   "search-by-name": "Tìm kiếm theo tên",
+  "search-by-name-or-bundle-id": "Tìm kiếm theo tên hoặc ID gói",
   "see-usage": "xem cách sử dụng",
   "select-channel": "Chọn kênh",
   "select-channel-msg": "Vui lòng chọn kênh bạn muốn sử dụng trong lần ghi đè này",

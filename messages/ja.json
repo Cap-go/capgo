@@ -450,6 +450,7 @@
   "search-by-device-id-": "デバイス ID またはアクションで検索",
   "search-by-device-id-0": "デバイス ID で検索",
   "search-by-name": "名前で検索",
+  "search-by-name-or-bundle-id": "名前またはバンドル ID で検索",
   "see-usage": "使い方を見る",
   "select-channel": "チャンネル選択",
   "select-channel-msg": "上書きで使用するチャンネルを選択してください。",

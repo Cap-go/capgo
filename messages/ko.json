@@ -450,6 +450,7 @@
   "search-by-device-id-": "장치 ID 또는 작업으로 검색",
   "search-by-device-id-0": "기기 ID로 검색",
   "search-by-name": "이름으로 검색",
+  "search-by-name-or-bundle-id": "이름 또는 번들 ID로 검색",
   "see-usage": "사용법 보기",
   "select-channel": "채널 선택",
   "select-channel-msg": "이 덮어쓰기에 사용할 채널을 선택하세요.",

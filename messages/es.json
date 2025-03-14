@@ -450,6 +450,7 @@
   "search-by-device-id-": "Buscar por ID de dispositivo o acción",
   "search-by-device-id-0": "Buscar por ID de dispositivo",
   "search-by-name": "Buscar por nombre",
+  "search-by-name-or-bundle-id": "Buscar por nombre o ID del paquete",
   "see-usage": "Ver uso",
   "select-channel": "Seleccionar canal",
   "select-channel-msg": "Seleccione el canal que desea utilizar en esta sobrescritura",

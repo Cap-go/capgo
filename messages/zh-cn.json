@@ -450,6 +450,7 @@
   "search-by-device-id-": "按设备 ID 或操作搜索",
   "search-by-device-id-0": "按设备 ID 搜索",
   "search-by-name": "按名称搜索",
+  "search-by-name-or-bundle-id": "按名称或捆绑包 ID 搜索",
   "see-usage": "查看用法",
   "select-channel": "选择频道",
   "select-channel-msg": "请选择您希望用于覆盖的频道",

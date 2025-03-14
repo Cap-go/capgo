@@ -450,6 +450,7 @@
   "search-by-device-id-": "Cari berdasarkan ID perangkat atau tindakan",
   "search-by-device-id-0": "Cari berdasarkan ID perangkat",
   "search-by-name": "Cari berdasarkan nama",
+  "search-by-name-or-bundle-id": "Cari berdasarkan nama atau ID bundel",
   "see-usage": "Lihat penggunaan",
   "select-channel": "Pilih saluran",
   "select-channel-msg": "Pilih saluran yang ingin Anda gunakan dalam penimpaan ini",
