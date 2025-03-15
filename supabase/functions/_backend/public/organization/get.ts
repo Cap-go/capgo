@@ -25,7 +25,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
   }
   const body = bodyParsed.data
 
-  if (body.orgId && !(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
+  if (body.orgId && !(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', apikey.key))) {
     console.error('You can\'t access this organization', body.orgId)
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
   }
@@ -35,7 +35,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
       console.error('You can\'t access this organization', body.orgId)
       return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
     }
-    const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
+    const { data, error } = await supabaseApikey(c, apikey.key)
       .from('orgs')
       .select('*')
       .eq('id', body.orgId)
@@ -52,7 +52,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     return c.json(dataParsed.data)
   }
   else {
-    const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
+    const { data, error } = await supabaseApikey(c, apikey.key)
       .from('orgs')
       .select('*')
     if (error) {
