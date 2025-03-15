@@ -3,11 +3,11 @@ CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT plan(12);
 
--- Test is_owner_of_org
+-- Test check_min_rights with super_admin role (replacing is_owner_of_org)
 SELECT
-    is(is_owner_of_org(tests.get_supabase_uid('test_admin'), '22dbad8a-b885-4309-9b3b-a09f8460fb6d'), true, 'is_owner_of_org test - user is owner');
+    is(check_min_rights('super_admin'::user_min_right, tests.get_supabase_uid('test_admin'), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL::character varying, NULL::bigint), true, 'check_min_rights test - admin has super_admin rights');
 SELECT
-    is(is_owner_of_org(tests.get_supabase_uid('test_user'), '22dbad8a-b885-4309-9b3b-a09f8460fb6d'), false, 'is_owner_of_org test - user is not owner');
+    is(check_min_rights('super_admin'::user_min_right, tests.get_supabase_uid('test_user'), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL::character varying, NULL::bigint), false, 'check_min_rights test - regular user does not have super_admin rights');
 
 -- Test is_member_of_org
 SELECT

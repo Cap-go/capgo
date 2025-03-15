@@ -30,7 +30,7 @@ SELECT
 SELECT
     is(is_member_of_org('6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'), true, 'is_member_of_org test - user is member of org');
 SELECT
-    is(is_owner_of_org('6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'), true, 'is_owner_of_org test - user is member of org');
+    is(check_min_rights('super_admin'::user_min_right, '6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL::character varying, NULL::bigint), true, 'check_min_rights super_admin test - user has super_admin rights');
 SELECT
     is((SELECT user_id FROM apikeys WHERE key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'), '6aa76066-55ef-4238-ade6-0b32334a4097', 'Check if apikey is associated with the correct user');
 SELECT
