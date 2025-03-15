@@ -28,7 +28,7 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
       user_id: userId,
       org_id: orgId,
       app_id: null as unknown as string,
-      channel_id: null as unknown as number
+      channel_id: null as unknown as number,
     })
 
   if (adminError) {
