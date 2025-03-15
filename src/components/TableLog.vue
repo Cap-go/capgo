@@ -190,17 +190,23 @@ onMounted(async () => {
   <div class="pb-4 overflow-x-auto md:pb-0 min-h-[500px]">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
-        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="resetTime">
+        <button class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="resetTime">
           <IconReload v-if="!isLoading" class="m-1 mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border divide-gray-100 rounded-lg dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
+      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
         <div ref="dropdown" class="dropdown dropdown-end">
-          <button tabindex="0" class="flex flex-row items-center justify-center flex-auto h-10 px-3 rounded-l-lg cursor-pointer md:px-6" :class="{ 'general': currentSelected, 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'general' }">
-            <IconClock class="mr-1" />
-            <span class="hidden md:block">{{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}</span>
+          <button
+            tabindex="0"
+            class="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-l-md"
+            :class="{ 'bg-gray-50 dark:bg-gray-700': currentSelected === 'general' }"
+          >
+            <IconClock class="h-4 w-4" />
+            <span class="text-sm font-medium">
+              {{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}
+            </span>
           </button>
           <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
@@ -209,7 +215,7 @@ onMounted(async () => {
           </ul>
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
-        <div class="flex items-center justify-center flex-auto rounded-r-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
+        <div class="flex items-center justify-center flex-auto rounded-r-md cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
               v-model="preciseDates"
