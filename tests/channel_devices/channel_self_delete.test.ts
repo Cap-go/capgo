@@ -14,12 +14,12 @@ describe('Channel Self Delete Tests', () => {
     const testAppId = `test-app-${Date.now()}`
     const { error: appError } = await supabase
       .from('apps')
-      .insert([{
+      .insert({
         app_id: testAppId,
         name: 'Test App',
         user_id: '00000000-0000-0000-0000-000000000000',
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
       .select()
     
     expect(appError).toBeNull()
@@ -27,12 +27,12 @@ describe('Channel Self Delete Tests', () => {
     // Create a test version
     const { data: versionData, error: versionError } = await supabase
       .from('app_versions')
-      .insert([{
+      .insert({
         app_id: testAppId,
         name: 'test-version',
         storage_provider: 'r2',
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
       .select()
     
     expect(versionError).toBeNull()
@@ -41,14 +41,14 @@ describe('Channel Self Delete Tests', () => {
     // Create a test channel with allow_device_self_set=true
     const { data: channelData, error: channelError } = await supabase
       .from('channels')
-      .insert([{
+      .insert({
         app_id: testAppId,
         name: 'test-channel',
         version: versionData![0].id,
         created_by: '00000000-0000-0000-0000-000000000000',
         owner_org: '00000000-0000-0000-0000-000000000000',
         allow_device_self_set: true,
-      }])
+      })
       .select()
     
     expect(channelError).toBeNull()
@@ -58,12 +58,12 @@ describe('Channel Self Delete Tests', () => {
     const testDeviceId = `test-device-${Date.now()}`
     const { error: channelDeviceError } = await supabase
       .from('channel_devices')
-      .insert([{
+      .insert({
         app_id: testAppId,
         device_id: testDeviceId,
         channel_id: channelData![0].id,
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
     
     expect(channelDeviceError).toBeNull()
     

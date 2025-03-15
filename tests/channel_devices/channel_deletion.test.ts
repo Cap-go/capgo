@@ -14,12 +14,12 @@ describe('Channel Devices Constraint Tests', () => {
     const testAppId = `test-app-${Date.now()}`
     const { data: appData, error: appError } = await supabase
       .from('apps')
-      .insert([{
+      .insert({
         app_id: testAppId,
         name: 'Test App',
         user_id: '00000000-0000-0000-0000-000000000000',
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
       .select()
     
     expect(appError).toBeNull()
@@ -27,12 +27,12 @@ describe('Channel Devices Constraint Tests', () => {
     // Create a test version
     const { data: versionData, error: versionError } = await supabase
       .from('app_versions')
-      .insert([{
+      .insert({
         app_id: testAppId,
         name: 'test-version',
         storage_provider: 'r2',
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
       .select()
     
     expect(versionError).toBeNull()
@@ -41,13 +41,13 @@ describe('Channel Devices Constraint Tests', () => {
     // Create a test channel
     const { data: channelData, error: channelError } = await supabase
       .from('channels')
-      .insert([{
+      .insert({
         app_id: testAppId,
         name: 'test-channel',
         version: versionData![0].id,
         created_by: '00000000-0000-0000-0000-000000000000',
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
       .select()
     
     expect(channelError).toBeNull()
@@ -57,12 +57,12 @@ describe('Channel Devices Constraint Tests', () => {
     const testDeviceId = `test-device-${Date.now()}`
     const { error: channelDeviceError } = await supabase
       .from('channel_devices')
-      .insert([{
+      .insert({
         app_id: testAppId,
         device_id: testDeviceId,
         channel_id: channelData![0].id,
         owner_org: '00000000-0000-0000-0000-000000000000',
-      }])
+      })
     
     expect(channelDeviceError).toBeNull()
     
