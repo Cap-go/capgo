@@ -57,15 +57,18 @@ describe('User Deletion', () => {
     expect(deleteError).toBeNull()
     
     // Verify user is added to deleted_account table
+    // Wait a short time for the trigger to complete
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
     const { data: deletedAccount, error: deletedAccountError } = await getSupabaseClient()
       .from('deleted_account')
       .select('*')
       .eq('email', testEmail)
-      .single()
+      .maybeSingle() // Use maybeSingle instead of single to avoid PGRST116 error
     
     expect(deletedAccountError).toBeNull()
     expect(deletedAccount).toBeTruthy()
-    expect(deletedAccount.email).toBe(testEmail)
+    expect(deletedAccount?.email).toBe(testEmail)
   })
 
   it('should prevent reuse of deleted email addresses', async () => {
