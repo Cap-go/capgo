@@ -27,5 +27,6 @@ export function urlToAppId(appId: string) {
   return appId.replace(/--/g, '.')
 }
 export function appIdToUrl(appId: string) {
-  return appId.replace(/\./g, '--')
+  // return appId.replace(/\./g, '--') not needed anymore
+  return appId
 }
