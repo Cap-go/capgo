@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Organization } from '~/stores/organization'
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
