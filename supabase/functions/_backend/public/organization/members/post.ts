@@ -30,7 +30,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
 
   const supabase = supabaseApikey(c, c.get('capgkey') as string)
   const { data, error } = await supabase
-    .rpc('invite_user_to_org', {
+    .rpc('invite_user_to_org_wrapper', {
       email: body.email,
       org_id: body.orgId,
       invite_type: `invite_${body.invite_type}`,
