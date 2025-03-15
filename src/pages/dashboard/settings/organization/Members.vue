@@ -9,6 +9,8 @@ import { toast } from 'vue-sonner'
 import Plus from '~icons/heroicons/plus'
 import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
+import iconEmail from '~icons/oui/email?raw'
+import iconName from '~icons/ph/user?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -149,15 +151,134 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   if (error)
     throw error
 
-  handleSendInvitationOutput(data)
+  handleSendInvitationOutput(data, email, type)
   members.value = await organizationStore.getMembers()
 }
 
-function handleSendInvitationOutput(output: string) {
+async function showUserCreationModal(email: string, inviteType: Database['public']['Enums']['user_min_right']) {
+  let firstName = ''
+  let lastName = ''
+
+  displayStore.dialogOption = {
+    header: t('please-create-user-account'),
+    size: 'max-w-md',
+    customContent: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-invite'),
+        id: 'confirm-button',
+        handler: async () => {
+          if (!firstName || !lastName) {
+            toast.error(t('missing-name'))
+            return
+          }
+
+          await createUserAndInvite(email, firstName, lastName, inviteType)
+        },
+      },
+    ],
+    customContentRender: () => {
+      return `
+        <div class="space-y-4 p-4">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${t('email')}</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+              <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                ${iconEmail}
+              </span>
+              <input type="text" disabled value="${email}" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 bg-gray-100 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 focus:outline-none sm:text-sm" />
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${t('first-name')}</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+              <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                ${iconName}
+              </span>
+              <input type="text" id="first-name-input" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 focus:outline-none sm:text-sm" />
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${t('last-name')}</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+              <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                ${iconName}
+              </span>
+              <input type="text" id="last-name-input" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 focus:outline-none sm:text-sm" />
+            </div>
+          </div>
+        </div>
+      `
+    },
+  }
+
+  displayStore.showDialog = true
+  await displayStore.onDialogDismiss()
+
+  // Get the values from the inputs after the dialog is shown
+  const firstNameInput = document.getElementById('first-name-input') as HTMLInputElement
+  const lastNameInput = document.getElementById('last-name-input') as HTMLInputElement
+
+  if (firstNameInput && lastNameInput) {
+    firstNameInput.addEventListener('input', (e) => {
+      firstName = (e.target as HTMLInputElement).value
+    })
+    lastNameInput.addEventListener('input', (e) => {
+      lastName = (e.target as HTMLInputElement).value
+    })
+  }
+}
+
+async function createUserAndInvite(email: string, firstName: string, lastName: string, inviteType: Database['public']['Enums']['user_min_right']) {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
+    return
+
+  try {
+    const { data, error } = await supabase.functions.invoke('organization/members/create_user', {
+      body: {
+        orgId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        invite_type: inviteType,
+      },
+    })
+
+    if (error) {
+      console.error('Error creating user:', error)
+      toast.error(t('error-creating-user'))
+      return
+    }
+
+    if (data.status === 'OK') {
+      toast.success(t('org-invited-user'))
+      members.value = await organizationStore.getMembers()
+    }
+    else {
+      toast.error(data.status)
+    }
+  }
+  catch (error) {
+    console.error('Error invoking function:', error)
+    toast.error(t('error-creating-user'))
+  }
+}
+
+function handleSendInvitationOutput(output: string, email: string, inviteType: Database['public']['Enums']['user_min_right']) {
   console.log('Output: ', output)
   switch (output) {
     case 'OK': {
       toast.success(t('org-invited-user'))
+      break
+    }
+    case 'CREATE_USER': {
+      // Show modal to create user
+      showUserCreationModal(email, inviteType)
       break
     }
     case 'NO_EMAIL': {
