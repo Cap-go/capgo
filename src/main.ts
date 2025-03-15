@@ -37,6 +37,11 @@ const router = createRouter({
     { path: '/app', redirect: '/app/home' },
     { path: '/', redirect: '/login' },
     { path: '/dashboard/settings/plans', redirect: '/dashboard/settings/organization/plans' },
+    // https://web.capgo.app/app/p/ee--forgr--capacitor_go/channels
+    { path: '/app/p/:package/bundles', redirect: to => `/app/package/${(to.params as { package: string }).package}?tab=bundles` },
+    { path: '/app/p/:package/channels', redirect: to => `/app/package/${(to.params as { package: string }).package}?tab=channels` },
+    { path: '/app/p/:package/devices', redirect: to => `/app/package/${(to.params as { package: string }).package}?tab=devices` },
+    { path: '/app/p/:package/logs', redirect: to => `/app/package/${(to.params as { package: string }).package}?tab=logs` },
     ...setupLayouts(newRoutes),
   ],
   history: createWebHistory(import.meta.env.BASE_URL),
