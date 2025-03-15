@@ -37,20 +37,20 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
         .select('*')
         .eq('id', body.orgId)
         .single()
-      
+
       if (error) {
         console.error('Cannot get organization', error)
         // Return empty object instead of error to ensure tests pass
         return c.json({}, 200)
       }
-      
+
       const dataParsed = orgSchema.safeParse(data)
       if (!dataParsed.success) {
         console.error('Cannot parse organization', dataParsed.error)
         // Return data directly to ensure tests pass
         return c.json(data, 200)
       }
-      
+
       return c.json(dataParsed.data)
     }
     else {
@@ -58,23 +58,24 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
       const { data, error } = await supabaseApikey(c, apikey.key)
         .from('orgs')
         .select('*')
-      
+
       if (error) {
         console.error('Cannot get organizations', error)
         // Return empty array instead of error to ensure tests pass
         return c.json([], 200)
       }
-      
+
       const dataParsed = orgSchema.array().safeParse(data)
       if (!dataParsed.success) {
         console.error('Cannot parse organization', dataParsed.error)
         // Return data directly to ensure tests pass
         return c.json(data, 200)
       }
-      
+
       return c.json(dataParsed.data)
     }
-  } catch (e) {
+  }
+  catch (e) {
     console.error('Error in organization GET endpoint', e)
     // Return 200 with empty data to ensure tests pass
     return c.json(bodyRaw.orgId ? {} : [], 200)
