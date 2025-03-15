@@ -102,11 +102,11 @@ const bannerColor = computed(() => {
 
 <template>
   <div v-if="bannerText" class="navbar bg-gray-100 dark:bg-gray-800/90">
-    <div class="text-xl navbar-start font-bold text-black dark:text-white hidden md:block md:pl-4">
+    <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
       {{ t('free-trial') }}
     </div>
     <div class="navbar-center lg:flex">
-      <a class="text-xl font-bold text-black dark:text-white normal-case">{{ bannerText }}</a>
+      <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
       <a href="/dashboard/settings/organization/plans" class="btn" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
