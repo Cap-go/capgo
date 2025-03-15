@@ -5,7 +5,6 @@ import { cors } from 'hono/cors'
 import { createFactory, createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 import { timingSafeEqual } from 'hono/utils/buffer'
-import { supabaseAdmin } from './supabase.ts'
 import { checkKey, getEnv } from './utils.ts'
 
 export const useCors = cors({
@@ -42,7 +41,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     const key = capgkey_string || apikey_string
     if (!key)
       throw new HTTPException(401, { message: 'Invalid apikey' })
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, key, supabaseAdmin(c as any), rights)
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, key, rights)
     if (!apikey)
       throw new HTTPException(401, { message: 'Invalid apikey' })
     c.set('apikey', apikey)

@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 export async function deleteApp(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {
@@ -18,100 +18,100 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
     // Run most deletions in parallel
     await Promise.all([
       // Delete version related data
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('app_versions_meta')
         .delete()
         .eq('app_id', appId),
 
       // Delete daily version stats
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('daily_version')
         .delete()
         .eq('app_id', appId),
 
       // Delete version usage
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('version_usage')
         .delete()
         .eq('app_id', appId),
 
       // Delete app related data
       // Delete channel devices
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('channel_devices')
         .delete()
         .eq('app_id', appId),
 
       // Delete channels
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('channels')
         .delete()
         .eq('app_id', appId),
 
       // Delete devices
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('devices')
         .delete()
         .eq('app_id', appId),
 
       // Delete usage stats
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('bandwidth_usage')
         .delete()
         .eq('app_id', appId),
 
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('storage_usage')
         .delete()
         .eq('app_id', appId),
 
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('device_usage')
         .delete()
         .eq('app_id', appId),
 
       // Delete daily metrics
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('daily_mau')
         .delete()
         .eq('app_id', appId),
 
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('daily_bandwidth')
         .delete()
         .eq('app_id', appId),
 
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('daily_storage')
         .delete()
         .eq('app_id', appId),
 
       // Delete stats
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('stats')
         .delete()
         .eq('app_id', appId),
 
       // Delete org_users with this app_id
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('org_users')
         .delete()
         .eq('app_id', appId),
 
-      supabaseAdmin(c)
+      supabaseApikey(c, apikey.key)
         .from('deploy_history')
         .delete()
         .eq('app_id', appId),
     ])
 
     // Delete versions (last)
-    await supabaseAdmin(c)
+    await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .delete()
       .eq('app_id', appId)
 
     // Finally delete the app
-    const { error: dbError } = await supabaseAdmin(c)
+    const { error: dbError } = await supabaseApikey(c, apikey.key)
       .from('apps')
       .delete()
       .eq('app_id', appId)
