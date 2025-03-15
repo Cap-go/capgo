@@ -87,11 +87,7 @@ $$;
 
 -- Update "Allow memeber and owner to select" policy on org_users
 DROP POLICY IF EXISTS "Allow memeber and owner to select" ON "public"."org_users";
-CREATE POLICY "Allow member and super admin to select" ON "public"."org_users" FOR SELECT TO "authenticated", "anon"  
-USING (("public"."is_member_of_org"((select auth.uid()), "org_id") OR "public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), "org_id", NULL::character varying, NULL::bigint)));
-
--- Update policy in the latest migration file
-DROP POLICY IF EXISTS "Allow memeber and owner to select" ON "public"."org_users";
+DROP POLICY IF EXISTS "Allow member and super admin to select" ON "public"."org_users";
 CREATE POLICY "Allow member and super admin to select" ON "public"."org_users" FOR SELECT TO "authenticated", "anon"  
 USING (("public"."is_member_of_org"((select get_identity_org_allowed('{read,upload,write,all}'::"public"."key_mode"[], "org_id")), "org_id") OR "public"."check_min_rights"('super_admin'::"public"."user_min_right", (select get_identity_org_allowed('{read,upload,write,all}'::"public"."key_mode"[], "org_id")), "org_id", NULL::character varying, NULL::bigint)));
 
