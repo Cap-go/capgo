@@ -14,12 +14,12 @@ BEGIN
     -- Get all organizations where the user is the only super_admin
     SELECT array_agg(org_id) INTO user_orgs
     FROM org_users
-    WHERE user_id = user_id AND user_right = 'super_admin'
+    WHERE org_users.user_id = user_id AND user_right = 'super_admin'
     AND org_id NOT IN (
         SELECT org_id 
         FROM org_users 
         WHERE user_right = 'super_admin' 
-        AND user_id != user_id
+        AND org_users.user_id != user_id
     );
     
     -- Delete organizations where the user is the only super_admin
