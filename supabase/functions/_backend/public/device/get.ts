@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { readDevices } from '../../utils/stats.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 interface GetDevice {
@@ -41,7 +41,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
     // get version from device
-    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin(c)
+    const { data: dataVersion, error: dbErrorVersion } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .select('id, name')
       .eq('id', dataDevice.version)
@@ -66,7 +66,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
-    const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin(c)
+    const { data: dataVersions, error: dbErrorVersions } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .select(`
               id,

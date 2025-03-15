@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { z } from 'zod'
 import { honoFactory, useCors } from '../../utils/hono.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
+import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseApikey, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
 import { checkKey } from '../../utils/utils.ts'
 
 dayjs.extend(utc)
@@ -95,7 +95,7 @@ app.get('/app/:app_id', async (c) => {
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c as any)
+    const supabase = auth.authType === 'apikey' ? supabaseApikey(c as any, auth.apikey!.key) : supabaseAdmin(c as any)
     const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error)
@@ -114,15 +114,14 @@ app.get('/org/:org_id', async (c) => {
     const orgId = c.req.param('org_id')
     const query = c.req.query()
 
+    const auth = c.get('auth') as AuthInfo
     // Check if user has access to this organization
-    const supabase = supabaseAdmin(c as any)
+    const supabase = auth.authType === 'apikey' ? supabaseApikey(c as any, auth.apikey!.key) : supabaseAdmin(c as any)
 
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     const body = bodyParsed.data
-
-    const auth = c.get('auth') as AuthInfo
     if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read')))
       return c.json({ status: 'You can\'t access this organization' }, 400)
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
@@ -167,7 +166,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c as any)
+    const supabase = auth.authType === 'apikey' ? supabaseApikey(c as any, auth.apikey!.key) : supabaseAdmin(c as any)
     const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
     if (error)
@@ -183,7 +182,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
 
 app.get('/user', async (c) => {
   const auth = c.get('auth') as AuthInfo
-  const supabase = supabaseAdmin(c as any)
+  const supabase = auth.authType === 'apikey' ? supabaseApikey(c as any, auth.apikey!.key) : supabaseAdmin(c as any)
 
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)
@@ -229,7 +228,7 @@ app.get('/user', async (c) => {
   return c.json({ status: 'ok', statistics: finalStats })
 })
 
-async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
+async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin> | ReturnType<typeof supabaseApikey>, isDashboard: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -346,7 +345,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   return { data: finalStats.filter(x => !!x), error: null }
 }
 
-async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseAdmin>) {
+async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseAdmin> | ReturnType<typeof supabaseApikey>) {
   const { data: dailyVersion, error: dailyVersionError } = await supabase
     .from('daily_version')
     .select('date, app_id, version_id, install, uninstall')

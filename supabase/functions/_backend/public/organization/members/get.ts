@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -39,8 +39,8 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
   }
 
   try {
-    const { data, error } = await supabaseAdmin(c)
-      .rpc('get_org_members', {
+    const { data, error } = await supabaseApikey(c, apikey.key)
+      .rpc('get_org_members',{
         user_id: apikey.user_id,
         guild_id: body.orgId,
       })
