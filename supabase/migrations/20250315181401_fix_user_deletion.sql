@@ -17,9 +17,9 @@ BEGIN
     WHERE org_users.user_id = user_id AND user_right = 'super_admin'
     AND org_id NOT IN (
         SELECT org_id 
-        FROM org_users 
-        WHERE user_right = 'super_admin' 
-        AND org_users.user_id != user_id
+        FROM org_users AS ou2
+        WHERE ou2.user_right = 'super_admin' 
+        AND ou2.user_id != user_id
     );
     
     -- Delete organizations where the user is the only super_admin
