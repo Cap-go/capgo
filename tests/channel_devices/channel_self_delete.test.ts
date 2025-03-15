@@ -12,7 +12,7 @@ describe('Channel Self Delete Tests', () => {
   it('should not delete channel when channel_self deleteOverride is called', async () => {
     // Create a test app
     const testAppId = `test-app-${Date.now()}`
-    const { data: appData, error: appError } = await supabase
+    const { error: appError } = await supabase
       .from('apps')
       .insert([{
         app_id: testAppId,
@@ -72,7 +72,7 @@ describe('Channel Self Delete Tests', () => {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY || 'service_role_key_placeholder'}`,
+        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY || 'anon_key_placeholder'}`,
       },
       body: JSON.stringify({
         app_id: testAppId,
