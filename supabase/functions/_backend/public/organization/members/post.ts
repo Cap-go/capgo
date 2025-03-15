@@ -28,7 +28,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
   }
 
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = supabaseApikey(c, apikey.key)
   const { data, error } = await supabase
     .rpc('invite_user_to_org', {
       email: body.email,
