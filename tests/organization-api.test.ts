@@ -102,7 +102,7 @@ describe('[POST] /organization/members', () => {
     expect(data?.user_right).toBe('invite_read')
   })
 
-  it.skip('create and add non-existing user to organization', async () => {
+  it('create and add non-existing user to organization', async () => {
     // Generate a unique test email to avoid conflicts
     const testEmail = `test-user-${Date.now()}@example.com`
     const firstName = 'Test'
@@ -136,7 +136,7 @@ describe('[POST] /organization/members', () => {
     expect(userData).toBeNull()
   })
 
-  it.skip('fails to create user when required fields are missing', async () => {
+  it('fails to create user when required fields are missing', async () => {
     // Generate a unique test email to avoid conflicts
     const testEmail = `test-user-${Date.now()}@example.com`
     
