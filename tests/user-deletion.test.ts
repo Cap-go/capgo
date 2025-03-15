@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './utils'
+import { describe, expect, it } from 'vitest'
 
 describe('User Deletion', () => {
   // We can't actually test deleting the current user in an automated test
