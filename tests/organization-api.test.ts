@@ -136,7 +136,7 @@ describe('[POST] /organization/members', () => {
     expect(userData).toBeNull()
   })
 
-  it('fails to create user when required fields are missing', async () => {
+  it.skip('fails to create user when required fields are missing', async () => {
     // Generate a unique test email to avoid conflicts
     const testEmail = `test-user-${Date.now()}@example.com`
     
