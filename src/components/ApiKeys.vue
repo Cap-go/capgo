@@ -643,7 +643,7 @@ getKeys()
           </a>
         </div>
       </div>
-      <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
+      <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="addNewApiKey">
         <plusOutline />
       </button>
     </div>
