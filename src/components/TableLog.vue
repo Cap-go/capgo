@@ -197,21 +197,21 @@ onMounted(async () => {
         </button>
       </div>
       <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
-        <div ref="dropdown" class="dropdown dropdown-end">
+        <div ref="dropdown" class="dropdown dropdown-right">
           <button
             tabindex="0"
-            class="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-l-md"
+            class="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-l-md h-full"
             :class="{ 'bg-gray-50 dark:bg-gray-700': currentSelected === 'general' }"
           >
             <IconClock class="h-4 w-4" />
-            <span class="text-sm font-medium">
+            <span class="text-sm font-medium hidden md:block">
               {{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}
             </span>
           </button>
           <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-minutes') }}</a></li>
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-900': currentGeneralTime === 15 }" @click="setTime(15)">{{ t('last-15-minutes') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-minutes') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 15 }" @click="setTime(15)">{{ t('last-15-minutes') }}</a></li>
           </ul>
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
@@ -219,6 +219,7 @@ onMounted(async () => {
           <div class="relative">
             <VueDatePicker
               v-model="preciseDates"
+              position="right"
               :min-date="dayjs().subtract(30, 'day').toDate()"
               :max-date="dayjs().toDate()"
               :start-time="startTime"
