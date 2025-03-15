@@ -20,19 +20,19 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
     console.error('Missing owner_org')
     return c.json({ status: 'Missing owner_org' }, 400)
   }
-  
+
   // First check if the organization exists
   const { data: orgExists, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
     .select('id')
     .eq('id', body.owner_org)
     .maybeSingle()
-  
+
   if (orgError || !orgExists) {
     console.error('You can\'t access this organization', body.owner_org)
     return c.json({ status: 'You can\'t access this organization', orgId: body.owner_org }, 403)
   }
-  
+
   if (!(await hasOrgRightApikey(c, body.owner_org, userId, 'read', c.get('capgkey') as string))) {
     console.error('You can\'t access this organization', body.owner_org)
     return c.json({ status: 'You can\'t access this organization', orgId: body.owner_org }, 403)

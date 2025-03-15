@@ -252,12 +252,12 @@ export async function hasOrgRightApikey(c: Context, orgId: string, userId: strin
       .select('id')
       .eq('id', orgId)
       .maybeSingle()
-    
+
     if (orgError || !orgExists) {
       console.error({ requestId: c.get('requestId'), context: 'Organization does not exist', orgId })
       return false
     }
-    
+
     const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
       min_right: right,
       org_id: orgId,
