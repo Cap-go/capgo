@@ -231,7 +231,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
       </div>
     </div>
     <div class="block">
-      <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+      <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400 md:pb-0 pb-14">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
             <th v-if="props.massSelect" class="ml-2" />

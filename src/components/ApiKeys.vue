@@ -161,7 +161,6 @@ columns.value = [
   {
     key: 'mode',
     label: t('type'),
-    head: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       return row.mode.toUpperCase()
     },
@@ -178,6 +177,7 @@ columns.value = [
     key: 'name',
     label: t('name'),
     head: true,
+    mobile: true,
   },
   {
     key: 'limited_to_orgs',
@@ -201,6 +201,7 @@ columns.value = [
     key: 'actions',
     label: t('actions'),
     allowHtml: true,
+    mobile: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       return `
         <div class="flex items-center justify-end space-x-2">
@@ -615,7 +616,7 @@ getKeys()
 
 <template>
   <div>
-    <div class="w-full h-full px-4 py-8 mx-auto max-w-9xl lg:px-8 sm:px-6">
+    <div class="w-full h-full md:px-4 md:py-8 mx-auto max-w-9xl lg:px-8 sm:px-6">
       <div class="flex flex-col">
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <Table

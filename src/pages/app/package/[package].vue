@@ -164,26 +164,26 @@ watchEffect(async () => {
         </BlurBg>
       </div>
 
-      <div v-if="ActiveTab === 'bundles'" class="mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+      <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <BundleTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'channels'" class="mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+      <div v-if="ActiveTab === 'channels'" class="mt-0 md:mt-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <ChannelTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'devices'" class="mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+      <div v-if="ActiveTab === 'devices'" class="mt-0 md:mt-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <DeviceTable :app-id="id" />
         </div>
       </div>
 
-      <div v-if="ActiveTab === 'logs'" class="mt-4">
-        <div class="flex flex-col mx-auto overflow-y-auto bg-white border rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+      <div v-if="ActiveTab === 'logs'" class="mt-0 md:mt-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
           <LogTable :app-id="id" />
         </div>
       </div>

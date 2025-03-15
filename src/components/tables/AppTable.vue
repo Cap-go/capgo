@@ -127,19 +127,21 @@ const filteredApps = computed(() => {
 </script>
 
 <template>
-  <div id="my_apps" class="bg-white border rounded-lg shadow-lg col-span-full border-slate-300 xl:col-span-16 dark:border-slate-800 dark:bg-gray-800">
-    <Table
-      v-model:filters="filters"
-      v-model:columns="columns"
-      v-model:current-page="currentPage"
-      v-model:search="search"
-      :total="filteredApps.length"
-      :element-list="filteredApps"
-      :search-placeholder="t('search-by-name-or-bundle-id')"
-      :is-loading="false"
-      filter-text="Filters"
-      class="cursor-pointer"
-      @row-click="openPackage"
-    />
+  <div class="pb-14 md:pb-0 w-full block">
+    <div class="bg-white border rounded-lg shadow-lg col-span-full border-slate-300 xl:col-span-16 dark:border-slate-800 dark:bg-gray-800">
+      <Table
+        v-model:filters="filters"
+        v-model:columns="columns"
+        v-model:current-page="currentPage"
+        v-model:search="search"
+        :total="filteredApps.length"
+        :element-list="filteredApps"
+        :search-placeholder="t('search-by-name-or-bundle-id')"
+        :is-loading="false"
+        filter-text="Filters"
+        class="cursor-pointer"
+        @row-click="openPackage"
+      />
+    </div>
   </div>
 </template>

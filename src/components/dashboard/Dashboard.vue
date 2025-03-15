@@ -37,9 +37,7 @@ watchEffect(async () => {
       <!-- Cards -->
       <Usage v-if="!isLoading" />
 
-      <div class="grid grid-cols-12 gap-6">
-        <AppTable :apps="props.apps" :delete-button="true" />
-      </div>
+      <AppTable :apps="props.apps" :delete-button="true" />
     </div>
     <button v-if="!stepsOpen && !isMobile" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
       <plusOutline />
