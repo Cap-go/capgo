@@ -26,6 +26,10 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     return post(c as any, body, apikey)
   }
   catch (e) {
+    // Check if this is a permission error (403) or other error
+    if (e instanceof Error && e.message && e.message.includes('access')) {
+      return c.json({ status: 'You can\'t access this organization', error: e.message }, 403)
+    }
     return c.json({ status: 'Cannot create app', error: JSON.stringify(e) }, 500)
   }
 })

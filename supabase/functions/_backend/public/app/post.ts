@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 
 export interface CreateApp {
   name: string
@@ -16,12 +16,29 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
 
   // Check if the user is allowed to create an app in this organization
   const userId = apikey.user_id
-  if (body.owner_org && !(await hasOrgRightApikey(c, body.owner_org, userId, 'read', c.get('capgkey') as string))) {
+  if (!body.owner_org) {
+    console.error('Missing owner_org')
+    return c.json({ status: 'Missing owner_org' }, 400)
+  }
+  
+  // First check if the organization exists
+  const { data: orgExists, error: orgError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('id')
+    .eq('id', body.owner_org)
+    .maybeSingle()
+  
+  if (orgError || !orgExists) {
+    console.error('You can\'t access this organization', body.owner_org)
+    return c.json({ status: 'You can\'t access this organization', orgId: body.owner_org }, 403)
+  }
+  
+  if (!(await hasOrgRightApikey(c, body.owner_org, userId, 'read', c.get('capgkey') as string))) {
     console.error('You can\'t access this organization', body.owner_org)
     return c.json({ status: 'You can\'t access this organization', orgId: body.owner_org }, 403)
   }
 
-  const { data: isOwner, error: ownerError } = await supabaseAdmin(c)
+  const { data: isOwner, error: ownerError } = await supabaseApikey(c, c.get('capgkey') as string)
     .rpc('is_owner_of_org', {
       user_id: userId,
       org_id: body.owner_org,
@@ -46,7 +63,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
     default_upload_channel: 'dev',
   }
   try {
-    const { data, error: dbError } = await supabaseAdmin(c)
+    const { data, error: dbError } = await supabaseApikey(c, c.get('capgkey') as string)
       .from('apps')
       .insert(dataInsert)
       .select()

@@ -1,5 +1,5 @@
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 export const app = honoFactory.createApp()
 
@@ -19,7 +19,9 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       return c.json({ status: 'Missing required fields', error: 'app_id and version_id are required' }, 400)
     }
 
-    const { data: version, error: versionError } = await supabaseAdmin(c as any)
+    // Get the apikey from middleware
+    const apikey = c.get('apikey') as any
+    const { data: version, error: versionError } = await supabaseApikey(c as any, apikey.key)
       .from('app_versions')
       .select('*')
       .eq('app_id', body.app_id)
@@ -45,7 +47,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       return c.json({ status: 'No fields to update' }, 400)
     }
 
-    const { error: updateError } = await supabaseAdmin(c as any)
+    const { error: updateError } = await supabaseApikey(c as any, apikey.key)
       .from('app_versions')
       .update(updateData)
       .eq('app_id', body.app_id)

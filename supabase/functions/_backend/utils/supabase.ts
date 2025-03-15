@@ -245,22 +245,40 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
 }
 
 export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
-  const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
-    min_right: right,
-    org_id: orgId,
-    user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
-  })
+  try {
+    // First check if the organization exists
+    const { data: orgExists, error: orgError } = await supabaseAdmin(c)
+      .from('orgs')
+      .select('id')
+      .eq('id', orgId)
+      .maybeSingle()
+    
+    if (orgError || !orgExists) {
+      console.error({ requestId: c.get('requestId'), context: 'Organization does not exist', orgId })
+      return false
+    }
+    
+    const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
+      min_right: right,
+      org_id: orgId,
+      user_id: userId,
+      channel_id: null as any,
+      app_id: null as any,
+    })
 
-  console.log({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight)', userRight })
+    console.log({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight)', userRight })
 
-  if (userRight.error || !userRight.data) {
-    console.error({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight) error', error: userRight.error })
+    if (userRight.error || !userRight.data) {
+      console.error({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight) error', error: userRight.error })
+      return false
+    }
+
+    return userRight.data
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'hasOrgRightApikey error', error })
     return false
   }
-
-  return userRight.data
 }
 
 interface PlanTotal {
