@@ -136,7 +136,7 @@ displayStore.NavTitle = t('settings')
         <li class="mr-2">
           <a
             class="inline-block p-4 rounded-t-lg cursor-pointer"
-            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'user', 'dark:hover:text-gray-300': type !== 'user' }"
+            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'user', 'dark:hover:text-gray-300 dark:hover:bg-gray-700 hover:text-gray-600 hover:bg-gray-300': type !== 'user' }"
             aria-current="page"
             @click="gotoMainSettings"
           >{{ t('your-settings') }}</a>
@@ -144,7 +144,7 @@ displayStore.NavTitle = t('settings')
         <li class="mr-2">
           <a
             class="inline-block p-4 rounded-t-lg cursor-pointer"
-            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'organization', 'dark:hover:text-gray-300': type !== 'organization' }"
+            :class="{ 'border-b-2 text-blue-600 border-blue-600 active dark:text-blue-500 dark:border-blue-500': type === 'organization', 'dark:hover:text-gray-300 dark:hover:bg-gray-700 hover:text-gray-600 hover:bg-gray-300': type !== 'organization' }"
             aria-current="page"
             @click="gotoOrgSettings"
           >{{ t('organization-settings') }} </a>

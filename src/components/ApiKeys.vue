@@ -258,7 +258,6 @@ async function refreshData() {
   }
 }
 async function getKeys(retry = true): Promise<void> {
-  console.log('getKeys')
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')
@@ -644,7 +643,7 @@ getKeys()
           </a>
         </div>
       </div>
-      <button class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
+      <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="addNewApiKey">
         <plusOutline />
       </button>
     </div>

@@ -316,7 +316,7 @@ watch(props, async () => {
       @reload="reload()" @reset="refreshData()"
       @row-click="openOne"
     />
-    <button id="create_channel" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
+    <button id="create_channel" class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
       <IconPlus />
     </button>
   </div>

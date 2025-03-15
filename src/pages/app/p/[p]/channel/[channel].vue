@@ -35,7 +35,11 @@ const id = ref<number>(0)
 const loading = ref(true)
 const deviceIds = ref<string[]>([])
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
-const ActiveTab = ref('info')
+const ActiveTab = ref(route.query.tab?.toString() || 'info')
+
+watchEffect(() => {
+  router.replace({ query: { ...route.query, tab: ActiveTab.value } })
+})
 
 // Function to open link in a new tab
 function openLink(url?: string): void {

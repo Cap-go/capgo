@@ -104,7 +104,6 @@ function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
 }
 
 function openPackage(app: Database['public']['Tables']['apps']['Row']) {
-  console.log('openPackage', app)
   router.push(`/app/package/${appIdToUrl(app.app_id)}`)
 }
 

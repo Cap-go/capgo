@@ -14,15 +14,9 @@ const optForNewsletters = ref(false)
 enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications || false
 optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters || false
 
-console.log('enableNotifications', enableNotifications.value)
-console.log('optForNewsletters', optForNewsletters.value)
-
 async function submitNotif() {
   isLoading.value = true
-  console.log('submitNotif')
   enableNotifications.value = !enableNotifications.value
-  console.log('enableNotifications', enableNotifications.value)
-  console.log('optForNewsletters', optForNewsletters.value)
   const activation = main.auth?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.updateUser({
     data: {
@@ -41,8 +35,6 @@ async function submitDoi() {
   console.log('submitDoi')
 
   optForNewsletters.value = !optForNewsletters.value
-  console.log('enableNotifications', enableNotifications.value)
-  console.log('optForNewsletters', optForNewsletters.value)
   const activation = main.auth?.user_metadata?.activation || {}
   const { data, error } = await supabase.auth.updateUser({
     data: {

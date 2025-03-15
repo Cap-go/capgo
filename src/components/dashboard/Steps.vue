@@ -256,7 +256,7 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <button v-if="!onboarding" class="fixed z-20 bg-gray-800 btn btn-xl btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
+  <button v-if="!onboarding" class="fixed z-40 bg-gray-800 btn btn-xl btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
     <arrowBack />
   </button>
 </template>

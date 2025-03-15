@@ -3,7 +3,7 @@ import type { Stat, Tab } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconHistory from '~icons/heroicons/clock'
 import IconCube from '~icons/heroicons/cube'
@@ -19,6 +19,7 @@ import { useOrganizationStore } from '~/stores/organization'
 const id = ref('')
 const { t } = useI18n()
 const route = useRoute('/app/package/[package]')
+const router = useRouter()
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
 const updatesNb = ref(0)
@@ -31,7 +32,7 @@ const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-const ActiveTab = ref('overview')
+const ActiveTab = ref(route.query.tab?.toString() || 'overview')
 
 const tabs: Tab[] = [
   {
@@ -144,6 +145,10 @@ watchEffect(async () => {
     displayStore.NavTitle = app.value?.name || ''
     displayStore.defaultBack = '/app/home'
   }
+})
+
+watchEffect(() => {
+  router.replace({ query: { ...route.query, tab: ActiveTab.value } })
 })
 </script>
 

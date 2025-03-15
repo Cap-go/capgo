@@ -218,7 +218,7 @@ async function customDeviceOverwritePart5(
 </script>
 
 <template>
-  <button class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="handlePlus">
+  <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="handlePlus">
     <plusOutline />
   </button>
 </template>

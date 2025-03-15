@@ -39,7 +39,7 @@ watchEffect(async () => {
 
       <AppTable :apps="props.apps" :delete-button="true" />
     </div>
-    <button v-if="!stepsOpen && !isMobile" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
+    <button v-if="!stepsOpen && !isMobile" class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-4-safe secondary" @click="stepsOpen = true">
       <plusOutline />
     </button>
   </div>

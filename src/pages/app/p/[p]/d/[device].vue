@@ -38,7 +38,12 @@ const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
-const ActiveTab = ref('info')
+const ActiveTab = ref(route.query.tab?.toString() || 'info')
+
+watchEffect(() => {
+  router.replace({ query: { ...route.query, tab: ActiveTab.value } })
+})
+
 const organizationStore = useOrganizationStore()
 
 const device = ref<Database['public']['Tables']['devices']['Row'] & Device>()
