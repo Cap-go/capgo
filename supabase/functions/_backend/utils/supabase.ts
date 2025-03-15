@@ -114,7 +114,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     return Promise.resolve({ error: new Error('missing app_id, name, or created_by'), requestId: c.get('requestId') })
   }
 
-  const { data: existingChannel } = await supabaseApikey(c, c.get('capgkey') as string)
+  const { data: existingChannel } = await supabaseAdmin(c)
     .from('channels')
     .select('*')
     .eq('app_id', update.app_id)
@@ -132,7 +132,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     }
   }
 
-  return supabaseApikey(c, c.get('capgkey') as string)
+  return supabaseAdmin(c)
     .from('channels')
     .upsert(update, { onConflict: 'app_id, name' })
 }
@@ -145,7 +145,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
   }
   update.device_id = update.device_id.toLowerCase()
 
-  const { data: existingChannelDevice } = await supabaseApikey(c, c.get('capgkey') as string)
+  const { data: existingChannelDevice } = await supabaseAdmin(c)
     .from('channel_devices')
     .select('*')
     .eq('device_id', update.device_id)
@@ -163,7 +163,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
     }
   }
 
-  return supabaseApikey(c, c.get('capgkey') as string)
+  return supabaseAdmin(c)
     .from('channel_devices')
     .upsert(update, { onConflict: 'device_id, channel_id, app_id' })
 }
@@ -208,7 +208,7 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
 
   console.log({ requestId: c.get('requestId'), context: 'hasAppRightApikey', appId, userid, right, apikey })
 
-  const { data, error } = await supabaseApikey(c, apikey)
+  const { data, error } = await supabaseAdmin(c)
     .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
 
   if (error) {

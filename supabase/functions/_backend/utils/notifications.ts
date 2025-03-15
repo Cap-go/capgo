@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
 import { trackBentoEvent } from './bento.ts'
-import { supabaseApikey } from './supabase.ts'
+import { supabaseAdmin } from './supabase.ts'
 
 interface EventData {
   [key: string]: any
@@ -18,7 +18,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
     return false
   }
   if (past != null) {
-    const { error } = await supabaseApikey(c, c.get('capgkey') as string)
+    const { error } = await supabaseAdmin(c)
       .from('notifications')
       .update({
         last_send_at: dayjs().toISOString(),
@@ -33,7 +33,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
     }
   }
   else {
-    const { error } = await supabaseApikey(c, c.get('capgkey') as string)
+    const { error } = await supabaseAdmin(c)
       .from('notifications')
       .insert({
         event: eventName,
@@ -63,7 +63,7 @@ function isSendable(c: Context, last: string, cron: string) {
 }
 
 export async function sendNotifOrg(c: Context, eventName: string, eventData: EventData, orgId: string, uniqId: string, cron: string) {
-  const { data: org, error: orgError } = await supabaseApikey(c, c.get('capgkey') as string)
+  const { data: org, error: orgError } = await supabaseAdmin(c)
     .from('orgs')
     .select()
     .eq('id', orgId)
@@ -74,7 +74,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     return false
   }
   // check if notif has already been send in notifications table
-  const { data: notif } = await supabaseApikey(c, c.get('capgkey') as string)
+  const { data: notif } = await supabaseAdmin(c)
     .from('notifications')
     .select()
     .eq('owner_org', org.id)
