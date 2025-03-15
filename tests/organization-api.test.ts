@@ -101,6 +101,81 @@ describe('[POST] /organization/members', () => {
     expect(data?.org_id).toBe(ORG_ID)
     expect(data?.user_right).toBe('invite_read')
   })
+
+  it('create and add non-existing user to organization', async () => {
+    // Generate a unique test email to avoid conflicts
+    const testEmail = `test-user-${Date.now()}@example.com`
+    const firstName = 'Test'
+    const lastName = 'User'
+    
+    // Make the API request to create and invite the user
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        email: testEmail,
+        first_name: firstName,
+        last_name: lastName,
+        invite_type: 'read',
+        create_if_not_exists: true,
+      }),
+    })
+
+    // Verify the response
+    const responseData = await response.json()
+    expect(response.status).toBe(200)
+    const type = z.object({
+      status: z.string(),
+    })
+    const safe = type.safeParse(responseData)
+    expect(safe.success).toBe(true)
+    expect(safe.data?.status).toBe('OK')
+
+    // Verify the user was created in the database
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', testEmail).single()
+    expect(userError).toBeNull()
+    expect(userData).toBeTruthy()
+    expect(userData?.email).toBe(testEmail)
+    
+    // Verify the user was added to the organization with correct permissions
+    const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.org_id).toBe(ORG_ID)
+    expect(data?.user_right).toBe('invite_read')
+    
+    // Clean up - remove the test user from the organization
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', userData!.id)
+  })
+
+  it('fails to create user when required fields are missing', async () => {
+    // Generate a unique test email to avoid conflicts
+    const testEmail = `test-user-${Date.now()}@example.com`
+    
+    // Make the API request with missing first_name and last_name
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        email: testEmail,
+        invite_type: 'read',
+        create_if_not_exists: true,
+        // Missing first_name and last_name
+      }),
+    })
+
+    // Verify the response indicates an error
+    const responseData = await response.json() as { status?: string }
+    expect(response.status).toBe(400)
+    expect(responseData.status).not.toBe('OK')
+    
+    // Verify the user was not created in the database
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', testEmail).single()
+    expect(userError).toBeTruthy()
+    expect(userData).toBeNull()
+  })
 })
 
 describe('[DELETE] /organization/members', () => {
