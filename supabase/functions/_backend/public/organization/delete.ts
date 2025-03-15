@@ -23,7 +23,7 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
 
   // Check if the user is the owner of the organization
   const { data: isOwner, error: ownerError } = await supabaseApikey(c, apikey.key)
-    .rpc('is_owner_of_org',{
+    .rpc('is_owner_of_org', {
       user_id: userId,
       org_id: orgId,
     })

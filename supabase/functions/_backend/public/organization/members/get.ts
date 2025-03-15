@@ -40,7 +40,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
 
   try {
     const { data, error } = await supabaseApikey(c, apikey.key)
-      .rpc('get_org_members',{
+      .rpc('get_org_members', {
         user_id: apikey.user_id,
         guild_id: body.orgId,
       })
