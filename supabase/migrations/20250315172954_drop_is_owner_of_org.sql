@@ -85,6 +85,19 @@ Begin
 End;  
 $$;
 
+-- Update get_org_members function to use check_min_rights instead of is_owner_of_org
+CREATE OR REPLACE FUNCTION "public"."get_org_members"("guild_id" "uuid") RETURNS TABLE("aid" bigint, "uid" "uuid", "email" character varying, "image_url" character varying, "role" "public"."user_min_right")
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+Begin
+  IF NOT (check_min_rights('super_admin'::user_min_right, (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint) OR check_min_rights('read'::user_min_right, (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint)) THEN
+    RAISE EXCEPTION 'NO_RIGHTS';
+  END IF;
+  
+  return query select * from get_org_members((select auth.uid()), get_org_members.guild_id);
+End;
+$$;
+
 -- Update "Allow memeber and owner to select" policy on org_users
 DROP POLICY IF EXISTS "Allow memeber and owner to select" ON "public"."org_users";
 DROP POLICY IF EXISTS "Allow member and super admin to select" ON "public"."org_users";
