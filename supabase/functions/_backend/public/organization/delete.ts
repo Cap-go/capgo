@@ -21,20 +21,23 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
     return c.json({ status: 'You don\'t have permission to delete this organization', orgId }, 403)
   }
 
-  // Check if the user is the owner of the organization
-  const { data: isOwner, error: ownerError } = await supabaseAdmin(c)
-    .rpc('is_owner_of_org', {
+  // Check if the user has super_admin rights for the organization
+  const { data: isAdmin, error: adminError } = await supabaseAdmin(c)
+    .rpc('check_min_rights', {
+      min_right: 'super_admin',
       user_id: userId,
       org_id: orgId,
+      app_id: null as unknown as string,
+      channel_id: null as unknown as number
     })
 
-  if (ownerError) {
-    console.error('Error checking organization ownership', ownerError)
-    return c.json({ status: 'Error checking organization ownership' }, 500)
+  if (adminError) {
+    console.error('Error checking organization admin rights', adminError)
+    return c.json({ status: 'Error checking organization admin rights' }, 500)
   }
 
-  if (!isOwner) {
-    console.error('User is not the owner of this organization')
+  if (!isAdmin) {
+    console.error('User does not have super_admin rights for this organization')
     return c.json({ status: 'Only the organization owner can delete an organization' }, 403)
   }
 
