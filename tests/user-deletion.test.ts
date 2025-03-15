@@ -1,9 +1,16 @@
-import { getSupabaseClient } from './utils'
-import { describe, expect, it } from 'vitest'
+import { getSupabaseClient, resetAndSeedAppData } from './utils'
+import { describe, expect, it, beforeEach } from 'vitest'
 
 describe('User Deletion', () => {
   // We can't actually test deleting the current user in an automated test
   // So we'll test the related functionality
+  
+  const APP_ID = 'com.test.user.deletion'
+  
+  beforeEach(async () => {
+    // Reset test data before each test
+    await resetAndSeedAppData(APP_ID)
+  })
 
   it('should properly handle the on_user_delete trigger', async () => {
     // Create a test user
@@ -19,6 +26,15 @@ describe('User Deletion', () => {
     expect(userData.user).toBeTruthy()
     
     const userId = userData.user.id
+    
+    // Insert the user into public.users table since auth.users doesn't automatically create this
+    await getSupabaseClient()
+      .from('users')
+      .insert({
+        id: userId,
+        email: testEmail,
+        created_at: new Date().toISOString()
+      })
     
     // Verify user exists in public.users
     const { data: publicUser, error: publicUserError } = await getSupabaseClient()

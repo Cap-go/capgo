@@ -1,3 +1,3 @@
-import { getSupabaseClient } from './test-utils'
+import { getSupabaseClient, resetAndSeedAppData } from './test-utils'
 
-export { getSupabaseClient }
+export { getSupabaseClient, resetAndSeedAppData }
