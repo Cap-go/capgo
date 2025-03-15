@@ -268,77 +268,79 @@ async function copyOrganizationId() {
               </button>
             </div>
           </section>
-          <div class="mt-3 mb-6">
-            <FormKit
-              type="text"
-              name="orgName"
-              autocomplete="given-name"
-              :prefix-icon="iconName"
-              :disabled="!hasOrgPerm"
-              :value="orgName"
-              validation="required:trim"
-              enterkeyhint="next"
-              autofocus
-              :label="t('organization-name')"
-            />
-          </div>
-          <div class="mt-3 mb-6">
-            <FormKit
-              type="email"
-              name="email"
-              :prefix-icon="iconEmail"
-              autocomplete="given-name"
-              :disabled="!hasOrgPerm"
-              :value="email"
-              validation="required:trim" enterkeyhint="next"
-              autofocus
-              :label="t('organization-email')"
-            />
-          </div>
-          <div class="flex flex-col md:flex-row md:items-center items-left">
-            <p class="text-slate-800 dark:text-white">
-              {{ t('organization-id') }}
-            </p>
-            <div class="md:ml-6">
-              <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
-                {{ t('copy-organization-id') }}
-              </button>
+          <div class="mt-5 space-y-4">
+            <div class="w-full md:pr-[50%]">
+              <FormKit
+                type="text"
+                name="orgName"
+                autocomplete="given-name"
+                :prefix-icon="iconName"
+                :disabled="!hasOrgPerm"
+                :value="orgName"
+                validation="required:trim"
+                enterkeyhint="next"
+                autofocus
+                :label="t('organization-name')"
+              />
+            </div>
+            <div class="w-full md:pr-[50%]">
+              <FormKit
+                type="email"
+                name="email"
+                :prefix-icon="iconEmail"
+                autocomplete="given-name"
+                :disabled="!hasOrgPerm"
+                :value="email"
+                validation="required:trim" enterkeyhint="next"
+                autofocus
+                :label="t('organization-email')"
+              />
+            </div>
+            <div class="flex flex-col md:flex-row md:items-center items-left">
+              <p class="text-slate-800 dark:text-white">
+                {{ t('organization-id') }}
+              </p>
+              <div class="md:ml-6">
+                <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+                  {{ t('copy-organization-id') }}
+                </button>
+              </div>
             </div>
           </div>
+          <footer style="margin-top: auto">
+            <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+              <div class="flex self-end">
+                <button
+                  class="p-2 mb-2 mr-4 text-white border border-red-400 rounded-lg btn hover:bg-red-600"
+                  color="secondary"
+                  shape="round"
+                  type="button"
+                  :class="{
+                    invisible: !canDeleteOrg(),
+                  }"
+                  @click="() => deleteOrganization()"
+                >
+                  <span v-if="!isLoading" class="rounded-4xl">
+                    {{ t('delete-org') }}
+                  </span>
+                  <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+                </button>
+                <button
+                  id="save-changes"
+                  class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-hidden dark:focus:ring-blue-800"
+                  type="submit"
+                  color="secondary"
+                  shape="round"
+                >
+                  <span v-if="!isLoading" class="rounded-4xl">
+                    {{ t('save-changes') }}
+                  </span>
+                  <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
+                </button>
+              </div>
+            </div>
+          </footer>
         </div>
-        <footer style="margin-top: auto">
-          <div class="flex flex-col px-6 py-5 border-t border-slate-300">
-            <div class="flex self-end">
-              <button
-                class="p-2 mb-2 mr-4 text-white border border-red-400 rounded-lg btn hover:bg-red-600"
-                color="secondary"
-                shape="round"
-                type="button"
-                :class="{
-                  invisible: !canDeleteOrg(),
-                }"
-                @click="() => deleteOrganization()"
-              >
-                <span v-if="!isLoading" class="rounded-4xl">
-                  {{ t('delete-org') }}
-                </span>
-                <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-              </button>
-              <button
-                id="save-changes"
-                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-hidden dark:focus:ring-blue-800"
-                type="submit"
-                color="secondary"
-                shape="round"
-              >
-                <span v-if="!isLoading" class="rounded-4xl">
-                  {{ t('save-changes') }}
-                </span>
-                <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
-              </button>
-            </div>
-          </div>
-        </footer>
       </FormKit>
     </div>
   </div>
