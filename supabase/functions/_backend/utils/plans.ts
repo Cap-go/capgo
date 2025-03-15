@@ -14,7 +14,7 @@ import {
   set_bandwidth_exceeded,
   set_mau_exceeded,
   set_storage_exceeded,
-  supabaseAdmin,
+  supabaseApikey,
 } from './supabase.ts'
 
 function planToInt(plan: string) {
@@ -33,7 +33,7 @@ function planToInt(plan: string) {
 }
 
 export async function findBestPlan(c: Context, stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
     .rpc('find_best_plan_v3', {
       mau: stats.mau || 0,
       bandwidth: stats.bandwidth,
@@ -49,7 +49,7 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
 }
 
 export async function getMeterdUsage(c: Context, orgId: string): Promise<Database['public']['CompositeTypes']['stats_table']> {
-  const { data, error } = await supabaseAdmin(c)
+  const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
     .rpc('get_metered_usage', { orgid: orgId })
 
   if (error) {
@@ -74,7 +74,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     return Promise.resolve()
   console.log({ requestId: c.get('requestId'), context: 'setMetered', customer_id, orgId })
   // return await Promise.resolve({} as Prices)
-  const { data } = await supabaseAdmin(c)
+  const { data } = await supabaseApikey(c, c.get('capgkey') as string)
     .from('stripe_info')
     .select()
     .eq('customer_id', customer_id)
@@ -99,7 +99,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
 
 export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
   try {
-    const { data: org, error: userError } = await supabaseAdmin(c)
+    const { data: org, error: userError } = await supabaseApikey(c, c.get('capgkey') as string)
       .from('orgs')
       .select()
       .eq('id', orgId)
@@ -107,7 +107,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     if (userError)
       throw userError
     if (await isTrialOrg(c, orgId)) {
-      const { error } = await supabaseAdmin(c)
+      const { error } = await supabaseApikey(c, c.get('capgkey') as string)
         .from('stripe_info')
         .update({ is_good_plan: true })
         .eq('customer_id', org.customer_id!)
@@ -143,7 +143,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         // }
         // else
         if (planToInt(best_plan) > planToInt(current_plan)) {
-          const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c).from('plans').select('*').eq('name', current_plan).single()
+          const { data: currentPlan, error: currentPlanError } = await supabaseApikey(c, c.get('capgkey') as string).from('plans').select('*').eq('name', current_plan).single()
           if (currentPlanError) {
             console.error({ requestId: c.get('requestId'), context: 'currentPlanError', error: currentPlanError })
           }
@@ -236,7 +236,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
 
       // and send email notification
     }
-    return supabaseAdmin(c)
+    return supabaseApikey(c, c.get('capgkey') as string)
       .from('stripe_info')
       .update({
         is_good_plan,

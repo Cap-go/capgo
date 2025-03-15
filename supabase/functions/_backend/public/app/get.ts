@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 export async function get(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {
@@ -14,7 +14,7 @@ export async function get(c: Context, appId: string, apikey: Database['public'][
   }
 
   try {
-    const { data, error: dbError } = await supabaseAdmin(c)
+    const { data, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('apps')
       .select('*')
       .eq('app_id', appId)

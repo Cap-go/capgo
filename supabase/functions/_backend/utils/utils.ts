@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './supabase.types.ts'
 import { env, getRuntimeKey } from 'hono/adapter'
+import { supabaseApikey } from './supabase.ts'
 
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
 
@@ -61,11 +61,11 @@ export function fixSemver(version: string) {
   return version
 }
 
-export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+export async function checkKey(c: Context, authorization: string | undefined, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseApikey(c, authorization)
       .from('apikeys')
       .select()
       .eq('key', authorization)

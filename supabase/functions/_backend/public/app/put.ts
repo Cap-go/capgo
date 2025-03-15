@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface UpdateApp {
   name?: string
@@ -20,7 +20,7 @@ export async function put(c: Context, appId: string, body: UpdateApp, apikey: Da
   }
 
   try {
-    const { data, error: dbError } = await supabaseAdmin(c)
+    const { data, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('apps')
       .update({
         name: body.name,

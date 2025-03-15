@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
 const deleteBodySchema = z.object({
   orgId: z.string(),
@@ -21,7 +21,7 @@ export async function deleteMember(c: Context, bodyRaw: any, apikey: Database['p
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
   }
 
-  const { data: userData, error: userError } = await supabaseAdmin(c)
+  const { data: userData, error: userError } = await supabaseApikey(c, apikey.key)
     .from('users')
     .select('id')
     .eq('email', body.email)

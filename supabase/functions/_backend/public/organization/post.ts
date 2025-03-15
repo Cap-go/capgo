@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   name: z.string(),
@@ -16,13 +16,13 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   const body = bodyParsed.data
 
   const userId = apikey.user_id
-  const { data, error } = await supabaseAdmin(c).from('users').select('*').eq('id', userId).single()
+  const { data, error } = await supabaseApikey(c, apikey.key).from('users').select('*').eq('id', userId).single()
   if (error) {
     console.error('Cannot get user', error)
     return c.json({ status: 'Cannot get user', error: error.message }, 500)
   }
 
-  const { data: dataOrg, error: errorOrg } = await supabaseAdmin(c)
+  const { data: dataOrg, error: errorOrg } = await supabaseApikey(c, apikey.key)
     .from('orgs')
     .insert({
       name: body.name,

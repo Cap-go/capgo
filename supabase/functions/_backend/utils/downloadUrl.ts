@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { s3 } from './s3.ts'
-import { supabaseAdmin } from './supabase.ts'
+import { supabaseApikey } from './supabase.ts'
 
 const EXPIRATION_SECONDS = 604800
 const BASE_PATH = 'files/read/attachments'
@@ -21,7 +21,7 @@ export async function getBundleUrl(
 ) {
   console.log({ requestId: c.get('requestId'), context: 'getBundleUrlV2 version', versionId })
 
-  const { data: bundleMeta } = await supabaseAdmin(c)
+  const { data: bundleMeta } = await supabaseApikey(c, c.get('capgkey') as string)
     .from('app_versions_meta')
     .select('size, checksum')
     .eq('id', versionId)
