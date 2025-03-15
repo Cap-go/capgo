@@ -95,6 +95,7 @@ async function showInviteModal() {
 
   let permisionPromise: Promise<Database['public']['Enums']['user_min_right'] | undefined> | undefined
   let email: string | undefined
+  let createIfNotExists = false
 
   displayStore.dialogOption = {
     header: t('insert-invite-email'),
@@ -118,7 +119,30 @@ async function showInviteModal() {
             return
           }
 
-          permisionPromise = showPermModal(true)
+          // Ask if user should be created if not exists
+          displayStore.dialogOption = {
+            header: t('option-to-create-user'),
+            message: t('would-you-like-to-create-user'),
+            buttons: [
+              {
+                text: t('button-no'),
+                role: 'cancel',
+                handler: () => {
+                  createIfNotExists = false
+                  permisionPromise = showPermModal(true)
+                },
+              },
+              {
+                text: t('button-yes'),
+                role: 'confirm',
+                handler: () => {
+                  createIfNotExists = true
+                  permisionPromise = showPermModal(true)
+                },
+              },
+            ],
+          }
+          displayStore.showDialog = true
         },
       },
     ],
@@ -130,26 +154,114 @@ async function showInviteModal() {
   if (!permision || !email)
     return
 
-  await sendInvitation(email, permision)
+  await sendInvitation(email, permision, createIfNotExists)
 }
 
-async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right']) {
-  console.log(`Invite ${email} with perm ${type}`)
+async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right'], createIfNotExists: boolean = false) {
+  console.log(`Invite ${email} with perm ${type}, create if not exists: ${createIfNotExists}`)
 
   const orgId = currentOrganization.value?.gid
   if (!orgId)
     return
 
-  const { data, error } = await supabase.rpc('invite_user_to_org', {
-    email,
-    org_id: orgId,
-    invite_type: type,
+  const { data, error } = await supabase.functions.invoke('organization/members', {
+    body: {
+      email,
+      orgId,
+      invite_type: type,
+      create_if_not_exists: createIfNotExists,
+    },
   })
 
   if (error)
     throw error
 
-  handleSendInvitationOutput(data)
+  if (data.status === 'CREATE_USER_FORM_NEEDED') {
+    await showCreateUserForm(email, type, orgId)
+    return
+  }
+
+  handleSendInvitationOutput(data.status)
+  members.value = await organizationStore.getMembers()
+}
+async function showCreateUserForm(email: string, type: Database['public']['Enums']['user_min_right'], orgId: string) {
+  let firstName = ''
+  let lastName = ''
+
+  // First name input
+  displayStore.dialogOption = {
+    header: t('create-user-first-name'),
+    input: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-next'),
+        id: 'confirm-button',
+        handler: () => {
+          firstName = displayStore.dialogInputText
+          if (!firstName) {
+            toast.error(t('missing-name'))
+            return false
+          }
+          return true
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  const firstNameResult = await displayStore.onDialogDismiss()
+
+  if (!firstNameResult || !firstName)
+    return
+
+  // Last name input
+  displayStore.dialogOption = {
+    header: t('create-user-last-name'),
+    input: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-create'),
+        id: 'confirm-button',
+        handler: () => {
+          lastName = displayStore.dialogInputText
+          if (!lastName) {
+            toast.error(t('missing-name'))
+            return false
+          }
+          return true
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  const lastNameResult = await displayStore.onDialogDismiss()
+
+  if (!lastNameResult || !lastName)
+    return
+
+  // Create user with collected information
+  const { data, error } = await supabase.functions.invoke('organization/members', {
+    body: {
+      email,
+      orgId,
+      invite_type: type,
+      create_if_not_exists: true,
+      first_name: firstName,
+      last_name: lastName,
+    },
+  })
+
+  if (error)
+    throw error
+
+  handleSendInvitationOutput(data.status)
   members.value = await organizationStore.getMembers()
 }
 
@@ -170,6 +282,18 @@ function handleSendInvitationOutput(output: string) {
     }
     case 'CAN_NOT_INVITE_OWNER': {
       toast.error(t('cannot-invite-owner'))
+      break
+    }
+    case 'ERROR_CREATING_USER': {
+      toast.error(t('error-creating-user'))
+      break
+    }
+    case 'ERROR_ADDING_TO_ORG': {
+      toast.error(t('error-adding-to-org'))
+      break
+    }
+    case 'USER_CREATED': {
+      toast.success(t('user-created-and-invited'))
       break
     }
   }
