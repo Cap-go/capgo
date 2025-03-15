@@ -25,6 +25,7 @@
     "test:updates": "vitest --bail=1 --mode=test tests/updates*",
     "test:all:local": "LOCAL_CLI_PATH=true vitest --bail=1 --mode=test tests/*",
     "test:backend": "vitest --bail=1 --mode=test --exclude=tests/cli*",
+    "test:channel_devices": "vitest run tests/channel_devices/*.test.ts",
     "test:cli": "vitest --bail=1 --mode=test tests/cli*",
     "test:cli:local": "LOCAL_CLI_PATH=true vitest --bail=1 --mode=test tests/cli*",
     "dev-mobile": "BRANCH=development vite build --mode mobile && cap copy",
