@@ -29,7 +29,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
 
   if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', apikey.key)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
     console.error('You can\'t access this organization', body.orgId)
-    return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
+    return c.json({ status: 'You can\'t access this organization', orgId: body.orgId, error: 'Insufficient permissions or invalid organization ID' }, 400)
   }
 
   // If create_if_not_exists is true and first_name/last_name are provided, try to create the user directly
