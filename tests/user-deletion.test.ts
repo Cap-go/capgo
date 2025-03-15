@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'vitest'
 import { getSupabaseClient } from './test-utils'
 import { createHash } from 'crypto'
 
