@@ -18,7 +18,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
   const userId = apikey.user_id
   if (!body.owner_org) {
     console.error('Missing owner_org')
-    return c.json({ status: 'Missing owner_org' }, 400)
+    return c.json({ status: 'Missing owner_org' }, 500)
   }
 
   // First check if the organization exists
