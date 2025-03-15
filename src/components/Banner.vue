@@ -19,7 +19,7 @@ const organizationStore = useOrganizationStore()
 
 const route = useRoute('/app/package/[package]')
 const appId = ref('')
-const organization = ref(null as null | Organization)
+// const organization = ref(null as null | Organization)
 const isOrgOwner = ref(false)
 
 watchEffect(async () => {
@@ -33,14 +33,12 @@ watchEffect(async () => {
 
       appId.value = urlToAppId(appIdRaw)
       await organizationStore.awaitInitialLoad()
-      organization.value = organizationStore.getOrgByAppId(appId.value) ?? null
     }
     else if (route.path.includes('/app') && route.path.includes('home')) {
       appId.value = ''
-      organization.value = null
     }
 
-    isOrgOwner.value = !!organization.value && organization.value.created_by === main.user?.id
+    isOrgOwner.value = !!organizationStore.currentOrganization && organizationStore.currentOrganization.created_by === main.user?.id
   }
   catch (ed) {
     console.error('Cannot figure out app_id for banner', ed)
@@ -50,7 +48,7 @@ watchEffect(async () => {
 const isMobile = Capacitor.isNativePlatform()
 
 const bannerText = computed(() => {
-  const org = organization.value
+  const org = organizationStore.currentOrganization
   if (!org)
     return
 
@@ -76,7 +74,7 @@ const bannerColor = computed(() => {
   // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
   const success = 'btn-success'
 
-  const org = organization.value
+  const org = organizationStore.currentOrganization
   if (!org)
     return
 

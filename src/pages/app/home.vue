@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
@@ -14,6 +15,7 @@ const route = useRoute('/app/home')
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
 const supabase = useSupabase()
+const { t } = useI18n()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
@@ -59,6 +61,8 @@ watchEffect(async () => {
     isLoading.value = false
   }
 })
+displayStore.NavTitle = t('home')
+displayStore.defaultBack = '/app/home'
 </script>
 
 <template>
