@@ -1810,6 +1810,22 @@ export type Database = {
         }
         Returns: string
       }
+      invite_user_to_org_wrapper: {
+        Args: {
+          email: string
+          org_id: string
+          invite_type: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: string
+      }
+      add_user_to_org_after_creation: {
+        Args: {
+          user_id: string
+          org_id: string
+          invite_type: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: string
+      }
       is_admin:
         | {
             Args: Record<PropertyKey, never>

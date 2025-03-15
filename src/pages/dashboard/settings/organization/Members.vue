@@ -239,13 +239,14 @@ async function createUserAndInvite(email: string, firstName: string, lastName: s
     return
 
   try {
-    const { data, error } = await supabase.functions.invoke('organization/members/create_user', {
+    const { data, error } = await supabase.functions.invoke('organization/members', {
       body: {
         orgId,
         email,
+        invite_type: inviteType.replace('invite_', ''),
         first_name: firstName,
         last_name: lastName,
-        invite_type: inviteType,
+        create_if_not_exists: true,
       },
     })
 
