@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import type { TableColumn } from './comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import ArrowPath from '~icons/heroicons/arrow-path'
-import Clipboard from '~icons/heroicons/clipboard-document'
-import Pencil from '~icons/heroicons/pencil'
-import Trash from '~icons/heroicons/trash'
+import ArrowPath from '~icons/heroicons/arrow-path?raw'
+import Clipboard from '~icons/heroicons/clipboard-document?raw'
+import Pencil from '~icons/heroicons/pencil?raw'
+import Trash from '~icons/heroicons/trash?raw'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -16,11 +17,16 @@ import { useOrganizationStore } from '~/stores/organization'
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const main = useMainStore()
+const currentPage = ref(1)
 const isLoading = ref(false)
 const supabase = useSupabase()
-const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>()
-const magicVal = ref(0)
+const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
 const organizationStore = useOrganizationStore()
+const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
+
+// Cache for organization and app names
+const orgCache = ref(new Map<string, string>())
+const appCache = ref(new Map<string, string>())
 
 // Function to truncate strings (show first 5 and last 5 characters)
 function hideString(str: string) {
@@ -28,21 +34,6 @@ function hideString(str: string) {
   const last = str.slice(-5)
   return `${first}...${last}`
 }
-
-// Computed property to truncate API keys
-const truncatedKeys = computed(() => {
-  if (!keys.value)
-    return []
-
-  return keys.value.map(key => ({
-    ...key,
-    truncatedKey: hideString(key.key),
-  }))
-})
-
-// Cache for organization and app names
-const orgCache = ref(new Map<string, string>())
-const appCache = ref(new Map<string, string>())
 
 // Computed property to get unique organization IDs from all API keys
 const uniqueOrgIds = computed(() => {
@@ -83,6 +74,7 @@ const getOrgName = computed(() => {
 const getAppName = computed(() => {
   return (appId: string) => appCache.value.get(appId) || 'Unknown'
 })
+
 // Function to fetch organization and app names in parallel
 async function fetchOrgAndAppNames() {
   if (!keys.value)
@@ -143,7 +135,129 @@ async function fetchOrgAndAppNames() {
   }
 }
 
+// Add type declarations for window functions
+declare global {
+  interface Window {
+    regenrateKey: (key: string) => void
+    changeName: (key: string) => void
+    copyKey: (key: string) => void
+    deleteKey: (key: string) => void
+  }
+}
+
+const searchQuery = ref('')
+const filteredKeys = computed(() => {
+  if (!keys.value || !searchQuery.value)
+    return keys.value || []
+
+  const query = searchQuery.value.toLowerCase()
+  return keys.value.filter(key =>
+    key.name?.toLowerCase().includes(query)
+    || key.key.toLowerCase().includes(query),
+  )
+})
+
+columns.value = [
+  {
+    key: 'mode',
+    label: t('type'),
+    head: true,
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return row.mode.toUpperCase()
+    },
+  },
+  {
+    key: 'key',
+    label: t('api-key'),
+    head: true,
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return hideString(row.key)
+    },
+  },
+  {
+    key: 'name',
+    label: t('name'),
+    head: true,
+  },
+  {
+    key: 'limited_to_orgs',
+    label: t('organizations'),
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      if (!row.limited_to_orgs || row.limited_to_orgs.length === 0)
+        return ''
+      return row.limited_to_orgs.map(orgId => getOrgName.value(orgId)).join(', ')
+    },
+  },
+  {
+    key: 'limited_to_apps',
+    label: t('apps'),
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      if (!row.limited_to_apps || row.limited_to_apps.length === 0)
+        return ''
+      return row.limited_to_apps.map(appId => getAppName.value(appId)).join(', ')
+    },
+  },
+  {
+    key: 'actions',
+    label: t('actions'),
+    allowHtml: true,
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return `
+        <div class="flex items-center justify-end space-x-2">
+          <button onclick="window.copyKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md">
+            ${Clipboard}
+          </button>
+          <button onclick="window.changeName('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md">
+            ${Pencil}
+          </button>
+          <button onclick="window.regenrateKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md">
+            ${ArrowPath}
+          </button>
+          <button onclick="window.deleteKey('${row.key}')" class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md">
+            ${Trash}
+          </button>
+        </div>
+      `
+    },
+  },
+]
+
+// Add window functions for the onclick handlers
+if (typeof window !== 'undefined') {
+  window.regenrateKey = (key: string) => {
+    const apiKey = keys.value?.find(k => k.key === key)
+    if (apiKey)
+      regenrateKey(apiKey)
+  }
+  window.changeName = (key: string) => {
+    const apiKey = keys.value?.find(k => k.key === key)
+    if (apiKey)
+      changeName(apiKey)
+  }
+  window.copyKey = (key: string) => {
+    const apiKey = keys.value?.find(k => k.key === key)
+    if (apiKey)
+      copyKey(apiKey)
+  }
+  window.deleteKey = (key: string) => {
+    const apiKey = keys.value?.find(k => k.key === key)
+    if (apiKey)
+      deleteKey(apiKey)
+  }
+}
+async function refreshData() {
+  // console.log('refreshData')
+  try {
+    currentPage.value = 1
+    keys.value.length = 0
+    await getKeys()
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
 async function getKeys(retry = true): Promise<void> {
+  console.log('getKeys')
   isLoading.value = true
   const { data } = await supabase
     .from('apikeys')
@@ -160,8 +274,6 @@ async function getKeys(retry = true): Promise<void> {
 
   isLoading.value = false
 }
-displayStore.NavTitle = ''
-getKeys()
 
 async function addNewApiKey() {
   console.log('displayStore.dialogCheckbox', organizationStore.organizations)
@@ -393,7 +505,6 @@ async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
 
             return k
           })
-          magicVal.value += 1
         },
       },
     ],
@@ -474,7 +585,6 @@ async function showAddNewKeyModal() {
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
 }
-
 async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
   try {
     await navigator.clipboard.writeText(app.key)
@@ -500,6 +610,7 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
 }
 displayStore.NavTitle = t('api-keys')
 displayStore.defaultBack = '/app/home'
+getKeys()
 </script>
 
 <template>
@@ -507,45 +618,18 @@ displayStore.defaultBack = '/app/home'
     <div class="w-full h-full px-4 py-8 mx-auto max-w-9xl lg:px-8 sm:px-6">
       <div class="flex flex-col">
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
-          <dl :key="magicVal" class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow v-for="key in truncatedKeys" :key="key.id" :label="key.name" :is-link="false">
-              <template #start>
-                <!-- Key information with better alignment -->
-                <div class="flex flex-col w-full">
-                  <!-- Truncated API Key with key type -->
-                  <div class="flex items-center">
-                    <span class="font-medium">{{ key.mode.toUpperCase() }}</span>
-                    <span class="text-sm text-gray-600 dark:text-gray-300 ml-1">{{ key.truncatedKey }}</span>
-                  </div>
-
-                  <!-- Organization and App Badges -->
-                  <div v-if="key.limited_to_orgs && key.limited_to_orgs.length > 0" class="flex flex-wrap gap-1 mt-2">
-                    <div v-for="orgId in key.limited_to_orgs" :key="orgId" class="badge badge-primary">
-                      {{ getOrgName(orgId) }}
-                    </div>
-                  </div>
-
-                  <div v-if="key.limited_to_apps && key.limited_to_apps.length > 0" class="flex flex-wrap gap-1 mt-1">
-                    <div v-for="appId in key.limited_to_apps" :key="appId" class="badge badge-secondary">
-                      {{ getAppName(appId) }}
-                    </div>
-                  </div>
-                </div>
-              </template>
-              <button class="mx-1 text-center bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="regenrateKey(key)">
-                <ArrowPath class="mx-auto text-lg" />
-              </button>
-              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="changeName(key)">
-                <Pencil class="mx-auto text-lg" />
-              </button>
-              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="copyKey(key)">
-                <Clipboard class="mx-auto text-lg" />
-              </button>
-              <button class="mx-1 bg-transparent rounded-sm w-7 h-7 hover:bg-slate-100 dark:hover:bg-slate-600" @click="deleteKey(key)">
-                <Trash class="mx-auto text-lg text-red-600" />
-              </button>
-            </InfoRow>
-          </dl>
+          <Table
+            v-model:current-page="currentPage"
+            :columns="columns"
+            :element-list="filteredKeys"
+            :is-loading="isLoading"
+            :total="filteredKeys.length"
+            :search-placeholder="t('search-api-keys')"
+            :search="searchQuery"
+            @update:search="searchQuery = $event"
+            @reload="getKeys()"
+            @reset="refreshData()"
+          />
         </div>
         <p class="mx-3 mt-6 md:mx-auto">
           {{ t('api-keys-are-used-for-cli-and-public-api') }}
