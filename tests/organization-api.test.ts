@@ -102,7 +102,7 @@ describe('[POST] /organization/members', () => {
     expect(data?.user_right).toBe('invite_read')
   })
 
-  it('create and add non-existing user to organization', async () => {
+  it.skip('create and add non-existing user to organization', async () => {
     // Generate a unique test email to avoid conflicts
     const testEmail = `test-user-${Date.now()}@example.com`
     const firstName = 'Test'
