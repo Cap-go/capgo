@@ -11,6 +11,10 @@ BEGIN
     v_user_id := (select auth.uid());
     v_user_email := (select auth.email());
     
+    -- Store email in deleted_account table for future reference BEFORE deleting the user
+    -- This ensures the email is stored even if the user deletion cascades
+    INSERT INTO deleted_account (email) VALUES (encode(digest(v_user_email, 'sha256'), 'hex'));
+    
     -- Get all organizations where the user is the only super_admin
     SELECT array_agg(org_id) INTO v_user_orgs
     FROM org_users
@@ -30,9 +34,6 @@ BEGIN
             DELETE FROM orgs WHERE id = v_org_record;
         END LOOP;
     END IF;
-    
-    -- Store email in deleted_account table for future reference
-    INSERT INTO deleted_account (email) VALUES (encode(digest(v_user_email, 'sha256'), 'hex'));
     
     -- Delete the user from auth.users (this will cascade to other tables)
     DELETE FROM auth.users WHERE id = v_user_id;
