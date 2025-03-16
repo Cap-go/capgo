@@ -12,6 +12,13 @@ BEGIN
     
     -- Store email in deleted_account table for future reference BEFORE deleting the user
     -- This ensures the email is stored even if the user deletion cascades
+    -- Make sure the deleted_account table exists
+    CREATE TABLE IF NOT EXISTS deleted_account (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        email text NOT NULL,
+        created_at timestamptz DEFAULT now()
+    );
+    
     INSERT INTO deleted_account (email) VALUES (encode(digest(v_user_email, 'sha256'), 'hex'));
     
     -- Get all organizations where the user is the only super_admin with a more efficient query
