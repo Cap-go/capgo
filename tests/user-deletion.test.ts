@@ -77,17 +77,11 @@ describe('User deletion', () => {
     
     // First ensure the deleted_account table exists
     try {
-      await supabase.rpc('create_deleted_account_table_if_not_exists')
+      // Use raw query since the RPC function might not be available yet
+      await supabase.from('deleted_account').select('count(*)').limit(1)
     } catch (e) {
-      console.log('Creating table manually as fallback')
-      // Create the table manually as fallback
-      await supabase.query(`
-        CREATE TABLE IF NOT EXISTS deleted_account (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          email text NOT NULL,
-          created_at timestamptz DEFAULT now()
-        );
-      `)
+      console.log('Table may not exist, continuing with test')
+      // The table will be created by the delete_user function
     }
     
     const { data: deletedAccounts, error: deletedError } = await retry(() => 
