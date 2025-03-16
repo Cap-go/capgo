@@ -30,7 +30,7 @@ const useAuth = honoFactory.createMiddleware(async (c, next) => {
       limited_to_apps: null,
       limited_to_orgs: null,
     }
-    
+
     c.set('auth', {
       userId: dummyApikey.user_id,
       authType: 'apikey',
