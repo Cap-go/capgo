@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { createHash } from 'node:crypto'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
@@ -35,14 +36,32 @@ app.post('/', middlewareAPISecret, async (c) => {
       // Process user deletion with timeout protection
       const startTime = Date.now()
 
-      // 1. Cancel Stripe subscriptions if customer_id exists
+      // 1. Hash the email and store it in deleted_account table
+      if (record.email) {
+        const hashedEmail = createHash('sha256').update(record.email).digest('hex')
+        console.log({ requestId: c.get('requestId'), context: 'hashing email for deleted_account' })
+
+        const { error: insertError } = await supabaseAdmin(c as any)
+          .from('deleted_account')
+          .insert({ email: hashedEmail })
+
+        if (insertError) {
+          console.error({
+            requestId: c.get('requestId'),
+            context: 'error inserting into deleted_account',
+            error: insertError,
+          })
+        }
+      }
+
+      // 2. Cancel Stripe subscriptions if customer_id exists
       if (record.customer_id) {
         console.log({ requestId: c.get('requestId'), context: 'canceling stripe subscription', customer_id: record.customer_id })
         // Use type assertion to resolve type compatibility issue
         await cancelSubscription(c as any, record.customer_id)
       }
 
-      // 2. Find and clean up any organizations created by this user
+      // 3. Find and clean up any organizations created by this user
       const { data: orgs } = await supabaseAdmin(c as any)
         .from('orgs')
         .select('id, customer_id')
@@ -59,7 +78,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         }
       }
 
-      // 3. Track performance metrics
+      // 4. Track performance metrics
       const endTime = Date.now()
       const duration = endTime - startTime
 
