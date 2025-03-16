@@ -1,3 +1,17 @@
+-- Create a function to ensure the deleted_account table exists
+CREATE OR REPLACE FUNCTION "public"."create_deleted_account_table_if_not_exists"() RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    -- Create the deleted_account table if it doesn't exist
+    CREATE TABLE IF NOT EXISTS deleted_account (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        email text NOT NULL,
+        created_at timestamptz DEFAULT now()
+    );
+END;
+$$;
+
 -- Optimize the delete_user function for better performance
 CREATE OR REPLACE FUNCTION "public"."delete_user"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -10,15 +24,11 @@ BEGIN
     -- Get the current user ID and email with a single query
     SELECT auth.uid(), auth.email() INTO v_user_id, v_user_email;
     
+    -- Ensure the deleted_account table exists
+    PERFORM create_deleted_account_table_if_not_exists();
+    
     -- Store email in deleted_account table for future reference BEFORE deleting the user
     -- This ensures the email is stored even if the user deletion cascades
-    -- Make sure the deleted_account table exists
-    CREATE TABLE IF NOT EXISTS deleted_account (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        email text NOT NULL,
-        created_at timestamptz DEFAULT now()
-    );
-    
     INSERT INTO deleted_account (email) VALUES (encode(digest(v_user_email, 'sha256'), 'hex'));
     
     -- Get all organizations where the user is the only super_admin with a more efficient query
