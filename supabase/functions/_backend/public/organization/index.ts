@@ -1,5 +1,8 @@
+import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { getBody, honoFactory, useCors } from '../../utils/hono.ts'
+import { supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
+import { checkKey } from '../../utils/utils.ts'
 import { deleteOrg } from './delete.ts'
 import { get } from './get.ts'
 import { deleteMember } from './members/delete.ts'
@@ -9,90 +12,272 @@ import { post as inviteUser } from './members/post.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
 
-export const app = honoFactory.createApp()
+const useAuth = honoFactory.createMiddleware(async (c, next) => {
+  const authToken = c.req.header('authorization')
+  const capgkey = c.req.header('capgkey')
 
-app.get('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+  if (authToken) {
+    // JWT auth
+    const supabaseClient = useSupabaseClient(c as any, authToken)
+    const { data: user, error: userError } = await supabaseClient.auth.getUser()
+    if (userError)
+      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
+
+    c.set('auth', {
+      userId: user.user?.id,
+      authType: 'jwt',
+      apikey: null,
+    } as AuthInfo)
+  }
+  else if (capgkey) {
+    // API key auth
+    const apikey = await checkKey(c as any, capgkey, supabaseAdmin(c as any), ['all'])
+    if (!apikey)
+      return c.json({ status: 'Unauthorized', error: 'Invalid API key' }, 401)
+
+    c.set('auth', {
+      userId: apikey.user_id,
+      authType: 'apikey',
+      apikey,
+    } as AuthInfo)
+  }
+  else {
+    return c.json({ status: 'Unauthorized', error: 'No authentication provided' }, 401)
+  }
+
+  await next()
+})
+
+export const app = honoFactory.createApp()
+app.use('*', useCors)
+app.use('*', useAuth)
+
+app.get('/', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return get(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return get(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return get(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot get organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.put('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.put('/', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return put(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return put(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return put(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot create organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.post('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.post('/', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return post(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return post(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return post(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot create organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.delete('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.delete('/', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteOrg(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return deleteOrg(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return deleteOrg(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot delete organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.get('/members', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return getMembers(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return getMembers(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return getMembers(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot get organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.post('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.post('/members', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return inviteUser(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return inviteUser(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return inviteUser(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot invite user to organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.delete('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.delete('/members', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteMember(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return deleteMember(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return deleteMember(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot delete user from organization', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.patch('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.patch('/members', async (c) => {
   try {
     const body = await getBody<any>(c as any)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return updateMember(c as any, body, apikey)
+    const auth = c.get('auth') as AuthInfo
+
+    if (auth.authType === 'jwt') {
+      // For JWT auth, we need to create a dummy apikey with the user_id
+      const dummyApikey: Database['public']['Tables']['apikeys']['Row'] = {
+        id: 0,
+        user_id: auth.userId,
+        key: '',
+        name: '',
+        mode: 'all',
+        created_at: null,
+        updated_at: null,
+        limited_to_apps: null,
+        limited_to_orgs: null,
+      }
+      return updateMember(c as any, body, dummyApikey)
+    }
+
+    // For API key auth
+    return updateMember(c as any, body, auth.apikey!)
   }
   catch (e) {
     return c.json({ status: 'Cannot update user permission in organization', error: JSON.stringify(e) }, 500)

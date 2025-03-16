@@ -1,7 +1,8 @@
 import type { Context } from '@hono/hono'
+import type { AuthInfo } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
 
 const inviteBodySchema = z.object({
   orgId: z.string(),
@@ -19,7 +20,7 @@ const inviteBodySchema = z.object({
   create_if_not_exists: z.boolean().optional(),
 })
 
-export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']) {
+export async function post(c: Context, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row'] | null) {
   const bodyParsed = inviteBodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     console.error('Invalid body', bodyParsed.error)
@@ -27,9 +28,20 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   }
   const body = bodyParsed.data
 
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', apikey.key)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
-    console.error('You can\'t access this organization', body.orgId)
-    return c.json({ status: 'You can\'t access this organization', orgId: body.orgId, error: 'Insufficient permissions or invalid organization ID' }, 400)
+  const auth = c.get('auth') as AuthInfo
+  if (auth.authType === 'apikey') {
+    // For API key auth
+    if (!(await hasOrgRightApikey(c, body.orgId, auth.userId, 'admin', auth.apikey!.key)) || !(apikeyHasOrgRight(auth.apikey!, body.orgId))) {
+      console.error('You can\'t access this organization', body.orgId)
+      return c.json({ status: 'You can\'t access this organization', orgId: body.orgId, error: 'Insufficient permissions or invalid organization ID' }, 400)
+    }
+  }
+  else {
+    // For JWT auth
+    if (!(await hasOrgRight(c, body.orgId, auth.userId, 'admin'))) {
+      console.error('You can\'t access this organization', body.orgId)
+      return c.json({ status: 'You can\'t access this organization', orgId: body.orgId, error: 'Insufficient permissions or invalid organization ID' }, 400)
+    }
   }
 
   // If create_if_not_exists is true and first_name/last_name are provided, try to create the user directly
@@ -83,7 +95,10 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   }
 
   // Standard invitation flow
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = auth.authType === 'apikey'
+    ? supabaseApikey(c, auth.apikey!.key)
+    : supabaseAdmin(c)
+
   const { data, error } = await supabase
     .rpc('invite_user_to_org_wrapper', {
       email: body.email,
