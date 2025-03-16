@@ -3,7 +3,6 @@ import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -12,91 +11,124 @@ app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<DeletePayload<typeof table>>()
-
     if (body.table !== table) {
       console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
-
     if (body.type !== 'DELETE') {
       console.log({ requestId: c.get('requestId'), context: 'Not DELETE' })
       return c.json({ status: 'Not DELETE' }, 200)
     }
-
-    const record = body.old_record
+    // For DELETE operations, the data is in old_record, not record
+    const record = body.old_record as unknown as Database['public']['Tables']['users']['Row']
     console.log({ requestId: c.get('requestId'), context: 'record', record })
 
-    if (!record || !record.id) {
-      console.log({ requestId: c.get('requestId'), context: 'no user id' })
-      return c.json(BRES)
-    }
-
     try {
-      // Process user deletion with timeout protection
-      const startTime = Date.now()
-
-      // 1. Cancel Stripe subscriptions if customer_id exists
-      if (record.customer_id) {
-        console.log({ requestId: c.get('requestId'), context: 'canceling stripe subscription', customer_id: record.customer_id })
-        // Use type assertion to resolve type compatibility issue
-        await cancelSubscription(c as any, record.customer_id)
+      // Ensure record exists
+      if (!record) {
+        console.error({ requestId: c.get('requestId'), context: 'Missing record data' })
+        return c.json(BRES)
       }
 
-      // 2. Find and clean up any organizations created by this user
-      const { data: orgs } = await supabaseAdmin(c as any)
+      // Get user ID from the record
+      const userId = record.id
+
+      // Get all organizations owned by the user
+      // Type assertion for context
+      const { data: userOrgs, error: orgsError } = await supabaseAdmin(c as any)
         .from('orgs')
-        .select('id, customer_id')
-        .eq('created_by', record.id)
+        .select('id')
+        .eq('created_by', userId)
 
-      if (orgs && orgs.length > 0) {
-        console.log({ requestId: c.get('requestId'), context: 'cleaning up orgs', count: orgs.length })
+      if (orgsError) {
+        console.error({ requestId: c.get('requestId'), context: 'Error fetching user orgs', error: orgsError })
+        throw new Error(`Error fetching user orgs: ${orgsError.message}`)
+      }
 
-        for (const org of orgs) {
-          // Cancel org subscriptions if they exist
-          if (org.customer_id) {
-            await cancelSubscription(c as any, org.customer_id)
+      // Delete all apps from user's organizations
+      if (userOrgs && userOrgs.length > 0) {
+        const orgIds = userOrgs.map(org => org.id)
+
+        // Get all apps from user's organizations
+        const { data: orgApps, error: appsError } = await supabaseAdmin(c as any)
+          .from('apps')
+          .select('app_id')
+          .in('owner_org', orgIds)
+
+        if (appsError) {
+          console.error({ requestId: c.get('requestId'), context: 'Error fetching org apps', error: appsError })
+          throw new Error(`Error fetching org apps: ${appsError.message}`)
+        }
+
+        // Delete each app
+        if (orgApps && orgApps.length > 0) {
+          for (const app of orgApps) {
+            const { error: deleteAppError } = await supabaseAdmin(c as any)
+              .from('apps')
+              .delete()
+              .eq('app_id', app.app_id)
+
+            if (deleteAppError) {
+              console.error({ requestId: c.get('requestId'), context: `Error deleting app ${app.app_id}`, error: deleteAppError })
+              throw new Error(`Error deleting app ${app.app_id}: ${deleteAppError.message}`)
+            }
+          }
+        }
+
+        // Delete all organizations owned by the user
+        for (const org of userOrgs) {
+          const { error: deleteOrgError } = await supabaseAdmin(c as any)
+            .from('orgs')
+            .delete()
+            .eq('id', org.id)
+
+          if (deleteOrgError) {
+            console.error({ requestId: c.get('requestId'), context: `Error deleting org ${org.id}`, error: deleteOrgError })
+            throw new Error(`Error deleting org ${org.id}: ${deleteOrgError.message}`)
           }
         }
       }
 
-      // 3. Track performance metrics
-      const endTime = Date.now()
-      const duration = endTime - startTime
+      // Delete user's Stripe customer if it exists
+      if (record.customer_id) {
+        const { error: deleteStripeError } = await supabaseAdmin(c as any)
+          .from('stripe_info')
+          .delete()
+          .eq('customer_id', record.customer_id)
 
-      console.log({
-        requestId: c.get('requestId'),
-        context: 'user deletion completed',
-        duration_ms: duration,
-        user_id: record.id,
-      })
-
-      return c.json(BRES)
-    }
-    catch (error) {
-      console.error({
-        requestId: c.get('requestId'),
-        context: 'user deletion process error',
-        error: error instanceof Error ? error.message : JSON.stringify(error),
-        timeout: error instanceof Error && error.message === 'Operation timed out',
-      })
-
-      // If it's a timeout, return a specific message
-      if (error instanceof Error && error.message === 'Operation timed out') {
-        return c.json({
-          status: 'User deletion process started but timed out. The process will continue in the background.',
-          error: 'Operation timed out',
-        }, 202)
+        if (deleteStripeError) {
+          console.error({ requestId: c.get('requestId'), context: 'Error deleting Stripe customer', error: deleteStripeError })
+          throw new Error(`Error deleting Stripe customer: ${deleteStripeError.message}`)
+        }
       }
 
-      return c.json(BRES)
+      // Add hashed user email to deleted_account table to prevent reuse
+      if (record && record.email) {
+        // Hash the email using SHA-256
+        const encoder = new TextEncoder()
+        const data = encoder.encode(record.email)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        const hashedEmail = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+        const { error: addDeletedError } = await supabaseAdmin(c as any)
+          .from('deleted_account')
+          .insert({ email: hashedEmail })
+
+        if (addDeletedError) {
+          console.error({ requestId: c.get('requestId'), context: 'Error adding to deleted_account', error: addDeletedError })
+          throw new Error(`Error adding to deleted_account: ${addDeletedError.message}`)
+        }
+      }
+
+      console.log({ requestId: c.get('requestId'), context: 'User deletion completed successfully', userId })
     }
+    catch (error) {
+      console.error({ requestId: c.get('requestId'), context: 'Error in user deletion process', error })
+      throw error
+    }
+    return c.json(BRES)
   }
   catch (e) {
-    console.error({
-      requestId: c.get('requestId'),
-      context: 'user deletion error',
-      error: e instanceof Error ? e.message : JSON.stringify(e),
-    })
     return c.json({ status: 'Cannot delete user', error: JSON.stringify(e) }, 500)
   }
 })
