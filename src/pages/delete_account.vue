@@ -29,34 +29,61 @@ async function deleteAccount() {
         role: 'danger',
         handler: async () => {
           const supabaseClient = useSupabase()
-
-          const authUser = await supabase.auth.getUser()
-          if (authUser.error)
-            return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
-
+          isLoading.value = true
+          
           try {
+            const authUser = await supabase.auth.getUser()
+            if (authUser.error) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
+            
             const { data: user } = await supabaseClient
               .from('users')
               .select()
               .eq('id', authUser.data.user.id)
               .single()
-            if (!user)
+              
+            if (!user) {
+              isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
-
+            }
+            
+            // Store hashed email in deleted_account table
             const hashedEmail = await hashEmail(authUser.data.user.email!)
-
-            await supabaseClient
+            const { error: insertError } = await supabaseClient
               .from('deleted_account')
               .insert({
                 email: hashedEmail,
               })
-
+              
+            if (insertError) {
+              console.error('Insert error:', insertError)
+              isLoading.value = false
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
+            
+            // Call the delete_user function to trigger the queue-based deletion
+            const { error: deleteError } = await supabaseClient.rpc('delete_user')
+            
+            if (deleteError) {
+              console.error('Delete error:', deleteError)
+              isLoading.value = false
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
+            
+            // Sign out and redirect to login page
             await supabase.auth.signOut()
+            toast.success(t('account-deleted-successfully'))
             router.replace('/login')
           }
           catch (error) {
             console.error(error)
+            isLoading.value = false
             return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+          }
+          finally {
+            isLoading.value = false
           }
         },
       },
