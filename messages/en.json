@@ -426,6 +426,7 @@
   "please-ask-the-user-to-create-account-first": "Please ask the user to create account first",
   "please-create-user-account": "This user doesn't exist yet. Please provide the following information to create their account:",
   "error-creating-user": "Error creating user. Please try again.",
+  "error-inviting-user": "Error inviting user. Please try again.",
   "please-choose-your-p": "Please choose your preferences",
   "please-confirm-org-del": "Please confirm that you want to delete \"%1\" org by typing it's name",
   "plugin-version": "Plugin version",

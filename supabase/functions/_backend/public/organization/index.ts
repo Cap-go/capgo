@@ -4,6 +4,7 @@ import { deleteOrg } from './delete.ts'
 import { get } from './get.ts'
 import { deleteMember } from './members/delete.ts'
 import { get as getMembers } from './members/get.ts'
+import { patch as updateMember } from './members/patch.ts'
 import { post as inviteUser } from './members/post.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
@@ -84,5 +85,16 @@ app.delete('/members', middlewareKey(['all', 'write', 'read', 'upload']), async 
   }
   catch (e) {
     return c.json({ status: 'Cannot delete user from organization', error: JSON.stringify(e) }, 500)
+  }
+})
+
+app.patch('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+  try {
+    const body = await getBody<any>(c as any)
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+    return updateMember(c as any, body, apikey)
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot update user permission in organization', error: JSON.stringify(e) }, 500)
   }
 })
