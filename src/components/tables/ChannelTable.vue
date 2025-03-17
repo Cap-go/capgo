@@ -101,6 +101,7 @@ async function addChannel(name: string) {
           app_id: props.appId,
           version: versionId.value as number,
           owner_org: currentGid as string,
+          created_by: main.user?.id,
         },
       ])
       .select()

@@ -351,14 +351,6 @@ onMounted(checkLogin)
                     {{ version }}
                   </p>
                   <div class="">
-                    <router-link
-                      to="/resend_email"
-                      class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
-                    >
-                      {{ t('resend-confirm') }}
-                    </router-link>
-                  </div>
-                  <div class="">
                     <a
                       :href="`${registerWebsiteDomain()}/register/`"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
