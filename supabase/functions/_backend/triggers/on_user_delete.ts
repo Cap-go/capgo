@@ -18,6 +18,8 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json({ status: `Not ${table}` }, 200)
     }
 
+    console.log({ requestId: c.get('requestId'), context: 'DELETE operation', type: body.type, table: body.table })
+
     if (body.type !== 'DELETE') {
       console.log({ requestId: c.get('requestId'), context: 'Not DELETE' })
       return c.json({ status: 'Not DELETE' }, 200)
