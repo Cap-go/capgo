@@ -9,6 +9,7 @@ import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
+import { app as events } from '../_backend/private/events.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../_backend/private/latency_postres.ts'
@@ -55,5 +56,6 @@ appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
+appGlobal.route('/events', events)
 
 Deno.serve(appGlobal.fetch)

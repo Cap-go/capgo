@@ -18,6 +18,7 @@ interface GlobalStats {
   updates_external: PromiseLike<number>
   updates_last_month: PromiseLike<number>
   users: PromiseLike<number>
+  orgs: PromiseLike<number>
   stars: Promise<number>
   onboarded: PromiseLike<number>
   need_upgrade: PromiseLike<number>
@@ -43,6 +44,10 @@ function getStats(c: Context): GlobalStats {
     updates_external: countAllUpdatesExternal(c),
     users: supabase
       .from('users')
+      .select('*', { count: 'exact' })
+      .then(res => res.count || 0),
+    orgs: supabase
+      .from('orgs')
       .select('*', { count: 'exact' })
       .then(res => res.count || 0),
     stars: getGithubStars(),
@@ -96,6 +101,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       updates,
       updates_external,
       users,
+      orgs,
       stars,
       customers,
       onboarded,
@@ -108,6 +114,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       res.updates,
       res.updates_external,
       res.users,
+      res.orgs,
       res.stars,
       res.customers,
       res.onboarded,
@@ -116,7 +123,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       res.actives,
       res.updates_last_month,
     ])
-    const not_paying = users - customers.total
+    const not_paying = users - customers.total - plans.Trial
     console.log({ requestId: c.get('requestId'), context: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
     // console.log(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
@@ -163,7 +170,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         icon: '📱',
       },
       {
-        title: 'Apps actives',
+        title: 'Active Apps',
         value: actives.apps,
         icon: '💃',
       },
@@ -183,19 +190,14 @@ app.post('/', middlewareAPISecret, async (c) => {
         icon: '📲',
       },
       {
-        title: 'User Count',
+        title: 'Total Users',
         value: users,
         icon: '👨',
       },
       {
-        title: 'Users actives',
+        title: 'Active Users',
         value: actives.users,
         icon: '🎉',
-      },
-      {
-        title: 'User need upgrade',
-        value: need_upgrade,
-        icon: '🤒',
       },
       {
         title: 'User onboarded',
@@ -203,47 +205,57 @@ app.post('/', middlewareAPISecret, async (c) => {
         icon: '✅',
       },
       {
-        title: 'User trial',
+        title: 'Orgs',
+        value: orgs,
+        icon: '🏢',
+      },
+      {
+        title: 'Orgs with trial',
         value: plans.Trial,
         icon: '👶',
       },
       {
-        title: 'User paying',
+        title: 'Orgs paying',
         value: customers.total,
         icon: '💰',
       },
       {
-        title: 'User yearly',
+        title: 'Orgs yearly',
         value: `${(customers.yearly * 100 / customers.total).toFixed(0)}% - ${customers.yearly}`,
         icon: '🧧',
       },
       {
-        title: 'User monthly',
+        title: 'Orgs monthly',
         value: `${(customers.monthly * 100 / customers.total).toFixed(0)}% - ${customers.monthly}`,
         icon: '🗓️',
       },
       {
-        title: 'User not paying',
+        title: 'Orgs not paying',
         value: not_paying,
         icon: '🥲',
       },
       {
-        title: 'Solo Plan',
+        title: 'Orgs need upgrade',
+        value: need_upgrade,
+        icon: '🤒',
+      },
+      {
+        title: 'Orgs Solo Plan',
         value: `${(plans.Solo * 100 / customers.total).toFixed(0)}% - ${plans.Solo}`,
         icon: '🎸',
       },
       {
-        title: 'Maker Plan',
+        title: 'Orgs Maker Plan',
         value: `${(plans.Maker * 100 / customers.total).toFixed(0)}% - ${plans.Maker}`,
         icon: '🤝',
       },
       {
-        title: 'Team plan',
+        title: 'Orgs Team Plan',
         value: `${(plans.Team * 100 / customers.total).toFixed(0)}% - ${plans.Team}`,
         icon: '👏',
       },
       {
-        title: 'Pay as you go plan',
+        title: 'Orgs Pay as you go Plan',
         value: `${(plans['Pay as you go'] * 100 / customers.total).toFixed(0)}% - ${plans['Pay as you go']}`,
         icon: '📈',
       },
