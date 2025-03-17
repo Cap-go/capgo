@@ -102,7 +102,7 @@
         "@antfu/eslint-config": "4.10.1",
         "@capacitor/cli": "^6.2.0",
         "@capacitor/core": "^6.2.0",
-        "@cloudflare/workers-types": "4.20250303.0",
+        "@cloudflare/workers-types": "4.20250313.0",
         "@iconify-json/carbon": "1.2.8",
         "@iconify-json/heroicons": "^1.2.2",
         "@iconify-json/ion": "1.2.2",
@@ -115,7 +115,7 @@
         "@tailwindcss/vite": "^4.0.9",
         "@types/adm-zip": "^0.5.7",
         "@types/dompurify": "3.2.0",
-        "@vitejs/plugin-vue": "5.2.1",
+        "@vitejs/plugin-vue": "5.2.2",
         "@vitejs/plugin-vue-jsx": "^4.1.1",
         "@vue/cli-service": "5.0.8",
         "@vue/compiler-sfc": "3.5.13",
@@ -449,7 +449,7 @@
 
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20250310.0", "", { "os": "win32", "cpu": "x64" }, "sha512-04OgaDzm8/8nkjF3tovB+WywZLjSdAHCQT2omXKCwH3EDd1kpd8vvzE1pErtdIyKCOf9/sArY4BhPdxRj7ijlg=="],
 
-    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250303.0", "", {}, "sha512-O7F7nRT4bbmwHf3gkRBLfJ7R6vHIJ/oZzWdby6obOiw2yavUfp/AIwS7aO2POu5Cv8+h3TXS3oHs3kKCZLraUA=="],
+    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250313.0", "", {}, "sha512-iqyzZwogC+3yL8h58vMhjYQUHUZA8XazE3Q+ofR59wDOnsPe/u9W6+aCl408N0iNBhMPvpJQQ3/lkz0iJN2fhA=="],
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
 
@@ -1113,7 +1113,7 @@
 
     "@typescript-eslint/visitor-keys": ["@typescript-eslint/visitor-keys@8.26.1", "", { "dependencies": { "@typescript-eslint/types": "8.26.1", "eslint-visitor-keys": "^4.2.0" } }, "sha512-AjOC3zfnxd6S4Eiy3jwktJPclqhFHNyd8L6Gycf9WUPoKZpgM5PjkxY1X7uSy61xVpiJDhhk7XT2NVsN3ALTWg=="],
 
-    "@vitejs/plugin-vue": ["@vitejs/plugin-vue@5.2.1", "", { "peerDependencies": { "vite": "^5.0.0 || ^6.0.0", "vue": "^3.2.25" } }, "sha512-cxh314tzaWwOLqVes2gnnCtvBDcM1UMdn+iFR+UjAn411dPT3tOmqrJjbMd7koZpMAmBM/GqeV4n9ge7JSiJJQ=="],
+    "@vitejs/plugin-vue": ["@vitejs/plugin-vue@5.2.2", "", { "peerDependencies": { "vite": "^5.0.0 || ^6.0.0", "vue": "^3.2.25" } }, "sha512-IY0aPonWZI2huxrWjoSBUQX14GThitmr1sc2OUJymcgnY5RlUI7HoXGAnFEoVNRsck/kS6inGvxCN6CoHu86yQ=="],
 
     "@vitejs/plugin-vue-jsx": ["@vitejs/plugin-vue-jsx@4.1.1", "", { "dependencies": { "@babel/core": "^7.26.0", "@babel/plugin-transform-typescript": "^7.25.9", "@vue/babel-plugin-jsx": "^1.2.5" }, "peerDependencies": { "vite": "^5.0.0 || ^6.0.0", "vue": "^3.0.0" } }, "sha512-uMJqv/7u1zz/9NbWAD3XdjaY20tKTf17XVfQ9zq4wY1BjsB/PjpJPMe2xiG39QpP4ZdhYNhm4Hvo66uJrykNLA=="],
 

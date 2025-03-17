@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "11.13.37",
+  "version": "11.13.39",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -178,7 +178,7 @@
     "@antfu/eslint-config": "4.10.1",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
-    "@cloudflare/workers-types": "4.20250303.0",
+    "@cloudflare/workers-types": "4.20250313.0",
     "@iconify-json/carbon": "1.2.8",
     "@iconify-json/heroicons": "^1.2.2",
     "@iconify-json/ion": "1.2.2",
@@ -191,7 +191,7 @@
     "@tailwindcss/vite": "^4.0.9",
     "@types/adm-zip": "^0.5.7",
     "@types/dompurify": "3.2.0",
-    "@vitejs/plugin-vue": "5.2.1",
+    "@vitejs/plugin-vue": "5.2.2",
     "@vitejs/plugin-vue-jsx": "^4.1.1",
     "@vue/cli-service": "5.0.8",
     "@vue/compiler-sfc": "3.5.13",
