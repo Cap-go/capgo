@@ -4,7 +4,6 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import { useI18n } from 'petite-vue-i18n'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
@@ -35,7 +34,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
   if (errorDeleted)
     console.error(errorDeleted)
   if (!deleted) {
-    toast.error(t('used-to-create'))
+    setErrors('register-account', [t('used-to-create')], {})
     return
   }
 
@@ -86,7 +85,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
             <FormKit id="register-account" type="form" :actions="false" @submit="submit">
-              <FormKitMessages />
+              <FormKitMessages data-test="form-error" />
               <div class="space-y-2 text-gray-500 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <div class="col-span-2">
                   <FormKit
@@ -98,6 +97,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                     enterkeyhint="next"
                     validation="required:trim|email"
                     :label="t('email')"
+                    data-test="email"
                     :classes="{
                       outer: 'mb-0!',
                     }"
@@ -112,6 +112,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   autocomplete="given-name"
                   validation="required:trim"
                   enterkeyhint="next"
+                  data-test="first_name"
                   autofocus
                 />
                 <FormKit
@@ -123,6 +124,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   :disabled="isLoading"
                   validation="required:trim"
                   enterkeyhint="next"
+                  data-test="last_name"
                 />
 
                 <FormKit
@@ -131,6 +133,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   :prefix-icon="iconPassword"
                   autocomplete="new-password"
                   :label="t('password')"
+                  data-test="password"
                   validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
                   validation-visibility="live"
                 />
@@ -140,6 +143,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                   :prefix-icon="iconPassword"
                   :label="t('confirm-password')"
                   autocomplete="new-password"
+                  data-test="confirm-password"
                   validation="required|confirm"
                   validation-visibility="live"
                   :validation-label="t('password-confirmatio')"
@@ -150,7 +154,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
                     <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                   </div>
                   <button
-                    :disabled="isLoading" type="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
+                    :disabled="isLoading" type="submit" data-test="submit" class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 border border-transparent rounded-md bg-muted-blue-600 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
                   >
                     <span v-if="!isLoading" class="rounded-4xl">
                       {{ t("register-next") }}

@@ -11,6 +11,7 @@ const toastOptions = ref({
 <template>
   <Toaster
     rich-colors close-button position="top-right"
+    data-test="toast"
     :toast-options="toastOptions"
   />
 </template>

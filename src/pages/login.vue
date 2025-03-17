@@ -353,6 +353,7 @@ onMounted(checkLogin)
                   <div class="">
                     <a
                       :href="`${registerWebsiteDomain()}/register/`"
+                      data-test="register"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
                       {{ t('create-a-free-accoun') }}
@@ -361,6 +362,7 @@ onMounted(checkLogin)
                   <div class="">
                     <router-link
                       to="/forgot_password"
+                      data-test="forgot-password"
                       class="text-sm font-medium text-orange-500 transition-all duration-200 focus:text-orange-600 hover:text-orange-600 hover:underline"
                     >
                       {{ t('forgot') }} {{ t('password') }} ?

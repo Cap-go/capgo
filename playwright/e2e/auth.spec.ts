@@ -32,4 +32,28 @@ test.describe('Authentication', () => {
     await page.click('[data-test="submit"]')
     await page.waitForURL('/app/home')
   })
+
+  test('should navigate to forgot password page', async ({ page }) => {
+    await page.click('[data-test="forgot-password"]')
+    await expect(page).toHaveURL('/forgot_password')
+  })
+
+  test('should navigate to registration page', async ({ page }) => {
+    await page.click('[data-test="register"]')
+    await expect(page).toHaveURL('/register/')
+  })
+})
+
+test.describe('Password Reset', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/forgot_password/')
+  })
+
+  test('should show success message after password reset request', async ({ page }) => {
+    await page.fill('[data-test="email"]', 'test@capgo.app')
+    await page.waitForSelector('[data-test="submit"]:not([disabled])')
+    await page.click('[data-test="submit"]')
+    await page.waitForSelector('[data-sonner-toast] [data-content]', { timeout: 5000 })
+    await expect(page.locator('[data-sonner-toast] [data-content]')).toContainText('Check your email to get the link to reset your password')
+  })
 })
