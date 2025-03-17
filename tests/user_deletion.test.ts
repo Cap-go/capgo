@@ -1,16 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
-import { v4 as uuidv4 } from 'uuid'
-import { expect } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { expect, it } from 'vitest'
+import { getSupabaseClient } from './test-utils'
 
 // Test user deletion process
 it('user deletion process', async () => {
-  const supabase = createClient(
-    process.env.SUPABASE_URL || 'http://localhost:54321',
-    process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
-  )
-
+  const supabase = getSupabaseClient()
   // Create a test user
-  const testEmail = `test-${uuidv4()}@example.com`
+  const testEmail = `test-${randomUUID()}@example.com`
   const testPassword = 'password123'
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -20,8 +16,6 @@ it('user deletion process', async () => {
 
   expect(signUpError).toBeNull()
   expect(signUpData.user).not.toBeNull()
-
-  const _userId = signUpData.user?.id
 
   // Sign in as the test user
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
