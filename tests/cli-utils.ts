@@ -104,7 +104,7 @@ export function cleanupCli(id: string) {
   deleteTempFolders(id)
 }
 
-function npmInstall(id: string) {
+export function npmInstall(id: string) {
   try {
     execSync('bun install', { cwd: tempFileFolder(id), stdio: 'ignore' })
   }
