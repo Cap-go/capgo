@@ -54,6 +54,8 @@ async function submit(form: { email: string, password: string, code: string }) {
       console.error(errorDeleted)
     if (!deleted) {
       toast.error(t('used-to-create'))
+      isLoading.value = false
+      setErrors('login-account', [t('used-to-create')], {})
       return
     }
     const { error } = await supabase.auth.signInWithPassword({
@@ -308,7 +310,7 @@ onMounted(checkLogin)
                 <FormKit
                   type="email" name="email" :disabled="isLoading" enterkeyhint="next"
                   :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
-                  validation="required:trim"
+                  validation="required:trim" data-test="email"
                 />
 
                 <div>
@@ -316,17 +318,18 @@ onMounted(checkLogin)
                     id="passwordInput" type="password" :placeholder="t('password')"
                     name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
+                    data-test="password"
                   />
                 </div>
                 <div v-if="!!captchaKey">
                   <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
-                <FormKitMessages />
+                <FormKitMessages data-test="form-error" />
                 <div>
                   <div class="inline-flex items-center justify-center w-full">
                     <svg
                       v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle dark:text-white animate-spin"
-                      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
                     >
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                       <path
@@ -335,7 +338,7 @@ onMounted(checkLogin)
                       />
                     </svg>
                     <button
-                      v-if="!isLoading" type="submit"
+                      v-if="!isLoading" type="submit" data-test="submit"
                       class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
                     >
                       {{ t('log-in') }}
@@ -388,7 +391,7 @@ onMounted(checkLogin)
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 sm:px-8 sm:py-7">
-            <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" @submit="submit">
+            <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" data-test="2fa-form" @submit="submit">
               <div class="space-y-5 text-gray-500">
                 <FormKit
                   type="text" name="code" :disabled="isLoading"
@@ -401,6 +404,7 @@ onMounted(checkLogin)
                   autocomplete="off"
                   validation="required|mfa_code_validation"
                   validation-visibility="live"
+                  data-test="2fa-code"
                 />
                 <FormKitMessages />
                 <div>
@@ -416,7 +420,7 @@ onMounted(checkLogin)
                       />
                     </svg>
                     <button
-                      v-if="!isLoading" type="submit"
+                      v-if="!isLoading" type="submit" data-test="verify"
                       class="inline-flex items-center justify-center w-full px-4 py-4 text-base font-semibold text-white transition-all duration-200 rounded-md bg-muted-blue-700 focus:bg-blue-700 hover:bg-blue-700 focus:outline-hidden"
                     >
                       {{ t('verify') }}

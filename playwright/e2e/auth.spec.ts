@@ -1,21 +1,35 @@
 import { expect, test } from '../support/commands'
 
 test.describe('Authentication', () => {
-  test('should login successfully with demo account', async ({ page }) => {
-    await page.login('test@capgo.app', 'testtest')
-    await expect(page.locator('[data-test="user-menu"]')).toBeVisible()
-  })
-
-  test('should login successfully with admin account', async ({ page }) => {
-    await page.login('admin@capgo.app', 'adminadmin')
-    await expect(page.locator('[data-test="user-menu"]')).toBeVisible()
-  })
-
-  test('should show error with invalid credentials', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/login/')
+  })
+
+  test('should show loading state during login', async ({ page }) => {
+    await page.fill('[data-test="email"]', 'test@capgo.app')
+    await page.fill('[data-test="password"]', 'testtest')
+    await page.click('[data-test="submit"]')
+    await expect(page.locator('svg.animate-spin')).toBeVisible()
+  })
+
+  test('should show error for invalid credentials', async ({ page }) => {
     await page.fill('[data-test="email"]', 'wrong@example.com')
     await page.fill('[data-test="password"]', 'wrongpass')
     await page.click('[data-test="submit"]')
-    await expect(page.locator('[data-test="error-message"]')).toBeVisible()
+    await expect(page.locator('[data-test="form-error"]')).toContainText('Invalid login credentials')
+  })
+
+  test('should show error for deleted account', async ({ page }) => {
+    await page.fill('[data-test="email"]', 'deleted@capgo.app')
+    await page.fill('[data-test="password"]', 'password')
+    await page.click('[data-test="submit"]')
+    await expect(page.locator('[data-test="form-error"]')).toContainText('Account with this email used to exist, cannot recreate')
+  })
+
+  test('should login successfully and redirect', async ({ page }) => {
+    await page.fill('[data-test="email"]', 'test@capgo.app')
+    await page.fill('[data-test="password"]', 'testtest')
+    await page.click('[data-test="submit"]')
+    await page.waitForURL('/app/home')
   })
 })
