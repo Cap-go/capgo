@@ -205,16 +205,16 @@ columns.value = [
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       return `
         <div class="flex items-center justify-end space-x-2">
-          <button onclick="window.copyKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md">
+          <button onclick="window.copyKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="copy-key">
             ${Clipboard}
           </button>
-          <button onclick="window.changeName('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md">
+          <button onclick="window.changeName('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="edit-key">
             ${Pencil}
           </button>
-          <button onclick="window.regenrateKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md">
+          <button onclick="window.regenrateKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="regenerate-key">
             ${ArrowPath}
           </button>
-          <button onclick="window.deleteKey('${row.key}')" class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md">
+          <button onclick="window.deleteKey('${row.key}')" class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md" data-test="delete-key">
             ${Trash}
           </button>
         </div>
@@ -543,9 +543,10 @@ async function showDeleteKeyModal() {
         role: 'cancel',
       },
       {
-        text: t('button-delete'),
-        role: 'danger',
-        id: 'confirm-button',
+        'text': t('button-delete'),
+        'role': 'danger',
+        'id': 'confirm-button',
+        'data-test': 'confirm-delete',
       },
     ],
   }
@@ -563,20 +564,24 @@ async function showAddNewKeyModal() {
         role: 'cancel',
       },
       {
-        text: t('key-read'),
-        id: 'read-button',
+        'text': t('key-read'),
+        'id': 'read-button',
+        'data-test': 'key-type-read',
       },
       {
-        text: t('key-upload'),
-        id: 'upload-button',
+        'text': t('key-upload'),
+        'id': 'upload-button',
+        'data-test': 'key-type-upload',
       },
       {
-        text: t('write-key'),
-        id: 'write-button',
+        'text': t('write-key'),
+        'id': 'write-button',
+        'data-test': 'key-type-write',
       },
       {
-        text: t('key-all'),
-        id: 'all-button',
+        'text': t('key-all'),
+        'id': 'all-button',
+        'data-test': 'key-type-all',
       },
     ],
     checkboxText: t('limit-to-org'),
@@ -643,7 +648,7 @@ getKeys()
           </a>
         </div>
       </div>
-      <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="addNewApiKey">
+      <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" data-test="create-key" @click="addNewApiKey">
         <plusOutline />
       </button>
     </div>

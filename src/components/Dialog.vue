@@ -205,6 +205,7 @@ onMounted(() => {
                 'my-4 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
+              :data-test="item.id"
               @click="close(item)"
             >
               {{ item.text }}
