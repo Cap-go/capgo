@@ -486,6 +486,7 @@ onMounted(async () => {
             <div class="md:ml-6">
               <button
                 type="button"
+                data-test="setup-mfa"
                 class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800"
                 :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
                 @click="handleMfa"

@@ -174,6 +174,7 @@ onMounted(() => {
                 v-model="displayStore.dialogInputText"
                 type="text"
                 name="text"
+                data-test="dialog-input-text"
                 enterkeyhint="next"
                 validation="required:trim"
                 :classes="{

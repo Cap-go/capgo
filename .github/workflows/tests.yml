@@ -9,7 +9,7 @@ on:
     branches:
       - renovate/**
     tags:
-      - '*'
+      - "*"
   pull_request:
 
 env:
@@ -47,6 +47,8 @@ jobs:
         run: bunx @capgo/cli@latest -v
       - name: Install dependencies
         run: bun install
+      - name: Install playwright
+        run: bunx playwright install
       - uses: JarvusInnovations/background-action@v1
         name: Bootstrap Edge server
         with:
@@ -72,3 +74,5 @@ jobs:
           working-directory: .
       - name: Run tests
         run: bun run test:all
+      - name: Run playwright tests
+        run: bun run test:front

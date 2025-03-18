@@ -268,7 +268,7 @@ function canDelete(member: ExtendedOrganizationMember) {
         <h2 class="mb-5 text-2xl font-bold text-slate-800 dark:text-white">
           {{ t('members') }}
         </h2>
-        <button type="button" class="btn btn-outline btn-secondary" @click="showInviteModal">
+        <button type="button" class="btn btn-outline btn-secondary" data-test="invite-user" @click="showInviteModal">
           <Plus />
           <p class="hidden ml-2 md:block">
             {{ t('add-member') }}
