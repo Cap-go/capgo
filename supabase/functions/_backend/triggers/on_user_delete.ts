@@ -26,14 +26,35 @@ app.post('/', middlewareAPISecret, async (c) => {
     const record = body.old_record
     console.log({ requestId: c.get('requestId'), context: 'record', record })
 
-    if (!record || !record.id) {
-      console.log({ requestId: c.get('requestId'), context: 'no user id' })
+    if (!record || !record.id || !record.email) {
+      console.log({ requestId: c.get('requestId'), context: 'missing user id or email' })
       return c.json(BRES)
     }
 
     try {
       // Process user deletion with timeout protection
       const startTime = Date.now()
+
+      // Hash the email for consistency with frontend implementation
+      const encoder = new TextEncoder()
+      const data = encoder.encode(record.email)
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      const hashedEmail = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('')
+
+      // Store hashed email in deleted_account table if not already done by the trigger
+      try {
+        await supabaseAdmin(c as any)
+          .from('deleted_account')
+          .insert({
+            email: hashedEmail,
+          })
+        console.log({ requestId: c.get('requestId'), context: 'hashed email stored', email: hashedEmail })
+      }
+      catch (insertError) {
+        // Email might already be in the table, which is fine
+        console.log({ requestId: c.get('requestId'), context: 'email insert error', error: insertError })
+      }
 
       // 1. Cancel Stripe subscriptions if customer_id exists
       if (record.customer_id) {
