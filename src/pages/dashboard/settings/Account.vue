@@ -75,13 +75,20 @@ async function deleteAccount() {
               return
             }
 
-            const hashedEmail = await hashEmail(authUser.data.user.email!)
+            // Delete user using RPC function
+            const { error: deleteError } = await supabase.rpc('delete_user')
 
-            await supabaseClient
-              .from('deleted_account')
-              .insert({
-                email: hashedEmail,
-              })
+            if (deleteError) {
+              console.error('Delete error:', deleteError)
+              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            }
+
+            // Delete auth user
+            const { error: authError } = await supabase.auth.admin.deleteUser(authUser.data.user.id)
+            if (authError) {
+              console.error('Auth delete error:', authError)
+              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+            }
 
             await main.logout()
             router.replace('/login')

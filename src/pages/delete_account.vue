@@ -49,22 +49,8 @@ async function deleteAccount() {
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
             }
 
-            // Store hashed email in deleted_account table
-            const hashedEmail = await hashEmail(authUser.data.user.email!)
-            const { error: insertError } = await supabaseClient
-              .from('deleted_account')
-              .insert({
-                email: hashedEmail,
-              })
-
-            if (insertError) {
-              console.error('Insert error:', insertError)
-              isLoading.value = false
-              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
-            }
-
-            // Call the delete_user function to trigger the queue-based deletion
-            const { error: deleteError } = await supabaseClient.rpc('delete_user')
+            // Delete user using RPC function
+            const { error: deleteError } = await supabase.rpc('delete_user')
 
             if (deleteError) {
               console.error('Delete error:', deleteError)

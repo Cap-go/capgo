@@ -1172,6 +1172,37 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_apps: {
+        Row: {
+          app_id: string
+          owner_org: string
+          created_at: string | null
+        }
+        Insert: {
+          app_id: string
+          owner_org: string
+          created_at?: string | null
+        }
+        Update: {
+          app_id?: string
+          owner_org?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deleted_apps_app_id_fkey"
+            columns: ["app_id"]
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "deleted_apps_owner_org_fkey"
+            columns: ["owner_org"]
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
