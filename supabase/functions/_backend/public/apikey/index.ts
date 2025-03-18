@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()
 
@@ -35,7 +35,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'Invalid mode' }, 400)
   }
 
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseApikey(c as any, key.key)
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
     if (!org || error) {
@@ -103,7 +103,7 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'API key ID is required' }, 400)
   }
 
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseApikey(c as any, key.key)
 
   const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', key.user_id).single()
   if (!apikey || apikeyError) {

@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 interface GetDevice {
@@ -17,7 +17,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
 
   // get one channel or all channels
   if (body.channel) {
-    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
+    const { data: dataChannel, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('channels')
       .select(`
         id,
@@ -55,7 +55,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const { data: dataChannels, error: dbError } = await supabaseAdmin(c)
+    const { data: dataChannels, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('channels')
       .select(`
         id,
