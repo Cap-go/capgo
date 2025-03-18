@@ -13,7 +13,7 @@ import iconFlag from '~icons/ph/flag?raw'
 import iconName from '~icons/ph/user?raw'
 import IconVersion from '~icons/radix-icons/update'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { hashEmail, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 

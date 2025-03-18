@@ -3,7 +3,6 @@ layer(base);
 
 @import 'tailwindcss';
 @plugin "@tailwindcss/typography";
-/* @plugin "tailwind-capacitor/safe-areas"; */ /* TODO: fix the plugin for tailwind 4 */
 @plugin "@tailwindcss/aspect-ratio";
 @plugin "@tailwindcss/container-queries";
 @plugin "@capgo/tailwind-capacitor";
@@ -16,38 +15,8 @@ layer(base);
 @plugin "daisyui/theme" {
   name: "capgotheme";
   default: true;
-  prefersdark: false;
-  color-scheme: light;
-
-  --color-primary: #515271;
-  --color-secondary: #119eff;
-  --color-accent: #1FB2A5;
-  --color-neutral: #191D24;
-  --color-base-100: #ffffff;
-  --color-base-200: #f8f9fa;
-  --color-base-300: #e9ecef;
-  --color-base-content: #1e293b;
-  --color-info: #3ABFF8;
-  --color-success: #88d4a6;
-  --color-warning: #ff7211;
-  --color-error: #456b9a;
-  --rounded-box: 0.5rem;
-  --rounded-btn: 0.5rem;
-  --rounded-badge: 0.5rem;
-  --animation-btn: 0.25s;
-  --animation-input: 0.2s;
-  --btn-text-case: uppercase;
-  --btn-focus-scale: 0.95;
-  --border-btn: 1px;
-  --tab-border: 1px;
-  --tab-radius: 0.5rem;
-}
-
-@plugin "daisyui/theme" {
-  name: "dark";
-  default: false;
   prefersdark: true;
-  color-scheme: dark;
+  color-scheme: light;
 
   --color-primary: #515271;
   --color-secondary: #119eff;
@@ -61,16 +30,15 @@ layer(base);
   --color-success: #88d4a6;
   --color-warning: #ff7211;
   --color-error: #456b9a;
-  --rounded-box: 0.5rem;
-  --rounded-btn: 0.5rem;
-  --rounded-badge: 0.5rem;
+  --radius-box: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
   --animation-btn: 0.25s;
   --animation-input: 0.2s;
   --btn-text-case: uppercase;
   --btn-focus-scale: 0.95;
   --border-btn: 1px;
   --tab-border: 1px;
-  --tab-radius: 0.5rem;
 }
 
 @theme {

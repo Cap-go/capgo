@@ -8,6 +8,7 @@ import { Hono } from 'hono/tiny'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
+import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../../supabase/functions/_backend/private/latency_postres.ts'
@@ -49,5 +50,6 @@ appGlobal.route('/upload_link', upload_link)
 appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
+appGlobal.route('/events', events)
 
 export default handle(appGlobal)

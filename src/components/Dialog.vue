@@ -25,7 +25,6 @@ function calculateAcronym(name: string) {
 }
 
 function close(item?: ActionSheetOptionButton) {
-  console.log('close', item)
   if (displayStore?.dialogOption)
     displayStore.dialogOption.preventAccidentalClose = false
   if (!item?.preventClose)
@@ -132,7 +131,7 @@ onMounted(() => {
                     :name="`app-${app.id}`"
                     :classes="{
                       outer: 'mb-0! ml-0 grow-0! h-[18px]!',
-                      inner: 'max-w-[18px]!',
+                      inner: 'max-w-[18px]! mr-2',
                       wrapper: 'mb-0!',
                     }"
                     @input="(value) => {
@@ -161,7 +160,11 @@ onMounted(() => {
                 type="checkbox"
                 decorator-icon="check"
                 :label="displayStore.dialogOption?.checkboxText"
-                :classes="{ outer: 'mb-[0px]', inner: 'max-w-[18px]!' }"
+                :classes="{
+                  outer: 'mb-0! ml-0 grow-0! h-[18px]!',
+                  inner: 'max-w-[18px]! mr-2',
+                  wrapper: 'mb-0!',
+                }"
               />
             </FormKit>
           </div>
@@ -205,7 +208,7 @@ onMounted(() => {
                 'my-4 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
-              :data-test="item.id"
+              :data-test="item.id || item.text"
               @click="close(item)"
             >
               {{ item.text }}

@@ -543,10 +543,9 @@ async function showDeleteKeyModal() {
         role: 'cancel',
       },
       {
-        'text': t('button-delete'),
-        'role': 'danger',
-        'id': 'confirm-button',
-        'data-test': 'confirm-delete',
+        text: t('button-delete'),
+        role: 'danger',
+        id: 'confirm-button',
       },
     ],
   }
@@ -564,24 +563,20 @@ async function showAddNewKeyModal() {
         role: 'cancel',
       },
       {
-        'text': t('key-read'),
-        'id': 'read-button',
-        'data-test': 'key-type-read',
+        text: t('key-read'),
+        id: 'read-button',
       },
       {
-        'text': t('key-upload'),
-        'id': 'upload-button',
-        'data-test': 'key-type-upload',
+        text: t('key-upload'),
+        id: 'upload-button',
       },
       {
-        'text': t('write-key'),
-        'id': 'write-button',
-        'data-test': 'key-type-write',
+        text: t('write-key'),
+        id: 'write-button',
       },
       {
-        'text': t('key-all'),
-        'id': 'all-button',
-        'data-test': 'key-type-all',
+        text: t('key-all'),
+        id: 'all-button',
       },
     ],
     checkboxText: t('limit-to-org'),
@@ -590,6 +585,7 @@ async function showAddNewKeyModal() {
   displayStore.showDialog = true
   return displayStore.onDialogDismiss()
 }
+
 async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
   try {
     await navigator.clipboard.writeText(app.key)
