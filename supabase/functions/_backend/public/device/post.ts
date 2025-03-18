@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
 export async function post(c: Context<MiddlewareKeyVariables, any, object>, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (!body.device_id || !body.app_id) {
@@ -25,7 +25,7 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
   // if channel set channel_override to it
   if (body.channel) {
     // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
+    const { data: dataChannel, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('channels')
       .select()
       .eq('app_id', body.app_id)

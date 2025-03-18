@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -24,13 +24,13 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
   }
 
-  const { data, error } = await supabaseAdmin(c).from('users').select('*').eq('id', userId).single()
+  const { data, error } = await supabaseApikey(c, apikey.key).from('users').select('*').eq('id', userId).single()
   if (error) {
     console.error('Cannot get user', error)
     return c.json({ status: 'Cannot get user', error: error.message }, 500)
   }
 
-  const { error: errorOrg, data: dataOrg } = await supabaseAdmin(c)
+  const { error: errorOrg, data: dataOrg } = await supabaseApikey(c, apikey.key)
     .from('orgs')
     .update({
       name: body.name,

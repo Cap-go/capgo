@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 export interface CreateApp {
   name: string
@@ -21,7 +21,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
     return c.json({ status: 'You can\'t access this organization', orgId: body.owner_org }, 403)
   }
 
-  const { data: isOwner, error: ownerError } = await supabaseAdmin(c)
+  const { data: isOwner, error: ownerError } = await supabaseApikey(c, apikey.key)
     .rpc('is_owner_of_org', {
       user_id: userId,
       org_id: body.owner_org,
@@ -46,7 +46,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
     default_upload_channel: 'dev',
   }
   try {
-    const { data, error: dbError } = await supabaseAdmin(c)
+    const { data, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('apps')
       .insert(dataInsert)
       .select()

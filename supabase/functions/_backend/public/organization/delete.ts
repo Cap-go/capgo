@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface DeleteOrganizationParams {
   orgId?: string
@@ -22,7 +22,7 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
   }
 
   // Check if the user is the owner of the organization
-  const { data: isOwner, error: ownerError } = await supabaseAdmin(c)
+  const { data: isOwner, error: ownerError } = await supabaseApikey(c, apikey.key)
     .rpc('is_owner_of_org', {
       user_id: userId,
       org_id: orgId,
@@ -39,7 +39,7 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
   }
 
   try {
-    const { error } = await supabaseAdmin(c)
+    const { error } = await supabaseApikey(c, apikey.key)
       .from('orgs')
       .delete()
       .eq('id', orgId)
