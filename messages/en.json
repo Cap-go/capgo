@@ -558,5 +558,12 @@
   "you-reached-the-limi": "Limit reached",
   "your-settings": "Your settings",
   "your-ussage": "Your usage:",
-  "zip-bundle": "Zip app bundle"
+  "zip-bundle": "Zip app bundle",
+  "option-to-create-user": "Create user option",
+  "would-you-like-to-create-user": "Would you like to create a user account if it doesn't exist?",
+  "create-user-first-name": "Enter first name",
+  "create-user-last-name": "Enter last name",
+  "error-creating-user": "Error creating user account",
+  "error-adding-to-org": "Error adding user to organization",
+  "user-created-and-invited": "User created and invited to organization"
 }

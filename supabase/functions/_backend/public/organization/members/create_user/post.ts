@@ -1,25 +1,24 @@
 import type { Context } from '@hono/hono'
-import type { Database } from '../../../utils/supabase.types.ts'
+import type { Database } from '../../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../../utils/supabase.ts'
 
-const inviteBodySchema = z.object({
-  orgId: z.string(),
+const createUserSchema = z.object({
+  orgId: z.string().uuid(),
   email: z.string().email(),
+  first_name: z.string(),
+  last_name: z.string(),
   invite_type: z.enum([
-    'read',
-    'upload',
-    'write',
-    'admin',
-    'super_admin',
+    'invite_read',
+    'invite_upload',
+    'invite_write',
+    'invite_admin',
+    'invite_super_admin',
   ]),
-  create_if_not_exists: z.boolean().optional().default(false),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
 })
 
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']) {
-  const bodyParsed = inviteBodySchema.safeParse(bodyRaw)
+  const bodyParsed = createUserSchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     console.error('Invalid body', bodyParsed.error)
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
@@ -31,41 +30,6 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
   }
 
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
-
-  // Use the wrapper function if create_if_not_exists is true
-  const rpcFunction = body.create_if_not_exists ? 'invite_user_to_org_wrapper' : 'invite_user_to_org'
-
-  const { data, error } = await supabase
-    .rpc(rpcFunction, {
-      email: body.email,
-      org_id: body.orgId,
-      invite_type: `invite_${body.invite_type}`,
-    })
-
-  if (error) {
-    console.error('Error inviting user to organization', error)
-    return c.json({ error, status: 'KO' }, 400)
-  }
-
-  // If the result is CREATE_USER and we have first_name and last_name, create the user
-  if (data === 'CREATE_USER' && body.create_if_not_exists) {
-    if (!body.first_name || !body.last_name) {
-      return c.json({ status: 'CREATE_USER_FORM_NEEDED' }, 200)
-    }
-
-    return createUser(c, body, apikey)
-  }
-
-  if (data && data !== 'OK') {
-    console.log('Invitation result:', data)
-    return c.json({ status: data }, 200)
-  }
-
-  console.log('User invited to organization', body.email, body.orgId)
-  return c.json({ status: data }, 200)
-}
-async function createUser(c: Context, body: z.infer<typeof inviteBodySchema>, _apikey: Database['public']['Tables']['apikeys']['Row']) {
   try {
     // Generate a random password (will be reset by user via email verification)
     const password = crypto.randomUUID()
@@ -97,7 +61,7 @@ async function createUser(c: Context, body: z.infer<typeof inviteBodySchema>, _a
       .rpc('add_user_to_org_after_creation', {
         user_id: userData.user.id,
         org_id: body.orgId,
-        invite_type: `invite_${body.invite_type}`,
+        invite_type: body.invite_type,
       })
 
     if (addToOrgError) {
