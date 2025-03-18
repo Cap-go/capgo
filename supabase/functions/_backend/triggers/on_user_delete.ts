@@ -59,7 +59,45 @@ app.post('/', middlewareAPISecret, async (c) => {
         }
       }
 
-      // 3. Track performance metrics
+      // 3. Hash and store email in deleted_account table if email exists
+      if (record.email) {
+        try {
+          // Hash the email using SHA-256
+          const encoder = new TextEncoder()
+          const data = encoder.encode(record.email)
+          const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+          const hashArray = Array.from(new Uint8Array(hashBuffer))
+          const hashedEmail = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+          console.log({
+            requestId: c.get('requestId'),
+            context: 'storing hashed email in deleted_account',
+            email_hash_length: hashedEmail.length,
+          })
+
+          // Insert the hashed email into deleted_account table
+          const { error: insertError } = await supabaseAdmin(c as any)
+            .from('deleted_account')
+            .insert({ email: hashedEmail })
+
+          if (insertError) {
+            console.error({
+              requestId: c.get('requestId'),
+              context: 'error storing hashed email',
+              error: insertError,
+            })
+          }
+        }
+        catch (hashError) {
+          console.error({
+            requestId: c.get('requestId'),
+            context: 'error hashing email',
+            error: hashError instanceof Error ? hashError.message : JSON.stringify(hashError),
+          })
+        }
+      }
+
+      // 4. Track performance metrics
       const endTime = Date.now()
       const duration = endTime - startTime
 
