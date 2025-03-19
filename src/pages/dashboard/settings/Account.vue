@@ -194,6 +194,7 @@ async function submit(form: { first_name: string, last_name: string, email: stri
     toast.success('A confirmation email was sent click to link to confirm your new email', {
       duration: 10000,
     })
+    updateData.email = form.email
   }
 
   const { data: usr, error: dbError } = await supabase
