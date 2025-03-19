@@ -41,17 +41,14 @@ app.post('/', middlewareAuth, async (c) => {
 
     const user_id = parsedBodyResult.data.user_id
 
-    const { data: userData, count: _userCount, error: userError } = await supabaseAdmin.from('users')
-      .select('email', { count: 'exact' })
-      .eq('id', user_id)
-      .single()
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id)
 
-    if (userError) {
+    if (userError || !userData?.user?.email) {
       console.error({ requestId: c.get('requestId'), context: 'user_does_not_exist', error: userError })
       return c.json({ error: 'user_does_not_exist' }, 400)
     }
 
-    const userEmail = userData?.email
+    const userEmail = userData?.user?.email
 
     const { data: magicLink, error: magicError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
