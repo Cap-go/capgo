@@ -337,4 +337,162 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(updateResponse.status).toBe(200)
     expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('need_plan_upgrade')
   })
+
+  it('should correctly handle MAU reset', async () => {
+    const supabase = getSupabaseClient()
+    const { error: latestMauError, data: latestMauData } = await supabase
+      .from('daily_mau')
+      .select('*')
+      .eq('app_id', APPNAME)
+      .order('date', { ascending: false })
+      .limit(1)
+      .single()
+    expect(latestMauError).toBeFalsy()
+
+    // First set high MAU
+    const { error: setMauError } = await supabase
+      .from('daily_mau')
+      .update({ mau: 1000000 })
+      .eq('app_id', APPNAME)
+      .eq('date', latestMauData?.date ?? '')
+    expect(setMauError).toBeFalsy()
+
+    // Run cron plan to set exceeded status
+    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response.status).toBe(200)
+
+    // Verify MAU is exceeded
+    const { data: mauExceededBefore, error: mauExceededErrorBefore } = await supabase
+      .rpc('is_mau_exceeded_by_org', { org_id: ORG_ID })
+    expect(mauExceededErrorBefore).toBeFalsy()
+    expect(mauExceededBefore).toBe(true)
+
+    // Reset MAU to normal value
+    const { error: resetMauError } = await supabase
+      .from('daily_mau')
+      .update({ mau: 0 })
+      .eq('app_id', APPNAME)
+      .eq('date', latestMauData?.date ?? '')
+    expect(resetMauError).toBeFalsy()
+
+    // Run cron plan again
+    const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response2.status).toBe(200)
+
+    // Verify MAU is no longer exceeded
+    const { data: mauExceededAfter, error: mauExceededErrorAfter } = await supabase
+      .rpc('is_mau_exceeded_by_org', { org_id: ORG_ID })
+    expect(mauExceededErrorAfter).toBeFalsy()
+    expect(mauExceededAfter).toBe(false)
+  })
+
+  it('should correctly handle storage reset', async () => {
+    const supabase = getSupabaseClient()
+
+    // First set high storage
+    const { error: setStorageError } = await supabase
+      .from('app_versions_meta')
+      .update({ size: 1000000000 })
+      .eq('app_id', APPNAME)
+    expect(setStorageError).toBeFalsy()
+
+    // Run cron plan to set exceeded status
+    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response.status).toBe(200)
+
+    // Verify storage is exceeded
+    const { data: storageExceededBefore, error: storageExceededErrorBefore } = await supabase
+      .rpc('is_storage_exceeded_by_org', { org_id: ORG_ID })
+    expect(storageExceededErrorBefore).toBeFalsy()
+    expect(storageExceededBefore).toBe(true)
+
+    // Reset storage to normal value
+    const { error: resetStorageError } = await supabase
+      .from('app_versions_meta')
+      .update({ size: 0 })
+      .eq('app_id', APPNAME)
+    expect(resetStorageError).toBeFalsy()
+
+    // Run cron plan again
+    const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response2.status).toBe(200)
+
+    // Verify storage is no longer exceeded
+    const { data: storageExceededAfter, error: storageExceededErrorAfter } = await supabase
+      .rpc('is_storage_exceeded_by_org', { org_id: ORG_ID })
+    expect(storageExceededErrorAfter).toBeFalsy()
+    expect(storageExceededAfter).toBe(false)
+  })
+
+  it('should correctly handle bandwidth reset', async () => {
+    const supabase = getSupabaseClient()
+    const { error: latestBandwidthError, data: latestBandwidthData } = await supabase
+      .from('daily_bandwidth')
+      .select('*')
+      .eq('app_id', APPNAME)
+      .order('date', { ascending: false })
+      .limit(1)
+      .single()
+    expect(latestBandwidthError).toBeFalsy()
+
+    // First set high bandwidth
+    const { error: setBandwidthError } = await supabase
+      .from('daily_bandwidth')
+      .update({ bandwidth: 100000000000 })
+      .eq('app_id', APPNAME)
+      .eq('date', latestBandwidthData?.date ?? '')
+    expect(setBandwidthError).toBeFalsy()
+
+    // Run cron plan to set exceeded status
+    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response.status).toBe(200)
+
+    // Verify bandwidth is exceeded
+    const { data: bandwidthExceededBefore, error: bandwidthExceededErrorBefore } = await supabase
+      .rpc('is_bandwidth_exceeded_by_org', { org_id: ORG_ID })
+    expect(bandwidthExceededErrorBefore).toBeFalsy()
+    expect(bandwidthExceededBefore).toBe(true)
+
+    // Reset bandwidth to normal value
+    const { error: resetBandwidthError } = await supabase
+      .from('daily_bandwidth')
+      .update({ bandwidth: 0 })
+      .eq('app_id', APPNAME)
+      .eq('date', latestBandwidthData?.date ?? '')
+    expect(resetBandwidthError).toBeFalsy()
+
+    // Run cron plan again
+    const response2 = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response2.status).toBe(200)
+
+    // Verify bandwidth is no longer exceeded
+    const { data: bandwidthExceededAfter, error: bandwidthExceededErrorAfter } = await supabase
+      .rpc('is_bandwidth_exceeded_by_org', { org_id: ORG_ID })
+    expect(bandwidthExceededErrorAfter).toBeFalsy()
+    expect(bandwidthExceededAfter).toBe(false)
+  })
 })

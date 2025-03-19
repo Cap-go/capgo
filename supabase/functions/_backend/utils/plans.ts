@@ -191,6 +191,11 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       }
     }
     else if (is_good_plan && is_onboarded) {
+      // Reset exceeded flags if plan is good
+      await set_mau_exceeded(c, orgId, false)
+      await set_storage_exceeded(c, orgId, false)
+      await set_bandwidth_exceeded(c, orgId, false)
+
       // check if user is at more than 90%, 50% or 70% of plan usage
       if (percentUsage.total_percent >= 90) {
         // cron every month * * * * 1

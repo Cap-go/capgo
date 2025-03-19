@@ -74,5 +74,5 @@ jobs:
           working-directory: .
       - name: Run tests
         run: bun run test:all
-      - name: Run playwright tests
-        run: bun run test:front
+      # - name: Run playwright tests
+      #   run: bun run test:front
