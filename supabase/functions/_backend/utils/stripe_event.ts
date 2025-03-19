@@ -27,6 +27,9 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
     subscription_metered: {} as MeteredData,
     customer_id: '',
     is_good_plan: true,
+    mau_exceeded: false,
+    storage_exceeded: false,
+    bandwidth_exceeded: false,
     status: undefined,
   }
   let isUpgrade = false
