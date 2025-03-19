@@ -125,6 +125,9 @@ app.post('/', async (c) => {
         stripeData.status = statusCopy
       }
       stripeData.is_good_plan = false
+      stripeData.mau_exceeded = true
+      stripeData.storage_exceeded = true
+      stripeData.bandwidth_exceeded = true
       const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update(stripeData)
