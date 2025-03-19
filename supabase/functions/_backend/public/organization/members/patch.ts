@@ -4,13 +4,25 @@ import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
 import { apikeyHasOrgRight, hasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
 
-const deleteBodySchema = z.object({
+const updateBodySchema = z.object({
   orgId: z.string(),
   email: z.string().email(),
+  user_right: z.enum([
+    'read',
+    'upload',
+    'write',
+    'admin',
+    'super_admin',
+    'invite_read',
+    'invite_upload',
+    'invite_write',
+    'invite_admin',
+    'invite_super_admin',
+  ]),
 })
 
-export async function deleteMember(c: Context, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row'] | null) {
-  const bodyParsed = deleteBodySchema.safeParse(bodyRaw)
+export async function patch(c: Context, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row'] | null) {
+  const bodyParsed = updateBodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     console.error('Invalid body', bodyParsed.error)
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
@@ -48,17 +60,16 @@ export async function deleteMember(c: Context, bodyRaw: any, _apikey: Database['
     ? supabaseApikey(c, auth.apikey!.key)
     : supabaseAdmin(c)
 
-  console.log(userData.id, body.orgId)
   const { error } = await supabase
     .from('org_users')
-    .delete()
+    .update({ user_right: body.user_right })
     .eq('user_id', userData.id)
     .eq('org_id', body.orgId)
 
   if (error) {
-    console.error('Error deleting user from organization', error)
+    console.error('Error updating user permission in organization', error)
     return c.json({ error, status: 'KO' }, 400)
   }
-  console.log('User deleted from organization', userData.id, body.orgId)
+  console.log('User permission updated in organization', userData.id, body.orgId, body.user_right)
   return c.json({ status: 'OK' }, 200)
 }

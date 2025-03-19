@@ -9,6 +9,8 @@ import { toast } from 'vue-sonner'
 import Plus from '~icons/heroicons/plus'
 import Trash from '~icons/heroicons/trash'
 import Wrench from '~icons/heroicons/Wrench'
+import iconEmail from '~icons/oui/email?raw'
+import iconName from '~icons/ph/user?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -140,24 +142,155 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   if (!orgId)
     return
 
-  const { data, error } = await supabase.rpc('invite_user_to_org', {
-    email,
-    org_id: orgId,
-    invite_type: type,
-  })
+  try {
+    const { data, error } = await supabase.functions.invoke('organization/members', {
+      body: {
+        orgId,
+        email,
+        invite_type: type.replace('invite_', ''),
+      },
+    })
 
-  if (error)
-    throw error
+    if (error) {
+      console.error('Error inviting user:', error)
+      toast.error(t('error-inviting-user'))
+      return
+    }
 
-  handleSendInvitationOutput(data)
-  members.value = await organizationStore.getMembers()
+    handleSendInvitationOutput(data.status, email, type)
+    members.value = await organizationStore.getMembers()
+  }
+  catch (error) {
+    console.error('Error invoking function:', error)
+    toast.error(t('error-inviting-user'))
+  }
 }
 
-function handleSendInvitationOutput(output: string) {
+async function showUserCreationModal(email: string, inviteType: Database['public']['Enums']['user_min_right']) {
+  let firstName = ''
+  let lastName = ''
+
+  displayStore.dialogOption = {
+    header: t('please-create-user-account'),
+    size: 'max-w-md',
+    customContent: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-invite'),
+        id: 'confirm-button',
+        handler: async () => {
+          if (!firstName || !lastName) {
+            toast.error(t('missing-name'))
+            return
+          }
+
+          await createUserAndInvite(email, firstName, lastName, inviteType)
+        },
+      },
+    ],
+    customContentRender: () => {
+      return `
+        <div class="space-y-4 p-4">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${t('email')}</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+              <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                ${iconEmail}
+              </span>
+              <input type="text" disabled value="${email}" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 bg-gray-100 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 focus:outline-none sm:text-sm" />
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${t('first-name')}</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+              <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                ${iconName}
+              </span>
+              <input type="text" id="first-name-input" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 focus:outline-none sm:text-sm" />
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">${t('last-name')}</label>
+            <div class="mt-1 flex rounded-md shadow-sm">
+              <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                ${iconName}
+              </span>
+              <input type="text" id="last-name-input" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 focus:outline-none sm:text-sm" />
+            </div>
+          </div>
+        </div>
+      `
+    },
+  }
+
+  displayStore.showDialog = true
+  await displayStore.onDialogDismiss()
+
+  // Get the values from the inputs after the dialog is shown
+  const firstNameInput = document.getElementById('first-name-input') as HTMLInputElement
+  const lastNameInput = document.getElementById('last-name-input') as HTMLInputElement
+
+  if (firstNameInput && lastNameInput) {
+    firstNameInput.addEventListener('input', (e) => {
+      firstName = (e.target as HTMLInputElement).value
+    })
+    lastNameInput.addEventListener('input', (e) => {
+      lastName = (e.target as HTMLInputElement).value
+    })
+  }
+}
+
+async function createUserAndInvite(email: string, firstName: string, lastName: string, inviteType: Database['public']['Enums']['user_min_right']) {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
+    return
+
+  try {
+    const { data, error } = await supabase.functions.invoke('organization/members', {
+      body: {
+        orgId,
+        email,
+        invite_type: inviteType.replace('invite_', ''),
+        first_name: firstName,
+        last_name: lastName,
+        create_if_not_exists: true,
+      },
+    })
+
+    if (error) {
+      console.error('Error creating user:', error)
+      toast.error(t('error-creating-user'))
+      return
+    }
+
+    if (data.status === 'OK') {
+      toast.success(t('org-invited-user'))
+      members.value = await organizationStore.getMembers()
+    }
+    else {
+      toast.error(data.status)
+    }
+  }
+  catch (error) {
+    console.error('Error invoking function:', error)
+    toast.error(t('error-creating-user'))
+  }
+}
+
+function handleSendInvitationOutput(output: string, email: string, inviteType: Database['public']['Enums']['user_min_right']) {
   console.log('Output: ', output)
   switch (output) {
     case 'OK': {
       toast.success(t('org-invited-user'))
+      break
+    }
+    case 'CREATE_USER': {
+      // Show modal to create user
+      showUserCreationModal(email, inviteType)
       break
     }
     case 'NO_EMAIL': {
@@ -204,21 +337,44 @@ async function deleteMember(member: ExtendedOrganizationMember) {
     return
   }
 
-  const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
-  if (error) {
-    console.log('Error delete: ', error)
+  try {
+    const orgId = currentOrganization.value?.gid
+    if (!orgId)
+      return
+
+    const { data, error } = await supabase.functions.invoke('organization/members', {
+      method: 'DELETE',
+      body: {
+        orgId,
+        email: member.email,
+      },
+    })
+
+    if (error) {
+      console.error('Error deleting member:', error)
+      toast.error(t('cannot-delete-member'))
+      return
+    }
+
+    if (data.status !== 'OK') {
+      toast.error(data.status)
+      return
+    }
+
+    if (member.uid === main.user?.id) {
+      organizationStore.fetchOrganizations()
+      organizationStore.setCurrentOrganizationToMain()
+    }
+    else {
+      members.value = await organizationStore.getMembers()
+    }
+
+    toast.success(t('member-deleted'))
+  }
+  catch (error) {
+    console.error('Error invoking function:', error)
     toast.error(t('cannot-delete-member'))
   }
-
-  if (member.uid === main.user?.id) {
-    organizationStore.fetchOrganizations()
-    organizationStore.setCurrentOrganizationToMain()
-  }
-  else {
-    members.value = await organizationStore.getMembers()
-  }
-
-  toast.success(t('member-deleted'))
 }
 
 async function changeMemberPermission(member: ExtendedOrganizationMember) {
@@ -227,14 +383,38 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
   if (!perm)
     return
 
-  const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
-  if (error) {
-    console.log('Error delete: ', error)
+  try {
+    const orgId = currentOrganization.value?.gid
+    if (!orgId)
+      return
+
+    const { data, error } = await supabase.functions.invoke('organization/members', {
+      method: 'PATCH',
+      body: {
+        orgId,
+        email: member.email,
+        user_right: perm,
+      },
+    })
+
+    if (error) {
+      console.error('Error updating member permission:', error)
+      toast.error(t('cannot-change-permission'))
+      return
+    }
+
+    if (data.status !== 'OK') {
+      toast.error(data.status)
+      return
+    }
+
+    toast.success(t('permission-changed'))
+    members.value = await organizationStore.getMembers()
+  }
+  catch (error) {
+    console.error('Error invoking function:', error)
     toast.error(t('cannot-change-permission'))
   }
-
-  toast.success(t('permission-changed'))
-  members.value = await organizationStore.getMembers()
 }
 function acronym(email: string) {
   let res = 'NA'
