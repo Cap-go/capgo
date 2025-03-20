@@ -454,12 +454,19 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
 
 export async function createApiKey(c: Context, userId: string) {
   // check if user has apikeys
+  if (!userId) {
+    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'userId is null' })
+    return
+  }
   const total = await supabaseAdmin(c)
     .from('apikeys')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .then(res => res.count || 0)
-
+    .then(res => res.count || null)
+  if (total === null) {
+    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'total is null' })
+    return
+  }
   if (total === 0) {
     // create apikeys
     return supabaseAdmin(c)
