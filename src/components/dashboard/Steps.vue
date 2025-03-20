@@ -138,13 +138,13 @@ async function getKey(retry = true): Promise<void> {
   isLoading.value = true
   if (!main?.user?.id)
     return
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('apikeys')
     .select()
     .eq('user_id', main?.user?.id)
     .eq('mode', 'all')
 
-  if (typeof data !== 'undefined' && data !== null) {
+  if (typeof data !== 'undefined' && data !== null && !error) {
     if (data.length === 0) {
       await addNewApiKey()
       return getKey(false)
