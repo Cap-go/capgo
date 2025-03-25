@@ -31,9 +31,36 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
+    // Get the user email from the record
+    const userEmail = record.email
+    if (!userEmail) {
+      console.log({ requestId: c.get('requestId'), context: 'no user email' })
+      return c.json(BRES)
+    }
+
     try {
       // Process user deletion with timeout protection
       const startTime = Date.now()
+
+      // Hash the email and insert into deleted_account table
+      try {
+        // Create a hash of the email using crypto API
+        const encoder = new TextEncoder()
+        const data = encoder.encode(userEmail)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+
+        // Convert hash buffer to hex string
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        const hashedEmail = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+        // Insert the hashed email into deleted_account table
+        await supabaseAdmin(c as any)
+          .from('deleted_account')
+          .insert({ email: hashedEmail })
+      }
+      catch (hashError) {
+        console.error({ requestId: c.get('requestId'), context: 'email hashing error', error: hashError })
+      }
 
       // 1. Cancel Stripe subscriptions if customer_id exists
       if (record.customer_id) {
