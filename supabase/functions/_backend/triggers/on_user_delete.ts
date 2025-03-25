@@ -31,6 +31,33 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
+    // Hash the email and store it in deleted_account table if email exists
+    if (record.email) {
+      try {
+        // Hash the email similar to how it's done in the delete_user function
+        const { error } = await supabaseAdmin(c as any)
+          .from('deleted_account')
+          .insert({ email: record.email })
+
+        if (error) {
+          console.error({
+            requestId: c.get('requestId'),
+            context: 'error inserting into deleted_account',
+            error: error.message,
+          })
+          // Continue with the rest of the process even if this fails
+        }
+      }
+      catch (emailError) {
+        console.error({
+          requestId: c.get('requestId'),
+          context: 'error hashing email',
+          error: emailError instanceof Error ? emailError.message : JSON.stringify(emailError),
+        })
+        // Continue with the rest of the process even if this fails
+      }
+    }
+
     try {
       // Process user deletion with timeout protection
       const startTime = Date.now()
