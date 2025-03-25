@@ -35,6 +35,34 @@ app.post('/', middlewareAPISecret, async (c) => {
       // Process user deletion with timeout protection
       const startTime = Date.now()
 
+      // Check if email exists and add to deleted_account if not already there
+      if (record.email) {
+        // Hash the email
+        const encoder = new TextEncoder()
+        const data = encoder.encode(record.email)
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+        const hashArray = Array.from(new Uint8Array(hashBuffer))
+        const hashedEmail = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+        // Check if the hashed email already exists in deleted_account
+        const { data: existingEmail } = await supabaseAdmin(c as any)
+          .from('deleted_account')
+          .select('email')
+          .eq('email', hashedEmail)
+          .maybeSingle()
+
+        // Only insert if it doesn't exist already
+        if (!existingEmail) {
+          console.log({
+            requestId: c.get('requestId'),
+            context: 'inserting hashed email to deleted_account',
+          })
+          await supabaseAdmin(c as any)
+            .from('deleted_account')
+            .insert({ email: hashedEmail })
+        }
+      }
+
       // 1. Cancel Stripe subscriptions if customer_id exists
       if (record.customer_id) {
         console.log({ requestId: c.get('requestId'), context: 'canceling stripe subscription', customer_id: record.customer_id })
