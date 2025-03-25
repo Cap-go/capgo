@@ -59,7 +59,63 @@ app.post('/', middlewareAPISecret, async (c) => {
         }
       }
 
-      // 3. Track performance metrics
+      // 3. Hash the email and store it in deleted_account table if not already done
+      if (record.email) {
+        console.log({ requestId: c.get('requestId'), context: 'storing hashed email in deleted_account' })
+
+        try {
+          // Create a hash of the email using TextEncoder and crypto.subtle
+          const encoder = new TextEncoder()
+          const data = encoder.encode(record.email)
+          const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+          const hashArray = Array.from(new Uint8Array(hashBuffer))
+          const hashedEmail = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+          // Check if the email already exists in deleted_account table
+          const { data: existingAccount, error: checkError } = await supabaseAdmin(c as any)
+            .from('deleted_account')
+            .select('id')
+            .eq('email', hashedEmail)
+            .maybeSingle()
+
+          if (checkError) {
+            console.error({
+              requestId: c.get('requestId'),
+              context: 'error checking deleted_account',
+              error: checkError,
+            })
+          }
+          else if (!existingAccount) {
+            // Insert the hashed email into deleted_account table
+            const { error: insertError } = await supabaseAdmin(c as any)
+              .from('deleted_account')
+              .insert([{ email: hashedEmail }])
+
+            if (insertError) {
+              console.error({
+                requestId: c.get('requestId'),
+                context: 'error inserting into deleted_account',
+                error: insertError,
+              })
+            }
+            else {
+              console.log({
+                requestId: c.get('requestId'),
+                context: 'successfully stored hashed email in deleted_account',
+              })
+            }
+          }
+        }
+        catch (hashError) {
+          console.error({
+            requestId: c.get('requestId'),
+            context: 'error hashing email',
+            error: hashError instanceof Error ? hashError.message : JSON.stringify(hashError),
+          })
+        }
+      }
+
+      // 4. Track performance metrics
       const endTime = Date.now()
       const duration = endTime - startTime
 
