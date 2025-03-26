@@ -31,7 +31,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900" :class="{ 'border-b border-slate-200 dark:border-slate-600': displayStore.NavTitle, 'border-b md:border-none border-slate-200 dark:border-slate-600': !displayStore.NavTitle }">
+  <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
     <div class="px-2 lg:px-8 sm:px-6">
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
@@ -53,8 +53,8 @@ const { t } = useI18n()
         </div>
 
         <!-- Centered title -->
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div class="font-bold text-md text-dark dark:text-white">
+        <div class="absolute inset-0 flex items-center justify-center md:justify-start pointer-events-none">
+          <div class="font-bold text-md md:text-2xl text-dark dark:text-white">
             {{ displayStore.NavTitle }}
           </div>
         </div>
