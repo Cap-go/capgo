@@ -7,6 +7,7 @@
 /api-edge/* https://webcapgo.netlify.app/api-edge/:splat
 
 /dashboard/settings/plans /dashboard/settings/organization/plans
+/dashboard/settings/usage /dashboard/settings/organization/usage
 
 /* /index.html 200
 

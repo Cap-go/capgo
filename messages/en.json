@@ -558,5 +558,14 @@
   "you-reached-the-limi": "Limit reached",
   "your-settings": "Your settings",
   "your-ussage": "Your usage:",
-  "zip-bundle": "Zip app bundle"
+  "zip-bundle": "Zip app bundle",
+  "device-not-found": "Device not found",
+  "device-not-found-description": "This device could not be found. It might have been deleted or you might not have access to it.",
+  "back-to-devices": "Back to devices",
+  "bundle-not-found": "Bundle not found",
+  "bundle-not-found-description": "This bundle could not be found. It might have been deleted or you might not have access to it.",
+  "back-to-bundles": "Back to bundles",
+  "channel-not-found": "Channel not found",
+  "channel-not-found-description": "This channel could not be found. It might have been deleted or you might not have access to it.",
+  "back-to-channels": "Back to channels"
 }

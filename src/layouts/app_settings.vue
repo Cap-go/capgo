@@ -6,7 +6,7 @@ import IconAcount from '~icons/mdi/user'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
-const route = useRoute('/app/p/[package]/settings')
+const route = useRoute('/app/p/[package].settings')
 const displayStore = useDisplayStore()
 const ActiveTab = ref(`/app/p/${route.params.package}/settings`)
 

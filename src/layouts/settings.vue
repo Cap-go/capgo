@@ -110,7 +110,7 @@ watchEffect(() => {
     organizationTabs.value.splice(tabs.value.length - 2, 0, {
       label: 'usage',
       icon: shallowRef(IconPlans) as any,
-      key: '/dashboard/settings/usage',
+      key: '/dashboard/settings/organization/usage',
     })
   }
   else if (organizationTabs.value.find(tab => tab.label === 'usage')) {

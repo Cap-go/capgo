@@ -32,13 +32,12 @@ const newRoutes = routes.map((route) => {
   }
   return route
 })
-// https://web.capgo.app/app/p/com.sourcewhere.sourcewhere/d/c8ca51a7-ab11-4b86-870e-990ea041436a
 const router = createRouter({
   routes: [
     { path: '/app', redirect: '/app/home' },
     { path: '/', redirect: '/login' },
     { path: '/dashboard/settings/plans', redirect: '/dashboard/settings/organization/plans' },
-    // https://web.capgo.app/app/p/ee--forgr--capacitor_go/channels
+    { path: '/dashboard/settings/usage', redirect: '/dashboard/settings/organization/usage' },
     { path: '/app/p/:package/bundles', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=bundles` },
     { path: '/app/p/:package/channels', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=channels` },
     { path: '/app/p/:package/devices', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=devices` },

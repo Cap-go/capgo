@@ -10,6 +10,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
+import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -333,7 +334,10 @@ function openChannel() {
 
 <template>
   <div>
-    <div v-if="device">
+    <div v-if="isLoading" class="flex flex-col items-center justify-center min-h-[50vh]">
+      <Spinner size="w-40 h-40" />
+    </div>
+    <div v-else-if="device">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
         <div v-if="device.plugin_version === '0.0.0'" class="my-2 bg-[#ef4444] text-center text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
@@ -375,6 +379,18 @@ function openChannel() {
           />
         </div>
       </div>
+    </div>
+    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
+      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+      <h2 class="text-xl font-semibold text-foreground">
+        {{ t('device-not-found') }}
+      </h2>
+      <p class="text-muted-foreground mt-2">
+        {{ t('device-not-found-description') }}
+      </p>
+      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/devices`)">
+        {{ t('back-to-devices') }}
+      </button>
     </div>
   </div>
 </template>

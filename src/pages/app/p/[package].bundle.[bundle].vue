@@ -8,7 +8,9 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconInformations from '~icons/material-symbols/info-rounded'
+import Spinner from '~/components/Spinner.vue'
 import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -327,7 +329,6 @@ async function getVersion() {
       .single()
     if (!data) {
       console.error('no version found')
-      router.back()
       return
     }
     if (dataVersionsMeta)
@@ -426,7 +427,10 @@ function preventInputChangePerm(event: Event) {
 
 <template>
   <div>
-    <div v-if="version">
+    <div v-if="loading" class="flex flex-col items-center justify-center min-h-[50vh]">
+      <Spinner size="w-40 h-40" />
+    </div>
+    <div v-else-if="version">
       <Tabs v-model:active-tab="ActiveTab" :tabs="tabs" />
       <div v-if="ActiveTab === 'info'" id="devices" class="flex flex-col">
         <div
@@ -547,6 +551,18 @@ function preventInputChangePerm(event: Event) {
           <DeviceTable class="p-3" :app-id="packageId" :version-id="version.id" />
         </div>
       </div>
+    </div>
+    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
+      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+      <h2 class="text-xl font-semibold text-foreground">
+        {{ t('bundle-not-found') }}
+      </h2>
+      <p class="text-muted-foreground mt-2">
+        {{ t('bundle-not-found-description') }}
+      </p>
+      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles`)">
+        {{ t('back-to-bundles') }}
+      </button>
     </div>
   </div>
 </template>
