@@ -18,7 +18,7 @@ import { useOrganizationStore } from '~/stores/organization'
 
 const id = ref('')
 const { t } = useI18n()
-const route = useRoute('/app/package/[package]')
+const route = useRoute('/app/p/[package]')
 const router = useRouter()
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
@@ -67,25 +67,25 @@ const stats = computed<Stat[]>(() => ([
     label: t('channels'),
     hoverLabel: 'Click to explore the channel list',
     value: channelsNb.value?.toLocaleString(),
-    link: `/app/package/${appIdToUrl(id.value)}?tab=channels`,
+    link: `/app/p/${appIdToUrl(id.value)}?tab=channels`,
   },
   {
     label: t('bundles'),
     hoverLabel: 'Click to explore the bundle list',
     value: bundlesNb.value?.toLocaleString(),
-    link: `/app/package/${appIdToUrl(id.value)}?tab=bundles`,
+    link: `/app/p/${appIdToUrl(id.value)}?tab=bundles`,
   },
   {
     label: t('devices'),
     hoverLabel: 'Click to explore the device list',
     value: devicesNb.value?.toLocaleString(),
-    link: `/app/package/${appIdToUrl(id.value)}?tab=devices`,
+    link: `/app/p/${appIdToUrl(id.value)}?tab=devices`,
   },
   {
     label: t('plan-updates'),
     hoverLabel: 'Click to explore the logs',
     value: updatesNb.value?.toLocaleString(),
-    link: `/app/package/${appIdToUrl(id.value)}?tab=logs`,
+    link: `/app/p/${appIdToUrl(id.value)}?tab=logs`,
   },
 ]))
 
@@ -146,7 +146,7 @@ async function refreshData() {
 }
 
 watchEffect(async () => {
-  if (route.path.startsWith('/app/package')) {
+  if (route.path.startsWith('/app/p')) {
     id.value = route.params.package as string
     id.value = urlToAppId(id.value)
     await refreshData()

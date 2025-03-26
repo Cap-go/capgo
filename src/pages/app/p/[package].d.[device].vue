@@ -33,7 +33,7 @@ const displayStore = useDisplayStore()
 const { t } = useI18n()
 const main = useMainStore()
 const router = useRouter()
-const route = useRoute('/app/p/[p]/d/[device]')
+const route = useRoute('/app/p/[package].d.[device]')
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
@@ -315,13 +315,13 @@ async function updateChannelOverride(event: Event) {
 
 watchEffect(async () => {
   if (route.path.includes('/d/')) {
-    packageId.value = route.params.p as string
+    packageId.value = route.params.package as string
     packageId.value = urlToAppId(packageId.value)
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await loadData()
     displayStore.NavTitle = t('device')
-    displayStore.defaultBack = `/app/package/${route.params.p}/devices`
+    displayStore.defaultBack = `/app/p/${route.params.package}/devices`
   }
 })
 

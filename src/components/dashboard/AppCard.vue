@@ -37,7 +37,7 @@ async function refreshData() {
 }
 
 function openPackage(appId: string) {
-  router.push(`/app/package/${appIdToUrl(appId)}`)
+  router.push(`/app/p/${appIdToUrl(appId)}`)
 }
 
 const acronym = computed(() => {

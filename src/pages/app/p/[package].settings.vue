@@ -16,7 +16,7 @@ import { useSupabase } from '~/services/supabase'
 
 const isLoading = ref(false)
 const isFirstLoading = ref(true)
-const route = useRoute('/app/p/[p]/settings')
+const route = useRoute('/app/p/[package].settings')
 const router = useRouter()
 const supabase = useSupabase()
 const appId = ref('')
@@ -30,7 +30,7 @@ const organizationStore = useOrganizationStore()
 onMounted(async () => {
   if (route.path.includes('/p/') && route.path.endsWith('/settings')) {
     displayStore.NavTitle = t('settings')
-    displayStore.defaultBack = `/app/package/${route.params.p}`
+    displayStore.defaultBack = `/app/p/${route.params.package}`
     appId.value = (route.params as any).p as string
     appId.value = urlToAppId(appId.value)
     isLoading.value = true

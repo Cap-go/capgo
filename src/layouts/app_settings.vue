@@ -6,15 +6,15 @@ import IconAcount from '~icons/mdi/user'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
-const route = useRoute('/app/p/[p]/settings')
+const route = useRoute('/app/p/[package]/settings')
 const displayStore = useDisplayStore()
-const ActiveTab = ref(`/app/p/${route.params.p}/settings`)
+const ActiveTab = ref(`/app/p/${route.params.package}/settings`)
 
 const tabs = ref<Tab[]>([
   {
     label: 'general',
     icon: shallowRef(IconAcount),
-    key: `/app/p/${route.params.p}/settings`,
+    key: `/app/p/${route.params.package}/settings`,
   },
 ])
 

@@ -15,7 +15,7 @@ import { useMainStore } from '~/stores/main'
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 const { t } = useI18n()
-const route = useRoute('/app/package/[package]')
+const route = useRoute('/app/p/[package]')
 const main = useMainStore()
 
 const appId = ref('')
@@ -72,7 +72,7 @@ function getDateRange(days: number) {
 }
 
 watchEffect(async () => {
-  if (route.path.includes('/package/')) {
+  if (route.path.includes('/p/')) {
     appId.value = urlToAppId(route.params.package as string)
     try {
       await loadData()

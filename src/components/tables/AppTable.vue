@@ -104,7 +104,7 @@ function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
 }
 
 function openPackage(app: Database['public']['Tables']['apps']['Row']) {
-  router.push(`/app/package/${appIdToUrl(app.app_id)}`)
+  router.push(`/app/p/${appIdToUrl(app.app_id)}`)
 }
 
 // Filter apps based on search term

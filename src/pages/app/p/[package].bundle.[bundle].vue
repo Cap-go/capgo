@@ -18,7 +18,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const route = useRoute('/app/p/[p]/bundle/[bundle]')
+const route = useRoute('/app/p/[package].bundle.[bundle]')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
@@ -343,14 +343,14 @@ async function getVersion() {
 watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
-    packageId.value = route.params.p as string
+    packageId.value = route.params.package as string
     packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
     loading.value = false
     displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/package/${route.params.p}/bundles`
+    displayStore.defaultBack = `/app/p/${route.params.package}/bundles`
   }
 })
 

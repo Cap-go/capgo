@@ -27,7 +27,7 @@ const router = useRouter()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const { t } = useI18n()
-const route = useRoute('/app/p/[p]/channel/[channel]')
+const route = useRoute('/app/p/[package].channel.[channel]')
 const main = useMainStore()
 const supabase = useSupabase()
 const packageId = ref<string>('')
@@ -87,7 +87,7 @@ function openBundle() {
   if (channel.value.version.name === 'unknown')
     return
   console.log('openBundle', channel.value.version.id)
-  router.push(`/app/p/${route.params.p}/bundle/${channel.value.version.id}`)
+  router.push(`/app/p/${route.params.package}/bundle/${channel.value.version.id}`)
 }
 
 async function getDeviceIds() {
@@ -190,14 +190,14 @@ async function saveChannelChange(key: string, val: any) {
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
-    packageId.value = route.params.p as string
+    packageId.value = route.params.package as string
     packageId.value = urlToAppId(packageId.value)
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
     loading.value = false
     displayStore.NavTitle = t('channel')
-    displayStore.defaultBack = `/app/package/${route.params.p}/channels`
+    displayStore.defaultBack = `/app/p/${route.params.package}/channels`
   }
 })
 
