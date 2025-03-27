@@ -23,12 +23,13 @@ app.get('/', (c) => {
   }
   // force partial and tus for 20% of the requests
   // const randomPU = Math.random()
-  const randomTUS = Math.random()
-  const forcePartialUpload = randomTUS < 0.5
+  // const randomTUS = Math.random()
+  // const forcePartialUpload = randomTUS < 0.5
   // const forceTUSUpload = randomTUS < 0.3
+  // TODO: re add partial update when we use file extension for compression
   return c.json({
-    partialUpload: true,
-    partialUploadForced: forcePartialUpload,
+    partialUpload: false,
+    partialUploadForced: false,
     maxUploadLength: MAX_UPLOAD_LENGTH_BYTES,
     maxChunkSize: MAX_CHUNK_SIZE_BYTES,
     alertUploadSize: ALERT_UPLOAD_SIZE_BYTES,
