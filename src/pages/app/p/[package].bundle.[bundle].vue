@@ -279,7 +279,7 @@ async function openDownload() {
           if (!version.value)
             return
           if (version.value.session_key) {
-            const filename = version.value.r2_path?.split('/').slice(-1)[0]
+            const filename = version.value.r2_path?.replace('/', '_')
             const localPath = `./${filename}`
             const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
             displayStore.dialogOption = {
