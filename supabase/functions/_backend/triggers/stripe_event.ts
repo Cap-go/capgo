@@ -1,5 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import Stripe from 'stripe'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
@@ -20,6 +21,62 @@ app.post('/', async (c) => {
     // event.headers
     const body = await c.req.text()
     const stripeEvent = await parseStripeEvent(c as any, body, signature!)
+    
+    if (stripeEvent.type === 'payment_intent.succeeded') {
+      const paymentIntent = stripeEvent.data.object as Stripe.PaymentIntent
+      if (paymentIntent.object === 'payment_intent') {
+        const customerId = typeof paymentIntent.customer === 'string' ? paymentIntent.customer : paymentIntent.customer?.id
+        const { data: org, error: orgError } = await supabaseAdmin(c as any)
+          .from('orgs')
+          .select('id')
+          .eq('customer_id', customerId ?? '')
+          .single()
+
+        if (!org || orgError) {
+          console.log({ requestId: c.get('requestId'), context: 'no org found for payment intent', paymentIntent })
+          return c.json({ received: false })
+        }
+
+        const howMany = paymentIntent.metadata?.howMany
+        const parsedHowMany = parseInt(howMany ?? '0')
+        if (!howMany || Number.isNaN(parsedHowMany)) {
+          console.log({ requestId: c.get('requestId'), context: 'no howMany found for payment intent', paymentIntent })
+          return c.json({ received: false })
+        }
+
+        const tokenRecord = {
+          sum: Number(parsedHowMany),
+          reason: 'MAU purchase',
+          org_id: org.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        console.log({ requestId: c.get('requestId'), context: 'inserting token record', tokenRecord })
+        
+        const { error: dbError } = await (supabaseAdmin(c as any) as any)
+          .from('capgo_tokens_history')
+          .insert(tokenRecord)
+        if (dbError) {
+          console.log({ requestId: c.get('requestId'), context: 'error inserting capgo_tokens_history', dbError })
+          return c.json({ received: false })
+        }
+
+        await LogSnag.track({
+          channel: 'usage', 
+          event: 'One-off Purchase',
+          icon: '💰',
+          user_id: org.id,
+          notify: true,
+          tags: {
+            amount: `${paymentIntent.amount / 100} ${paymentIntent.currency.toUpperCase()}`,
+            payment_intent: paymentIntent.id,
+          },
+        }).catch()
+
+        return c.json({ received: true })
+      }
+    }
+
     const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '')

@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
 import { existInEnv, getEnv } from './utils.ts'
+import { supabaseAdmin } from './supabase.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
@@ -126,6 +127,105 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
       })),
     ],
   })
+  return { url: session.url }
+}
+
+function toMilion(price: number) {
+  return `${price / 1000000}M`
+}
+
+interface TokenStep {
+  step_min: number
+  step_max: number
+  price_per_unit: number
+}
+
+export async function createCheckoutForOneOff(c: Context, customerId: string, successUrl: string, cancelUrl: string, howMany: number) {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return { url: '' }
+  
+  let tokensSteps: TokenStep[] = []
+  
+  try {
+    const { data, error } = await (supabaseAdmin(c) as any).from('capgo_tokens_steps').select('*').order('step_min', { ascending: true })
+    if (error || !data || !data.length) {
+      console.log({ requestId: c.get('requestId'), context: 'error fetching token steps', error })
+      return { url: '' }
+    }
+    
+    tokensSteps = (data as unknown[]).map(step => {
+      const stepObj = step as any
+      return {
+        step_min: typeof stepObj.step_min === 'number' ? stepObj.step_min : 0,
+        step_max: typeof stepObj.step_max === 'number' ? stepObj.step_max : Number.MAX_SAFE_INTEGER,
+        price_per_unit: typeof stepObj.price_per_unit === 'number' ? stepObj.price_per_unit : 0.01
+      }
+    })
+  } catch (err) {
+    console.log({ requestId: c.get('requestId'), context: 'error processing token steps', error: err })
+    return { url: '' }
+  }
+
+  let i = 0
+  const prices = []
+
+  while (true) {
+    const step = tokensSteps[i]
+    const howManyInStep = Math.min(howMany, step.step_max) - Math.max(0, step.step_min)
+    const description = step.step_min > 0
+      ? step.step_max !== 9223372036854775807
+        ? `Price per token: ${step.price_per_unit} between ${toMilion(step.step_min)} and ${toMilion(step.step_max)}`
+        : `Price per token: ${step.price_per_unit} after ${toMilion(step.step_min)}`
+      : `Price per token: ${step.price_per_unit} up to ${toMilion(step.step_max)}`
+
+    const formatedAmmount = 
+      howManyInStep % 1000000 === 0 && howManyInStep > 0 ? 
+        toMilion(howManyInStep) : 
+        howManyInStep % 1000 === 0 && howManyInStep > 0 ? 
+          `${howManyInStep / 1000}K` : 
+          `${howManyInStep}`
+
+    prices.push({
+      quantity: 1,
+      price_data: {
+        unit_amount: Math.ceil(step.price_per_unit * howManyInStep * 100),
+        currency: 'usd',
+        product_data: {
+          name: `${formatedAmmount} tokens`,
+          description,
+        },
+      },
+    })
+    if (howMany >= step.step_min && howMany <= step.step_max) {
+      break
+    }
+    i++
+  }
+
+  const totalPrice = prices.reduce((acc, price) => acc + price.price_data.unit_amount, 0)
+  if (totalPrice % 100 !== 0) {
+    console.log({ requestId: c.get('requestId'), context: 'totalPrice', error: 'totalPrice is not divisible by 100' })
+    return { url: '' }
+  }
+
+  console.log({ requestId: c.get('requestId'), context: 'prices', prices })
+
+  const req = {
+    customer: customerId,
+    success_url: successUrl,
+    mode: 'payment' as const,
+    cancel_url: cancelUrl,
+    automatic_tax: { enabled: true },
+    payment_method_types: ['card' as const],
+    payment_intent_data: {
+      metadata: {
+        howMany,
+      },
+    },
+    line_items: prices,
+  }
+  console.log({ requestId: c.get('requestId'), context: 'req', req })
+  const session = await getStripe(c).checkout.sessions.create(req)
   return { url: session.url }
 }
 
