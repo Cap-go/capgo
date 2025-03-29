@@ -206,7 +206,7 @@ async function deleteOne(one: Element) {
       toast.error(t('cannot-delete-channel'))
     }
     else {
-      await refreshData()
+      await reload()
       toast.success(t('channel-deleted'))
     }
   }
