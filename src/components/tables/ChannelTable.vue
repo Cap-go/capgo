@@ -5,7 +5,7 @@ import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
 import IconTrash from '~icons/heroicons/trash?raw'
@@ -40,6 +40,7 @@ const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const router = useRouter()
+const route = useRoute()
 const main = useMainStore()
 const total = ref(0)
 const search = ref('')
@@ -298,7 +299,20 @@ async function showAddModal() {
 async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
+// Update URL when page changes
+watch(currentPage, (newPage) => {
+  const query = { ...route.query, page: newPage.toString() }
+  router.replace({ query })
+})
+
 onMounted(async () => {
+  // Read page from URL if available
+  if (route.query.page) {
+    const pageFromUrl = parseInt(route.query.page as string, 10)
+    if (!isNaN(pageFromUrl) && pageFromUrl > 0) {
+      currentPage.value = pageFromUrl
+    }
+  }
   await refreshData()
 })
 watch(props, async () => {
