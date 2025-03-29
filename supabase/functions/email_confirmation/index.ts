@@ -45,7 +45,8 @@ app.get('/', async (c) => {
     }
 
     return c.redirect(`${url.origin}${redirectTo}`)
-  } catch (error) {
+  }
+  catch (error) {
     console.error({ requestId: c.get('requestId'), context: 'Error processing email confirmation', error })
     return c.redirect(`${new URL(c.req.url).origin}/error?message=An error occurred`)
   }
