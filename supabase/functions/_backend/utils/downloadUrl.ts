@@ -11,6 +11,7 @@ export interface ManifestEntry {
   file_name: string | null
   file_hash: string | null
   download_url: string | null
+  file_size: number | null
 }
 
 export async function getBundleUrl(
@@ -78,6 +79,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Database
         file_name: entry.file_name,
         file_hash: entry.file_hash,
         download_url: `${url.protocol}//${url.host}/${finalPath}/${entry.s3_path}?key=${signKey}&device_id=${deviceId}`,
+        file_size: entry.file_size
       }
     }).filter(entry => entry !== null) as ManifestEntry[]
   }
