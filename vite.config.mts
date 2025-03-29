@@ -8,6 +8,7 @@ import formkit from 'unplugin-formkit/vite'
 import IconsResolver from 'unplugin-icons/resolver'
 import Icons from 'unplugin-icons/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import svgLoader from 'vite-svg-loader'
 
 import Components from 'unplugin-vue-components/vite'
 import VueMacros from 'unplugin-vue-macros/vite'
@@ -47,15 +48,14 @@ export default defineConfig({
     },
   },
   plugins: [
+    svgLoader(),
     tailwindcss(),
     formkit({}),
-
     VueMacros({
       plugins: {
         vue: Vue({
           include: [/\.vue$/, /\.md$/],
         }),
-
       },
     }),
     Components({
