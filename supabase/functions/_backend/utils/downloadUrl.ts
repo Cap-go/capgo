@@ -79,7 +79,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Database
         file_name: entry.file_name,
         file_hash: entry.file_hash,
         download_url: `${url.protocol}//${url.host}/${finalPath}/${entry.s3_path}?key=${signKey}&device_id=${deviceId}`,
-        file_size: entry.file_size
+        file_size: entry.file_size,
       }
     }).filter(entry => entry !== null) as ManifestEntry[]
   }
