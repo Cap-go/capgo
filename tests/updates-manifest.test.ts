@@ -7,7 +7,7 @@ import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetA
 const id = randomUUID()
 const APPNAME = `com.demo.app.updates.${id}`
 
-const manifest = [{ file_name: 'test', s3_path: '/test_file.html', file_hash: '1234567890' }]
+const manifest = [{ file_name: 'test', s3_path: '/test_file.html', file_hash: '1234567890', file_size: 1024 }]
 
 interface UpdateRes {
   error?: string
@@ -41,6 +41,7 @@ describe('update manifest scenarios', () => {
     expect(json.manifest?.[0].file_name).toBe('test')
     expect(json.manifest?.[0].download_url).toContain('/test_file.html')
     expect(json.manifest?.[0].file_hash).toBe('1234567890')
+    expect(json.manifest?.[0].file_size).toBe(1024)
   })
   // test for plugin version < 6.8.0
   it('manifest should not be available with plugin version < 6.8.0', async () => {
