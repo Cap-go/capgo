@@ -1,4 +1,22 @@
-CREATE TYPE manifest_entry_new AS (
+CREATE OR REPLACE FUNCTION migrate_manifest_entries()
+RETURNS manifest_entry[] AS $$
+DECLARE
+    result manifest_entry[];
+BEGIN
+    CREATE TYPE manifest_entry AS (
+        file_name character varying,
+        s3_path character varying,
+        file_hash character varying,
+        file_size bigint
+    );
+    
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TYPE IF EXISTS manifest_entry CASCADE;
+
+CREATE TYPE manifest_entry AS (
     file_name character varying,
     s3_path character varying,
     file_hash character varying,
@@ -6,11 +24,4 @@ CREATE TYPE manifest_entry_new AS (
 );
 
 ALTER TABLE app_versions 
-  ALTER COLUMN manifest TYPE manifest_entry_new[] 
-  USING array(
-    SELECT ROW(m.file_name, m.s3_path, m.file_hash, 0)::manifest_entry_new 
-    FROM unnest(manifest) m
-  );
-
-DROP TYPE IF EXISTS manifest_entry CASCADE;
-ALTER TYPE manifest_entry_new RENAME TO manifest_entry;
+  ALTER COLUMN manifest TYPE manifest_entry[] USING NULL;
