@@ -1,18 +1,26 @@
-CREATE OR REPLACE FUNCTION migrate_manifest_entries()
-RETURNS manifest_entry[] AS $$
-DECLARE
-    result manifest_entry[];
+DO $$
 BEGIN
-    CREATE TYPE manifest_entry AS (
-        file_name character varying,
-        s3_path character varying,
-        file_hash character varying,
-        file_size bigint
-    );
-    
-    RETURN result;
-END;
-$$ LANGUAGE plpgsql;
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'app_versions' 
+        AND column_name = 'manifest'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM pg_type 
+            WHERE typname = 'manifest_entry'
+        ) THEN
+            CREATE TYPE manifest_entry AS (
+                file_name character varying,
+                s3_path character varying,
+                file_hash character varying
+            );
+        END IF;
+        
+        ALTER TABLE app_versions ADD COLUMN manifest manifest_entry[];
+    END IF;
+END $$;
 
 DROP TYPE IF EXISTS manifest_entry CASCADE;
 
