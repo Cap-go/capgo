@@ -107,7 +107,7 @@ async function addChannel(name: string) {
       .select()
     if (!dataChannel)
       return
-    elements.value.push(dataChannel[0] as any)
+    refreshData(true)
   }
   catch (error) {
     console.error(error)
@@ -175,13 +175,18 @@ async function getData() {
   }
   isLoading.value = false
 }
-async function refreshData() {
+async function refreshData(keepCurrentPage = false) {
   // console.log('refreshData')
   try {
-    currentPage.value = 1
+    let page = currentPage.value
+    if (!keepCurrentPage)
+      currentPage.value = 1
+
     elements.value.length = 0
     await getData()
     versionId.value = await findUnknownVersion()
+    if (keepCurrentPage)
+      currentPage.value = page
   }
   catch (error) {
     console.error(error)
@@ -206,7 +211,7 @@ async function deleteOne(one: Element) {
       toast.error(t('cannot-delete-channel'))
     }
     else {
-      await refreshData()
+      await refreshData(true)
       toast.success(t('channel-deleted'))
     }
   }
