@@ -183,10 +183,11 @@ async function refreshData(keepCurrentPage = false) {
       currentPage.value = 1
 
     elements.value.length = 0
-    await getData()
-    versionId.value = await findUnknownVersion()
+    // Set the page before getting data to ensure correct data is fetched
     if (keepCurrentPage)
       currentPage.value = page
+    await getData()
+    versionId.value = await findUnknownVersion()
   }
   catch (error) {
     console.error(error)
