@@ -50,8 +50,13 @@ async function submit(form: { email: string, password: string, code: string }) {
     const hashedEmail = await hashEmail(form.email)
     const { data: deleted, error: errorDeleted } = await supabase
       .rpc('is_not_deleted', { email_check: hashedEmail })
-    if (errorDeleted)
+    if (errorDeleted) {
       console.error(errorDeleted)
+      isLoading.value = false
+      setErrors('login-account', [errorDeleted.message], {})
+      return
+    }
+
     if (!deleted) {
       toast.error(t('used-to-create'))
       isLoading.value = false
