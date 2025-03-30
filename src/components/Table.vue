@@ -2,6 +2,7 @@
 import type { TableColumn } from './comp_def'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
+import DOMPurify from 'dompurify'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import IconTrash from '~icons/heroicons/trash'
@@ -111,7 +112,10 @@ watch(searchVal, useDebounceFn(() => {
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
     return ''
-  return col.displayFunction ? col.displayFunction(elem) : elem[col.key]
+  const text = col.displayFunction ? col.displayFunction(elem) : elem[col.key]
+  if (col.sanitizeHtml)
+    return DOMPurify.sanitize(text)
+  return text
 }
 const displayElemRange = computed(() => {
   const begin = (props.currentPage - 1) * props.elementList.length

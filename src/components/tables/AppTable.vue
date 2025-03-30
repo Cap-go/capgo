@@ -46,6 +46,7 @@ const columns = ref<TableColumn[]>([
     sortable: true,
     head: true,
     allowHtml: true,
+    sanitizeHtml: true,
     displayFunction: (item) => {
       return `
         <div class="flex flex-wrap items-center text-slate-800 dark:text-white">

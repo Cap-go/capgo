@@ -138,10 +138,10 @@ async function fetchOrgAndAppNames() {
 // Add type declarations for window functions
 declare global {
   interface Window {
-    regenrateKey: (key: string) => void
-    changeName: (key: string) => void
-    copyKey: (key: string) => void
-    deleteKey: (key: string) => void
+    regenrateKey: (id: number) => void
+    changeName: (id: number) => void
+    copyKey: (id: number) => void
+    deleteKey: (id: number) => void
   }
 }
 
@@ -205,16 +205,16 @@ columns.value = [
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       return `
         <div class="flex items-center justify-end space-x-2">
-          <button onclick="window.copyKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="copy-key">
+          <button onclick="window.copyKey(${row.id})" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="copy-key">
             ${Clipboard}
           </button>
-          <button onclick="window.changeName('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="edit-key">
+          <button onclick="window.changeName(${row.id})" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="edit-key">
             ${Pencil}
           </button>
-          <button onclick="window.regenrateKey('${row.key}')" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="regenerate-key">
+          <button onclick="window.regenrateKey(${row.id})" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="regenerate-key">
             ${ArrowPath}
           </button>
-          <button onclick="window.deleteKey('${row.key}')" class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md" data-test="delete-key">
+          <button onclick="window.deleteKey(${row.id})" class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md" data-test="delete-key">
             ${Trash}
           </button>
         </div>
@@ -225,23 +225,23 @@ columns.value = [
 
 // Add window functions for the onclick handlers
 if (typeof window !== 'undefined') {
-  window.regenrateKey = (key: string) => {
-    const apiKey = keys.value?.find(k => k.key === key)
+  window.regenrateKey = (id: number) => {
+    const apiKey = keys.value?.find(k => k.id === id)
     if (apiKey)
       regenrateKey(apiKey)
   }
-  window.changeName = (key: string) => {
-    const apiKey = keys.value?.find(k => k.key === key)
+  window.changeName = (id: number) => {
+    const apiKey = keys.value?.find(k => k.id === id)
     if (apiKey)
       changeName(apiKey)
   }
-  window.copyKey = (key: string) => {
-    const apiKey = keys.value?.find(k => k.key === key)
+  window.copyKey = (id: number) => {
+    const apiKey = keys.value?.find(k => k.id === id)
     if (apiKey)
       copyKey(apiKey)
   }
-  window.deleteKey = (key: string) => {
-    const apiKey = keys.value?.find(k => k.key === key)
+  window.deleteKey = (id: number) => {
+    const apiKey = keys.value?.find(k => k.id === id)
     if (apiKey)
       deleteKey(apiKey)
   }
