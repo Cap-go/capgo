@@ -370,7 +370,7 @@ export type Database = {
           android: boolean
           app_id: string
           created_at: string
-          created_by: string | null
+          created_by: string
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native: boolean
           id: number
@@ -388,7 +388,7 @@ export type Database = {
           android?: boolean
           app_id: string
           created_at?: string
-          created_by?: string | null
+          created_by: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
           id?: number
@@ -406,7 +406,7 @@ export type Database = {
           android?: boolean
           app_id?: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
           id?: number
@@ -552,16 +552,38 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_apps: {
+        Row: {
+          app_id: string
+          created_at: string | null
+          deleted_at: string | null
+          id: number
+          owner_org: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: number
+          owner_org: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: number
+          owner_org?: string
+        }
+        Relationships: []
+      }
       deploy_history: {
         Row: {
           app_id: string
           channel_id: number
-          comment: string | null
           created_at: string | null
+          created_by: string
           deployed_at: string | null
           id: number
-          is_current: boolean | null
-          link: string | null
           owner_org: string
           updated_at: string | null
           version_id: number
@@ -569,12 +591,10 @@ export type Database = {
         Insert: {
           app_id: string
           channel_id: number
-          comment?: string | null
           created_at?: string | null
+          created_by: string
           deployed_at?: string | null
           id?: number
-          is_current?: boolean | null
-          link?: string | null
           owner_org: string
           updated_at?: string | null
           version_id: number
@@ -582,22 +602,34 @@ export type Database = {
         Update: {
           app_id?: string
           channel_id?: number
-          comment?: string | null
           created_at?: string | null
+          created_by?: string
           deployed_at?: string | null
           id?: number
-          is_current?: boolean | null
-          link?: string | null
           owner_org?: string
           updated_at?: string | null
           version_id?: number
         }
         Relationships: [
           {
+            foreignKeyName: "deploy_history_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
             foreignKeyName: "deploy_history_channel_id_fkey"
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deploy_history_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -731,6 +763,41 @@ export type Database = {
           users_active?: number | null
         }
         Relationships: []
+      }
+      manifest: {
+        Row: {
+          app_version_id: number
+          file_hash: string
+          file_name: string
+          file_size: number | null
+          id: number
+          s3_path: string
+        }
+        Insert: {
+          app_version_id: number
+          file_hash: string
+          file_name: string
+          file_size?: number | null
+          id?: number
+          s3_path: string
+        }
+        Update: {
+          app_version_id?: number
+          file_hash?: string
+          file_name?: string
+          file_size?: number | null
+          id?: number
+          s3_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manifest_app_version_id_fkey"
+            columns: ["app_version_id"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -1172,78 +1239,6 @@ export type Database = {
         }
         Relationships: []
       }
-      deleted_apps: {
-        Row: {
-          app_id: string
-          owner_org: string
-          created_at: string | null
-        }
-        Insert: {
-          app_id: string
-          owner_org: string
-          created_at?: string | null
-        }
-        Update: {
-          app_id?: string
-          owner_org?: string
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deleted_apps_app_id_fkey"
-            columns: ["app_id"]
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "deleted_apps_owner_org_fkey"
-            columns: ["owner_org"]
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      manifest: {
-        Row: {
-          id: number
-          created_at: string | null
-          updated_at: string | null
-          app_version_id: number
-          file_name: string
-          s3_path: string
-          file_hash: string
-          file_size: number | null
-        }
-        Insert: {
-          id?: number
-          created_at?: string | null
-          updated_at?: string | null
-          app_version_id: number
-          file_name: string
-          s3_path: string
-          file_hash: string
-          file_size?: number | null
-        }
-        Update: {
-          id?: number
-          created_at?: string | null
-          updated_at?: string | null
-          app_version_id?: number
-          file_name?: string
-          s3_path?: string
-          file_hash?: string
-          file_size?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "manifest_app_version_id_fkey"
-            columns: ["app_version_id"]
-            isOneToOne: false
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -1410,6 +1405,19 @@ export type Database = {
               fail: number
               install: number
               uninstall: number
+            }[]
+          }
+        | {
+            Args: {
+              p_org_id: string
+              p_start_date: string
+              p_end_date: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+              deleted_apps: number
             }[]
           }
       get_app_versions: {
@@ -2327,27 +2335,29 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -2355,20 +2365,22 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -2376,20 +2388,22 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -2397,21 +2411,23 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
@@ -2420,7 +2436,92 @@ export type CompositeTypes<
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      action_type: ["mau", "storage", "bandwidth"],
+      disable_update: ["major", "minor", "patch", "version_number", "none"],
+      key_mode: ["read", "write", "all", "upload"],
+      platform_os: ["ios", "android"],
+      stats_action: [
+        "delete",
+        "reset",
+        "set",
+        "get",
+        "set_fail",
+        "update_fail",
+        "download_fail",
+        "windows_path_fail",
+        "canonical_path_fail",
+        "directory_path_fail",
+        "unzip_fail",
+        "low_mem_fail",
+        "download_10",
+        "download_20",
+        "download_30",
+        "download_40",
+        "download_50",
+        "download_60",
+        "download_70",
+        "download_80",
+        "download_90",
+        "download_complete",
+        "decrypt_fail",
+        "app_moved_to_foreground",
+        "app_moved_to_background",
+        "uninstall",
+        "needPlanUpgrade",
+        "missingBundle",
+        "noNew",
+        "disablePlatformIos",
+        "disablePlatformAndroid",
+        "disableAutoUpdateToMajor",
+        "cannotUpdateViaPrivateChannel",
+        "disableAutoUpdateToMinor",
+        "disableAutoUpdateToPatch",
+        "channelMisconfigured",
+        "disableAutoUpdateMetadata",
+        "disableAutoUpdateUnderNative",
+        "disableDevBuild",
+        "disableEmulator",
+        "cannotGetBundle",
+        "checksum_fail",
+        "NoChannelOrOverride",
+        "setChannel",
+        "getChannel",
+        "rateLimited",
+      ],
+      stripe_status: [
+        "created",
+        "succeeded",
+        "updated",
+        "failed",
+        "deleted",
+        "canceled",
+      ],
+      usage_mode: ["last_saved", "5min", "day", "cycle"],
+      user_min_right: [
+        "invite_read",
+        "invite_upload",
+        "invite_write",
+        "invite_admin",
+        "invite_super_admin",
+        "read",
+        "upload",
+        "write",
+        "admin",
+        "super_admin",
+      ],
+      user_role: ["read", "upload", "write", "admin"],
+      version_action: ["get", "fail", "install", "uninstall"],
+    },
+  },
+} as const
 

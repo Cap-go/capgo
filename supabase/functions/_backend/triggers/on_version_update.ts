@@ -41,6 +41,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 
   // Handle manifest entries
   if (record.manifest) {
+    console.log({ requestId: c.get('requestId'), context: 'manifest', manifest: record.manifest })
     const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
 
     // Check if entries exist

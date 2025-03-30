@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS "public"."manifest" (
     "id" SERIAL PRIMARY KEY,
     "app_version_id" BIGINT NOT NULL REFERENCES "public"."app_versions"("id") ON DELETE CASCADE,
+    -- "app_id" VARCHAR NOT NULL REFERENCES "public"."apps"("app_id") ON DELETE CASCADE,
     "file_name" VARCHAR NOT NULL,
     "s3_path" VARCHAR NOT NULL,
     "file_hash" VARCHAR NOT NULL,
