@@ -13,6 +13,7 @@ import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cro
 import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
+import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../../supabase/functions/_backend/triggers/on_user_delete.ts'
 import { app as on_user_update } from '../../supabase/functions/_backend/triggers/on_user_update.ts'
@@ -45,6 +46,7 @@ appGlobal.route('/on_user_delete', on_user_delete)
 appGlobal.route('/on_version_create', on_version_create)
 appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
+appGlobal.route('/on_manifest_create', on_manifest_create)
 appGlobal.route('/stripe_event', stripe_event)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)

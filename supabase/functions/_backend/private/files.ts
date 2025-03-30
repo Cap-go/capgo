@@ -47,6 +47,8 @@ async function getHandler(c: Context): Promise<Response> {
   const cache = caches.default
   const cacheKey = new Request(new URL(c.req.url), c.req)
   let response = await cache.match(cacheKey)
+  // TODO: move bandwidth tracking here instead of in the updates.ts
+  // createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
   if (response != null) {
     console.log('getHandler files', 'cache hit')
     return response

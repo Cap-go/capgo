@@ -379,10 +379,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
         }
       }
-      manifest = getManifestUrl(c, version.id, version.manifest as any, device_id)
+      manifest = await getManifestUrl(c, version.id, null, device_id)
     }
     //  check signedURL and if it's url
-    if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !version.manifest) {
+    if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
@@ -390,7 +390,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'no_bundle_url',
       }, 200)
     }
-    if (version.manifest && !signedURL) {
+    if (manifest.length && !signedURL) {
       // TODO: remove this when all plugin acccept no URL
       signedURL = 'https://404.capgo.app/no.zip'
     }

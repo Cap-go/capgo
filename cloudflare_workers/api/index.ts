@@ -37,6 +37,7 @@ import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cr
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
+import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { app as on_organization_create } from '../../supabase/functions/_backend/triggers/on_organization_create.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../../supabase/functions/_backend/triggers/on_user_delete.ts'
@@ -97,8 +98,9 @@ appTriggers.route('/on_user_update', on_user_update)
 appTriggers.route('/on_user_delete', on_user_delete)
 appTriggers.route('/on_version_create', on_version_create)
 appTriggers.route('/on_version_update', on_version_update)
-appTriggers.route('/replicate_data', replicate_data)
 appTriggers.route('/on_version_delete', on_version_delete)
+appTriggers.route('/on_manifest_create', on_manifest_create)
+appTriggers.route('/replicate_data', replicate_data)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)

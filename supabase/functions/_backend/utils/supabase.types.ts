@@ -1203,6 +1203,47 @@ export type Database = {
           }
         ]
       }
+      manifest: {
+        Row: {
+          id: number
+          created_at: string | null
+          updated_at: string | null
+          app_version_id: number
+          file_name: string
+          s3_path: string
+          file_hash: string
+          file_size: number | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string | null
+          updated_at?: string | null
+          app_version_id: number
+          file_name: string
+          s3_path: string
+          file_hash: string
+          file_size?: number | null
+        }
+        Update: {
+          id?: number
+          created_at?: string | null
+          updated_at?: string | null
+          app_version_id?: number
+          file_name?: string
+          s3_path?: string
+          file_hash?: string
+          file_size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manifest_app_version_id_fkey"
+            columns: ["app_version_id"]
+            isOneToOne: false
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
