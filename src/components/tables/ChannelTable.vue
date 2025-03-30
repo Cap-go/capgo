@@ -178,7 +178,7 @@ async function getData() {
 async function refreshData(keepCurrentPage = false) {
   // console.log('refreshData')
   try {
-    let page = currentPage.value
+    const page = currentPage.value
     if (!keepCurrentPage)
       currentPage.value = 1
 
