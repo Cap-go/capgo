@@ -2261,6 +2261,7 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
+        file_size: number | null
       }
       orgs_table: {
         id: string | null
