@@ -262,8 +262,9 @@ columns.value = [
 async function reload() {
   console.log('reload')
   try {
-    elements.value.length = 0
-    await getData()
+    // Use refreshData with keepCurrentPage=true to maintain the current page when reloading
+    // This fixes issue #974 - When deleting a channel on page 2, the table reloads and puts the user back on page 1
+    await refreshData(true)
   }
   catch (error) {
     console.error(error)
