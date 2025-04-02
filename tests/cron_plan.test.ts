@@ -523,6 +523,7 @@ describe('[POST] /triggers/cron_plan', () => {
     const { error: queueError } = await supabase
       .rpc('process_function_queue', { queue_name: 'on_app_delete' })
     expect(queueError).toBeFalsy()
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Wait for the trigger to process by calling cron_plan
     const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
