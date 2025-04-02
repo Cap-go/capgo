@@ -31,7 +31,7 @@ onMounted(async () => {
   if (route.path.includes('/p/') && route.path.endsWith('/settings')) {
     displayStore.NavTitle = t('settings')
     displayStore.defaultBack = `/app/p/${route.params.package}`
-    appId.value = (route.params as any).p as string
+    appId.value = route.params.package as string
     appId.value = urlToAppId(appId.value)
     isLoading.value = true
 
@@ -498,6 +498,7 @@ async function transferAppOwnership() {
                 <FormKit
                   type="text"
                   name="default_upload_channel"
+                  class="cursor-pointer"
                   :prefix-icon="ArrowUpTray"
                   :value="appRef?.default_upload_channel ?? t('undefined')"
                   :label="t('default-upload-channel')"
