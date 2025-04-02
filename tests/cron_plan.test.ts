@@ -523,7 +523,15 @@ describe('[POST] /triggers/cron_plan', () => {
     const { error: queueError } = await supabase
       .rpc('process_function_queue', { queue_name: 'on_app_delete' })
     expect(queueError).toBeFalsy()
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Check if the app is in the deleted_app table
+    const { data: deletedApp, error: deletedAppError } = await supabase
+      .from('deleted_apps')
+      .select('app_id')
+      .eq('app_id', APPNAME)
+      .single()
+    expect(deletedAppError).toBeFalsy()
+    expect(deletedApp).toBeTruthy()
 
     // Wait for the trigger to process by calling cron_plan
     const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
