@@ -6,12 +6,11 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import mime from 'mime'
 import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
-import ArrowUpTray from '~icons/mingcute/upload-2-fill?raw'
 import Pencil from '~icons/heroicons/pencil-square'
-import PencilRaw from '~icons/heroicons/pencil-square?raw'
-import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&height=36'
 import Android from '~icons/mingcute/android-line?raw&width=48&height=48'
 import Apple from '~icons/mingcute/apple-line?raw&width=48&height=48'
+import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&height=36'
+import ArrowUpTray from '~icons/mingcute/upload-2-fill?raw'
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import { urlToAppId } from '~/services/conversion'
@@ -99,30 +98,32 @@ async function setUpdateChannelSync(value: boolean) {
       .eq('app_id', appId.value)
       .in('id', [
         ...(appRef.value.default_channel_ios ? [(appRef.value.default_channel_ios as any).id] : []),
-        ...(appRef.value.default_channel_android ? [(appRef.value.default_channel_android as any).id] : [])
+        ...(appRef.value.default_channel_android ? [(appRef.value.default_channel_android as any).id] : []),
       ])
     if (channels.error) {
       toast.error(t('cannot-change-update-channel-sync'))
       return
     }
-    var buttonRole = null as string | null
+    let buttonRole = null as string | null
     displayStore.dialogOption = {
       header: t('select-default-update-channel-header-before-sync-change'),
       message: t('select-default-update-channel-header-before-sync-change-message'),
       buttons: [
-        ...channels.data.map((channel) => ({
+        ...channels.data.map(channel => ({
           text: channel.name,
           handler: () => {
             buttonRole = channel.id.toString()
           },
         })),
-        ...(!appRef.value.default_channel_ios || !appRef.value.default_channel_android ? [{
-          text: t('undefined'),
-          role: 'danger',
-          handler: () => {
-            buttonRole = 'empty'
-          },
-        }] : []),
+        ...(!appRef.value.default_channel_ios || !appRef.value.default_channel_android
+          ? [{
+              text: t('undefined'),
+              role: 'danger',
+              handler: () => {
+                buttonRole = 'empty'
+              },
+            }]
+          : []),
         {
           text: t('button-cancel'),
           role: 'cancel',
@@ -164,7 +165,8 @@ async function setUpdateChannelSync(value: boolean) {
       if (channel) {
         appRef.value.default_channel_ios = channel as any
         appRef.value.default_channel_android = channel as any
-      } else {
+      }
+      else {
         appRef.value.default_channel_ios = null
         appRef.value.default_channel_android = null
       }
@@ -330,11 +332,14 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
         if (type !== 'both') {
           appError = await supabase.from('apps')
             .update({ [`default_channel_${type}`]: chann.id })
-            .eq('app_id', appRef.value?.app_id ?? '').then(x => x.error)
-        } else {
+            .eq('app_id', appRef.value?.app_id ?? '')
+            .then(x => x.error)
+        }
+        else {
           appError = await supabase.from('apps')
             .update({ default_channel_ios: chann.id, default_channel_android: chann.id })
-            .eq('app_id', appRef.value?.app_id ?? '').then(x => x.error)
+            .eq('app_id', appRef.value?.app_id ?? '')
+            .then(x => x.error)
         }
 
         if (appError) {
@@ -348,7 +353,8 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
             name: chann.name,
           } as any
           forceBump.value += 1
-        } else if (appRef.value && type === 'both') {
+        }
+        else if (appRef.value && type === 'both') {
           appRef.value.default_channel_android = {
             id: chann.id,
             name: chann.name,
@@ -379,15 +385,18 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
           text: t('unset'),
           role: 'danger',
           handler: async () => {
+            let appError: any = null
             if (type === 'both') {
-              var appError: any = null
               appError = await supabase.from('apps')
                 .update({ default_channel_android: null, default_channel_ios: null })
-                .eq('app_id', appRef.value?.app_id ?? '').then(x => x.error)
-            } else {
+                .eq('app_id', appRef.value?.app_id ?? '')
+                .then(x => x.error)
+            }
+            else {
               appError = await supabase.from('apps')
                 .update({ [`default_channel_${type}`]: null })
-                .eq('app_id', appRef.value?.app_id ?? '').then(x => x.error)
+                .eq('app_id', appRef.value?.app_id ?? '')
+                .then(x => x.error)
             }
             if (appError) {
               toast.error(t('cannot-change-update-channel'))
@@ -397,7 +406,8 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
             if (appRef.value && type !== 'both') {
               appRef.value[`default_channel_${type}`] = null
               forceBump.value += 1
-            } else if (appRef.value && type === 'both') {
+            }
+            else if (appRef.value && type === 'both') {
               appRef.value.default_channel_android = null
               appRef.value.default_channel_ios = null
               forceBump.value += 1
@@ -712,7 +722,7 @@ async function transferAppOwnership() {
                   :disabled="true"
                   :classes="{
                     outer: {
-                      $reset: true,
+                      '$reset': true,
                       'mb-4': true,
                     },
                   }"
@@ -725,15 +735,15 @@ async function transferAppOwnership() {
                 </FormKit>
               </div>
               <div class="flex flex-col mb-4">
-                <lable class="text-neutral-700 text-sm font-bold dark:text-neutral-300 inline-flex! mb-1 formkit-label">
+                <label class="text-neutral-700 text-sm font-bold dark:text-neutral-300 inline-flex! mb-1 formkit-label">
                   {{ t('default-channel-sync') }}
-                </lable>
+                </label>
                 <label class="relative inline-flex items-center cursor-pointer">
-                  <input @change="setUpdateChannelSync(!appRef?.default_channel_sync)" type="checkbox" class="sr-only peer" v-model="defaultChannelSync">
+                  <input v-model="defaultChannelSync" type="checkbox" class="sr-only peer" @change="setUpdateChannelSync(!appRef?.default_channel_sync)">
                   <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:border-gray-300 dark:border-gray-600 after:rounded-full after:bg-white dark:bg-gray-700 peer-checked:bg-blue-600 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
                 </label>
               </div>
-              <div class="flex flex-row" v-if="!appRef?.default_channel_sync">
+              <div v-if="!appRef?.default_channel_sync" class="flex flex-row">
                 <div class="flex flex-col">
                   <div :key="forceBump" class="flex flex-row">
                     <FormKit
@@ -752,7 +762,7 @@ async function transferAppOwnership() {
                       :disabled="true"
                       :classes="{
                         outer: {
-                          $reset: true,
+                          '$reset': true,
                           'mb-4': true,
                         },
                       }"
@@ -781,7 +791,7 @@ async function transferAppOwnership() {
                       :disabled="true"
                       :classes="{
                         outer: {
-                          $reset: true,
+                          '$reset': true,
                           'mb-4': true,
                         },
                       }"
@@ -794,73 +804,37 @@ async function transferAppOwnership() {
                     </FormKit>
                   </div>
                 </div>
-                <div class="flex flex-col ml-5 text-8xl my-auto">
-                  <h1>
-                    &#125;
-                  </h1>
-                </div>
-                <div class="flex flex-col ml-2 my-auto">
+              </div>
+              <div v-else class="flex flex-row">
+                <div :key="forceBump" class="flex flex-row">
                   <FormKit
-                    type="button"
-                    :label="t('change-both')"
-                    :prefix-icon="PencilRaw"
+                    type="text"
+                    name="default_update_channel"
+                    :prefix-icon="ArrowUpTray"
+                    :value="(appRef?.default_channel_ios as any)?.name ?? t('undefined')"
+                    :label="t('default-update-channel')"
                     :sections-schema="{
-                      outer: {
-                        $el: 'div',
-                        attrs: {
-                          class: 'flex flex-col-reverse',
-                        },
-                      },
-                      input: {
-                        attrs: {
-                          class: 'inline-flex items-center mt-3 py-3 px-3 my-auto py-auto text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800 cursor-pointer',
-                        },
-                      },
-                      wrapper: {
-                        attrs: {
-                          class: 'flex flex-col items-center',
-                        },
-                      },
-                      prefix: {
-                        attrs: {
-                          class: 'w-4 h-4 mr-2',
-                        },
+                      suffix: {
+                        children: [
+                          '$slots.suffix',
+                        ],
                       },
                     }"
-                    @click="setDefaultUpdateChannel('both')"
-                  />
+                    :disabled="true"
+                    :classes="{
+                      outer: {
+                        '$reset': true,
+                        'mb-4': true,
+                      },
+                    }"
+                  >
+                    <template #suffix>
+                      <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultUpdateChannel('both')">
+                        <Pencil width="24px" height="24px" />
+                      </button>
+                    </template>
+                  </FormKit>
                 </div>
-              </div>
-              <div class="flex flex-row" v-else>
-                <div :key="forceBump" class="flex flex-row">
-                    <FormKit
-                      type="text"
-                      name="default_update_channel"
-                      :prefix-icon="ArrowUpTray"
-                      :value="(appRef?.default_channel_ios as any)?.name ?? t('undefined')"
-                      :label="t('default-update-channel')"
-                      :sections-schema="{
-                        suffix: {
-                          children: [
-                            '$slots.suffix',
-                          ],
-                        },
-                      }"
-                      :disabled="true"
-                      :classes="{
-                        outer: {
-                          $reset: true,
-                          'mb-4': true,
-                        },
-                      }"
-                    >
-                      <template #suffix>
-                        <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultUpdateChannel('both')">
-                          <Pencil width="24px" height="24px" />
-                        </button>
-                      </template>
-                    </FormKit>
-                  </div>
               </div>
               <FormKit
                 type="number"

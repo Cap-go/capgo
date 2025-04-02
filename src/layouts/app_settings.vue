@@ -12,7 +12,7 @@ const ActiveTab = ref(`/app/p/${route.params.package}/settings`)
 
 const tabs = ref<Tab[]>([
   {
-    label: 'general',
+    label: 'general-information',
     icon: shallowRef(IconAcount),
     key: `/app/p/${route.params.package}/settings`,
   },
