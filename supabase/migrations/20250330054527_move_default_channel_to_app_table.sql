@@ -53,8 +53,12 @@ END $$;
 
 
 -- Drop the default_channel_ios column
-ALTER TABLE public.channels 
-DROP COLUMN public;
+-- TODO at 2025-10-02: remove this public column
+-- Still used in the CLI during upload, removing it will break the upload
+-- ALTER TABLE public.channels 
+-- DROP COLUMN public;
+
+
 
 -- Drop existing foreign key constraints
 ALTER TABLE public.apps
@@ -79,3 +83,98 @@ ON DELETE SET NULL;
 -- Mark default_channel_sync as not null
 ALTER TABLE public.apps
 ALTER COLUMN default_channel_sync SET NOT NULL;
+
+-- Create a trigger function that ensures default channels in apps are marked as public
+CREATE OR REPLACE FUNCTION public.update_channel_public_from_app()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- If default_channel_ios is set, mark the corresponding channel as public
+    IF NEW.default_channel_ios IS NOT NULL THEN
+        UPDATE public.channels
+        SET public = TRUE
+        WHERE id = NEW.default_channel_ios
+        AND app_id = NEW.app_id;
+    END IF;
+    
+    -- If default_channel_android is set, mark the corresponding channel as public
+    IF NEW.default_channel_android IS NOT NULL THEN
+        UPDATE public.channels
+        SET public = TRUE
+        WHERE id = NEW.default_channel_android
+        AND app_id = NEW.app_id;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+-- Create a trigger for the apps table
+DROP TRIGGER IF EXISTS update_default_channel_public_trigger ON public.apps;
+CREATE TRIGGER update_default_channel_public_trigger
+AFTER INSERT OR UPDATE OF default_channel_ios, default_channel_android
+ON public.apps
+FOR EACH ROW
+EXECUTE FUNCTION public.update_channel_public_from_app();
+
+-- Create a trigger function that manages the public flag for channels based on default status
+CREATE OR REPLACE FUNCTION public.manage_channel_public_status()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    is_default BOOLEAN;
+BEGIN
+    -- Check if this channel is used as a default in any app with the same app_id
+    SELECT EXISTS (
+        SELECT 1 FROM public.apps
+        WHERE (default_channel_ios = NEW.id OR default_channel_android = NEW.id)
+        AND app_id = NEW.app_id
+    ) INTO is_default;
+    
+    -- If this channel is a default channel, ensure it's marked as public
+    IF is_default THEN
+        NEW.public = TRUE;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+-- Create a trigger for the channels table
+DROP TRIGGER IF EXISTS manage_channel_public_status_trigger ON public.channels;
+CREATE TRIGGER manage_channel_public_status_trigger
+BEFORE INSERT OR UPDATE
+ON public.channels
+FOR EACH ROW
+EXECUTE FUNCTION public.manage_channel_public_status();
+
+-- Procedure to sync all existing channels
+DO $$
+DECLARE
+    channel_record RECORD;
+    is_default BOOLEAN;
+BEGIN
+    -- Loop through all channels
+    FOR channel_record IN SELECT id, app_id FROM public.channels LOOP
+        -- Check if this channel is used as a default in any app with the same app_id
+        SELECT EXISTS (
+            SELECT 1 FROM public.apps
+            WHERE (default_channel_ios = channel_record.id OR default_channel_android = channel_record.id)
+            AND app_id = channel_record.app_id
+        ) INTO is_default;
+        
+        -- If this channel is a default channel, ensure it's marked as public
+        IF is_default THEN
+            UPDATE public.channels
+            SET public = TRUE
+            WHERE id = channel_record.id;
+        END IF;
+    END LOOP;
+    
+    -- Log how many channels were potentially affected
+    RAISE NOTICE 'Channel public status synchronization completed.';
+END $$;
