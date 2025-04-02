@@ -97,6 +97,11 @@ BEGIN
         SET public = TRUE
         WHERE id = NEW.default_channel_ios
         AND app_id = NEW.app_id;
+    ELSIF OLD.default_channel_ios IS NOT NULL THEN
+        UPDATE public.channels 
+        SET public = FALSE
+        WHERE id = OLD.default_channel_ios
+        AND app_id = NEW.app_id;
     END IF;
     
     -- If default_channel_android is set, mark the corresponding channel as public
@@ -104,6 +109,11 @@ BEGIN
         UPDATE public.channels
         SET public = TRUE
         WHERE id = NEW.default_channel_android
+        AND app_id = NEW.app_id;
+    ELSIF OLD.default_channel_android IS NOT NULL THEN
+        UPDATE public.channels
+        SET public = FALSE
+        WHERE id = OLD.default_channel_android
         AND app_id = NEW.app_id;
     END IF;
     
