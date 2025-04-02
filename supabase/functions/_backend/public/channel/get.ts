@@ -58,7 +58,8 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     delete Object.assign(newObject, { disableAutoUpdate: dataChannel.disable_auto_update }).disable_auto_update
     if (dataChannel.id === dataApp.default_channel_android || dataChannel.id === dataApp.default_channel_ios) {
       newObject.public = true
-    } else {
+    }
+    else {
       newObject.public = false
     }
     return c.json(newObject)
@@ -99,7 +100,8 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
       if (o.id === dataApp.default_channel_android || o.id === dataApp.default_channel_ios) {
         newObject.public = true
-      } else {
+      }
+      else {
         newObject.public = false
       }
       return newObject
