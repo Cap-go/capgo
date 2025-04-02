@@ -242,11 +242,15 @@ it('[POST] /channel_self with default channel', async () => {
     .from('channels')
     .update({ allow_device_self_set: true })
     .eq('name', 'no_access').eq('app_id', APPNAME)
-    .select('id, owner_org, public').single()
+    .select('id, owner_org').single()
 
   expect(channelUpdateError).toBeNull()
   expect(noAccessData).toBeTruthy()
-  expect(noAccessData!.public).toBeFalsy()
+  const { data: appData, error: appError } = await getSupabaseClient().from('apps').select('default_channel_android, default_channel_ios').eq('app_id', APPNAME).single()
+  expect(appError).toBeNull()
+  expect(appData).toBeTruthy()
+  expect(appData!.default_channel_android).not.toBe(noAccessData!.id)
+  expect(appData!.default_channel_ios).not.toBe(noAccessData!.id)
 
   try {
     const { error: overwriteUpsertError } = await getSupabaseClient().from('channel_devices').upsert({

@@ -68,7 +68,6 @@ export const channels = pgTable('channels', {
   version: bigint('version', { mode: 'number' }).notNull().references(() => app_versions.id),
   created_by: uuid('created_by').notNull(),
   updated_at: timestamp('updated_at').defaultNow().notNull(),
-  public: boolean('public').notNull().default(false),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
   disable_auto_update: disableUpdatePgEnum('disable_auto_update').default('major').notNull(),
   ios: boolean('ios').default(true).notNull(),

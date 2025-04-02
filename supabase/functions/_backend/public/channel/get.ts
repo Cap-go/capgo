@@ -15,6 +15,16 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
 
+  const { data: dataApp, error: dbError } = await supabaseAdmin(c)
+    .from('apps')
+    .select('default_channel_android, default_channel_ios')
+    .eq('app_id', body.app_id)
+    .single()
+  if (dbError || !dataApp) {
+    console.log('Cannot find app', dbError)
+    return c.json({ status: 'Cannot find app', error: JSON.stringify(dbError) }, 400)
+  }
+
   // get one channel or all channels
   if (body.channel) {
     const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
@@ -26,12 +36,10 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         app_id,
         created_by,
         updated_at,
-        public,
         disable_auto_update_under_native,
         disable_auto_update,
         allow_device_self_set,
         allow_emulator,
-        public,
         version (
           name,
           id
@@ -48,7 +56,11 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const newObject = dataChannel as any
     delete Object.assign(newObject, { disableAutoUpdateUnderNative: dataChannel.disable_auto_update_under_native }).disable_auto_update_under_native
     delete Object.assign(newObject, { disableAutoUpdate: dataChannel.disable_auto_update }).disable_auto_update
-
+    if (dataChannel.id === dataApp.default_channel_android || dataChannel.id === dataApp.default_channel_ios) {
+      newObject.public = true
+    } else {
+      newObject.public = false
+    }
     return c.json(newObject)
   }
   else {
@@ -64,7 +76,6 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         app_id,
         created_by,
         updated_at,
-        public,
         disable_auto_update_under_native,
         disable_auto_update,
         allow_device_self_set,
@@ -86,6 +97,11 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       const newObject = o as any
       delete Object.assign(newObject, { disableAutoUpdateUnderNative: o.disable_auto_update_under_native }).disable_auto_update_under_native
       delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
+      if (o.id === dataApp.default_channel_android || o.id === dataApp.default_channel_ios) {
+        newObject.public = true
+      } else {
+        newObject.public = false
+      }
       return newObject
     }))
   }

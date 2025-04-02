@@ -230,6 +230,9 @@ export type Database = {
         Row: {
           app_id: string
           created_at: string | null
+          default_channel_android: number | null
+          default_channel_ios: number | null
+          default_channel_sync: boolean
           default_upload_channel: string
           icon_url: string
           id: string | null
@@ -244,6 +247,9 @@ export type Database = {
         Insert: {
           app_id: string
           created_at?: string | null
+          default_channel_android?: number | null
+          default_channel_ios?: number | null
+          default_channel_sync?: boolean
           default_upload_channel?: string
           icon_url: string
           id?: string | null
@@ -258,6 +264,9 @@ export type Database = {
         Update: {
           app_id?: string
           created_at?: string | null
+          default_channel_android?: number | null
+          default_channel_ios?: number | null
+          default_channel_sync?: boolean
           default_upload_channel?: string
           icon_url?: string
           id?: string | null
@@ -270,6 +279,20 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "apps_default_channel_android_fkey"
+            columns: ["default_channel_android"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apps_default_channel_ios_fkey"
+            columns: ["default_channel_ios"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "apps_user_id_fkey"
             columns: ["user_id"]
@@ -370,14 +393,13 @@ export type Database = {
           android: boolean
           app_id: string
           created_at: string
-          created_by: string | null
+          created_by: string
           disable_auto_update: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native: boolean
           id: number
           ios: boolean
           name: string
           owner_org: string
-          public: boolean
           updated_at: string
           version: number
         }
@@ -388,14 +410,13 @@ export type Database = {
           android?: boolean
           app_id: string
           created_at?: string
-          created_by?: string | null
+          created_by: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
           id?: number
           ios?: boolean
           name: string
           owner_org: string
-          public?: boolean
           updated_at?: string
           version: number
         }
@@ -406,14 +427,13 @@ export type Database = {
           android?: boolean
           app_id?: string
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           disable_auto_update?: Database["public"]["Enums"]["disable_update"]
           disable_auto_update_under_native?: boolean
           id?: number
           ios?: boolean
           name?: string
           owner_org?: string
-          public?: boolean
           updated_at?: string
           version?: number
         }
@@ -552,16 +572,38 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_apps: {
+        Row: {
+          app_id: string
+          created_at: string | null
+          deleted_at: string | null
+          id: number
+          owner_org: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: number
+          owner_org: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: number
+          owner_org?: string
+        }
+        Relationships: []
+      }
       deploy_history: {
         Row: {
           app_id: string
           channel_id: number
-          comment: string | null
           created_at: string | null
+          created_by: string
           deployed_at: string | null
           id: number
-          is_current: boolean | null
-          link: string | null
           owner_org: string
           updated_at: string | null
           version_id: number
@@ -569,12 +611,10 @@ export type Database = {
         Insert: {
           app_id: string
           channel_id: number
-          comment?: string | null
           created_at?: string | null
+          created_by: string
           deployed_at?: string | null
           id?: number
-          is_current?: boolean | null
-          link?: string | null
           owner_org: string
           updated_at?: string | null
           version_id: number
@@ -582,22 +622,34 @@ export type Database = {
         Update: {
           app_id?: string
           channel_id?: number
-          comment?: string | null
           created_at?: string | null
+          created_by?: string
           deployed_at?: string | null
           id?: number
-          is_current?: boolean | null
-          link?: string | null
           owner_org?: string
           updated_at?: string | null
           version_id?: number
         }
         Relationships: [
           {
+            foreignKeyName: "deploy_history_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
             foreignKeyName: "deploy_history_channel_id_fkey"
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deploy_history_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -1338,6 +1390,19 @@ export type Database = {
               fail: number
               install: number
               uninstall: number
+            }[]
+          }
+        | {
+            Args: {
+              p_org_id: string
+              p_start_date: string
+              p_end_date: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+              deleted_apps: number
             }[]
           }
       get_app_versions: {

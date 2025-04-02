@@ -189,7 +189,6 @@ export function requestInfosPostgres(
         ios: channelAlias.ios,
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
       },
     },
     )
@@ -225,14 +224,13 @@ export function requestInfosPostgres(
         ios: channelAlias.ios,
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
       },
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
     .where(!defaultChannel
       ? and(
-          eq(channelAlias.public, true),
+          sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
           eq(channelAlias.app_id, app_id),
           eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
         )

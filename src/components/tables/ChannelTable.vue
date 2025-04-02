@@ -123,7 +123,6 @@ async function getData() {
           id,
           name,
           app_id,
-          public,
           version (
             name,
             created_at,
