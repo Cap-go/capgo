@@ -55,7 +55,7 @@ export async function getBundleUrl(
   return { url: downloadUrl, size: bundleMeta?.size }
 }
 
-export function getManifestUrl(c: Context, versionId: number, manifest: Database['public']['CompositeTypes']['manifest_entry'][] | null, deviceId: string): ManifestEntry[] {
+export function getManifestUrl(c: Context, versionId: number, manifest: Partial<Database['public']['Tables']['manifest']['Row']>[] | null, deviceId: string): ManifestEntry[] {
   if (!manifest) {
     return []
   }

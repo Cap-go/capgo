@@ -22,6 +22,7 @@ export interface TableColumn {
   icon?: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
   class?: string
   allowHtml?: boolean
+  sanitizeHtml?: boolean
   displayFunction?: (item: any) => string | any
   onClick?: (item: any) => void
 }

@@ -190,12 +190,11 @@ export function requestInfosPostgres(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
-      manifestEntries: {
-        file_name: schema.manifest.file_name,
-        file_hash: schema.manifest.file_hash,
-        s3_path: schema.manifest.s3_path,
-        file_size: schema.manifest.file_size,
-      },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     },
     )
     .from(channelDevicesAlias)
@@ -203,6 +202,7 @@ export function requestInfosPostgres(
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
     .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
@@ -231,12 +231,11 @@ export function requestInfosPostgres(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
-      manifestEntries: {
-        file_name: schema.manifest.file_name,
-        file_hash: schema.manifest.file_hash,
-        s3_path: schema.manifest.s3_path,
-        file_size: schema.manifest.file_size,
-      },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
@@ -252,6 +251,7 @@ export function requestInfosPostgres(
           eq(channelAlias.name, defaultChannel),
         ),
     )
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
@@ -310,12 +310,11 @@ export function requestInfosPostgresV2(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
-      manifestEntries: {
-        file_name: schemaV2.manifest.file_name,
-        file_hash: schemaV2.manifest.file_hash,
-        s3_path: schemaV2.manifest.s3_path,
-        file_size: schemaV2.manifest.file_size,
-      },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`,
     },
     )
     .from(channelDevicesAlias)
@@ -323,6 +322,7 @@ export function requestInfosPostgresV2(
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
     .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
@@ -351,12 +351,11 @@ export function requestInfosPostgresV2(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
-      manifestEntries: {
-        file_name: schemaV2.manifest.file_name,
-        file_hash: schemaV2.manifest.file_hash,
-        s3_path: schemaV2.manifest.s3_path,
-        file_size: schemaV2.manifest.file_size,
-      },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path},
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
@@ -372,6 +371,7 @@ export function requestInfosPostgresV2(
           eq(channelAlias.name, defaultChannel),
         ),
     )
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 

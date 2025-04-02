@@ -495,4 +495,55 @@ describe('[POST] /triggers/cron_plan', () => {
     expect(bandwidthExceededErrorAfter).toBeFalsy()
     expect(bandwidthExceededAfter).toBe(false)
   })
+
+  it('should correctly count metrics for deleted apps', async () => {
+    const supabase = getSupabaseClient()
+
+    // Set some initial metrics
+    const { error: setMauError } = await supabase
+      .from('daily_mau')
+      .update({ mau: 100 })
+      .eq('app_id', APPNAME)
+    expect(setMauError).toBeFalsy()
+
+    const { error: setBandwidthError } = await supabase
+      .from('daily_bandwidth')
+      .update({ bandwidth: 1000 })
+      .eq('app_id', APPNAME)
+    expect(setBandwidthError).toBeFalsy()
+
+    // Delete the app
+    const { error: deleteError } = await supabase
+      .from('apps')
+      .delete()
+      .eq('app_id', APPNAME)
+    expect(deleteError).toBeFalsy()
+
+    // Wait for the delete queue to process
+    const { error: queueError } = await supabase
+      .rpc('process_function_queue', { queue_name: 'on_app_delete' })
+    expect(queueError).toBeFalsy()
+
+    // Wait for the trigger to process by calling cron_plan
+    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orgId: ORG_ID }),
+    })
+    expect(response.status).toBe(200)
+
+    // Verify metrics are still counted
+    const { data: metrics, error: metricsError } = await supabase
+      .rpc('get_app_metrics', {
+        org_id: ORG_ID,
+        start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end_date: new Date().toISOString().split('T')[0],
+      })
+    expect(metricsError).toBeFalsy()
+    expect(metrics).toBeTruthy()
+    if (!metrics)
+      throw new Error('Metrics should not be null')
+    expect(metrics.some(m => m.mau > 0)).toBe(true)
+    expect(metrics.some(m => m.bandwidth > 0)).toBe(true)
+  })
 })

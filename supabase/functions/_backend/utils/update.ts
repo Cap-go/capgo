@@ -182,6 +182,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     const version = channelOverride?.version || channelData.version
+    const manifestEntries = channelOverride?.manifestEntries || channelData.manifestEntries
     device.version = versionData ? versionData.id : version.id
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
@@ -200,7 +201,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //   }, 400)
     // }
 
-    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && !version.manifest) {
+    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && !manifestEntries) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
@@ -379,7 +380,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
         }
       }
-      manifest = await getManifestUrl(c, version.id, null, device_id)
+      manifest = await getManifestUrl(c, version.id, manifestEntries, device_id)
     }
     //  check signedURL and if it's url
     if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {

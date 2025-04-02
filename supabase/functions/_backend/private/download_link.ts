@@ -55,7 +55,17 @@ app.post('/', middlewareAuth, async (c) => {
     }
 
     if (body.isManifest) {
-      const manifestEntries = getManifestUrl(c as any, bundle.id, bundle.manifest, userId)
+      const { data: manifest, error: getManifestError } = await supabaseAdmin(c as any)
+        .from('manifest')
+        .select('*')
+        .eq('app_id', body.app_id)
+        .eq('id', body.id)
+
+      if (getManifestError) {
+        console.error({ requestId: c.get('requestId'), context: 'getManifestError', error: getManifestError })
+        return c.json({ status: 'Error unknown' }, 500)
+      }
+      const manifestEntries = getManifestUrl(c as any, bundle.id, manifest, userId)
       return c.json({ manifest: manifestEntries })
     }
     else {

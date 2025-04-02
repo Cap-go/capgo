@@ -1407,19 +1407,6 @@ export type Database = {
               uninstall: number
             }[]
           }
-        | {
-            Args: {
-              p_org_id: string
-              p_start_date: string
-              p_end_date: string
-            }
-            Returns: {
-              mau: number
-              bandwidth: number
-              storage: number
-              deleted_apps: number
-            }[]
-          }
       get_app_versions: {
         Args: {
           appid: string
