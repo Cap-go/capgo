@@ -1,4 +1,4 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
@@ -80,7 +80,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       console.log('Cannot create channel', rawUpdateInfo.error)
       return c.json({ status: 'Cannot create channel', error: JSON.stringify(rawUpdateInfo.error) }, 400)
     }
-    const channelId = rawUpdateInfo.id
+    const channelId = (rawUpdateInfo as any).id
 
     if (body.public) {
       const updateData: any = {}
