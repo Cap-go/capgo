@@ -176,7 +176,6 @@ export function requestInfosPostgres(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -190,16 +189,22 @@ export function requestInfosPostgres(
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     },
     )
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
-  // v => version
   const channel = drizzleCient
     .select({
       version: {
@@ -211,7 +216,6 @@ export function requestInfosPostgres(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -225,9 +229,15 @@ export function requestInfosPostgres(
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
           sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
@@ -239,37 +249,15 @@ export function requestInfosPostgres(
           eq(channelAlias.name, defaultChannel),
         ),
     )
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
-  // promise all
   return Promise.all([channelDevice, channel, appVersions])
     .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
     .catch((e) => {
       throw e
     })
-}
-
-function transformManifest(manifest: string | null) {
-  if (!manifest)
-    return null
-  try {
-    const parsed = JSON.parse(manifest)
-    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
-      // Convert back from optimized format [prefix, [file_name, file_hash], ...] to original format
-      const [prefix, ...files] = parsed
-      return files.map(([file_name, file_hash]: [string, string]) => ({
-        file_name,
-        file_hash,
-        s3_path: prefix + file_name,
-      }))
-    }
-    return parsed
-  }
-  catch (e) {
-    console.error('Failed to parse manifest:', e)
-    return null
-  }
 }
 
 export function requestInfosPostgresV2(
@@ -290,7 +278,6 @@ export function requestInfosPostgresV2(
     .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
-  console.error({ context: 'requestInfosPostgresV2 appVersions', appVersions })
 
   const channelDevice = drizzleCient
     .select({
@@ -307,7 +294,6 @@ export function requestInfosPostgresV2(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(transformManifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -322,16 +308,22 @@ export function requestInfosPostgresV2(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`,
     },
     )
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
-  // v => version
   const channel = drizzleCient
     .select({
       version: {
@@ -343,7 +335,6 @@ export function requestInfosPostgresV2(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(transformManifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -358,9 +349,15 @@ export function requestInfosPostgresV2(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path},
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
           eq(channelAlias.public, true),
@@ -372,10 +369,10 @@ export function requestInfosPostgresV2(
           eq(channelAlias.name, defaultChannel),
         ),
     )
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
-  // promise all
   return Promise.all([channelDevice, channel, appVersions])
     .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
     .catch((e) => {

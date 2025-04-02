@@ -128,7 +128,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
 type SQLiteType = 'INTEGER' | 'TEXT' | 'BOOLEAN' | 'JSON'
 type TableSchema = Record<string, SQLiteType>
-export type TableNames = 'app_versions' | 'channels' | 'channel_devices' | 'apps' | 'orgs' | 'stripe_info'
+export type TableNames = 'app_versions' | 'channels' | 'channel_devices' | 'apps' | 'orgs' | 'stripe_info' | 'manifest'
 
 export const TABLE_SCHEMAS: Record<TableNames, TableSchema> = {
   app_versions: {
@@ -144,7 +144,13 @@ export const TABLE_SCHEMAS: Record<TableNames, TableSchema> = {
     session_key: 'TEXT',
     storage_provider: 'TEXT',
     min_update_version: 'TEXT',
-    manifest: 'JSON',
+  },
+  manifest: {
+    id: 'INTEGER',
+    app_version_id: 'INTEGER',
+    file_name: 'TEXT',
+    file_hash: 'TEXT',
+    s3_path: 'TEXT',
   },
   channels: {
     id: 'INTEGER',
@@ -216,14 +222,6 @@ function convertValue(value: any, type: string): any {
     case 'BOOLEAN':
       return value ? 1 : 0
     case 'JSON':
-      if (Array.isArray(value) && value.length > 0 && 's3_path' in value[0]) {
-        // Store as [prefix, [file_name, file_hash], [file_name, file_hash], ...]
-        const prefix = value[0].s3_path.slice(0, -value[0].file_name.length)
-        return JSON.stringify([
-          prefix,
-          ...value.map(v => [v.file_name, v.file_hash]),
-        ])
-      }
       return typeof value !== 'string' ? JSON.stringify(value) : value
     default:
       return value
