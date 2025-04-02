@@ -81,24 +81,24 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       return c.json({ status: 'Cannot create channel', error: JSON.stringify(rawUpdateInfo.error) }, 400)
     }
     const channelId = rawUpdateInfo.id
-    
+
     if (body.public) {
-      const updateData: any = {};
-      
+      const updateData: any = {}
+
       if (channel.ios) {
-        updateData.default_channel_ios = channelId;
+        updateData.default_channel_ios = channelId
       }
-      
+
       if (channel.android) {
-        updateData.default_channel_android = channelId;
+        updateData.default_channel_android = channelId
       }
-      
+
       if (Object.keys(updateData).length > 0) {
         const { error: dbError } = await supabaseAdmin(c)
           .from('apps')
           .update(updateData)
-          .eq('app_id', body.app_id);
-          
+          .eq('app_id', body.app_id)
+
         if (dbError) {
           console.log('Cannot update default channel', dbError)
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)

@@ -25,7 +25,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     return c.json({ status: 'Cannot find app', error: JSON.stringify(dbError) }, 400)
   }
 
-  const defaultChannelIds = [(dataApp as any).default_channel_android, (dataApp as any).default_channel_ios].filter(Boolean);
+  const defaultChannelIds = [(dataApp as any).default_channel_android, (dataApp as any).default_channel_ios].filter(Boolean)
 
   if (body.channel) {
     const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
@@ -57,16 +57,16 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const newObject = dataChannel as any
     delete Object.assign(newObject, { disableAutoUpdateUnderNative: dataChannel.disable_auto_update_under_native }).disable_auto_update_under_native
     delete Object.assign(newObject, { disableAutoUpdate: dataChannel.disable_auto_update }).disable_auto_update
-    
-    newObject.public = defaultChannelIds.includes(dataChannel.id);
-    
+
+    newObject.public = defaultChannelIds.includes(dataChannel.id)
+
     return c.json(newObject)
   }
   else {
     const fetchOffset = body.page == null ? 0 : body.page
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    
+
     const { data: dataChannels, error: dbError } = await supabaseAdmin(c)
       .from('channels')
       .select(`
@@ -93,14 +93,14 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       console.log('Cannot find channels', dbError)
       return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
     }
-    
+
     return c.json(dataChannels.map((o) => {
       const newObject = o as any
       delete Object.assign(newObject, { disableAutoUpdateUnderNative: o.disable_auto_update_under_native }).disable_auto_update_under_native
       delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
-      
-      newObject.public = defaultChannelIds.includes(o.id);
-      
+
+      newObject.public = defaultChannelIds.includes(o.id)
+
       return newObject
     }))
   }
