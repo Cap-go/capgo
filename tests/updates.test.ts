@@ -275,7 +275,7 @@ describe('update scenarios', () => {
   })
 
   it('disallowed public channel update', async () => {
-    await getSupabaseClient().from('channels').update({ public: false }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+    await getSupabaseClient().from('apps').update({ default_channel_ios: null, default_channel_android: null }).eq('app_id', APP_NAME_UPDATE)
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'

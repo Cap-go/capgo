@@ -2050,9 +2050,9 @@ BEGIN
     (8, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ab4d9a98-ec25-4af8-933c-2aae4aa52b85', 'upload', now()),
     (9, now(), '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85', 'all', now());
 
-    INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
-    (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
-    (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
+    INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id", "default_channel_ios", "default_channel_android", "default_channel_sync") VALUES
+    (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', NULL, NULL, true),
+    (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', NULL, NULL, true);
 
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org", "user_id", "comment", "link") VALUES
     (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
@@ -2070,10 +2070,12 @@ BEGIN
     (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
     (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40);
 
-    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
-    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+    INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
+    (1, now(), 'production', 'com.demo.app', 3, now(), 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (2, now(), 'no_access', 'com.demo.app', 5, now(), 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+
+    UPDATE "public"."apps" SET "default_channel_ios" = 3, "default_channel_android" = 1, "default_channel_sync" = false WHERE "app_id" = 'com.demo.app';
 
     INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
     (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
@@ -2261,14 +2263,13 @@ BEGIN
     ),
     inserted_channels AS (
         -- Insert channels using the version IDs from the CTE
-        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by")
+        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by")
         SELECT 
             now(),
             c.name,
             p_app_id,
             v.id,
             now(),
-            c.is_public,
             't',
             'major',
             c.ios,
@@ -2279,11 +2280,11 @@ BEGIN
             c.created_by
         FROM (
             VALUES 
-                ('production', '1.0.0', true, false, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-                ('beta', '1.361.0', false, true, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-                ('development', '1.359.0', true, true, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-                ('no_access', '1.361.0', false, false, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid)
-        ) as c(name, version_name, is_public, ios, android, created_by)
+                ('production', '1.0.0', false, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+                ('beta', '1.361.0', false, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+                ('development', '1.359.0', true, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+                ('no_access', '1.361.0', false, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid)
+        ) as c(name, version_name, ios, android, created_by)
         JOIN inserted_versions v ON v.name = c.version_name
         RETURNING id, name, version, created_by
     )
@@ -2300,6 +2301,12 @@ BEGIN
         c.created_by
     FROM inserted_channels c;
 
+    -- Update app table with default channels based on platform
+    UPDATE "public"."apps" 
+    SET 
+        default_channel_android = (select id from channels where name = 'production' and app_id = p_app_id),
+        default_channel_ios = (select id from channels where name = 'development' and app_id = p_app_id)
+    WHERE app_id = p_app_id;
 END;
 $$;
 
