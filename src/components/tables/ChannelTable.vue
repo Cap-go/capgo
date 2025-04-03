@@ -26,6 +26,7 @@ const emit = defineEmits<{
 
 interface Channel {
   version: {
+    id: number
     name: string
     created_at: string
     min_update_version: string | null
@@ -125,6 +126,7 @@ async function getData() {
           app_id,
           public,
           version (
+            id,
             name,
             created_at,
             min_update_version
@@ -243,6 +245,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     displayFunction: (elem: Element) => elem.version.name,
+    onClick: (elem: Element) => openOneVersion(elem),
   },
   {
     label: t('misconfigured'),
@@ -299,6 +302,10 @@ async function showAddModal() {
   }
   displayStore.showDialog = true
   await displayStore.onDialogDismiss()
+}
+
+async function openOneVersion(one: Element) {
+  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
 }
 
 async function openOne(one: Element) {

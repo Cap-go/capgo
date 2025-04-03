@@ -200,7 +200,7 @@ async function reload() {
 async function openOneVersion(one: Element) {
   if (props.deviceId || !props.appId)
     return
-  router.push(`/app/p/${appIdToUrl(props.appId)}/v/${one.version?.id}`)
+  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
 }
 async function openOne(one: Element) {
   if (props.deviceId || !props.appId)

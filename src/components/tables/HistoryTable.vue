@@ -5,6 +5,8 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import IconReload from '~icons/tabler/reload'
+import Table from '~/components/Table.vue'
+import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -41,6 +43,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const displayStore = useDisplayStore()
@@ -100,6 +103,7 @@ const columns = computed<TableColumn[]>(() => [
     mobile: true,
     sortable: true,
     displayFunction: item => item.version.name,
+    onClick: (item: DeployHistory) => openOneVersion(item),
   },
   {
     label: t('created-at'),
@@ -141,7 +145,7 @@ const columns = computed<TableColumn[]>(() => [
   {
     label: t('rollback-to-this-version'),
     key: 'rollback',
-    mobile: false,
+    mobile: true,
     class: 'text-center',
     displayFunction: (item) => {
       return isCurrentVersion(item) ? 'Current' : 'Rollback'
@@ -154,6 +158,10 @@ const columns = computed<TableColumn[]>(() => [
     },
   },
 ])
+
+async function openOneVersion(item: DeployHistory) {
+  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${item.version_id}`)
+}
 
 async function fetchDeployHistory() {
   loading.value = true
@@ -286,128 +294,17 @@ watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], 
       </div>
     </div>
 
-    <!-- Custom table rendering to handle rollback column -->
-    <div class="block">
-      <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-          <tr>
-            <th v-for="col in columns" :key="col.key" scope="col" class="py-3 px-6" :class="{ 'hidden md:table-cell': !col.mobile }">
-              <div class="flex items-center">
-                {{ col.label }}
-                <div v-if="col.sortable">
-                  <span @click="sort = { [col.key]: sort[col.key] === 'asc' ? 'desc' : 'asc' }">
-                    ↑↓
-                  </span>
-                </div>
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody v-if="!loading && deployHistory.length > 0">
-          <tr v-for="item in deployHistory" :key="item.id" class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600">
-            <td class="px-6 py-4">
-              {{ item.version.name }}
-            </td>
-            <td class="px-6 py-4 hidden md:table-cell">
-              {{ formatDate(item.version.created_at) }}
-            </td>
-            <td class="px-6 py-4">
-              {{ formatDate(item.deployed_at) }}
-            </td>
-            <td class="px-6 py-4 hidden md:table-cell">
-              {{ `${item.user?.first_name} ${item.user?.last_name}` }}
-            </td>
-            <td class="px-6 py-4 hidden md:table-cell">
-              <span
-                v-if="item.version.link"
-                class="text-blue-500 underline cursor-pointer"
-                @click="openLink(item.version.link)"
-              >
-                {{ item.version.link }}
-              </span>
-              <span v-else>-</span>
-            </td>
-            <td class="px-6 py-4 hidden md:table-cell">
-              {{ item.version.comment || '-' }}
-            </td>
-            <td class="px-6 py-4 text-center hidden md:table-cell">
-              <span v-if="isCurrentVersion(item)">Current</span>
-              <span
-                v-else
-                class="text-blue-500 underline cursor-pointer"
-                @click="handleRollback(item)"
-              >
-                Rollback
-              </span>
-            </td>
-          </tr>
-        </tbody>
-        <tbody v-else>
-          <tr v-for="i in 5" :key="i" class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 animate-pulse">
-            <td v-for="col in columns" :key="col.key" class="px-6 py-4" :class="{ 'hidden md:table-cell': !col.mobile }">
-              <div class="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-full" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-if="!loading && deployHistory.length === 0" class="flex flex-col items-center justify-center p-8">
-      <p class="text-gray-500 dark:text-gray-400">
-        {{ t('no-deploy-history') }}
-      </p>
-    </div>
-
-    <!-- Pagination -->
-    <nav class="flex items-center justify-between p-4" aria-label="Table navigation">
-      <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
-        Showing {{ (page - 1) * pageSize + 1 }}-{{ Math.min(page * pageSize, total) }} of {{ total }}
-      </span>
-      <ul class="inline-flex items-center -space-x-px">
-        <li>
-          <button
-            class="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
-            :disabled="page === 1"
-            @click="page = 1"
-          >
-            «
-          </button>
-        </li>
-        <li>
-          <button
-            class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
-            :disabled="page === 1"
-            @click="page = Math.max(1, page - 1)"
-          >
-            ‹
-          </button>
-        </li>
-        <li>
-          <button
-            class="px-3 py-2 leading-tight text-blue-600 border border-blue-300 bg-blue-50 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
-          >
-            {{ page }}
-          </button>
-        </li>
-        <li>
-          <button
-            class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
-            :disabled="page >= Math.ceil(total / pageSize)"
-            @click="page = Math.min(Math.ceil(total / pageSize), page + 1)"
-          >
-            ›
-          </button>
-        </li>
-        <li>
-          <button
-            class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-white"
-            :disabled="page >= Math.ceil(total / pageSize)"
-            @click="page = Math.ceil(total / pageSize)"
-          >
-            »
-          </button>
-        </li>
-      </ul>
-    </nav>
+    <Table
+      :is-loading="loading"
+      :search="search"
+      :total="total"
+      :current-page="page"
+      :columns="columns"
+      :element-list="deployHistory"
+      @update:search="search = $event"
+      @update:current-page="page = $event"
+      @update:columns="columns = $event"
+      @reload="fetchDeployHistory"
+    />
   </div>
 </template>

@@ -261,7 +261,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''} ${col.onClick ? 'cursor-pointer text-primary hover:underline clickable-cell' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
@@ -272,7 +272,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                     class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white cursor-pointer" v-html="col.icon"
                   />
                 </td>
-                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer text-primary hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}

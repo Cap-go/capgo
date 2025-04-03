@@ -208,7 +208,7 @@ async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
 async function openOneVersion(one: Element) {
-  router.push(`/app/p/${appIdToUrl(props.appId)}/v/${one.version?.id}`)
+  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
 }
 
 onMounted(async () => {
