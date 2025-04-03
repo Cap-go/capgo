@@ -34,20 +34,10 @@ WHERE manifest IS NOT NULL AND array_length(manifest, 1) > 0;
 COMMIT;
 
 -- Add trigger for the manifest table to replicate data to D1
-CREATE TRIGGER "tr_d1_manifest_insert"
-AFTER INSERT ON "public"."manifest"
-FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1"();
-
-CREATE TRIGGER "tr_d1_manifest_update"
-AFTER UPDATE ON "public"."manifest"
-FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1"();
-
-CREATE TRIGGER "tr_d1_manifest_delete"
-AFTER DELETE ON "public"."manifest"
-FOR EACH ROW
-EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function_d1"();
+CREATE TRIGGER replicate_manifest
+    AFTER INSERT OR DELETE ON public.manifest
+    FOR EACH ROW
+    EXECUTE FUNCTION public.trigger_http_queue_post_to_function_d1();
 
 -- Enable Row Level Security
 ALTER TABLE "public"."manifest" ENABLE ROW LEVEL SECURITY;
