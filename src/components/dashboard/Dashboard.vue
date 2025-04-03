@@ -9,7 +9,6 @@ import WelcomeBanner from './WelcomeBanner.vue'
 
 const props = defineProps<{
   apps: Database['public']['Tables']['apps']['Row'][]
-  sharedApps: Database['public']['Tables']['apps']['Row'][]
 }>()
 const isMobile = Capacitor.isNativePlatform()
 const isLoading = ref(false)
@@ -33,7 +32,7 @@ watchEffect(async () => {
   <div v-else class="h-full pb-4 overflow-hidden">
     <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
       <!-- Welcome banner -->
-      <WelcomeBanner v-if="props.apps.length === 0 && props.sharedApps.length === 0" />
+      <WelcomeBanner v-if="props.apps.length === 0" />
       <!-- Cards -->
       <Usage v-if="!isLoading" />
 

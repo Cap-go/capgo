@@ -7,6 +7,8 @@ import { useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth?raw'
 import Table from '~/components/Table.vue'
 import { appIdToUrl } from '~/services/conversion'
+import { formatDate } from '~/services/date'
+import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -15,6 +17,7 @@ const props = defineProps<{
   deleteButton: boolean
 }>()
 const { t } = useI18n()
+const supabase = useSupabase()
 const router = useRouter()
 const search = ref('')
 const currentPage = ref(1)
@@ -67,12 +70,14 @@ const columns = ref<TableColumn[]>([
     key: 'last_version',
     mobile: true,
     sortable: true,
+    onClick: item => openOneVersion(item),
   },
   {
     label: t('last-upload'),
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
+    displayFunction: item => formatDate(item.updated_at || ''),
   },
   {
     label: t('mau'),
@@ -107,6 +112,19 @@ function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
 
 function openPackage(app: Database['public']['Tables']['apps']['Row']) {
   router.push(`/app/p/${appIdToUrl(app.app_id)}`)
+}
+
+async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) {
+  if (!app.last_version)
+    return
+  const { data: versionData } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', app.app_id)
+    .eq('name', app.last_version)
+    .single()
+
+  router.push(`/app/p/${appIdToUrl(app.app_id)}/bundle/${versionData?.id}`)
 }
 
 // Filter apps based on search term

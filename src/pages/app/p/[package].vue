@@ -99,7 +99,6 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
     const promises = []
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
-
     updatesNb.value = await main.getTotalStatsByApp(id.value, organizationStore.currentOrganization?.subscription_start)
     devicesNb.value = await main.getTotalMauByApp(id.value, organizationStore.currentOrganization?.subscription_start)
 

@@ -18,7 +18,6 @@ const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
-const sharedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -36,7 +35,6 @@ async function getMyApps() {
     .from('apps')
     .select()
     .eq('owner_org', currentGid)
-    // .eq('user_id', main.user?.id).order('name', { ascending: true })
 
   if (data && data.length)
     apps.value = data
@@ -67,7 +65,7 @@ displayStore.defaultBack = '/app/home'
 
 <template>
   <div>
-    <Dashboard v-if="apps.length > 0 || sharedApps.length > 0" :apps="apps" :shared-apps="sharedApps" />
+    <Dashboard v-if="apps.length > 0" :apps="apps" />
     <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
     <div v-else class="flex flex-col items-center justify-center h-full">
       <Spinner size="w-40 h-40" />
