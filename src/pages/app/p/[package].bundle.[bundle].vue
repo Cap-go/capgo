@@ -499,6 +499,16 @@ function preventInputChangePerm(event: Event) {
             >
               {{ t('set-bundle') }}
             </InfoRow>
+            <InfoRow
+              v-if="version.session_key" :label="t('encryption')"
+            >
+              {{ t('encrypted') }}
+            </InfoRow>
+            <InfoRow
+              v-else :label="t('encryption')"
+            >
+              {{ t('not-encrypted-bundle') }}
+            </InfoRow>
             <!-- session_key -->
             <InfoRow
               v-if="version.session_key" :label="t('session_key')" :is-link="true"

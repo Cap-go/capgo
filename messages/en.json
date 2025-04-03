@@ -35,6 +35,8 @@
   "actions": "Actions",
   "external-storage": "External storage",
   "encrypted": "Encrypted",
+  "encryption": "Encryption",
+  "not-encrypted-bundle": "Not encrypted bundle",
   "Override": "Override",
   "organizations": "Organizations",
   "apps": "Apps",
