@@ -1,94 +1,98 @@
 PODS:
   - Alamofire (5.10.2)
-  - Capacitor (6.2.0):
+  - BigInt (5.2.0)
+  - Capacitor (7.2.0):
     - CapacitorCordova
-  - CapacitorActionSheet (6.0.3):
+  - CapacitorActionSheet (7.0.1):
     - Capacitor
-  - CapacitorApp (6.0.2):
+  - CapacitorApp (7.0.1):
     - Capacitor
-  - CapacitorAppLauncher (6.0.3):
+  - CapacitorAppLauncher (7.0.1):
     - Capacitor
-  - CapacitorBrowser (6.0.4):
+  - CapacitorBrowser (7.0.1):
     - Capacitor
-  - CapacitorCamera (6.1.2):
+  - CapacitorCamera (7.0.1):
     - Capacitor
-  - CapacitorClipboard (6.0.2):
+  - CapacitorClipboard (7.0.1):
     - Capacitor
-  - CapacitorCommunityInAppReview (6.0.0):
+  - CapacitorCommunityInAppReview (7.0.0):
     - Capacitor
-  - CapacitorCommunityKeepAwake (5.0.1):
+  - CapacitorCommunityKeepAwake (7.0.0):
     - Capacitor
-  - CapacitorCordova (6.2.0)
-  - CapacitorDevice (6.0.2):
+  - CapacitorCordova (7.2.0)
+  - CapacitorDevice (7.0.1):
     - Capacitor
-  - CapacitorDialog (6.0.2):
+  - CapacitorDialog (7.0.1):
     - Capacitor
-  - CapacitorFilesystem (6.0.2):
+  - CapacitorFilesystem (7.0.1):
     - Capacitor
-  - CapacitorGeolocation (6.1.0):
+  - CapacitorGeolocation (7.1.1):
     - Capacitor
-  - CapacitorHaptics (6.0.2):
+    - IONGeolocationLib (~> 1.0)
+  - CapacitorHaptics (7.0.1):
     - Capacitor
-  - CapacitorKeyboard (6.0.3):
+  - CapacitorKeyboard (7.0.1):
     - Capacitor
-  - CapacitorLocalNotifications (6.1.1):
+  - CapacitorLocalNotifications (7.0.1):
     - Capacitor
-  - CapacitorNetwork (6.0.3):
+  - CapacitorNetwork (7.0.1):
     - Capacitor
-  - CapacitorPreferences (6.0.3):
+  - CapacitorPreferences (7.0.1):
     - Capacitor
-  - CapacitorPushNotifications (6.0.3):
+  - CapacitorPushNotifications (7.0.1):
     - Capacitor
-  - CapacitorScreenReader (6.0.3):
+  - CapacitorScreenReader (7.0.1):
     - Capacitor
-  - CapacitorSecureStoragePlugin (0.10.0):
+  - CapacitorSecureStoragePlugin (0.11.0):
     - Capacitor
     - SwiftKeychainWrapper
-  - CapacitorShare (6.0.3):
+  - CapacitorShare (7.0.1):
     - Capacitor
-  - CapacitorSplashScreen (6.0.3):
+  - CapacitorSplashScreen (7.0.1):
     - Capacitor
-  - CapacitorStatusBar (6.0.2):
+  - CapacitorStatusBar (7.0.1):
     - Capacitor
-  - CapacitorTextZoom (6.0.3):
+  - CapacitorTextZoom (7.0.1):
     - Capacitor
-  - CapacitorToast (6.0.3):
+  - CapacitorToast (7.0.1):
     - Capacitor
-  - CapawesomeCapacitorFilePicker (6.2.0):
+  - CapawesomeCapacitorFilePicker (7.0.1):
     - Capacitor
-  - CapawesomeCapacitorScreenOrientation (6.0.1):
+  - CapawesomeCapacitorScreenOrientation (7.0.1):
     - Capacitor
-  - CapgoCapacitorCrisp (6.0.63):
+  - CapgoCapacitorCrisp (7.1.5):
     - Capacitor
     - Crisp
-  - CapgoCapacitorFlash (6.0.7):
+  - CapgoCapacitorFlash (7.0.4):
     - Capacitor
-  - CapgoCapacitorMute (6.0.3):
+  - CapgoCapacitorMute (7.1.21):
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorScreenRecorder (8.1.94):
+  - CapgoCapacitorScreenRecorder (7.1.5):
     - Capacitor
-  - CapgoCapacitorUpdater (6.7.7-alpha.2):
-    - Alamofire
+  - CapgoCapacitorUpdater (7.0.42):
+    - Alamofire (= 5.10.2)
+    - BigInt (= 5.2.0)
     - Capacitor
-    - SSZipArchive
-    - Version
-  - CapgoInappbrowser (6.9.28):
+    - SSZipArchive (= 2.4.3)
+    - Version (= 0.8.0)
+  - CapgoInappbrowser (7.7.2):
     - Capacitor
-  - CapgoNativeAudio (6.4.23):
+  - CapgoNativeAudio (7.3.14):
     - Capacitor
   - CapgoNativeMarket (0.0.1):
     - Capacitor
-  - Crisp (2.8.1):
-    - Crisp/Crisp (= 2.8.1)
-  - Crisp/Crisp (2.8.1)
-  - PurchasesHybridCommon (13.13.0):
-    - RevenueCat (= 5.14.0)
-  - RevenueCat (5.14.0)
-  - RevenuecatPurchasesCapacitor (9.0.9):
+  - Crisp (2.8.2):
+    - Crisp/Crisp (= 2.8.2)
+  - Crisp/Crisp (2.8.2)
+  - IONGeolocationLib (1.0.0)
+  - PurchasesHybridCommon (13.26.0):
+    - RevenueCat (= 5.20.0)
+  - RevenueCat (5.20.0)
+  - RevenuecatPurchasesCapacitor (10.2.2):
     - Capacitor
-    - PurchasesHybridCommon (= 13.13.0)
+    - PurchasesHybridCommon (= 13.26.0)
   - SSZipArchive (2.4.3)
   - SwiftKeychainWrapper (4.0.1)
   - Version (0.8.0)
@@ -137,7 +141,9 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - Alamofire
+    - BigInt
     - Crisp
+    - IONGeolocationLib
     - PurchasesHybridCommon
     - RevenueCat
     - SSZipArchive
@@ -226,52 +232,54 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Alamofire: 7193b3b92c74a07f85569e1a6c4f4237291e7496
-  Capacitor: 1f3c7b9802d958cd8c4eb63895fff85dff2e1eea
-  CapacitorActionSheet: 653276dc474be8914db13293a987915f16148d00
-  CapacitorApp: 2a8c3a0b0814322e5e6e15fe595f02c3808f0f8b
-  CapacitorAppLauncher: a9fb7da942e89fa9cb2bb1e579c8bd2ab81652a5
-  CapacitorBrowser: ef0529d16cd8839281050c350e7bbee4f5c6d65f
-  CapacitorCamera: 9052bd3f464f135ba983feccd8ac1266272f0549
-  CapacitorClipboard: 55e0a514f1e97b1409d533266c119dcbff3e78c3
-  CapacitorCommunityInAppReview: c69a9392f39a10f28092d823cfa979637f4fa079
-  CapacitorCommunityKeepAwake: e2ddd50812e3407f8dc3a2c28e97d66e9b59b2f5
-  CapacitorCordova: b33e7f4aa4ed105dd43283acdd940964374a87d9
-  CapacitorDevice: 1a215717f0b5061503b21a03508b0ec458a57d78
-  CapacitorDialog: e966e2261e1c74a8a502e610dd66b4f97ec6fcca
-  CapacitorFilesystem: c832a3f6d4870c3872688e782ae8e33665e6ecbf
-  CapacitorGeolocation: d994ee64ee41909e2089e575c9d3a976007c2812
-  CapacitorHaptics: b53409aaca1203f79c6d0eb3ed5de40556339518
-  CapacitorKeyboard: 460c6f9ec5e52c84f2742d5ce2e67bbc7ab0ebb0
-  CapacitorLocalNotifications: 113dcab0b40781e8463bfdbbd6b54c6116361644
-  CapacitorNetwork: da96b5fff8d05b67f4658503aabb22f65bda2c0f
-  CapacitorPreferences: 9f9935bce493977183511362131a93f7b260191a
-  CapacitorPushNotifications: 2912e63470b895aefadff55c49f1fb8d82769423
-  CapacitorScreenReader: b70c6915993c5138d4471c44f69effdfc0bf4e0e
-  CapacitorSecureStoragePlugin: ced6025438fbbdbfb9fffec4398e748572fc147b
-  CapacitorShare: 7af6ca761ce62030e8e9fbd2eb82416f5ceced38
-  CapacitorSplashScreen: 68893659d77b5f82d753b3a70475082845e3039c
-  CapacitorStatusBar: 3b9ac7d0684770522c532d1158a1434512ab1477
-  CapacitorTextZoom: be3bee30e5bf4bc623539877e6241dff861d631e
-  CapacitorToast: 048d8cbefa6651509ed29c3e7262e9e64abe251d
-  CapawesomeCapacitorFilePicker: c14df1f5a23226039e0cb82b171cf5a351470459
-  CapawesomeCapacitorScreenOrientation: 9cc68ecd085fcea2e1755475a3ed60d85e604a6c
-  CapgoCapacitorCrisp: d76c67400094d2a2623738f11d0753f6dee9894c
-  CapgoCapacitorFlash: 95210589a71f3ced3094193faab31288cbe29734
-  CapgoCapacitorMute: 6cf5b54cb19afe8f0cf9b20c0040ec65d9ecf0a0
-  CapgoCapacitorNativeBiometric: 44b0bb31118f6ed5171087a77a856a80a0cfa250
-  CapgoCapacitorScreenRecorder: d3ee41b9635d11f514d2d2f277371428f70acf9f
-  CapgoCapacitorUpdater: 062edeb403244c8c5e54055b4b6bb0a8c17b13ec
-  CapgoInappbrowser: fdf490fa1f3923a3f226f208ae0e8ebd05e3a7f4
-  CapgoNativeAudio: 9ad122368ba4ac9cc19f9cc04e4c16a681c093f4
+  BigInt: f668a80089607f521586bbe29513d708491ef2f7
+  Capacitor: 106e7a4205f4618d582b886a975657c61179138d
+  CapacitorActionSheet: 24609588961cc27c87e8b033be92b5eee65b5d4c
+  CapacitorApp: d63334c052278caf5d81585d80b21905c6f93f39
+  CapacitorAppLauncher: 551876cb6b3f5939206ed7dc35d97b42256940c1
+  CapacitorBrowser: 081852cf532acf77b9d2953f3a88fe5b9711fb06
+  CapacitorCamera: eb8687d8687fed853598ec9460d94bcd5e16babe
+  CapacitorClipboard: b98aead5dc7ec595547fc2c5d75bacd2ae3338bc
+  CapacitorCommunityInAppReview: a01a1508adc1bf02dda70b33a521ef627324d898
+  CapacitorCommunityKeepAwake: 00dfd8fa3cca0df003c9a3e2cd7bee678aeec68b
+  CapacitorCordova: 5967b9ba03915ef1d585469d6e31f31dc49be96f
+  CapacitorDevice: fe3f190e1d718f4607bdc6b73993433d1c84f409
+  CapacitorDialog: 9b934329026b2b0ffa56939bb06df3c67541a2ab
+  CapacitorFilesystem: 307f97c27a265edf8396a1c9c235592fd8572fe3
+  CapacitorGeolocation: 8f8ac02ceaeb203a4762f8dc4ff5119e3f7fa50a
+  CapacitorHaptics: 70e47470fa1a6bd6338cd102552e3846b7f9a1b3
+  CapacitorKeyboard: 969647d0ca2e5c737d7300088e2517aa832434e2
+  CapacitorLocalNotifications: 4ea60b9347eac60b37cb4daaf62d12060bb00972
+  CapacitorNetwork: 07ec4c69c1bb696f41c23e00d31bda1bbb221bba
+  CapacitorPreferences: cbf154e5e5519b7f5ab33817a334dda1e98387f9
+  CapacitorPushNotifications: 0b653a3264d56daccf0e8769fff15d2f48306de6
+  CapacitorScreenReader: d565ba159d84d986d0c8e22d99cf37abd4afb2ed
+  CapacitorSecureStoragePlugin: 8019bd11de7d5832a87c1bb320750dd6cef792d7
+  CapacitorShare: 58d6c2da63b093e8693287b2d36db92435538435
+  CapacitorSplashScreen: 19cd3573e57507e02d6f34597a8c421e00931487
+  CapacitorStatusBar: 275cbf2f4dfc00388f519ef80c7ec22edda342c9
+  CapacitorTextZoom: 58cec0b04777e26d17241d4db86fd4a65b554a67
+  CapacitorToast: c0f64abc0fae75c54e504db9be180a7f5f7d7476
+  CapawesomeCapacitorFilePicker: 6673764afb8768eba0197876e222adc19fd4c120
+  CapawesomeCapacitorScreenOrientation: f47275aee2356b38d34c1328afc930e787f1caa2
+  CapgoCapacitorCrisp: b18134ef3cdd7f9a66bce081a9a73501be52075e
+  CapgoCapacitorFlash: e483f9fe907045a98982bc52192053022edd197e
+  CapgoCapacitorMute: e1c364f32e160fb164b05b66dc8c202e02008d47
+  CapgoCapacitorNativeBiometric: ef4244ffac92fb918ec8aaf19dc0aaef54e24a99
+  CapgoCapacitorScreenRecorder: 656720fa92c5028a185cb63e76fe77d27d874c54
+  CapgoCapacitorUpdater: 40ae5a730e006b06bf7844995319cf6bcd20dbc9
+  CapgoInappbrowser: 2f4f4be029efac3d7f2641c0e1236a0eada903fe
+  CapgoNativeAudio: 3b4acd1809a4369d989b41db10a92cbc8b15cf1d
   CapgoNativeMarket: d56ce2c516637c3e2a8467413e7b313a48dfb059
-  Crisp: 0ff88141775c806ed3c8683595e1c10b06beb5d2
-  PurchasesHybridCommon: a712dcce0d81fa39dada521292408816146ca58c
-  RevenueCat: 34f4147c8d26d2f3c691be4e3c9f033698e557f2
-  RevenuecatPurchasesCapacitor: b8fdd2675aea72e8d52b88a8de5a4f0e5fc6d0e6
+  Crisp: 6747c96b2b2c2a81babf1eaecd1688a65d98edd4
+  IONGeolocationLib: 81f33f88d025846946de2cf63b0c7628e7c6bc9d
+  PurchasesHybridCommon: fa166fc8b385cf80f581f923c91d8ccffe5dd7f8
+  RevenueCat: e47ff90dfd271fde155a4befe48e8fc02e8281e4
+  RevenuecatPurchasesCapacitor: d8d6710d402b7a4abea86e11f6d6e7ad3c1c300a
   SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: 37a97bf6083aae73e13d61d5c09d9d23bda6b0ad
+PODFILE CHECKSUM: aa1fcc1f941ae0ff469efe9ffa00b4856f06710b
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2
