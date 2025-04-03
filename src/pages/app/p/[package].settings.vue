@@ -91,7 +91,7 @@ async function didCancel(name: string) {
 }
 
 async function setUpdateChannelSync(value: boolean) {
-  if (value === true && appRef.value && ((appRef.value.default_channel_ios && appRef.value.default_channel_android && (appRef.value.default_channel_ios as any)?.id !== (appRef.value.default_channel_android as any)?.id))) {
+  if (value === true && appRef.value && ((appRef.value.default_channel_ios && appRef.value.default_channel_android && (appRef.value.default_channel_ios as any)?.id !== (appRef.value.default_channel_android as any)?.id) || (!appRef.value?.default_channel_ios && !!appRef.value?.default_channel_android) || (!appRef.value?.default_channel_android && !!appRef.value?.default_channel_ios))) {
     const channels = await supabase
       .from('channels')
       .select('*')
