@@ -15,7 +15,6 @@
       "@intlify/unplugin-vue-i18n/messages",
       "@cloudflare/workers-types",
       "unplugin-icons/types/vue",
-      "bun-types",
       "vitest",
       "vite/client",
       "vite-plugin-vue-layouts/client",

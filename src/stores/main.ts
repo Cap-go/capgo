@@ -97,7 +97,7 @@ export const useMainStore = defineStore('main', () => {
       totalStats.value = getTotalStats()
       bestPlan.value = await findBestPlan(totalStats.value)
       dashboardFetched.value = true
-      _initialLoadPromise.value.resolve()
+      _initialLoadPromise.value.resolve(true)
     }
     catch (error) {
       _initialLoadPromise.value.reject(error)
