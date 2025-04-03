@@ -58,8 +58,8 @@ const { t } = useI18n()
 const isDark = useDark()
 const searchVal = ref(props.search || '')
 const currentSelected = ref<'general' | 'precise'>('general')
-type Minutes = 1 | 3 | 15
-const currentGeneralTime = ref<Minutes>(3)
+type Minutes = 1 | 3 | 12
+const currentGeneralTime = ref<Minutes>(1)
 const preciseDates = ref<[Date, Date]>()
 const thisOrganization = ref<Organization | null>(null)
 const organizationStore = useOrganizationStore()
@@ -145,19 +145,19 @@ async function setTime(time: Minutes) {
   console.log('setTime', time)
   if (time === 1) {
     preciseDates.value = [
-      dayjs().subtract(1, 'minute').toDate(),
+      dayjs().subtract(1, 'hour').toDate(),
       new Date(),
     ]
   }
   else if (time === 3) {
     preciseDates.value = [
-      dayjs().subtract(3, 'minute').toDate(),
+      dayjs().subtract(3, 'hour').toDate(),
       new Date(),
     ]
   }
   else {
     preciseDates.value = [
-      dayjs().subtract(15, 'minute').toDate(),
+      dayjs().subtract(12, 'hour').toDate(),
       new Date(),
     ]
   }
@@ -205,13 +205,13 @@ onMounted(async () => {
           >
             <IconClock class="h-4 w-4" />
             <span class="text-sm font-medium hidden md:block">
-              {{ currentGeneralTime === 1 ? t('last-minute') : (currentGeneralTime === 3 ? t('last-3-minutes') : t('last-15-minutes')) }}
+              {{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hours') : t('last-12-hours')) }}
             </span>
           </button>
           <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-minute') }}</a></li>
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-minutes') }}</a></li>
-            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 15 }" @click="setTime(15)">{{ t('last-15-minutes') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-hour') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-hours') }}</a></li>
+            <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 12 }" @click="setTime(12)">{{ t('last-12-hours') }}</a></li>
           </ul>
         </div>
         <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
