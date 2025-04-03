@@ -41,6 +41,13 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Date()])
 const filters = ref()
+const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
+
+// const actionLinks = {
+//   update: '/app/p/{{appId}}/update',
+//   download: '/app/p/{{appId}}/download',
+//   error: '/app/p/{{appId}}/error',
+// }
 
 function findVersion(id: number, versions: { name: string, id: number }[]) {
   return versions.find(elem => elem.id === id)
@@ -159,6 +166,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('action'),
@@ -166,14 +174,15 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: () => window.open(DOC_LOGS, '_blank'),
   },
-
   {
     label: t('version'),
     key: 'version',
     mobile: false,
     sortable: false,
     displayFunction: (elem: Element) => elem.version?.name,
+    onClick: (elem: Element) => openOneVersion(elem),
   },
 ]
 
@@ -187,6 +196,11 @@ async function reload() {
   catch (error) {
     console.error(error)
   }
+}
+async function openOneVersion(one: Element) {
+  if (props.deviceId || !props.appId)
+    return
+  router.push(`/app/p/${appIdToUrl(props.appId)}/v/${one.version?.id}`)
 }
 async function openOne(one: Element) {
   if (props.deviceId || !props.appId)
@@ -215,7 +229,6 @@ watch(props, async () => {
       :app-id="props.appId ?? ''"
       :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
       @reload="reload()" @reset="refreshData()"
-      @row-click="openOne"
     />
   </div>
 </template>

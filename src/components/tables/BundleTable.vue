@@ -279,6 +279,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('created-at'),
@@ -434,13 +435,13 @@ watch(props, async () => {
   <div>
     <Table
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total" row-click :element-list="elements"
+      :total="total"
+      :element-list="elements"
       filter-text="Filters"
       mass-select
       :is-loading="isLoading"
       :search-placeholder="t('search-bundle-id')"
       @reload="reload()" @reset="refreshData()"
-      @row-click="openOne"
       @mass-delete="massDelete()"
       @select-row="selectedElementsFilter"
     />

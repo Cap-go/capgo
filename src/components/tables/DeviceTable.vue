@@ -40,6 +40,7 @@ const columns = ref<TableColumn[]>([
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('updated-at'),
@@ -63,6 +64,7 @@ const columns = ref<TableColumn[]>([
     sortable: true,
     head: true,
     displayFunction: (elem: Element) => elem.version.name,
+    onClick: (elem: Element) => openOneVersion(elem),
   },
 ])
 
@@ -205,6 +207,9 @@ async function refreshData() {
 async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/d/${one.device_id}`)
 }
+async function openOneVersion(one: Element) {
+  router.push(`/app/p/${appIdToUrl(props.appId)}/v/${one.version?.id}`)
+}
 
 onMounted(async () => {
   await refreshData()
@@ -215,14 +220,13 @@ onMounted(async () => {
   <div>
     <Table
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total" row-click :element-list="elements"
+      :total="total" :element-list="elements"
       filter-text="Filters"
       :plus-button="true"
       :is-loading="isLoading"
       :search-placeholder="t('search-by-device-id')"
       @reload="reload()"
       @reset="refreshData()"
-      @row-click="openOne"
     />
   </div>
 </template>

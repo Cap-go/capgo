@@ -19,7 +19,6 @@ import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
 
 interface Props {
-  rowClick?: boolean
   isLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
@@ -46,7 +45,6 @@ const emit = defineEmits([
   'update:currentPage',
   'filterClick',
   'plusClick',
-  'rowClick',
   'sortClick',
   'selectRow',
   'massDelete',
@@ -254,14 +252,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <tbody v-if="!isLoading && elementList.length !== 0">
           <tr
             v-for="(elem, i) in elementList" :key="i"
-            :class="{ 'cursor-pointer': rowClick }"
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
-            @click="(e: MouseEvent) => {
-              if (e.target !== null && (e.target as HTMLElement).id === 'select-rows') {
-                return
-              }
-              emit('rowClick', elem)
-            }"
           >
             <template v-if="true">
               <th v-if="props.massSelect" class="pl-4 pr-2">
@@ -270,18 +261,18 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''} ${col.onClick ? 'cursor-pointer text-primary hover:underline clickable-cell' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <button
-                    class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white" v-html="col.icon"
+                    class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white cursor-pointer" v-html="col.icon"
                   />
                 </td>
-                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4">
+                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer text-primary hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}

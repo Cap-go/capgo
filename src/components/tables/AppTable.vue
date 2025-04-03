@@ -47,6 +47,7 @@ const columns = ref<TableColumn[]>([
     head: true,
     allowHtml: true,
     sanitizeHtml: true,
+    onClick: item => openPackage(item),
     displayFunction: (item) => {
       return `
         <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
@@ -139,8 +140,6 @@ const filteredApps = computed(() => {
         :search-placeholder="t('search-by-name-or-bundle-id')"
         :is-loading="false"
         filter-text="Filters"
-        class="cursor-pointer"
-        @row-click="openPackage"
       />
     </div>
   </div>

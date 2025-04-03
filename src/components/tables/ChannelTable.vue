@@ -228,6 +228,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('last-upload'),
@@ -255,7 +256,7 @@ columns.value = [
     mobile: true,
     icon: IconTrash,
     class: 'text-red-500',
-    onClick: deleteOne,
+    onClick: (elem: Element) => deleteOne(elem),
   },
 ]
 
@@ -315,12 +316,11 @@ watch(props, async () => {
   <div>
     <Table
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total" row-click :element-list="elements"
+      :total="total" :element-list="elements"
       filter-text="Filters"
       :is-loading="isLoading"
       :search-placeholder="t('search-by-name')"
       @reload="reload()" @reset="refreshData()"
-      @row-click="openOne"
     />
     <button id="create_channel" class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
       <IconPlus />
