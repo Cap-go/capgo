@@ -157,7 +157,7 @@ async function getData() {
     const versionPromises = dataD.map((element) => {
       return supabase
         .from('app_versions')
-        .select('name')
+        .select('name, id')
         .eq('id', element.version)
         .single()
     })
