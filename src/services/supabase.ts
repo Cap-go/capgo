@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-// import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
@@ -19,7 +18,7 @@ export interface CapgoConfig {
   hostWeb: string
 }
 
-export function isLocal(supaHost:  string) {
+export function isLocal(supaHost: string) {
   return supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 }
 

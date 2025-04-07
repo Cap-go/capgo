@@ -108,8 +108,12 @@ function nextRunDate() {
             <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
           </div>
           <div class="tooltip-content">
-            <div class="max-w-xs whitespace-normal">{{ lastRunDate() }}</div>
-            <div class="max-w-xs whitespace-normal">{{ nextRunDate() }}</div>
+            <div class="max-w-xs whitespace-normal">
+              {{ lastRunDate() }}
+            </div>
+            <div class="max-w-xs whitespace-normal">
+              {{ nextRunDate() }}
+            </div>
           </div>
         </div>
         <div class="font-medium badge badge-primary">

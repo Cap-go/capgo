@@ -205,12 +205,16 @@ function nextRunDate() {
     <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
       <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="sm:align-center sm:flex sm:flex-col">
-          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip" >
+          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip">
             {{ t('usage') }}
             <IcBaselineInfo class="w-4 h-4 cursor-pointer text-slate-400 dark:text-white" />
             <div class="tooltip-content">
-               <div class="max-w-xs whitespace-normal">{{ lastRunDate() }}</div>
-               <div class="max-w-xs whitespace-normal">{{ nextRunDate() }}</div>
+              <div class="max-w-xs whitespace-normal">
+                {{ lastRunDate() }}
+              </div>
+              <div class="max-w-xs whitespace-normal">
+                {{ nextRunDate() }}
+              </div>
             </div>
           </h1>
 

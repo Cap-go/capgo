@@ -4,7 +4,7 @@ import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { pushEvent } from '~/services/posthog'
-import { getLocalConfig, useSupabase, isLocal } from '~/services/supabase'
+import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 
@@ -12,7 +12,7 @@ const props = defineProps<{
   onboarding: boolean
   appId: string
 }>()
-const emit = defineEmits(['done', 'close-step'])
+const emit = defineEmits(['done', 'closeStep'])
 const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
@@ -33,11 +33,10 @@ interface Step {
 
 const config = getLocalConfig()
 
-
 const steps = ref<Step[]>([
   {
     title: t('add-another-bundle'),
-    command: `npx @capgo/cli@latest bundle upload --a [APIKEY]${isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
+    command: `npx @capgo/cli@latest bundle upload -a [APIKEY]${isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
     subtitle: '',
   },
   {
@@ -47,6 +46,7 @@ const steps = ref<Step[]>([
   },
 ])
 function setLog() {
+  console.log('setLog', props.onboarding, main.user?.id, step.value)
   if (props.onboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-bundle',
@@ -57,8 +57,13 @@ function setLog() {
     }).catch()
     pushEvent(`user:step-${step.value}`, config.supaHost)
 
-    if (step.value === 2)
+    if (step.value === 2) {
       pushEvent('user:onboarding-bundle-done', config.supaHost)
+      emit('done')
+    }
+  }
+  if (step.value === 2) {
+    emit('done')
   }
 }
 
@@ -98,13 +103,13 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
   }
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
-    setLog()
     step.value += 1
     clicked.value = 0
     realtimeListener.value = false
     if (mySubscription.value)
       mySubscription.value.unsubscribe()
     scrollToElement(id)
+    setLog()
   }
 }
 
@@ -166,11 +171,11 @@ watchEffect(async () => {
         },
         (payload) => {
           console.log('Change received step 1!', payload)
-          setLog()
           step.value += 1
           appId.value = payload.new.id || ''
           realtimeListener.value = false
           mySubscription.value.unsubscribe()
+          setLog()
         },
       )
       .subscribe()
@@ -186,7 +191,7 @@ watchEffect(async () => {
   <section class="h-full py-12 overflow-y-auto max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="flex items-center justify-items-center place-content-center">
-        <button v-if="!onboarding" class="bg-gray-800 btn btn-outline mr-6" @click="emit('close-step')">
+        <button v-if="!onboarding" class="bg-gray-800 btn btn-outline mr-6" @click="emit('closeStep')">
           <arrowBack />
         </button>
         <div v-if="props.onboarding" class="text-center">

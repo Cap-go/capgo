@@ -87,8 +87,12 @@ function nextRunDate() {
         </h2>
         <div class="tooltip">
           <div class="tooltip-content">
-            <div class="max-w-xs whitespace-normal">{{ lastRunDate() }}</div>
-            <div class="max-w-xs whitespace-normal">{{ nextRunDate() }}</div>
+            <div class="max-w-xs whitespace-normal">
+              {{ lastRunDate() }}
+            </div>
+            <div class="max-w-xs whitespace-normal">
+              {{ nextRunDate() }}
+            </div>
           </div>
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
             <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />

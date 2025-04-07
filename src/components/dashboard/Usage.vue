@@ -128,9 +128,11 @@ if (main.dashboardFetched)
 </script>
 
 <template>
-  <div v-if="!noData || isLoading"
-       class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
-       :class="appId && showMobileStats ? 'xl:grid-cols-16' : 'xl:grid-cols-12'">
+  <div
+    v-if="!noData || isLoading"
+    class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
+    :class="appId && showMobileStats ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
+  >
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="false"
       :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"

@@ -5,8 +5,7 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
-import { useSupabase } from '~/services/supabase'
-import { getLocalConfig } from '~/services/supabase'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import {
   findBestPlan,
   getAllDashboard,

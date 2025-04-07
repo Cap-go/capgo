@@ -1,11 +1,10 @@
 import posthog from 'posthog-js'
+import { isLocal } from '~/services/supabase'
 import 'posthog-js/dist/recorder'
 import 'posthog-js/dist/surveys'
 import 'posthog-js/dist/exception-autocapture'
 import 'posthog-js/dist/tracing-headers'
 import 'posthog-js/dist/web-vitals'
-import { isLocal } from '~/services/supabase'
-
 
 export function posthogLoader(supaHost: string) {
   if (isLocal(supaHost))

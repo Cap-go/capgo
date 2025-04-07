@@ -4,14 +4,14 @@ import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { pushEvent } from '~/services/posthog'
-import { getLocalConfig, useSupabase, isLocal } from '~/services/supabase'
+import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
-const emit = defineEmits(['done', 'close-step'])
+const emit = defineEmits(['done', 'closeStep'])
 const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
@@ -55,8 +55,12 @@ function setLog() {
     }).catch()
     pushEvent(`user:step-${step.value}`, config.supaHost)
 
-    if (step.value === 2)
+    if (step.value === 2) {
       pushEvent('user:onboarding-done', config.supaHost)
+    }
+  }
+  if (step.value === 2) {
+    emit('done')
   }
 }
 function scrollToElement(id: string) {
@@ -95,13 +99,13 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
   }
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
-    setLog()
     step.value += 1
     clicked.value = 0
     realtimeListener.value = false
     if (mySubscription.value)
       mySubscription.value.unsubscribe()
     scrollToElement(id)
+    setLog()
   }
 }
 
@@ -163,11 +167,11 @@ watchEffect(async () => {
         },
         (payload) => {
           console.log('Change received step 1!', payload)
-          setLog()
           step.value += 1
           appId.value = payload.new.id || ''
           realtimeListener.value = false
           mySubscription.value.unsubscribe()
+          setLog()
         },
       )
       .subscribe()
@@ -183,27 +187,27 @@ watchEffect(async () => {
   <section class="h-full py-12 overflow-y-auto max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="flex items-center justify-items-center place-content-center">
-        <button v-if="!onboarding" class="bg-gray-800 btn btn-outline mr-6" @click="emit('close-step')">
+        <button v-if="!onboarding" class="bg-gray-800 btn btn-outline mr-6" @click="emit('closeStep')">
           <arrowBack />
         </button>
-      <div v-if="props.onboarding" class="text-center">
-        <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
-          {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
-        </h2>
-        <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
-          {{ t('add-your-first-app-t') }}
-        </p>
-        <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">
-          {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
-        </p>
-      </div>
+        <div v-if="props.onboarding" class="text-center">
+          <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
+            {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
+          </h2>
+          <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
+            {{ t('add-your-first-app-t') }}
+          </p>
+          <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">
+            {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
+          </p>
+        </div>
 
-      <div v-else class="text-center">
-        <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
-          {{ t('add-another-app') }}
-        </h2>
+        <div v-else class="text-center">
+          <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
+            {{ t('add-another-app') }}
+          </h2>
+        </div>
       </div>
-    </div>
 
       <div class="max-w-4xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">

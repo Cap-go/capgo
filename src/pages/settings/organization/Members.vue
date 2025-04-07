@@ -1,15 +1,15 @@
 <script setup lang="ts">
+import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import type { TableColumn } from '~/components/comp_def'
-import Table from '~/components/Table.vue'
-
 import Trash from '~icons/heroicons/trash?raw'
+
 import Wrench from '~icons/heroicons/wrench?raw'
+import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -70,42 +70,44 @@ columns.value = [
     mobile: true,
     class: 'text-center',
     displayFunction: (member: ExtendedOrganizationMember) => {
-        return canEdit(member) ? Wrench : ''
+      return canEdit(member) ? Wrench : ''
     },
     allowHtml: true,
     onClick: (member: ExtendedOrganizationMember) => {
-        if (canEdit(member)) {
-            changeMemberPermission(member)
-        }
+      if (canEdit(member)) {
+        changeMemberPermission(member)
+      }
     },
   },
-    {
+  {
     label: '',
     key: 'delete_action',
     mobile: true,
     class: 'text-center text-red-500',
     displayFunction: (member: ExtendedOrganizationMember) => {
-        return canDelete(member) ? Trash : ''
+      return canDelete(member) ? Trash : ''
     },
     allowHtml: true,
     onClick: (member: ExtendedOrganizationMember) => {
-        if (canDelete(member)) {
-            deleteMember(member)
-        }
+      if (canDelete(member)) {
+        deleteMember(member)
+      }
     },
   },
 ]
 
 async function reloadData() {
-    isLoading.value = true
-    try {
-        members.value = await organizationStore.getMembers()
-    } catch (error) {
-        console.error("Error reloading members:", error)
-        toast.error(t('error-fetching-members'))
-    } finally {
-        isLoading.value = false
-    }
+  isLoading.value = true
+  try {
+    members.value = await organizationStore.getMembers()
+  }
+  catch (error) {
+    console.error('Error reloading members:', error)
+    toast.error(t('error-fetching-members'))
+  }
+  finally {
+    isLoading.value = false
+  }
 }
 
 watch(currentOrganization, reloadData)
@@ -218,8 +220,8 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
 
   const orgId = currentOrganization.value?.gid
   if (!orgId) {
-      toast.error("Organization ID not found.")
-      return
+    toast.error('Organization ID not found.')
+    return
   }
 
   isLoading.value = true
@@ -238,17 +240,20 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
 
     handleSendInvitationOutput(data)
     await reloadData()
-  } catch (error) {
-      console.error("Invitation failed:", error)
-      toast.error(t('invitation-failed'))
-  } finally {
-      isLoading.value = false
+  }
+  catch (error) {
+    console.error('Invitation failed:', error)
+    toast.error(t('invitation-failed'))
+  }
+  finally {
+    isLoading.value = false
   }
 }
 
 function handleSendInvitationOutput(output: string | null | undefined) {
   console.log('Output: ', output)
-  if (!output) return
+  if (!output)
+    return
   switch (output) {
     case 'OK': {
       toast.success(t('org-invited-user'))
@@ -267,7 +272,7 @@ function handleSendInvitationOutput(output: string | null | undefined) {
       break
     }
     default:
-        toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
+      toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
   }
 }
 
@@ -294,8 +299,8 @@ async function didCancel() {
 
 async function deleteMember(member: ExtendedOrganizationMember) {
   if (await didCancel()) {
-      console.log('Member deletion cancelled.')
-      return
+    console.log('Member deletion cancelled.')
+    return
   }
 
   if (member.aid === 0) {
@@ -315,18 +320,20 @@ async function deleteMember(member: ExtendedOrganizationMember) {
     toast.success(t('member-deleted'))
 
     if (member.uid === main.user?.id) {
-        console.log('Current user deleted themselves from the org.')
-        await organizationStore.fetchOrganizations()
-        organizationStore.setCurrentOrganizationToMain()
-    } else {
-        await reloadData()
+      console.log('Current user deleted themselves from the org.')
+      await organizationStore.fetchOrganizations()
+      organizationStore.setCurrentOrganizationToMain()
     }
-
-  } catch (error) {
-      console.error("Deletion failed:", error)
-      toast.error(t('deletion-failed'))
-  } finally {
-      isLoading.value = false
+    else {
+      await reloadData()
+    }
+  }
+  catch (error) {
+    console.error('Deletion failed:', error)
+    toast.error(t('deletion-failed'))
+  }
+  finally {
+    isLoading.value = false
   }
 }
 
@@ -334,8 +341,8 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
   const perm = await showPermModal(member.role.includes('invite'))
 
   if (!perm) {
-      console.log('Permission change cancelled.')
-      return
+    console.log('Permission change cancelled.')
+    return
   }
 
   isLoading.value = true
@@ -349,56 +356,66 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
 
     toast.success(t('permission-changed'))
     await reloadData()
-  } catch (error) {
-      console.error("Permission change failed:", error)
-      toast.error(t('permission-change-failed'))
-  } finally {
-      isLoading.value = false
+  }
+  catch (error) {
+    console.error('Permission change failed:', error)
+    toast.error(t('permission-change-failed'))
+  }
+  finally {
+    isLoading.value = false
   }
 }
 
 function acronym(email: string) {
   let res = 'NA'
   const prefix = email?.split('@')[0]
-  if (!prefix) return res;
+  if (!prefix)
+    return res
 
   if (prefix.length > 2 && prefix.includes('.')) {
     const parts = prefix.split('.')
     const firstName = parts[0]
     const lastName = parts[1]
     if (firstName && lastName) {
-        res = (firstName[0] + lastName[0]).toUpperCase()
+      res = (firstName[0] + lastName[0]).toUpperCase()
     }
-  } else if (prefix.length >= 2) {
+  }
+  else if (prefix.length >= 2) {
     res = (prefix[0] + prefix[1]).toUpperCase()
-  } else if (prefix.length === 1) {
-      res = (prefix[0] + 'X').toUpperCase()
+  }
+  else if (prefix.length === 1) {
+    res = (`${prefix[0]}X`).toUpperCase()
   }
   return res
 }
 
 function canEdit(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
-  if (!role) return false
+  if (!role)
+    return false
   return (organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin'])) && (member.uid !== currentOrganization?.value?.created_by)
 }
 function isSuperAdmin() {
   const role = organizationStore.currentRole
-  if (!role) return false
+  if (!role)
+    return false
   return organizationStore.hasPermisisonsInRole(role, ['super_admin'])
 }
 function canDelete(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
   const currentUserId = main.user?.id
   const ownerId = currentOrganization?.value?.created_by
-  if (!role || !currentUserId || !ownerId) return false
+  if (!role || !currentUserId || !ownerId)
+    return false
 
   const isSelf = member.uid === currentUserId
   const isOwner = member.uid === ownerId
 
-  if (isOwner) return false
+  if (isOwner)
+    return false
 
-  if (isSelf) return true
+  if (isSelf)
+    return true
 
   const currentUserIsOwner = currentUserId === ownerId
   const currentUserIsAdmin = role === 'admin' || role === 'super_admin'
