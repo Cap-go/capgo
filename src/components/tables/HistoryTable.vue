@@ -27,6 +27,7 @@ interface DeployHistory {
     created_at: string
     link?: string
     comment?: string
+    deleted?: boolean
   }
   user?: {
     id: string
@@ -146,11 +147,13 @@ const columns = computed<TableColumn[]>(() => [
     mobile: true,
     class: 'text-center',
     displayFunction: (item) => {
-      return isCurrentVersion(item) ? 'Current' : 'Rollback'
+      if (item.version?.deleted) {
+        return t('bundle-deleted')
+      }
+      return isCurrentVersion(item) ? t('current') : t('rollback')
     },
     onClick: (item) => {
-      // Only allow rollback if it's not the current version
-      if (!isCurrentVersion(item)) {
+      if (!isCurrentVersion(item) && !item.version?.deleted) {
         handleRollback(item)
       }
     },
@@ -178,7 +181,8 @@ async function fetchDeployHistory() {
           app_id,
           created_at,
           link,
-          comment
+          comment,
+          deleted
         ),
         user:created_by (
           id,
@@ -225,6 +229,11 @@ async function handleRollback(item: DeployHistory) {
   const role = await organizationStore.getCurrentRoleForApp(props.appId)
   if (!organizationStore.hasPermisisonsInRole(role, ['admin', 'super_admin', 'write'])) {
     toast.error(t('no-permission'))
+    return
+  }
+
+  if (item.version?.deleted) {
+    toast.error(t('version-deleted-cannot-rollback'))
     return
   }
 

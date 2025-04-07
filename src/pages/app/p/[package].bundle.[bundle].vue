@@ -9,6 +9,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconInformations from '~icons/heroicons/information-circle'
+import IconTrash from '~icons/heroicons/trash'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -400,13 +401,6 @@ async function saveCustomId(input: string) {
 
   toast.success(t('updated-min-version'))
 }
-// const failPercent = computed(() => {
-//   if (!version.value)
-//     return '0%'
-//   const total = version_meta.value?.installs || 1
-//   const fail = version_meta.value?.fails || 1
-//   return `${Math.round((fail / total) * 100).toLocaleString()}%`
-// })
 
 function guardMinAutoUpdate(event: Event) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
@@ -420,6 +414,195 @@ function preventInputChangePerm(event: Event) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])) {
     event.preventDefault()
     return false
+  }
+}
+
+// Replicated logic from BundleTable.vue for deletion
+async function didCancel(name: string, askForMethod = true): Promise<boolean | 'normal' | 'unsafe'> {
+  let method: 'normal' | 'unsafe' | null = null
+  if (askForMethod) {
+    displayStore.dialogOption = {
+      header: t('select-style-of-deletion'),
+      message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle" target="_blank">${t('here')}</a>`),
+      buttons: [
+        {
+          text: t('normal'),
+          role: 'normal',
+          handler: () => {
+            method = 'normal'
+          },
+        },
+        {
+          text: t('unsafe'),
+          role: 'danger',
+          id: 'unsafe',
+          handler: async () => {
+            if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(packageId.value), ['super_admin'])) {
+              toast.error(t('no-permission-ask-super-admin'))
+              return
+            }
+            method = 'unsafe'
+          },
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss() || !method)
+      return true
+  }
+  else {
+    method = 'unsafe' // If not asking, assume unsafe (used for already soft-deleted)
+  }
+
+  displayStore.dialogOption = {
+    header: t('alert-confirm-delete'),
+    message:
+      askForMethod
+        ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
+        : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\
+${t('you-are-deleting-unsafely').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle" target="_blank">').replace('$4', '</a>')}.`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        role: 'danger',
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  if (await displayStore.onDialogDismiss())
+    return true
+  if (method === null)
+    throw new Error('Unreachable, method = null')
+
+  return method
+}
+
+async function deleteBundle() {
+  if (!version.value)
+    return
+
+  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  try {
+    const { data: channelFound, error: errorChannel } = await supabase
+      .from('channels')
+      .select('id, name, version!inner(name)') // Ensure version is selected for display
+      .eq('app_id', version.value.app_id)
+      .eq('version', version.value.id)
+
+    let unlink = [] as { id: number, name: string }[] // Store id and name
+    if (errorChannel) {
+      console.error('Error checking channels:', errorChannel)
+      toast.error(t('error-checking-channels')) // Add translation key
+      return
+    }
+
+    if (channelFound && channelFound.length > 0) {
+      displayStore.dialogOption = {
+        header: t('want-to-unlink'),
+        message: t('channel-bundle-linked').replace('%s', channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')),
+        buttons: [
+          {
+            text: t('yes'),
+            role: 'yes',
+            id: 'yes',
+            handler: () => {
+              unlink = channelFound.map((ch: any) => ({ id: ch.id, name: ch.name })) // Map to id and name
+            },
+          },
+          {
+            text: t('no'),
+            id: 'cancel',
+            role: 'cancel',
+          },
+        ],
+      }
+      displayStore.showDialog = true
+      if (await displayStore.onDialogDismiss()) {
+        toast.info(t('canceled-delete')) // Use info for cancellation
+        return
+      }
+    }
+
+    // Prevent deletion of essential bundles
+    if (version.value.name === 'unknown' || version.value.name === 'builtin') {
+      toast.error(t('cannot-delete-unknown-or-builtin'))
+      return
+    }
+
+    const didCancelRes = await didCancel(t('bundle'), !version.value.deleted)
+    if (typeof didCancelRes === 'boolean' && didCancelRes === true) {
+      toast.info(t('canceled-delete'))
+      return
+    }
+
+    // Unlink channels if confirmed
+    if (unlink.length > 0) {
+      const { data: unknownVersion, error: unknownError } = await supabase
+        .from('app_versions')
+        .select('id')
+        .eq('app_id', version.value.app_id)
+        .eq('name', 'unknown')
+        .single()
+
+      if (unknownError || !unknownVersion) {
+        toast.error(t('cannot-find-unknown-version'))
+        console.error('Cannot find unknown version:', unknownError)
+        return
+      }
+
+      const { error: updateError } = await supabase
+        .from('channels')
+        .update({ version: unknownVersion.id })
+        .in('id', unlink.map(c => c.id))
+
+      if (updateError) {
+        toast.error(t('unlink-error'))
+        console.error('Channel unlink error:', updateError)
+        // Decide whether to proceed with deletion or stop
+        // return // Optional: stop deletion if unlinking fails
+      }
+      else {
+        toast.success(t('channels-unlinked-successfully')) // Add translation key
+      }
+    }
+
+    // Perform deletion (soft or hard)
+    const deleteQuery = didCancelRes === 'normal'
+      ? supabase
+          .from('app_versions')
+          .update({ deleted: true })
+          .eq('id', version.value.id)
+          .eq('app_id', version.value.app_id)
+      : supabase
+          .from('app_versions')
+          .delete()
+          .eq('id', version.value.id)
+          .eq('app_id', version.value.app_id)
+
+    const { error: deleteError } = await deleteQuery
+
+    if (deleteError) {
+      toast.error(t('cannot-delete-bundle'))
+      console.error('Bundle deletion error:', deleteError)
+    }
+    else {
+      toast.success(t('bundle-deleted'))
+      // Navigate back to the bundle list
+      router.push(`/app/p/${appIdToUrl(packageId.value)}/bundles/`)
+    }
+  }
+  catch (error) {
+    console.error('Unexpected error during deletion:', error)
+    toast.error(t('cannot-delete-bundle'))
   }
 }
 </script>
@@ -549,7 +732,23 @@ function preventInputChangePerm(event: Event) {
               {{ t('enabled') }}
             </InfoRow>
 
-            <!-- <InfoRow :label="t('preview')" :value="t('preview-short')" :is-link="true" @click="previewBundle()" /> -->
+            <!-- Delete Bundle Action -->
+            <InfoRow
+              v-if="!version.deleted"
+              :label="t('status')"
+              :value="t('bundle-active')"
+              :icon="IconTrash"
+              :disabled="!organizationStore.hasPermisisonsInRole(role, ['admin', 'write', 'super_admin'])"
+            >
+              <span class="text-red-500 dark:text-red-400 cursor-pointer underline underline-offset-4 active font-bold text-dust hover:text-red-600" @click="deleteBundle">
+                {{ t('bundle-delete') }}
+              </span>
+            </InfoRow>
+
+            <!-- Show deleted status if applicable -->
+            <InfoRow v-if="version.deleted" :label="t('status')">
+              {{ t('bundle-deleted') }}
+            </InfoRow>
           </dl>
         </div>
       </div>
@@ -569,7 +768,7 @@ function preventInputChangePerm(event: Event) {
       <p class="text-muted-foreground mt-2">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles`)">
+      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>
