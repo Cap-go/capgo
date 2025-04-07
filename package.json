@@ -203,7 +203,7 @@
     "husky": "^9.1.7",
     "sass": "1.85.1",
     "tailwindcss": "^4.1.1",
-    "typescript": "5.8.2",
+    "typescript": "5.8.3",
     "unplugin-icons": "22.1.0",
     "unplugin-vue-components": "^28.4.1",
     "vite": "6.2.2",
