@@ -60,7 +60,7 @@ function setLog() {
     }
   }
   if (step.value === 2) {
-    emit('done')
+    emit('done', appId.value)
   }
 }
 function scrollToElement(id: string) {

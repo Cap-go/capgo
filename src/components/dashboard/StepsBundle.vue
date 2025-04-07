@@ -196,7 +196,7 @@ watchEffect(async () => {
         </button>
         <div v-if="props.onboarding" class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
-            {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
+            {{ t('feel-magic-of-capgo') }} <span class="font-prompt">Capgo</span> !
           </h2>
           <p class="mx-auto mt-6 text-lg font-normal text-gray-600 font-pj dark:text-gray-200">
             {{ t('add-your-first-bundle') }}

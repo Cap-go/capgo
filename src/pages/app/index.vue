@@ -3,12 +3,14 @@ import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+import { appIdToUrl } from '~/services/conversion'
 
 const route = useRoute('/app/')
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
 const stepsOpen = ref(false)
@@ -19,6 +21,9 @@ const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
+async function NextStep(appId: string) {
+  router.push(`/app/p/${appIdToUrl(appId)}`)
+}
 async function getMyApps() {
   await organizationStore.awaitInitialLoad()
   const currentGid = organizationStore.currentOrganization?.gid
@@ -63,7 +68,7 @@ displayStore.defaultBack = '/app'
 <template>
   <div>
     <div v-if="!isLoading">
-      <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="getMyApps" @close-step="stepsOpen = !stepsOpen" />
+      <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
       <div v-else class="h-full pb-4 overflow-hidden">
         <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
           <WelcomeBanner v-if="apps.length === 0" />

@@ -111,6 +111,8 @@ async function loadAppInfo() {
         .then(({ count: bundlesCount }) => {
           if (bundlesCount)
             bundlesNb.value = bundlesCount
+          else
+            ActiveTab.value = 'bundles'
         }),
     )
 
