@@ -379,6 +379,7 @@
   "no-permission": "Không đủ quyền",
   "no-permission-ask-super-admin": "không đủ quyền, vui lòng yêu cầu quản trị viên cấp cao xóa gói này một cách không an toàn",
   "no-super-admin-organizations": "Không tìm thấy tổ chức super_admin nào",
+  "no_elements_found": "Không tìm thấy phần tử nào",
   "none": "Không có",
   "normal": "Bình thường",
   "not-encrypted-bundle": "Gói không được mã hóa",

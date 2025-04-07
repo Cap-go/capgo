@@ -379,6 +379,7 @@
   "no-permission": "Permessi insufficienti",
   "no-permission-ask-super-admin": "Autorizzazione insufficiente, chiedere a un super amministratore di eliminare questo bundle in modo non sicuro.",
   "no-super-admin-organizations": "Nessuna organizzazione super_admin trovata",
+  "no_elements_found": "Nessun elemento trovato",
   "none": "Nessuno",
   "normal": "Normale",
   "not-encrypted-bundle": "Pacchetto non crittografato",

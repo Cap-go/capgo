@@ -18,6 +18,7 @@ import { useOrganizationStore } from '~/stores/organization'
 const id = ref('')
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
+const lastPath = ref('')
 const router = useRouter()
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
@@ -144,7 +145,8 @@ async function refreshData() {
 }
 
 watchEffect(async () => {
-  if (route.path.startsWith('/app/p')) {
+  if (route.path.startsWith('/app/p') && lastPath.value !== route.path) {
+    lastPath.value = route.path
     id.value = route.params.package as string
     id.value = urlToAppId(id.value)
     await refreshData()

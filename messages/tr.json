@@ -379,6 +379,7 @@
   "no-permission": "Yetersiz yetkiler",
   "no-permission-ask-super-admin": "Yetersiz izin, lütfen bir süper yöneticiden bu paketi güvenli olmayan bir şekilde silmesini isteyin",
   "no-super-admin-organizations": "Hiçbir super_admin kuruluşu bulunamadı",
+  "no_elements_found": "Hiçbir öğe bulunamadı",
   "none": "Hiçbiri",
   "normal": "Normal",
   "not-encrypted-bundle": "Şifrelenmemiş paket",

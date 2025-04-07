@@ -185,7 +185,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="pb-4 overflow-x-auto md:pb-0 min-h-[500px]">
+  <div class="pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
         <button class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="resetTime">
@@ -341,8 +341,15 @@ onMounted(async () => {
             </template>
           </tr>
         </tbody>
+        <tbody v-else-if="!isLoading && elementList.length === 0">
+          <tr>
+            <td :colspan="columns.length" class="py-4 px-6 text-center text-gray-500 dark:text-gray-400">
+              {{ t('no_elements_found') }}
+            </td>
+          </tr>
+        </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse': isLoading }">
+          <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
             <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-6 py-4">
               <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>

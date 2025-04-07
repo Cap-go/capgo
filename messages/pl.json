@@ -379,6 +379,7 @@
   "no-permission": "Niewystarczające uprawnienia",
   "no-permission-ask-super-admin": "Niewystarczające uprawnienia, poproś superadministratora o niebezpieczne usunięcie tego pakietu",
   "no-super-admin-organizations": "Nie znaleziono organizacji super_admin",
+  "no_elements_found": "Nie znaleziono elementów",
   "none": "Nic",
   "normal": "Normalny",
   "not-encrypted-bundle": "Niezaszyfrowany pakiet",

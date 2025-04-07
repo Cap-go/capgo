@@ -379,6 +379,7 @@
   "no-permission": "Недостаточно разрешений",
   "no-permission-ask-super-admin": "Недостаточное разрешение, пожалуйста, попросите супер-администратора удалить эту связку небезопасным способом",
   "no-super-admin-organizations": "Организации super_admin не найдены",
+  "no_elements_found": "Не найдено элементов",
   "none": "Никто",
   "normal": "Нормальный",
   "not-encrypted-bundle": "Нешифрованный пакет",

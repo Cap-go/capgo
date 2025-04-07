@@ -44,7 +44,7 @@ const main = useMainStore()
 const total = ref(0)
 const search = ref('')
 const elements = ref<(Element)[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
 const versionId = ref<number>()
 const filters = ref()
@@ -153,6 +153,9 @@ async function getData() {
     elements.value.push(...dataVersions as any)
     // console.log('count', count)
     total.value = count || 0
+    if (count === 0) {
+      showAddModal()
+    }
 
     // Look for misconfigured channels
     // This will trigger if the channel disables updates based on metadata + if the metadata is undefined

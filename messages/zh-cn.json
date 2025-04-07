@@ -379,6 +379,7 @@
   "no-permission": "权限不足",
   "no-permission-ask-super-admin": "权限不足，请让超级管理员不安全地删除此包",
   "no-super-admin-organizations": "未找到 super_admin 组织",
+  "no_elements_found": "未找到元素",
   "none": "没有任何",
   "normal": "正常",
   "not-encrypted-bundle": "未加密的捆绑包",

@@ -379,6 +379,7 @@
   "no-permission": "권한이 부족합니다.",
   "no-permission-ask-super-admin": "권한이 충분하지 않은 경우 슈퍼 관리자에게 이 번들을 안전하지 않게 삭제해달라고 요청하세요.",
   "no-super-admin-organizations": "super_admin 조직을 찾을 수 없습니다.",
+  "no_elements_found": "요소를 찾을 수 없습니다",
   "none": "없음",
   "normal": "보통",
   "not-encrypted-bundle": "암호화되지 않은 번들",

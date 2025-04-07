@@ -155,6 +155,9 @@ async function getData() {
     elements.value.push(...(await enhenceVersionElems(dataVersions) as any))
     // console.log('count', count)
     total.value = count || 0
+    if (count === 0) {
+      showSteps.value = true
+    }
   }
   catch (error) {
     console.error(error)

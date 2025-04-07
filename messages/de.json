@@ -379,6 +379,7 @@
   "no-permission": "Nicht ausreichende Berechtigungen",
   "no-permission-ask-super-admin": "Unzureichende Berechtigungen, bitten Sie einen Super-Administrator, dieses Paket unsicher zu löschen",
   "no-super-admin-organizations": "Keine super_admin Organisationen gefunden",
+  "no_elements_found": "Keine Elemente gefunden",
   "none": "Keiner",
   "normal": "Normal",
   "not-encrypted-bundle": "Nicht verschlüsseltes Paket",

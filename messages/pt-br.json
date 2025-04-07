@@ -379,6 +379,7 @@
   "no-permission": "Permissões insuficientes",
   "no-permission-ask-super-admin": "permissão insuficiente, por favor peça a um super administrador para eliminar este pacote sem segurança",
   "no-super-admin-organizations": "Nenhuma organização super_admin encontrada",
+  "no_elements_found": "Nenhum elemento encontrado",
   "none": "Nenhum",
   "normal": "Normal",
   "not-encrypted-bundle": "Pacote não criptografado",

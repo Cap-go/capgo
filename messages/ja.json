@@ -379,6 +379,7 @@
   "no-permission": "権限が不十分です",
   "no-permission-ask-super-admin": "このバンドルを安全に削除するには、スーパー管理者に依頼してください。",
   "no-super-admin-organizations": "super_admin 組織が見つかりません。",
+  "no_elements_found": "要素が見つかりません",
   "none": "なし",
   "normal": "ノーマル",
   "not-encrypted-bundle": "暗号化されていないバンドル",

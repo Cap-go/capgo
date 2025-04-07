@@ -379,6 +379,7 @@
   "no-permission": "Izin tidak memadai",
   "no-permission-ask-super-admin": "izin tidak mencukupi, silakan minta admin super untuk menghapus bundel ini secara tidak aman",
   "no-super-admin-organizations": "Tidak ditemukan organisasi super_admin",
+  "no_elements_found": "Tidak ada elemen yang ditemukan",
   "none": "Tidak ada",
   "normal": "Normal",
   "not-encrypted-bundle": "Paket tidak terenkripsi",
