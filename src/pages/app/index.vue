@@ -4,10 +4,10 @@ import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { appIdToUrl } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-import { appIdToUrl } from '~/services/conversion'
 
 const route = useRoute('/app/')
 const router = useRouter()
