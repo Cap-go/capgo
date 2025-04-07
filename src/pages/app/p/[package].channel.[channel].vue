@@ -11,6 +11,7 @@ import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -40,6 +41,131 @@ const ActiveTab = ref(route.query.tab?.toString() || 'info')
 watchEffect(() => {
   router.replace({ query: { ...route.query, tab: ActiveTab.value } })
 })
+
+function countLowercaseLetters(str: string) {
+  const matches = str.match(/[a-z]/g)
+  return matches ? matches.length : 0
+}
+
+function countCapitalLetters(str: string) {
+  const matches = str.match(/[A-Z]/g)
+  return matches ? matches.length : 0
+}
+
+const deviceIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function AddDevice() {
+  displayStore.dialogOption = {
+    header: t('type-device-id'),
+    message: `${t('type-device-id-msg')}`,
+    buttonCenter: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    preventAccidentalClose: true,
+    input: true,
+    size: 'max-w-xl',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('continue'),
+        id: 'confirm-button',
+        preventClose: true,
+        handler: async () => {
+          await customDeviceOverwritePart3()
+        },
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
+
+async function customDeviceOverwritePart3() {
+  const input = displayStore.dialogInputText
+  const deviceId = input
+
+  if (!deviceIdRegex.test(input)) {
+    toast.error(t('invalid-uuid'))
+    return
+  }
+
+  const bigLetters = countCapitalLetters(input)
+  const smallLetters = countLowercaseLetters(input)
+
+  if (bigLetters === smallLetters) {
+    toast.error(t('cannot-determine-platform'))
+    return
+  }
+  const platform = bigLetters > smallLetters ? 'ios' : 'android'
+
+  await customDeviceOverwritePart4(deviceId, platform)
+}
+
+async function customDeviceOverwritePart4(
+  deviceId: string,
+  platform: 'ios' | 'android',
+) {
+  displayStore.dialogOption = {
+    buttonCenter: true,
+    headerStyle: 'w-full text-center',
+    textStyle: 'w-full text-center',
+    preventAccidentalClose: true,
+    header: t('confirm-overwrite'),
+    message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name || '').replace('$3', channel.value?.version.name || '')}`,
+    size: 'max-w-xl',
+    buttons: [
+      {
+        text: t('yes'),
+        role: 'yes',
+        handler: async () => {
+          await customDeviceOverwritePart5(deviceId, platform)
+        },
+      },
+      {
+        text: t('no'),
+        role: 'cancel',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+}
+
+async function customDeviceOverwritePart5(
+  deviceId: string,
+  platform: 'ios' | 'android',
+) {
+  const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
+    body: {
+      device_id: deviceId,
+      app_id: route.params.package as string,
+      platform,
+      version: Number(route.params.channel),
+    },
+  })
+
+  if (addDeviceError) {
+    console.error('addDeviceError', addDeviceError)
+    toast.error(t('cannot-create-empty-device'))
+    return
+  }
+
+  const { error: overwriteError } = await supabase.from('channel_devices')
+    .insert({
+      app_id: route.params.package as string,
+      channel_id: Number(route.params.channel),
+      device_id: deviceId.toLowerCase(),
+      owner_org: channel.value?.owner_org || '',
+    })
+
+  if (overwriteError) {
+    console.error('overwriteError', overwriteError)
+    toast.error(t('cannot-create-overwrite'))
+  }
+
+  reload()
+}
 
 // Function to open link in a new tab
 function openLink(url?: string): void {
@@ -119,6 +245,7 @@ async function getChannel() {
           id,
           name,
           public,
+          owner_org,
           version (
             id,
             name,
@@ -560,7 +687,6 @@ function openSelectVersion() {
         v-if="channel && ActiveTab === 'devices'"
         class="flex flex-col"
         :class="{
-          // 'translate-y-[-50%] translate-x-[-50%] top-1/2 left-1/2 absolute m-0': deviceIds.length === 0,
           'm-0 w-full h-screen items-center justify-center overflow-hidden': deviceIds.length === 0,
         }"
       >
@@ -572,10 +698,13 @@ function openSelectVersion() {
             'p-4': deviceIds.length === 0 && !displayStore.showDialog,
           }"
         >
-          <DeviceTable v-if="deviceIds.length > 0" class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" />
+          <DeviceTable v-if="deviceIds.length > 0" class="p-3" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" show-add-button @add-device="AddDevice" />
           <template v-else-if="!displayStore.showDialog">
-            <div>
-              {{ t('forced-devices-not-found') }}
+            <div class="text-center">
+              <div>{{ t('forced-devices-not-found') }}</div>
+              <div class="btn btn-primary mt-4" @click="AddDevice">
+                <plusOutline />
+              </div>
             </div>
           </template>
         </div>
@@ -593,11 +722,6 @@ function openSelectVersion() {
         {{ t('back-to-channels') }}
       </button>
     </div>
-    <AddDeviceOverwriteButton
-      v-if="channel && deviceIds.length === 0 && ActiveTab === 'devices'"
-      :app-id="channel.version.app_id"
-      :channel="channel"
-    />
     <div
       v-if="channel && ActiveTab === 'history'"
       class="flex flex-col"

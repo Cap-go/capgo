@@ -13,7 +13,10 @@ const props = defineProps<{
   appId: string
   ids?: string[]
   versionId?: number | undefined
+  showAddButton?: boolean
 }>()
+
+const emit = defineEmits(['addDevice'])
 
 type Element = Database['public']['Tables']['devices']['Row'] & { version: Database['public']['Tables']['app_versions']['Row'] }
 
@@ -211,6 +214,10 @@ async function openOneVersion(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
 }
 
+function handleAddDevice() {
+  emit('addDevice')
+}
+
 onMounted(async () => {
   await refreshData()
 })
@@ -222,9 +229,10 @@ onMounted(async () => {
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
       :total="total" :element-list="elements"
       filter-text="Filters"
-      :plus-button="true"
+      :show-add="showAddButton"
       :is-loading="isLoading"
       :search-placeholder="t('search-by-device-id')"
+      @add="handleAddDevice"
       @reload="reload()"
       @reset="refreshData()"
     />
