@@ -26,6 +26,14 @@ const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
 
+// Add type declarations for window functions
+declare global {
+  interface Window {
+    changeMemberPermission: (member: ExtendedOrganizationMember) => void
+    deleteMember: (member: ExtendedOrganizationMember) => void
+  }
+}
+
 const members = ref([] as ExtendedOrganizationMembers)
 
 const filteredMembers = computed(() => {
@@ -49,10 +57,10 @@ columns.value = [
     displayFunction: (member: ExtendedOrganizationMember) => `
       <div class="flex items-center">
         ${member.image_url
-            ? `<img src="${member.image_url}" alt="Profile picture for ${member.email}" class="mr-2 rounded-sm shrink-0 sm:mr-3 mask mask-squircle" width="42" height="42">`
-            : `<div class="flex items-center justify-center w-10 h-10 mr-2 text-xl bg-gray-700 mask mask-squircle"><span class="font-medium text-gray-300">${acronym(member.email)}</span></div>`
+            ? `<img src="${member.image_url}" alt="Profile picture for ${member.email}" class="rounded-sm shrink-0 mask mask-squircle" width="42" height="42">`
+            : `<div class="flex items-center justify-center w-10 h-10 text-xl bg-gray-700 mask mask-squircle shrink-0"><span class="font-medium text-gray-300">${acronym(member.email)}</span></div>`
         }
-        <span>${member.email}</span>
+        <span class="ml-2 hidden sm:inline truncate">${member.email}</span>
       </div>`,
     allowHtml: true,
     sanitizeHtml: true,
@@ -65,36 +73,40 @@ columns.value = [
     displayFunction: (member: ExtendedOrganizationMember) => member.role.replaceAll('_', ' '),
   },
   {
-    label: '',
-    key: 'edit_action',
-    mobile: true,
-    class: 'text-center',
-    displayFunction: (member: ExtendedOrganizationMember) => {
-      return canEdit(member) ? Wrench : ''
-    },
+    key: 'actions',
+    label: t('actions'),
     allowHtml: true,
-    onClick: (member: ExtendedOrganizationMember) => {
+    mobile: true,
+    displayFunction: (member: ExtendedOrganizationMember) => {
+      let buttons = ''
       if (canEdit(member)) {
-        changeMemberPermission(member)
+        buttons += `
+          <button onclick='window.changeMemberPermission(${JSON.stringify(member)})' class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="edit-member">
+            ${Wrench}
+          </button>
+        `
       }
-    },
-  },
-  {
-    label: '',
-    key: 'delete_action',
-    mobile: true,
-    class: 'text-center text-red-500',
-    displayFunction: (member: ExtendedOrganizationMember) => {
-      return canDelete(member) ? Trash : ''
-    },
-    allowHtml: true,
-    onClick: (member: ExtendedOrganizationMember) => {
       if (canDelete(member)) {
-        deleteMember(member)
+        buttons += `
+          <button onclick='window.deleteMember(${JSON.stringify(member)})' class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md" data-test="delete-member">
+            ${Trash}
+          </button>
+        `
       }
+      return `<div class="flex items-center justify-end space-x-2">${buttons}</div>`
     },
   },
 ]
+
+// Expose functions to window object
+if (typeof window !== 'undefined') {
+  window.changeMemberPermission = (member: ExtendedOrganizationMember) => {
+    changeMemberPermission(member)
+  }
+  window.deleteMember = (member: ExtendedOrganizationMember) => {
+    deleteMember(member)
+  }
+}
 
 async function reloadData() {
   isLoading.value = true
@@ -426,8 +438,8 @@ function canDelete(member: ExtendedOrganizationMember) {
 
 <template>
   <div>
-    <div class="h-full p-8 overflow-hidden max-h-fit grow md:pb-0">
-      <div class="flex justify-between w-full mb-5">
+    <div class="h-full md:p-8 overflow-hidden max-h-fit grow md:pb-0">
+      <div class="flex justify-between w-full ml-2 md:ml-0 mb-5">
         <h2 class="text-2xl font-bold text-slate-800 dark:text-white">
           {{ t('members') }}
         </h2>

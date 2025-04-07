@@ -245,7 +245,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
             <th v-if="props.massSelect" class="ml-2" />
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3" :class="{ 'px-6': ((i !== 0 && props.massSelect) || !props.massSelect), 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3" :class="{ 'px-1 md:px-6': ((i !== 0 && props.massSelect) || !props.massSelect), 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -269,18 +269,18 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''}${((_y !== 0 && props.massSelect) || !props.massSelect) ? ' px-1 md:px-6' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="md:px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td v-else-if="col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <button
-                    class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white cursor-pointer" v-html="col.icon"
+                    class="flex items-center p-3 mx-auto truncate rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 cursor-pointer" v-html="col.icon"
                   />
                 </td>
-                <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-1 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
@@ -292,14 +292,14 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         </tbody>
         <tbody v-else-if="!isLoading && elementList.length === 0">
           <tr>
-            <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="py-4 px-6 text-center text-gray-500 dark:text-gray-400">
+            <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-1 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
               {{ t('no_elements_found') }}
             </td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-6 py-4">
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 md:px-6 py-2 md:py-4">
               <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
           </tr>

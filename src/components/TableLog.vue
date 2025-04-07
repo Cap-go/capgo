@@ -189,12 +189,12 @@ onMounted(async () => {
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex h-10 md:mb-0">
         <button class="mr-2 inline-flex items-center border border-gray-300 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button" @click="resetTime">
-          <IconReload v-if="!isLoading" class="m-1 mr-2" />
+          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
       </div>
-      <div class="flex h-10 mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
+      <div class="flex h-10 mr-2 md:mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
         <div ref="dropdown" class="dropdown dropdown-right">
           <button
             tabindex="0"
@@ -230,7 +230,7 @@ onMounted(async () => {
               @update:model-value="clickRight"
             >
               <template #trigger>
-                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-6">
+                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-1 md:px-6">
                   <IconCalendar class="mr-1" />
                   <p class="hidden md:block">
                     {{ t('custom') }}
@@ -296,7 +296,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div class="flex h-10 w-70 md:w-auto">
+      <div class="flex md:w-auto overflow-hidden">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
@@ -304,7 +304,7 @@ onMounted(async () => {
           enterkeyhint="send"
           :classes="{
             outer: 'mb-0! md:w-96',
-            inner: 'rounded-full!',
+            inner: 'rounded-full! py-1.5!',
           }"
         />
       </div>
@@ -313,7 +313,7 @@ onMounted(async () => {
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="px-1 md:px-6 py-3" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -331,11 +331,11 @@ onMounted(async () => {
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="px-1 md:px-6 py-1 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </th>
-              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
-              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+              <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}" v-html="col.icon" />
+              <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" class="px-1 md:px-6 py-1 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                 {{ displayValueKey(elem, col) }}
               </td>
             </template>
@@ -343,14 +343,14 @@ onMounted(async () => {
         </tbody>
         <tbody v-else-if="!isLoading && elementList.length === 0">
           <tr>
-            <td :colspan="columns.length" class="py-4 px-6 text-center text-gray-500 dark:text-gray-400">
+            <td :colspan="columns.length" class="py-1 md:py-4 px-1 md:px-6 text-center text-gray-500 dark:text-gray-400">
               {{ t('no_elements_found') }}
             </td>
           </tr>
         </tbody>
         <tbody v-else>
           <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-6 py-4">
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 md:px-6 py-1 md:py-4">
               <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
           </tr>
