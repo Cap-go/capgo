@@ -26,7 +26,7 @@ const router = useRouter()
 const { currentOrganization } = storeToRefs(organizationStore)
 
 watchEffect(async () => {
-  if (route.path === '/dashboard/settings/organization/plans') {
+  if (route.path === '/settings/organization/plans') {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
       toast.success(t('usage-success'))
@@ -162,7 +162,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
         return
       }
       else {
-        router.push('/app/home')
+        router.push('/app')
       }
     }
 
@@ -180,7 +180,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
     displayStore.showDialog = true
     await displayStore.onDialogDismiss()
     if (!prevOrg)
-      router.push('/app/home')
+      router.push('/app')
     else
       organizationStore.setCurrentOrganization(prevOrg.gid)
   }
@@ -192,9 +192,11 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 function lastRunDate() {
   const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  return `${t('last-run')}: ${lastRun}`
+}
+function nextRunDate() {
   const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
-
-  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+  return `${t('next-run')}: ${nextRun}`
 }
 </script>
 
@@ -203,9 +205,13 @@ function lastRunDate() {
     <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
       <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="sm:align-center sm:flex sm:flex-col">
-          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip-bottom tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
+          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip" >
             {{ t('usage') }}
             <IcBaselineInfo class="w-4 h-4 cursor-pointer text-slate-400 dark:text-white" />
+            <div class="tooltip-content">
+               <div class="max-w-xs whitespace-normal">{{ lastRunDate() }}</div>
+               <div class="max-w-xs whitespace-normal">{{ nextRunDate() }}</div>
+            </div>
           </h1>
 
           <div class="my-2">

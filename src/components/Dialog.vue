@@ -33,10 +33,8 @@ function close(item?: ActionSheetOptionButton) {
     displayStore.lastButtonRole = item.id ?? ''
     if (item.role === 'cancel')
       displayStore.dialogCanceled = true
-
     else
       displayStore.dialogCanceled = false
-
     if (item?.handler)
       item.handler()
   }

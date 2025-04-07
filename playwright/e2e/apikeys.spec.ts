@@ -5,7 +5,7 @@ test.describe('API Key Management', () => {
     // Login first
     await page.login('test@capgo.app', 'testtest')
     // Go to API keys page
-    await page.goto('/dashboard/apikeys')
+    await page.goto('/apikeys')
   })
 
   test('should create new API key', async ({ page }) => {

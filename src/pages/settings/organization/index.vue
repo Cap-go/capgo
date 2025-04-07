@@ -13,7 +13,6 @@ import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-
 const organizationStore = useOrganizationStore()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()

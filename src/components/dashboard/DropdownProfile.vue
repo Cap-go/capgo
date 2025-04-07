@@ -152,7 +152,7 @@ async function logOut() {
             </p>
           </div>
         </div>
-        <router-link to="/dashboard/settings/account" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <router-link to="/settings/account" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
           {{ t('settings') }}
         </router-link>
         <router-link v-if="isMobile" to="/app/modules" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">

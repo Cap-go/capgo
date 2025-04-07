@@ -4,8 +4,12 @@ import 'posthog-js/dist/surveys'
 import 'posthog-js/dist/exception-autocapture'
 import 'posthog-js/dist/tracing-headers'
 import 'posthog-js/dist/web-vitals'
+import { isLocal } from '~/services/supabase'
 
-export function posthogLoader() {
+
+export function posthogLoader(supaHost: string) {
+  if (isLocal(supaHost))
+    return
   posthog.init('phc_NXDyDajQaTQVwb25DEhIVZfxVUn4R0Y348Z7vWYHZUi', {
     api_host: 'https://eu.i.posthog.com',
     person_profiles: 'identified_only',
@@ -13,7 +17,9 @@ export function posthogLoader() {
   })
 }
 
-export function pushEvent(nameEvent: string): void {
+export function pushEvent(nameEvent: string, supaHost: string): void {
+  if (isLocal(supaHost))
+    return
   posthog.capture(nameEvent)
 }
 
@@ -22,7 +28,9 @@ export function setUser(uuid: string, data: {
   phone?: string
   email?: string
   avatar?: string
-}): void {
+}, supaHost: string): void {
+  if (isLocal(supaHost))
+    return
   // console.log('setUser')
   posthog.identify(
     uuid,
@@ -33,6 +41,8 @@ export function setUser(uuid: string, data: {
   )
 }
 
-export function reset(): void {
+export function reset(supaHost: string): void {
+  if (isLocal(supaHost))
+    return
   posthog.reset()
 }

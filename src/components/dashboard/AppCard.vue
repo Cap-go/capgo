@@ -65,7 +65,7 @@ const perm = computed(() => {
 })
 
 watchEffect(async () => {
-  if (route.path.endsWith('/app/home'))
+  if (route.path.endsWith('/app'))
     await refreshData()
 })
 </script>

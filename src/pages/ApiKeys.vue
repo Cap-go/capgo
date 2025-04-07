@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from './comp_def'
+import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
@@ -8,7 +8,6 @@ import ArrowPath from '~icons/heroicons/arrow-path?raw'
 import Clipboard from '~icons/heroicons/clipboard-document?raw'
 import Pencil from '~icons/heroicons/pencil?raw'
 import Trash from '~icons/heroicons/trash?raw'
-import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -610,7 +609,7 @@ async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
   }
 }
 displayStore.NavTitle = t('api-keys')
-displayStore.defaultBack = '/app/home'
+displayStore.defaultBack = '/app'
 getKeys()
 </script>
 
@@ -621,12 +620,14 @@ getKeys()
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white rounded-lg shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 dark:bg-slate-800">
           <Table
             v-model:current-page="currentPage"
+            show-add
             :columns="columns"
             :element-list="filteredKeys"
             :is-loading="isLoading"
             :total="filteredKeys.length"
             :search-placeholder="t('search-api-keys')"
             :search="searchQuery"
+            @add="addNewApiKey"
             @update:search="searchQuery = $event"
             @reload="getKeys()"
             @reset="refreshData()"
@@ -644,9 +645,6 @@ getKeys()
           </a>
         </div>
       </div>
-      <button class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" data-test="create-key" @click="addNewApiKey">
-        <plusOutline />
-      </button>
     </div>
   </div>
 </template>

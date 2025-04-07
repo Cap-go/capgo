@@ -25,7 +25,57 @@ status = 200
 
 [[redirects]]
 from = "dashboard/settings/plans"
-to = "dashboard/settings/organization/plans"
+to = "settings/organization/plans"
+status = 200
+
+[[redirects]]
+from = "dashboard/settings/usage"
+to = "settings/organization/usage"
+status = 200
+
+[[redirects]]
+from = "/app/home"
+to = "/app/"
+status = 200
+
+[[redirects]]
+from = "/dashboard/apikeys"
+to = "/apikeys"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/account"
+to = "/settings/account"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/change-password"
+to = "/settings/change-password"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/notifications"
+to = "/settings/notifications"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/organization/general"
+to = "/settings/organization/"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/organization/members"
+to = "/settings/organization/members"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/organization/plans"
+to = "/settings/organization/plans"
+status = 200
+
+[[redirects]]
+from = "/dashboard/settings/organization/usage"
+to = "/settings/organization/usage"
 status = 200
 
 [[redirects]]

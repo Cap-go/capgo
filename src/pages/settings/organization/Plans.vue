@@ -221,7 +221,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
     displayStore.showDialog = true
     await displayStore.onDialogDismiss()
     if (!prevOrg)
-      router.push('/app/home')
+      router.push('/app')
     else
       organizationStore.setCurrentOrganization(prevOrg.gid)
   }
@@ -233,7 +233,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/dashboard/settings/organization/plans') {
+  if (route.path === '/settings/organization/plans') {
     // if session_id is in url params show modal success plan setup
     if (route.query.session_id) {
       // toast.success(t('usage-success'))
@@ -578,7 +578,7 @@ const hightLights = computed<Stat[]>(() => ([
         <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
         {{ t('thank-you-for-sub') }}
         <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
-        <router-link class="mt-[40vh]" to="/app/home">
+        <router-link class="mt-[40vh]" to="/app">
           <span class="text-xl text-blue-600">{{ t('use-capgo') }} 🚀</span>
         </router-link>
       </div>

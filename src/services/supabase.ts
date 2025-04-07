@@ -11,12 +11,16 @@ let supaClient: SupabaseClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
-interface CapgoConfig {
+export interface CapgoConfig {
   supaHost: string
   supaKey: string
   supbaseId: string
   host: string
   hostWeb: string
+}
+
+export function isLocal(supaHost:  string) {
+  return supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 }
 
 export function getLocalConfig() {

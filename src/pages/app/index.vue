@@ -4,16 +4,14 @@ import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-import Dashboard from '../../components/dashboard/Dashboard.vue'
-import Steps from '../../components/dashboard/Steps.vue'
 
-const route = useRoute('/app/home')
+const route = useRoute('/app/')
 const organizationStore = useOrganizationStore()
-const isLoading = ref(false)
+const isLoading = ref(true)
+const stepsOpen = ref(false)
 const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -36,14 +34,14 @@ async function getMyApps() {
     .select()
     .eq('owner_org', currentGid)
 
-  if (data && data.length)
+  if (data && data.length) {
     apps.value = data
-  else
+    stepsOpen.value = false
+  }
+  else {
     apps.value = []
-}
-
-async function onboardingDone() {
-  await getMyApps()
+    stepsOpen.value = true
+  }
 }
 
 watch(currentOrganization, async () => {
@@ -51,22 +49,29 @@ watch(currentOrganization, async () => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/app/home') {
+  if (route.path === '/app') {
     displayStore.NavTitle = ''
     isLoading.value = true
-    // await organizationStore.dedupFetchOrganizations()
     await getMyApps()
     isLoading.value = false
   }
 })
 displayStore.NavTitle = t('home')
-displayStore.defaultBack = '/app/home'
+displayStore.defaultBack = '/app'
 </script>
 
 <template>
   <div>
-    <Dashboard v-if="apps.length > 0" :apps="apps" />
-    <Steps v-else-if="!isLoading" :onboarding="true" @done="onboardingDone" />
+    <div v-if="!isLoading">
+      <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="getMyApps" @close-step="stepsOpen = !stepsOpen" />
+      <div v-else class="h-full pb-4 overflow-hidden">
+        <div class="w-full h-full px-4 pt-8 mx-auto mb-8 overflow-y-auto max-w-9xl max-h-fit lg:px-8 sm:px-6">
+          <WelcomeBanner v-if="apps.length === 0" />
+          <Usage v-if="!isLoading" />
+          <AppTable :apps="apps" :delete-button="true" @add-app="stepsOpen = !stepsOpen" />
+        </div>
+      </div>
+    </div>
     <div v-else class="flex flex-col items-center justify-center h-full">
       <Spinner size="w-40 h-40" />
     </div>

@@ -7,7 +7,6 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
 import IconTrash from '~icons/heroicons/trash?raw'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -324,13 +323,12 @@ watch(props, async () => {
     <Table
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
       :total="total" :element-list="elements"
+      show-add
       filter-text="Filters"
       :is-loading="isLoading"
       :search-placeholder="t('search-by-name')"
+      @add="showAddModal"
       @reload="reload()" @reset="refreshData()"
     />
-    <button id="create_channel" class="fixed z-40 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
-      <IconPlus />
-    </button>
   </div>
 </template>

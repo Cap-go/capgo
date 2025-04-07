@@ -128,10 +128,13 @@ if (main.dashboardFetched)
 </script>
 
 <template>
-  <div v-if="!noData || isLoading" class="grid grid-cols-12 gap-6 mb-6" :class="appId && showMobileStats ? 'grid-cols-16' : ''">
+  <div v-if="!noData || isLoading"
+       class="grid grid-cols-1 sm:grid-cols-12 gap-6 mb-6"
+       :class="appId && showMobileStats ? 'xl:grid-cols-16' : 'xl:grid-cols-12'">
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="false"
       :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"
+      class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
       v-else
@@ -142,6 +145,7 @@ if (main.dashboardFetched)
     <UsageCard
       v-if="!isLoading" :limits="allLimits.storage" :colors="colors.blue" :datas="datas.storage" :accumulated="false"
       :title="t('Storage')" :unit="storageUnit"
+      class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
       v-else
@@ -152,6 +156,7 @@ if (main.dashboardFetched)
     <UsageCard
       v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :accumulated="false"
       :title="t('Bandwidth')" unit="GB"
+      class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
       v-else
@@ -159,6 +164,6 @@ if (main.dashboardFetched)
     >
       <Spinner size="w-40 h-40" />
     </div>
-    <MobileStats v-if="appId && showMobileStats" />
+    <MobileStats v-if="appId && showMobileStats" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 </template>

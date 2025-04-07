@@ -4,14 +4,14 @@ import { ref, watchEffect } from 'vue'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import { pushEvent } from '~/services/posthog'
-import { getLocalConfig, useSupabase } from '~/services/supabase'
+import { getLocalConfig, useSupabase, isLocal } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 
 const props = defineProps<{
   onboarding: boolean
 }>()
-const emit = defineEmits(['done'])
+const emit = defineEmits(['done', 'close-step'])
 const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
@@ -28,28 +28,22 @@ interface Step {
   title: string
   command?: string
   subtitle: string
-  link?: string
 }
 
 const config = getLocalConfig()
-function isLocal() {
-  return config.supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
-}
 
-const simpleStep: Step[] = [
+const steps = ref<Step[]>([
   {
     title: t('init-capgo-in-your-a'),
-    command: `npx @capgo/cli@latest i [APIKEY]${isLocal() ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
+    command: `npx @capgo/cli@latest i [APIKEY]${isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
     subtitle: '',
-    link: '',
   },
   {
     title: t('discover-your-dashbo'),
     command: '',
     subtitle: t('this-page-will-self-'),
   },
-]
-const steps = ref(simpleStep)
+])
 function setLog() {
   if (props.onboarding && main.user?.id) {
     sendEvent({
@@ -59,17 +53,11 @@ function setLog() {
       user_id: organizationStore.currentOrganization?.gid,
       notify: false,
     }).catch()
-    pushEvent(`user:step-${step.value}`)
-    if (step.value === 1)
-      window.location.reload()
+    pushEvent(`user:step-${step.value}`, config.supaHost)
 
-    if (step.value === 4)
-      pushEvent('user:onboarding-done')
+    if (step.value === 2)
+      pushEvent('user:onboarding-done', config.supaHost)
   }
-}
-function openExt(url?: string) {
-  if (url)
-    window.open(url, '_blank')
 }
 function scrollToElement(id: string) {
   // Get the element with the id
@@ -194,6 +182,10 @@ watchEffect(async () => {
 <template>
   <section class="h-full py-12 overflow-y-auto max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
+      <div class="flex items-center justify-items-center place-content-center">
+        <button v-if="!onboarding" class="bg-gray-800 btn btn-outline mr-6" @click="emit('close-step')">
+          <arrowBack />
+        </button>
       <div v-if="props.onboarding" class="text-center">
         <h2 class="text-3xl font-bold text-gray-900 font-pj sm:text-4xl xl:text-5xl dark:text-gray-50">
           {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
@@ -211,17 +203,8 @@ watchEffect(async () => {
           {{ t('add-another-app') }}
         </h2>
       </div>
+    </div>
 
-      <!-- show toggle for simpleMode -->
-      <!-- <div class="flex flex-col items-center justify-center mt-4">
-        <label class="block mb-2 text-sm text-gray-900 capitalize dark:text-gray-50 font-pj">
-          {{ t('old-onboarding-mode') }}
-        </label>
-        <Toggle
-          :value="stepMode !== 'simple'"
-          @change="changeMode()"
-        />
-      </div> -->
       <div class="max-w-4xl mx-auto mt-12 sm:px-10">
         <template v-for="(s, i) in steps" :key="i">
           <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
@@ -244,9 +227,6 @@ watchEffect(async () => {
                     {{ s.command }}
                     <i-ion-copy-outline class="text-muted-blue-300" />
                   </code>
-                  <button v-else-if="s.link" class="relative mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700" @click="openExt(s.link)">
-                    {{ t('open') }}
-                  </button>
                 </div>
                 <br v-if="s.command">
               </div>
@@ -256,7 +236,4 @@ watchEffect(async () => {
       </div>
     </div>
   </section>
-  <button v-if="!onboarding" class="fixed z-40 bg-gray-800 btn btn-xl btn-circle btn-outline right-4-safe bottom-4-safe" @click="emit('done')">
-    <arrowBack />
-  </button>
 </template>

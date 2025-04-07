@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
 import { useSupabase } from '~/services/supabase'
+import { getLocalConfig } from '~/services/supabase'
 import {
   findBestPlan,
   getAllDashboard,
@@ -46,12 +47,13 @@ export const useMainStore = defineStore('main', () => {
   const logout = () => {
     return new Promise<void>((resolve) => {
       const supabase = useSupabase()
+      const config = getLocalConfig()
       const listner = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
           listner.data.subscription.unsubscribe()
           auth.value = undefined
           user.value = undefined
-          reset()
+          reset(config.supaHost)
           unspoofUser()
           resolve()
         }

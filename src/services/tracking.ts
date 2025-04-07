@@ -54,27 +54,21 @@ interface TrackOptions {
   timestamp?: number | Date
 }
 
-export async function sendEvent(payload: TrackOptions): Promise<void> {
-  try {
-    const { data: currentSession } = await useSupabase().auth.getSession()!
-    if (!currentSession.session)
-      return
-
-    const currentJwt = currentSession.session.access_token
-    const response = await ky.post(`${defaultApiHost}/private/events`, {
-      json: payload,
-      headers: {
-        Authorization: `Bearer ${currentJwt}`,
-      },
-      timeout: 10000, // 10 seconds timeout
-      retry: 3,
-    }).json<{ error?: string }>()
-
-    if (response.error) {
-      console.error(`Failed to send LogSnag event: ${response.error}`)
-    }
-  }
-  catch (error) {
-    console.error('Failed to send LogSnag event', error)
-  }
+export async function sendEvent(payload: TrackOptions): Promise<null> {
+    return useSupabase().auth.getSession().then(({data: currentSession}) => {
+      if (!currentSession.session)
+        return null
+  
+      const currentJwt = currentSession.session.access_token
+      return ky.post(`${defaultApiHost}/private/events`, {
+       json: payload,
+       headers: {
+         Authorization: `Bearer ${currentJwt}`,
+       },
+       timeout: 10000, // 10 seconds timeout
+       retry: 3,
+     })
+     .catch(() => null)
+     .then(() => null)
+    }).catch(() => null)
 }
