@@ -28,13 +28,16 @@
   ],
   "compatibility_date": "2024-11-11",
   "main": "./index.ts",
-  "compatibility_flags": ["nodejs_compat_v2"],
+  "compatibility_flags": [
+    "nodejs_compat_v2"
+  ],
   "placement": {
     "mode": "smart"
   },
   "workers_dev": false,
   "observability": {
-    "enabled": false
+    "enabled": true,
+    "head_sampling_rate": 0.1
   },
   "upload_source_maps": true,
   "analytics_engine_datasets": [
