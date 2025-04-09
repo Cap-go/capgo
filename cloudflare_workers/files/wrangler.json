@@ -34,7 +34,7 @@
   "workers_dev": false,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 0.1
+    "head_sampling_rate": 0.001
   },
   "upload_source_maps": true,
   "r2_buckets": [
