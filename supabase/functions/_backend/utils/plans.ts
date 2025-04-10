@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { recordUsage, setThreshold } from './stripe.ts'
+import { getStripe, recordUsage, setThreshold } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -97,6 +97,94 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
   }
 }
 
+export async function getSubscriptionData(c: Context, customerId: string) {
+  try {
+    // Get customer's subscriptions from Stripe
+    const subscriptions = await getStripe(c).subscriptions.list({
+      customer: customerId,
+      status: 'all',
+      expand: ['data.items.data.price.product'],
+      limit: 1,
+    })
+
+    // If no subscriptions found, return default data
+    if (!subscriptions.data.length) {
+      console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'No subscriptions found for customer' })
+      return null
+    }
+
+    // Get the most recent subscription
+    const subscription = subscriptions.data[0]
+
+    // Extract product ID from the first subscription item
+    let productId = null
+    if (subscription.items.data.length > 0) {
+      const item = subscription.items.data[0]
+      if (typeof item.price.product === 'object' && item.price.product !== null) {
+        productId = item.price.product.id
+      }
+      else {
+        productId = item.price.product as string
+      }
+    }
+
+    // Format dates from epoch to ISO string
+    const cycleStart = subscription.current_period_start
+      ? new Date(subscription.current_period_start * 1000).toISOString()
+      : null
+
+    const cycleEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : null
+
+    return {
+      productId,
+      status: subscription.status,
+      cycleStart,
+      cycleEnd,
+      subscriptionId: subscription.id,
+    }
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'getSubscriptionData', error })
+    return null
+  }
+}
+
+export async function syncSubscriptionData(c: Context, customerId: string): Promise<void> {
+  try {
+    // Get subscription data from Stripe
+    const subscriptionData = await getSubscriptionData(c, customerId)
+
+    // Update stripe_info table with latest data, even if no subscription exists
+    const { error: updateError } = await supabaseAdmin(c)
+      .from('stripe_info')
+      .update({
+        product_id: subscriptionData?.productId || undefined,
+        subscription_id: subscriptionData?.subscriptionId || undefined,
+        subscription_anchor_start: subscriptionData?.cycleStart || undefined,
+        subscription_anchor_end: subscriptionData?.cycleEnd || undefined,
+        status: mapSubscriptionStatus(subscriptionData?.status || 'canceled'),
+      })
+      .eq('customer_id', customerId)
+
+    if (updateError) {
+      console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error: updateError })
+    }
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error })
+  }
+}
+
+// Helper function to map Stripe subscription status to our database status
+function mapSubscriptionStatus(stripeStatus: string | null): 'updated' | 'canceled' | undefined {
+  if (!stripeStatus)
+    return undefined
+
+  return stripeStatus === 'canceled' ? 'canceled' : 'updated'
+}
+
 export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
   try {
     const { data: org, error: userError } = await supabaseAdmin(c)
@@ -106,6 +194,11 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       .single()
     if (userError)
       throw userError
+
+    // Sync subscription data with Stripe
+    if (org.customer_id)
+      await syncSubscriptionData(c, org.customer_id!)
+
     if (await isTrialOrg(c, orgId)) {
       const { error } = await supabaseAdmin(c)
         .from('stripe_info')
@@ -116,6 +209,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         console.error({ requestId: c.get('requestId'), context: 'update stripe info', error })
       return Promise.resolve()
     }
+
     const is_good_plan = await isGoodPlanOrg(c, orgId)
     const is_onboarded = await isOnboardedOrg(c, orgId)
     const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
