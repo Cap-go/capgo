@@ -99,33 +99,38 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
 
 export async function getSubscriptionData(c: Context, customerId: string) {
   try {
-    // Get customer's subscriptions from Stripe
+    console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Fetching subscription data', customerId })
+
+    // Get only active subscriptions from Stripe
     const subscriptions = await getStripe(c).subscriptions.list({
       customer: customerId,
-      status: 'all',
-      expand: ['data.items.data.price.product'],
+      status: 'active', // only get active subscriptions
+      expand: ['data.items.data.price'],
       limit: 1,
     })
 
-    // If no subscriptions found, return default data
+    console.log({
+      requestId: c.get('requestId'),
+      context: 'getSubscriptionData',
+      subscriptionsFound: subscriptions.data.length,
+      subscriptionIds: subscriptions.data.map(s => s.id),
+    })
+
+    // If no subscriptions found
     if (!subscriptions.data.length) {
-      console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'No subscriptions found for customer' })
+      console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'No active subscriptions found for customer' })
       return null
     }
 
-    // Get the most recent subscription
+    // Get the subscription
     const subscription = subscriptions.data[0]
 
     // Extract product ID from the first subscription item
     let productId = null
     if (subscription.items.data.length > 0) {
       const item = subscription.items.data[0]
-      if (typeof item.price.product === 'object' && item.price.product !== null) {
-        productId = item.price.product.id
-      }
-      else {
-        productId = item.price.product as string
-      }
+      // Get product ID directly from price.product (no need for object check)
+      productId = item.price.product as string
     }
 
     // Format dates from epoch to ISO string
@@ -178,11 +183,11 @@ export async function syncSubscriptionData(c: Context, customerId: string): Prom
 }
 
 // Helper function to map Stripe subscription status to our database status
-function mapSubscriptionStatus(stripeStatus: string | null): 'updated' | 'canceled' | undefined {
+function mapSubscriptionStatus(stripeStatus: string | null): 'updated' | 'canceled' | 'succeeded' | undefined {
   if (!stripeStatus)
     return undefined
 
-  return stripeStatus === 'canceled' ? 'canceled' : 'updated'
+  return stripeStatus === 'canceled' ? 'canceled' : 'succeeded'
 }
 
 export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
