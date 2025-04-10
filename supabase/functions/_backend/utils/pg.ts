@@ -59,9 +59,7 @@ export function getDrizzleClientD1(c: Context) {
   return drizzleD1(c.env.DB_REPLICATE)
 }
 
-export function getDrizzleClientD1Session(c: Context) {
-  // TODO: try when available in Cloudflare
-  const token = c.req.raw.headers.get('x-d1-token') ?? 'first-unconditional'
+export function getDrizzleClientD1Session(c: Context, token: string) {
   const session = c.env.DB_REPLICATE.withSession(token)
   return drizzleD1(session)
 }
