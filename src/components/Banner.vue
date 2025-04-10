@@ -23,7 +23,7 @@ const isOrgOwner = ref(false)
 
 watchEffect(async () => {
   try {
-    if (route.path.includes('/app') && !route.path.includes('home')) {
+    if (route.path.includes('/app/p/')) {
       const appIdRaw = route.params.package as string
       if (!appIdRaw) {
         console.error('cannot get app id. Parms:', route.params)
@@ -108,7 +108,7 @@ const bannerColor = computed(() => {
       <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a href="/dashboard/settings/organization/plans" class="btn" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <a href="/settings/organization/plans" class="btn" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
     </div>
   </div>
 </template>

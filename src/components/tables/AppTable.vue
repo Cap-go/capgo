@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth?raw'
-import Table from '~/components/Table.vue'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -16,7 +16,11 @@ const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
   deleteButton: boolean
 }>()
+const emit = defineEmits([
+  'addApp',
+])
 const { t } = useI18n()
+const isMobile = Capacitor.isNativePlatform()
 const supabase = useSupabase()
 const router = useRouter()
 const search = ref('')
@@ -153,11 +157,13 @@ const filteredApps = computed(() => {
         v-model:columns="columns"
         v-model:current-page="currentPage"
         v-model:search="search"
+        :show-add="!isMobile"
         :total="filteredApps.length"
         :element-list="filteredApps"
         :search-placeholder="t('search-by-name-or-bundle-id')"
         :is-loading="false"
         filter-text="Filters"
+        @add="emit('addApp')"
       />
     </div>
   </div>

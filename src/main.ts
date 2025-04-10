@@ -34,10 +34,19 @@ const newRoutes = routes.map((route) => {
 })
 const router = createRouter({
   routes: [
-    { path: '/app', redirect: '/app/home' },
     { path: '/', redirect: '/login' },
-    { path: '/dashboard/settings/plans', redirect: '/dashboard/settings/organization/plans' },
-    { path: '/dashboard/settings/usage', redirect: '/dashboard/settings/organization/usage' },
+    { path: '/settings/plans', redirect: '/settings/organization/plans' },
+    { path: '/settings/usage', redirect: '/settings/organization/usage' },
+    { path: '/dashboard/settings/plans', redirect: '/settings/organization/plans' },
+    { path: '/dashboard/settings/usage', redirect: '/settings/organization/usage' },
+    { path: '/dashboard/apikeys', redirect: '/apikeys' },
+    { path: '/dashboard/settings/account', redirect: '/settings/account' },
+    { path: '/dashboard/settings/change-password', redirect: '/settings/change-password' },
+    { path: '/dashboard/settings/notifications', redirect: '/settings/notifications' },
+    { path: '/dashboard/settings/organization/general', redirect: '/settings/organization/' },
+    { path: '/dashboard/settings/organization/members', redirect: '/settings/organization/members' },
+    { path: '/dashboard/settings/organization/plans', redirect: '/settings/organization/plans' },
+    { path: '/dashboard/settings/organization/usage', redirect: '/settings/organization/usage' },
     { path: '/app/p/:package/bundles', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=bundles` },
     { path: '/app/p/:package/channels', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=channels` },
     { path: '/app/p/:package/devices', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=devices` },

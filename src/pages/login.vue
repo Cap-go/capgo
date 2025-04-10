@@ -37,7 +37,7 @@ async function nextLogin() {
     router.push(route.query.to)
   }
   else {
-    router.push('/app/home')
+    router.push('/app')
   }
   setTimeout(async () => {
     isLoading.value = false
@@ -143,7 +143,7 @@ async function submit(form: { email: string, password: string, code: string }) {
     }
   }
   else {
-    // http://localhost:5173/app/home
+    // http://localhost:5173/app
     const verify = await supabase.auth.mfa.verify({
       factorId: mfaLoginFactor.value!.id!,
       challengeId: mfaChallangeId.value!,

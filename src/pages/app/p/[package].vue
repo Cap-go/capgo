@@ -9,7 +9,6 @@ import IconHistory from '~icons/heroicons/clock'
 import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
-import Spinner from '~/components/Spinner.vue'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -19,6 +18,7 @@ import { useOrganizationStore } from '~/stores/organization'
 const id = ref('')
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
+const lastPath = ref('')
 const router = useRouter()
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
@@ -111,6 +111,8 @@ async function loadAppInfo() {
         .then(({ count: bundlesCount }) => {
           if (bundlesCount)
             bundlesNb.value = bundlesCount
+          else
+            ActiveTab.value = 'bundles'
         }),
     )
 
@@ -145,12 +147,13 @@ async function refreshData() {
 }
 
 watchEffect(async () => {
-  if (route.path.startsWith('/app/p')) {
+  if (route.path.startsWith('/app/p') && lastPath.value !== route.path) {
+    lastPath.value = route.path
     id.value = route.params.package as string
     id.value = urlToAppId(id.value)
     await refreshData()
     displayStore.NavTitle = app.value?.name || ''
-    displayStore.defaultBack = '/app/home'
+    displayStore.defaultBack = '/app'
   }
 })
 

@@ -109,7 +109,7 @@ async function deleteApp() {
       toast.success(t('app-deleted'))
 
     // return to home
-    router.push('/app/home')
+    router.push('/app')
   }
   catch (error) {
     console.error(error)
@@ -433,7 +433,7 @@ async function transferAppOwnership() {
                   }
                   toast.success(t('app-transferred'))
                   setTimeout(() => {
-                    router.push('/app/home')
+                    router.push('/app')
                   }, 2500)
                 },
               },

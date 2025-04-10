@@ -20,13 +20,13 @@ const router = useRouter()
 function getCurrentTab() {
   // look the path and set the active tab
   const path = router.currentRoute.value.path
-  if (path.includes('/dashboard/settings/account'))
-    return '/dashboard/settings/account'
-  else if (path.includes('/dashboard/settings/organization'))
-    return '/dashboard/settings/organization'
-  else if (path.includes('/dashboard/settings/organization/plans'))
-    return '/dashboard/settings/organization/plans'
-  return '/dashboard/settings/account'
+  if (path.includes('/settings/account'))
+    return '/settings/account'
+  else if (path.includes('/settings/organization'))
+    return '/settings/organization'
+  else if (path.includes('/settings/organization/plans'))
+    return '/settings/organization/plans'
+  return '/settings/account'
 }
 
 const ActiveTab = ref(getCurrentTab())
@@ -35,17 +35,17 @@ const tabs = ref<Tab[]>([
   {
     label: 'account',
     icon: shallowRef(IconAcount),
-    key: '/dashboard/settings/account',
+    key: '/settings/account',
   },
   {
     label: 'password',
     icon: shallowRef(IconPassword),
-    key: '/dashboard/settings/changepassword',
+    key: '/settings/changepassword',
   },
   {
     label: 'notifications',
     icon: shallowRef(IconNotification),
-    key: '/dashboard/settings/notifications',
+    key: '/settings/notifications',
   },
 ])
 
@@ -53,12 +53,12 @@ const organizationTabs = ref<Tab[]>([
   {
     label: 'general-information',
     icon: shallowRef(IconAcount),
-    key: '/dashboard/settings/organization/general',
+    key: '/settings/organization/',
   },
   {
     label: 'members',
     icon: shallowRef(IconPassword),
-    key: '/dashboard/settings/organization/members',
+    key: '/settings/organization/members',
   },
 ])
 
@@ -82,7 +82,7 @@ watchEffect(() => {
       {
         label: 'plans',
         icon: shallowRef(IconPlans) as any,
-        key: '/dashboard/settings/organization/plans',
+        key: '/settings/organization/plans',
       },
     )
   }
@@ -110,7 +110,7 @@ watchEffect(() => {
     organizationTabs.value.splice(tabs.value.length - 2, 0, {
       label: 'usage',
       icon: shallowRef(IconPlans) as any,
-      key: '/dashboard/settings/organization/usage',
+      key: '/settings/organization/usage',
     })
   }
   else if (organizationTabs.value.find(tab => tab.label === 'usage')) {

@@ -3,7 +3,6 @@ import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
 import IcBaselineInfo from '~icons/ic/baseline-info'
-import LineChartStats from '~/components/LineChartStats.vue'
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
 
@@ -71,9 +70,11 @@ const lastDayEvolution = computed(() => {
 
 function lastRunDate() {
   const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  return `${t('last-run')}: ${lastRun}`
+}
+function nextRunDate() {
   const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
-
-  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+  return `${t('next-run')}: ${nextRun}`
 }
 </script>
 
@@ -84,7 +85,15 @@ function lastRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
+        <div class="tooltip">
+          <div class="tooltip-content">
+            <div class="max-w-xs whitespace-normal">
+              {{ lastRunDate() }}
+            </div>
+            <div class="max-w-xs whitespace-normal">
+              {{ nextRunDate() }}
+            </div>
+          </div>
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
             <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
           </div>

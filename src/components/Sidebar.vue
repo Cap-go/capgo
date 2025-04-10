@@ -39,12 +39,12 @@ const tabs = ref<Tab[]>([
   {
     label: 'dashboard',
     icon: shallowRef(IconDashboard),
-    key: '/app/home',
+    key: '/app',
   },
   {
     label: 'api-keys',
     icon: shallowRef(IconApiKey),
-    key: '/dashboard/apikeys',
+    key: '/apikeys',
   },
   // {
   //   label: t('live-reload'),
@@ -93,7 +93,7 @@ const tabs = ref<Tab[]>([
     >
       <!-- Sidebar header -->
       <div class="flex justify-between px-3 py-4 border-b border-slate-800">
-        <router-link class="flex items-center space-x-2 cursor-pointer" to="/app/home">
+        <router-link class="flex items-center space-x-2 cursor-pointer" to="/app">
           <img src="/capgo.webp" alt="logo" class="w-8 h-8">
           <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 hover:text-white">Capgo</span>
         </router-link>

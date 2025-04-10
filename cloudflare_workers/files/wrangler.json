@@ -26,12 +26,15 @@
       "zone_name": "capgo.app"
     }
   ],
-  "compatibility_date": "2024-11-11",
+  "compatibility_date": "2025-04-01",
   "main": "./index.ts",
-  "compatibility_flags": ["nodejs_compat_v2"],
+  "compatibility_flags": [
+    "nodejs_compat_v2"
+  ],
   "workers_dev": false,
   "observability": {
-    "enabled": false
+    "enabled": true,
+    "head_sampling_rate": 0.001
   },
   "upload_source_maps": true,
   "r2_buckets": [
@@ -52,7 +55,9 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["UploadHandler"]
+      "new_classes": [
+        "UploadHandler"
+      ]
     },
     {
       "tag": "v2",

@@ -3,12 +3,12 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash?raw'
-import Table from '~/components/Table.vue'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -20,16 +20,18 @@ const props = defineProps<{
 
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
-const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const role = ref<OrganizationRole | null>(null)
+const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
+const showSteps = ref(false)
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const total = ref(0)
 const search = ref('')
+const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
 const selectedElements = ref<Element[]>([])
 const isLoading = ref(false)
@@ -39,6 +41,11 @@ const filters = ref({
   'deleted': false,
   'encrypted': false,
 })
+
+function onboardingDone() {
+  reload()
+  showSteps.value = !showSteps.value
+}
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
@@ -148,6 +155,9 @@ async function getData() {
     elements.value.push(...(await enhenceVersionElems(dataVersions) as any))
     // console.log('count', count)
     total.value = count || 0
+    if (count === 0) {
+      showSteps.value = true
+    }
   }
   catch (error) {
     console.error(error)
@@ -434,16 +444,20 @@ watch(props, async () => {
 <template>
   <div>
     <Table
+      v-if="!showSteps"
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
       :total="total"
+      :show-add="!isMobile"
       :element-list="elements"
       filter-text="Filters"
       mass-select
       :is-loading="isLoading"
       :search-placeholder="t('search-bundle-id')"
+      @add="showSteps = !showSteps"
       @reload="reload()" @reset="refreshData()"
       @mass-delete="massDelete()"
       @select-row="selectedElementsFilter"
     />
+    <StepsBundle v-else :onboarding="!total" :app-id="props.appId" @done="onboardingDone" @close-step="showSteps = !showSteps" />
   </div>
 </template>

@@ -19,7 +19,8 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/[...all]': RouteRecordInfo<'/[...all]', '/:all(.*)', { all: ParamValue<true> }, { all: ParamValue<false> }>,
-    '/app/home': RouteRecordInfo<'/app/home', '/app/home', Record<never, never>, Record<never, never>>,
+    '/ApiKeys': RouteRecordInfo<'/ApiKeys', '/ApiKeys', Record<never, never>, Record<never, never>>,
+    '/app/': RouteRecordInfo<'/app/', '/app', Record<never, never>, Record<never, never>>,
     '/app/modules': RouteRecordInfo<'/app/modules', '/app/modules', Record<never, never>, Record<never, never>>,
     '/app/modules_test': RouteRecordInfo<'/app/modules_test', '/app/modules_test', Record<never, never>, Record<never, never>>,
     '/app/p/[package]': RouteRecordInfo<'/app/p/[package]', '/app/p/:package', { package: ParamValue<true> }, { package: ParamValue<false> }>,
@@ -28,14 +29,6 @@ declare module 'vue-router/auto-routes' {
     '/app/p/[package].d.[device]': RouteRecordInfo<'/app/p/[package].d.[device]', '/app/p/:package/d/:device', { package: ParamValue<true>, device: ParamValue<true> }, { package: ParamValue<false>, device: ParamValue<false> }>,
     '/app/p/[package].settings': RouteRecordInfo<'/app/p/[package].settings', '/app/p/:package/settings', { package: ParamValue<true> }, { package: ParamValue<false> }>,
     '/confirm-signup': RouteRecordInfo<'/confirm-signup', '/confirm-signup', Record<never, never>, Record<never, never>>,
-    '/dashboard/ApiKeys': RouteRecordInfo<'/dashboard/ApiKeys', '/dashboard/ApiKeys', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/Account': RouteRecordInfo<'/dashboard/settings/Account', '/dashboard/settings/Account', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/ChangePassword': RouteRecordInfo<'/dashboard/settings/ChangePassword', '/dashboard/settings/ChangePassword', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/Notifications': RouteRecordInfo<'/dashboard/settings/Notifications', '/dashboard/settings/Notifications', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/organization/General': RouteRecordInfo<'/dashboard/settings/organization/General', '/dashboard/settings/organization/General', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/organization/Members': RouteRecordInfo<'/dashboard/settings/organization/Members', '/dashboard/settings/organization/Members', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/organization/Plans': RouteRecordInfo<'/dashboard/settings/organization/Plans', '/dashboard/settings/organization/Plans', Record<never, never>, Record<never, never>>,
-    '/dashboard/settings/organization/Usage': RouteRecordInfo<'/dashboard/settings/organization/Usage', '/dashboard/settings/organization/Usage', Record<never, never>, Record<never, never>>,
     '/delete_account': RouteRecordInfo<'/delete_account', '/delete_account', Record<never, never>, Record<never, never>>,
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
@@ -45,5 +38,12 @@ declare module 'vue-router/auto-routes' {
     '/onboarding/verify_email': RouteRecordInfo<'/onboarding/verify_email', '/onboarding/verify_email', Record<never, never>, Record<never, never>>,
     '/register': RouteRecordInfo<'/register', '/register', Record<never, never>, Record<never, never>>,
     '/resend_email': RouteRecordInfo<'/resend_email', '/resend_email', Record<never, never>, Record<never, never>>,
+    '/settings/Account': RouteRecordInfo<'/settings/Account', '/settings/Account', Record<never, never>, Record<never, never>>,
+    '/settings/ChangePassword': RouteRecordInfo<'/settings/ChangePassword', '/settings/ChangePassword', Record<never, never>, Record<never, never>>,
+    '/settings/Notifications': RouteRecordInfo<'/settings/Notifications', '/settings/Notifications', Record<never, never>, Record<never, never>>,
+    '/settings/organization/': RouteRecordInfo<'/settings/organization/', '/settings/organization', Record<never, never>, Record<never, never>>,
+    '/settings/organization/Members': RouteRecordInfo<'/settings/organization/Members', '/settings/organization/Members', Record<never, never>, Record<never, never>>,
+    '/settings/organization/Plans': RouteRecordInfo<'/settings/organization/Plans', '/settings/organization/Plans', Record<never, never>, Record<never, never>>,
+    '/settings/organization/Usage': RouteRecordInfo<'/settings/organization/Usage', '/settings/organization/Usage', Record<never, never>, Record<never, never>>,
   }
 }
