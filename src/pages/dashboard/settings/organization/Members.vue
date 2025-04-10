@@ -149,11 +149,11 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   if (error)
     throw error
 
-  handleSendInvitationOutput(data)
+  handleSendInvitationOutput(data, email, type)
   members.value = await organizationStore.getMembers()
 }
 
-function handleSendInvitationOutput(output: string) {
+function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']) {
   console.log('Output: ', output)
   switch (output) {
     case 'OK': {
@@ -161,7 +161,44 @@ function handleSendInvitationOutput(output: string) {
       break
     }
     case 'NO_EMAIL': {
-      toast.error(t('please-ask-the-user-to-create-account-first'))
+      displayStore.dialogOption = {
+        header: t('please-fill-the-captcha'),
+        message: t('user-doesnt-exist-solve-captcha'),
+        textStyle: 'text-center',
+        headerStyle: 'text-center',
+        showCaptcha: true,
+        buttonCenter: true,
+        buttons: [
+          {
+            preventClose: true,
+            text: t('ok'),
+            role: 'ok',
+            handler: async () => {
+              const captchaToken = displayStore.captchaToken
+              if (!captchaToken) {
+                toast.error(t('captcha-required'))
+                displayStore.resetCaptcha()
+                return
+              }
+              const error = await sendInvitationWithCaptcha(email, type, captchaToken)
+              if (error) {
+                toast.error(t('cannot-invite-user'))
+                displayStore.showDialog = false
+                displayStore.resetCaptcha()
+                return
+              }
+              displayStore.showDialog = false
+              displayStore.resetCaptcha()
+              toast.success(t('org-invited-user'))
+            },
+          },
+          {
+            text: t('button-cancel'),
+            role: 'cancel',
+          }
+        ],
+      }
+      displayStore.showDialog = true
       break
     }
     case 'ALREADY_INVITED': {
@@ -173,6 +210,19 @@ function handleSendInvitationOutput(output: string) {
       break
     }
   }
+}
+
+async function sendInvitationWithCaptcha(email: string, type: Database['public']['Enums']['user_min_right'], captchaToken: string) {
+  const { error } = await supabase.functions.invoke('private/invite_new_user_to_org', {
+    body: {
+      email,
+      org_id: currentOrganization.value?.gid,
+      invite_type: type.replace('invite_', ''),
+      captcha_token: captchaToken,
+    },
+  })
+
+  return error
 }
 
 async function didCancel() {

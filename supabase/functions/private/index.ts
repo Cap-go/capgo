@@ -23,6 +23,7 @@ import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
+import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
@@ -57,5 +58,5 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
 appGlobal.route('/events', events)
-
+appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 Deno.serve(appGlobal.fetch)

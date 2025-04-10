@@ -6,6 +6,8 @@ import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+import VueTurnstile from 'vue-turnstile'
+
 /*
 * $targetEl: required
 * options: optional
@@ -13,6 +15,7 @@ import { useOrganizationStore } from '~/stores/organization'
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const route = useRoute()
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 
 function calculateAcronym(name: string) {
   const words = name?.split(' ') || []
@@ -117,8 +120,14 @@ onMounted(() => {
                     N/A
                   </span>
                 </div>
-                <span :class="{ 'ml-[6.344px]': !!org.logo }">{{ org.name }}</span>
+              <span :class="{ 'ml-[6.344px]': !!org.logo }">{{ org.name }}</span>
               </div>
+            </div>
+          </div>
+          <div class="flex justify-center mt-8" v-if="displayStore.dialogOption?.showCaptcha">
+            <VueTurnstile ref="displayStore.captchaElement" v-if="captchaKey" v-model="displayStore.captchaToken" size="flexible" :site-key="captchaKey" />
+            <div v-else>
+              Captcha not available on local
             </div>
           </div>
           <div v-if="displayStore.dialogOption?.listApps">
