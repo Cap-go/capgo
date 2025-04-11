@@ -202,8 +202,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //   }, 400)
     // }
 
-    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && !manifestEntries) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
+    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && (!manifestEntries || manifestEntries.length === 0)) {
+      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
         message: 'Cannot get bundle',

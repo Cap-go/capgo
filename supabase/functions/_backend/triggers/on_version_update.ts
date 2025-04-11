@@ -150,8 +150,8 @@ app.post('/', middlewareAPISecret, async (c) => {
       console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id' })
       return c.json(BRES)
     }
-    if (!record.r2_path) {
-      console.log({ requestId: c.get('requestId'), context: 'no r2_path' })
+    if (!record.r2_path && !record.manifest) {
+      console.log({ requestId: c.get('requestId'), context: 'no r2_path and no manifest, skipping update', record })
       return c.json(BRES)
     }
     // // check if not deleted it's present in s3 storage
