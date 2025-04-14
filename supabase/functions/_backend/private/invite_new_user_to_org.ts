@@ -5,13 +5,15 @@ import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-
+import { trackBentoEvent } from '../utils/bento.ts'
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
   email: z.string().email(),
   org_id: z.string().min(1),
   invite_type: z.enum(['read', 'upload', 'write', 'admin', 'super_admin']),
   captcha_token: z.string().min(1),
+  first_name: z.string().min(1),
+  last_name: z.string().min(1),
 })
 
 const captchaSchema = z.object({
@@ -67,16 +69,44 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'Failed to invite user', error: 'User already exists' }, 500)
     }
 
+    const { data: org, error: orgError } = await supabaseAdmin(c as any)
+      .from('orgs')
+      .select('*')
+      .eq('id', body.org_id)
+      .single()
+
+    if (orgError) {
+      return c.json({ status: 'Failed to invite user', error: orgError.message }, 500)
+    }
+
+    const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabaseAdmin(c as any)
+      .from('users')
+      .select('*')
+      .eq('id', auth.user.id)
+      .single()
+
+    if (inviteCreatorUserError) {
+      return c.json({ status: 'Failed to invite user', error: inviteCreatorUserError.message }, 500)
+    }
+
     const { error: createUserError } = await supabaseAdmin(c as any).from('tmp_users').insert({
       email: body.email,
       org_id: body.org_id,
       role: body.invite_type,
+      first_name: body.first_name,
+      last_name: body.last_name,
     })
 
     if (createUserError) {
       return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
     }
 
+    const a = await trackBentoEvent(c as any, body.email, { 
+      org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
+      org_name: org.name,
+      invite_link: `https://capgo.app`
+    }, 'org:invite_new_capgo_user_to_org')
+    console.log({ requestId: c.get('requestId'), context: 'bento_event', a })
     return c.json({ status: 'User invited successfully' })
   }
   catch (error) {

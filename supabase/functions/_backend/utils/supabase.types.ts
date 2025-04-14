@@ -1140,32 +1140,41 @@ export type Database = {
       }
       tmp_users: {
         Row: {
+          cancelled_at: string | null
           created_at: string
           email: string
+          first_name: string
+          future_uuid: string
           id: number
           invite_magic_string: string
+          last_name: string
           org_id: string
-          rescinded: boolean
           role: Database["public"]["Enums"]["user_min_right"]
           updated_at: string
         }
         Insert: {
+          cancelled_at?: string | null
           created_at?: string
           email: string
+          first_name: string
+          future_uuid?: string
           id?: number
           invite_magic_string?: string
+          last_name: string
           org_id: string
-          rescinded?: boolean
           role: Database["public"]["Enums"]["user_min_right"]
           updated_at?: string
         }
         Update: {
+          cancelled_at?: string | null
           created_at?: string
           email?: string
+          first_name?: string
+          future_uuid?: string
           id?: number
           invite_magic_string?: string
+          last_name?: string
           org_id?: string
-          rescinded?: boolean
           role?: Database["public"]["Enums"]["user_min_right"]
           updated_at?: string
         }
@@ -1618,6 +1627,7 @@ export type Database = {
               email: string
               image_url: string
               role: Database["public"]["Enums"]["user_min_right"]
+              is_tmp: boolean
             }[]
           }
         | {
@@ -1631,6 +1641,7 @@ export type Database = {
               email: string
               image_url: string
               role: Database["public"]["Enums"]["user_min_right"]
+              is_tmp: boolean
             }[]
           }
       get_org_owner_id: {
@@ -2257,6 +2268,12 @@ export type Database = {
           p_new_org_id: string
         }
         Returns: undefined
+      }
+      transform_role_to_invite: {
+        Args: {
+          role_input: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: Database["public"]["Enums"]["user_min_right"]
       }
       verify_mfa: {
         Args: Record<PropertyKey, never>

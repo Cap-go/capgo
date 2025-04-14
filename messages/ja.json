@@ -526,6 +526,7 @@
   "this-page-will-self-": "このページは、CLI でのオンボーディングが完了すると自動的に更新されます。",
   "to": "請求先",
   "to-open-encrypted-bu": "暗号化されたバンドルを開くには、次のコマンドを使用します。",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "アプリ",
   "transfer-app-ownership": "アプリの所有権を譲渡する",
   "transfer-app-ownership-requirements": "組織間でアプリを転送するには、転送元と転送先の両方の組織で super_admin 権限が必要です。これにより、所有権の安全な移転が保証され、不正アクセスが防止されます。",

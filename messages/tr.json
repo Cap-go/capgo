@@ -526,6 +526,7 @@
   "this-page-will-self-": "CLI'ye katılımınızı tamamladıktan sonra bu sayfa kendi kendine yenilenecektir",
   "to": "için",
   "to-open-encrypted-bu": "Şifreli paketi açmak için şu komutu kullanın:",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "Uygulamalar",
   "transfer-app-ownership": "Uygulama sahipliğini aktarma",
   "transfer-app-ownership-requirements": "Bir uygulamayı kuruluşlar arasında aktarmak için hem kaynak hem de hedef kuruluşta super_admin ayrıcalıklarına sahip olmanız gerekir. Bu, sahipliğin güvenli bir şekilde aktarılmasını sağlar ve yetkisiz erişimi önler.",

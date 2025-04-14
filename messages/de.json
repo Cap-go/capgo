@@ -526,6 +526,7 @@
   "this-page-will-self-": "Diese Seite wird automatisch aktualisiert, nachdem Sie das Onboarding mit der CLI abgeschlossen haben",
   "to": "Bis",
   "to-open-encrypted-bu": "Um das verschlüsselte Paket zu öffnen, verwenden Sie den Befehl:",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "Apps",
   "transfer-app-ownership": "App-Eigentum übertragen",
   "transfer-app-ownership-requirements": "Um eine App zwischen Organisationen zu übertragen, müssen Sie sowohl in der Quell- als auch in der Zielorganisation über super_admin-Rechte verfügen. Dies gewährleistet eine sichere Übertragung des Eigentums und verhindert unbefugten Zugriff.",

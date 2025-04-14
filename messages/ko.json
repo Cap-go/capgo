@@ -526,6 +526,7 @@
   "this-page-will-self-": "CLI 온보딩을 완료하면 이 페이지가 자동으로 새로 고쳐집니다.",
   "to": "To",
   "to-open-encrypted-bu": "암호화된 번들을 열려면 다음 명령을 사용하십시오.",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "앱",
   "transfer-app-ownership": "앱 소유권 이전",
   "transfer-app-ownership-requirements": "조직 간에 앱을 이전하려면 원본 조직과 대상 조직 모두에서 super_admin 권한이 있어야 합니다. 이렇게 하면 소유권을 안전하게 이전하고 무단 액세스를 방지할 수 있습니다.",

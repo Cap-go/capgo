@@ -7,6 +7,7 @@ const config = getLocalConfig()
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
 const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleLinkDialog.vue'))
+const InviteNewUserWithoutAccountDialog = defineAsyncComponent(() => import('~/components/InviteNewUserWithoutAccountDialog.vue'))
 onMounted(() => {
   posthogLoader(config.supaHost)
 })
@@ -18,5 +19,6 @@ onMounted(() => {
     <Toast />
     <Dialog />
     <BundleLinkDialog />
+    <InviteNewUserWithoutAccountDialog />
   </div>
 </template>

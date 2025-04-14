@@ -526,6 +526,7 @@
   "this-page-will-self-": "Halaman ini akan disegarkan sendiri setelah Anda selesai melakukan orientasi dengan CLI",
   "to": "Ke",
   "to-open-encrypted-bu": "Untuk membuka Bundel terenkripsi gunakan perintah:",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "Aplikasi",
   "transfer-app-ownership": "Mentransfer kepemilikan aplikasi",
   "transfer-app-ownership-requirements": "Untuk mentransfer aplikasi antar organisasi, Anda harus memiliki hak istimewa super_admin di organisasi sumber dan tujuan. Hal ini memastikan transfer kepemilikan yang aman dan mencegah akses yang tidak sah.",

@@ -526,6 +526,7 @@
   "this-page-will-self-": "完成 CLI 入门后，此页面将自动刷新",
   "to": "至",
   "to-open-encrypted-bu": "要打开加密包，请使用以下命令：",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "应用",
   "transfer-app-ownership": "转让应用程序所有权",
   "transfer-app-ownership-requirements": "要在组织间传输应用程序，您必须在源组织和目标组织中都拥有 super_admin 权限。这可确保所有权的安全转移，并防止未经授权的访问。",

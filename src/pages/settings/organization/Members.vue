@@ -271,45 +271,28 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
       toast.success(t('org-invited-user'))
       break
     }
-    case 'NO_EMAIL': {
+    case 'TOO_RECENT_INVITATION_CANCELATION': {
       displayStore.dialogOption = {
-        header: t('please-fill-the-captcha'),
-        message: t('user-doesnt-exist-solve-captcha'),
-        textStyle: 'text-center',
-        headerStyle: 'text-center',
-        showCaptcha: true,
-        buttonCenter: true,
+        header: t('error'),
+        message: t('too-recent-invitation-cancelation'),
         buttons: [
           {
-            preventClose: true,
-            text: t('ok'),
+            text: t('button-ok'),
             role: 'ok',
-            handler: async () => {
-              const captchaToken = displayStore.captchaToken
-              if (!captchaToken) {
-                toast.error(t('captcha-required'))
-                displayStore.resetCaptcha()
-                return
-              }
-              const error = await sendInvitationWithCaptcha(email, type, captchaToken)
-              if (error) {
-                toast.error(t('cannot-invite-user'))
-                displayStore.showDialog = false
-                displayStore.resetCaptcha()
-                return
-              }
-              displayStore.showDialog = false
-              displayStore.resetCaptcha()
-              toast.success(t('org-invited-user'))
-            },
-          },
-          {
-            text: t('button-cancel'),
-            role: 'cancel',
           }
-        ],
+        ]
       }
       displayStore.showDialog = true
+      break
+    }
+    case 'NO_EMAIL': {
+      displayStore.showInviteNewUserWithoutAccountDialog = {
+        email,
+        role: type,
+        orgId: currentOrganization.value?.gid ?? '',
+        refreshFunction: reloadData,
+      }
+      break
     }
     case 'ALREADY_INVITED': {
       toast.error(t('user-already-invited'))
@@ -371,22 +354,26 @@ async function deleteMember(member: ExtendedOrganizationMember) {
 
   isLoading.value = true
   try {
-    const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
-    if (error) {
-      console.error('Error deleting member: ', error)
-      toast.error(`${t('cannot-delete-member')}: ${error.message}`)
-      return
-    }
+    if (member.is_tmp) {
 
-    toast.success(t('member-deleted'))
+    } else {
+      const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
+      if (error) {
+          console.error('Error deleting member: ', error)
+          toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+          return
+      }
 
-    if (member.uid === main.user?.id) {
-      console.log('Current user deleted themselves from the org.')
-      await organizationStore.fetchOrganizations()
-      organizationStore.setCurrentOrganizationToMain()
-    }
-    else {
-      await reloadData()
+      toast.success(t('member-deleted'))
+
+      if (member.uid === main.user?.id) {
+        console.log('Current user deleted themselves from the org.')
+        await organizationStore.fetchOrganizations()
+        organizationStore.setCurrentOrganizationToMain()
+      }
+      else {
+        await reloadData()
+      }      
     }
   }
   catch (error) {

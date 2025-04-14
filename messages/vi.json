@@ -526,6 +526,7 @@
   "this-page-will-self-": "Trang này sẽ tự làm mới sau khi bạn hoàn tất quá trình làm quen với CLI",
   "to": "ĐẾN",
   "to-open-encrypted-bu": "Để mở Gói được mã hóa, hãy sử dụng lệnh:",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "Ứng dụng",
   "transfer-app-ownership": "Chuyển quyền sở hữu ứng dụng",
   "transfer-app-ownership-requirements": "Để chuyển ứng dụng giữa các tổ chức, bạn phải có đặc quyền super_admin ở cả tổ chức nguồn và tổ chức đích. \nĐiều này đảm bảo chuyển quyền sở hữu an toàn và ngăn chặn truy cập trái phép.",

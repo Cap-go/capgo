@@ -526,6 +526,7 @@
   "this-page-will-self-": "Esta página se actualizará automáticamente después de que termine de incorporarse a la CLI",
   "to": "Hasta",
   "to-open-encrypted-bu": "Para abrir el paquete cifrado, use el comando:",
+  "too-recent-invitation-cancelation": "",
   "top-apps-v2": "Aplicaciones",
   "transfer-app-ownership": "Transferir la propiedad de la aplicación",
   "transfer-app-ownership-requirements": "Para transferir una aplicación entre organizaciones, debe tener privilegios de super_admin tanto en la organización de origen como en la de destino. Esto garantiza una transferencia segura de la propiedad y evita accesos no autorizados.",

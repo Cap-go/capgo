@@ -1,6 +1,5 @@
 import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import VueTurnstile from 'vue-turnstile'
 import { ref, watch } from 'vue'
 
 export interface ActionSheetOptionButton {
@@ -27,12 +26,18 @@ export interface ActionSheetOption {
   listApps?: Database['public']['Tables']['apps']['Row'][]
   listOrganizations?: boolean
   buttons?: ActionSheetOptionButton[]
-  showCaptcha?: boolean
 }
 
 export interface AppPreviewOptions {
   appId: string
   version: Database['public']['Tables']['app_versions']['Row']
+}
+
+export interface InviteNewUserWithoutAccountDialogOption {
+  email: string
+  role: Database['public']['Enums']['user_min_right']
+  orgId: string
+  refreshFunction: () => Promise<void>
 }
 
 export const useDisplayStore = defineStore('display', () => {
@@ -41,8 +46,7 @@ export const useDisplayStore = defineStore('display', () => {
   const dialogCanceled = ref<boolean>(false)
   const showDialog = ref<boolean>(false)
   const showBundleLinkDialogChannel = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
-  const captchaToken = ref<string>('')
-  const captchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
+  const showInviteNewUserWithoutAccountDialog = ref<InviteNewUserWithoutAccountDialogOption | null>(null)
   const showBundleLinkDialogCallbacks = ref<{
     onUnlink: () => Promise<void>
     onRevert: () => Promise<void>
@@ -78,13 +82,6 @@ export const useDisplayStore = defineStore('display', () => {
     dialogCheckbox.value = false
   }
 
-  const resetCaptcha = () => {
-    if (captchaElement.value) {
-      captchaToken.value = ''
-      captchaElement.value?.reset()
-    }
-  }
-
   return {
     onDialogDismiss,
     dialogCanceled,
@@ -103,9 +100,7 @@ export const useDisplayStore = defineStore('display', () => {
     selectedOrganizations,
     showBundleLinkDialogChannel,
     showBundleLinkDialogCallbacks,
-    captchaToken,
-    captchaElement,
-    resetCaptcha,
+    showInviteNewUserWithoutAccountDialog,
   }
 })
 
