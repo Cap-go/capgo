@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { getStripe, recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
+import { recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
