@@ -186,7 +186,6 @@ async function getData() {
 }
 
 async function reload() {
-  // console.log('reload')
   try {
     elements.value.length = 0
     await getData()

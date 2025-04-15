@@ -6,7 +6,7 @@ import VueDatePicker from '@vuepic/vue-datepicker'
 import { useDark, useDebounceFn } from '@vueuse/core'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClock from '~icons/heroicons/clock'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
@@ -43,8 +43,6 @@ const emit = defineEmits([
   'update:range',
   'update:columns',
   'update:currentPage',
-  'filterClick',
-  'sortClick',
 ])
 const dropdown = useTemplateRef('dropdown')
 function closeDropdown() {
@@ -140,7 +138,6 @@ async function clickRight() {
 async function setTime(time: Minutes) {
   currentSelected.value = 'general'
   currentGeneralTime.value = time
-  console.log('setTime', time)
   if (time === 1) {
     preciseDates.value = [
       dayjs().subtract(1, 'hour').toDate(),
@@ -175,12 +172,88 @@ function formatValue(previewValue: Date[] | undefined) {
   }
 }
 
+function updateUrlParams() {
+  const params = new URLSearchParams()
+  if (searchVal.value)
+    params.set('search', searchVal.value)
+  if (preciseDates.value) {
+    params.set('start', dayjs(preciseDates.value[0]).toISOString())
+    params.set('end', dayjs(preciseDates.value[1]).toISOString())
+  }
+  props.columns.forEach((col) => {
+    if (col.sortable && col.sortable !== true)
+      params.set(`sort_${col.key}`, col.sortable)
+  })
+  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+}
+
+function loadFromUrlParams() {
+  const params = new URLSearchParams(window.location.search)
+  const searchParam = params.get('search')
+  if (searchParam) {
+    searchVal.value = searchParam
+    emit('update:search', searchVal.value)
+  }
+
+  const startParam = params.get('start')
+  const endParam = params.get('end')
+  if (startParam && endParam) {
+    const start = new Date(startParam)
+    const end = new Date(endParam)
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+      preciseDates.value = [start, end]
+      currentSelected.value = 'precise'
+      emit('update:range', preciseDates.value)
+    }
+  }
+
+  const newColumns = [...props.columns]
+  props.columns.forEach((col) => {
+    const sortParam = params.get(`sort_${col.key}`)
+    if (sortParam && col.sortable && (sortParam === 'asc' || sortParam === 'desc')) {
+      newColumns[props.columns.indexOf(col)].sortable = sortParam
+    }
+  })
+  emit('update:columns', newColumns)
+  emit('reload')
+}
+
+// Cleanup on unmount
+onUnmounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  params.delete('search')
+  params.delete('start')
+  params.delete('end')
+  props.columns.forEach((col) => {
+    params.delete(`sort_${col.key}`)
+  })
+  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+})
+
+// Add watches
+watch(() => props.columns, useDebounceFn(() => {
+  updateUrlParams()
+  emit('reload')
+}, 500), { deep: true })
+
+watch(preciseDates, useDebounceFn(() => {
+  updateUrlParams()
+  emit('update:range', preciseDates.value)
+  emit('reload')
+}, 500))
+
+watch(searchVal, useDebounceFn(() => {
+  updateUrlParams()
+  emit('update:search', searchVal.value)
+  emit('reload')
+}, 500))
+
 onMounted(async () => {
   await organizationStore.awaitInitialLoad()
   thisOrganization.value = organizationStore.getOrgByAppId(props.appId) ?? null
-
   if (!thisOrganization.value)
     console.error('Invalid app??')
+  loadFromUrlParams()
 })
 </script>
 
@@ -376,5 +449,11 @@ onMounted(async () => {
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
   @apply btn btn-primary  btn-sm;
+}
+
+/* Make date picker popup fixed to viewport */
+.dp__menu {
+  position: fixed !important;
+  z-index: 1000 !important;
 }
 </style>

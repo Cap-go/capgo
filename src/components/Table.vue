@@ -4,7 +4,7 @@ import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
@@ -46,9 +46,7 @@ const emit = defineEmits([
   'update:filters',
   'update:columns',
   'update:currentPage',
-  'filterClick',
   'plusClick',
-  'sortClick',
   'selectRow',
   'massDelete',
 ])
@@ -96,17 +94,93 @@ function sortClick(key: number) {
   emit('update:columns', newColumns)
 }
 
-watch(props.columns, () => {
-  emit('reload')
-})
-if (props.filters) {
-  watch(props.filters, () => {
-    emit('reload')
+function updateUrlParams() {
+  const params = new URLSearchParams()
+  if (searchVal.value)
+    params.set('search', searchVal.value)
+  if (props.filters) {
+    Object.entries(props.filters).forEach(([key, value]) => {
+      if (value)
+        params.append('filter', key)
+    })
+  }
+  if (props.currentPage)
+    params.set('page', props.currentPage.toString())
+  props.columns.forEach((col) => {
+    if (col.sortable && col.sortable !== true)
+      params.set(`sort_${col.key}`, col.sortable)
   })
+  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
 }
+
+function loadFromUrlParams() {
+  const params = new URLSearchParams(window.location.search)
+  const searchParam = params.get('search')
+  if (searchParam) {
+    searchVal.value = searchParam
+    emit('update:search', searchVal.value)
+  }
+  const pageParam = params.get('page')
+  if (pageParam) {
+    const page = Number.parseInt(pageParam, 10)
+    if (!Number.isNaN(page) && page !== props.currentPage) {
+      emit('update:currentPage', page)
+    }
+  }
+  if (props.filters) {
+    const filterParams = params.getAll('filter')
+    const newFilters = { ...props.filters }
+    Object.keys(newFilters).forEach((key) => {
+      newFilters[key] = filterParams.includes(key)
+    })
+    emit('update:filters', newFilters)
+  }
+  const newColumns = [...props.columns]
+  props.columns.forEach((col) => {
+    const sortParam = params.get(`sort_${col.key}`)
+    if (sortParam && col.sortable && (sortParam === 'asc' || sortParam === 'desc')) {
+      newColumns[props.columns.indexOf(col)].sortable = sortParam
+    }
+  })
+  emit('update:columns', newColumns)
+  emit('reload')
+}
+
+// Cleanup on unmount
+onUnmounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  // Remove our specific parameters
+  params.delete('search')
+  params.delete('page')
+  params.delete('filter')
+  props.columns.forEach((col) => {
+    params.delete(`sort_${col.key}`)
+  })
+  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+})
+
+onMounted(() => {
+  loadFromUrlParams()
+})
+
+watch(props.columns, useDebounceFn(() => {
+  updateUrlParams()
+  emit('reload')
+}, 500), { deep: true })
+
+watch(() => props.filters, useDebounceFn(() => {
+  updateUrlParams()
+  emit('reload')
+}, 500), { deep: true, immediate: true })
 
 watch(searchVal, useDebounceFn(() => {
   emit('update:search', searchVal.value)
+  updateUrlParams()
+  emit('reload')
+}, 500))
+
+watch(() => props.currentPage, useDebounceFn(() => {
+  updateUrlParams()
   emit('reload')
 }, 500))
 
@@ -203,7 +277,6 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <div v-if="filterText && filterList.length" class="dropdown">
           <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
-              <!-- uppercase first letter in tailwind -->
               {{ filterActivated }}
             </div>
             <IconFilter class="m-1 mr-2" />
@@ -213,7 +286,14 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
           <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-                <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">
+                <input
+                  :id="`filter-radio-example-${i}`"
+                  :checked="filters?.[f]"
+                  type="checkbox"
+                  :name="`filter-radio-${i}`"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
+                  @change="emit('update:filters', { ...filters, [f]: !filters?.[f] })"
+                >
                 <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
               </div>
             </li>
@@ -226,7 +306,6 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
       <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
-      <!-- </div> -->
       <div class="flex md:w-auto overflow-hidden">
         <FormKit
           v-model="searchVal"
