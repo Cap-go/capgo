@@ -135,19 +135,6 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         const best_plan = await findBestPlan(c, { mau: get_total_stats.mau, storage: get_total_stats.storage, bandwidth: get_total_stats.bandwidth })
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
         await setMetered(c, org.customer_id!, orgId)
-        // if (best_plan === 'Free' && current_plan === 'Free') {
-        // TODO: find a better trigger for this since there is no more free plan, maybe percent of useage ?
-        //   await trackEvent(c, org.management_email, {}, 'user:need_more_time')
-        //   console.log(c.get('requestId'), 'best_plan is free', orgId)
-        //   await logsnag(c).track({
-        //     channel: 'usage',
-        //     event: 'User need more time',
-        //     icon: '⏰',
-        //     user_id: orgId,
-        //     notify: false,
-        //   }).catch()
-        // }
-        // else
         if (planToInt(best_plan) > planToInt(current_plan)) {
           const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c).from('plans').select('*').eq('name', current_plan).single()
           if (currentPlanError) {

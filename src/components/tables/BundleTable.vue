@@ -153,11 +153,7 @@ async function getData() {
     if (!dataVersions)
       return
     elements.value.push(...(await enhenceVersionElems(dataVersions) as any))
-    // console.log('count', count)
     total.value = count || 0
-    if (count === 0) {
-      showSteps.value = true
-    }
   }
   catch (error) {
     console.error(error)
@@ -433,6 +429,9 @@ async function openOne(one: Element) {
 onMounted(async () => {
   await refreshData()
   role.value = await organizationStore.getCurrentRoleForApp(props.appId)
+  if (total.value === 0) {
+    showSteps.value = true
+  }
 })
 watch(props, async () => {
   await refreshData()
