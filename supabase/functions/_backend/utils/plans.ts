@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { getStripe, recordUsage, setThreshold } from './stripe.ts'
+import { getStripe, recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -95,99 +95,6 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     if (get_metered_usage.bandwidth && get_metered_usage.bandwidth > 0)
       await recordUsage(c, prices.bandwidth, get_metered_usage.bandwidth)
   }
-}
-
-export async function getSubscriptionData(c: Context, customerId: string) {
-  try {
-    console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Fetching subscription data', customerId })
-
-    // Get only active subscriptions from Stripe
-    const subscriptions = await getStripe(c).subscriptions.list({
-      customer: customerId,
-      status: 'active', // only get active subscriptions
-      expand: ['data.items.data.price'],
-      limit: 1,
-    })
-
-    console.log({
-      requestId: c.get('requestId'),
-      context: 'getSubscriptionData',
-      subscriptionsFound: subscriptions.data.length,
-      subscriptionIds: subscriptions.data.map(s => s.id),
-    })
-
-    // If no subscriptions found
-    if (!subscriptions.data.length) {
-      console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'No active subscriptions found for customer' })
-      return null
-    }
-
-    // Get the subscription
-    const subscription = subscriptions.data[0]
-
-    // Extract product ID from the first subscription item
-    let productId = null
-    if (subscription.items.data.length > 0) {
-      const item = subscription.items.data[0]
-      // Get product ID directly from price.product (no need for object check)
-      productId = item.price.product as string
-    }
-
-    // Format dates from epoch to ISO string
-    const cycleStart = subscription.current_period_start
-      ? new Date(subscription.current_period_start * 1000).toISOString()
-      : null
-
-    const cycleEnd = subscription.current_period_end
-      ? new Date(subscription.current_period_end * 1000).toISOString()
-      : null
-
-    return {
-      productId,
-      status: subscription.status,
-      cycleStart,
-      cycleEnd,
-      subscriptionId: subscription.id,
-    }
-  }
-  catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'getSubscriptionData', error })
-    return null
-  }
-}
-
-export async function syncSubscriptionData(c: Context, customerId: string): Promise<void> {
-  try {
-    // Get subscription data from Stripe
-    const subscriptionData = await getSubscriptionData(c, customerId)
-
-    // Update stripe_info table with latest data, even if no subscription exists
-    const { error: updateError } = await supabaseAdmin(c)
-      .from('stripe_info')
-      .update({
-        product_id: subscriptionData?.productId || undefined,
-        subscription_id: subscriptionData?.subscriptionId || undefined,
-        subscription_anchor_start: subscriptionData?.cycleStart || undefined,
-        subscription_anchor_end: subscriptionData?.cycleEnd || undefined,
-        status: mapSubscriptionStatus(subscriptionData?.status || 'canceled'),
-      })
-      .eq('customer_id', customerId)
-
-    if (updateError) {
-      console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error: updateError })
-    }
-  }
-  catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error })
-  }
-}
-
-// Helper function to map Stripe subscription status to our database status
-function mapSubscriptionStatus(stripeStatus: string | null): 'updated' | 'canceled' | 'succeeded' | undefined {
-  if (!stripeStatus)
-    return undefined
-
-  return stripeStatus === 'canceled' ? 'canceled' : 'succeeded'
 }
 
 export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
