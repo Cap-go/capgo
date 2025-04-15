@@ -217,3 +217,90 @@ ALTER FUNCTION "public"."rescind_invitation"(TEXT, UUID) OWNER TO postgres;
 GRANT ALL ON FUNCTION "public"."rescind_invitation"(TEXT, UUID) TO service_role;
 GRANT EXECUTE ON FUNCTION "public"."rescind_invitation"(TEXT, UUID) TO authenticated;
 
+-- Function to transform invite_role to regular role
+CREATE OR REPLACE FUNCTION public.transform_role_to_non_invite(role_input user_min_right)
+RETURNS user_min_right
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  CASE role_input
+    WHEN 'invite_read'::user_min_right THEN RETURN 'read'::user_min_right;
+    WHEN 'invite_upload'::user_min_right THEN RETURN 'upload'::user_min_right;
+    WHEN 'invite_write'::user_min_right THEN RETURN 'write'::user_min_right;
+    WHEN 'invite_admin'::user_min_right THEN RETURN 'admin'::user_min_right;
+    WHEN 'invite_super_admin'::user_min_right THEN RETURN 'super_admin'::user_min_right;
+    ELSE RETURN role_input; -- If it's already a non-invite role or unrecognized, return as is
+  END CASE;
+END;
+$$;
+
+-- Grant privileges for the function
+ALTER FUNCTION public.transform_role_to_non_invite(user_min_right) OWNER TO postgres;
+GRANT ALL ON FUNCTION public.transform_role_to_non_invite(user_min_right) TO service_role;
+GRANT EXECUTE ON FUNCTION public.transform_role_to_non_invite(user_min_right) TO authenticated;
+
+-- Function to modify permissions for a temporary user
+CREATE OR REPLACE FUNCTION "public"."modify_permissions_tmp"("email" TEXT, "org_id" UUID, "new_role" "public"."user_min_right") 
+RETURNS character varying
+LANGUAGE "plpgsql" SECURITY DEFINER
+AS $$
+DECLARE
+  tmp_user record;
+  org record;
+  non_invite_role user_min_right;
+BEGIN
+  -- Convert the role to non-invite format for permission checks
+  non_invite_role := transform_role_to_non_invite(new_role);
+  
+  -- Check if org exists
+  SELECT * FROM orgs
+  INTO org
+  WHERE orgs.id = modify_permissions_tmp.org_id;
+
+  IF NOT FOUND THEN
+    RETURN 'NO_ORG';
+  END IF;
+
+  -- Check if user has admin rights
+  IF NOT (check_min_rights('admin'::user_min_right, (select "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::character varying, NULL::bigint)) THEN
+    RETURN 'NO_RIGHTS';
+  END IF;
+  
+  -- Special permission check for super_admin roles
+  IF (non_invite_role = 'super_admin'::user_min_right) THEN
+    IF NOT (check_min_rights('super_admin'::user_min_right, (select "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], modify_permissions_tmp.org_id)), modify_permissions_tmp.org_id, NULL::character varying, NULL::bigint)) THEN
+      RETURN 'NO_RIGHTS_FOR_SUPER_ADMIN';
+    END IF;
+  END IF;
+
+  -- Find the temporary user
+  SELECT * FROM tmp_users
+  INTO tmp_user
+  WHERE tmp_users.email = modify_permissions_tmp.email
+  AND tmp_users.org_id = modify_permissions_tmp.org_id;
+
+  IF NOT FOUND THEN
+    RETURN 'NO_INVITATION';
+  END IF;
+
+  -- Check if invitation has been cancelled
+  IF tmp_user.cancelled_at IS NOT NULL THEN
+    RETURN 'INVITATION_CANCELLED';
+  END IF;
+
+  -- Make sure we store the non-invite role (we store the raw roles in tmp_users)
+  UPDATE tmp_users
+  SET role = non_invite_role,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE tmp_users.id = tmp_user.id;
+
+  RETURN 'OK';
+END;
+$$;
+
+-- Grant privileges
+ALTER FUNCTION "public"."modify_permissions_tmp"(TEXT, UUID, "public"."user_min_right") OWNER TO postgres;
+GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"(TEXT, UUID, "public"."user_min_right") TO service_role;
+GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"(TEXT, UUID, "public"."user_min_right") TO authenticated;
+

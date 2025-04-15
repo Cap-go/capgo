@@ -277,7 +277,7 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
         message: t('too-recent-invitation-cancelation'),
         buttons: [
           {
-            text: t('button-ok'),
+            text: t('ok'),
             role: 'ok',
           }
         ]
@@ -307,15 +307,30 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
   }
 }
 
-async function sendInvitationWithCaptcha(email: string, type: Database['public']['Enums']['user_min_right'], captchaToken: string) {
-  const { error } = await supabase.functions.invoke('private/invite_new_user_to_org', {
-    body: {
-      email,
-      org_id: currentOrganization.value?.gid,
-      invite_type: type.replace('invite_', ''),
-      captcha_token: captchaToken,
-    },
+async function rescindInvitation(email: string) {
+  const { data, error } = await supabase.rpc('rescind_invitation', {
+    email,
+    org_id: currentOrganization.value?.gid ?? '',
   })
+
+  if (error) {
+      console.error('Error rescinding invitation: ', error)
+      toast.error(`${t('cannot-rescind-invitation')}`)
+      return
+    }
+
+  if (!error && data) {
+    // Handle different response codes from the rescind_invitation function
+    switch (data) {
+      case 'OK':
+        // Success is handled in the calling function
+        toast.success(t('invitation-rescinded'))
+        await reloadData()
+        break
+      default:
+        toast.warning(`${t('unexpected-rescind-response')}: ${data}`)
+    }
+  }
 
   return error
 }
@@ -355,7 +370,8 @@ async function deleteMember(member: ExtendedOrganizationMember) {
   isLoading.value = true
   try {
     if (member.is_tmp) {
-
+      // Handle invitation rescinding for temporary users
+      await rescindInvitation(member.email)
     } else {
       const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
       if (error) {
@@ -395,15 +411,42 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
 
   isLoading.value = true
   try {
-    const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
-    if (error) {
-      console.error('Error changing permission: ', error)
-      toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-      return
-    }
+    if (member.is_tmp) {
+      // Handle modifying permissions for temporary users
+      const { data, error } = await supabase.rpc('modify_permissions_tmp', {
+        email: member.email,
+        org_id: currentOrganization.value?.gid ?? '',
+        new_role: perm
+      })
 
-    toast.success(t('permission-changed'))
-    await reloadData()
+      if (error) {
+        console.error('Error changing permission for invitation: ', error)
+        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+        return
+      }
+
+      // Handle response codes
+      switch (data) {
+        case 'OK':
+          toast.success(t('permission-changed'))
+          break
+        default:
+          toast.warning(`${t('unexpected-response')}: ${data}`)
+      }
+      
+      await reloadData()
+    } else {
+      // Handle regular users as before
+      const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
+      if (error) {
+        console.error('Error changing permission: ', error)
+        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+        return
+      }
+
+      toast.success(t('permission-changed'))
+      await reloadData()
+    }
   }
   catch (error) {
     console.error('Permission change failed:', error)
