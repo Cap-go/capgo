@@ -103,12 +103,6 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'API key ID is required' }, 400)
   }
 
-  const numberId = Number(id)
-  if (Number.isNaN(numberId)) {
-    console.error('Cannot delete apikey', 'Invalid API key ID')
-    return c.json({ error: 'Invalid API key ID' }, 400)
-  }
-
   const supabase = supabaseAdmin(c as any)
 
   const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', key.user_id).single()
@@ -120,7 +114,7 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
   const { error } = await supabase
     .from('apikeys')
     .delete()
-    .eq('id', numberId)
+    .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', key.user_id)
 
   if (error) {
