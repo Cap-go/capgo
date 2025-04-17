@@ -101,15 +101,15 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
   try {
     const { data: org, error: userError } = await supabaseAdmin(c)
       .from('orgs')
-      .select()
+      .select('customer_id, stripe_info(subscription_id)')
       .eq('id', orgId)
       .single()
     if (userError)
       throw userError
 
     // Sync subscription data with Stripe
-    if (org.customer_id)
-      await syncSubscriptionData(c, org.customer_id!)
+    if (org.customer_id && org?.stripe_info?.subscription_id)
+      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id)
 
     if (await isTrialOrg(c, orgId)) {
       const { error } = await supabaseAdmin(c)

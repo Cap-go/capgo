@@ -2,11 +2,27 @@ import type { Database } from '../../utils/supabase.types.ts'
 import type { CreateApp } from './post.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteApp } from './delete.ts'
-import { get } from './get.ts'
+import { get, getAll } from './get.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
 
 export const app = honoFactory.createApp()
+
+app.get('/', middlewareKey(['all', 'read']), async (c) => {
+  try {
+    const pageQuery = c.req.query('page')
+    const limitQuery = c.req.query('limit')
+
+    const page = pageQuery ? Number.parseInt(pageQuery) : undefined
+    const limit = limitQuery ? Number.parseInt(limitQuery) : undefined
+
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+    return getAll(c as any, apikey, page, limit)
+  }
+  catch (e) {
+    return c.json({ status: 'Cannot get apps', error: JSON.stringify(e) }, 500)
+  }
+})
 
 app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
   try {
