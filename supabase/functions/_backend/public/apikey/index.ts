@@ -104,7 +104,7 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
   }
 
   const numberId = Number(id)
-  if (isNaN(numberId)) {
+  if (Number.isNaN(numberId)) {
     console.error('Cannot delete apikey', 'Invalid API key ID')
     return c.json({ error: 'Invalid API key ID' }, 400)
   }
