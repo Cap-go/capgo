@@ -12,12 +12,13 @@ app.get('/', middlewareKey(['all', 'read']), async (c) => {
   try {
     const pageQuery = c.req.query('page')
     const limitQuery = c.req.query('limit')
+    const orgId = c.req.query('org_id')
 
     const page = pageQuery ? Number.parseInt(pageQuery) : undefined
     const limit = limitQuery ? Number.parseInt(limitQuery) : undefined
 
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return getAll(c as any, apikey, page, limit)
+    return getAll(c as any, apikey, page, limit, orgId)
   }
   catch (e) {
     return c.json({ status: 'Cannot get apps', error: JSON.stringify(e) }, 500)
