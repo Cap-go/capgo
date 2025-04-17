@@ -4,7 +4,7 @@ CREATE TABLE public.tmp_users (
     email TEXT NOT NULL,
     org_id UUID NOT NULL REFERENCES public.orgs(id),
     role user_min_right NOT NULL,
-    invite_magic_string TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+    invite_magic_string TEXT NOT NULL DEFAULT encode(gen_random_bytes(128), 'hex')::text,
     future_uuid UUID NOT NULL DEFAULT gen_random_uuid(),
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -16,6 +16,9 @@ CREATE TABLE public.tmp_users (
 
 -- Create unique index on both org_id and email
 CREATE UNIQUE INDEX tmp_users_org_id_email_idx ON public.tmp_users (org_id, email);
+
+-- Create index on invite_magic_string for faster lookups
+CREATE INDEX tmp_users_invite_magic_string_idx ON public.tmp_users (invite_magic_string);
 
 -- Add trigger for automatically updating updated_at
 CREATE TRIGGER handle_updated_at
@@ -304,3 +307,58 @@ ALTER FUNCTION "public"."modify_permissions_tmp"(TEXT, UUID, "public"."user_min_
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"(TEXT, UUID, "public"."user_min_right") TO service_role;
 GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"(TEXT, UUID, "public"."user_min_right") TO authenticated;
 
+-- Function to get invite by magic string lookup
+CREATE OR REPLACE FUNCTION "public"."get_invite_by_magic_lookup"("lookup" TEXT)
+RETURNS TABLE(
+  org_name TEXT,
+  org_logo TEXT,
+  role user_min_right
+)
+LANGUAGE "plpgsql" SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY 
+  SELECT 
+    o.name AS org_name,
+    o.logo AS org_logo,
+    tmp.role
+  FROM tmp_users tmp
+  JOIN orgs o ON tmp.org_id = o.id
+  WHERE tmp.invite_magic_string = get_invite_by_magic_lookup.lookup
+  AND tmp.cancelled_at IS NULL
+  AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+END;
+$$;
+
+-- Grant privileges
+ALTER FUNCTION "public"."get_invite_by_magic_lookup"(TEXT) OWNER TO postgres;
+GRANT ALL ON FUNCTION "public"."get_invite_by_magic_lookup"(TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION "public"."get_invite_by_magic_lookup"(TEXT) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$BEGIN
+  
+  -- here we check if the user is a service role in order to bypass this permission check
+  IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((select current_user) IS NOT DISTINCT FROM 'postgres')) THEN
+    RETURN NEW;
+  END IF;
+  
+  IF ("public"."check_min_rights"('super_admin'::"public"."user_min_right", (select auth.uid()), NEW.org_id, NULL::character varying, NULL::bigint))
+  THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.user_right IS NOT DISTINCT FROM 'super_admin'::"public"."user_min_right"
+  THEN
+    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+  END IF;
+
+  IF NEW.user_right IS NOT DISTINCT FROM 'invite_super_admin'::"public"."user_min_right"
+  THEN
+    RAISE EXCEPTION 'Admins cannot elevate privilages!';
+  END IF;
+
+  RETURN NEW;
+END;$$;

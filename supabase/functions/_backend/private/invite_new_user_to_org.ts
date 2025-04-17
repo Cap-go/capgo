@@ -6,6 +6,9 @@ import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
+import dayjs from 'dayjs'
+import type { Database } from '../utils/supabase.types.ts'
+
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
   email: z.string().email(),
@@ -89,24 +92,65 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'Failed to invite user', error: inviteCreatorUserError.message }, 500)
     }
 
-    const { error: createUserError } = await supabaseAdmin(c as any).from('tmp_users').insert({
-      email: body.email,
-      org_id: body.org_id,
-      role: body.invite_type,
-      first_name: body.first_name,
-      last_name: body.last_name,
-    })
+    const { data: existingInvitation } = await supabaseAdmin(c as any)
+      .from('tmp_users')
+      .select('*')
+      .eq('email', body.email)
+      .eq('org_id', body.org_id)
+      .single()
 
-    if (createUserError) {
-      return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
+    let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
+    if (existingInvitation) {
+      const nowMinusThreeHours = dayjs().subtract(3, 'hours')
+      if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
+        return c.json({ status: 'Failed to invite user', error: 'User already invited and it hasnt been 3 hours since the last invitation was cancelled' }, 400)
+      }
+
+      const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdmin(c as any)
+        .from('tmp_users')
+        .update({
+          cancelled_at: null,
+          first_name: body.first_name,
+          last_name: body.last_name,
+        })
+        .eq('email', body.email)
+        .eq('org_id', body.org_id)
+        .select('*')
+        .single()
+
+      if (updateInvitationError) {
+        return c.json({ status: 'Failed to invite user', error: updateInvitationError.message }, 500)
+      }
+
+      newInvitation = updatedInvitationData
+    } else {
+      const { error: createUserError, data: newInvitationData } = await supabaseAdmin(c as any).from('tmp_users').insert({
+        email: body.email,
+        org_id: body.org_id,
+        role: body.invite_type,
+        first_name: body.first_name,
+        last_name: body.last_name,
+      }).select('*').single()
+  
+      if (createUserError) {
+        return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
+      }
+
+      newInvitation = newInvitationData
     }
 
-    const a = await trackBentoEvent(c as any, body.email, { 
+    const bentoEvent = await trackBentoEvent(c as any, body.email, { 
       org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
       org_name: org.name,
-      invite_link: `https://capgo.app`
+      invite_link: `${getEnv(c as any, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
+      invited_first_name: `${body.first_name}`,
+      invited_last_name: `${body.last_name}`,
     }, 'org:invite_new_capgo_user_to_org')
-    console.log({ requestId: c.get('requestId'), context: 'bento_event', a })
+    console.log({ requestId: c.get('requestId'), context: 'bento_event', bentoEvent })
+    if (!bentoEvent) {
+      console.error({ requestId: c.get('requestId'), context: 'bento_event_error', error: 'Failed to track bento event' })
+      return c.json({ status: 'Failed to invite user', error: 'Failed to track bento event' }, 500)
+    }
     return c.json({ status: 'User invited successfully' })
   }
   catch (error) {

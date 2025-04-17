@@ -1586,6 +1586,16 @@ export type Database = {
         }
         Returns: string
       }
+      get_invite_by_magic_lookup: {
+        Args: {
+          lookup: string
+        }
+        Returns: {
+          org_name: string
+          org_logo: string
+          role: Database["public"]["Enums"]["user_min_right"]
+        }[]
+      }
       get_metered_usage:
         | {
             Args: Record<PropertyKey, never>
@@ -2100,6 +2110,14 @@ export type Database = {
         }
         Returns: number
       }
+      modify_permissions_tmp: {
+        Args: {
+          email: string
+          org_id: string
+          new_role: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: string
+      }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -2209,6 +2227,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      rescind_invitation: {
+        Args: {
+          email: string
+          org_id: string
+        }
+        Returns: string
+      }
       reset_and_seed_app_data: {
         Args: {
           p_app_id: string
@@ -2270,6 +2295,12 @@ export type Database = {
         Returns: undefined
       }
       transform_role_to_invite: {
+        Args: {
+          role_input: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: Database["public"]["Enums"]["user_min_right"]
+      }
+      transform_role_to_non_invite: {
         Args: {
           role_input: Database["public"]["Enums"]["user_min_right"]
         }

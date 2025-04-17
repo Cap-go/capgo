@@ -8,6 +8,7 @@ function hasBento(c: Context) {
 
 function initBentoKy(c: Context) {
   if (!hasBento(c)) {
+    console.log({ requestId: c.get('requestId'), context: 'initBentoKy', error: 'Bento is not enabled' })
     return null
   }
 

@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import VueTurnstile from 'vue-turnstile'
+import IconInformation from '~icons/heroicons/information-circle'
 
 const displayStore = useDisplayStore()
 const { t } = useI18n()
@@ -348,6 +349,17 @@ const handleSubmit = async () => {
               <p v-if="!isFormValid" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 {{ t('complete-all-fields', 'Please complete all required fields to continue') }}
               </p>
+              <div class="mt-1 flex items-center text-2xs text-blue-600 dark:text-blue-400 cursor-pointer group relative" :class="{ 'mt-4': isFormValid }">
+                <IconInformation class="w-4 h-4 mr-1" />
+                <span class="font-medium">Why do I need this?</span>
+                
+                <!-- Tooltip that appears on hover -->
+                <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg w-60 text-center pointer-events-none">
+                  {{ t('captcha-new-user-org-tooltip') }}
+                  <!-- Tooltip arrow -->
+                  <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                </div>
+              </div>
             </div>
           </form>
         </div>
