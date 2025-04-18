@@ -52,8 +52,13 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       // current_period_start is epoch and current_period_end is epoch
       // subscription_anchor_start is date and subscription_anchor_end is date
       // convert epoch to date
-      data.subscription_anchor_start = new Date(subscription.current_period_start * 1000).toISOString()
-      data.subscription_anchor_end = new Date(subscription.current_period_end * 1000).toISOString()
+      const firstItem = subscription.items.data.length > 0 ? subscription.items.data[0] : null
+      data.subscription_anchor_start = firstItem?.current_period_start
+        ? new Date(firstItem.current_period_start * 1000).toISOString()
+        : undefined
+      data.subscription_anchor_end = firstItem?.current_period_end
+        ? new Date(firstItem.current_period_end * 1000).toISOString()
+        : undefined
       data.subscription_metered = res.meteredData
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
