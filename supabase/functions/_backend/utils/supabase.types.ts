@@ -230,6 +230,9 @@ export type Database = {
         Row: {
           app_id: string
           created_at: string | null
+          default_channel_android: number | null
+          default_channel_ios: number | null
+          default_channel_sync: boolean
           default_upload_channel: string
           icon_url: string
           id: string | null
@@ -244,6 +247,9 @@ export type Database = {
         Insert: {
           app_id: string
           created_at?: string | null
+          default_channel_android?: number | null
+          default_channel_ios?: number | null
+          default_channel_sync?: boolean
           default_upload_channel?: string
           icon_url: string
           id?: string | null
@@ -258,6 +264,9 @@ export type Database = {
         Update: {
           app_id?: string
           created_at?: string | null
+          default_channel_android?: number | null
+          default_channel_ios?: number | null
+          default_channel_sync?: boolean
           default_upload_channel?: string
           icon_url?: string
           id?: string | null
@@ -270,6 +279,20 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "apps_default_channel_android_fkey"
+            columns: ["default_channel_android"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apps_default_channel_ios_fkey"
+            columns: ["default_channel_ios"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "apps_user_id_fkey"
             columns: ["user_id"]
@@ -377,7 +400,6 @@ export type Database = {
           ios: boolean
           name: string
           owner_org: string
-          public: boolean
           updated_at: string
           version: number
         }
@@ -395,7 +417,6 @@ export type Database = {
           ios?: boolean
           name: string
           owner_org: string
-          public?: boolean
           updated_at?: string
           version: number
         }
@@ -413,7 +434,6 @@ export type Database = {
           ios?: boolean
           name?: string
           owner_org?: string
-          public?: boolean
           updated_at?: string
           version?: number
         }
@@ -1405,6 +1425,19 @@ export type Database = {
               fail: number
               install: number
               uninstall: number
+            }[]
+          }
+        | {
+            Args: {
+              p_org_id: string
+              p_start_date: string
+              p_end_date: string
+            }
+            Returns: {
+              mau: number
+              bandwidth: number
+              storage: number
+              deleted_apps: number
             }[]
           }
       get_app_versions: {
