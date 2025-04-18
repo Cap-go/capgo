@@ -6,8 +6,17 @@
 
 /api-edge/* https://webcapgo.netlify.app/api-edge/:splat
 
-/dashboard/settings/plans /dashboard/settings/organization/plans
-/dashboard/settings/usage /dashboard/settings/organization/usage
+/dashboard/settings/plans /settings/organization/plans
+/dashboard/settings/usage /settings/organization/usage
+/app/home /app
+/dashboard/apikeys /apikeys
+/dashboard/settings/account /settings/account
+/dashboard/settings/change-password /settings/change-password
+/dashboard/settings/notifications /settings/notifications
+/dashboard/settings/organization/general /settings/organization/
+/dashboard/settings/organization/members /settings/organization/members
+/dashboard/settings/organization/plans /settings/organization/plans
+/dashboard/settings/organization/usage /settings/organization/usage
 
 /* /index.html 200
 

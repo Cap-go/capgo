@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
+import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
@@ -7,6 +8,129 @@ export function getStripe(c: Context) {
     apiVersion: '2025-02-24.acacia',
     httpClient: Stripe.createFetchHttpClient(),
   })
+}
+
+export async function getSubscriptionData(c: Context, customerId: string, subscriptionId: string) {
+  try {
+    console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Fetching subscription data', customerId, subscriptionId })
+
+    // Retrieve the specific subscription from Stripe
+    const subscription = await getStripe(c).subscriptions.retrieve(subscriptionId, {
+      expand: ['items.data.price'], // Correct expand path for retrieve
+    })
+
+    console.log({
+      requestId: c.get('requestId'),
+      context: 'getSubscriptionData',
+      // subscriptionsFound: subscriptions.data.length, // Removed - retrieve returns one or throws
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+    })
+
+    // // If no subscriptions found - Removed: retrieve throws error if not found
+    // if (!subscriptions.data.length) {
+    //   console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'No active subscriptions found for customer' })
+    //   return null
+    // }
+
+    // // Get the subscription - Removed: already have the subscription object
+    // const subscription = subscriptions.data[0]
+
+    // Extract product ID from the first subscription item
+    let productId = null
+    if (subscription.items.data.length > 0) {
+      const item = subscription.items.data[0]
+      // Ensure price and product are objects before accessing properties
+      if (typeof item.price === 'object' && item.price !== null && typeof item.price.product === 'string') {
+        productId = item.price.product
+      }
+      else {
+        console.warn({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
+      }
+    }
+
+    // Format dates from epoch to ISO string
+    const cycleStart = subscription.current_period_start
+      ? new Date(subscription.current_period_start * 1000).toISOString()
+      : null
+
+    const cycleEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : null
+
+    return {
+      productId,
+      status: subscription.status,
+      cycleStart,
+      cycleEnd,
+      subscriptionId: subscription.id,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+    }
+  }
+  catch (error) {
+    // Handle specific Stripe errors if needed, e.g., resource_missing
+    if (error instanceof Stripe.errors.StripeInvalidRequestError && error.code === 'resource_missing') {
+      console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Subscription not found', subscriptionId, error: error.code })
+    }
+    else {
+      console.error({ requestId: c.get('requestId'), context: 'getSubscriptionData', error })
+    }
+    return null
+  }
+}
+
+export async function syncSubscriptionData(c: Context, customerId: string, subscriptionId: string): Promise<void> {
+  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+    return
+  try {
+    // Get subscription data from Stripe
+    const subscriptionData = await getSubscriptionData(c, customerId, subscriptionId)
+
+    let dbStatus: 'succeeded' | 'canceled' | undefined
+
+    if (subscriptionData) {
+      if (subscriptionData.status === 'canceled') {
+        // Only apply 'active until period end' logic if Stripe status is 'canceled'
+        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date()) {
+          dbStatus = 'succeeded' // Still active until period end because cycleEnd is future
+        }
+        else {
+          dbStatus = 'canceled' // Truly canceled because cycleEnd is past or null
+        }
+      }
+      else if (subscriptionData.status === 'active') {
+        // Active subscriptions are always considered succeeded
+        dbStatus = 'succeeded'
+      }
+      else {
+        // All other statuses (past_due, unpaid, incomplete, incomplete_expired) are considered canceled immediately
+        dbStatus = 'canceled'
+      }
+    }
+    else {
+      // No active subscription found in Stripe
+      dbStatus = 'canceled'
+    }
+
+    // Update stripe_info table with latest data, even if no subscription exists
+    const { error: updateError } = await supabaseAdmin(c)
+      .from('stripe_info')
+      .update({
+        product_id: subscriptionData?.productId || undefined,
+        subscription_id: subscriptionData?.subscriptionId || undefined,
+        subscription_anchor_start: subscriptionData?.cycleStart || undefined,
+        subscription_anchor_end: subscriptionData?.cycleEnd || undefined,
+        status: dbStatus,
+      })
+      .eq('customer_id', customerId)
+
+    if (updateError) {
+      console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error: updateError })
+    }
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error })
+  }
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {

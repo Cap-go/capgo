@@ -158,7 +158,7 @@ async function runMethod(m: Module) {
   })
 }
 displayStore.NavTitle = `${t('module-heading')} ${t('tests')}`
-displayStore.defaultBack = '/app/home'
+displayStore.defaultBack = '/app'
 // console.log('modules', modules.value)
 </script>
 

@@ -10,11 +10,9 @@ BEGIN
       customer_id,
       price_id,
       status,
-      trial_at,
-      canceled_at
+      trial_at
     FROM stripe_info
     WHERE status = 'succeeded'
-      AND (canceled_at IS NULL OR canceled_at > NOW())
     ORDER BY customer_id, created_at DESC
   )
   SELECT
@@ -44,7 +42,6 @@ BEGIN
     FROM stripe_info si
     INNER JOIN plans p ON si.product_id = p.stripe_id 
     WHERE si.status = 'succeeded'
-      AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
     ORDER BY si.customer_id, si.created_at DESC
   ),
   TrialUsers AS (
@@ -54,7 +51,6 @@ BEGIN
     FROM stripe_info si
     WHERE si.trial_at > NOW() 
     AND si.status is NULL
-    AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
     AND NOT EXISTS (
       SELECT 1 FROM ActiveSubscriptions a 
       WHERE a.customer_id = si.customer_id
@@ -76,6 +72,6 @@ CREATE OR REPLACE FUNCTION "public"."count_all_need_upgrade"() RETURNS integer
     LANGUAGE "plpgsql"
     AS $$
 Begin
-  RETURN (SELECT COUNT(*) FROM stripe_info WHERE is_good_plan = false AND status = 'succeeded' AND (canceled_at IS NULL OR canceled_at > NOW()));
+  RETURN (SELECT COUNT(*) FROM stripe_info WHERE is_good_plan = false AND status = 'succeeded');
 End;  
 $$;

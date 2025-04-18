@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { ManifestEntry } from './downloadUrl.ts'
+import type { getDrizzleClientD1 } from './pg.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos } from './types.ts'
@@ -16,7 +17,7 @@ import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1, getPgClient, isAllowedActionOrgActionD1, isAllowedActionOrgActionPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
+import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1Session, getPgClient, isAllowedActionOrgActionD1, isAllowedActionOrgActionPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver } from './utils.ts'
 
@@ -201,8 +202,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     //   }, 400)
     // }
 
-    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && !manifestEntries) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version })
+    if (!version.external_url && !version.r2_path && version.name !== 'builtin' && (!manifestEntries || manifestEntries.length === 0)) {
+      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
         message: 'Cannot get bundle',
@@ -441,7 +442,7 @@ export async function update(c: Context, body: AppInfos) {
 
   let res
   try {
-    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1(c) : getDrizzleClient(pgClient as any), isV2)
+    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c, body.device_id) : getDrizzleClient(pgClient as any), isV2)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), context: 'update', error: e })

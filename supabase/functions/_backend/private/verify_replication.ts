@@ -130,6 +130,7 @@ app.get('/', async (c) => {
       'app_versions',
       'channels',
       'channel_devices',
+      'manifest',
       'orgs',
     ]
 

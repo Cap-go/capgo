@@ -8,7 +8,6 @@ import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
-import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()

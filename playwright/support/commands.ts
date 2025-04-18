@@ -10,7 +10,7 @@ export const test = base.extend({
       await page.fill('[data-test="email"]', email)
       await page.fill('[data-test="password"]', password)
       await page.click('[data-test="submit"]')
-      await page.waitForURL('/app/home')
+      await page.waitForURL('/app')
     }
 
     await use(page)

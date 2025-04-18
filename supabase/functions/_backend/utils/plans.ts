@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { recordUsage, setThreshold } from './stripe.ts'
+import { recordUsage, setThreshold, syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -101,11 +101,16 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
   try {
     const { data: org, error: userError } = await supabaseAdmin(c)
       .from('orgs')
-      .select()
+      .select('customer_id, stripe_info(subscription_id)')
       .eq('id', orgId)
       .single()
     if (userError)
       throw userError
+
+    // Sync subscription data with Stripe
+    if (org.customer_id && org?.stripe_info?.subscription_id)
+      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id)
+
     if (await isTrialOrg(c, orgId)) {
       const { error } = await supabaseAdmin(c)
         .from('stripe_info')
@@ -116,6 +121,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         console.error({ requestId: c.get('requestId'), context: 'update stripe info', error })
       return Promise.resolve()
     }
+
     const is_good_plan = await isGoodPlanOrg(c, orgId)
     const is_onboarded = await isOnboardedOrg(c, orgId)
     const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
@@ -129,19 +135,6 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         const best_plan = await findBestPlan(c, { mau: get_total_stats.mau, storage: get_total_stats.storage, bandwidth: get_total_stats.bandwidth })
         const bestPlanKey = best_plan.toLowerCase().replace(' ', '_')
         await setMetered(c, org.customer_id!, orgId)
-        // if (best_plan === 'Free' && current_plan === 'Free') {
-        // TODO: find a better trigger for this since there is no more free plan, maybe percent of useage ?
-        //   await trackEvent(c, org.management_email, {}, 'user:need_more_time')
-        //   console.log(c.get('requestId'), 'best_plan is free', orgId)
-        //   await logsnag(c).track({
-        //     channel: 'usage',
-        //     event: 'User need more time',
-        //     icon: '⏰',
-        //     user_id: orgId,
-        //     notify: false,
-        //   }).catch()
-        // }
-        // else
         if (planToInt(best_plan) > planToInt(current_plan)) {
           const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c).from('plans').select('*').eq('name', current_plan).single()
           if (currentPlanError) {

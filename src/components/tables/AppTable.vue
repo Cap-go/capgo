@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import IconSettings from '~icons/heroicons/cog-8-tooth?raw'
-import Table from '~/components/Table.vue'
 import { appIdToUrl } from '~/services/conversion'
+import { formatDate } from '~/services/date'
+import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -14,7 +16,12 @@ const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
   deleteButton: boolean
 }>()
+const emit = defineEmits([
+  'addApp',
+])
 const { t } = useI18n()
+const isMobile = Capacitor.isNativePlatform()
+const supabase = useSupabase()
 const router = useRouter()
 const search = ref('')
 const currentPage = ref(1)
@@ -47,6 +54,7 @@ const columns = ref<TableColumn[]>([
     head: true,
     allowHtml: true,
     sanitizeHtml: true,
+    onClick: item => openPackage(item),
     displayFunction: (item) => {
       return `
         <div class="flex flex-wrap items-center text-slate-800 dark:text-white">
@@ -66,12 +74,14 @@ const columns = ref<TableColumn[]>([
     key: 'last_version',
     mobile: true,
     sortable: true,
+    onClick: item => openOneVersion(item),
   },
   {
     label: t('last-upload'),
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
+    displayFunction: item => formatDate(item.updated_at || ''),
   },
   {
     label: t('mau'),
@@ -108,6 +118,19 @@ function openPackage(app: Database['public']['Tables']['apps']['Row']) {
   router.push(`/app/p/${appIdToUrl(app.app_id)}`)
 }
 
+async function openOneVersion(app: Database['public']['Tables']['apps']['Row']) {
+  if (!app.last_version)
+    return
+  const { data: versionData } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', app.app_id)
+    .eq('name', app.last_version)
+    .single()
+
+  router.push(`/app/p/${appIdToUrl(app.app_id)}/bundle/${versionData?.id}`)
+}
+
 // Filter apps based on search term
 const filteredApps = computed(() => {
   if (!search.value)
@@ -134,13 +157,13 @@ const filteredApps = computed(() => {
         v-model:columns="columns"
         v-model:current-page="currentPage"
         v-model:search="search"
+        :show-add="!isMobile"
         :total="filteredApps.length"
         :element-list="filteredApps"
         :search-placeholder="t('search-by-name-or-bundle-id')"
         :is-loading="false"
         filter-text="Filters"
-        class="cursor-pointer"
-        @row-click="openPackage"
+        @add="emit('addApp')"
       />
     </div>
   </div>

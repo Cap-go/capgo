@@ -2,7 +2,6 @@
 import { useI18n } from 'petite-vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
-import Navbar from '~/components/Navbar.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 

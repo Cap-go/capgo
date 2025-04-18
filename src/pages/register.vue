@@ -66,7 +66,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
     setErrors('register-account', [error?.message || 'user not found'], {})
     return
   }
-  router.push(`/app/home`)
+  router.push(`/app`)
 }
 </script>
 

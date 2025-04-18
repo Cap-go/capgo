@@ -114,7 +114,7 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
   const { error } = await supabase
     .from('apikeys')
     .delete()
-    .eq('key', id)
+    .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', key.user_id)
 
   if (error) {

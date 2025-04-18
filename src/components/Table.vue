@@ -4,7 +4,7 @@ import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import IconTrash from '~icons/heroicons/trash'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconPrev from '~icons/ic/round-keyboard-arrow-left'
@@ -12,6 +12,7 @@ import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
 import IconFastForward from '~icons/ic/round-keyboard-double-arrow-right'
 import IconSearch from '~icons/ic/round-search?raw'
+import plusOutline from '~icons/ion/add-outline'
 import IconSortDown from '~icons/lucide/chevron-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
@@ -19,11 +20,11 @@ import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
 
 interface Props {
-  rowClick?: boolean
   isLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
   searchPlaceholder?: string
+  showAdd?: boolean
   search?: string
   total: number
   currentPage: number
@@ -34,6 +35,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits([
+  'add',
   'reload',
   'reset',
   'next',
@@ -44,10 +46,7 @@ const emit = defineEmits([
   'update:filters',
   'update:columns',
   'update:currentPage',
-  'filterClick',
   'plusClick',
-  'rowClick',
-  'sortClick',
   'selectRow',
   'massDelete',
 ])
@@ -95,17 +94,93 @@ function sortClick(key: number) {
   emit('update:columns', newColumns)
 }
 
-watch(props.columns, () => {
-  emit('reload')
-})
-if (props.filters) {
-  watch(props.filters, () => {
-    emit('reload')
+function updateUrlParams() {
+  const params = new URLSearchParams()
+  if (searchVal.value)
+    params.set('search', searchVal.value)
+  if (props.filters) {
+    Object.entries(props.filters).forEach(([key, value]) => {
+      if (value)
+        params.append('filter', key)
+    })
+  }
+  if (props.currentPage)
+    params.set('page', props.currentPage.toString())
+  props.columns.forEach((col) => {
+    if (col.sortable && col.sortable !== true)
+      params.set(`sort_${col.key}`, col.sortable)
   })
+  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
 }
+
+function loadFromUrlParams() {
+  const params = new URLSearchParams(window.location.search)
+  const searchParam = params.get('search')
+  if (searchParam) {
+    searchVal.value = searchParam
+    emit('update:search', searchVal.value)
+  }
+  const pageParam = params.get('page')
+  if (pageParam) {
+    const page = Number.parseInt(pageParam, 10)
+    if (!Number.isNaN(page) && page !== props.currentPage) {
+      emit('update:currentPage', page)
+    }
+  }
+  if (props.filters) {
+    const filterParams = params.getAll('filter')
+    const newFilters = { ...props.filters }
+    Object.keys(newFilters).forEach((key) => {
+      newFilters[key] = filterParams.includes(key)
+    })
+    emit('update:filters', newFilters)
+  }
+  const newColumns = [...props.columns]
+  props.columns.forEach((col) => {
+    const sortParam = params.get(`sort_${col.key}`)
+    if (sortParam && col.sortable && (sortParam === 'asc' || sortParam === 'desc')) {
+      newColumns[props.columns.indexOf(col)].sortable = sortParam
+    }
+  })
+  emit('update:columns', newColumns)
+  emit('reload')
+}
+
+// Cleanup on unmount
+onUnmounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  // Remove our specific parameters
+  params.delete('search')
+  params.delete('page')
+  params.delete('filter')
+  props.columns.forEach((col) => {
+    params.delete(`sort_${col.key}`)
+  })
+  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+})
+
+onMounted(() => {
+  loadFromUrlParams()
+})
+
+watch(props.columns, useDebounceFn(() => {
+  updateUrlParams()
+  emit('reload')
+}, 500), { deep: true })
+
+watch(() => props.filters, useDebounceFn(() => {
+  updateUrlParams()
+  emit('reload')
+}, 500), { deep: true, immediate: true })
 
 watch(searchVal, useDebounceFn(() => {
   emit('update:search', searchVal.value)
+  updateUrlParams()
+  emit('reload')
+}, 500))
+
+watch(() => props.currentPage, useDebounceFn(() => {
+  updateUrlParams()
   emit('reload')
 }, 500))
 
@@ -186,18 +261,22 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
 </script>
 
 <template>
-  <div class="pb-4 overflow-x-auto md:pb-0 min-h-[300px]">
+  <div class="pb-4 overflow-x-auto md:pb-0">
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex">
         <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
-          <IconReload v-if="!isLoading" class="m-1 mr-2" />
+          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
+        </button>
+        <button v-if="showAdd" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
+          <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+          <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
         </button>
         <div v-if="filterText && filterList.length" class="dropdown">
           <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
-              <!-- uppercase first letter in tailwind -->
               {{ filterActivated }}
             </div>
             <IconFilter class="m-1 mr-2" />
@@ -207,7 +286,14 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
           <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-                <input :id="`filter-radio-example-${i}`" v-model="(filters as any)[f]" type="checkbox" :name="`filter-radio-${i}`" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800" @click="emit('filterClick', { clicked: f, filters })">
+                <input
+                  :id="`filter-radio-example-${i}`"
+                  :checked="filters?.[f]"
+                  type="checkbox"
+                  :name="`filter-radio-${i}`"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 dark:ring-offset-gray-800 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800"
+                  @change="emit('update:filters', { ...filters, [f]: !filters?.[f] })"
+                >
                 <label :for="`filter-radio-example-${i}`" class="w-full ml-2 text-sm font-medium text-gray-900 rounded-sm dark:text-gray-300 first-letter:uppercase">{{ t(f) }}</label>
               </div>
             </li>
@@ -220,8 +306,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
       <button v-if="props.massSelect && selectedRows.find(val => val)" class=" self-end mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('massDelete')">
         <IconTrash class="text-red-500 h-[24px]" />
       </button>
-      <!-- </div> -->
-      <div class="flex h-10 md:w-auto">
+      <div class="flex md:w-auto overflow-hidden">
         <FormKit
           v-model="searchVal"
           :placeholder="searchPlaceholder"
@@ -229,7 +314,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
           enterkeyhint="send"
           :classes="{
             outer: 'mb-0! md:w-96',
-            inner: 'rounded-full!',
+            inner: 'rounded-full! py-1.5!',
           }"
         />
       </div>
@@ -239,7 +324,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
             <th v-if="props.massSelect" class="ml-2" />
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-3" :class="{ 'px-6': ((i !== 0 && props.massSelect) || !props.massSelect), 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3" :class="{ 'px-1 md:px-6': ((i !== 0 && props.massSelect) || !props.massSelect), 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -254,14 +339,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         <tbody v-if="!isLoading && elementList.length !== 0">
           <tr
             v-for="(elem, i) in elementList" :key="i"
-            :class="{ 'cursor-pointer': rowClick }"
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
-            @click="(e: MouseEvent) => {
-              if (e.target !== null && (e.target as HTMLElement).id === 'select-rows') {
-                return
-              }
-              emit('rowClick', elem)
-            }"
           >
             <template v-if="true">
               <th v-if="props.massSelect" class="pl-4 pr-2">
@@ -270,18 +348,18 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} ${((_y !== 0 && props.massSelect) || !props.massSelect) ? 'px-6' : ''}`" scope="row" class="py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''}${((_y !== 0 && props.massSelect) || !props.massSelect) ? ' px-1 md:px-6' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.icon" :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-6 py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td v-else-if="col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <button
-                    class="flex items-center p-3 mx-auto truncate rounded-lg hover:bg-gray-400 hover:text-white" v-html="col.icon"
+                    class="flex items-center p-3 mx-auto truncate rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 cursor-pointer" v-html="col.icon"
                   />
                 </td>
-                <td v-else :class="`${col.class} ${!col.mobile ? 'hidden md:table-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-6 py-4">
+                <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-1 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
@@ -291,9 +369,16 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
             </template>
           </tr>
         </tbody>
+        <tbody v-else-if="!isLoading && elementList.length === 0">
+          <tr>
+            <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-1 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
+              {{ t('no_elements_found') }}
+            </td>
+          </tr>
+        </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-6 py-4">
+          <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 md:px-6 py-2 md:py-4">
               <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
           </tr>
