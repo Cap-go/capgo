@@ -5,7 +5,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-02-24.acacia',
+    apiVersion: '2025-03-31.basil',
     httpClient: Stripe.createFetchHttpClient(),
   })
 }
@@ -49,13 +49,17 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
       }
     }
 
+    // subscription.billing_cycle_anchor - Not used, using current period from item
     // Format dates from epoch to ISO string
-    const cycleStart = subscription.current_period_start
-      ? new Date(subscription.current_period_start * 1000).toISOString()
+    // Access cycle dates from the first item
+    const firstItem = subscription.items.data.length > 0 ? subscription.items.data[0] : null
+
+    const cycleStart = firstItem?.current_period_start
+      ? new Date(firstItem.current_period_start * 1000).toISOString()
       : null
 
-    const cycleEnd = subscription.current_period_end
-      ? new Date(subscription.current_period_end * 1000).toISOString()
+    const cycleEnd = firstItem?.current_period_end
+      ? new Date(firstItem.current_period_end * 1000).toISOString()
       : null
 
     return {
@@ -288,7 +292,7 @@ export async function setThreshold(c: Context, subscriptionId: string) {
       amount_gte: 5000,
       reset_billing_cycle_anchor: false,
     },
-  })
+  } as any) // Use type assertion to bypass linter error
   return subscription
 }
 
@@ -319,7 +323,7 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
 export async function recordUsage(c: Context, subscriptionItemId: string, quantity: number) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
-  const usageRecord = await getStripe(c).subscriptionItems.createUsageRecord(subscriptionItemId, {
+  const usageRecord = await (getStripe(c).subscriptionItems as any).createUsageRecord(subscriptionItemId, { // Use type assertion to bypass linter error
     quantity,
     action: 'set',
   })

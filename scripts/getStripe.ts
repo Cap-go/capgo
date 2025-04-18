@@ -1,14 +1,13 @@
 import Stripe from 'stripe'
 
 const s = new Stripe('', {
-  apiVersion: '2025-02-24.acacia',
+  apiVersion: '2025-03-31.basil',
   httpClient: Stripe.createFetchHttpClient(),
 })
 
 // Retrieve a specific subscription by ID
 const subscription = await s.subscriptions.retrieve(
-  // '',
-  '',
+  'sub_1RE5vhGH46eYKnWwi0wv2n2q',
   {
     expand: ['items.data.price'], // Expand price details if needed
   }
@@ -34,13 +33,18 @@ if (subscription.items.data.length > 0) {
 }
 
 // Format dates from epoch to ISO string
-const cycleStart = subscription.current_period_start
-  ? new Date(subscription.current_period_start * 1000).toISOString()
-  : null
+// Access cycle dates from the first item
+const firstItem = subscription.items.data.length > 0 ? subscription.items.data[0] : null;
 
-const cycleEnd = subscription.current_period_end
-  ? new Date(subscription.current_period_end * 1000).toISOString()
-  : null
+const cycleStart = firstItem?.current_period_start
+  ? new Date(firstItem.current_period_start * 1000).toISOString()
+  : null;
+
+const cycleEnd = firstItem?.current_period_end
+  ? new Date(firstItem.current_period_end * 1000).toISOString()
+  : null;
+
+console.log('subscription', subscription)
 
 const subscriptionData = {
   productId,
