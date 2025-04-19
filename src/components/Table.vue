@@ -354,10 +354,26 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
-                  <button
-                    class="flex items-center p-3 mx-auto truncate rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 cursor-pointer" v-html="col.icon"
-                  />
+                <td v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4">
+                  <div class="flex items-center space-x-1">
+                    <template v-if="col.actions">
+                      <button
+                        v-for="(action, actionIndex) in col.actions"
+                        :key="actionIndex"
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        @click.stop="action.onClick(elem)"
+                      >
+                        <component :is="action.icon" />
+                      </button>
+                    </template>
+                    <template v-else-if="col.icon">
+                      <button
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        @click.stop="col.onClick ? col.onClick(elem) : () => {}"
+                        v-html="col.icon"
+                      />
+                    </template>
+                  </div>
                 </td>
                 <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-1 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />

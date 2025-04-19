@@ -13,6 +13,15 @@ export interface Stat {
 export interface TableSort {
   [key: string]: 'asc' | 'desc' | null
 }
+
+/**
+ * Defines a single action button configuration.
+ */
+export interface TableAction {
+  icon: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
+  onClick: (item: any) => void
+}
+
 export interface TableColumn {
   label: string
   key: string
@@ -20,11 +29,12 @@ export interface TableColumn {
   sortable?: boolean | 'asc' | 'desc'
   head?: boolean
   icon?: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
+  onClick?: (item: any) => void
+  actions?: TableAction[] // New property for multiple actions
   class?: string
   allowHtml?: boolean
   sanitizeHtml?: boolean
   displayFunction?: (item: any) => string | any
-  onClick?: (item: any) => void
 }
 
 export interface Tab {
