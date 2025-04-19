@@ -17,6 +17,7 @@
 /dashboard/settings/organization/members /settings/organization/members
 /dashboard/settings/organization/plans /settings/organization/plans
 /dashboard/settings/organization/usage /settings/organization/usage
+/app/p/:appid/settings /app/p/:appid?tab=info
 
 /* /index.html 200
 

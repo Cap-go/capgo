@@ -52,6 +52,7 @@ const router = createRouter({
     { path: '/app/p/:package/devices', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=devices` },
     { path: '/app/p/:package/logs', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=logs` },
     { path: '/app/package/:package', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=logs` },
+    { path: '/app/package/:package/settings', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=info` },
     ...setupLayouts(newRoutes),
   ],
   history: createWebHistory(import.meta.env.BASE_URL),

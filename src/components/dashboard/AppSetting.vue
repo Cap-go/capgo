@@ -11,15 +11,13 @@ import Pencil from '~icons/heroicons/pencil-square'
 import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&height=36'
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
-import { urlToAppId } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
 
+const props = defineProps<{ appId: string }>()
 const isLoading = ref(false)
 const isFirstLoading = ref(true)
-const route = useRoute('/app/p/[package].settings')
 const router = useRouter()
 const supabase = useSupabase()
-const appId = ref('')
 const appRef = ref<Database['public']['Tables']['apps']['Row'] & { owner_org: Database['public']['Tables']['orgs']['Row'] } | null>(null)
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -28,32 +26,26 @@ const forceBump = ref(0)
 const organizationStore = useOrganizationStore()
 
 onMounted(async () => {
-  if (route.path.includes('/p/') && route.path.endsWith('/settings')) {
-    displayStore.NavTitle = t('settings')
-    displayStore.defaultBack = `/app/p/${route.params.package}`
-    appId.value = route.params.package as string
-    appId.value = urlToAppId(appId.value)
-    isLoading.value = true
+  isLoading.value = true
 
-    const [{ error, data }] = await Promise.all([
-      supabase
-        .from('apps')
-        .select('*, owner_org ( name, id )')
-        .eq('app_id', appId.value)
-        .single(),
-    ])
+  const [{ error, data }] = await Promise.all([
+    supabase
+      .from('apps')
+      .select('*, owner_org ( name, id )')
+      .eq('app_id', props.appId)
+      .single(),
+  ])
 
-    if (error) {
-      toast.error(t('cannot-load-app-settings'))
-      return
-    }
-
-    await organizationStore.awaitInitialLoad()
-    role.value = organizationStore.getCurrentRoleForApp(appId.value)
-    appRef.value = data as any
-    isLoading.value = false
-    isFirstLoading.value = false
+  if (error) {
+    toast.error(t('cannot-load-app-settings'))
+    return
   }
+
+  await organizationStore.awaitInitialLoad()
+  role.value = organizationStore.getCurrentRoleForApp(props.appId)
+  appRef.value = data as any
+  isLoading.value = false
+  isFirstLoading.value = false
 })
 
 const acronym = computed(() => {
@@ -91,17 +83,17 @@ async function deleteApp() {
     return
 
   try {
-    const org = organizationStore.getOrgByAppId(appId.value)
+    const org = organizationStore.getOrgByAppId(props.appId)
     const { error: errorIcon } = await supabase.storage
       .from(`images`)
-      .remove([`org/${org?.gid}/${appId.value}/icon`])
+      .remove([`org/${org?.gid}/${props.appId}/icon`])
     if (errorIcon)
       toast.error(t('cannot-delete-app-icon'))
 
     const { error: dbAppError } = await supabase
       .from('apps')
       .delete()
-      .eq('app_id', appId.value)
+      .eq('app_id', props.appId)
     if (dbAppError)
       toast.error(t('cannot-delete-app'))
 
@@ -131,7 +123,7 @@ async function submit(form: { app_name: string, retention: number }) {
       return
     }
 
-    const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', appId.value)
+    const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
     if (error) {
       toast.error(t('cannot-change-name'))
       console.error(error)
@@ -145,7 +137,7 @@ async function submit(form: { app_name: string, retention: number }) {
     toast.success(t('changed-app-name'))
   }
   if (form.retention !== appRef.value?.retention) {
-    const { error } = await supabase.from('apps').update({ retention: form.retention }).eq('app_id', appId.value)
+    const { error } = await supabase.from('apps').update({ retention: form.retention }).eq('app_id', props.appId)
     if (error) {
       toast.error(t('cannot-change-retention'))
       console.error(error)
@@ -267,7 +259,7 @@ async function editPhoto() {
           }
 
           const { error } = await supabase.storage
-            .from(`images/org/${appRef.value?.owner_org.id}/${appId.value}`)
+            .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
             .upload('icon', blob, {
               contentType: mimeType,
             })
@@ -280,12 +272,12 @@ async function editPhoto() {
 
           const { data: signedURLData } = await supabase
             .storage
-            .from(`images/org/${appRef.value?.owner_org.id}/${appId.value}`)
+            .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
             .getPublicUrl('icon')
 
           const { error: appUpdateErr } = await supabase.from('apps')
             .update({ icon_url: signedURLData.publicUrl })
-            .eq('app_id', appId.value)
+            .eq('app_id', props.appId)
 
           if (appUpdateErr) {
             toast.error(t('upload-img-error'))
@@ -314,7 +306,7 @@ async function editPhoto() {
           const { error } = await supabase
             .storage
             .from(`images`)
-            .remove([`org/${appRef.value?.owner_org.id}/${appId.value}/icon`])
+            .remove([`org/${appRef.value?.owner_org.id}/${props.appId}/icon`])
 
           if (error) {
             console.error('Cannot remove app logo', error)
@@ -324,7 +316,7 @@ async function editPhoto() {
 
           const { error: setAppError } = await supabase.from('apps')
             .update({ icon_url: '' })
-            .eq('app_id', appId.value)
+            .eq('app_id', props.appId)
 
           if (setAppError) {
             console.error('Cannot remove app logo (set app)', error)
@@ -401,7 +393,7 @@ async function transferAppOwnership() {
         handler: async () => {
           displayStore.dialogOption = {
             header: t('confirm-transfer'),
-            message: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', appId.value)}`,
+            message: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', props.appId)}`,
             headerStyle: 'w-full text-center',
             textStyle: 'w-full text-center mb-4',
             size: 'max-w-xl',
@@ -417,13 +409,13 @@ async function transferAppOwnership() {
                 text: t('transfer'),
                 role: 'danger',
                 handler: async () => {
-                  if (displayStore.dialogInputText !== appId.value) {
+                  if (displayStore.dialogInputText !== props.appId) {
                     toast.error(t('incorrect-app-id'))
                     return
                   }
                   // Transfer logic will go here
                   const { error } = await supabase.rpc('transfer_app', {
-                    p_app_id: appId.value,
+                    p_app_id: props.appId,
                     p_new_org_id: org.gid,
                   })
                   if (error) {
@@ -585,8 +577,3 @@ async function transferAppOwnership() {
     </FormKit>
   </div>
 </template>
-
-<route lang="yaml">
-  meta:
-    layout: app_settings
-      </route>
