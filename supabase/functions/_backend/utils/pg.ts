@@ -60,6 +60,9 @@ export function getDrizzleClientD1(c: Context) {
 }
 
 export function getDrizzleClientD1Session(c: Context, token: string) {
+  if (!existInEnv(c, 'DB_REPLICATE')) {
+    throw new Error('DB_REPLICATE is not set')
+  }
   const session = c.env.DB_REPLICATE.withSession(token)
   return drizzleD1(session)
 }
@@ -352,7 +355,7 @@ export function requestInfosPostgresV2(
       manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
         'file_name', ${schemaV2.manifest.file_name},
         'file_hash', ${schemaV2.manifest.file_hash},
-        's3_path', ${schemaV2.manifest.s3_path},
+        's3_path', ${schemaV2.manifest.s3_path}
       ))`,
     })
     .from(channelAlias)

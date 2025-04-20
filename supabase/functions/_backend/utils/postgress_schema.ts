@@ -105,6 +105,3 @@ export const orgs = pgTable('orgs', {
   id: uuid('id').notNull(),
   created_by: uuid('created_by').notNull(),
 })
-
-export type AppVersionsType = typeof app_versions.$inferInsert
-export type ManifestType = typeof manifest.$inferInsert
