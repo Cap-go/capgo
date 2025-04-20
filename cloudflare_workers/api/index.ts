@@ -45,7 +45,6 @@ import { app as on_user_update } from '../../supabase/functions/_backend/trigger
 import { app as on_version_create } from '../../supabase/functions/_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
-import { app as replicate_data } from '../../supabase/functions/_backend/triggers/replicate_data.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 
 const app = new Hono<MiddlewareKeyVariables>()
@@ -100,7 +99,6 @@ appTriggers.route('/on_version_create', on_version_create)
 appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/on_manifest_create', on_manifest_create)
-appTriggers.route('/replicate_data', replicate_data)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)

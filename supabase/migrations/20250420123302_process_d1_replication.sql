@@ -1,0 +1,56 @@
+-- create a new function who calls the https://sync.capgo.app/sync function every 1 sec with header x-webhook-signature: e8672f2f-491e-44fb-be83-b3d0210fac0b
+-- using net.http_post
+
+-- Remove the cron job for process_d1_replication_batch
+SELECT cron.unschedule('process_d1_replication_batch');
+
+CREATE OR REPLACE FUNCTION "public"."get_d1_webhook_signature"() RETURNS "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL SAFE
+    AS $$
+    SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='d1_webhook_signature';
+$$;
+
+ALTER FUNCTION "public"."get_d1_webhook_signature"() OWNER TO "postgres";
+
+DROP FUNCTION IF EXISTS "public"."process_d1_replication_batch"();
+
+CREATE OR REPLACE FUNCTION "public"."process_d1_replication_batch"()
+RETURNS "void"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF get_d1_webhook_signature() IS NOT NULL THEN
+    PERFORM net.http_post(
+      url := 'https://sync.capgo.app/sync',
+      headers := jsonb_build_object('x-webhook-signature', get_d1_webhook_signature())
+    );
+  END IF;
+END;
+$$;
+
+SELECT cron.schedule(
+    'process_d1_replication_batch',
+    '5 seconds',
+    $$SELECT process_d1_replication_batch();$$
+);
+
+
+CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function_d1"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+    -- Queue the operation for batch processing
+    IF get_d1_webhook_signature() IS NOT NULL THEN
+      PERFORM pgmq.send('replicate_data', 
+          jsonb_build_object(
+              'record', to_jsonb(NEW),
+              'old_record', to_jsonb(OLD),
+              'type', TG_OP,
+              'table', TG_TABLE_NAME
+          )
+      );
+    END IF;
+    RETURN NEW;
+END;
+$$;
