@@ -21,6 +21,8 @@ SECURITY DEFINER
 AS $$
 DECLARE
   queue_size bigint;
+  calls_needed int;
+  i int;
 BEGIN
   -- Check if the webhook signature is set
   IF get_d1_webhook_signature() IS NOT NULL THEN
@@ -30,10 +32,16 @@ BEGIN
 
     -- Call the endpoint only if the queue is not empty
     IF queue_size > 0 THEN
-      PERFORM net.http_post(
-        url := 'https://sync.capgo.app/sync',
-        headers := jsonb_build_object('x-webhook-signature', get_d1_webhook_signature())
-      );
+      -- Calculate how many times to call the sync endpoint (1 call per 1000 items, max 10 calls)
+      calls_needed := least(ceil(queue_size / 1000.0)::int, 10);
+
+      -- Call the endpoint multiple times if needed
+      FOR i IN 1..calls_needed LOOP
+        PERFORM net.http_post(
+          url := 'https://sync.capgo.app/sync',
+          headers := jsonb_build_object('x-webhook-signature', get_d1_webhook_signature())
+        );
+      END LOOP;
     END IF;
   END IF;
 END;
