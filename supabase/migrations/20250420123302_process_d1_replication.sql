@@ -19,12 +19,22 @@ RETURNS "void"
 LANGUAGE "plpgsql"
 SECURITY DEFINER
 AS $$
+DECLARE
+  queue_size bigint;
 BEGIN
+  -- Check if the webhook signature is set
   IF get_d1_webhook_signature() IS NOT NULL THEN
-    PERFORM net.http_post(
-      url := 'https://sync.capgo.app/sync',
-      headers := jsonb_build_object('x-webhook-signature', get_d1_webhook_signature())
-    );
+    -- Get the queue size by counting rows in the table
+    SELECT count(*) INTO queue_size
+    FROM pgmq.q_replicate_data;
+
+    -- Call the endpoint only if the queue is not empty
+    IF queue_size > 0 THEN
+      PERFORM net.http_post(
+        url := 'https://sync.capgo.app/sync',
+        headers := jsonb_build_object('x-webhook-signature', get_d1_webhook_signature())
+      );
+    END IF;
   END IF;
 END;
 $$;
