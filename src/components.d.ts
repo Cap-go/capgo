@@ -8,19 +8,14 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    '[package].settings': typeof import('./components/dashboard/[package].settings.vue')['default']
-    AddDeviceOverwriteButton: typeof import('./components/AddDeviceOverwriteButton.vue')['default']
-    ApiKeys: typeof import('./components/ApiKeys.vue')['default']
     AppCard: typeof import('./components/dashboard/AppCard.vue')['default']
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
     AppTable: typeof import('./components/tables/AppTable.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
-    BaseTable: typeof import('./components/BaseTable.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BundleLinkDialog: typeof import('./components/BundleLinkDialog.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
-    Dashboard: typeof import('./components/dashboard/Dashboard.vue')['default']
     DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
     Dialog: typeof import('./components/Dialog.vue')['default']
     DropdownOrganization: typeof import('./components/dashboard/DropdownOrganization.vue')['default']
