@@ -306,6 +306,20 @@ async function deleteMember(member: ExtendedOrganizationMember) {
 
   isLoading.value = true
   try {
+    // if member.aid is the one who created the org, we need to update it to the current user
+    if (member.uid === currentOrganization.value?.created_by) {
+      // update the org to have the current user as created_by
+      const { error } = await supabase
+        .from('orgs')
+        .update({ created_by: main.user?.id })
+        .eq('id', currentOrganization.value?.gid)
+      if (error) {
+        console.error('Error updating owner: ', error)
+        toast.error(`${t('cannot-update-owner')}: ${error.message}`)
+        return
+      }
+    }
+
     const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
     if (error) {
       console.error('Error deleting member: ', error)
@@ -400,23 +414,17 @@ function isSuperAdmin() {
 function canDelete(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
   const currentUserId = main.user?.id
-  const ownerId = currentOrganization?.value?.created_by
-  if (!role || !currentUserId || !ownerId)
+  if (!role || !currentUserId)
     return false
 
   const isSelf = member.uid === currentUserId
-  const isOwner = member.uid === ownerId
-
-  if (isOwner)
-    return false
 
   if (isSelf)
     return true
 
-  const currentUserIsOwner = currentUserId === ownerId
   const currentUserIsAdmin = role === 'admin' || role === 'super_admin'
 
-  return currentUserIsOwner || currentUserIsAdmin
+  return currentUserIsAdmin
 }
 </script>
 
