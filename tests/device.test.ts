@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME_DEVICE = `${APP_NAME}.device`
+const id = randomUUID()
+const APPNAME_DEVICE = `${APP_NAME}.d.${id}`
 
 beforeAll(async () => {
   await Promise.all([resetAndSeedAppData(APPNAME_DEVICE), resetAndSeedAppDataStats(APPNAME_DEVICE)])

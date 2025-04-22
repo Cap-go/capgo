@@ -11,6 +11,8 @@ CREATE OR REPLACE FUNCTION "public"."get_d1_webhook_signature"() RETURNS "text"
 $$;
 
 ALTER FUNCTION "public"."get_d1_webhook_signature"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_d1_webhook_signature"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_d1_webhook_signature"() TO "service_role";
 
 DROP FUNCTION IF EXISTS "public"."process_d1_replication_batch"();
 
@@ -46,6 +48,9 @@ BEGIN
   END IF;
 END;
 $$;
+ALTER FUNCTION "public"."process_d1_replication_batch"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."process_d1_replication_batch"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."process_d1_replication_batch"() TO "service_role";
 
 SELECT cron.schedule(
     'process_d1_replication_batch',
@@ -72,3 +77,6 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+ALTER FUNCTION "public"."trigger_http_queue_post_to_function_d1"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1"() TO "service_role";

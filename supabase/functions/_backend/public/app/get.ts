@@ -98,7 +98,7 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
       return c.json({ status: 'Cannot get apps', error: JSON.stringify(dbError) }, 400)
     }
 
-    return c.json({ data })
+    return c.json(data)
   }
   catch (e) {
     console.error('Cannot get apps', e)
