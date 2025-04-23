@@ -22,6 +22,8 @@ app.post('/', middlewareKey(['all']), async (c) => {
   const orgId = body.org_id
   const appId = body.app_id
   const name = body.name ?? ''
+  const limitedToApps = body.limited_to_apps ?? []
+  const limitedToOrgs = body.limited_to_orgs ?? []
 
   const mode = body.mode ?? 'all'
   if (!name) {
@@ -44,6 +46,8 @@ app.post('/', middlewareKey(['all']), async (c) => {
     key: crypto.randomUUID(),
     mode,
     name,
+    limited_to_apps: limitedToApps,
+    limited_to_orgs: limitedToOrgs,
   }
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()

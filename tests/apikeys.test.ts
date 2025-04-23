@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
-// Note: We need a way to get a valid API key ID for PATCH and DELETE tests.
+// Note: We need a way to get a valid API key ID for PUT and DELETE tests.
 // Assuming resetAndSeedAppData creates a default app and potentially an API key we can query?
 // Or we might need to create one in the POST test and store its ID.
 let createdApiKeyId: number | null = null // To store the ID of the key created in POST test
@@ -12,13 +12,10 @@ const APPNAME = `com.app.key.${id}`
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
-  // TODO: Potentially seed an API key specifically for testing PATCH/DELETE,
-  // or rely on the POST test to create one.
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  // No separate stats table assumed for API keys
 })
 
 describe('[GET] /apikey operations', () => {
@@ -97,23 +94,23 @@ describe('[POST] /apikey operations', () => {
   })
 })
 
-describe('[PATCH] /apikey/:id operations', () => {
+describe('[PUT] /apikey/:id operations', () => {
   it('update api key name', async () => {
     if (!createdApiKeyId) {
-      console.warn('Skipping PATCH API key test as no key ID is available.')
+      console.warn('Skipping PUT API key test as no key ID is available.')
       return
     }
     const newName = 'updated-test-key-name'
     const response = await fetch(`${BASE_URL}/apikey/${createdApiKeyId}`, { // Path parameter
-      method: 'PATCH',
+      method: 'PUT',
       headers,
       body: JSON.stringify({
         name: newName,
-        // Include other fields to update based on patch.ts
+        // Include other fields to update based on PUT.ts
       }),
     })
 
-    const data = await response.json() // Check response structure based on patch.ts
+    const data = await response.json() // Check response structure based on PUT.ts
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('name', newName) // Assuming success indicator
     // Optional: Verify the update with a GET request
@@ -124,7 +121,7 @@ describe('[PATCH] /apikey/:id operations', () => {
 
   it('update api key with invalid id', async () => {
     const response = await fetch(`${BASE_URL}/apikey/424242`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers,
       body: JSON.stringify({ name: 'wont-work' }),
     })
@@ -132,7 +129,7 @@ describe('[PATCH] /apikey/:id operations', () => {
     expect(response.status).toBe(404) // Assuming 404 for not found
   })
 
-  // Add more PATCH tests for different scenarios (e.g., updating permissions)
+  // Add more PUT tests for different scenarios (e.g., updating permissions)
 })
 
 describe('[DELETE] /apikey/:id operations', () => {

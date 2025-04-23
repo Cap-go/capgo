@@ -5,7 +5,7 @@ import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
 
-app.patch('/:id', middlewareKey(['all']), async (c) => {
+app.put('/:id', middlewareKey(['all']), async (c) => {
   const key = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   if (!key) {
     console.error('Cannot update apikey', 'Unauthorized')

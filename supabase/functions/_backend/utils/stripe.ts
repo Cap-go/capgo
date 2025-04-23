@@ -10,7 +10,9 @@ export function getStripe(c: Context) {
   })
 }
 
-export async function getSubscriptionData(c: Context, customerId: string, subscriptionId: string) {
+export async function getSubscriptionData(c: Context, customerId: string, subscriptionId: string | null) {
+  if (!subscriptionId)
+    return null
   try {
     console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Fetching subscription data', customerId, subscriptionId })
 
@@ -83,7 +85,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
   }
 }
 
-export async function syncSubscriptionData(c: Context, customerId: string, subscriptionId: string): Promise<void> {
+export async function syncSubscriptionData(c: Context, customerId: string, subscriptionId: string | null): Promise<void> {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return
   try {
@@ -91,7 +93,7 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     let subscriptionData = await getSubscriptionData(c, customerId, subscriptionId)
 
     // If the stored subscription is not active or doesn't exist, check for any other active subscriptions
-    if (!subscriptionData || (subscriptionData.status !== 'active' && subscriptionData.status !== 'trialing')) {
+    if (!subscriptionData || (subscriptionData.status !== 'active')) {
       console.log({ requestId: c.get('requestId'), context: 'syncSubscriptionData', message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
       const activeSubscriptions = await getStripe(c).subscriptions.list({
         customer: customerId,

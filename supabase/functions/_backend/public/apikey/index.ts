@@ -1,8 +1,8 @@
 import { honoFactory } from '../../utils/hono.ts'
 import deleteHandler from './delete.ts'
 import getHandler from './get.ts'
-import patchHandler from './patch.ts'
 import postHandler from './post.ts'
+import patchHandler from './put.ts'
 
 const app = honoFactory.createApp()
 

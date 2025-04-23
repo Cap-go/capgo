@@ -13,7 +13,6 @@ app.use('/', useCors)
 
 // No middleware applied to this route, as we allow both authorization and capgkey for CLI and webapp access
 app.post('/', async (c) => {
-  console.log('yoyoyo')
   try {
     const body = await c.req.json<TrackOptions>()
     console.log({ requestId: c.get('requestId'), context: 'post private/stats body', body })

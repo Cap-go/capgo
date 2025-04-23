@@ -18,7 +18,10 @@ app.get('/', middlewareKey(['all', 'read']), async (c) => {
     const limit = limitQuery ? Number.parseInt(limitQuery) : undefined
 
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return getAll(c as any, apikey, page, limit, orgId)
+    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    const keyToUse = subkey || apikey
+
+    return getAll(c as any, keyToUse, page, limit, orgId)
   }
   catch (e) {
     return c.json({ status: 'Cannot get apps', error: JSON.stringify(e) }, 500)
@@ -29,7 +32,9 @@ app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
   try {
     const id = c.req.param('id')
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return get(c as any, id, apikey)
+    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    const keyToUse = subkey || apikey
+    return get(c as any, id, keyToUse)
   }
   catch (e) {
     return c.json({ status: 'Cannot get app', error: JSON.stringify(e) }, 500)
@@ -52,7 +57,9 @@ app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
     const id = c.req.param('id')
     const body = await getBody<{ name?: string, icon?: string, retention?: number }>(c as any)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return put(c as any, id, body, apikey)
+    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    const keyToUse = subkey || apikey
+    return put(c as any, id, body, keyToUse)
   }
   catch (e) {
     return c.json({ status: 'Cannot update app', error: JSON.stringify(e) }, 500)
@@ -63,7 +70,9 @@ app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
   try {
     const id = c.req.param('id')
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteApp(c as any, id, apikey)
+    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    const keyToUse = subkey || apikey
+    return deleteApp(c as any, id, keyToUse)
   }
   catch (e) {
     return c.json({ status: 'Cannot delete app', error: JSON.stringify(e) }, 500)

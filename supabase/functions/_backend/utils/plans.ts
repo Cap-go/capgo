@@ -108,8 +108,8 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
       throw userError
 
     // Sync subscription data with Stripe
-    if (org.customer_id && org?.stripe_info?.subscription_id)
-      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id)
+    if (org.customer_id)
+      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id || null)
 
     if (await isTrialOrg(c, orgId)) {
       const { error } = await supabaseAdmin(c)
