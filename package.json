@@ -193,7 +193,7 @@
     "@vue/server-renderer": "3.5.13",
     "adm-zip": "^0.5.16",
     "cross-env": "^7.0.3",
-    "eslint": "9.24.0",
+    "eslint": "9.25.1",
     "husky": "^9.1.7",
     "sass": "1.86.3",
     "tailwindcss": "^4.1.4",
