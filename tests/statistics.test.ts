@@ -31,7 +31,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getStats.status).toBe(200)
     const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('status', 'ok')
+    expect(Array.isArray(statsData)).toBe(true)
   })
 
   it('should get organization statistics without subkey', async () => {
@@ -43,7 +43,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getOrgStats.status).toBe(200)
     const orgStatsData = await getOrgStats.json()
-    expect(orgStatsData).toHaveProperty('status', 'ok')
+    expect(Array.isArray(orgStatsData)).toBe(true)
   })
 
   it('should get user statistics without subkey', async () => {
@@ -55,7 +55,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getUserStats.status).toBe(200)
     const userStatsData = await getUserStats.json()
-    expect(userStatsData).toHaveProperty('status', 'ok')
+    expect(Array.isArray(userStatsData)).toBe(true)
   })
 
   it('should get bundle usage statistics without subkey', async () => {
@@ -67,7 +67,8 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getBundleUsage.status).toBe(200)
     const bundleUsageData = await getBundleUsage.json()
-    expect(bundleUsageData).toHaveProperty('status', 'ok')
+    expect(bundleUsageData).toHaveProperty('labels')
+    expect(bundleUsageData).toHaveProperty('datasets')
   })
 
   it('should create app and subkey with limited rights', async () => {
@@ -96,7 +97,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getStats.status).toBe(200)
     const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('status', 'ok')
+    expect(Array.isArray(statsData)).toBe(true)
   })
 
   it('should get organization statistics with subkey', async () => {
@@ -120,7 +121,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getUserStats.status).toBe(200)
     const userStatsData = await getUserStats.json()
-    expect(userStatsData).toHaveProperty('status', 'ok')
+    expect(Array.isArray(userStatsData)).toBe(true)
   })
 
   it('should get bundle usage statistics with subkey', async () => {
@@ -133,7 +134,8 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getBundleUsage.status).toBe(200)
     const bundleUsageData = await getBundleUsage.json()
-    expect(bundleUsageData).toHaveProperty('status', 'ok')
+    expect(bundleUsageData).toHaveProperty('labels')
+    expect(bundleUsageData).toHaveProperty('datasets')
   })
 
   it('should fail to get app statistics with subkey for app not belonging to user', async () => {

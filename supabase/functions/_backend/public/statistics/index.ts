@@ -66,7 +66,7 @@ app.get('/app/:app_id', async (c) => {
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
     }
 
-    return c.json({ status: 'ok', statistics: finalStats })
+    return c.json(finalStats)
   }
   catch (e) {
     console.error('Error in app statistics', e)
@@ -113,7 +113,7 @@ app.get('/org/:org_id', async (c) => {
       return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
     }
 
-    return c.json({ status: 'ok', statistics: finalStats })
+    return c.json(finalStats)
   }
   catch (e) {
     console.error('Error in organization statistics', e)
@@ -154,7 +154,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
       return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
     }
 
-    return c.json({ status: 'ok', data })
+    return c.json(data)
   }
   catch (e) {
     console.error('Error in app statistics. Cannot get bundle usage', e)
@@ -222,7 +222,7 @@ app.get('/user', async (c) => {
     return acc
   }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
 
-  return c.json({ status: 'ok', statistics: finalStats })
+  return c.json(finalStats)
 })
 
 async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {

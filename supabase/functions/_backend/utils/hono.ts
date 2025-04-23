@@ -101,6 +101,10 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
           console.log('Invalid subkey', subkey_id)
           throw new HTTPException(401, { message: 'Invalid subkey' })
         }
+        if (subkey && subkey.user_id !== apikey.user_id) {
+          console.log('Subkey user_id does not match apikey user_id', subkey, apikey)
+          throw new HTTPException(401, { message: 'Invalid subkey' })
+        }
         if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
           console.log('Invalid subkey, no limited apps or orgs', subkey)
           throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
