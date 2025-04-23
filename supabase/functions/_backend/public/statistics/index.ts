@@ -1,5 +1,4 @@
 import type { AuthInfo } from '../../utils/hono.ts'
-import type { Database } from '../../utils/supabase.types.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { z } from 'zod'
