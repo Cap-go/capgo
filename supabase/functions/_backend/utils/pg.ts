@@ -273,6 +273,20 @@ export function requestInfosPostgresV2(
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
 
+  // Helper function to parse manifestEntries
+  const parseManifestEntries = (data: any, source: string) => {
+    const result = data.at(0)
+    if (result && typeof result.manifestEntries === 'string') {
+      try {
+        result.manifestEntries = JSON.parse(result.manifestEntries)
+      }
+      catch (e) {
+        console.error(`Error parsing manifestEntries for ${source}:`, e)
+      }
+    }
+    return result
+  }
+
   const appVersions = drizzleCient
     .select({
       id: versionAlias.id,
@@ -282,7 +296,7 @@ export function requestInfosPostgresV2(
     .limit(1)
     .then(data => data.at(0))
 
-  const channelDevice = drizzleCient
+  const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
@@ -325,9 +339,14 @@ export function requestInfosPostgresV2(
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
 
-  const channel = drizzleCient
+  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  const channelDevice = channelDeviceQuery.then((data) => {
+    console.log('channelDevice data:', data)
+    return parseManifestEntries(data, 'channelDevice')
+  })
+
+  const channelQuery = drizzleCient
     .select({
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -374,10 +393,19 @@ export function requestInfosPostgresV2(
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+
+  console.log('channel Query:', channelQuery.toSQL())
+  const channel = channelQuery.then((data) => {
+    console.log('channel data:', data)
+    return parseManifestEntries(data, 'channel')
+  })
 
   return Promise.all([channelDevice, channel, appVersions])
-    .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
+    .then(([channelOverride, channelData, versionData]) => {
+      const responseData = { versionData, channelData, channelOverride }
+      console.log('Final response data:', responseData)
+      return responseData
+    })
     .catch((e) => {
       throw e
     })
