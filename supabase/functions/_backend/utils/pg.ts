@@ -59,11 +59,11 @@ export function getDrizzleClientD1(c: Context) {
   return drizzleD1(c.env.DB_REPLICATE)
 }
 
-export function getDrizzleClientD1Session(c: Context, token: string) {
+export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     throw new Error('DB_REPLICATE is not set')
   }
-  const session = c.env.DB_REPLICATE.withSession(token)
+  const session = c.env.DB_REPLICATE.withSession()
   return drizzleD1(session)
 }
 
@@ -389,6 +389,7 @@ export async function getAppOwnerPostgresV2(
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
+    console.log('appOwner', appId)
     const appOwner = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
@@ -402,10 +403,11 @@ export async function getAppOwnerPostgresV2(
       .innerJoin(aliasV2(schemaV2.orgs, 'orgs'), eq(schemaV2.apps.owner_org, schemaV2.orgs.id))
       .limit(1)
       .then(data => data[0])
-
+    console.log('appOwner result', appOwner)
     return appOwner
   }
   catch (e: any) {
+    console.log('appOwner error', e)
     console.error({ requestId: c.get('requestId'), context: 'getAppOwnerPostgres', error: e })
     return null
   }

@@ -804,7 +804,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
       const values = columns.map(column => app[column as keyof StoreApp])
 
       const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
-
+      console.log('query', query, placeholders, values)
       const res = await c.env.DB_STOREAPPS
         .prepare(query)
         .bind(...values)

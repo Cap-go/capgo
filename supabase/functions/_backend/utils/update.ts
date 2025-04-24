@@ -442,7 +442,7 @@ export async function update(c: Context, body: AppInfos) {
 
   let res
   try {
-    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c, body.device_id) : getDrizzleClient(pgClient as any), isV2)
+    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), isV2)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), context: 'update', error: e })
