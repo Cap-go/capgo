@@ -63,7 +63,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     device_id = device_id.toLowerCase()
     // if version_build is not semver, then make it semver
     const coerce = tryParse(fixSemver(version_build))
+    const startTotal = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'start_total_timing', start: startTotal, date: new Date().toISOString() })
+    const startAppOwner = performance.now()
     const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
+    const endAppOwner = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'app_owner_timing', duration: `${endAppOwner - startAppOwner}ms`, date: new Date().toISOString() })
     if (!appOwner) {
       if (app_id) {
         await backgroundTask(c, createIfNotExistStoreInfo(c, {
@@ -127,8 +132,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       platform: platform as Database['public']['Enums']['platform_os'],
       updated_at: new Date().toISOString(),
     }
-    const start = performance.now()
+    const startPlanCheck = performance.now()
     const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
+    const endPlanCheck = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'plan_check_timing', duration: `${endPlanCheck - startPlanCheck}ms`, date: new Date().toISOString() })
     if (!planValid) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
       await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
@@ -141,12 +148,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
 
+    const startRequestInfo = performance.now()
     const requestedInto = isV2
       ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
       : await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
-
-    const end = performance.now()
-    console.log({ requestId: c.get('requestId'), context: 'requestInfosPostgres', duration: `${end - start}ms` })
+    const endRequestInfo = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'request_info_timing', duration: `${endRequestInfo - startRequestInfo}ms`, date: new Date().toISOString() })
 
     const { versionData, channelOverride } = requestedInto
     let { channelData } = requestedInto
@@ -370,6 +377,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'revert_to_builtin_plugin_version_too_old',
       }, 200)
     }
+    const startBundleUrl = performance.now()
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
     if (!version.external_url) {
@@ -383,6 +391,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
       manifest = await getManifestUrl(c, version.id, manifestEntries, device_id)
     }
+    const endBundleUrl = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'bundle_url_timing', duration: `${endBundleUrl - startBundleUrl}ms`, date: new Date().toISOString() })
     //  check signedURL and if it's url
     if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
@@ -410,6 +420,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'no_url_or_manifest',
       }, 200)
     }
+    const endTotal = performance.now()
+    console.log({ requestId: c.get('requestId'), context: 'total_timing', duration: `${endTotal - startTotal}ms`, date: new Date().toISOString() })
     return c.json(res, 200)
   }
   catch (e) {
@@ -427,10 +439,10 @@ export async function update(c: Context, body: AppInfos) {
   if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
     isV2 = true
   }
-  // if (!isV2 && getRuntimeKey() === 'workerd') {
-  //   // make 20% chance to be v2
-  //   isV2 = Math.random() < 0.3
-  // }
+  if (!isV2 && getRuntimeKey() === 'workerd') {
+    // make 10% chance to use v2 with D1 read replicate to test the performance
+    isV2 = Math.random() < 0.1
+  }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
     console.log({ requestId: c.get('requestId'), context: 'update2', isV2 })
