@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { ManifestEntry } from './downloadUrl.ts'
+import type { getDrizzleClientD1 } from './pg.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos } from './types.ts'
@@ -11,11 +12,12 @@ import {
   parse,
   tryParse,
 } from '@std/semver'
+import { getRuntimeKey } from 'hono/adapter'
 import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { sendNotifOrg } from './notifications.ts'
-import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgPg, requestInfosPostgresLite } from './pg.ts'
+import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1Session, getPgClient, isAllowedActionOrgActionD1, isAllowedActionOrgActionPg, isAllowedActionOrgPg, requestInfosPostgresLite, requestInfosPostgresLiteV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver } from './utils.ts'
 
@@ -40,17 +42,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   return res
 }
 
-function getCaches() {
-  if (typeof globalThis.caches === 'object') {
-    return (globalThis.caches as any).default as {
-      match: (request: Request) => Promise<Response | undefined>
-      put: (request: Request, response: Response) => Promise<void>
-    }
-  }
-  return undefined
-}
-
-export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient>) {
+export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean = false) {
   try {
     console.log({ requestId: c.get('requestId'), context: 'body', body, date: new Date().toISOString() })
     let {
@@ -68,27 +60,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       is_prod = true,
     } = body
     device_id = device_id.toLowerCase()
-
-    const cache = getCaches()
-    if (cache) {
-      const cacheKey = `app_${app_id}_${version_build}`
-      const url = new URL(`${c.req.url}?app_id=${app_id}&version_build=${version_build}`)
-      const cacheRequest = new Request(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Cache-Key': cacheKey,
-          'Cache-Control': 'public, max-age=300',
-        },
-      })
-      const cachedResponse = await cache.match(cacheRequest)
-      if (cachedResponse) {
-        const cachedBody = await cachedResponse.json() as Record<string, unknown>
-        return c.json({ ...cachedBody, cached: true }, 200)
-      }
-    }
     // if version_build is not semver, then make it semver
     const coerce = tryParse(fixSemver(version_build))
-    const appOwner = await getAppOwnerPostgres(c, app_id, drizzleCient)
+    const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
     if (!appOwner) {
       if (app_id) {
         await backgroundTask(c, createIfNotExistStoreInfo(c, {
@@ -153,7 +127,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       updated_at: new Date().toISOString(),
     }
     const start = performance.now()
-    const planValid = await isAllowedActionOrgPg(c, drizzleCient, appOwner.orgs.id)
+    const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
     if (!planValid) {
       console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
       await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
@@ -166,7 +140,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
 
-    const requestedInto = await requestInfosPostgresLite(app_id, version_name, drizzleCient)
+    const requestedInto = isV2 ? await requestInfosPostgresLiteV2(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
 
     const end = performance.now()
     console.log({ requestId: c.get('requestId'), context: 'requestInfosPostgres', duration: `${end - start}ms` })
@@ -237,7 +211,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = getManifestUrl(c, version.id, version.manifest as any, device_id)
+        manifest = getManifestUrl(c, version.id, [] as any, device_id)
       }
     }
     //  check signedURL and if it's url
@@ -262,25 +236,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'no_url_or_manifest',
       }, 200)
     }
-    // Cache successful update response
-    if (cache) {
-      const cacheKey = `app_${app_id}_${version_build}`
-      const url = new URL(`${c.req.url}?app_id=${app_id}&version_build=${version_build}`)
-      const cacheRequest = new Request(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Cache-Key': cacheKey,
-          'Cache-Control': 'public, max-age=300',
-        },
-      })
-      const response = new Response(JSON.stringify(res), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=300',
-        },
-      })
-      await cache.put(cacheRequest, response.clone())
-    }
     return c.json(res, 200)
   }
   catch (e) {
@@ -293,10 +248,27 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 }
 
 export async function update(c: Context, body: AppInfos) {
-  const pgClient = getPgClient(c)
+  let pgClient
+  let isV2 = false
+  if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
+    isV2 = true
+  }
+  if (!isV2 && getRuntimeKey() === 'workerd') {
+    // make 10% chance to use v2 with D1 read replicate to test the performance
+    isV2 = Math.random() < 0.1
+  }
+  // check if URL ends with update_v2 if yes do not init PG
+  if (isV2) {
+    console.log({ requestId: c.get('requestId'), context: 'update2', isV2 })
+    pgClient = null
+  }
+  else {
+    pgClient = getPgClient(c)
+  }
+
   let res
   try {
-    res = await updateWithPG(c, body, getDrizzleClient(pgClient))
+    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), isV2)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), context: 'update', error: e })
@@ -305,6 +277,7 @@ export async function update(c: Context, body: AppInfos) {
       error: 'unknow_error',
     }, 500)
   }
-  await closeClient(c, pgClient)
+  if (isV2 && pgClient)
+    await closeClient(c, pgClient)
   return res
 }
