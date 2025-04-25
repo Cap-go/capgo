@@ -1,4 +1,3 @@
-import type { Context } from '@hono/hono'
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
@@ -68,11 +67,11 @@ const jsonRequestSchema = z.object({
 
 export const app = new Hono()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppInfos>()
     console.log({ requestId: c.get('requestId'), context: 'post updates body', body })
-    if (isLimited(c, body.app_id)) {
+    if (isLimited(c as any, body.app_id)) {
       return c.json({
         status: 'Too many requests',
         error: 'too_many_requests',
@@ -87,7 +86,7 @@ app.post('/', async (c: Context) => {
       }, 400)
     }
 
-    return updateLite(c, body)
+    return updateLite(c as any, body)
   }
   catch (e) {
     console.log({ requestId: c.get('requestId'), context: 'error', error: JSON.stringify(e) })
@@ -95,6 +94,6 @@ app.post('/', async (c: Context) => {
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   return c.json({ status: 'ok' })
 })
