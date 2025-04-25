@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
@@ -12,11 +12,11 @@ interface DataDownload {
   isManifest?: boolean
 }
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareAuth, async (c) => {
   try {
     const body = await c.req.json<DataDownload>()
     console.log({ requestId: c.get('requestId'), context: 'post download link body', body })
@@ -24,7 +24,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (!authorization)
       return c.json({ status: 'Cannot find authorization' }, 400)
 
-    const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
+    const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
       authorization?.split('Bearer ')[1],
     )
     if (error || !auth || !auth.user)
@@ -32,10 +32,10 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     const userId = auth.user.id
 
-    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+    if (!(await hasAppRight(c as any, body.app_id, userId, 'read')))
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
-    const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
+    const { data: bundle, error: getBundleError } = await supabaseAdmin(c as any)
       .from('app_versions')
       .select('*, owner_org ( created_by )')
       .eq('app_id', body.app_id)
@@ -55,11 +55,21 @@ app.post('/', middlewareAuth, async (c: Context) => {
     }
 
     if (body.isManifest) {
-      const manifestEntries = getManifestUrl(c, bundle.id, bundle.manifest, userId)
+      const { data: manifest, error: getManifestError } = await supabaseAdmin(c as any)
+        .from('manifest')
+        .select('*')
+        .eq('app_id', body.app_id)
+        .eq('id', body.id)
+
+      if (getManifestError) {
+        console.error({ requestId: c.get('requestId'), context: 'getManifestError', error: getManifestError })
+        return c.json({ status: 'Error unknown' }, 500)
+      }
+      const manifestEntries = getManifestUrl(c as any, bundle.id, manifest, userId)
       return c.json({ manifest: manifestEntries })
     }
     else {
-      const data = await getBundleUrl(c, bundle.id, bundle.r2_path, userId)
+      const data = await getBundleUrl(c as any, bundle.id, bundle.r2_path, userId)
       if (!data)
         return c.json({ status: 'Error unknown' }, 500)
 

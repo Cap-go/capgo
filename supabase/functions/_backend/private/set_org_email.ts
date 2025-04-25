@@ -1,5 +1,4 @@
-import type { Context } from '@hono/hono'
-
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
@@ -11,11 +10,11 @@ const bodySchema = z.object({
   org_id: z.string().uuid(),
 })
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareAuth, async (c) => {
   try {
     const authToken = c.req.header('authorization')
 
@@ -32,8 +31,8 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     const safeBody = parsedBodyResult.data
 
-    const supabaseAdmin = await useSupabaseAdmin(c)
-    const supabaseClient = useSupabaseClient(c, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c as any)
+    const supabaseClient = useSupabaseClient(c as any, authToken)
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData || !clientData.data || clientData.error) {
@@ -76,7 +75,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'not_authorized' }, 403)
     }
 
-    await updateCustomerEmail(c, organization.customer_id, safeBody.emial)
+    await updateCustomerEmail(c as any, organization.customer_id, safeBody.emial)
 
     // Update supabase
     const { error: updateOrgErr } = await supabaseAdmin.from('orgs')
@@ -86,7 +85,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (updateOrgErr) {
       // revert stripe
       console.error({ requestId: c.get('requestId'), context: 'CRITICAL!!! Cannot update supabase, reverting stripe', error: updateOrgErr })
-      await updateCustomerEmail(c, organization.customer_id, organization.management_email)
+      await updateCustomerEmail(c as any, organization.customer_id, organization.management_email)
       return c.json({ status: 'critical_error' }, 500)
     }
 

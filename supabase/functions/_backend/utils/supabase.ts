@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 
+import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
@@ -110,7 +111,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   console.log({ requestId: c.get('requestId'), context: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     console.log({ requestId: c.get('requestId'), context: 'missing app_id, name, or created_by' })
-    return Promise.reject(new Error('missing app_id, name, or created_by'))
+    return Promise.resolve({ error: new Error('missing app_id, name, or created_by'), requestId: c.get('requestId') })
   }
 
   const { data: existingChannel } = await supabaseAdmin(c)
@@ -127,7 +128,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     )
     if (!fieldsDiffer) {
       console.log({ requestId: c.get('requestId'), context: 'No fields differ, no update needed' })
-      return Promise.resolve()
+      return Promise.resolve({ error: null, requestId: c.get('requestId') })
     }
   }
 
@@ -201,7 +202,7 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
   return data
 }
 
-export async function hasAppRightApikey(c: Context, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
+export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string) {
   if (!appId)
     return false
 
@@ -344,6 +345,33 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   return false
 }
 
+export async function set_mau_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
+  const { error } = await supabaseAdmin(c).rpc('set_mau_exceeded_by_org', { org_id: orgId, disabled })
+  if (error) {
+    console.error({ requestId: c.get('requestId'), context: 'set_mau_exceeded error', orgId, error })
+    return false
+  }
+  return true
+}
+
+export async function set_storage_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
+  const { error } = await supabaseAdmin(c).rpc('set_storage_exceeded_by_org', { org_id: orgId, disabled })
+  if (error) {
+    console.error({ requestId: c.get('requestId'), context: 'set_download_disabled error', orgId, error })
+    return false
+  }
+  return true
+}
+
+export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
+  const { error } = await supabaseAdmin(c).rpc('set_bandwidth_exceeded_by_org', { org_id: orgId, disabled })
+  if (error) {
+    console.error({ requestId: c.get('requestId'), context: 'set_bandwidth_exceeded error', orgId, error })
+    return false
+  }
+  return true
+}
+
 export async function isOnboardingNeeded(c: Context, userId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)
@@ -426,12 +454,19 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
 
 export async function createApiKey(c: Context, userId: string) {
   // check if user has apikeys
+  if (!userId) {
+    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'userId is null' })
+    return
+  }
   const total = await supabaseAdmin(c)
     .from('apikeys')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .then(res => res.count || 0)
-
+    .then(res => res.count || null)
+  if (total === null) {
+    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'total is null' })
+    return
+  }
   if (total === 0) {
     // create apikeys
     return supabaseAdmin(c)
@@ -652,6 +687,7 @@ export function trackMetaSB(
 }
 
 export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
+  console.log({ requestId: c.get('requestId'), context: 'trackDevicesSB', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
   return supabaseAdmin(c)
     .from('devices')
     .upsert(
@@ -668,8 +704,8 @@ export function trackDevicesSB(c: Context, app_id: string, device_id: string, ve
         is_prod,
         is_emulator,
       },
+      { onConflict: 'device_id,app_id' },
     )
-    .eq('device_id', device_id.toLowerCase())
 }
 
 export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_id: number) {

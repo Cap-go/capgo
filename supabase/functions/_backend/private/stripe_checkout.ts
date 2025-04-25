@@ -1,5 +1,6 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { HTTPError } from 'ky'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { createCheckout } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -14,16 +15,16 @@ interface PortalData {
   orgId: string
 }
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareAuth, async (c) => {
   try {
     const body = await c.req.json<PortalData>()
     console.log({ requestId: c.get('requestId'), context: 'post stripe checkout body', body })
     const authorization = c.get('authorization')
-    const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
+    const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
       authorization?.split('Bearer ')[1],
     )
 
@@ -34,7 +35,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
     console.log({ requestId: c.get('requestId'), context: 'auth', auth: auth.user.id })
-    const { data: org, error: dbError } = await supabaseAdmin(c)
+    const { data: org, error: dbError } = await supabaseAdmin(c as any)
       .from('orgs')
       .select('customer_id')
       .eq('id', body.orgId)
@@ -44,16 +45,16 @@ app.post('/', middlewareAuth, async (c: Context) => {
     if (!org.customer_id)
       return c.json({ status: 'no customer' }, 400)
 
-    if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+    if (!await hasOrgRight(c as any, body.orgId, auth.user.id, 'super_admin'))
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 
     console.log({ requestId: c.get('requestId'), context: 'user', org })
-    const checkout = await createCheckout(c, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+    const checkout = await createCheckout(c as any, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return c.json({ url: checkout.url })
   }
   catch (error) {
     console.error({ requestId: c.get('requestId'), context: 'error', error })
-    if (error.name === 'HTTPError') {
+    if (error instanceof HTTPError) {
       const errorJson = await error.response.json()
       return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(errorJson) }, 500)
     }

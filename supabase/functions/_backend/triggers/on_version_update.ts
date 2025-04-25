@@ -1,4 +1,5 @@
 import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -37,6 +38,48 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   else {
     console.log({ requestId: c.get('requestId'), context: 'no v2 path' })
   }
+
+  // Handle manifest entries
+  if (record.manifest) {
+    console.log({ requestId: c.get('requestId'), context: 'manifest', manifest: record.manifest })
+    const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
+
+    // Check if entries exist
+    const { data: existingEntries } = await supabaseAdmin(c)
+      .from('manifest')
+      .select('id')
+      .eq('app_version_id', record.id)
+      .limit(1)
+
+    // Only create entries if none exist
+    if (!existingEntries?.length && manifestEntries.length > 0) {
+      const validEntries = manifestEntries
+        .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
+        .map(entry => ({
+          app_version_id: record.id,
+          file_name: entry.file_name!,
+          file_hash: entry.file_hash!,
+          s3_path: entry.s3_path!,
+          file_size: 0,
+        }))
+
+      if (validEntries.length > 0) {
+        const { error: insertError } = await supabaseAdmin(c)
+          .from('manifest')
+          .insert(validEntries)
+        if (insertError)
+          console.log({ requestId: c.get('requestId'), context: 'error insert manifest', error: insertError })
+      }
+    }
+    // delete manifest in app_versions
+    const { error: deleteError } = await supabaseAdmin(c)
+      .from('app_versions')
+      .update({ manifest: null })
+      .eq('id', record.id)
+    if (deleteError)
+      console.log({ requestId: c.get('requestId'), context: 'error delete manifest in app_versions', error: deleteError })
+  }
+
   return c.json(BRES)
 }
 
@@ -56,6 +99,14 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     console.log({ requestId: c.get('requestId'), context: 'Cannot delete s3 (v2)', error })
     return c.json(BRES)
   }
+
+  // Delete manifest entries
+  const { error: deleteError } = await supabaseAdmin(c)
+    .from('manifest')
+    .delete()
+    .eq('app_version_id', record.id)
+  if (deleteError)
+    console.log({ requestId: c.get('requestId'), context: 'error delete manifest', error: deleteError })
 
   const { data, error: dbError } = await supabaseAdmin(c)
     .from('app_versions_meta')
@@ -78,9 +129,9 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   return c.json(BRES)
 }
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<UpdatePayload<typeof table>>()
@@ -99,16 +150,16 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id' })
       return c.json(BRES)
     }
-    if (!record.r2_path) {
-      console.log({ requestId: c.get('requestId'), context: 'no r2_path' })
+    if (!record.r2_path && !record.manifest) {
+      console.log({ requestId: c.get('requestId'), context: 'no r2_path and no manifest, skipping update', record })
       return c.json(BRES)
     }
     // // check if not deleted it's present in s3 storage
     if (record.deleted && record.deleted !== body.old_record.deleted)
-      return deleteIt(c, body.record as any)
+      return deleteIt(c as any, body.record as any)
 
     console.log({ requestId: c.get('requestId'), context: 'Update but not deleted' })
-    return updateIt(c, body)
+    return updateIt(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot update version', error: JSON.stringify(e) }, 500)

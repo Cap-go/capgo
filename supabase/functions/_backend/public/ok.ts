@@ -1,10 +1,8 @@
-import type { Context } from '@hono/hono'
-import { Hono } from 'hono/tiny'
-import { BRES } from '../utils/hono.ts'
+import { BRES, honoFactory } from '../utils/hono.ts'
 
-export const app = new Hono()
+export const app = honoFactory.createApp()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<any>()
     console.log('body', body)
@@ -15,7 +13,7 @@ app.post('/', async (c: Context) => {
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   try {
     return c.json(BRES)
   }

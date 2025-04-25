@@ -1,4 +1,5 @@
 import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats } from '../utils/types.ts'
@@ -61,13 +62,15 @@ export const jsonRequestSchema = z.object({
 async function post(c: Context, body: AppStats) {
   try {
     if (isLimited(c, body.app_id)) {
+      console.log({ requestId: c.get('requestId'), context: 'Too many requests' })
       return c.json({
         message: 'Too many requests',
         error: 'too_many_requests',
-      }, 200)
+      }, 400)
     }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
+      console.log({ requestId: c.get('requestId'), context: `Cannot parse json: ${parseResult.error}` })
       return c.json({
         error: `Cannot parse json: ${parseResult.error}`,
       }, 400)
@@ -98,15 +101,23 @@ async function post(c: Context, body: AppStats) {
       .eq('app_id', app_id)
       .single()
 
-    if (coerce)
+    if (coerce) {
       version_build = format(coerce)
-    console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}` })
+    }
+    else {
+      return c.json({
+        message: 'Invalid version build',
+        error: 'invalid_version_build',
+      }, 400)
+    }
+    console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
       platform: platform as Database['public']['Enums']['platform_os'],
       device_id,
       app_id,
       plugin_version,
+      version_build,
       os_version: version_os,
       version: 0,
       is_emulator: is_emulator == null ? false : is_emulator,
@@ -131,7 +142,7 @@ async function post(c: Context, body: AppStats) {
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
-      }, 200)
+      }, 400)
     }
     const statsActions: StatsActions[] = []
 
@@ -147,13 +158,13 @@ async function post(c: Context, body: AppStats) {
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
-      }, 200)
+      }, 400)
     }
     if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
       return c.json({
         message: 'Action not allowed',
         error: 'action_not_allowed',
-      }, 200)
+      }, 400)
     }
     device.version = appVersion.id
     if (action === 'set' && !device.is_emulator && device.is_prod) {
@@ -186,6 +197,7 @@ async function post(c: Context, body: AppStats) {
     return c.json(BRES)
   }
   catch (e) {
+    console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
     return c.json({
       status: 'Error unknow',
       error: JSON.stringify(e),
@@ -193,19 +205,20 @@ async function post(c: Context, body: AppStats) {
   }
 }
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppStats>()
     console.log({ requestId: c.get('requestId'), context: 'post plugin/stats body', body })
-    return post(c, body)
+    return post(c as any, body)
   }
   catch (e) {
+    console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
     return c.json({ status: 'Cannot post stats', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   return c.json({ status: 'ok' })
 })

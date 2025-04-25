@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -6,9 +6,9 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { createApiKey } from '../utils/supabase.ts'
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<InsertPayload<typeof table>>()
@@ -23,12 +23,12 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     const record = body.record
     console.log({ requestId: c.get('requestId'), context: 'record', record })
     await Promise.all([
-      createApiKey(c, record.id),
+      createApiKey(c as any, record.id),
     ])
     console.log({ requestId: c.get('requestId'), context: 'createCustomer stripe' })
     if (record.customer_id)
       return c.json(BRES)
-    const LogSnag = logsnag(c)
+    const LogSnag = logsnag(c as any)
     await LogSnag.track({
       channel: 'user-register',
       event: 'User Joined',

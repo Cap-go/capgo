@@ -1,5 +1,6 @@
 // channel self old function
 import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
@@ -251,7 +252,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           channel_id: dataChannel.id,
           app_id,
           owner_org: dataChannel.owner_org,
-        })
+        }, { onConflict: 'device_id, app_id' })
       if (dbErrorDev) {
         console.error({ requestId: c.get('requestId'), context: 'Cannot do channel override', dbErrorDev })
         return c.json({
@@ -348,7 +349,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .from('channels')
     .select()
     .eq('app_id', app_id)
-    .eq('public', true)
+    .eq(body.defaultChannel ? 'name' : 'public', body.defaultChannel || true)
 
   const { data: dataChannelOverride } = await supabaseAdmin(c)
     .from('channel_devices')
@@ -366,7 +367,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .single()
   if (dataChannelOverride && dataChannelOverride.channel_id) {
     const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
-
+    await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
     return c.json({
       channel: channelId.name,
       status: 'override',
@@ -375,37 +376,38 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
   }
   if (errorChannel)
     console.error({ requestId: c.get('requestId'), context: 'Cannot find channel default', errorChannel })
-  if (dataChannel) {
-    await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
-
-    const devicePlatform = devicePlatformScheme.safeParse(platform)
-    if (!devicePlatform.success) {
-      return c.json({
-        message: 'Invalid device platform',
-        error: 'invalid_platform',
-      }, 400)
-    }
-
-    const finalChannel = dataChannel.find(channel => channel[devicePlatform.data] === true)
-
-    if (!finalChannel) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
-      return c.json({
-        message: 'Cannot find channel',
-        error: 'channel_not_found',
-      }, 400)
-    }
-
+  if (!dataChannel) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
     return c.json({
-      channel: finalChannel.name,
-      status: 'default',
-    })
+      message: 'Cannot find channel',
+      error: 'channel_not_found',
+    }, 400)
   }
-  console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
+
+  const devicePlatform = devicePlatformScheme.safeParse(platform)
+  if (!devicePlatform.success) {
+    return c.json({
+      message: 'Invalid device platform',
+      error: 'invalid_platform',
+    }, 400)
+  }
+
+  const finalChannel = body.defaultChannel
+    ? dataChannel.find(channel => channel.name === body.defaultChannel)
+    : dataChannel.find(channel => channel[devicePlatform.data] === true)
+
+  if (!finalChannel) {
+    console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dataChannel, errorChannel })
+    return c.json({
+      message: 'Cannot find channel',
+      error: 'channel_not_found',
+    }, 400)
+  }
+  await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
   return c.json({
-    message: 'Cannot find channel',
-    error: 'channel_not_found',
-  }, 400)
+    channel: finalChannel.name,
+    status: 'default',
+  })
 }
 
 async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
@@ -469,43 +471,43 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   return c.json(BRES)
 }
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'post body', body })
-    return post(c, body)
+    return post(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.put('/', async (c: Context) => {
+app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
   try {
     const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'put body', body })
-    return put(c, body)
+    return put(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self get channel', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.delete('/', async (c: Context) => {
+app.delete('/', async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c)
+    const body = await getBody<DeviceLink>(c as any)
     // const body = await c.req.json<DeviceLink>()
     console.log({ requestId: c.get('requestId'), context: 'delete body', body })
-    return deleteOverride(c, body)
+    return deleteOverride(c as any, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   return c.json({ status: 'ok' })
 })

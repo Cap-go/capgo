@@ -120,7 +120,7 @@ export type Part = IntermediatePart | FinalPart | ErrorPart
 // containing whatever was read before the error was encountered.
 export async function* generateParts(body: ReadableStream<Uint8Array>, mem: WritableStreamBuffer): AsyncGenerator<Part> {
   try {
-    for await (const chunk of body) {
+    for await (const chunk of body as any) {
       let chunkOffset = 0
       while (chunkOffset < chunk.byteLength) {
         const copied = mem.writeUpTo(chunk.subarray(chunkOffset))

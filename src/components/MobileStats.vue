@@ -15,7 +15,7 @@ import { useMainStore } from '~/stores/main'
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
 const { t } = useI18n()
-const route = useRoute('/app/package/[package]')
+const route = useRoute('/app/p/[package]')
 const main = useMainStore()
 
 const appId = ref('')
@@ -41,7 +41,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
     legend: { display: false },
     title: { display: false },
   },
-}))
+} as any))
 
 const chartData = ref<any>(null)
 
@@ -72,7 +72,7 @@ function getDateRange(days: number) {
 }
 
 watchEffect(async () => {
-  if (route.path.includes('/package/')) {
+  if (route.path.includes('/p/')) {
     appId.value = urlToAppId(route.params.package as string)
     try {
       await loadData()
@@ -88,9 +88,11 @@ watchEffect(async () => {
 
 function lastRunDate() {
   const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
+  return `${t('last-run')}: ${lastRun}`
+}
+function nextRunDate() {
   const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
-
-  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
+  return `${t('next-run')}: ${nextRun}`
 }
 </script>
 
@@ -101,9 +103,17 @@ function lastRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ t('active_users_by_version') }}
         </h2>
-        <div class="tooltip before:whitespace-pre before:content-[attr(data-tip)]" :data-tip="lastRunDate()">
+        <div class="tooltip">
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
             <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
+          </div>
+          <div class="tooltip-content">
+            <div class="max-w-xs whitespace-normal">
+              {{ lastRunDate() }}
+            </div>
+            <div class="max-w-xs whitespace-normal">
+              {{ nextRunDate() }}
+            </div>
           </div>
         </div>
         <div class="font-medium badge badge-primary">

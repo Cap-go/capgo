@@ -1,15 +1,21 @@
-import { beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats } from './test-utils.ts'
+import { randomUUID } from 'node:crypto'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.device'
+const id = randomUUID()
+const APPNAME_DEVICE = `${APP_NAME}.d.${id}`
 
 beforeAll(async () => {
-  await Promise.all([resetAndSeedAppData(APPNAME), resetAndSeedAppDataStats(APPNAME)])
+  await Promise.all([resetAndSeedAppData(APPNAME_DEVICE), resetAndSeedAppDataStats(APPNAME_DEVICE)])
+})
+afterAll(async () => {
+  await resetAppData(APPNAME_DEVICE)
+  await resetAppDataStats(APPNAME_DEVICE)
 })
 
 describe('[GET] /device operations', () => {
   it('all devices', async () => {
-    const params = new URLSearchParams({ app_id: APPNAME })
+    const params = new URLSearchParams({ app_id: APPNAME_DEVICE })
     const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
       method: 'GET',
       headers,
@@ -22,7 +28,7 @@ describe('[GET] /device operations', () => {
 
   it('specific device', async () => {
     const params = new URLSearchParams({
-      app_id: APPNAME,
+      app_id: APPNAME_DEVICE,
       device_id: '00000000-0000-0000-0000-000000000000',
     })
     const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
@@ -47,7 +53,7 @@ describe('[GET] /device operations', () => {
 
   it('invalid device_id', async () => {
     const params = new URLSearchParams({
-      app_id: APPNAME,
+      app_id: APPNAME_DEVICE,
       device_id: 'invalid_device',
     })
     const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
@@ -65,7 +71,7 @@ describe('[POST] /device operations', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        app_id: APPNAME,
+        app_id: APPNAME_DEVICE,
         device_id: 'test_device',
         channel: 'no_access',
       }),
@@ -94,7 +100,7 @@ describe('[POST] /device operations', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        app_id: APPNAME,
+        app_id: APPNAME_DEVICE,
         device_id: 'test_device',
         version_id: '1.0.0',
       }),
@@ -111,7 +117,7 @@ describe('[DELETE] /device operations', () => {
       headers,
       body: JSON.stringify({
         device_id: 'test_device',
-        app_id: APPNAME,
+        app_id: APPNAME_DEVICE,
       }),
     })
 
@@ -126,7 +132,7 @@ describe('[DELETE] /device operations', () => {
       headers,
       body: JSON.stringify({
         device_id: 'invalid_device',
-        app_id: APPNAME,
+        app_id: APPNAME_DEVICE,
       }),
     })
     const data = await response.json<{ status: string }>()

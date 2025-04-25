@@ -1,4 +1,4 @@
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
+import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -11,7 +11,7 @@ import { app as upload_link } from '../../supabase/functions/_backend/private/up
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('*', sentry({
   release: version,
@@ -28,6 +28,7 @@ app.route('/private/upload_link', upload_link)
 app.route('/private/files', files)
 
 app.onError((e, c) => {
+  console.log('app onError', e)
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException) {
     if (e.status === 429) {
@@ -35,8 +36,6 @@ app.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
   }
-  
-  console.log('app', 'onError', e)
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 

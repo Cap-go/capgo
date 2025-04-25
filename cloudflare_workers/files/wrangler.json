@@ -1,0 +1,170 @@
+{
+  "name": "capgo_files-prod",
+  "routes": [
+    {
+      "pattern": "files.capgo.app",
+      "custom_domain": true
+    },
+    {
+      "pattern": "api.capgo.app/files*",
+      "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "plugin.capgo.app/files*",
+      "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "api.capgo.app/private/files*",
+      "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "api.capgo.app/private/download_link",
+      "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "updater.spencer.co/files*",
+      "zone_name": "capgo.app"
+    }
+  ],
+  "compatibility_date": "2025-04-01",
+  "main": "./index.ts",
+  "compatibility_flags": [
+    "nodejs_compat_v2"
+  ],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.001
+  },
+  "upload_source_maps": true,
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENT_BUCKET",
+      "bucket_name": "capgo",
+      "preview_bucket_name": "capgo"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ATTACHMENT_UPLOAD_HANDLER",
+        "class_name": "AttachmentUploadHandler"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": [
+        "UploadHandler"
+      ]
+    },
+    {
+      "tag": "v2",
+      "renamed_classes": [
+        {
+          "from": "UploadHandler",
+          "to": "AttachmentUploadHandler"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "preprod": {
+      "name": "capgo_files-preprod",
+      "observability": {
+        "enabled": true
+      },
+      "routes": [
+        {
+          "pattern": "files-preprod.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api-preprod.capgo.app/private/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api-preprod.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api-preprod.capgo.app/private/download_link",
+          "zone_name": "capgo.app"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ATTACHMENT_UPLOAD_HANDLER",
+            "class_name": "AttachmentUploadHandler"
+          }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        }
+      ]
+    },
+    "alpha": {
+      "name": "capgo_files-alpha",
+      "observability": {
+        "enabled": true
+      },
+      "routes": [
+        {
+          "pattern": "files-alpha.capgo.app",
+          "custom_domain": true
+        },
+        {
+          "pattern": "api-alpha.capgo.app/private/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api-alpha.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api-alpha.capgo.app/private/download_link",
+          "zone_name": "capgo.app"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ATTACHMENT_UPLOAD_HANDLER",
+            "class_name": "AttachmentUploadHandler"
+          }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo-alpha",
+          "preview_bucket_name": "capgo-alpha"
+        }
+      ]
+    },
+    "local": {
+      "name": "capgo_files-local",
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "ATTACHMENT_UPLOAD_HANDLER",
+            "class_name": "AttachmentUploadHandler"
+          }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo-local",
+          "preview_bucket_name": "capgo-local"
+        }
+      ]
+    }
+  }
+}

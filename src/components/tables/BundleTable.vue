@@ -3,12 +3,12 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash?raw'
-import Table from '~/components/Table.vue'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -20,16 +20,18 @@ const props = defineProps<{
 
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
-const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const role = ref<OrganizationRole | null>(null)
+const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
+const showSteps = ref(false)
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const total = ref(0)
 const search = ref('')
+const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
 const selectedElements = ref<Element[]>([])
 const isLoading = ref(false)
@@ -39,6 +41,11 @@ const filters = ref({
   'deleted': false,
   'encrypted': false,
 })
+
+function onboardingDone() {
+  reload()
+  showSteps.value = !showSteps.value
+}
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
@@ -145,8 +152,7 @@ async function getData() {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
-    elements.value.push(...(await enhenceVersionElems(dataVersions)))
-    // console.log('count', count)
+    elements.value.push(...(await enhenceVersionElems(dataVersions) as any))
     total.value = count || 0
   }
   catch (error) {
@@ -194,7 +200,7 @@ async function deleteOne(one: Element) {
             id: 'yes',
             handler: () => {
               if (channelFound)
-                unlink = channelFound
+                unlink = channelFound as any
             },
           },
           {
@@ -279,6 +285,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('created-at'),
@@ -314,7 +321,6 @@ columns.value = [
 ]
 
 async function reload() {
-  console.log('reload')
   try {
     elements.value.length = 0
     await getData()
@@ -330,7 +336,7 @@ async function massDelete() {
     return
   }
 
-  if (selectedElements.value.length > 0 && !!selectedElements.value.find(val => val.name === 'unknown' || val.name === 'builtin')) {
+  if (selectedElements.value.length > 0 && !!(selectedElements.value as any).find((val: Element) => val.name === 'unknown' || val.name === 'builtin')) {
     toast.error(t('cannot-delete-unknown-or-builtin'))
     return
   }
@@ -339,7 +345,7 @@ async function massDelete() {
   if (typeof didCancelRes === 'boolean' && didCancelRes === true)
     return
 
-  const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
+  const linkedChannels = (await Promise.all((selectedElements.value as any).map(async (element: Element) => {
     return {
       data: (await supabase
         .from('channels')
@@ -366,7 +372,7 @@ async function massDelete() {
       buttonCenter: true,
       textStyle: 'text-center',
       headerStyle: 'text-center',
-      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
       buttons: [
         {
           text: t('ok'),
@@ -384,7 +390,7 @@ async function massDelete() {
     const { error: updateError } = await supabase
       .from('app_versions')
       .update({ deleted: true })
-      .in('id', selectedElements.value.map(val => val.id))
+      .in('id', (selectedElements.value as any).map((val: Element) => val.id))
 
     if (updateError) {
       toast.error(t('cannot-delete-bundles'))
@@ -398,7 +404,7 @@ async function massDelete() {
     const { error: delAppError } = await supabase
       .from('app_versions')
       .delete()
-      .in('id', selectedElements.value.map(val => val.id))
+      .in('id', (selectedElements.value as any).map((val: Element) => val.id))
 
     if (delAppError) {
       toast.error(t('cannot-delete-bundles'))
@@ -412,7 +418,7 @@ async function massDelete() {
 
 function selectedElementsFilter(val: boolean[]) {
   console.log('selectedElementsFilter', val)
-  selectedElements.value = elements.value.filter((_, i) => val[i])
+  selectedElements.value = (elements.value as any).filter((_: any, i: number) => val[i])
 }
 
 async function openOne(one: Element) {
@@ -423,6 +429,9 @@ async function openOne(one: Element) {
 onMounted(async () => {
   await refreshData()
   role.value = await organizationStore.getCurrentRoleForApp(props.appId)
+  if (total.value === 0) {
+    showSteps.value = true
+  }
 })
 watch(props, async () => {
   await refreshData()
@@ -433,16 +442,20 @@ watch(props, async () => {
 <template>
   <div>
     <Table
+      v-if="!showSteps"
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total" row-click :element-list="elements"
-      filter-text="filters"
+      :total="total"
+      :show-add="!isMobile"
+      :element-list="elements"
+      filter-text="Filters"
       mass-select
       :is-loading="isLoading"
       :search-placeholder="t('search-bundle-id')"
+      @add="showSteps = !showSteps"
       @reload="reload()" @reset="refreshData()"
-      @row-click="openOne"
       @mass-delete="massDelete()"
       @select-row="selectedElementsFilter"
     />
+    <StepsBundle v-else :onboarding="!total" :app-id="props.appId" @done="onboardingDone" @close-step="showSteps = !showSteps" />
   </div>
 </template>

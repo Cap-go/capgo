@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "supabase-local": {
+      "command": "bunx",
+      "args": [
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+      ]
+    },
+    "browser": {
+      "command": "bunx",
+      "args": [
+        "@agentdeskai/browser-tools-mcp"
+      ],
+      "env": {}
+    },
+    "playwright-mcp": {
+      "command": "bunx",
+      "args": [
+        "playwright-mcp"
+      ],
+      "env": {}
+    }
+  }
+}

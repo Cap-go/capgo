@@ -60,15 +60,59 @@ export function getDrizzleClientD1(c: Context) {
 }
 
 export function getDrizzleClientD1Session(c: Context) {
-  // TODO: try when available in Cloudflare
-  const token = c.req.raw.headers.get('x-d1-token') ?? 'first-unconditional'
-  const session = c.env.DB_REPLICATE.withSession(token)
+  if (!existInEnv(c, 'DB_REPLICATE')) {
+    throw new Error('DB_REPLICATE is not set')
+  }
+  const session = c.env.DB_REPLICATE.withSession()
   return drizzleD1(session)
 }
 
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
   // console.log(c.get('requestId'), 'Closing client', client)
   return backgroundTask(c, client.end())
+}
+
+export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string, actions: ('mau' | 'storage' | 'bandwidth')[]): Promise<boolean> {
+  try {
+    const sqls = [sql`SELECT is_allowed_action_org_action(${orgId}, ARRAY[`]
+    actions.forEach((action, index) => index !== actions.length - 1 ? sqls.push(sql`${action},`) : sqls.push(sql`${action}`))
+    sqls.push(sql`]::action_type[]) AS is_allowed`)
+
+    const result = await drizzleCient.execute<{ is_allowed: boolean }>(
+      sql.join(sqls),
+    )
+    return result[0]?.is_allowed || false
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
+  }
+  return false
+}
+
+export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: ReturnType<typeof getDrizzleClientD1>, orgId: string, actions: ('mau' | 'storage' | 'bandwidth')[]): Promise<boolean> {
+  try {
+    const conditions = actions.map(action => `${action}_exceeded = 0`).join(' AND ')
+    const subQuery = sql<boolean>`EXISTS (
+      SELECT 1
+      FROM ${schemaV2.stripe_info}
+      WHERE customer_id = (SELECT customer_id FROM ${schemaV2.orgs} WHERE id = ${orgId})
+      AND (
+        (date(trial_at) > date('now'))
+        OR (
+          status = 'succeeded'
+          AND is_good_plan = 1
+          ${conditions ? sql` AND ${sql.raw(conditions)}` : sql``}
+        )
+      )
+    )`
+    const fullQuery = drizzleCient.select({ is_allowed: subQuery }).from(sql`(SELECT 1)`)
+    const result = await fullQuery
+    return result[0]?.is_allowed || false
+  }
+  catch (error) {
+    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrgActionD1', error })
+  }
+  return false
 }
 
 export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient>, orgId: string): Promise<boolean> {
@@ -133,7 +177,6 @@ export function requestInfosPostgres(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -148,16 +191,22 @@ export function requestInfosPostgres(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     },
     )
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
-  // v => version
   const channel = drizzleCient
     .select({
       version: {
@@ -169,7 +218,6 @@ export function requestInfosPostgres(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -184,9 +232,15 @@ export function requestInfosPostgres(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
           eq(channelAlias.public, true),
@@ -198,10 +252,10 @@ export function requestInfosPostgres(
           eq(channelAlias.name, defaultChannel),
         ),
     )
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
     .then(data => data.at(0))
 
-  // promise all
   return Promise.all([channelDevice, channel, appVersions])
     .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
     .catch((e) => {
@@ -219,6 +273,20 @@ export function requestInfosPostgresV2(
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
 
+  // Helper function to parse manifestEntries
+  const parseManifestEntries = (data: any, source: string) => {
+    const result = data.at(0)
+    if (result && typeof result.manifestEntries === 'string') {
+      try {
+        result.manifestEntries = JSON.parse(result.manifestEntries)
+      }
+      catch (e) {
+        console.error(`Error parsing manifestEntries for ${source}:`, e)
+      }
+    }
+    return result
+  }
+
   const appVersions = drizzleCient
     .select({
       id: versionAlias.id,
@@ -227,9 +295,8 @@ export function requestInfosPostgresV2(
     .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
     .then(data => data.at(0))
-  console.error({ context: 'requestInfosPostgresV2 appVersions', appVersions })
 
-  const channelDevice = drizzleCient
+  const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
@@ -244,7 +311,6 @@ export function requestInfosPostgresV2(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -259,17 +325,28 @@ export function requestInfosPostgresV2(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`,
     },
     )
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
 
-  // v => version
-  const channel = drizzleCient
+  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  const channelDevice = channelDeviceQuery.then((data) => {
+    console.log('channelDevice data:', data)
+    return parseManifestEntries(data, 'channelDevice')
+  })
+
+  const channelQuery = drizzleCient
     .select({
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -280,7 +357,6 @@ export function requestInfosPostgresV2(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -295,9 +371,15 @@ export function requestInfosPostgresV2(
         allow_device_self_set: channelAlias.allow_device_self_set,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
           eq(channelAlias.public, true),
@@ -309,12 +391,21 @@ export function requestInfosPostgresV2(
           eq(channelAlias.name, defaultChannel),
         ),
     )
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
 
-  // promise all
+  console.log('channel Query:', channelQuery.toSQL())
+  const channel = channelQuery.then((data) => {
+    console.log('channel data:', data)
+    return parseManifestEntries(data, 'channel')
+  })
+
   return Promise.all([channelDevice, channel, appVersions])
-    .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
+    .then(([channelOverride, channelData, versionData]) => {
+      const responseData = { versionData, channelData, channelOverride }
+      console.log('Final response data:', responseData)
+      return responseData
+    })
     .catch((e) => {
       throw e
     })
@@ -326,6 +417,7 @@ export async function getAppOwnerPostgresV2(
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
+    console.log('appOwner', appId)
     const appOwner = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
@@ -339,10 +431,11 @@ export async function getAppOwnerPostgresV2(
       .innerJoin(aliasV2(schemaV2.orgs, 'orgs'), eq(schemaV2.apps.owner_org, schemaV2.orgs.id))
       .limit(1)
       .then(data => data[0])
-
+    console.log('appOwner result', appOwner)
     return appOwner
   }
   catch (e: any) {
+    console.log('appOwner error', e)
     console.error({ requestId: c.get('requestId'), context: 'getAppOwnerPostgres', error: e })
     return null
   }

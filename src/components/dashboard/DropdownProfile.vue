@@ -135,7 +135,7 @@ async function logOut() {
 <template>
   <div>
     <div class="relative">
-      <div class="flex flex-col p-4 space-y-2 bg-gray-300 shadow dark:bg-base-100 rounded-box">
+      <div class="flex flex-col p-4 space-y-2 bg-gray-300 shadow dark:bg-base-200 rounded-box">
         <div class="flex items-center mb-4">
           <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 mask mask-squircle" :src="main.user?.image_url" alt="User" width="32" height="32">
           <div v-else class="p-2 mr-3 bg-gray-700 mask mask-squircle">
@@ -152,7 +152,7 @@ async function logOut() {
             </p>
           </div>
         </div>
-        <router-link to="/dashboard/settings/account" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <router-link to="/settings/account" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
           {{ t('settings') }}
         </router-link>
         <router-link v-if="isMobile" to="/app/modules" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">

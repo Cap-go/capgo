@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Organization } from '~/stores/organization'
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
@@ -17,15 +16,15 @@ const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 
-const route = useRoute('/app/package/[package]')
+const route = useRoute('/app/p/[package]')
 const appId = ref('')
-const organization = ref(null as null | Organization)
+// const organization = ref(null as null | Organization)
 const isOrgOwner = ref(false)
 
 watchEffect(async () => {
   try {
-    if (route.path.includes('/app') && !route.path.includes('home')) {
-      const appIdRaw = route.params.p as string || route.params.package as string
+    if (route.path.includes('/app/p/')) {
+      const appIdRaw = route.params.package as string
       if (!appIdRaw) {
         console.error('cannot get app id. Parms:', route.params)
         return
@@ -33,14 +32,12 @@ watchEffect(async () => {
 
       appId.value = urlToAppId(appIdRaw)
       await organizationStore.awaitInitialLoad()
-      organization.value = organizationStore.getOrgByAppId(appId.value) ?? null
     }
     else if (route.path.includes('/app') && route.path.includes('home')) {
       appId.value = ''
-      organization.value = null
     }
 
-    isOrgOwner.value = !!organization.value && organization.value.created_by === main.user?.id
+    isOrgOwner.value = !!organizationStore.currentOrganization && organizationStore.currentOrganization.created_by === main.user?.id
   }
   catch (ed) {
     console.error('Cannot figure out app_id for banner', ed)
@@ -49,8 +46,16 @@ watchEffect(async () => {
 
 const isMobile = Capacitor.isNativePlatform()
 
+const bannerLeftText = computed(() => {
+  const org = organizationStore.currentOrganization
+  if (org?.paying)
+    return t('billing')
+
+  return t('free-trial')
+})
+
 const bannerText = computed(() => {
-  const org = organization.value
+  const org = organizationStore.currentOrganization
   if (!org)
     return
 
@@ -72,11 +77,11 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
-  const warning = 'bg-warning'
+  const warning = 'btn-warning'
   // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
-  const success = 'bg-success'
+  const success = 'btn-success'
 
-  const org = organization.value
+  const org = organizationStore.currentOrganization
   if (!org)
     return
 
@@ -103,13 +108,15 @@ const bannerColor = computed(() => {
 </script>
 
 <template>
-  <div v-if="bannerText" class="navbar" :class="bannerColor">
-    <div class="navbar-start" />
+  <div v-if="bannerText" class="navbar bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
+    <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
+      {{ bannerLeftText }}
+    </div>
     <div class="navbar-center lg:flex">
-      <a class="text-xl font-bold text-black normal-case">{{ bannerText }}</a>
+      <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a href="/dashboard/settings/organization/plans" class="btn btn-outline btn-primary">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <a href="/settings/organization/plans" class="btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
     </div>
   </div>
 </template>

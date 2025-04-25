@@ -10,11 +10,15 @@ interface GetLatest {
 }
 
 export async function deleteBundle(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id)
+  if (!body.app_id) {
+    console.error('Cannot delete bundle', 'Missing app_id')
     return c.json({ status: 'Missing app_id' }, 400)
+  }
 
-  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key)))
+  if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
+    console.error('Cannot delete bundle', 'You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+  }
 
   try {
     if (body.version) {
@@ -27,8 +31,10 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
         .eq('name', body.version)
         .select()
         .single()
-      if (dbError || !data)
+      if (dbError || !data) {
+        console.error('Cannot delete version', dbError)
         return c.json({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
+      }
     }
     else {
       const { error: dbError } = await supabaseAdmin(c)
@@ -37,11 +43,14 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
           deleted: true,
         })
         .eq('app_id', body.app_id)
-      if (dbError)
+      if (dbError) {
+        console.error('Cannot delete all version', dbError)
         return c.json({ status: 'Cannot delete all version', error: JSON.stringify(dbError) }, 400)
+      }
     }
   }
   catch (e) {
+    console.error('Cannot delete bundle', e)
     return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
   return c.json(BRES)

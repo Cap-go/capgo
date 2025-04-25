@@ -1,4 +1,4 @@
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
+import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { HTTPException } from 'hono/http-exception'
@@ -9,13 +9,12 @@ import { app as channel_self } from '../../supabase/functions/_backend/plugins/c
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
-import { app as update_stats } from '../../supabase/functions/_backend/private/updates_stats.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as updates_lite } from '../../supabase/functions/_backend/plugins/updates_lite.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('*', sentry({
   release: version,
@@ -28,8 +27,6 @@ app.route('/plugin/ok', ok)
 app.route('/plugin/channel_self', channel_self)
 app.route('/plugin/updates', updates)
 app.route('/plugin/updates_v2', updates)
-app.route('/plugin/updates_stats', update_stats)
-app.route('/plugin/updates_debug', updates)
 app.route('/plugin/stats', stats)
 app.route('/plugin/latency_drizzle', latency_drizzle)
 
@@ -37,11 +34,11 @@ app.route('/plugin/latency_drizzle', latency_drizzle)
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
 app.route('/updates_v2', updates)
-app.route('/updates_debug', updates)
 app.route('/updates_lite', updates_lite)
 app.route('/stats', stats)
 
 app.onError((e, c) => {
+  console.log('app onError', e)
   c.get('sentry').captureException(e)
   if (e instanceof HTTPException) {
     if (e.status === 429) {
@@ -49,7 +46,6 @@ app.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
   }
-  console.log('app', 'onError', e)
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 

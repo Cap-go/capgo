@@ -1,8 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { getPgClient } from '../../../utils/pg.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -28,31 +27,40 @@ const memberSchema = z.object({
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
-  if (!bodyParsed.success)
+  if (!bodyParsed.success) {
+    console.error('Invalid body', bodyParsed.error)
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+  }
   const body = bodyParsed.data
 
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId)))
+  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
+    console.error('You can\'t access this organization', body.orgId)
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
+  }
 
-  const pgClient = getPgClient(c)
   try {
-    const result = await pgClient`
-      SELECT users.id as uid, users.email, users.image_url, o.user_right as role 
-      FROM org_users as o 
-      JOIN users ON users.id = o.user_id 
-      WHERE o.org_id=${body.orgId} 
-      AND (is_member_of_org(users.id, o.org_id) OR is_owner_of_org(users.id, o.org_id))
-    `
+    const { data, error } = await supabaseAdmin(c)
+      .rpc('get_org_members', {
+        user_id: apikey.user_id,
+        guild_id: body.orgId,
+      })
 
-    const parsed = memberSchema.safeParse(result)
+    console.log('data', data, error)
+    if (error) {
+      console.error('Cannot get organization members', error)
+      return c.json({ status: 'Cannot get organization members', error: error.message }, 500)
+    }
+
+    const parsed = memberSchema.safeParse(data)
     if (!parsed.success) {
+      console.error('Cannot parse members', parsed.error)
       return c.json({ status: 'Cannot get organization members', error: parsed.error.message }, 500)
     }
+    console.log('Members', parsed.data)
     return c.json(parsed.data)
   }
   catch (error) {
-    await pgClient.end()
-    return c.json({ status: 'Cannot get members', error: error.message }, 500)
+    console.error('Cannot get members', error)
+    return c.json({ status: 'Cannot get members', error: error instanceof Error ? error.message : 'Unknown error' }, 500)
   }
 }

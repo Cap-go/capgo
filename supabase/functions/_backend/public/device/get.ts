@@ -18,8 +18,10 @@ export function filterDeviceKeys(devices: Database['public']['Tables']['devices'
 }
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key)))
+  if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
+    console.error('Cannot get device', 'You can\'t access this app', body.app_id)
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+  }
 
   // start is 30 days ago
   const rangeStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -33,8 +35,10 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id.toLowerCase()])
     console.log('res', res)
 
-    if (!res || !res.length)
+    if (!res || !res.length) {
+      console.error('Cannot find device', 'Cannot find device', body.device_id)
       return c.json({ status: 'Cannot find device' }, 400)
+    }
     const dataDevice = filterDeviceKeys(res as any)[0]
     // get version from device
     const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin(c)
@@ -42,8 +46,10 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .select('id, name')
       .eq('id', dataDevice.version)
       .single()
-    if (dbErrorVersion || !dataVersion)
+    if (dbErrorVersion || !dataVersion) {
+      console.error('Cannot find version', 'Cannot find version', dataDevice.version)
       return c.json({ status: 'Cannot find version', error: dbErrorVersion }, 400)
+    }
     dataDevice.version = dataVersion as any
     return c.json(dataDevice)
   }
@@ -53,8 +59,10 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const to = (fetchOffset + 1) * fetchLimit - 1
     const res = await readDevices(c, body.app_id, from, to, undefined)
 
-    if (!res)
+    if (!res) {
+      console.error('Cannot get devices', 'Cannot get devices')
       return c.json([])
+    }
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
@@ -66,12 +74,15 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       `)
       .in('id', versionIds)
     // replace version with object from app_versions table
-    if (dbErrorVersions || !dataVersions || !dataVersions.length)
+    if (dbErrorVersions || !dataVersions || !dataVersions.length) {
+      console.error('Cannot get versions', 'Cannot get versions', dbErrorVersions)
       return c.json([])
+    }
     dataDevices.forEach((device) => {
       const version = dataVersions.find((v: any) => v.id === device.version)
-      if (version)
+      if (version) {
         device.version = version as any
+      }
     })
     return c.json(dataDevices)
   }

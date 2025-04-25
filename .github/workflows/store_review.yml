@@ -3,10 +3,10 @@ name: Send app to review
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 on:
   workflow_dispatch:
-      
+
 jobs:
   release_android:
     runs-on: ubuntu-latest
@@ -15,19 +15,19 @@ jobs:
       - name: Setup java
         uses: actions/setup-java@v4
         with:
-            distribution: 'zulu'
-            java-version: '17'
+          distribution: zulu
+          java-version: '17'
       - name: Decode Keystore File
         uses: timheuer/base64-to-file@v1
         id: android_keystore
         with:
-          fileName: "android_keystore.keystore"
+          fileName: android_keystore.keystore
           encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
       - name: Decode Google Play Confi File
         uses: timheuer/base64-to-file@v1
         id: service_account_json_file
         with:
-          fileName: "serviceAccount.json"
+          fileName: serviceAccount.json
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
       - uses: maierj/fastlane-action@v2.3.0
         env:
@@ -40,16 +40,16 @@ jobs:
         with:
           lane: android prod_release
   release_ios:
-      runs-on: macOS-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: ruby/setup-ruby@v1
-          with:
-            ruby-version: '2.7.2'
-        - uses: maierj/fastlane-action@v2.3.0
-          env:
-            GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
-            GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-            APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
-          with:
-            lane: ios submit_review
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7.2
+      - uses: maierj/fastlane-action@v2.3.0
+        env:
+          GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+          GIT_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+        with:
+          lane: ios submit_review

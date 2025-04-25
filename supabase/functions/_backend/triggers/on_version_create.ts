@@ -1,13 +1,13 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<InsertPayload<typeof table>>()
@@ -27,7 +27,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       return c.json(BRES)
     }
 
-    const { error: errorUpdate } = await supabaseAdmin(c)
+    const { error: errorUpdate } = await supabaseAdmin(c as any)
       .from('apps')
       .update({
         last_version: record.name,
@@ -45,7 +45,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
     }
 
     // create app version meta
-    const { error: dbError } = await supabaseAdmin(c)
+    const { error: dbError } = await supabaseAdmin(c as any)
       .from('app_versions_meta')
       .insert({
         id: record.id,

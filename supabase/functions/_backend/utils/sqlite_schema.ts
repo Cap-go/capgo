@@ -10,74 +10,82 @@ const boolean = customType<{ data: boolean }>({
 })
 
 export const apps = sqliteTable('apps', {
-  id: text('id').primaryKey().unique(),
-  owner_org: text('owner_org').notNull(),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
+  id: text('id').primaryKey(),
   app_id: text('app_id').notNull(),
   icon_url: text('icon_url').notNull(),
-  user_id: text('user_id').notNull(),
-  name: text('name').unique(),
+  user_id: text('user_id'),
+  name: text('name'),
   last_version: text('last_version'),
-  updated_at: integer('updated_at', { mode: 'timestamp' }),
   retention: integer('retention', { mode: 'number' }).notNull().default(2592000),
-  default_upload_channel: text('default_upload_channel'),
+  owner_org: text('owner_org').notNull(),
+  default_upload_channel: text('default_upload_channel').default('dev').notNull(),
+  transfer_history: text('transfer_history', { mode: 'json' }),
 })
+
 export const app_versions = sqliteTable('app_versions', {
   id: integer('id', { mode: 'number' }).primaryKey().notNull(),
   owner_org: text('owner_org').notNull(),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  app_id: text('app_id').notNull().references(() => apps.name),
+  app_id: text('app_id').notNull(),
   name: text('name').notNull(),
   r2_path: text('r2_path'),
   user_id: text('user_id'),
-  updated_at: integer('updated_at', { mode: 'timestamp' }),
-  deleted: boolean('deleted').default(false),
+  deleted: boolean('deleted').default(false).notNull(),
   external_url: text('external_url'),
   checksum: text('checksum'),
   session_key: text('session_key'),
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: text('min_update_version'),
-  manifest: text('manifest', { mode: 'json' }),
+})
+
+export const manifest = sqliteTable('manifest', {
+  id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  app_version_id: integer('app_version_id', { mode: 'number' }).notNull(),
+  file_name: text('file_name').notNull(),
+  s3_path: text('s3_path').notNull(),
+  file_hash: text('file_hash').notNull(),
 })
 
 export const channels = sqliteTable('channels', {
   id: integer('id', { mode: 'number' }).primaryKey().notNull(),
-  owner_org: text('owner_org').notNull(),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
   name: text('name').notNull(),
-  app_id: text('app_id').notNull().references(() => apps.name),
-  version: integer('version', { mode: 'number' }).notNull().references(() => app_versions.id),
+  app_id: text('app_id').notNull(),
+  version: integer('version', { mode: 'number' }).notNull(),
   created_by: text('created_by'),
-  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
-  public: boolean('public').notNull().default(false),
-  disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
-  disable_auto_update: text('disable_auto_update', { enum: ['major', 'minor', 'patch', 'version_number', 'none'] }).default('major').notNull(),
+  owner_org: text('owner_org').notNull(),
+  public: boolean('public').default(false).notNull(),
+  disable_auto_update_under_native: boolean('disable_auto_update_under_native').default(true).notNull(),
+  disable_auto_update: text('disable_auto_update').default('major').notNull(),
   ios: boolean('ios').default(true).notNull(),
-  android: boolean('android').notNull().default(true),
+  android: boolean('android').default(true).notNull(),
   allow_device_self_set: boolean('allow_device_self_set').default(false).notNull(),
-  allow_emulator: boolean('allow_emulator').notNull().default(true),
-  allow_dev: boolean('allow_dev').notNull().default(true),
+  allow_emulator: boolean('allow_emulator').default(true).notNull(),
+  allow_dev: boolean('allow_dev').default(true).notNull(),
 })
 
 export const channel_devices = sqliteTable('channel_devices', {
   id: integer('id', { mode: 'number' }).primaryKey().notNull(),
-  owner_org: text('owner_org').notNull(),
+  channel_id: integer('channel_id', { mode: 'number' }).notNull(),
+  app_id: text('app_id').notNull(),
   device_id: text('device_id').notNull(),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
-  channel_id: integer('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
-  app_id: text('app_id').notNull().references(() => apps.name),
+  owner_org: text('owner_org').notNull(),
 })
 
 export const orgs = sqliteTable('orgs', {
   id: text('id').primaryKey().notNull(),
   created_by: text('created_by').notNull(),
-  created_at: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updated_at: integer('updated_at', { mode: 'timestamp' }).notNull(),
   logo: text('logo'),
   name: text('name').notNull(),
   management_email: text('management_email').notNull(),
   customer_id: text('customer_id'),
 })
 
-export type AppVersionsType = typeof app_versions.$inferInsert
+export const stripe_info = sqliteTable('stripe_info', {
+  id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  customer_id: text('customer_id'),
+  status: text('status'),
+  trial_at: text('trial_at'),
+  is_good_plan: boolean('is_good_plan'),
+  mau_exceeded: boolean('mau_exceeded'),
+  storage_exceeded: boolean('storage_exceeded'),
+  bandwidth_exceeded: boolean('bandwidth_exceeded'),
+})

@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-// import { Http } from '@capacitor-community/http'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
@@ -11,12 +10,16 @@ let supaClient: SupabaseClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
-interface CapgoConfig {
+export interface CapgoConfig {
   supaHost: string
   supaKey: string
   supbaseId: string
   host: string
   hostWeb: string
+}
+
+export function isLocal(supaHost: string) {
+  return supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
 }
 
 export function getLocalConfig() {
@@ -119,7 +122,7 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     return ''
 
   const currentJwt = currentSession.session.access_token
-  const res = await ky.post(`${defaultApiHost}/private/download_link`, {
+  const res = await ky.post(`${defaultApiHost}/files/download_link`, {
     json: data,
     headers: {
       Authorization: `Bearer ${currentJwt}`,
@@ -162,6 +165,7 @@ export interface appUsageByApp {
   mau: number
   storage: number
   bandwidth: number
+  get: number
 }
 
 export interface appUsageByVersion {
@@ -177,6 +181,7 @@ export interface appUsageGlobal {
   bandwidth: number
   mau: number
   storage: number
+  get: number
 }
 
 export interface appUsageGlobalByApp {
@@ -203,7 +208,7 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
       }).then((res) => {
         if (res.error)
           throw new Error(res.error.message)
-        return (res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string }[] }).statistics
+        return (res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string, get: number }[] }).statistics
       }),
       // Get app statistics for all apps
       Promise.all(resAppIds.map(appId =>
@@ -212,13 +217,14 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
         }).then((res) => {
           if (res.error)
             throw new Error(res.error.message)
-          const typedData = res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string }[] }
+          const typedData = res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string, get: number }[] }
           return typedData.statistics.map(stat => ({
             app_id: appId,
             date: stat.date,
             mau: stat.mau,
             storage: stat.storage,
             bandwidth: stat.bandwidth,
+            get: stat.get,
           }))
         }),
       )).then(stats => stats.flat()),
@@ -333,19 +339,6 @@ export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
     throw new Error(error.message)
 
   return data || false
-}
-
-export async function getOrgs(): Promise<Database['public']['Tables']['orgs']['Row'][]> {
-  const { data, error } = await useSupabase()
-    .from('orgs')
-    .select('*')
-
-  if (error) {
-    console.error('getOrgs error', error.message)
-    throw error
-  }
-
-  return data || []
 }
 
 export async function isTrialOrg(orgId: string): Promise<number> {

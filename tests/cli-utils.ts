@@ -1,11 +1,10 @@
 import type { ExecSyncOptions } from 'node:child_process'
-import type { Readable } from 'node:stream'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
 import { sync as rimrafSync } from 'rimraf'
-import { APIKEY_TEST, BASE_URL } from './test-utils'
+import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -14,13 +13,20 @@ export const BASE_PACKAGE_JSON = `{
   "description": "An Amazing Test App",
   "dependencies": %DEPENDENCIES%,
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
+    "@capacitor/cli": "^7.0.0",
     "typescript": "^5.2.2"
   },
   "author": ""
 }`
 export const BASE_DEPENDENCIES = {
+  '@capacitor/android': '^7.0.0',
+  '@capacitor/core': '7.0.0',
+  '@capgo/capacitor-updater': '7.0.38',
+}
+export const BASE_DEPENDENCIES_OLD = {
   '@capacitor/android': '^6.0.0',
+  '@capacitor/core': '6.0.0',
+  '@capgo/capacitor-updater': '6.14.17',
 }
 export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
 
@@ -61,7 +67,7 @@ export function setDependencies(dependencies: Record<string, string>, id: string
   writeFileSync(pathPack, res)
 }
 export function deleteAllTempFolders() {
-  console.log('Deleting all temp folders')
+  // console.log('Deleting all temp folders')
   rimrafSync(TEMP_DIR_NAME)
 }
 
@@ -77,7 +83,7 @@ export function getSemver(semver = `1.0.${Date.now()}`) {
   return newSemver
 }
 
-export async function prepareCli(appId: string, id: string) {
+export async function prepareCli(appId: string, id: string, old = false) {
   const defaultConfig = generateCliConfig(appId)
   deleteTempFolders(id)
   mkdirSync(tempFileFolder(id), { recursive: true })
@@ -88,7 +94,7 @@ export async function prepareCli(appId: string, id: string) {
   mkdirSync(join(tempFileFolder(id), 'dist'), { recursive: true })
   writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(join(tempFileFolder(id), 'dist', 'index.html'), '')
-  setDependencies(BASE_DEPENDENCIES, id, appId)
+  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, id, appId)
 
   npmInstall(id)
 }
@@ -98,7 +104,7 @@ export function cleanupCli(id: string) {
   deleteTempFolders(id)
 }
 
-function npmInstall(id: string) {
+export function npmInstall(id: string) {
   try {
     execSync('bun install', { cwd: tempFileFolder(id), stdio: 'ignore' })
   }
@@ -117,7 +123,7 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
     localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath || '@capgo/cli@latest',
     ...params,
-    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST] : []),
+    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
   ].join(' ')
 
   const options: ExecSyncOptions = {
@@ -130,20 +136,19 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
   try {
     const output = execSync(command, options)
 
-    if (logOutput)
-      console.log('CLI execution successful:\n', output)
+    if (logOutput) {
+      // console.log('CLI execution successful')
+      console.log(output)
+    }
 
     return output.toString()
   }
   catch (error: any) {
-    console.log('CLI execution failed with error:', error)
-    const errorOutput = error.stdout?.toString() ?? ''
-    const errorMessage = error.stderr?.toString() ?? ''
-    const fullError = `Command: ${command}\nStdout: ${errorOutput}\nStderr: ${errorMessage}\nError: ${error.message}`
+    if (logOutput) {
+      console.error('CLI execution failed')
+      console.error(error.stdout)
+    }
 
-    if (logOutput)
-      console.error('CLI execution failed:\n', fullError)
-
-    return fullError
+    return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message
   }
 }

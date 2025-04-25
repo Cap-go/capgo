@@ -12,7 +12,7 @@ import IconDashboard from '~icons/ic/round-space-dashboard'
 import IconApiKey from '~icons/mdi/shield-key'
 import UserMenu from '../components/dashboard/DropdownProfile.vue'
 
-const props = defineProps < {
+const props = defineProps <{
   sidebarOpen: boolean
 }>()
 
@@ -39,12 +39,12 @@ const tabs = ref<Tab[]>([
   {
     label: 'dashboard',
     icon: shallowRef(IconDashboard),
-    key: '/app/home',
+    key: '/app',
   },
   {
     label: 'api-keys',
     icon: shallowRef(IconApiKey),
-    key: '/dashboard/apikeys',
+    key: '/apikeys',
   },
   // {
   //   label: t('live-reload'),
@@ -72,9 +72,9 @@ const tabs = ref<Tab[]>([
   <div>
     <!-- Sidebar backdrop (mobile only) -->
     <div
-      class="fixed inset-0 z-40 transition-opacity duration-200 bg-slate-900/50 lg:hidden"
+      class="fixed inset-0 z-40 transition-opacity duration-200 lg:hidden"
       :class="{
-        'bg-slate-900': props.sidebarOpen,
+        'bg-slate-900/50': props.sidebarOpen,
         'bg-slate-900/0 pointer-events-none': !props.sidebarOpen,
       }"
       aria-hidden="true"
@@ -93,7 +93,7 @@ const tabs = ref<Tab[]>([
     >
       <!-- Sidebar header -->
       <div class="flex justify-between px-3 py-4 border-b border-slate-800">
-        <router-link class="flex items-center space-x-2" to="/app/home">
+        <router-link class="flex items-center space-x-2 cursor-pointer" to="/app">
           <img src="/capgo.webp" alt="logo" class="w-8 h-8">
           <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 hover:text-white">Capgo</span>
         </router-link>
@@ -113,16 +113,16 @@ const tabs = ref<Tab[]>([
           <ul class="space-y-1">
             <li v-for="tab, i in tabs" :key="i">
               <button
-                class="flex items-center w-full p-2 transition duration-150 rounded-md text-slate-200"
+                class="flex items-center w-full p-2 transition duration-150 rounded-md text-slate-200 cursor-pointer hover:bg-slate-700/50"
                 :class="{
-                  'hover:bg-slate-800': !isTabActive(tab.key),
-                  'bg-slate-800 text-white': isTabActive(tab.key),
-                  'pointer-events-none': isTabActive(tab.key),
+                  'hover:bg-slate-700/50': !isTabActive(tab.key),
+                  'bg-slate-700 text-white': isTabActive(tab.key),
+                  'cursor-default': isTabActive(tab.key),
                 }"
                 @click="openTab(tab)"
               >
-                <component :is="tab.icon" class="w-5 h-5 shrink-0" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key) }" />
-                <span class="ml-3 text-sm font-medium first-letter:uppercase" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400': !isTabActive(tab.key), 'underline': tab.redirect }">
+                <component :is="tab.icon" class="w-5 h-5 shrink-0 transition-colors duration-150" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400 group-hover:text-slate-300': !isTabActive(tab.key) }" />
+                <span class="ml-3 text-sm font-medium first-letter:uppercase transition-colors duration-150" :class="{ 'text-blue-500': isTabActive(tab.key), 'text-slate-400 group-hover:text-slate-300': !isTabActive(tab.key), 'underline': tab.redirect }">
                   {{ t(tab.label) }}
                 </span>
               </button>
@@ -132,7 +132,7 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- User menu -->
-      <div class="px-3 py-4 mt-auto border-t border-slate-800">
+      <div class="px-3 py-4 mt-auto">
         <div v-if="main.user" class="flex items-center">
           <UserMenu class="w-full" />
         </div>

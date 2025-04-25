@@ -1,10 +1,11 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'node_modules/@hono/hono/_dist/src/context'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { BRES } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
-export async function post(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context<MiddlewareKeyVariables, any, object>, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (!body.device_id || !body.app_id) {
     console.log('Missing device_id or app_id')
     return c.json({ status: 'Missing device_id or app_id' }, 400)

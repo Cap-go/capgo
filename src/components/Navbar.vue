@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconMenu from '~icons/material-symbols/menu-rounded'
 import { useDisplayStore } from '~/stores/display'
-import { useMainStore } from '~/stores/main'
-import { getOrgs } from '../services/supabase'
 import Banner from './Banner.vue'
 
 const props = defineProps({
@@ -18,14 +16,7 @@ const props = defineProps({
 })
 
 defineEmits(['toggleSidebar'])
-const main = useMainStore()
 const isMobile = ref(Capacitor.isNativePlatform())
-
-const orgs = ref()
-onMounted(async () => {
-  if (main.user)
-    orgs.value = await getOrgs()
-})
 
 const router = useRouter()
 
@@ -40,7 +31,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900" :class="{ 'border-b border-slate-200 dark:border-slate-600': displayStore.NavTitle, 'border-b md:border-none border-slate-200 dark:border-slate-600': !displayStore.NavTitle }">
+  <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
     <div class="px-2 lg:px-8 sm:px-6">
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
@@ -62,8 +53,8 @@ const { t } = useI18n()
         </div>
 
         <!-- Centered title -->
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div class="font-bold text-md text-dark dark:text-white">
+        <div class="flex-1 px-4 text-center lg:text-left">
+          <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white">
             {{ displayStore.NavTitle }}
           </div>
         </div>

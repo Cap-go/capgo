@@ -1,5 +1,4 @@
-import type { Context } from '@hono/hono'
-
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
@@ -9,11 +8,11 @@ const bodySchema = z.object({
   user_id: z.string(),
 })
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareAuth, async (c) => {
   try {
     const authToken = c.req.header('authorization')
 
@@ -28,8 +27,8 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
-    const supabaseAdmin = await useSupabaseAdmin(c)
-    const supabaseClient = useSupabaseClient(c, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c as any)
+    const supabaseClient = useSupabaseClient(c as any, authToken)
 
     const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
     if (adminError) {
@@ -42,17 +41,14 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     const user_id = parsedBodyResult.data.user_id
 
-    const { data: userData, count: _userCount, error: userError } = await supabaseAdmin.from('users')
-      .select('email', { count: 'exact' })
-      .eq('id', user_id)
-      .single()
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id)
 
-    if (userError) {
+    if (userError || !userData?.user?.email) {
       console.error({ requestId: c.get('requestId'), context: 'user_does_not_exist', error: userError })
       return c.json({ error: 'user_does_not_exist' }, 400)
     }
 
-    const userEmail = userData?.email
+    const userEmail = userData?.user?.email
 
     const { data: magicLink, error: magicError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
@@ -64,7 +60,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       return c.json({ error: 'generate_magic_link_error' }, 500)
     }
 
-    const tmpSupabaseClient = emptySupabase(c)
+    const tmpSupabaseClient = emptySupabase(c as any)
     const { data: authData, error: authError } = await tmpSupabaseClient.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
     if (authError) {

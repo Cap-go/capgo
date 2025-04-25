@@ -2,21 +2,25 @@ import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
 
-const ORG_ID = '00000000-0000-0000-0000-000000000000'
+const ORG_ID = randomUUID()
+const id = randomUUID()
+const name = `Test Organization ${id}`
+
+// console.log('ORG_ID', ORG_ID)
 
 beforeEach(async () => {
-  // await resetAndSeedAppData(APPNAME)
   const { data } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
   if (data) {
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   }
+  // console.log('name', name)
   const { error } = await getSupabaseClient().from('orgs').insert({
     id: ORG_ID,
-    name: 'Test Organization',
-    management_email: 'test@test.com',
-    created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
+    name,
+    management_email: TEST_EMAIL,
+    created_by: USER_ID,
   })
   if (error)
     throw error
@@ -40,7 +44,7 @@ describe('[GET] /organization', () => {
     const type = z.object({ id: z.string(), name: z.string() })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data).toEqual({ id: ORG_ID, name: 'Test Organization' })
+    expect(safe.data).toEqual({ id: ORG_ID, name })
   })
 })
 
@@ -54,13 +58,13 @@ describe('[GET] /organization/members', () => {
       uid: z.string(),
       email: z.string(),
       image_url: z.string(),
-      role: z.string()
+      role: z.string(),
     }))
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
     expect(safe.data?.length).toBe(1)
-    expect(safe.data?.[0].uid).toBe('6aa76066-55ef-4238-ade6-0b32334a4097')
-    expect(safe.data?.[0].email).toBe('test@capgo.app')
+    expect(safe.data?.[0].uid).toBe(USER_ID)
+    expect(safe.data?.[0].email).toBe(USER_EMAIL)
     expect(safe.data?.[0].role).toBe('super_admin')
   })
 })
@@ -72,7 +76,7 @@ describe('[POST] /organization/members', () => {
       method: 'POST',
       body: JSON.stringify({
         orgId: ORG_ID,
-        email: 'admin@capgo.app',
+        email: USER_ADMIN_EMAIL,
         invite_type: 'read',
       }),
     })
@@ -86,10 +90,10 @@ describe('[POST] /organization/members', () => {
     expect(safe.success).toBe(true)
     expect(safe.data?.status).toBe('OK')
 
-    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', 'admin@capgo.app').single()
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userError).toBeNull()
     expect(userData).toBeTruthy()
-    expect(userData?.email).toBe('admin@capgo.app')
+    expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
     const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
     expect(error).toBeNull()
@@ -101,10 +105,10 @@ describe('[POST] /organization/members', () => {
 
 describe('[DELETE] /organization/members', () => {
   it('delete organization member', async () => {
-    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', 'admin@capgo.app').single()
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userError).toBeNull()
     expect(userData).toBeTruthy()
-    expect(userData?.email).toBe('admin@capgo.app')
+    expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
     const { error } = await getSupabaseClient().from('org_users').insert({
       org_id: ORG_ID,
@@ -113,7 +117,7 @@ describe('[DELETE] /organization/members', () => {
     })
     expect(error).toBeNull()
 
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=admin@capgo.app`, {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
       headers,
       method: 'DELETE',
     })
@@ -132,34 +136,11 @@ describe('[DELETE] /organization/members', () => {
 })
 
 describe('[POST] /organization', () => {
-  it('update organization', async () => {
-    const name = `Updated Organization ${new Date().toISOString()}`
-    const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
-      method: 'POST',
-      body: JSON.stringify({ orgId: ORG_ID, name }),
-    })
-    expect(response.status).toBe(200)
-    const type = z.object({
-      status: z.string(),
-    })
-    const safe = type.safeParse(await response.json())
-    expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('Organization updated')
-
-    const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe(name)
-  })
-})
-
-describe('[PUT] /organization', () => {
   it('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({ name }),
     })
     expect(response.status).toBe(200)
@@ -179,14 +160,37 @@ describe('[PUT] /organization', () => {
   })
 })
 
-describe.todo('[DELETE] /organization', () => {
-  it.todo('delete organization', async () => {
+describe('[PUT] /organization', () => {
+  it('update organization', async () => {
+    const name = `Updated Organization ${new Date().toISOString()}`
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({ orgId: ORG_ID, name }),
+    })
+    expect(response.status).toBe(200)
+    const type = z.object({
+      status: z.string(),
+    })
+    const safe = type.safeParse(await response.json())
+    expect(safe.success).toBe(true)
+    expect(safe.data?.status).toBe('Organization updated')
+
+    const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
+    expect(error).toBeNull()
+    expect(data).toBeTruthy()
+    expect(data?.name).toBe(name)
+  })
+})
+
+describe('[DELETE] /organization', () => {
+  it('delete organization successfully', async () => {
     const id = randomUUID()
     const { error } = await getSupabaseClient().from('orgs').insert({
       id,
       name: `Test Organization ${new Date().toISOString()}`,
-      management_email: 'test@test.com',
-      created_by: '6aa76066-55ef-4238-ade6-0b32334a4097',
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
     })
     expect(error).toBeNull()
 
@@ -199,9 +203,93 @@ describe.todo('[DELETE] /organization', () => {
       method: 'DELETE',
     })
     expect(response.status).toBe(200)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Organization deleted')
 
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
     expect(errorOrg2).toBeTruthy()
     expect(dataOrg2).toBeNull()
+  })
+
+  it('fail to delete non-existent organization', async () => {
+    const nonExistentId = randomUUID()
+
+    const response = await fetch(`${BASE_URL}/organization?orgId=${nonExistentId}`, {
+      headers,
+      method: 'DELETE',
+    })
+
+    // Should return error as the organization doesn't exist
+    expect(response.status).toBeGreaterThanOrEqual(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).not.toBe('Organization deleted')
+  })
+
+  it('fail to delete organization not owned by user', async () => {
+    // First, get an existing user that's not our test user
+    const { data: anotherUser, error: userError } = await getSupabaseClient()
+      .from('users')
+      .select('id')
+      .neq('id', USER_ID)
+      .limit(1)
+      .single()
+
+    expect(userError).toBeNull()
+    expect(anotherUser).toBeTruthy()
+
+    // Skip the test if we couldn't find another user
+    if (!anotherUser) {
+      console.warn('Skipping test: Could not find another user to use as owner')
+      return
+    }
+
+    // Create organization with a different owner
+    const id = randomUUID()
+    const differentOwnerId = anotherUser.id
+
+    const { error } = await getSupabaseClient().from('orgs').insert({
+      id,
+      name: `Organization Not Owned ${new Date().toISOString()}`,
+      management_email: `not-owned-${id}@example.com`,
+      created_by: differentOwnerId, // Use an existing user ID
+    })
+    expect(error).toBeNull()
+
+    // Verify organization was created
+    const { data: dataOrg, error: errorOrg } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
+    expect(errorOrg).toBeNull()
+    expect(dataOrg).toBeTruthy()
+
+    if (dataOrg) {
+      expect(dataOrg.created_by).toBe(differentOwnerId)
+    }
+
+    // Add test user as a member but not owner
+    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+      org_id: id,
+      user_id: USER_ID,
+      user_right: 'admin', // Even with admin rights, shouldn't be able to delete
+    })
+    expect(memberError).toBeNull()
+
+    // Try to delete the organization
+    const response = await fetch(`${BASE_URL}/organization?orgId=${id}`, {
+      headers,
+      method: 'DELETE',
+    })
+
+    // Should be forbidden since the user isn't the owner
+    expect(response.status).toBe(403)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Only the organization owner can delete an organization')
+
+    // Verify the organization still exists
+    const { data: dataOrgAfter, error: errorOrgAfter } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
+    expect(errorOrgAfter).toBeNull()
+    expect(dataOrgAfter).toBeTruthy()
+
+    // Clean up
+    await getSupabaseClient().from('org_users').delete().eq('org_id', id).eq('user_id', USER_ID)
+    await getSupabaseClient().from('orgs').delete().eq('id', id)
   })
 })

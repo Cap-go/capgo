@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -6,27 +6,27 @@ import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
-    const LogSnag = logsnag(c)
-    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+    const LogSnag = logsnag(c as any)
+    if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no secret found' }, 400)
 
     const signature = c.req.raw.headers.get('stripe-signature')
-    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY'))
+    if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY'))
       return c.json({ status: 'Webhook Error: no signature' }, 400)
     // event.headers
     const body = await c.req.text()
-    const stripeEvent = await parseStripeEvent(c, body, signature!)
-    const stripeDataEvent = extractDataEvent(c, stripeEvent)
+    const stripeEvent = await parseStripeEvent(c as any, body, signature!)
+    const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '')
       return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
 
     // find email from user with customer_id
-    const { error: dbError, data: org } = await supabaseAdmin(c)
+    const { error: dbError, data: org } = await supabaseAdmin(c as any)
       .from('orgs')
       .select('id, management_email')
       .eq('customer_id', stripeData.customer_id)
@@ -36,7 +36,7 @@ app.post('/', async (c: Context) => {
     if (!org)
       return c.json('no user found', 500)
 
-    const { data: customer } = await supabaseAdmin(c)
+    const { data: customer } = await supabaseAdmin(c as any)
       .from('stripe_info')
       .select()
       .eq('customer_id', stripeData.customer_id)
@@ -54,19 +54,19 @@ app.post('/', async (c: Context) => {
       const status = stripeData.status
       let statusName: string = status || ''
       stripeData.status = 'succeeded'
-      const { data: plan } = await supabaseAdmin(c)
+      const { data: plan } = await supabaseAdmin(c as any)
         .from('plans')
         .select()
         .eq('stripe_id', stripeData.product_id)
         .single()
       if (plan) {
-        const { error: dbError2 } = await supabaseAdmin(c)
+        const { error: dbError2 } = await supabaseAdmin(c as any)
           .from('stripe_info')
           .update(stripeData)
           .eq('customer_id', stripeData.customer_id)
         if (stripeDataEvent.isUpgrade && stripeDataEvent.previousProductId) {
           statusName = 'upgraded'
-          const previousProduct = await supabaseAdmin(c)
+          const previousProduct = await supabaseAdmin(c as any)
             .from('plans')
             .select()
             .eq('stripe_id', stripeDataEvent.previousProductId)
@@ -87,11 +87,11 @@ app.post('/', async (c: Context) => {
         if (dbError2)
           return c.json({ error: JSON.stringify(dbError) }, 500)
 
-        const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id, plan)
+        const segment = await customerToSegmentOrg(c as any, org.id, stripeData.price_id, plan)
         const isMonthly = plan.price_m_id === stripeData.price_id
         const eventName = `user:subcribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
-        await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
-        await addTagBento(c, org.management_email, segment)
+        await trackBentoEvent(c as any, org.management_email, { plan_name: plan.name }, eventName)
+        await addTagBento(c as any, org.management_email, segment)
         await LogSnag.track({
           channel: 'usage',
           event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
@@ -104,17 +104,17 @@ app.post('/', async (c: Context) => {
         }).catch()
       }
       else {
-        const segment = await customerToSegmentOrg(c, org.id, stripeData.price_id)
-        await addTagBento(c, org.management_email, segment)
+        const segment = await customerToSegmentOrg(c as any, org.id, stripeData.price_id)
+        await addTagBento(c as any, org.management_email, segment)
       }
     }
     else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         const statusCopy = stripeData.status
         stripeData.status = 'succeeded'
-        const segment = await customerToSegmentOrg(c, org.id, 'canceled')
-        await addTagBento(c, org.management_email, segment)
-        await trackBentoEvent(c, org.management_email, {}, 'user:cancel')
+        const segment = await customerToSegmentOrg(c as any, org.id, 'canceled')
+        await addTagBento(c as any, org.management_email, segment)
+        await trackBentoEvent(c as any, org.management_email, {}, 'user:cancel')
         await LogSnag.track({
           channel: 'usage',
           event: 'User cancel',
@@ -125,7 +125,10 @@ app.post('/', async (c: Context) => {
         stripeData.status = statusCopy
       }
       stripeData.is_good_plan = false
-      const { error: dbError2 } = await supabaseAdmin(c)
+      stripeData.mau_exceeded = true
+      stripeData.storage_exceeded = true
+      stripeData.bandwidth_exceeded = true
+      const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update(stripeData)
         .eq('customer_id', stripeData.customer_id)
@@ -136,7 +139,7 @@ app.post('/', async (c: Context) => {
     const previousAttributes = stripeEvent.data.previous_attributes ?? {} as any
     if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === true && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === false) {
       // console.log('USER CANCELLED!!!!!!!!!!!!!!!')
-      const { error: dbError2 } = await supabaseAdmin(c)
+      const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update({ canceled_at: new Date().toISOString() })
         .eq('customer_id', stripeData.customer_id)
@@ -145,7 +148,7 @@ app.post('/', async (c: Context) => {
     }
     else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
       // console.log('USER UNCANCELED')
-      const { error: dbError2 } = await supabaseAdmin(c)
+      const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update({ canceled_at: null })
         .eq('customer_id', stripeData.customer_id)

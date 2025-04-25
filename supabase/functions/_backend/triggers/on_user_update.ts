@@ -1,13 +1,13 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { createApiKey } from '../utils/supabase.ts'
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c: Context) => {
+app.post('/', middlewareAPISecret, async (c) => {
   try {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<UpdatePayload<typeof table>>()
@@ -29,7 +29,7 @@ app.post('/', middlewareAPISecret, async (c: Context) => {
       console.log({ requestId: c.get('requestId'), context: 'No id' })
       return c.json(BRES)
     }
-    await createApiKey(c, record.id)
+    await createApiKey(c as any, record.id)
     return c.json(BRES)
   }
   catch (e) {

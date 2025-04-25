@@ -7,7 +7,7 @@ SELECT plan(8);
 -- Test get_current_plan_max_org
 SELECT results_eq(
     'SELECT (get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')).mau',
-    $$VALUES (500::bigint)$$,
+    $$VALUES (1000::bigint)$$,
     'get_current_plan_max_org test - correct mau'
 );
 SELECT results_eq(

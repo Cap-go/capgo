@@ -3,7 +3,7 @@ name: Build mobile android
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 on:
   workflow_dispatch:
     inputs:
@@ -42,19 +42,19 @@ jobs:
       - name: Setup java
         uses: actions/setup-java@v4
         with:
-            distribution: 'zulu'
-            java-version: '17'
+          distribution: zulu
+          java-version: '17'
       - name: Decode Keystore File
         uses: timheuer/base64-to-file@v1
         id: android_keystore
         with:
-          fileName: "android_keystore.keystore"
+          fileName: android_keystore.keystore
           encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
       - name: Decode Google Play Confi File
         uses: timheuer/base64-to-file@v1
         id: service_account_json_file
         with:
-          fileName: "serviceAccount.json"
+          fileName: serviceAccount.json
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
       - uses: ruby/setup-ruby@v1
         with:
