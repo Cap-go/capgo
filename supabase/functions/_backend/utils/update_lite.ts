@@ -211,7 +211,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = getManifestUrl(c, version.id, [] as any, device_id)
+        manifest = getManifestUrl(c, version.id, channelData.manifestEntries || [], device_id)
       }
     }
     //  check signedURL and if it's url

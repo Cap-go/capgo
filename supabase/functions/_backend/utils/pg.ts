@@ -143,6 +143,21 @@ function getAliasV2() {
   const channelAlias = aliasV2(schemaV2.channels, 'channels')
   return { versionAlias, channelDevicesAlias, channelAlias }
 }
+
+// Helper function to parse manifestEntries
+function parseManifestEntries(data: any, source: string) {
+  const result = data.at(0)
+  if (result && typeof result.manifestEntries === 'string') {
+    try {
+      result.manifestEntries = JSON.parse(result.manifestEntries)
+    }
+    catch (e) {
+      console.error(`Error parsing manifestEntries for ${source}:`, e)
+    }
+  }
+  return result
+}
+
 export function requestInfosPostgres(
   platform: string,
   app_id: string,
@@ -272,20 +287,6 @@ export function requestInfosPostgresV2(
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAliasV2()
-
-  // Helper function to parse manifestEntries
-  const parseManifestEntries = (data: any, source: string) => {
-    const result = data.at(0)
-    if (result && typeof result.manifestEntries === 'string') {
-      try {
-        result.manifestEntries = JSON.parse(result.manifestEntries)
-      }
-      catch (e) {
-        console.error(`Error parsing manifestEntries for ${source}:`, e)
-      }
-    }
-    return result
-  }
 
   const appVersions = drizzleCient
     .select({
@@ -496,7 +497,6 @@ export function requestInfosPostgresLite(
         external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
         min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
         r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
       },
       channels: {
         id: channelAlias.id,
@@ -504,15 +504,22 @@ export function requestInfosPostgresLite(
         app_id: channelAlias.app_id,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(and(
       eq(channelAlias.public, true),
       eq(channelAlias.app_id, app_id),
     ))
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+    .then(data => parseManifestEntries(data, 'channel'))
 
   return Promise.all([channel, appVersions])
     .then(([channelData, versionData]) => ({ versionData, channelData }))
@@ -555,15 +562,22 @@ export function requestInfosPostgresLiteV2(
         app_id: channelAlias.app_id,
         public: channelAlias.public,
       },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`,
     })
     .from(channelAlias)
     .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(and(
       eq(channelAlias.public, true),
       eq(channelAlias.app_id, app_id),
     ))
+    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+    .then(data => parseManifestEntries(data, 'channel'))
 
   return Promise.all([channel, appVersions])
     .then(([channelData, versionData]) => ({ versionData, channelData }))
