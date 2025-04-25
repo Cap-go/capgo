@@ -468,3 +468,55 @@ export async function getAppOwnerPostgres(
     return null
   }
 }
+
+export function requestInfosPostgresLite(
+  app_id: string,
+  version_name: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+) {
+  const { versionAlias, channelAlias } = getAlias()
+
+  const appVersions = drizzleCient
+    .select({
+      id: versionAlias.id,
+    })
+    .from(versionAlias)
+    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  const channel = drizzleCient
+    .select({
+      version: {
+        id: sql<number>`${versionAlias.id}`.as('vid'),
+        name: sql<string>`${versionAlias.name}`.as('vname'),
+        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+        manifest: sql`${versionAlias.manifest}`.mapWith(versionAlias.manifest).as('vmanifest'),
+      },
+      channels: {
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        public: channelAlias.public,
+      },
+    })
+    .from(channelAlias)
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .where(and(
+      eq(channelAlias.public, true),
+      eq(channelAlias.app_id, app_id),
+    ))
+    .limit(1)
+    .then(data => data.at(0))
+
+  return Promise.all([channel, appVersions])
+    .then(([channelData, versionData]) => ({ versionData, channelData }))
+    .catch((e) => {
+      throw e
+    })
+}

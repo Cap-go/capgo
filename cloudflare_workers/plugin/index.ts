@@ -10,6 +10,7 @@ import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
+import { app as updates_lite } from '../../supabase/functions/_backend/plugins/updates_lite.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
@@ -33,6 +34,7 @@ app.route('/plugin/latency_drizzle', latency_drizzle)
 app.route('/channel_self', channel_self)
 app.route('/updates', updates)
 app.route('/updates_v2', updates)
+app.route('/updates_lite', updates_lite)
 app.route('/stats', stats)
 
 app.onError((e, c) => {
