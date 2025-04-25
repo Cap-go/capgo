@@ -15,7 +15,7 @@ app.use('/', useCors)
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<TrackOptions>()
-    console.log({ requestId: c.get('requestId'), context: 'post private/stats body', body })
+    console.log({ requestId: c.get('requestId'), message: 'post private/stats body', body })
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')
     const supabase = supabaseAdmin(c as any)
@@ -32,7 +32,7 @@ app.post('/', async (c) => {
         return c.json({ status: 'not authorize' }, 400)
     }
     else {
-      console.log({ requestId: c.get('requestId'), context: 'error no auth', auth: authorization })
+      console.log({ requestId: c.get('requestId'), message: 'error no auth', auth: authorization })
       return c.json({ status: 'You can\'t access this, auth not found' }, 400)
     }
     await logsnag(c as any).track(body)

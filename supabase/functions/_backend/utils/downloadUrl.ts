@@ -19,7 +19,7 @@ export async function getBundleUrl(
   r2_path: string | null,
   deviceId: string,
 ) {
-  console.log({ requestId: c.get('requestId'), context: 'getBundleUrlV2 version', versionId })
+  console.log({ requestId: c.get('requestId'), message: 'getBundleUrlV2 version', versionId })
 
   const { data: bundleMeta } = await supabaseAdmin(c)
     .from('app_versions_meta')
@@ -27,14 +27,14 @@ export async function getBundleUrl(
     .eq('id', versionId)
     .single()
 
-  console.log({ requestId: c.get('requestId'), context: 'path', r2_path })
+  console.log({ requestId: c.get('requestId'), message: 'path', r2_path })
   if (!r2_path)
     return null
 
   if (getRuntimeKey() !== 'workerd') {
     try {
       const signedUrl = await s3.getSignedUrl(c, r2_path, EXPIRATION_SECONDS)
-      console.log({ requestId: c.get('requestId'), context: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
+      console.log({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
 
       const url = signedUrl
 

@@ -51,7 +51,7 @@ export const jsonRequestSchema = z.object({
 })
 
 async function post(c: Context, body: DeviceLink): Promise<Response> {
-  console.log({ requestId: c.get('requestId'), context: 'post channel self body', body })
+  console.log({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
     console.error({ requestId: c.get('requestId'), context: 'post channel self', error: parseResult.error })
@@ -166,7 +166,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .eq('name', channel)
       .single()
     if (dbError || !dataChannel) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot find channel', channel, app_id })
+      console.log({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
       console.error({ requestId: c.get('requestId'), context: 'Cannot find channel', dbError, dataChannel })
       return c.json({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
@@ -220,17 +220,17 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           error: 'override_not_allowed',
         }, 400)
       }
-      console.log({ requestId: c.get('requestId'), context: 'main channel set, removing override' })
+      console.log({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
     }
     else {
       // if dataChannelOverride is same from dataChannel and exist then do nothing
       if (channelId && channelId.id === dataChannel.id) {
         // already set
-        console.log({ requestId: c.get('requestId'), context: 'channel already set' })
+        console.log({ requestId: c.get('requestId'), message: 'channel already set' })
         return c.json(BRES)
       }
 
-      console.log({ requestId: c.get('requestId'), context: 'setting channel' })
+      console.log({ requestId: c.get('requestId'), message: 'setting channel' })
       if (dataChannelOverride) {
         const { error: dbErrorDev } = await supabaseAdmin(c)
           .from('channel_devices')
@@ -267,7 +267,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function put(c: Context, body: DeviceLink): Promise<Response> {
-  console.log({ requestId: c.get('requestId'), context: 'put channel self body', body })
+  console.log({ requestId: c.get('requestId'), message: 'put channel self body', body })
   let {
     version_name,
     version_build,
@@ -411,7 +411,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
-  console.log({ requestId: c.get('requestId'), context: 'delete channel self body', body })
+  console.log({ requestId: c.get('requestId'), message: 'delete channel self body', body })
   let {
     version_build,
   } = body
@@ -476,7 +476,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log({ requestId: c.get('requestId'), context: 'post body', body })
+    console.log({ requestId: c.get('requestId'), message: 'post body', body })
     return post(c as any, body)
   }
   catch (e) {
@@ -488,7 +488,7 @@ app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log({ requestId: c.get('requestId'), context: 'put body', body })
+    console.log({ requestId: c.get('requestId'), message: 'put body', body })
     return put(c as any, body)
   }
   catch (e) {
@@ -500,7 +500,7 @@ app.delete('/', async (c) => {
   try {
     const body = await getBody<DeviceLink>(c as any)
     // const body = await c.req.json<DeviceLink>()
-    console.log({ requestId: c.get('requestId'), context: 'delete body', body })
+    console.log({ requestId: c.get('requestId'), message: 'delete body', body })
     return deleteOverride(c as any, body)
   }
   catch (e) {

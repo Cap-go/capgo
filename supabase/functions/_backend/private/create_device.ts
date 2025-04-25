@@ -26,8 +26,8 @@ app.post('/', middlewareAuth, async (c) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log({ requestId: c.get('requestId'), context: 'post create device body', body })
-      console.log({ requestId: c.get('requestId'), context: 'post create device error', error: parsedBodyResult.error })
+      console.log({ requestId: c.get('requestId'), message: 'post create device body', body })
+      console.log({ requestId: c.get('requestId'), message: 'post create device error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 

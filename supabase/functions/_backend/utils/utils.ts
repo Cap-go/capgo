@@ -78,7 +78,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
     return data
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'checkKey error', error })
+    console.log({ requestId: c.get('requestId'), message: 'checkKey error', error })
     return null
   }
 }
@@ -98,7 +98,7 @@ export async function checkKeyById(c: Context, id: number, supabase: SupabaseCli
     return data
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'checkKeyById error', error })
+    console.log({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
     return null
   }
 }

@@ -11,10 +11,10 @@ interface EventData {
 }
 
 async function sendNow(c: Context, eventName: string, eventData: EventData, email: string, orgId: string, uniqId: string, past: Database['public']['Tables']['notifications']['Row'] | null) {
-  console.log({ requestId: c.get('requestId'), context: 'send notif', eventName, email })
+  console.log({ requestId: c.get('requestId'), message: 'send notif', eventName, email })
   const res = await trackBentoEvent(c, email, eventData, eventName)
   if (!res) {
-    console.log({ requestId: c.get('requestId'), context: 'trackEvent failed', eventName, email, eventData })
+    console.log({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email, eventData })
     return false
   }
   if (past != null) {
@@ -46,7 +46,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
       return false
     }
   }
-  console.log({ requestId: c.get('requestId'), context: 'send notif done', eventName, email })
+  console.log({ requestId: c.get('requestId'), message: 'send notif done', eventName, email })
   return true
 }
 
@@ -56,7 +56,7 @@ function isSendable(c: Context, last: string, cron: string) {
   const now = new Date()
   const nextDate = interval.getNextDate(last_send_at)
   const sendable = dayjs(now).isAfter(nextDate)
-  console.log({ requestId: c.get('requestId'), context: 'isSendable', cron, last_send_at, nextDate, now, sendable })
+  console.log({ requestId: c.get('requestId'), message: 'isSendable', cron, last_send_at, nextDate, now, sendable })
 
   return sendable
   // return false
@@ -70,7 +70,7 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     .single()
 
   if (!org || orgError) {
-    console.log({ requestId: c.get('requestId'), context: 'org not found', orgId })
+    console.log({ requestId: c.get('requestId'), message: 'org not found', orgId })
     return false
   }
   // check if notif has already been send in notifications table
@@ -83,15 +83,15 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
     .single()
   // set user data in crisp
   if (!notif) {
-    console.log({ requestId: c.get('requestId'), context: 'notif never sent', event: eventName, uniqId })
+    console.log({ requestId: c.get('requestId'), message: 'notif never sent', event: eventName, uniqId })
     return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, null).then(() => true)
   }
 
   if (notif && !isSendable(c, notif.last_send_at, cron)) {
-    console.log({ requestId: c.get('requestId'), context: 'notif already sent', event: eventName, orgId })
+    console.log({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
     return false
   }
-  console.log({ requestId: c.get('requestId'), context: 'notif ready to sent', event: eventName, orgId })
+  console.log({ requestId: c.get('requestId'), message: 'notif ready to sent', event: eventName, orgId })
   return sendNow(c, eventName, eventData, org.management_email, orgId, uniqId, notif).then(() => true)
 }
 

@@ -17,7 +17,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   try {
     // unsafe parse the body
     const body = await c.req.json<{ version: Database['public']['Tables']['app_versions']['Row'] }>()
-    console.log({ requestId: c.get('requestId'), context: 'post body cron_clear_versions', body })
+    console.log({ requestId: c.get('requestId'), message: 'post body cron_clear_versions', body })
 
     // Let's start with the metadata
     const supabase = supabaseAdmin(c as any)
@@ -37,7 +37,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       version.user_id = app.user_id
     }
     const v2Path = await getPath(c as any, version)
-    console.log({ requestId: c.get('requestId'), context: 'v2Path', v2Path })
+    console.log({ requestId: c.get('requestId'), message: 'v2Path', v2Path })
     if (!v2Path) {
       await supabase.from('app_versions')
         .delete()
@@ -48,7 +48,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     try {
       const size = await s3.getSize(c as any, v2Path)
       if (!size) {
-        console.log({ requestId: c.get('requestId'), context: `No size for ${v2Path}, ${size}` })
+        console.log({ requestId: c.get('requestId'), message: `No size for ${v2Path}, ${size}` })
         // throw error to trigger the deletion
         notFound = true
         throw new Error('no_size')
@@ -65,10 +65,10 @@ app.post('/', middlewareAPISecret, async (c) => {
         return errorOut(c as any, `Cannot find checksum for app_versions id ${version.id} because of no app_versions found`)
       const checksum = appVersion.checksum
       if (!checksum) {
-        console.log({ requestId: c.get('requestId'), context: `No checksum for ${v2Path}, ${checksum}` })
+        console.log({ requestId: c.get('requestId'), message: `No checksum for ${v2Path}, ${checksum}` })
       }
 
-      console.log({ requestId: c.get('requestId'), context: `Upsert app_versions_meta (version id: ${version.id}) to: ${size}` })
+      console.log({ requestId: c.get('requestId'), message: `Upsert app_versions_meta (version id: ${version.id}) to: ${size}` })
 
       await supabase.from('app_versions_meta')
         .upsert({

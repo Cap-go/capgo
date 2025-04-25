@@ -43,12 +43,12 @@ app.post('/', async (c) => {
       .single()
 
     if (!customer) {
-      console.log({ requestId: c.get('requestId'), context: 'no customer found' })
+      console.log({ requestId: c.get('requestId'), message: 'no customer found' })
       return c.json({ status: 'ok' }, 200)
     }
     if (!customer.subscription_id)
       stripeData.status = 'succeeded'
-    console.log({ requestId: c.get('requestId'), context: 'stripeData', stripeData })
+    console.log({ requestId: c.get('requestId'), message: 'stripeData', stripeData })
 
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
@@ -157,7 +157,7 @@ app.post('/', async (c) => {
     return c.json({ received: true })
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: 'error', error: e })
+    console.log({ requestId: c.get('requestId'), message: 'error', error: e })
     return c.json({ status: 'Cannot parse event', error: JSON.stringify(e) }, 500)
   }
 })

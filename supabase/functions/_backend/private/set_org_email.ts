@@ -24,8 +24,8 @@ app.post('/', middlewareAuth, async (c) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log({ requestId: c.get('requestId'), context: 'set_org_email body', body })
-      console.log({ requestId: c.get('requestId'), context: 'parsedBodyResult.error', error: parsedBodyResult.error })
+      console.log({ requestId: c.get('requestId'), message: 'set_org_email body', body })
+      console.log({ requestId: c.get('requestId'), message: 'parsedBodyResult.error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 

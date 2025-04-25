@@ -200,7 +200,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     const prices = await getStripe(c).prices.search({
       query: `product:"${planId}"`,
     })
-    console.log({ requestId: c.get('requestId'), context: 'prices stripe', prices })
+    console.log({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.data.forEach((price) => {
       if (price.recurring && price.recurring.interval === reccurence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
@@ -209,7 +209,7 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
     })
   }
   catch (err) {
-    console.log({ requestId: c.get('requestId'), context: 'search err', error: err })
+    console.log({ requestId: c.get('requestId'), message: 'search err', error: err })
   }
   return { priceId, meteredIds }
 }
@@ -225,7 +225,7 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return { priceId, productId, meteredData }
   try {
-    console.log({ requestId: c.get('requestId'), context: 'prices stripe', prices })
+    console.log({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.forEach((price) => {
       if (price.plan.usage_type === 'licensed') {
         priceId = price.plan.id
@@ -233,12 +233,12 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
       }
       if (price.plan.billing_scheme === 'per_unit' && price?.plan?.usage_type !== 'licensed' && price.plan.nickname) {
         meteredData[price.plan.nickname.toLowerCase()] = price.plan.id
-        console.log({ requestId: c.get('requestId'), context: 'metered price', price })
+        console.log({ requestId: c.get('requestId'), message: 'metered price', price })
       }
     })
   }
   catch (err) {
-    console.log({ requestId: c.get('requestId'), context: 'search err', error: err })
+    console.log({ requestId: c.get('requestId'), message: 'search err', error: err })
   }
   return { priceId, productId, meteredData }
 }
@@ -247,7 +247,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return { url: '' }
   const prices = await getPriceIds(c, planId, reccurence)
-  console.log({ requestId: c.get('requestId'), context: 'prices', prices })
+  console.log({ requestId: c.get('requestId'), message: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const session = await getStripe(c).checkout.sessions.create({
@@ -291,9 +291,9 @@ export interface StripeCustomer {
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, name: string) {
-  console.log({ requestId: c.get('requestId'), context: 'createCustomer', email, userId, name })
+  console.log({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, name })
   if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
-    console.log({ requestId: c.get('requestId'), context: 'createCustomer no stripe key', email, userId, name })
+    console.log({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     return { id: `cus_${randomId}`, email, name, metadata: { user_id: userId } }
@@ -357,7 +357,7 @@ export async function recordUsage(c: Context, subscriptionItemId: string, quanti
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
-  console.log({ requestId: c.get('requestId'), context: 'removeOldSubscription', id: subscriptionId })
+  console.log({ requestId: c.get('requestId'), message: 'removeOldSubscription', id: subscriptionId })
   const deletedSubscription = await getStripe(c).subscriptions.cancel(subscriptionId)
   return deletedSubscription
 }

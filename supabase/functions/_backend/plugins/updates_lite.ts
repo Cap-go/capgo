@@ -70,7 +70,7 @@ export const app = new Hono()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppInfos>()
-    console.log({ requestId: c.get('requestId'), context: 'post updates body', body })
+    console.log({ requestId: c.get('requestId'), message: 'post updates body', body })
     if (isLimited(c as any, body.app_id)) {
       return c.json({
         status: 'Too many requests',
@@ -80,7 +80,7 @@ app.post('/', async (c) => {
     const parseResult = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
       const error = parseResult.error.errors[0]
-      console.log({ requestId: c.get('requestId'), context: 'parseResult', error: error.message })
+      console.log({ requestId: c.get('requestId'), message: 'parseResult', error: error.message })
       return c.json({
         error: `Cannot parse json: ${error.message}`,
       }, 400)
@@ -89,7 +89,7 @@ app.post('/', async (c) => {
     return updateLite(c as any, body)
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: 'error', error: JSON.stringify(e) })
+    console.log({ requestId: c.get('requestId'), message: 'error', error: JSON.stringify(e) })
     return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 400)
   }
 })

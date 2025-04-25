@@ -62,7 +62,7 @@ export const jsonRequestSchema = z.object({
 async function post(c: Context, body: AppStats) {
   try {
     if (isLimited(c, body.app_id)) {
-      console.log({ requestId: c.get('requestId'), context: 'Too many requests' })
+      console.log({ requestId: c.get('requestId'), message: 'Too many requests' })
       return c.json({
         message: 'Too many requests',
         error: 'too_many_requests',
@@ -70,7 +70,7 @@ async function post(c: Context, body: AppStats) {
     }
     const parseResult: any = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
-      console.log({ requestId: c.get('requestId'), context: `Cannot parse json: ${parseResult.error}` })
+      console.log({ requestId: c.get('requestId'), message: `Cannot parse json: ${parseResult.error}` })
       return c.json({
         error: `Cannot parse json: ${parseResult.error}`,
       }, 400)
@@ -110,7 +110,7 @@ async function post(c: Context, body: AppStats) {
         error: 'invalid_version_build',
       }, 400)
     }
-    console.log({ requestId: c.get('requestId'), context: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
+    console.log({ requestId: c.get('requestId'), message: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
       platform: platform as Database['public']['Enums']['platform_os'],
@@ -138,7 +138,7 @@ async function post(c: Context, body: AppStats) {
         await updateStoreApp(c, app_id, 1)
       // save stats of unknow sources in our analytic DB
       await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
-      console.log({ requestId: c.get('requestId'), context: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
+      console.log({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
@@ -152,9 +152,9 @@ async function post(c: Context, body: AppStats) {
       .eq('app_id', app_id)
       .or(`name.eq.${version_name}`)
       .single()
-    console.log({ requestId: c.get('requestId'), context: `appVersion ${JSON.stringify(appVersion)}` })
+    console.log({ requestId: c.get('requestId'), message: `appVersion ${JSON.stringify(appVersion)}` })
     if (!appVersion) {
-      console.log({ requestId: c.get('requestId'), context: 'switch to onprem', app_id })
+      console.log({ requestId: c.get('requestId'), message: 'switch to onprem', app_id })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
@@ -184,7 +184,7 @@ async function post(c: Context, body: AppStats) {
     }
     else if (failActions.includes(action)) {
       await createStatsVersion(c, appVersion.id, app_id, 'fail')
-      console.log({ requestId: c.get('requestId'), context: 'FAIL!' })
+      console.log({ requestId: c.get('requestId'), message: 'FAIL!' })
       await sendNotifOrg(c, 'user:update_fail', {
         app_id,
         device_id,
@@ -197,7 +197,7 @@ async function post(c: Context, body: AppStats) {
     return c.json(BRES)
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
+    console.log({ requestId: c.get('requestId'), message: `Error unknow: ${e}` })
     return c.json({
       status: 'Error unknow',
       error: JSON.stringify(e),
@@ -210,11 +210,11 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppStats>()
-    console.log({ requestId: c.get('requestId'), context: 'post plugin/stats body', body })
+    console.log({ requestId: c.get('requestId'), message: 'post plugin/stats body', body })
     return post(c as any, body)
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: `Error unknow: ${e}` })
+    console.log({ requestId: c.get('requestId'), message: `Error unknow: ${e}` })
     return c.json({ status: 'Cannot post stats', error: JSON.stringify(e) }, 500)
   }
 })

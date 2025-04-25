@@ -22,7 +22,7 @@ app.get('/', async (c) => {
         stars: data.stars,
       })
     }
-    console.log({ requestId: c.get('requestId'), context: 'Supabase error:', error })
+    console.log({ requestId: c.get('requestId'), message: 'Supabase error:', error })
     return c.json({
       apps: 750,
       updates: 23500638,

@@ -12,7 +12,7 @@ import * as schemaV2 from './sqlite_schema.ts'
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
-  // console.log({ requestId: c.get('requestId'), context: 'clientContinent', clientContinent })
+  // console.log({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent })
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
@@ -44,7 +44,7 @@ export function getDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
-  console.log({ requestId: c.get('requestId'), context: 'SUPABASE_DB_URL', dbUrl })
+  console.log({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
   return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
 
@@ -168,16 +168,17 @@ export function requestInfosPostgres(
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
-  const appVersions = drizzleCient
+  const appVersionsQuery = drizzleCient
     .select({
       id: versionAlias.id,
     })
     .from(versionAlias)
     .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
-    .then(data => data.at(0))
+  console.log('appVersions Query:', appVersionsQuery.toSQL())
+  const appVersions = appVersionsQuery.then(data => data.at(0))
 
-  const channelDevice = drizzleCient
+  const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
@@ -220,9 +221,10 @@ export function requestInfosPostgres(
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  const channelDevice = channelDeviceQuery.then(data => data.at(0))
 
-  const channel = drizzleCient
+  const channelQuery = drizzleCient
     .select({
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -269,7 +271,8 @@ export function requestInfosPostgres(
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+  console.log('channel Query:', channelQuery.toSQL())
+  const channel = channelQuery.then(data => data.at(0))
 
   return Promise.all([channelDevice, channel, appVersions])
     .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))

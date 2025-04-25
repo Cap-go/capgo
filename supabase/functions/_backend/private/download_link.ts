@@ -19,7 +19,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   try {
     const body = await c.req.json<DataDownload>()
-    console.log({ requestId: c.get('requestId'), context: 'post download link body', body })
+    console.log({ requestId: c.get('requestId'), message: 'post download link body', body })
     const authorization = c.req.header('authorization')
     if (!authorization)
       return c.json({ status: 'Cannot find authorization' }, 400)

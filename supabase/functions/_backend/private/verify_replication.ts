@@ -24,7 +24,7 @@ app.get('/', async (c) => {
         d1.prepare(`SELECT COUNT(*) as count FROM ${table}`).first(),
       ),
     )
-    console.log({ requestId: c.get('requestId'), context: 'd1Counts', d1Counts })
+    console.log({ requestId: c.get('requestId'), message: 'd1Counts', d1Counts })
 
     // Count from update.ts (PostgreSQL database)
     const pgCounts = await Promise.all(
@@ -33,12 +33,12 @@ app.get('/', async (c) => {
           .from(table)
           .select('*', { count: 'exact', head: true })
           .then((v) => {
-            console.log({ requestId: c.get('requestId'), context: 'v', v })
+            console.log({ requestId: c.get('requestId'), message: 'v', v })
             return { count: v.count }
           }),
       ),
     )
-    console.log({ requestId: c.get('requestId'), context: 'pgCounts', pgCounts })
+    console.log({ requestId: c.get('requestId'), message: 'pgCounts', pgCounts })
     const diff = await tables.reduce(async (acc: Promise<Record<TableNames, { d1: number, supabase: number, percent: number }>>, table: TableNames, index: number) => {
       const result = await acc
       const d1Count = (d1Counts[index]?.count as number) || 0

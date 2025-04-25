@@ -58,7 +58,7 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
     return true
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: 'trackBentoEvent error', error: e })
+    console.log({ requestId: c.get('requestId'), message: 'trackBentoEvent error', error: e })
     return false
   }
 }
@@ -98,11 +98,11 @@ export async function addTagBento(c: Context, email: string, segments: { segment
       }).json(),
     ))
 
-    console.log({ requestId: c.get('requestId'), context: 'addTagBento', email, commands, results })
+    console.log({ requestId: c.get('requestId'), message: 'addTagBento', email, commands, results })
     return true
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: 'addTagBento error', error: e })
+    console.log({ requestId: c.get('requestId'), message: 'addTagBento error', error: e })
     return false
   }
 }
