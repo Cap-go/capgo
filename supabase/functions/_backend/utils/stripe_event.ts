@@ -72,10 +72,15 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       }
     }
     else if (event.type === 'customer.subscription.deleted') {
-      const charge = event.data.object
+      const subscription = event.data.object
       data.status = 'canceled'
+      data.customer_id = String(subscription.customer)
+      data.subscription_id = subscription.id
+    }
+    else if (event.type === 'charge.failed') {
+      const charge = event.data.object
+      data.status = 'failed'
       data.customer_id = String(charge.customer)
-      data.subscription_id = charge.id
     }
     else {
       console.error({ requestId: c.get('requestId'), context: 'Other event', event })

@@ -108,7 +108,10 @@ app.post('/', async (c) => {
         await addTagBento(c as any, org.management_email, segment)
       }
     }
-    else if (['canceled', 'deleted', 'failed'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
+    else if (stripeData.status === 'failed') {
+      await trackBentoEvent(c as any, org.management_email, {}, 'org:failed_payment')
+    }
+    else if (['canceled', 'deleted'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         const statusCopy = stripeData.status
         stripeData.status = 'succeeded'
@@ -124,10 +127,6 @@ app.post('/', async (c) => {
         }).catch()
         stripeData.status = statusCopy
       }
-      stripeData.is_good_plan = false
-      stripeData.mau_exceeded = true
-      stripeData.storage_exceeded = true
-      stripeData.bandwidth_exceeded = true
       const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update(stripeData)
