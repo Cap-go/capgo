@@ -31,7 +31,7 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
     }
   }
 
-  const chartDataFromApi = (data as { status: string, data: ChartData }).data
+  const chartDataFromApi = data as ChartData
   const finalData = {
     labels: chartDataFromApi.labels,
     datasets: chartDataFromApi.datasets.map((dataset, i) => {
