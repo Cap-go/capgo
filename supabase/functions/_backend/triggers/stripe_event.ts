@@ -74,6 +74,35 @@ app.post('/', async (c) => {
       }).catch()
       return c.json({ status: 'ok' }, 200)
     }
+    else if (stripeEvent.type === 'invoice.upcoming') {
+      const invoice = stripeEvent.data.object as any
+      let planName = null
+      let planType = 'monthly'
+      if (stripeData.product_id) {
+        const { data: plan } = await supabaseAdmin(c as any)
+          .from('plans')
+          .select('name, price_y_id')
+          .eq('stripe_id', stripeData.product_id)
+          .single()
+        if (!plan) {
+          return c.json({ status: 'failed to get plan' }, 500)
+        }
+        planName = plan.name
+        if (plan.price_y_id === stripeData.price_id) {
+          planType = 'yearly'
+        }
+      }
+      const price = invoice.total ? invoice.total / 100 : 0
+      await trackBentoEvent(c as any, org.management_email, { plan_name: planName, price, plan_type: planType }, 'org:invoice_upcoming')
+      await LogSnag.track({
+        channel: 'usage',
+        event: 'Invoice Upcoming',
+        icon: '📄',
+        user_id: org.id,
+        notify: false,
+      }).catch()
+      return c.json({ status: 'ok' }, 200)
+    }
 
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
@@ -96,6 +125,10 @@ app.post('/', async (c) => {
             .select()
             .eq('stripe_id', stripeDataEvent.previousProductId)
             .single()
+          await trackBentoEvent(c as any, org.management_email, {
+            plan_name: plan.name,
+            previous_plan_name: previousProduct.data?.name || '',
+          }, 'user:plan_change')
           await LogSnag.track({
             channel: 'usage',
             event: 'User Upgraded',
