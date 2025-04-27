@@ -34,7 +34,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       event: 'User Joined',
       icon: '🎉',
       user_id: record.id,
-      notify: true,
+      notify: false,
     }).catch()
     return c.json(BRES)
   }

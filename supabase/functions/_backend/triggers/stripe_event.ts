@@ -50,6 +50,18 @@ app.post('/', async (c) => {
       stripeData.status = 'succeeded'
     console.log({ requestId: c.get('requestId'), message: 'stripeData', stripeData })
 
+    if (stripeEvent.type === 'customer.source.expiring') {
+      await trackBentoEvent(c as any, org.management_email, {}, 'org:card_expiring')
+      await LogSnag.track({
+        channel: 'usage',
+        event: 'Credit Card Expiring',
+        icon: '⚠️',
+        user_id: org.id,
+        notify: false,
+      }).catch()
+      return c.json({ status: 'ok' }, 200)
+    }
+
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
       let statusName: string = status || ''
