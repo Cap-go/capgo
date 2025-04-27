@@ -126,7 +126,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       platform: platform as Database['public']['Enums']['platform_os'],
       updated_at: new Date().toISOString(),
     }
-    const start = performance.now()
     const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
     if (!planValid) {
       console.log({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
@@ -141,9 +140,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     console.log({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
     const requestedInto = isV2 ? await requestInfosPostgresLiteV2(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
-
-    const end = performance.now()
-    console.log({ requestId: c.get('requestId'), message: 'requestInfosPostgres', duration: `${end - start}ms` })
 
     const { versionData } = requestedInto
     const { channelData } = requestedInto

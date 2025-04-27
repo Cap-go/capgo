@@ -31,9 +31,6 @@
   "compatibility_flags": [
     "nodejs_compat_v2"
   ],
-  "placement": {
-    "mode": "smart"
-  },
   "workers_dev": false,
   "observability": {
     "enabled": true,

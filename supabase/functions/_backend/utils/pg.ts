@@ -63,7 +63,7 @@ export function getDrizzleClientD1Session(c: Context) {
   if (!existInEnv(c, 'DB_REPLICATE')) {
     throw new Error('DB_REPLICATE is not set')
   }
-  const session = c.env.DB_REPLICATE.withSession()
+  const session = c.env.DB_REPLICATE.withSession('first-unconstrained')
   return drizzleD1(session)
 }
 
