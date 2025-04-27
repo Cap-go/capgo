@@ -61,6 +61,19 @@ app.post('/', async (c) => {
       }).catch()
       return c.json({ status: 'ok' }, 200)
     }
+    else if (stripeEvent.type === 'customer.source.created') {
+      const card = stripeEvent.data.object as any
+      const expirationDate = card.exp_month && card.exp_year ? `${card.exp_month}/${card.exp_year}` : 'unknown'
+      await trackBentoEvent(c as any, org.management_email, { expiration_date: expirationDate }, 'org:card_added')
+      await LogSnag.track({
+        channel: 'usage',
+        event: 'Credit Card Added',
+        icon: '💳',
+        user_id: org.id,
+        notify: false,
+      }).catch()
+      return c.json({ status: 'ok' }, 200)
+    }
 
     if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
