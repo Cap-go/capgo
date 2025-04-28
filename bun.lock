@@ -96,7 +96,7 @@
         "@antfu/eslint-config": "4.12.0",
         "@capacitor/cli": "^7.2.0",
         "@capacitor/core": "^7.2.0",
-        "@cloudflare/workers-types": "4.20250423.0",
+        "@cloudflare/workers-types": "4.20250427.0",
         "@iconify-json/carbon": "1.2.8",
         "@iconify-json/heroicons": "^1.2.2",
         "@iconify-json/ion": "1.2.3",
@@ -451,7 +451,7 @@
 
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20250422.0", "", { "os": "win32", "cpu": "x64" }, "sha512-O2f6f7oxU/oaWX/3/5d/9qvzNSKsw72RsQFjpew2va7KwnnUciI2LnbYR6KYOqRGYrEoiMJxpWPQaYaFVj8t1w=="],
 
-    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250423.0", "", {}, "sha512-uzy7fvgYIs9YCEaPScC+RnZvd+yJJCqLCEe/n/6p2PZTxWbDmiZjtJQiP5Zx6G0p64ZD/0ZRmtALfDZDNYBDHg=="],
+    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250427.0", "", {}, "sha512-5RLld1Bf5W2EE06bnE5qdicx1AtfF3LT+YD93cR32yKDNridHeBriWO8/pMZG7JmURdHEwyXyIV4gtdPzDPNdw=="],
 
     "@colors/colors": ["@colors/colors@1.6.0", "", {}, "sha512-Ir+AOibqzrIsL6ajt3Rz3LskB7OiMVHqltZmspbW/TJuTVuyOMirVqAkjfY6JISiLHgyNqicAC8AyHHGzNd/dA=="],
 
