@@ -41,6 +41,7 @@ const filters = ref({
   'deleted': false,
   'encrypted': false,
 })
+const channelCache = ref<Record<number, { name: string, id?: number }>>({})
 
 function onboardingDone() {
   reload()
@@ -152,7 +153,9 @@ async function getData() {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
-    elements.value.push(...(await enhenceVersionElems(dataVersions) as any))
+    const enhancedVersions = await enhenceVersionElems(dataVersions)
+    await fetchChannelsForVersions(enhancedVersions)
+    elements.value.push(...enhancedVersions as any)
     total.value = count || 0
   }
   catch (error) {
@@ -160,12 +163,29 @@ async function getData() {
   }
   isLoading.value = false
 }
+async function fetchChannelsForVersions(versions: Element[]) {
+  const versionIds = versions.map(v => v.id)
+  const { data: channelData, error } = await supabase
+    .from('channels')
+    .select('name, version, id')
+    .eq('app_id', props.appId)
+    .in('version', versionIds)
+  if (error) {
+    console.error('Error fetching channels:', error)
+    return
+  }
+  versionIds.forEach((id) => {
+    const channel = channelData?.find(c => c.version === id)
+    channelCache.value[id] = channel ? { name: channel.name, id: channel.id } : { name: '' }
+  })
+}
 async function refreshData() {
   // console.log('refreshData')
   try {
     currentPage.value = 1
     elements.value.length = 0
     selectedElements.value.length = 0
+    channelCache.value = {} // Clear cache on refresh
     await getData()
   }
   catch (error) {
@@ -184,7 +204,7 @@ async function deleteOne(one: Element) {
     // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
-      .select('name, version(name)')
+      .select('id, name, version(name)')
       .eq('app_id', one.app_id)
       .eq('version', one.id)
 
@@ -293,6 +313,22 @@ columns.value = [
     mobile: true,
     sortable: 'desc',
     displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
+  },
+  {
+    label: t('channel'),
+    key: 'channel',
+    mobile: false,
+    sortable: false,
+    displayFunction: (elem: Element) => {
+      if (elem.deleted)
+        return t('deleted')
+      return channelCache.value[elem.id]?.name || ''
+    },
+    onClick: async (elem: Element) => {
+      if (elem.deleted || !channelCache.value[elem.id] || !channelCache.value[elem.id].id)
+        return
+      router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${channelCache.value[elem.id].id}`)
+    },
   },
   {
     label: t('size'),
