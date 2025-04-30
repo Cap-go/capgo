@@ -79,6 +79,7 @@
   "app-transferred": "App transferred successfully",
   "app-will-be-transferred": "App will be transferred to $ORG_ID. Please type the app ID ('$APP_ID') to confirm the transfer. ",
   "apps": "Apps",
+  "app-id": "App ID",
   "are-u-sure": "Are you sure ?",
   "are-you-sure-you-want-to-download": "Are you sure that you want to download?",
   "available-in-the-san": "Available in the sandbox app",

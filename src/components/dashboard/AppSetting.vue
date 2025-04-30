@@ -481,6 +481,14 @@ async function transferAppOwnership() {
             <div class="sm:w-1/2">
               <FormKit
                 type="text"
+                name="app_id"
+                :prefix-icon="iconName"
+                :value="appRef?.app_id || ''"
+                :label="t('app-id')"
+                :disabled="true"
+              />
+              <FormKit
+                type="text"
                 name="app_name"
                 :prefix-icon="iconName"
                 :value="appRef?.name || ''"

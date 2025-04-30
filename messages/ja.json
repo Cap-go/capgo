@@ -70,6 +70,7 @@
   "api-keys-are-used-for-cli-and-public-api": "API キーは CLI とパブリック API に使用されます",
   "app": "アプリ",
   "app-deleted": "アプリを削除しました",
+  "app-id": "アプリID",
   "app-info": "アプリ情報",
   "app-info-desc": "ここでアプリ情報を変更できます",
   "app-logo-deleted": "アプリの画像が正常に削除されました",

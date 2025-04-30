@@ -70,6 +70,7 @@
   "api-keys-are-used-for-cli-and-public-api": "API 密钥用于 CLI 和公共 API",
   "app": "应用程序",
   "app-deleted": "应用已删除",
+  "app-id": "应用程序ID",
   "app-info": "应用信息",
   "app-info-desc": "您可以在此处更改您的应用程序信息",
   "app-logo-deleted": "应用图片删除成功",
