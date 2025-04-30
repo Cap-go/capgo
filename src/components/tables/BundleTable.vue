@@ -367,6 +367,7 @@ async function reload() {
 }
 
 async function massDelete() {
+  console.log('massDelete')
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
@@ -385,7 +386,7 @@ async function massDelete() {
     return {
       data: (await supabase
         .from('channels')
-        .select('name, version(name)')
+        .select('id, name, version(name)')
         .eq('app_id', element.app_id)
         .eq('version', element.id)),
       element,
@@ -400,26 +401,62 @@ async function massDelete() {
       rawChannel: data,
     }
   })
+  console.log('linkedChannels', linkedChannels)
 
   const linkedChannelsList = linkedChannels.filter(({ channelFound }) => channelFound)
+  console.log('linkedChannelsList', linkedChannelsList)
+  let unlink = [] as Database['public']['Tables']['channels']['Row'][]
   if (linkedChannelsList.length > 0) {
     displayStore.dialogOption = {
-      header: t('cannot-delete-bundle-linked-channel-1'),
-      buttonCenter: true,
-      textStyle: 'text-center',
-      headerStyle: 'text-center',
-      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      header: t('want-to-unlink'),
+      message: t('channel-bundle-linked').replace('%', linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join(', ') ?? ''),
       buttons: [
         {
-          text: t('ok'),
-          role: 'confirm',
-          id: 'confirm',
+          text: t('yes'),
+          role: 'yes',
+          id: 'yes',
+          handler: () => {
+            unlink = linkedChannelsList.map(val => val.rawChannel) as any
+          },
+        },
+        {
+          text: t('no'),
+          id: 'cancel',
+          role: 'cancel',
         },
       ],
     }
-
     displayStore.showDialog = true
-    return
+    if (await displayStore.onDialogDismiss()) {
+      toast.error(t('canceled-delete'))
+      return
+    }
+  }
+
+  if (unlink.length > 0) {
+    const { data: unknownVersion, error: unknownError } = await supabase
+      .from('app_versions')
+      .select()
+      .eq('app_id', props.appId)
+      .eq('name', 'unknown')
+      .single()
+
+    if (unknownError) {
+      toast.error(t('cannot-find-unknown-version'))
+      console.error('Cannot find unknown', JSON.stringify(unknownError))
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('channels')
+      .update({ version: unknownVersion.id })
+      .in('id', unlink.map(c => c.id).flat())
+
+    if (updateError) {
+      toast.error(t('unlink-error'))
+      console.error('unlink error (updateError)', updateError)
+      return
+    }
   }
 
   if (didCancelRes === 'normal') {
@@ -432,7 +469,7 @@ async function massDelete() {
       toast.error(t('cannot-delete-bundles'))
     }
     else {
-      toast.success(t('bundle-deleted'))
+      toast.success(t('bundles-deleted'))
       await refreshData()
     }
   }
@@ -446,7 +483,7 @@ async function massDelete() {
       toast.error(t('cannot-delete-bundles'))
     }
     else {
-      toast.success(t('bundle-deleted'))
+      toast.success(t('bundles-deleted'))
       await refreshData()
     }
   }
