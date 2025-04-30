@@ -129,6 +129,21 @@ async function enhenceVersionElems(dataVersions: Database['public']['Tables']['a
 async function getData() {
   isLoading.value = true
   try {
+    let channelsToSearch = null
+
+    // If search term might be a channel name, find versions linked to channels with that name
+    if (search.value) {
+      const { data: channels } = await supabase
+        .from('channels')
+        .select('id, version')
+        .eq('app_id', props.appId)
+        .ilike('name', `%${search.value}%`)
+
+      if (channels && channels.length > 0) {
+        channelsToSearch = channels.map(c => c.version)
+      }
+    }
+
     let req = supabase
       .from('app_versions')
       .select('*', { count: 'exact' })
@@ -136,8 +151,16 @@ async function getData() {
       .neq('storage_provider', 'revert_to_builtin')
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
-    if (search.value)
-      req = req.like('name', `%${search.value}%`)
+    if (search.value) {
+      if (channelsToSearch && channelsToSearch.length > 0) {
+        // Search by both version name or linked channel
+        req = req.or(`name.ilike.%${search.value}%,id.in.(${channelsToSearch.join(',')})`)
+      }
+      else {
+        // Search by version name only
+        req = req.like('name', `%${search.value}%`)
+      }
+    }
 
     req = req.eq('deleted', filters.value.deleted)
     if (filters.value['external-storage'])
