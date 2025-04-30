@@ -151,7 +151,7 @@
     "dompurify": "^3.2.5",
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.42.0",
-    "firebase": "11.6.0",
+    "firebase": "11.6.1",
     "ky": "^1.8.1",
     "mime": "^4.0.7",
     "petite-vue-i18n": "^11.1.3",
