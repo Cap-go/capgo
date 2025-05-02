@@ -36,6 +36,9 @@
     "enabled": true,
     "head_sampling_rate": 0.001
   },
+  "placement": {
+    "mode": "smart"
+  },
   "upload_source_maps": true,
   "analytics_engine_datasets": [
     {

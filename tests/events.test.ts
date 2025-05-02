@@ -48,14 +48,14 @@ describe('[POST] /private/events operations', () => {
     })
 
     if (magicError) {
-      console.error({ requestId: c.get('requestId'), context: 'generate_magic_link_error', error: magicError })
+      console.error('generate_magic_link_error', magicError)
       throw new Error('generate_magic_link_error')
     }
 
     const { data: authData, error: authError } = await supabase.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
     if (authError) {
-      console.error({ requestId: c.get('requestId'), context: 'auth_error', error: authError })
+      console.error('auth_error', authError)
       throw new Error('auth_error')
     }
 
