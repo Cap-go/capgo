@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { emptySupabase } from 'supabase/functions/_backend/utils/supabase.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { APP_NAME, BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, USER_EMAIL } from './test-utils.ts'
 
