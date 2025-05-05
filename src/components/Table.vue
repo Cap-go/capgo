@@ -95,20 +95,28 @@ function sortClick(key: number) {
 }
 
 function updateUrlParams() {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams(window.location.search)
   if (searchVal.value)
     params.set('search', searchVal.value)
+  else
+    params.delete('search')
   if (props.filters) {
     Object.entries(props.filters).forEach(([key, value]) => {
       if (value)
         params.append('filter', key)
+      else
+        params.delete('filter', key)
     })
   }
   if (props.currentPage)
     params.set('page', props.currentPage.toString())
+  else
+    params.delete('page')
   props.columns.forEach((col) => {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
+    else
+      params.delete(`sort_${col.key}`)
   })
   window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
 }

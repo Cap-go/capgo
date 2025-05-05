@@ -320,16 +320,6 @@ export async function setThreshold(c: Context, subscriptionId: string) {
   return subscription
 }
 
-export async function setBillingPeriod(c: Context, subscriptionId: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
-    return Promise.resolve()
-  const subscription = await getStripe(c).subscriptions.update(subscriptionId, {
-    billing_cycle_anchor: 'now',
-    proration_behavior: 'create_prorations',
-  })
-  return subscription
-}
-
 export async function updateCustomer(c: Context, customerId: string, email: string, billing_email: string | null | undefined, userId: string, name: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
