@@ -124,24 +124,27 @@ function updateUrlParams() {
 function loadFromUrlParams() {
   const params = new URLSearchParams(window.location.search)
   const searchParam = params.get('search')
-  if (searchParam) {
+  if (searchParam && searchParam !== searchVal.value) {
     searchVal.value = searchParam
     emit('update:search', searchVal.value)
   }
   const pageParam = params.get('page')
-  if (pageParam) {
+  if (pageParam && pageParam !== props.currentPage.toString()) {
     const page = Number.parseInt(pageParam, 10)
     if (!Number.isNaN(page) && page !== props.currentPage) {
       emit('update:currentPage', page)
     }
   }
-  if (props.filters) {
-    const filterParams = params.getAll('filter')
+  const filterParams = params.getAll('filter')
+  if (props.filters && filterParams.length > 0) {
     const newFilters = { ...props.filters }
     Object.keys(newFilters).forEach((key) => {
       newFilters[key] = filterParams.includes(key)
     })
-    emit('update:filters', newFilters)
+    if (JSON.stringify(newFilters) !== JSON.stringify(props.filters)) {
+      console.log('update filters', newFilters, props.filters)
+      emit('update:filters', newFilters)
+    }
   }
   const newColumns = [...props.columns]
   props.columns.forEach((col) => {
@@ -150,7 +153,9 @@ function loadFromUrlParams() {
       newColumns[props.columns.indexOf(col)].sortable = sortParam
     }
   })
-  emit('update:columns', newColumns)
+  if (newColumns.length > 0) {
+    emit('update:columns', newColumns)
+  }
 }
 
 // Cleanup on unmount
@@ -170,26 +175,38 @@ onMounted(() => {
   loadFromUrlParams()
 })
 
-watch(props.columns, useDebounceFn(() => {
-  updateUrlParams()
+const debouncedReload = useDebounceFn(() => {
   emit('reload')
-}, 500), { deep: true })
+}, 1000)
 
-watch(() => props.filters, useDebounceFn(() => {
+const debouncedUpdateUrlParams = useDebounceFn(() => {
   updateUrlParams()
-  emit('reload')
-}, 500), { deep: true, immediate: true })
+}, 1000)
 
-watch(searchVal, useDebounceFn(() => {
+const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
-  updateUrlParams()
-  emit('reload')
-}, 500))
+}, 1000)
 
-watch(() => props.currentPage, useDebounceFn(() => {
-  updateUrlParams()
-  emit('reload')
-}, 500))
+watch(() => props.columns, () => {
+  debouncedUpdateUrlParams()
+  debouncedReload()
+}, { deep: true })
+
+watch(() => props.filters, () => {
+  debouncedUpdateUrlParams()
+  debouncedReload()
+}, { deep: true, immediate: true })
+
+watch(searchVal, () => {
+  debouncedSearch()
+  debouncedUpdateUrlParams()
+  debouncedReload()
+})
+
+watch(() => props.currentPage, () => {
+  debouncedUpdateUrlParams()
+  debouncedReload()
+})
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
