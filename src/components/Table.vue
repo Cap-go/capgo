@@ -151,7 +151,6 @@ function loadFromUrlParams() {
     }
   })
   emit('update:columns', newColumns)
-  emit('reload')
 }
 
 // Cleanup on unmount
@@ -214,35 +213,27 @@ function canPrev() {
 }
 
 async function next() {
-  console.log('next')
   if (canNext()) {
     emit('next')
     emit('update:currentPage', props.currentPage + 1)
-    emit('reload')
   }
 }
 async function fastForward() {
-  console.log('fastForward')
   if (canNext()) {
     emit('fastForward')
     emit('update:currentPage', Math.ceil(props.total / offset.value))
-    emit('reload')
   }
 }
 async function prev() {
-  console.log('prev')
   if (canPrev()) {
     emit('prev')
     emit('update:currentPage', props.currentPage - 1)
-    emit('reload')
   }
 }
 async function fastBackward() {
-  console.log('fastBackward')
   if (canPrev()) {
     emit('fastBackward')
     emit('update:currentPage', 1)
-    emit('reload')
   }
 }
 watch(props.elementList, () => {

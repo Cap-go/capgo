@@ -178,7 +178,7 @@ async function getData() {
       return
     const enhancedVersions = await enhenceVersionElems(dataVersions)
     await fetchChannelsForVersions(enhancedVersions)
-    elements.value.push(...enhancedVersions as any)
+    elements.value = enhancedVersions as any
     total.value = count || 0
   }
   catch (error) {
@@ -203,7 +203,6 @@ async function fetchChannelsForVersions(versions: Element[]) {
   })
 }
 async function refreshData() {
-  // console.log('refreshData')
   try {
     currentPage.value = 1
     elements.value.length = 0
@@ -380,13 +379,18 @@ columns.value = [
 ]
 
 async function reload() {
-  try {
-    elements.value.length = 0
-    await getData()
-  }
-  catch (error) {
-    console.error(error)
-  }
+  elements.value.length = 0
+  getData()
+    .then(() => {
+      if (total.value === 0) {
+        showSteps.value = true
+      }
+      return organizationStore.getCurrentRoleForApp(props.appId)
+    })
+    .then((r) => {
+      role.value = r
+    })
+    .catch(console.error)
 }
 
 async function massDelete() {
@@ -522,13 +526,6 @@ async function openOne(one: Element) {
     return
   router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)
 }
-onMounted(async () => {
-  await refreshData()
-  role.value = await organizationStore.getCurrentRoleForApp(props.appId)
-  if (total.value === 0) {
-    showSteps.value = true
-  }
-})
 watch(props, async () => {
   await refreshData()
   role.value = await organizationStore.getCurrentRoleForApp(props.appId)
