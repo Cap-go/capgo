@@ -628,7 +628,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from external logs', error: e })
   }
   return 0
 }
