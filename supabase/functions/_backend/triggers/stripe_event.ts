@@ -11,19 +11,25 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const LogSnag = logsnag(c as any)
-    if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY'))
+    if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       return c.json({ status: 'Webhook Error: no secret found' }, 400)
+    }
 
     const signature = c.req.raw.headers.get('stripe-signature')
-    if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY'))
+    if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
       return c.json({ status: 'Webhook Error: no signature' }, 400)
+    }
     // event.headers
     const body = await c.req.text()
     const stripeEvent = await parseStripeEvent(c as any, body, signature!)
     const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
     const stripeData = stripeDataEvent.data
-    if (stripeData.customer_id === '')
-      return c.json({ error: 'no customer found', stripeData, stripeEvent, body }, 500)
+    if (stripeData.customer_id === '') {
+      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
+      return c.json({ status: 'Webhook Error: no customer found' }, 400)
+    }
 
     // find email from user with customer_id
     const { error: dbError, data: org } = await supabaseAdmin(c as any)
@@ -31,10 +37,14 @@ app.post('/', async (c) => {
       .select('id, management_email')
       .eq('customer_id', stripeData.customer_id)
       .single()
-    if (dbError)
-      return c.json({ error: JSON.stringify(dbError) }, 500)
-    if (!org)
-      return c.json('no user found', 500)
+    if (dbError) {
+      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no user found' })
+      return c.json({ status: 'Webhook Error: no user found' }, 400)
+    }
+    if (!org) {
+      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no user found' })
+      return c.json({ status: 'Webhook Error: no user found' }, 400)
+    }
 
     const { data: customer } = await supabaseAdmin(c as any)
       .from('stripe_info')
@@ -85,6 +95,7 @@ app.post('/', async (c) => {
           .eq('stripe_id', stripeData.product_id)
           .single()
         if (!plan) {
+          console.log({ requestId: c.get('requestId'), message: 'failed to get plan' })
           return c.json({ status: 'failed to get plan' }, 500)
         }
         planName = plan.name
@@ -142,8 +153,10 @@ app.post('/', async (c) => {
           }).catch()
         }
 
-        if (dbError2)
-          return c.json({ error: JSON.stringify(dbError) }, 500)
+        if (dbError2) {
+          console.log({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
+          return c.json({ error: `succeeded: customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
+        }
 
         const segment = await customerToSegmentOrg(c as any, org.id, stripeData.price_id, plan)
         const isMonthly = plan.price_m_id === stripeData.price_id
@@ -171,8 +184,6 @@ app.post('/', async (c) => {
     }
     else if (['canceled', 'deleted'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
-        const statusCopy = stripeData.status
-        stripeData.status = 'succeeded'
         const segment = await customerToSegmentOrg(c as any, org.id, 'canceled')
         await addTagBento(c as any, org.management_email, segment)
         await trackBentoEvent(c as any, org.management_email, {}, 'user:cancel')
@@ -183,16 +194,17 @@ app.post('/', async (c) => {
           user_id: org.id,
           notify: true,
         }).catch()
-        stripeData.status = statusCopy
+        stripeData.status = 'succeeded'
       }
       const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update(stripeData)
         .eq('customer_id', stripeData.customer_id)
-      if (dbError2)
-        return c.json({ error: JSON.stringify(dbError) }, 500)
+      if (dbError2) {
+        console.log({ requestId: c.get('requestId'), message: 'customer_id not found', error: dbError2 })
+        return c.json({ error: `canceled:  customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
+      }
     }
-
     const previousAttributes = stripeEvent.data.previous_attributes ?? {} as any
     if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === true && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === false) {
       // console.log('USER CANCELLED!!!!!!!!!!!!!!!')
@@ -200,8 +212,10 @@ app.post('/', async (c) => {
         .from('stripe_info')
         .update({ canceled_at: new Date().toISOString() })
         .eq('customer_id', stripeData.customer_id)
-      if (dbError2)
-        return c.json({ error: JSON.stringify(dbError) }, 500)
+      if (dbError2) {
+        console.log({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
+        return c.json({ error: `USER CANCELLED, customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
+      }
     }
     else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
       // console.log('USER UNCANCELED')
@@ -209,8 +223,10 @@ app.post('/', async (c) => {
         .from('stripe_info')
         .update({ canceled_at: null })
         .eq('customer_id', stripeData.customer_id)
-      if (dbError2)
-        return c.json({ error: JSON.stringify(dbError) }, 500)
+      if (dbError2) {
+        console.log({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
+        return c.json({ error: `USER UNCANCELED, customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
+      }
     }
     return c.json({ received: true })
   }
