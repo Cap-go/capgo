@@ -86,7 +86,19 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       const invoice = event.data.object
       data.status = 'updated'
       data.customer_id = String(invoice.customer)
-      data.subscription_id = invoice.id
+
+      const plan = invoice.lines.data[0]
+      if (plan) {
+        if (plan.parent?.subscription_item_details?.subscription) {
+          data.subscription_id = plan.parent.subscription_item_details.subscription as string
+        }
+        if (plan.pricing?.price_details?.product) {
+          data.product_id = plan.pricing.price_details.product as string
+        }
+        if (plan.pricing?.price_details?.price) {
+          data.price_id = plan.pricing.price_details.price as string
+        }
+      }
     }
     else {
       console.error({ requestId: c.get('requestId'), message: 'Other event', event })
