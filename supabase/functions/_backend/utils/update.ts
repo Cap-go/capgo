@@ -145,7 +145,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       : await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
     const { versionData, channelOverride } = requestedInto
     let { channelData } = requestedInto
-    console.log({ requestId: c.get('requestId'), context: 'requestedInto', message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
+    console.log({ requestId: c.get('requestId'), message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
 
     if (!versionData) {
       console.log({ requestId: c.get('requestId'), message: 'No version data found' })
@@ -411,7 +411,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     return c.json(res, 200)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'update', error: JSON.stringify(e), body })
+    console.error({ requestId: c.get('requestId'), message: 'update', error: JSON.stringify(e), body })
     return c.json({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
@@ -443,7 +443,7 @@ export async function update(c: Context, body: AppInfos) {
     res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), isV2)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'update', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'update', error: e })
     return c.json({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',

@@ -14,7 +14,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
   if (!subscriptionId)
     return null
   try {
-    console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Fetching subscription data', customerId, subscriptionId })
+    console.log({ requestId: c.get('requestId'), message: 'Fetching subscription data', customerId, subscriptionId })
 
     // Retrieve the specific subscription from Stripe
     const subscription = await getStripe(c).subscriptions.retrieve(subscriptionId, {
@@ -31,7 +31,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 
     // // If no subscriptions found - Removed: retrieve throws error if not found
     // if (!subscriptions.data.length) {
-    //   console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'No active subscriptions found for customer' })
+    //   console.log({ requestId: c.get('requestId'), message: 'getSubscriptionData', message: 'No active subscriptions found for customer' })
     //   return null
     // }
 
@@ -47,7 +47,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
         productId = item.price.product
       }
       else {
-        console.warn({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
+        console.warn({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
       }
     }
 
@@ -76,10 +76,10 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
   catch (error) {
     // Handle specific Stripe errors if needed, e.g., resource_missing
     if (error instanceof Stripe.errors.StripeInvalidRequestError && error.code === 'resource_missing') {
-      console.log({ requestId: c.get('requestId'), context: 'getSubscriptionData', message: 'Subscription not found', subscriptionId, error: error.code })
+      console.log({ requestId: c.get('requestId'), message: 'Subscription not found', subscriptionId, error: error.code })
     }
     else {
-      console.error({ requestId: c.get('requestId'), context: 'getSubscriptionData', error })
+      console.error({ requestId: c.get('requestId'), message: 'getSubscriptionData', error })
     }
     return null
   }
@@ -94,7 +94,7 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     // If the stored subscription is not active or doesn't exist, check for any other active subscriptions
     if (!subscriptionData || (subscriptionData.status !== 'active')) {
-      console.log({ requestId: c.get('requestId'), context: 'syncSubscriptionData', message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
+      console.log({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
       const activeSubscriptions = await getStripe(c).subscriptions.list({
         customer: customerId,
         status: 'active', // Look specifically for active subscriptions
@@ -103,12 +103,12 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
       if (activeSubscriptions.data.length > 0) {
         const activeSub = activeSubscriptions.data[0]
-        console.log({ requestId: c.get('requestId'), context: 'syncSubscriptionData', message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
+        console.log({ requestId: c.get('requestId'), message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
         // Fetch data for the newly found active subscription
         subscriptionData = await getSubscriptionData(c, customerId, activeSub.id)
       }
       else {
-        console.log({ requestId: c.get('requestId'), context: 'syncSubscriptionData', message: 'No other active subscriptions found for customer.', customerId })
+        console.log({ requestId: c.get('requestId'), message: 'No other active subscriptions found for customer.', customerId })
         // Keep subscriptionData as null or the inactive one, it will be handled below
       }
     }
@@ -153,11 +153,11 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
       .eq('customer_id', customerId)
 
     if (updateError) {
-      console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error: updateError })
+      console.error({ requestId: c.get('requestId'), message: 'syncSubscriptionData', error: updateError })
     }
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'syncSubscriptionData', error })
+    console.error({ requestId: c.get('requestId'), message: 'syncSubscriptionData', error })
   }
 }
 
@@ -187,7 +187,7 @@ export async function cancelSubscription(c: Context, customerId: string) {
   return Promise.all(
     allSubscriptions.data.map(sub => getStripe(c).subscriptions.cancel(sub.id)),
   ).catch((err) => {
-    console.error({ requestId: c.get('requestId'), context: 'cancelSubscription', error: err })
+    console.error({ requestId: c.get('requestId'), message: 'cancelSubscription', error: err })
   })
 }
 

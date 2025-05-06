@@ -36,7 +36,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData || !clientData.data || clientData.error) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get supabase user', error: clientData.error })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get supabase user', error: clientData.error })
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }
 
@@ -46,12 +46,12 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (!organization || organizationError) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get org', error: organizationError })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get org', error: organizationError })
       return c.json({ status: 'get_org_internal_error' }, 500)
     }
 
     if (!organization.customer_id) {
-      console.error({ requestId: c.get('requestId'), context: 'Organization does not have a customer id', orgId: safeBody.org_id })
+      console.error({ requestId: c.get('requestId'), message: 'Organization does not have a customer id', orgId: safeBody.org_id })
       return c.json({ status: 'org_does_not_have_customer' }, 400)
     }
 
@@ -66,12 +66,12 @@ app.post('/', middlewareAuth, async (c) => {
     })
 
     if (userRight.error) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get user right', error: userRight.error })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get user right', error: userRight.error })
       return c.json({ status: 'internal_auth_error' }, 500)
     }
 
     if (!userRight.data) {
-      console.error({ requestId: c.get('requestId'), context: 'No user right', userId, orgId: safeBody.org_id })
+      console.error({ requestId: c.get('requestId'), message: 'No user right', userId, orgId: safeBody.org_id })
       return c.json({ status: 'not_authorized' }, 403)
     }
 
@@ -84,7 +84,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     if (updateOrgErr) {
       // revert stripe
-      console.error({ requestId: c.get('requestId'), context: 'CRITICAL!!! Cannot update supabase, reverting stripe', error: updateOrgErr })
+      console.error({ requestId: c.get('requestId'), message: 'CRITICAL!!! Cannot update supabase, reverting stripe', error: updateOrgErr })
       await updateCustomerEmail(c as any, organization.customer_id, organization.management_email)
       return c.json({ status: 'critical_error' }, 500)
     }
@@ -92,7 +92,7 @@ app.post('/', middlewareAuth, async (c) => {
     return c.body(null, 204) // No content
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'set_org_email internal error', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'set_org_email internal error', error: e })
     return c.json({ status: 'internal_error' }, 500)
   }
 })

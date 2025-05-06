@@ -11,7 +11,7 @@ function getAllMetrics(c: Context): Promise<string[]> {
     .then(response => response.text())
     .then(data => data.split('\n'))
     .catch((err) => {
-      console.error({ requestId: c.get('requestId'), context: 'getAllMetrics', error: err })
+      console.error({ requestId: c.get('requestId'), message: 'getAllMetrics', error: err })
       return [] as string[]
     })
 }

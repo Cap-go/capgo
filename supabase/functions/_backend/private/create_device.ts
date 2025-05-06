@@ -38,7 +38,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData || !clientData.data || clientData.error) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get supabase user', error: clientData.error })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get supabase user', error: clientData.error })
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }
 
@@ -48,7 +48,7 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (appError) {
-      console.error({ requestId: c.get('requestId'), context: 'app error', error: appError })
+      console.error({ requestId: c.get('requestId'), message: 'app error', error: appError })
       return c.json({ status: 'app_not_found', app_id: safeBody.app_id }, 400)
     }
 
@@ -63,12 +63,12 @@ app.post('/', middlewareAuth, async (c) => {
     })
 
     if (userRight.error) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get user right', error: userRight.error })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get user right', error: userRight.error })
       return c.json({ status: 'internal_auth_error' }, 500)
     }
 
     if (!userRight.data) {
-      console.error({ requestId: c.get('requestId'), context: 'No user right', userId, appId: safeBody.app_id })
+      console.error({ requestId: c.get('requestId'), message: 'No user right', userId, appId: safeBody.app_id })
       return c.json({ status: 'not_authorized' }, 403)
     }
 

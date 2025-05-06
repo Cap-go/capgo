@@ -80,7 +80,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         }, { onConflict: 'id' })
     }
     catch (errorSize) {
-      console.error({ requestId: c.get('requestId'), context: 'errorSize', notFound, v2Path, error: errorSize })
+      console.error({ requestId: c.get('requestId'), message: 'errorSize', notFound, v2Path, error: errorSize })
       // Ensure that the version is not linked anywhere
       const { count, error, data } = await supabase.from('channels')
         .select('id', { count: 'exact' })

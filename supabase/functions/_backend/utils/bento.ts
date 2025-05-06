@@ -52,7 +52,7 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
       json: payload,
     }).json<{ results: number, failed: number }>()
     if (res.failed > 0) {
-      console.error({ requestId: c.get('requestId'), context: 'trackBentoEvent', error: res })
+      console.error({ requestId: c.get('requestId'), message: 'trackBentoEvent', error: res })
       return false
     }
     return true

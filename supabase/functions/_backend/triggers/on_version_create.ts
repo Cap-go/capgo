@@ -55,7 +55,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         size: 0,
       })
     if (dbError)
-      console.error({ requestId: c.get('requestId'), context: 'Cannot create app version meta', error: dbError })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot create app version meta', error: dbError })
     return c.json(BRES) // skip delete s3 and increment size in new upload
   }
   catch (e) {

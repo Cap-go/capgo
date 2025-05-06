@@ -83,7 +83,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       data.customer_id = String(charge.customer)
     }
     else {
-      console.error({ requestId: c.get('requestId'), context: 'Other event', event })
+      console.error({ requestId: c.get('requestId'), message: 'Other event', event })
     }
   }
   return { data, isUpgrade, previousProductId }

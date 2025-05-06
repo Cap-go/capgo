@@ -153,7 +153,7 @@ export async function trackDevicesCF(
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error tracking device', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error tracking device', error: e })
   }
 
   return Promise.resolve()
@@ -261,7 +261,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     return result
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device usage', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device usage', error: e })
   }
   return [] as DeviceUsageCF[]
 }
@@ -281,7 +281,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
     return await runQueryToCF<any>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading rawAnalyticsQuery', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: e })
   }
   return []
 }
@@ -306,7 +306,7 @@ ORDER BY date, app_id`
     return await runQueryToCF<BandwidthUsageCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading bandwidth usage', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: e })
   }
   return [] as BandwidthUsageCF[]
 }
@@ -375,7 +375,7 @@ ORDER BY date`
     return await runQueryToCF<VersionUsageCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading version usage', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading version usage', error: e })
   }
   return [] as VersionUsageCF[]
 }
@@ -410,7 +410,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device list', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
   }
   return [] as DeviceRowCF[]
 }
@@ -489,7 +489,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     return res.results as DeviceRowCF[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device list', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
   }
   return [] as DeviceRowCF[]
 }
@@ -556,7 +556,7 @@ LIMIT ${limit}`
     return await runQueryToCF<StatRowCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading stats list', error: e, query })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading stats list', error: e, query })
   }
   return [] as StatRowCF[]
 }
@@ -574,11 +574,11 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
       .all()
     const res = await readD1
     if (res.error || !res.results || !res.success)
-      console.error({ requestId: c.get('requestId'), context: 'getAppsFromCF error', error: res.error })
+      console.error({ requestId: c.get('requestId'), message: 'getAppsFromCF error', error: res.error })
     return res.results as { app_id: string }[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading app list', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading app list', error: e })
   }
   return []
 }
@@ -598,7 +598,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from store apps', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from store apps', error: e })
   }
   return 0
 }
@@ -613,7 +613,7 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from logs', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: e })
   }
   return 0
 }
@@ -628,7 +628,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from logs', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: e })
   }
   return 0
 }
@@ -645,7 +645,7 @@ export async function readActiveAppsCF(c: Context) {
     return unique
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting active apps', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting active apps', error: e })
   }
   return []
 }
@@ -660,7 +660,7 @@ export async function readLastMonthUpdatesCF(c: Context) {
     return response[0].count ?? 0
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading last month updates', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading last month updates', error: e })
   }
   return 0
 }
@@ -679,7 +679,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
     return res.results as StoreApp[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting apps to process', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting apps to process', error: e })
   }
   return [] as StoreApp[]
 }
@@ -724,7 +724,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
     return res.results as StoreApp[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting top apps', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting top apps', error: e })
   }
   return [] as StoreApp[]
 }
@@ -761,7 +761,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting total apps by mode', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting total apps by mode', error: e })
   }
   return 0
 }
@@ -780,7 +780,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting store app by id', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: e })
   }
   return {} as StoreApp
 }
@@ -814,7 +814,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error creating store info', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error creating store info', error: e })
   }
 
   return Promise.resolve()
@@ -840,7 +840,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
     console.log({ requestId: c.get('requestId'), message: 'saveStoreInfoCF result', res })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error saving store info', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error saving store info', error: e })
   }
 
   return Promise.resolve()
@@ -875,7 +875,7 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
     console.log({ requestId: c.get('requestId'), message: 'updateStoreApp result', res })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error updating StoreApp', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: e })
   }
 
   return Promise.resolve()
@@ -950,7 +950,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting update stats', error: e })
     return {
       apps: [],
       total: {

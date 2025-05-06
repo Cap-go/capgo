@@ -41,7 +41,7 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
     })
     .single()
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'findBestPlan', error })
+    console.error({ requestId: c.get('requestId'), message: 'findBestPlan', error })
     throw new Error(error.message)
   }
 
@@ -53,7 +53,7 @@ export async function getMeterdUsage(c: Context, orgId: string): Promise<Databas
     .rpc('get_metered_usage', { orgid: orgId })
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'getMeterdUsage', error })
+    console.error({ requestId: c.get('requestId'), message: 'getMeterdUsage', error })
     throw new Error(error.message)
   }
 
@@ -118,7 +118,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         .eq('customer_id', org.customer_id!)
         .then()
       if (error)
-        console.error({ requestId: c.get('requestId'), context: 'update stripe info', error })
+        console.error({ requestId: c.get('requestId'), message: 'update stripe info', error })
       return Promise.resolve()
     }
 
@@ -138,7 +138,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
         if (planToInt(best_plan) > planToInt(current_plan)) {
           const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c).from('plans').select('*').eq('name', current_plan).single()
           if (currentPlanError) {
-            console.error({ requestId: c.get('requestId'), context: 'currentPlanError', error: currentPlanError })
+            console.error({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
           }
 
           console.log(get_total_stats)

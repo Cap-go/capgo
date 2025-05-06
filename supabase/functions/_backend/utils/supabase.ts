@@ -93,7 +93,7 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
       .range(page * limit, (page + 1) * limit - 1)
 
     if (error) {
-      console.error({ requestId: c.get('requestId'), context: 'Error getting apps from Supabase', error })
+      console.error({ requestId: c.get('requestId'), message: 'Error getting apps from Supabase', error })
       break
     }
 
@@ -195,7 +195,7 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
     .rpc('has_app_right_userid', { appid: appId, right, userid })
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'has_app_right_userid error', error })
+    console.error({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
     return false
   }
 
@@ -212,7 +212,7 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
     .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'has_app_right_userid error', error })
+    console.error({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
     return false
   }
 
@@ -237,7 +237,7 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
   console.log({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
 
   if (userRight.error || !userRight.data) {
-    console.error({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight) error', error: userRight.error })
+    console.error({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
     return false
   }
 
@@ -256,7 +256,7 @@ export async function hasOrgRightApikey(c: Context, orgId: string, userId: strin
   console.log({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
 
   if (userRight.error || !userRight.data) {
-    console.error({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight) error', error: userRight.error })
+    console.error({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
     return false
   }
 
@@ -326,7 +326,7 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isGoodPlan error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isGoodPlan error', orgId, error })
   }
   return false
 }
@@ -340,7 +340,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isOnboarded error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isOnboarded error', orgId, error })
   }
   return false
 }
@@ -348,7 +348,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
 export async function set_mau_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
   const { error } = await supabaseAdmin(c).rpc('set_mau_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'set_mau_exceeded error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId, error })
     return false
   }
   return true
@@ -357,7 +357,7 @@ export async function set_mau_exceeded(c: Context, orgId: string, disabled: bool
 export async function set_storage_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
   const { error } = await supabaseAdmin(c).rpc('set_storage_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'set_download_disabled error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'set_download_disabled error', orgId, error })
     return false
   }
   return true
@@ -366,7 +366,7 @@ export async function set_storage_exceeded(c: Context, orgId: string, disabled: 
 export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
   const { error } = await supabaseAdmin(c).rpc('set_bandwidth_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'set_bandwidth_exceeded error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId, error })
     return false
   }
   return true
@@ -381,7 +381,7 @@ export async function isOnboardingNeeded(c: Context, userId: string): Promise<bo
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isOnboardingNeeded error', userId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isOnboardingNeeded error', userId, error })
   }
   return false
 }
@@ -395,7 +395,7 @@ export async function isCanceledOrg(c: Context, orgId: string): Promise<boolean>
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isCanceled error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isCanceled error', orgId, error })
   }
   return false
 }
@@ -409,7 +409,7 @@ export async function isPayingOrg(c: Context, orgId: string): Promise<boolean> {
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isPayingOrg error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isPayingOrg error', orgId, error })
   }
   return false
 }
@@ -423,7 +423,7 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
     return data || 0
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isTrialOrg error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isTrialOrg error', orgId, error })
   }
   return 0
 }
@@ -447,7 +447,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg error', orgId, error })
   }
   return false
 }
@@ -455,7 +455,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
 export async function createApiKey(c: Context, userId: string) {
   // check if user has apikeys
   if (!userId) {
-    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'userId is null' })
+    console.error({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'userId is null' })
     return
   }
   const total = await supabaseAdmin(c)
@@ -464,7 +464,7 @@ export async function createApiKey(c: Context, userId: string) {
     .eq('user_id', userId)
     .then(res => res.count || null)
   if (total === null) {
-    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'total is null' })
+    console.error({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is null' })
     return
   }
   if (total === 0) {
@@ -789,7 +789,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   const { data, error } = await query
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading stats list', error })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading stats list', error })
     return []
   }
 
@@ -836,7 +836,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   const { data, error } = await query
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device list', error })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error })
     return []
   }
 
@@ -888,7 +888,7 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
     .rpc('get_update_stats')
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting update stats', error })
     return {
       apps: [],
       total: {

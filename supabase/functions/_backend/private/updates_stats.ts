@@ -24,7 +24,7 @@ app.get('/', async (c) => {
     return c.json(updateStats)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'error', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'error', error: e })
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })

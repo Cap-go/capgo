@@ -28,7 +28,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
       .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
     if (error) {
-      console.error({ requestId: c.get('requestId'), context: 'update notif', error })
+      console.error({ requestId: c.get('requestId'), message: 'update notif', error })
       return false
     }
   }
@@ -42,7 +42,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
         last_send_at: dayjs().toISOString(),
       })
     if (error) {
-      console.error({ requestId: c.get('requestId'), context: 'insert notif', error })
+      console.error({ requestId: c.get('requestId'), message: 'insert notif', error })
       return false
     }
   }

@@ -98,7 +98,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
       .eq('id', version.id)
 
     if (changeError) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot update supabase', changeError })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot update supabase', changeError })
       return c.json({ status: 'Error unknow' }, 500)
     }
 

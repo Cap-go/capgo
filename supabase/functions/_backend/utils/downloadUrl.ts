@@ -41,7 +41,7 @@ export async function getBundleUrl(
       return { url, size: bundleMeta?.size }
     }
     catch (error) {
-      console.error({ requestId: c.get('requestId'), context: 'getBundleUrl', error })
+      console.error({ requestId: c.get('requestId'), message: 'getBundleUrl', error })
     }
   }
   const url = new URL(c.req.url)
@@ -82,7 +82,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
     }).filter(entry => entry !== null) as ManifestEntry[]
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'getManifestUrl', error })
+    console.error({ requestId: c.get('requestId'), message: 'getManifestUrl', error })
     return []
   }
 }

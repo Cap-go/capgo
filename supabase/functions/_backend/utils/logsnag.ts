@@ -44,7 +44,7 @@ function logsnagInsights(c: Context, data: { title: string, value: string | bool
       },
     }).then(res => res.json())
       .catch((e) => {
-        console.error({ requestId: c.get('requestId'), context: 'logsnagInsights', error: e, payload })
+        console.error({ requestId: c.get('requestId'), message: 'logsnagInsights', error: e, payload })
         return false
       }),
     )

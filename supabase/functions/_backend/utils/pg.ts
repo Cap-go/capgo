@@ -84,7 +84,7 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -110,7 +110,7 @@ export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrgActionD1', error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
   }
   return false
 }
@@ -126,7 +126,7 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -440,7 +440,7 @@ export async function getAppOwnerPostgresV2(
   }
   catch (e: any) {
     console.log('appOwner error', e)
-    console.error({ requestId: c.get('requestId'), context: 'getAppOwnerPostgres', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }
@@ -468,7 +468,7 @@ export async function getAppOwnerPostgres(
     return appOwner
   }
   catch (e: any) {
-    console.error({ requestId: c.get('requestId'), context: 'getAppOwnerPostgres', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }

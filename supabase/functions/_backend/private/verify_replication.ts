@@ -62,7 +62,7 @@ app.get('/', async (c) => {
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error in db_comparison:', e })
+    console.error({ requestId: c.get('requestId'), message: 'Error in db_comparison:', e })
     return c.json({ status: 'Error in db comparison', error: JSON.stringify(e) }, 500)
   }
 })

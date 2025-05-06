@@ -78,7 +78,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting stats', e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting stats', e })
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })
