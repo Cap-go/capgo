@@ -37,7 +37,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
 
   console.log({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
   if (event && event.data && event.data.object) {
-    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.created') {
       const subscription = event.data.object
       const previousAttributes = event.data.previous_attributes as Partial<Stripe.Subscription>
 
@@ -64,6 +64,9 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
       if (event.type === 'customer.subscription.deleted') {
         data.status = 'deleted'
+      }
+      else if (event.type === 'customer.subscription.created') {
+        data.status = 'created'
       }
       else {
         data.status = subscription.cancel_at ? 'canceled' : 'updated'
