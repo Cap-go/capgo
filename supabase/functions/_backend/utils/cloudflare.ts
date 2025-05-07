@@ -190,7 +190,7 @@ function convertDataToJsTypes<T>(apiResponse: AnalyticsApiResponse) {
   })
 }
 
-async function runQueryToCF<T>(c: Context, query: string) {
+async function runQueryToCFA<T>(c: Context, query: string) {
   const CF_ANALYTICS_TOKEN = getEnv(c, 'CF_ANALYTICS_TOKEN')
   const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
 
@@ -201,8 +201,16 @@ async function runQueryToCF<T>(c: Context, query: string) {
       'Accept-Encoding': 'gzip, zlib, deflate, zstd, br',
     },
     body: query,
+  }).catch(async (e) => {
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.error({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: errorJson })
+    }
+    else {
+      console.error({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: e })
+    }
+    throw new Error('runQueryToCFA encountered an error')
   })
-
   const res = await response.json<AnalyticsApiResponse & { data: T[] }>()
   return convertDataToJsTypes<T>(res)
 }
@@ -235,7 +243,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
 
   console.log({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
   try {
-    const res = await runQueryToCF<DeviceUsageAllCF>(c, query)
+    const res = await runQueryToCFA<DeviceUsageAllCF>(c, query)
     // First, filter to keep only the first appearance of each device_id
     const uniqueDevices = new Map<string, DeviceUsageAllCF>()
     res.reverse().forEach((entry) => {
@@ -278,7 +286,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
 
   console.log({ requestId: c.get('requestId'), message: 'rawAnalyticsQuery query', query })
   try {
-    return await runQueryToCF<any>(c, query)
+    return await runQueryToCFA<any>(c, query)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: e })
@@ -303,7 +311,7 @@ ORDER BY date, app_id`
 
   console.log({ requestId: c.get('requestId'), message: 'readBandwidthUsageCF query', query })
   try {
-    return await runQueryToCF<BandwidthUsageCF>(c, query)
+    return await runQueryToCFA<BandwidthUsageCF>(c, query)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: e })
@@ -372,7 +380,7 @@ ORDER BY date`
 
   console.log({ requestId: c.get('requestId'), message: 'readStatsVersionCF query', query })
   try {
-    return await runQueryToCF<VersionUsageCF>(c, query)
+    return await runQueryToCFA<VersionUsageCF>(c, query)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), message: 'Error reading version usage', error: e })
@@ -553,7 +561,7 @@ LIMIT ${limit}`
 
   console.log({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
-    return await runQueryToCF<StatRowCF>(c, query)
+    return await runQueryToCFA<StatRowCF>(c, query)
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), message: 'Error reading stats list', error: e, query })
@@ -609,7 +617,7 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
 
   console.log({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
   try {
-    const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
+    const readAnalytics = await runQueryToCFA<{ count: number }>(c, query)
     return readAnalytics[0].count
   }
   catch (e) {
@@ -624,7 +632,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
 
   console.log({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })
   try {
-    const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
+    const readAnalytics = await runQueryToCFA<{ count: number }>(c, query)
     return readAnalytics[0].count
   }
   catch (e) {
@@ -638,7 +646,7 @@ export async function readActiveAppsCF(c: Context) {
   const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get' GROUP BY app_id`
   console.log({ requestId: c.get('requestId'), message: 'readActiveAppsCF query', query })
   try {
-    const response = await runQueryToCF<{ app_id: string }>(c, query)
+    const response = await runQueryToCFA<{ app_id: string }>(c, query)
     const app_ids = response.map(app => app.app_id)
     // deduplicate them
     const unique = Array.from(new Set(app_ids))
@@ -655,7 +663,7 @@ export async function readLastMonthUpdatesCF(c: Context) {
   const query = `SELECT sum(if(blob2 = 'get', 1, 0)) AS count FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
   console.log({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF query', query })
   try {
-    const response = await runQueryToCF<{ count: number }>(c, query)
+    const response = await runQueryToCFA<{ count: number }>(c, query)
     console.log({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF response', response })
     return response[0].count ?? 0
   }
@@ -916,7 +924,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
 
   console.log({ requestId: c.get('requestId'), message: 'getUpdateStatsCF query', query })
   try {
-    const result = await runQueryToCF<{ app_id: string, failed: number, set: number, get: number }>(c, query)
+    const result = await runQueryToCFA<{ app_id: string, failed: number, set: number, get: number }>(c, query)
 
     const apps = result
       .filter(app => app.get > 0)
