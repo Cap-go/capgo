@@ -124,8 +124,8 @@ function optionsHandler(c: Context) {
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context) {
   const requestId = c.get('fileId') as string
-  // make requestId  safe
-  console.log('files req', 'uploadHandler', requestId, c.req.method, c.req.url)
+  // make requestId safe
+  const normalizedRequestId = decodeURIComponent(requestId)
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
 
   if (durableObjNs == null) {
@@ -133,7 +133,7 @@ async function uploadHandler(c: Context) {
     return c.json({ error: 'Invalid bucket configuration' }, 500)
   }
 
-  const handler = durableObjNs.get(durableObjNs.idFromName(requestId))
+  const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
   console.log({ requestId: c.get('requestId'), message: 'upload handler' })
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
@@ -149,7 +149,16 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     console.log({ requestId: c.get('requestId'), message: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
-  c.set('fileId', fileId)
+  // Decode base64 if necessary
+  let decodedFileId = fileId
+  try {
+    decodedFileId = atob(fileId)
+  }
+  catch {
+    console.log('Debug setKeyFromMetadata - Not base64 encoded:', fileId)
+  }
+  const normalizedFileId = decodeURIComponent(decodedFileId)
+  c.set('fileId', normalizedFileId)
   await next()
 }
 
@@ -159,7 +168,8 @@ async function setKeyFromIdParam(c: Context, next: Next) {
     console.log({ requestId: c.get('requestId'), message: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
-  c.set('fileId', fileId)
+  const normalizedFileId = decodeURIComponent(fileId)
+  c.set('fileId', normalizedFileId)
   await next()
 }
 
