@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 describe('[DELETE] /app operations', () => {
   const id = randomUUID()
@@ -201,5 +201,51 @@ describe('[GET] /app operations with subkey', () => {
     const appsDataWithoutSubkey = await getAllApps.json() as { name: string }[]
     const appNamesWithoutSubkey = appsDataWithoutSubkey.map(app => app.name)
     expect(appNamesWithoutSubkey).toContain(APPNAME)
+  })
+})
+
+describe.only('[POST] /app operations with non-owner user', () => {
+  const id = randomUUID()
+  const APPNAME = `com.nonowner.${id}`
+
+  afterAll(async () => {
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
+  })
+
+  it('should not allow app creation in an organization where user has no write access', async () => {
+    const createApp = await fetch(`${BASE_URL}/app`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        owner_org: NON_OWNER_ORG_ID,
+        name: `${APPNAME}_no_access`,
+        icon: 'test-icon',
+      }),
+    })
+    expect(createApp.status).toBe(403)
+    const responseData = await createApp.json()
+    expect(responseData).toHaveProperty('status', 'You can\'t access this organization')
+  })
+
+  it('should allow app creation in an organization where user is not owner but has write access', async () => {
+    const supabase = getSupabaseClient()
+    const { error: error2 } = await supabase.from('org_users').update({
+      user_right: 'write',
+    }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
+    if (error2)
+      throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)
+    const createApp = await fetch(`${BASE_URL}/app`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        owner_org: NON_OWNER_ORG_ID,
+        name: APPNAME,
+        icon: 'test-icon',
+      }),
+    })
+    expect(createApp.status).toBe(200)
+    const responseData = await createApp.json()
+    expect(responseData).toHaveProperty('app_id', APPNAME)
   })
 })
