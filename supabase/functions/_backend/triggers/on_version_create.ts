@@ -37,26 +37,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (errorUpdate)
       console.log({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
 
-    if (!record.app_id) {
-      return c.json({
-        status: 'error app_id',
-        error: 'Np app id included the request',
-      }, 500)
-    }
-
-    // create app version meta
-    const { error: dbError } = await supabaseAdmin(c as any)
-      .from('app_versions_meta')
-      .insert({
-        id: record.id,
-        app_id: record.app_id,
-        owner_org: record.owner_org,
-        checksum: '',
-        size: 0,
-      })
-    if (dbError)
-      console.error({ requestId: c.get('requestId'), message: 'Cannot create app version meta', error: dbError })
-    return c.json(BRES) // skip delete s3 and increment size in new upload
+    return c.json(BRES)
   }
   catch (e) {
     return c.json({ status: 'Cannot create version', error: JSON.stringify(e) }, 500)

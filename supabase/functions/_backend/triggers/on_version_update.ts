@@ -23,9 +23,14 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
       // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
       const { error: errorUpdate } = await supabaseAdmin(c)
         .from('app_versions_meta')
-        .update({
+        .upsert({
+          id: record.id,
+          app_id: record.app_id,
+          owner_org: record.owner_org,
           size,
           checksum: record.checksum ?? '',
+        }, {
+          onConflict: 'id',
         })
         .eq('id', record.id)
       if (errorUpdate)
