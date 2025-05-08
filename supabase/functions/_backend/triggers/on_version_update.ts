@@ -100,14 +100,6 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     return c.json(BRES)
   }
 
-  // Delete manifest entries
-  const { error: deleteError } = await supabaseAdmin(c)
-    .from('manifest')
-    .delete()
-    .eq('app_version_id', record.id)
-  if (deleteError)
-    console.log({ requestId: c.get('requestId'), message: 'error delete manifest', error: deleteError })
-
   const { data, error: dbError } = await supabaseAdmin(c)
     .from('app_versions_meta')
     .select()
@@ -125,6 +117,14 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .eq('id', record.id)
   if (errorUpdate)
     console.log({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
+
+  // Delete manifest entries
+  const { error: deleteError } = await supabaseAdmin(c)
+    .from('manifest')
+    .delete()
+    .eq('app_version_id', record.id)
+  if (deleteError)
+    console.log({ requestId: c.get('requestId'), message: 'error delete manifest', error: deleteError })
 
   return c.json(BRES)
 }
