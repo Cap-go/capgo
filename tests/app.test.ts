@@ -204,7 +204,7 @@ describe('[GET] /app operations with subkey', () => {
   })
 })
 
-describe.only('[POST] /app operations with non-owner user', () => {
+describe('[POST] /app operations with non-owner user', () => {
   const id = randomUUID()
   const APPNAME = `com.nonowner.${id}`
 
