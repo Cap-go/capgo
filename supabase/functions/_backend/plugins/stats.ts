@@ -151,13 +151,14 @@ async function post(c: Context, body: AppStats) {
       .select('id, owner_org')
       .eq('app_id', app_id)
       .or(`name.eq.${version_name}`)
+      .eq('deleted', false)
       .single()
     console.log({ requestId: c.get('requestId'), message: `appVersion ${JSON.stringify(appVersion)}` })
     if (!appVersion) {
       console.log({ requestId: c.get('requestId'), message: 'switch to onprem', app_id })
       return c.json({
-        message: 'App not found',
-        error: 'app_not_found',
+        message: 'Version not found',
+        error: 'version_not_found',
       }, 400)
     }
     if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
