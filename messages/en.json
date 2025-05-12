@@ -291,7 +291,7 @@
   "included-in-plan": "Included in plan",
   "incorrect-app-id": "You wrote the wrong app id.",
   "info": "Information",
-  "init-capgo-in-your-a": "Init Capgo in your app",
+  "init-capgo-in-your-a": "Install Capgo in your Capacitor app",
   "insert-invite-email": "Insert email of the user you want to invite",
   "install": "Installed",
   "invalid-auth": "Your login are not a match, try again.",
