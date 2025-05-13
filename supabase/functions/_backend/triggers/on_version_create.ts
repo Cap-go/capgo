@@ -41,7 +41,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       console.log({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
 
     const LogSnag = logsnag(c as any)
-    backgroundTask(c as any, LogSnag.track({
+    await backgroundTask(c as any, LogSnag.track({
       channel: 'bundle-created',
       event: 'Bundle Created',
       icon: '🎉',
@@ -52,7 +52,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       },
       notify: false,
     }))
-    backgroundTask(c as any, supabaseAdmin(c as any)
+    await backgroundTask(c as any, supabaseAdmin(c as any)
       .from('orgs')
       .select('*')
       .eq('id', record.owner_org)

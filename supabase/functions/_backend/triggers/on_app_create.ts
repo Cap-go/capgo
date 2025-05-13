@@ -31,7 +31,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     }
 
     const LogSnag = logsnag(c as any)
-    backgroundTask(c as any, LogSnag.track({
+    await backgroundTask(c as any, LogSnag.track({
       channel: 'app-created',
       event: 'App Created',
       icon: '🎉',
@@ -42,7 +42,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       notify: false,
     }))
     const supabase = supabaseAdmin(c as any)
-    backgroundTask(c as any, supabase
+    await backgroundTask(c as any, supabase
       .from('orgs')
       .select('*')
       .eq('id', record.owner_org)

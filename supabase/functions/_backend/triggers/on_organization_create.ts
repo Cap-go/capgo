@@ -34,14 +34,14 @@ app.post('/', middlewareAPISecret, async (c) => {
       await createStripeCustomer(c as any, record as any)
 
     const LogSnag = logsnag(c as any)
-    backgroundTask(c as any, LogSnag.track({
+    await backgroundTask(c as any, LogSnag.track({
       channel: 'org-created',
       event: 'Org Created',
       icon: '🎉',
       user_id: record.id,
       notify: false,
     }))
-    backgroundTask(c as any, trackBentoEvent(c as any, record.management_email, {
+    await backgroundTask(c as any, trackBentoEvent(c as any, record.management_email, {
       org_id: record.id,
       org_name: record.name,
     }, 'org:created'))
