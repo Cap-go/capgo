@@ -214,6 +214,12 @@ describe('[POST] /app operations with non-owner user', () => {
   })
 
   it('should not allow app creation in an organization where user has no write access', async () => {
+    const supabase = getSupabaseClient()
+    const { error: error2 } = await supabase.from('org_users').update({
+      user_right: 'read',
+    }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
+    if (error2)
+      throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
       headers,
