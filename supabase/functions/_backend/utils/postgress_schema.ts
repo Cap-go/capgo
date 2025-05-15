@@ -1,10 +1,11 @@
 import type { Database } from './supabase.types.ts'
-import { bigint, boolean, customType, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, customType, pgEnum, pgTable, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 
+// Keeping this for backward compatibility but marking as deprecated
 const manfiestType = customType <{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
   dataType() {
     return 'manifest_entry[]'
@@ -57,7 +58,20 @@ export const app_versions = pgTable('app_versions', {
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: varchar('min_update_version'),
   r2_path: varchar('r2_path'),
+  // Keeping this for backward compatibility but it's deprecated now
   manifest: manfiestType('manifest'),
+})
+
+// New manifest table schema
+export const manifest = pgTable('manifest', {
+  id: serial('id').primaryKey().notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  app_version_id: bigint('app_version_id', { mode: 'number' }).notNull().references(() => app_versions.id, { onDelete: 'cascade' }),
+  file_name: varchar('file_name').notNull(),
+  s3_path: varchar('s3_path').notNull(),
+  file_hash: varchar('file_hash').notNull(),
+  file_size: bigint('file_size', { mode: 'number' }).default(0),
 })
 
 export const channels = pgTable('channels', {
@@ -91,5 +105,3 @@ export const orgs = pgTable('orgs', {
   id: uuid('id').notNull(),
   created_by: uuid('created_by').notNull(),
 })
-
-export type AppVersionsType = typeof app_versions.$inferInsert

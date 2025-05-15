@@ -8,7 +8,6 @@ import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
-import Spinner from '~/components/Spinner.vue'
 import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
@@ -119,7 +118,7 @@ async function submit(form: { email: string, password: string, password_confirm:
 
 watchEffect(() => {
   isLoadingMain.value = true
-  if (route && route.path === '/forgot_password') {
+  if (route && (route.path === '/forgot_password' || route.path === '/forgot_password/')) {
     // console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
       step.value = Number.parseInt(router.currentRoute.value.query.step as string)
@@ -160,6 +159,7 @@ watchEffect(() => {
                       :label="t('email')"
                       :disabled="isLoading"
                       :prefix-icon="iconEmail"
+                      data-test="email"
                       inputmode="email"
                       autocomplete="email"
                       validation="required:trim"
@@ -201,7 +201,7 @@ watchEffect(() => {
                   </div>
 
                   <div>
-                    <button type="submit" class="inline-flex items-center justify-center w-full">
+                    <button type="submit" data-test="submit" class="inline-flex items-center justify-center w-full">
                       <svg v-if="isLoading" class="inline-block w-5 h-5 mr-3 -ml-1 text-gray-900 align-middle dark:text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle
                           class="opacity-25"

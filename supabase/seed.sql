@@ -19,6 +19,10 @@ BEGIN
         PERFORM vault.create_secret('http://host.docker.internal:54321/functions/v1', 'cloudflare_function_url', 'Cloudflare function url');
     END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'cloudflare_pp_function_url') THEN
+        PERFORM vault.create_secret('http://host.docker.internal:54321/functions/v1', 'cloudflare_pp_function_url', 'Cloudflare preprod function url');
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'apikey') THEN
         PERFORM vault.create_secret('testsecret', 'apikey', 'admin user id');
     END IF;

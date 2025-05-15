@@ -1,5 +1,4 @@
-import type { Context } from '@hono/hono'
-
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
@@ -13,11 +12,11 @@ const bodySchema = z.object({
   version: z.number(),
 })
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareAuth, async (c) => {
   try {
     const authToken = c.req.header('authorization')
 
@@ -27,19 +26,19 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log({ requestId: c.get('requestId'), context: 'post create device body', body })
-      console.log({ requestId: c.get('requestId'), context: 'post create device error', error: parsedBodyResult.error })
+      console.log({ requestId: c.get('requestId'), message: 'post create device body', body })
+      console.log({ requestId: c.get('requestId'), message: 'post create device error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
     const safeBody = parsedBodyResult.data
 
-    const supabaseAdmin = await useSupabaseAdmin(c)
-    const supabaseClient = useSupabaseClient(c, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c as any)
+    const supabaseClient = useSupabaseClient(c as any, authToken)
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData || !clientData.data || clientData.error) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get supabase user', error: clientData.error })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get supabase user', error: clientData.error })
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }
 
@@ -49,7 +48,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
       .single()
 
     if (appError) {
-      console.error({ requestId: c.get('requestId'), context: 'app error', error: appError })
+      console.error({ requestId: c.get('requestId'), message: 'app error', error: appError })
       return c.json({ status: 'app_not_found', app_id: safeBody.app_id }, 400)
     }
 
@@ -64,16 +63,16 @@ app.post('/', middlewareAuth, async (c: Context) => {
     })
 
     if (userRight.error) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot get user right', error: userRight.error })
+      console.error({ requestId: c.get('requestId'), message: 'Cannot get user right', error: userRight.error })
       return c.json({ status: 'internal_auth_error' }, 500)
     }
 
     if (!userRight.data) {
-      console.error({ requestId: c.get('requestId'), context: 'No user right', userId, appId: safeBody.app_id })
+      console.error({ requestId: c.get('requestId'), message: 'No user right', userId, appId: safeBody.app_id })
       return c.json({ status: 'not_authorized' }, 403)
     }
 
-    await createStatsDevices(c, safeBody.app_id, safeBody.device_id, safeBody.version, safeBody.platform, '0.0.0', '0.0.0', '0.0.0', '', true, false)
+    await createStatsDevices(c as any, safeBody.app_id, safeBody.device_id, safeBody.version, safeBody.platform, '0.0.0', '0.0.0', '0.0.0', '', true, false)
 
     return c.body(null, 204) // No content
   }

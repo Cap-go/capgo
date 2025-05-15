@@ -1,81 +1,24 @@
-import type { Context, MiddlewareHandler } from '@hono/hono'
-import type { Database } from '../../utils/supabase.types.ts'
-import * as d3 from 'd3'
+import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import { Hono } from 'hono/tiny'
-import { JSDOM } from 'jsdom'
-import { svgPathProperties } from 'svg-path-properties'
 import { z } from 'zod'
-import { useCors } from '../../utils/hono.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
-import { checkKey } from '../../utils/utils.ts'
+import { honoFactory, middlewareV2, useCors } from '../../utils/hono.ts'
+import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 
-interface AuthInfo {
-  userId: string
-  authType: 'apikey' | 'jwt'
-  apikey: Database['public']['Tables']['apikeys']['Row'] | null
-}
-
-const useAuth: MiddlewareHandler<{
-  Variables: {
-    auth: AuthInfo
-  }
-}> = async (c, next) => {
-  const authToken = c.req.header('authorization')
-  const capgkey = c.req.header('capgkey')
-
-  if (authToken) {
-    // JWT auth
-    const supabaseClient = useSupabaseClient(c, authToken)
-    const { data: user, error: userError } = await supabaseClient.auth.getUser()
-    if (userError)
-      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
-
-    c.set('auth', {
-      userId: user.user?.id,
-      authType: 'jwt',
-      apikey: null,
-    } as AuthInfo)
-  }
-  else if (capgkey) {
-    // API key auth
-    const apikey = await checkKey(c, capgkey, supabaseAdmin(c), ['all'])
-    if (!apikey)
-      return c.json({ status: 'Unauthorized', error: 'Invalid API key' }, 401)
-
-    c.set('auth', {
-      userId: apikey.user_id,
-      authType: 'apikey',
-      apikey,
-    } as AuthInfo)
-  }
-  else {
-    return c.json({ status: 'Unauthorized', error: 'No authentication provided' }, 401)
-  }
-
-  await next()
-}
-
-export const app = new Hono()
+export const app = honoFactory.createApp()
 app.use('*', useCors)
-app.use('*', useAuth)
+app.use('*', middlewareV2(['all', 'read']))
 
 const bundleUsageSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
-  graph: z.string().optional().superRefine((val, ctx) => {
-    if (val && val !== 'true' && val !== 'false')
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid graph value. Must be true or false.' })
-  }).transform(val => val === 'true'),
 })
 
 const normalStatsSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
-  graph: z.enum(['mau', 'storage', 'bandwidth']).optional(),
 })
 
 interface VersionName {
@@ -92,159 +35,179 @@ interface appUsageByVersion {
   uninstall: number | null
 }
 
-app.get('/app/:app_id', async (c: Context) => {
+app.get('/app/:app_id', async (c) => {
   try {
     const appId = c.req.param('app_id')
     const query = c.req.query()
     const bodyParsed = normalStatsSchema.safeParse(query)
-    if (!bodyParsed.success)
+    if (!bodyParsed.success) {
+      console.log('Invalid body', bodyParsed.error)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
+      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
+        console.log('Invalid apikey', auth)
         return c.json({ status: 'You can\'t access this app' }, 400)
+      }
     }
-    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
+    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
+      console.log('Invalid jwt', auth.userId)
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c)
-    const { data: finalStats, error } = (body.graph === undefined) ? await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth').authType === 'jwt') : await drawGraphForNormalStats(appId, null, body.from, body.to, body.graph, supabase)
-    if (error)
-      return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
+    const supabase = supabaseAdmin(c as any)
+    const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
-    if (body.graph === undefined) {
-      return c.json({ status: 'ok', statistics: finalStats })
+    if (error) {
+      console.log('Cannot get app statistics', error)
+      return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
     }
-    else {
-      c.header('Content-Type', 'image/svg+xml')
-      return c.body(finalStats as string)
-    }
+
+    return c.json(finalStats)
   }
   catch (e) {
-    console.error(e)
+    console.error('Error in app statistics', e)
     return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/org/:org_id', async (c: Context) => {
+app.get('/org/:org_id', async (c) => {
   try {
     const orgId = c.req.param('org_id')
     const query = c.req.query()
 
     // Check if user has access to this organization
-    const supabase = supabaseAdmin(c)
+    const supabase = supabaseAdmin(c as any)
 
     const bodyParsed = normalStatsSchema.safeParse(query)
-    if (!bodyParsed.success)
+    if (!bodyParsed.success) {
+      console.log('Invalid body', bodyParsed.error)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
-    if (!(await hasOrgRight(c, orgId, auth.userId, 'read')))
+    if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read'))) {
+      console.log('Invalid jwt', auth.userId)
       return c.json({ status: 'You can\'t access this organization' }, 400)
+    }
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-      if (!auth.apikey!.limited_to_orgs.includes(orgId))
+      if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
+        console.log('Invalid apikey', auth.apikey!.key)
         return c.json({ status: 'You can\'t access this organization' }, 400)
+      }
     }
 
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+      console.log('Invalid apikey', auth.apikey!.key)
       return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
-    const { data: finalStats, error } = (body.graph === undefined)
-      ? await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth').authType === 'jwt')
-      : await drawGraphForNormalStats(null, orgId, body.from, body.to, body.graph, supabase)
+    const { data: finalStats, error } = await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
-    if (error)
+    if (error) {
+      console.log('Cannot get organization statistics', error)
       return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
+    }
 
-    if (body.graph === undefined) {
-      return c.json({ status: 'ok', statistics: finalStats })
-    }
-    else {
-      c.header('Content-Type', 'image/svg+xml')
-      return c.body(finalStats as string)
-    }
+    return c.json(finalStats)
   }
   catch (e) {
-    console.error(e)
+    console.error('Error in organization statistics', e)
     return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/app/:app_id/bundle_usage', async (c: Context) => {
+app.get('/app/:app_id/bundle_usage', async (c) => {
   try {
     const appId = c.req.param('app_id')
     const query = c.req.query()
     const useDashbord = false
 
     const bodyParsed = bundleUsageSchema.safeParse(query)
-    if (!bodyParsed.success)
+    if (!bodyParsed.success) {
+      console.log('Invalid body', bodyParsed.error)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key))
+      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
+        console.log('Invalid apikey', auth.apikey!.key)
         return c.json({ status: 'You can\'t access this app' }, 400)
+      }
     }
-    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
+    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
+      console.log('Invalid jwt', auth.userId)
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c)
-    const { data, error } = ((body.graph === true) ? await getBundleUsageGraph(appId, body.from, body.to, supabase) : await getBundleUsage(appId, body.from, body.to, useDashbord, supabase))
-    if (error)
-      return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
+    const supabase = supabaseAdmin(c as any)
+    const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
-    if (body.graph === false && typeof data !== 'string') {
-      return c.json({ status: 'ok', data })
+    if (error) {
+      console.log('Cannot get app statistics. Cannot get bundle usage', error)
+      return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
     }
-    else {
-      c.header('Content-Type', 'image/svg+xml')
-      return c.body(data as string)
-    }
+
+    return c.json(data)
   }
   catch (e) {
-    console.error(e)
+    console.error('Error in app statistics. Cannot get bundle usage', e)
     return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(e) }, 500)
   }
 })
 
-app.get('/user', async (c: Context) => {
+app.get('/user', async (c) => {
   const auth = c.get('auth') as AuthInfo
-  const supabase = supabaseAdmin(c)
+  const supabase = supabaseAdmin(c as any)
 
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)
-  if (!bodyParsed.success)
+  if (!bodyParsed.success) {
+    console.log('Invalid body', bodyParsed.error)
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+  }
   const body = bodyParsed.data
 
   const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
     orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
   }
-  else if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    orgsReq.in('app_id', auth.apikey!.limited_to_apps)
-  }
   const orgs = await orgsReq
-  if (orgs.error)
+  if (orgs.error) {
+    console.log('Cannot get user statistics', orgs.error)
     return c.json({ status: 'User not found', error: JSON.stringify(orgs.error) }, 404)
+  }
+
+  console.log('orgs', orgs.data)
 
   // Deduplicate organizations by org_id using Set for better performance
   const uniqueOrgs = Array.from(
     new Map(orgs.data.map(org => [org.org_id, org])).values(),
   )
-  if (uniqueOrgs.length === 0)
-    return c.json({ status: 'No organizations found', error: 'No organizations found' }, 404)
-  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+  if (uniqueOrgs.length === 0) {
+    console.log('No organizations found', auth.userId)
+    return c.json({ status: 'No organizations found', error: 'No organizations found' }, 401)
+  }
+
+  let stats: Array<{ data: any, error: any }> = []
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+  }
+  else {
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+  }
+
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
-  if (errors.length > 0)
+  if (errors.length > 0) {
+    console.log('Cannot get user statistics', errors)
     return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
+  }
 
   const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
     const current = acc.get(curr.date)
@@ -259,7 +222,7 @@ app.get('/user', async (c: Context) => {
     return acc
   }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
 
-  return c.json({ status: 'ok', statistics: finalStats })
+  return c.json(finalStats)
 })
 
 async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
@@ -538,412 +501,6 @@ function getLatestVersion(versions: VersionName[]) {
 function getLatestVersionPercentage(datasets: any[], latestVersion: { name: string }) {
   const latestVersionDataset = datasets.find(dataset => dataset.label === latestVersion?.name)
   return latestVersionDataset ? latestVersionDataset.data[latestVersionDataset.data.length - 1] : 0
-}
-
-async function drawGraphForNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, key: 'mau' | 'storage' | 'bandwidth', supabase: ReturnType<typeof supabaseAdmin>) {
-  const normalStatsRaw = await getNormalStats(appId, ownerOrg, from, to, supabase)
-  const error = normalStatsRaw.error
-  let data = normalStatsRaw.data
-
-  if (error || !data)
-    return { data: null, error }
-
-  const virtualDOM = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
-  (globalThis as any).document = virtualDOM.window.document
-
-  const svgWidth = 700
-  const svgHeight = 700
-
-  const colors = {
-    mau: '#34d399',
-    storage: '#60a5fa',
-    bandwidth: '#fb923c',
-  }
-
-  const margin = { top: 20, right: 20, bottom: 70, left: 120 }
-  const graphWidth = svgWidth - margin.left - margin.right
-  const graphHeight = svgHeight - margin.top - margin.bottom
-
-  const svg = d3.select(document.body).append('svg').attr('width', svgWidth).attr('height', svgHeight)
-  const graph = svg.append('g')
-    .attr('width', graphWidth)
-    .attr('height', graphHeight)
-    .attr('transform', `translate(${margin.left}, ${margin.top})`)
-
-  const x = d3.scaleTime()
-    .range([0, graphWidth])
-
-  const y = d3.scaleLinear().range([graphHeight, 0])
-
-  if (key === 'storage' || key === 'bandwidth') {
-    data = data.map(d => ({
-      ...d,
-      [key]: d[key] / 1024 / 1024,
-    }))
-  }
-
-  const parseDate = d3.isoParse
-  const parsedDates = data.map(d => parseDate(d.date))
-  x.domain(d3.extent(parsedDates as any) as any)
-  y.domain([0, d3.max(data, d => d[key]) || 0])
-
-  const line = d3.line<typeof data[0]>()
-    .x((d) => {
-      const date = parseDate(d.date)!
-      return x(date!)
-    })
-    .y((d) => {
-      return y(d[key])
-    })
-    .curve(d3.curveBasis)
-
-  const stroke = colors[key]
-
-  graph.append('path')
-    .datum(data)
-    .attr('d', line)
-    .attr('stroke', stroke)
-    .attr('stroke-width', 2)
-    .attr('fill', 'none')
-
-  // X axis
-  graph.append('g')
-    .attr('transform', `translate(0, ${graphHeight})`)
-    .call(d3.axisBottom(x)
-      .tickFormat(d => d3.timeFormat('%Y-%m-%d')(d as any) as any),
-    )
-  // Rotate x-axis labels
-  graph.selectAll('.tick text')
-    .attr('transform', 'rotate(-75)')
-    .style('text-anchor', 'end')
-    .attr('dx', '-.8em')
-    .attr('dy', '.15em')
-
-  // Y axis
-  graph.append('g')
-    .call(key === 'mau' ? d3.axisLeft(y) : d3.axisLeft(y).tickFormat((d: any) => `${d} MB`))
-
-  // Convert HTML SVG to proper SVG string with XML declaration and namespace
-  const svgElement = virtualDOM.window.document.querySelector('svg')
-  if (!svgElement) {
-    return { data: null, error: 'No SVG element found' }
-  }
-
-  // Add required SVG namespace
-  svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  svgElement.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
-
-  // Create XML declaration and SVG string
-  const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
-  const svgString = `${xmlDeclaration}\n${svgElement.outerHTML}`
-  // const svgString = virtualDOM.window.document.body.innerHTML;
-
-  return { data: svgString, error: null } // Added missing return statement
-}
-
-async function getBundleUsageGraph(appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>) {
-  const { data, error } = await getBundleUsage(appId, from, to, false, supabase)
-  if (error)
-    return { data: null, error }
-
-  // const window = svgdom.createSVGWindow();
-  const virtualDOM = new JSDOM('<html><body></body></html>', { pretendToBeVisual: true });
-  (globalThis as any).document = virtualDOM.window.document
-
-  const svgWidth = 700
-  const svgHeight = 700
-
-  const margin = { top: 20, right: 20, bottom: 70, left: 120 }
-  const graphWidth = svgWidth - margin.left - margin.right
-  const graphHeight = svgHeight - margin.top - margin.bottom
-
-  const svg = d3.select(document.body).append('svg').attr('width', svgWidth).attr('height', svgHeight)
-  const graph = svg.append('g')
-    .attr('width', graphWidth)
-    .attr('height', graphHeight)
-    .attr('transform', `translate(${margin.left}, ${margin.top})`)
-
-  const x = d3.scaleTime()
-    .range([0, graphWidth])
-
-  const y = d3.scaleLinear().range([graphHeight, 0])
-  // X scale domain
-  // Parse dates from strings using d3's timeParse
-  const parseDate = d3.timeParse('%Y-%m-%d')
-  const parsedDates = data.labels.map(dateStr => parseDate(dateStr))
-  x.domain(d3.extent(parsedDates as any) as any)
-  // x.domain(d3.extent(data.versionStats.labels, d => d) as [Date, Date]);
-
-  // Y scale domain
-  y.domain([0, 100])
-  y.ticks(10)
-
-  const datasets = data.datasets.map((d) => {
-    return d.data.map((x, i) => {
-      return {
-        date: parseDate(data.labels[i])!,
-        value: x,
-      }
-    })
-  })
-
-  const line = d3.line<typeof datasets[0][0]>()
-    .x(d => x(d.date))
-    .y(d => y(d.value))
-    .curve(d3.curveBasis)
-
-  const linesHashSet = new Set<string>()
-
-  // First pass: create texts and find max width
-  const legendItems = datasets.map((dataset, i) => {
-    function RNG(seed: number) {
-      const m = 2 ** 35 - 31
-      const a = 185852
-      let s = seed % m
-      return function () {
-        return (s = s * a % m) / m
-      }
-    }
-    function crc32(str: string) {
-      let crc = -1
-      for (let i = 0; i < str.length; i++) {
-        const byte = str.charCodeAt(i)
-        crc = crc ^ byte
-        for (let j = 0; j < 8; j++) {
-          const mask = -(crc & 1)
-          crc = (crc >>> 1) ^ (0xEDB88320 & mask)
-        }
-      }
-      return ~crc >>> 0
-    }
-    const seed = crc32(data.datasets[i].label.toString())
-
-    const random = RNG(seed)()
-    const stroke = `hsl(${random * 360}, 70%, 50%)`
-
-    const legendGroup = svg.append('g')
-      .attr('transform', `translate(${margin.left - 40}, ${margin.top})`)
-
-    const legendText = legendGroup.append('text')
-      .attr('x', 0)
-      .attr('y', i * 20)
-      .attr('dy', '0.35em')
-      .attr('text-anchor', 'end')
-      .style('font-size', '12px')
-      .style('fill', stroke)
-      .text(data.datasets[i].label)
-
-    // Polyfill getComputedTextLength for JSDOM environment
-    if (!legendText.node()!.getComputedTextLength) {
-      const textContent = legendText.text()
-      legendText.node()!.getComputedTextLength = () => {
-        return textContent.split('').reduce((width, char) => {
-          // Reduced all widths by ~25%
-          if (/[mw]/i.test(char))
-            return width + 7.5 // Was 10
-          if (/[A-LN-VXYZ0-9]/.test(char))
-            return width + 6.75 // Was 8
-          if (/[il1.]/.test(char))
-            return width + 3 // Was 4
-          return width + 4.5 // Was 6
-        }, 0)
-      }
-    }
-
-    return {
-      group: legendGroup,
-      text: legendText,
-      stroke,
-      width: legendText.node()!.getComputedTextLength(),
-    }
-  })
-
-  // Find maximum text width
-  const maxTextWidth = Math.max(...legendItems.map(item => item.width))
-
-  // Second pass: add circles using consistent positioning
-  legendItems.forEach((item) => {
-    item.group.append('circle')
-      .attr('cx', -maxTextWidth - 10)
-      .attr('cy', legendItems.indexOf(item) * 20)
-      .attr('r', 4)
-      .style('fill', item.stroke)
-  })
-
-  // Now continue with the rest of your dataset forEach loop
-  datasets.forEach((dataset, i) => {
-    const stroke = legendItems[i].stroke // Use the same color as legend
-    const key = dataset.map(d => `${d.date.toISOString()}=${d.value}`).join('$')
-    const hasKey = linesHashSet.has(key)
-
-    // const yOffset = hasKey ? 10 : 0;
-    // graph.append("g")
-    //   .attr("transform", `translate(0, ${yOffset})`)
-    //   .append("path")
-    //   .datum(dataset)
-    //   .attr("d", line)
-    //   .attr("stroke", stroke)
-    //   .attr("stroke-width", 2)
-    //   .attr("fill", "none");
-    // // Skip the original graph.append("path") after this insert
-    // continue;
-    if (hasKey) {
-      // If line exists, create offset version
-      // Get points along the line path
-      // Create a line generator with curveBasis for getting smooth points
-      const smoothLine = d3.line<typeof dataset[0]>()
-        .x(d => x(d.date))
-        .y(d => y(d.value))
-        .curve(d3.curveBasis)
-
-      // Create a temporary SVG path to get the points along the curved line
-      const tempPath = d3.create('svg')
-        .append('path')
-        .attr('d', smoothLine(dataset))
-
-      // Replace the polyfill section with:
-      if (!tempPath.node()?.getTotalLength) {
-        const pathNode = tempPath.node()!
-        // eslint-disable-next-line new-cap
-        const properties = new svgPathProperties(pathNode.getAttribute('d')!)
-        pathNode.getTotalLength = () => properties.getTotalLength()
-        pathNode.getPointAtLength = (distance: number): DOMPoint => {
-          const point = properties.getPointAtLength(distance)
-          return Object.assign(point, {
-            x: point.x,
-            y: point.y,
-            w: 0,
-            z: 0,
-            matrixTransform: () => null as any,
-            toJSON: () => ({ x: point.x, y: point.y }),
-          })
-        }
-      }
-
-      const pathLength = tempPath.node()!.getTotalLength()
-      const numPoints = dataset.length * 20 // More points for smoother curve
-      const smoothPathPoints = Array.from({ length: numPoints }, (_, i) => {
-        const point = tempPath.node()!.getPointAtLength(pathLength * i / (numPoints - 1))
-        return {
-          x: point.x,
-          y: point.y,
-        }
-      })
-
-      const finalSmoothPathPoints = smoothPathPoints.reduceRight((acc, p) => {
-        if (acc.length === 0) {
-          acc.push({
-            x: p.x,
-            y: p.y,
-            mX: p.x,
-            mY: p.y,
-          })
-        }
-        else {
-          const lastPoint = acc[acc.length - 1]
-
-          if (lastPoint.y === p.y) {
-            return acc
-          }
-          const sX = (p.x + lastPoint.x) / 2
-          const sY = (p.y + lastPoint.y) / 2
-
-          // Calculate points 5 units away from S(sX, sY)
-          const angle = Math.atan2(lastPoint.y - p.y, lastPoint.x - p.x)
-          const perpendicular = angle + Math.PI / 2
-
-          const point2 = {
-            x: sX - 5 * Math.cos(perpendicular),
-            y: sY - 5 * Math.sin(perpendicular),
-          }
-
-          acc.push({
-            x: p.x,
-            y: p.y,
-            mX: point2.x,
-            mY: point2.y,
-          })
-        }
-
-        return acc
-      }, [] as { x: number, y: number, mX: number, mY: number }[]).map(p => ({
-        x: p.mX,
-        y: p.mY,
-      }))
-
-      // Create a line generator for offset points
-      const offsetLine = d3.line<{ x: number, y: number }>()
-        .x(d => d.x)
-        .y(d => d.y)
-        // .curve(d3.curveBasis);
-
-      // Draw the offset path
-      graph.append('path')
-        .datum(finalSmoothPathPoints)
-        .attr('d', offsetLine) // Type assertion needed due to d3 typing limitations
-        .attr('stroke', stroke)
-        .attr('stroke-width', 5)
-        .attr('fill', 'none')
-
-      // graph.append("path")
-      //   .datum(dataset)
-      //   .attr("d", line)
-      //   .attr("stroke", stroke)
-      //   .attr("stroke-width", 5)
-      //   .attr("fill", "none");
-    }
-    else {
-      graph.append('path')
-        .datum(dataset)
-        .attr('d', line)
-        .attr('stroke', stroke)
-        .attr('stroke-width', 5)
-        .attr('fill', 'none')
-    }
-
-    linesHashSet.add(key)
-  })
-
-  // graph.append("path")
-  //   .datum(data)
-  //   .attr("d", line)
-  //   .attr("stroke", "#0099ff")
-  //   .attr("stroke-width", 2)
-  //   .attr("fill", "none");
-
-  // X axis
-  graph.append('g')
-    .attr('transform', `translate(0, ${graphHeight})`)
-    .call(d3.axisBottom(x)
-      .tickFormat(d => d3.timeFormat('%Y-%m-%d')(d as any) as any),
-    )
-  // Rotate x-axis labels
-  graph.selectAll('.tick text')
-    .attr('transform', 'rotate(-75)')
-    .style('text-anchor', 'end')
-    .attr('dx', '-.8em')
-    .attr('dy', '.15em')
-
-  // Y axis
-  graph.append('g')
-    .call(d3.axisLeft(y))
-
-  // Convert HTML SVG to proper SVG string with XML declaration and namespace
-  const svgElement = virtualDOM.window.document.querySelector('svg')
-  if (!svgElement) {
-    return { data: null, error: 'No SVG element found' }
-  }
-
-  // Add required SVG namespace
-  svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  svgElement.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
-
-  // Create XML declaration and SVG string
-  const xmlDeclaration = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
-  const svgString = `${xmlDeclaration}\n${svgElement.outerHTML}`
-  // const svgString = virtualDOM.window.document.body.innerHTML;
-
-  return { data: svgString, error: null } // Added missing return statement
 }
 
 function getDaysBetweenDates(firstDate: Date, secondDate: Date) {

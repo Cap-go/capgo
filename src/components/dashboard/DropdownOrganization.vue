@@ -106,8 +106,8 @@ function onOrganizationClick(org: Organization) {
 
   organizationStore.setCurrentOrganization(org.gid)
   // if current path is not home, redirect to the org home page
-  if (router.currentRoute.value.path !== '/app/home')
-    router.push(`/app/home`)
+  if (router.currentRoute.value.path !== '/app')
+    router.push(`/app`)
 }
 
 async function createNewOrg() {
@@ -159,13 +159,13 @@ async function createNewOrg() {
 <template>
   <div>
     <details v-show="currentOrganization" ref="dropdown" class="w-full dropdown dropdown-end">
-      <summary class="justify-between w-full btn btn-outline btn-sm text-slate-300 dark:text-white">
+      <summary class="justify-between w-full btn btn-outline border-gray-300 dark:border-gray-600 btn-sm text-slate-300 dark:text-white">
         <div class="w-4/5 text-left truncate">
           {{ currentOrganization?.name }}
         </div>
         <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
-      <ul class="dropdown-content dark:bg-base-100 bg-white rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
+      <ul class="dropdown-content dark:bg-base-200 bg-white rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
         <li v-for="org in organizationStore.organizations" :key="org.gid" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
           <a
             class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
@@ -183,5 +183,8 @@ async function createNewOrg() {
         </li>
       </ul>
     </details>
+    <button v-show="!currentOrganization" class="btn btn-outline border-gray-300 dark:border-gray-600 w-full btn-sm text-slate-300 dark:text-white" @click="createNewOrg">
+      <Plus class="mx-auto" />
+    </button>
   </div>
 </template>

@@ -27,7 +27,7 @@ function openSettngs(app: Database['public']['Tables']['apps']['Row']) {
 
 async function loadData() {
   if (props.app.app_id)
-    mauNb.value = main.getTotalMauByApp(props.app.app_id)
+    mauNb.value = await main.getTotalMauByApp(props.app.app_id, organizationStore.currentOrganization?.subscription_start)
 }
 
 async function refreshData() {
@@ -37,7 +37,7 @@ async function refreshData() {
 }
 
 function openPackage(appId: string) {
-  router.push(`/app/package/${appIdToUrl(appId)}`)
+  router.push(`/app/p/${appIdToUrl(appId)}`)
 }
 
 const acronym = computed(() => {
@@ -65,7 +65,7 @@ const perm = computed(() => {
 })
 
 watchEffect(async () => {
-  if (route.path.endsWith('/app/home'))
+  if (route.path.endsWith('/app'))
     await refreshData()
 })
 </script>

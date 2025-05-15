@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
-import { posthogLoader } from '~/services/posthog'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
 const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleLinkDialog.vue'))
-onMounted(() => {
-  posthogLoader()
-})
 </script>
 
 <template>

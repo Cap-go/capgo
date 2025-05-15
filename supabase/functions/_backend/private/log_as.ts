@@ -1,5 +1,4 @@
-import type { Context } from '@hono/hono'
-
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
@@ -9,11 +8,11 @@ const bodySchema = z.object({
   user_id: z.string(),
 })
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c: Context) => {
+app.post('/', middlewareAuth, async (c) => {
   try {
     const authToken = c.req.header('authorization')
 
@@ -23,17 +22,17 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log({ requestId: c.get('requestId'), context: 'log_as body', body })
-      console.log({ requestId: c.get('requestId'), context: 'log_as parsedBodyResult.error', error: parsedBodyResult.error })
+      console.log({ requestId: c.get('requestId'), message: 'log_as body', body })
+      console.log({ requestId: c.get('requestId'), message: 'log_as parsedBodyResult.error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
-    const supabaseAdmin = await useSupabaseAdmin(c)
-    const supabaseClient = useSupabaseClient(c, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c as any)
+    const supabaseClient = useSupabaseClient(c as any, authToken)
 
     const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
     if (adminError) {
-      console.error({ requestId: c.get('requestId'), context: 'is_admin_error', error: adminError })
+      console.error({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
       return c.json({ error: 'is_admin_error' }, 500)
     }
 
@@ -42,17 +41,14 @@ app.post('/', middlewareAuth, async (c: Context) => {
 
     const user_id = parsedBodyResult.data.user_id
 
-    const { data: userData, count: _userCount, error: userError } = await supabaseAdmin.from('users')
-      .select('email', { count: 'exact' })
-      .eq('id', user_id)
-      .single()
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id)
 
-    if (userError) {
-      console.error({ requestId: c.get('requestId'), context: 'user_does_not_exist', error: userError })
+    if (userError || !userData?.user?.email) {
+      console.error({ requestId: c.get('requestId'), message: 'user_does_not_exist', error: userError })
       return c.json({ error: 'user_does_not_exist' }, 400)
     }
 
-    const userEmail = userData?.email
+    const userEmail = userData?.user?.email
 
     const { data: magicLink, error: magicError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
@@ -60,15 +56,15 @@ app.post('/', middlewareAuth, async (c: Context) => {
     })
 
     if (magicError) {
-      console.error({ requestId: c.get('requestId'), context: 'generate_magic_link_error', error: magicError })
+      console.error({ requestId: c.get('requestId'), message: 'generate_magic_link_error', error: magicError })
       return c.json({ error: 'generate_magic_link_error' }, 500)
     }
 
-    const tmpSupabaseClient = emptySupabase(c)
+    const tmpSupabaseClient = emptySupabase(c as any)
     const { data: authData, error: authError } = await tmpSupabaseClient.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
     if (authError) {
-      console.error({ requestId: c.get('requestId'), context: 'auth_error', error: authError })
+      console.error({ requestId: c.get('requestId'), message: 'auth_error', error: authError })
       return c.json({ error: 'auth_error' }, 500)
     }
 
@@ -76,7 +72,7 @@ app.post('/', middlewareAuth, async (c: Context) => {
     const refreshToken = authData.session?.refresh_token
 
     if (!jwt) {
-      console.error({ requestId: c.get('requestId'), context: 'no_jwt', authData })
+      console.error({ requestId: c.get('requestId'), message: 'no_jwt', authData })
       return c.json({ error: 'no_jwt' }, 500)
     }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ActionSheetOptionButton } from '~/stores/display'
+import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
@@ -24,7 +25,6 @@ function calculateAcronym(name: string) {
 }
 
 function close(item?: ActionSheetOptionButton) {
-  console.log('close', item)
   if (displayStore?.dialogOption)
     displayStore.dialogOption.preventAccidentalClose = false
   if (!item?.preventClose)
@@ -33,10 +33,8 @@ function close(item?: ActionSheetOptionButton) {
     displayStore.lastButtonRole = item.id ?? ''
     if (item.role === 'cancel')
       displayStore.dialogCanceled = true
-
     else
       displayStore.dialogCanceled = false
-
     if (item?.handler)
       item.handler()
   }
@@ -77,7 +75,7 @@ onMounted(() => {
 <template>
   <div>
     <dialog id="my_modal_1" class="modal" :open="displayStore.showDialog">
-      <div class="bg-white modal-box dark:bg-base-100" :class="displayStore.dialogOption?.size ?? ''">
+      <div class="bg-white modal-box dark:bg-base-200" :class="displayStore.dialogOption?.size ?? ''">
         <button class="absolute btn btn-sm btn-circle btn-ghost right-2 top-2" @click="close()">
           ✕
         </button>
@@ -131,14 +129,14 @@ onMounted(() => {
                     :name="`app-${app.id}`"
                     :classes="{
                       outer: 'mb-0! ml-0 grow-0! h-[18px]!',
-                      inner: 'max-w-[18px]!',
+                      inner: 'max-w-[18px]! mr-2',
                       wrapper: 'mb-0!',
                     }"
                     @input="(value) => {
                       if (value)
-                        displayStore.selectedApps.push(app)
+                        displayStore.selectedApps.push(app as any)
                       else
-                        displayStore.selectedApps = displayStore.selectedApps.filter(filterApp => filterApp.app_id !== app.app_id)
+                        displayStore.selectedApps = (displayStore.selectedApps as any).filter((filterApp: Database['public']['Tables']['apps']['Row']) => filterApp.app_id !== app.app_id)
                     }"
                   />
                 </div>
@@ -160,7 +158,11 @@ onMounted(() => {
                 type="checkbox"
                 decorator-icon="check"
                 :label="displayStore.dialogOption?.checkboxText"
-                :classes="{ outer: 'mb-[0px]', inner: 'max-w-[18px]!' }"
+                :classes="{
+                  outer: 'mb-0! ml-0 grow-0! h-[18px]!',
+                  inner: 'max-w-[18px]! mr-2',
+                  wrapper: 'mb-0!',
+                }"
               />
             </FormKit>
           </div>
@@ -170,6 +172,7 @@ onMounted(() => {
                 v-model="displayStore.dialogInputText"
                 type="text"
                 name="text"
+                data-test="dialog-input-text"
                 enterkeyhint="next"
                 validation="required:trim"
                 :classes="{
@@ -204,6 +207,7 @@ onMounted(() => {
                 'my-4 mx-auto!': displayStore.dialogOption?.buttonVertical && item.role === 'cancel',
               }"
               class="btn rounded-lg px-5 py-2.5 text-center text-sm font-mediumtext-whitefocus:outline-none focus:ring-4"
+              :data-test="item.id || item.text"
               @click="close(item)"
             >
               {{ item.text }}

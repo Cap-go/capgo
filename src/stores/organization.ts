@@ -91,7 +91,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     _organizationsByAppId.value = organizationsByAppId
-    _initialLoadPromise.value.resolve()
+    _initialLoadPromise.value.resolve(true)
   })
 
   const getOrgByAppId = (appId: string) => {

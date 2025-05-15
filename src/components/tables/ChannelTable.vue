@@ -4,10 +4,9 @@ import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconPlus from '~icons/heroicons/plus?width=2em&height=2em'
 import IconTrash from '~icons/heroicons/trash?raw'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -26,6 +25,7 @@ const emit = defineEmits<{
 
 interface Channel {
   version: {
+    id: number
     name: string
     created_at: string
     min_update_version: string | null
@@ -44,7 +44,7 @@ const main = useMainStore()
 const total = ref(0)
 const search = ref('')
 const elements = ref<(Element)[]>([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 const currentPage = ref(1)
 const versionId = ref<number>()
 const filters = ref()
@@ -90,6 +90,8 @@ async function addChannel(name: string) {
   try {
     console.log('addChannel', name, versionId.value, main.user)
     const currentGid = organizationStore.currentOrganization?.gid
+    if (!currentGid)
+      return
     // { name: channelId, app_id: appId, version: data.id, created_by: userId }
     const { data: dataChannel } = await supabase
       .from('channels')
@@ -97,14 +99,15 @@ async function addChannel(name: string) {
         {
           name,
           app_id: props.appId,
-          version: versionId.value,
-          owner_org: currentGid,
+          version: versionId.value as number,
+          owner_org: currentGid as string,
+          created_by: main.user?.id,
         },
       ])
       .select()
     if (!dataChannel)
       return
-    elements.value.push(dataChannel[0] as any)
+    refreshData(true)
   }
   catch (error) {
     console.error(error)
@@ -122,6 +125,7 @@ async function getData() {
           app_id,
           public,
           version (
+            id,
             name,
             created_at,
             min_update_version
@@ -149,6 +153,9 @@ async function getData() {
     elements.value.push(...dataVersions as any)
     // console.log('count', count)
     total.value = count || 0
+    if (count === 0) {
+      showAddModal()
+    }
 
     // Look for misconfigured channels
     // This will trigger if the channel disables updates based on metadata + if the metadata is undefined
@@ -172,13 +179,18 @@ async function getData() {
   }
   isLoading.value = false
 }
-async function refreshData() {
+async function refreshData(keepCurrentPage = false) {
   // console.log('refreshData')
   try {
-    currentPage.value = 1
+    const page = currentPage.value
+    if (!keepCurrentPage)
+      currentPage.value = 1
+
     elements.value.length = 0
     await getData()
     versionId.value = await findUnknownVersion()
+    if (keepCurrentPage)
+      currentPage.value = page
   }
   catch (error) {
     console.error(error)
@@ -203,7 +215,7 @@ async function deleteOne(one: Element) {
       toast.error(t('cannot-delete-channel'))
     }
     else {
-      await refreshData()
+      await refreshData(true)
       toast.success(t('channel-deleted'))
     }
   }
@@ -220,6 +232,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('last-upload'),
@@ -234,6 +247,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     displayFunction: (elem: Element) => elem.version.name,
+    onClick: (elem: Element) => openOneVersion(elem),
   },
   {
     label: t('misconfigured'),
@@ -247,12 +261,11 @@ columns.value = [
     mobile: true,
     icon: IconTrash,
     class: 'text-red-500',
-    onClick: deleteOne,
+    onClick: (elem: Element) => deleteOne(elem),
   },
 ]
 
 async function reload() {
-  console.log('reload')
   try {
     elements.value.length = 0
     await getData()
@@ -292,12 +305,13 @@ async function showAddModal() {
   await displayStore.onDialogDismiss()
 }
 
+async function openOneVersion(one: Element) {
+  router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.version?.id}`)
+}
+
 async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
-onMounted(async () => {
-  await refreshData()
-})
 watch(props, async () => {
   await refreshData()
 })
@@ -307,15 +321,13 @@ watch(props, async () => {
   <div>
     <Table
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total" row-click :element-list="elements"
+      :total="total" :element-list="elements"
+      show-add
       filter-text="Filters"
       :is-loading="isLoading"
       :search-placeholder="t('search-by-name')"
+      @add="showAddModal"
       @reload="reload()" @reset="refreshData()"
-      @row-click="openOne"
     />
-    <button id="create_channel" class="fixed z-20 bg-gray-800 btn btn-circle btn-xl btn-outline right-4-safe bottom-20-safe md:right-4-safe md:bottom-4-safe secondary" @click="showAddModal">
-      <IconPlus />
-    </button>
   </div>
 </template>

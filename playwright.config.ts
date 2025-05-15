@@ -24,7 +24,7 @@ else {
 }
 
 webServer.push({
-  command: 'bun run prebuild-serve-dev',
+  command: 'bun run serve:dev',
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,
@@ -35,7 +35,7 @@ webServer.push({
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './tests',
+  testDir: './playwright/e2e',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -48,13 +48,17 @@ export default defineConfig({
   reporter: [
     ['list', { printSteps: true }],
     ['github'],
-    ['html', { outputFolder: './test-results/reports/playwright-html-report', open: 'never' }],
+    ['html', { outputFolder: './playwright-report/', open: 'never' }],
   ],
   use: {
     headless,
     trace: 'on',
     video: 'on',
     screenshot: 'on',
+    baseURL: 'http://localhost:5173/',
+    viewport: { width: 1280, height: 720 },
+    actionTimeout: 15000,
+    navigationTimeout: 15000,
     // storageState: 'playwright/.auth/user1.json',
   },
   expect: {

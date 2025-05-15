@@ -80,7 +80,7 @@ async function refreshfilteredVersions() {
 <template>
   <div>
     <dialog id="my_modal_1" class="modal" :open="open">
-      <div class="bg-white modal-box dark:bg-base-100 max-h-[80vh]" :class="displayStore.dialogOption?.size ?? ''">
+      <div class="bg-white modal-box dark:bg-base-200 max-h-[80vh]" :class="displayStore.dialogOption?.size ?? ''">
         <div class="absolute flex flex-col right-2 top-2">
           <button class="ml-auto btn btn-sm btn-circle btn-ghost" @click="() => { open = false; displayStore.showBundleLinkDialogChannel = null }">
             ✕
@@ -104,7 +104,7 @@ async function refreshfilteredVersions() {
           <div
             class="flex flex-col items-center w-full rounded-b dark:border-gray-600"
           >
-            <div v-for="version in versions" :key="version.id" class="w-full px-8 h-11" @click="async () => { await displayStore.showBundleLinkDialogCallbacks.onLink(version); open = false }">
+            <div v-for="version in versions" :key="version.id" class="w-full px-8 h-11" @click="async () => { await (displayStore.showBundleLinkDialogCallbacks.onLink as any)(version); open = false }">
               <div
                 class="flex items-center justify-center h-full text-center dark:hover:bg-gray-400 hover:bg-gray-200" :class="{
                   'dark:bg-gray-700 bg-gray-400 cursor-not-allowed': showBundleLinkDialogChannel && (showBundleLinkDialogChannel?.version as any).id === version.id,

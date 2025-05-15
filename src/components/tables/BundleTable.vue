@@ -3,12 +3,12 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash?raw'
-import Table from '~/components/Table.vue'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -20,16 +20,18 @@ const props = defineProps<{
 
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
-const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const role = ref<OrganizationRole | null>(null)
+const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
+const showSteps = ref(false)
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const total = ref(0)
 const search = ref('')
+const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
 const selectedElements = ref<Element[]>([])
 const isLoading = ref(false)
@@ -39,6 +41,12 @@ const filters = ref({
   'deleted': false,
   'encrypted': false,
 })
+const channelCache = ref<Record<number, { name: string, id?: number }>>({})
+
+function onboardingDone() {
+  reload()
+  showSteps.value = !showSteps.value
+}
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
@@ -121,6 +129,21 @@ async function enhenceVersionElems(dataVersions: Database['public']['Tables']['a
 async function getData() {
   isLoading.value = true
   try {
+    let channelsToSearch = null
+
+    // If search term might be a channel name, find versions linked to channels with that name
+    if (search.value) {
+      const { data: channels } = await supabase
+        .from('channels')
+        .select('id, version')
+        .eq('app_id', props.appId)
+        .ilike('name', `%${search.value}%`)
+
+      if (channels && channels.length > 0) {
+        channelsToSearch = channels.map(c => c.version)
+      }
+    }
+
     let req = supabase
       .from('app_versions')
       .select('*', { count: 'exact' })
@@ -128,8 +151,16 @@ async function getData() {
       .neq('storage_provider', 'revert_to_builtin')
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
 
-    if (search.value)
-      req = req.like('name', `%${search.value}%`)
+    if (search.value) {
+      if (channelsToSearch && channelsToSearch.length > 0) {
+        // Search by both version name or linked channel
+        req = req.or(`name.ilike.%${search.value}%,id.in.(${channelsToSearch.join(',')})`)
+      }
+      else {
+        // Search by version name only
+        req = req.like('name', `%${search.value}%`)
+      }
+    }
 
     req = req.eq('deleted', filters.value.deleted)
     if (filters.value['external-storage'])
@@ -145,8 +176,9 @@ async function getData() {
     const { data: dataVersions, count } = await req
     if (!dataVersions)
       return
-    elements.value.push(...(await enhenceVersionElems(dataVersions)))
-    // console.log('count', count)
+    const enhancedVersions = await enhenceVersionElems(dataVersions)
+    await fetchChannelsForVersions(enhancedVersions)
+    elements.value = enhancedVersions as any
     total.value = count || 0
   }
   catch (error) {
@@ -154,12 +186,28 @@ async function getData() {
   }
   isLoading.value = false
 }
+async function fetchChannelsForVersions(versions: Element[]) {
+  const versionIds = versions.map(v => v.id)
+  const { data: channelData, error } = await supabase
+    .from('channels')
+    .select('name, version, id')
+    .eq('app_id', props.appId)
+    .in('version', versionIds)
+  if (error) {
+    console.error('Error fetching channels:', error)
+    return
+  }
+  versionIds.forEach((id) => {
+    const channel = channelData?.find(c => c.version === id)
+    channelCache.value[id] = channel ? { name: channel.name, id: channel.id } : { name: '' }
+  })
+}
 async function refreshData() {
-  // console.log('refreshData')
   try {
     currentPage.value = 1
     elements.value.length = 0
     selectedElements.value.length = 0
+    channelCache.value = {} // Clear cache on refresh
     await getData()
   }
   catch (error) {
@@ -178,7 +226,7 @@ async function deleteOne(one: Element) {
     // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
-      .select('name, version(name)')
+      .select('id, name, version(name)')
       .eq('app_id', one.app_id)
       .eq('version', one.id)
 
@@ -194,7 +242,7 @@ async function deleteOne(one: Element) {
             id: 'yes',
             handler: () => {
               if (channelFound)
-                unlink = channelFound
+                unlink = channelFound as any
             },
           },
           {
@@ -279,6 +327,7 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
+    onClick: (elem: Element) => openOne(elem),
   },
   {
     label: t('created-at'),
@@ -286,6 +335,22 @@ columns.value = [
     mobile: true,
     sortable: 'desc',
     displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
+  },
+  {
+    label: t('channel'),
+    key: 'channel',
+    mobile: false,
+    sortable: false,
+    displayFunction: (elem: Element) => {
+      if (elem.deleted)
+        return t('deleted')
+      return channelCache.value[elem.id]?.name || ''
+    },
+    onClick: async (elem: Element) => {
+      if (elem.deleted || !channelCache.value[elem.id] || !channelCache.value[elem.id].id)
+        return
+      router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${channelCache.value[elem.id].id}`)
+    },
   },
   {
     label: t('size'),
@@ -314,23 +379,28 @@ columns.value = [
 ]
 
 async function reload() {
-  console.log('reload')
-  try {
-    elements.value.length = 0
-    await getData()
-  }
-  catch (error) {
-    console.error(error)
-  }
+  elements.value.length = 0
+  getData()
+    .then(() => {
+      if (total.value === 0) {
+        showSteps.value = true
+      }
+      return organizationStore.getCurrentRoleForApp(props.appId)
+    })
+    .then((r) => {
+      role.value = r
+    })
+    .catch(console.error)
 }
 
 async function massDelete() {
+  console.log('massDelete')
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
     toast.error(t('no-permission'))
     return
   }
 
-  if (selectedElements.value.length > 0 && !!selectedElements.value.find(val => val.name === 'unknown' || val.name === 'builtin')) {
+  if (selectedElements.value.length > 0 && !!(selectedElements.value as any).find((val: Element) => val.name === 'unknown' || val.name === 'builtin')) {
     toast.error(t('cannot-delete-unknown-or-builtin'))
     return
   }
@@ -339,11 +409,11 @@ async function massDelete() {
   if (typeof didCancelRes === 'boolean' && didCancelRes === true)
     return
 
-  const linkedChannels = (await Promise.all(selectedElements.value.map(async (element) => {
+  const linkedChannels = (await Promise.all((selectedElements.value as any).map(async (element: Element) => {
     return {
       data: (await supabase
         .from('channels')
-        .select('name, version(name)')
+        .select('id, name, version(name)')
         .eq('app_id', element.app_id)
         .eq('version', element.id)),
       element,
@@ -358,39 +428,75 @@ async function massDelete() {
       rawChannel: data,
     }
   })
+  console.log('linkedChannels', linkedChannels)
 
   const linkedChannelsList = linkedChannels.filter(({ channelFound }) => channelFound)
+  console.log('linkedChannelsList', linkedChannelsList)
+  let unlink = [] as Database['public']['Tables']['channels']['Row'][]
   if (linkedChannelsList.length > 0) {
     displayStore.dialogOption = {
-      header: t('cannot-delete-bundle-linked-channel-1'),
-      buttonCenter: true,
-      textStyle: 'text-center',
-      headerStyle: 'text-center',
-      message: `${t('cannot-delete-bundle-linked-channel-2')}\n\n${linkedChannelsList.map(val => val.rawChannel?.map(ch => `${ch.name} (${ch.version.name})`).join(', ')).join('\n')}\n\n${t('cannot-delete-bundle-linked-channel-3')}`,
+      header: t('want-to-unlink'),
+      message: t('channel-bundle-linked').replace('%', linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join(', ') ?? ''),
       buttons: [
         {
-          text: t('ok'),
-          role: 'confirm',
-          id: 'confirm',
+          text: t('yes'),
+          role: 'yes',
+          id: 'yes',
+          handler: () => {
+            unlink = linkedChannelsList.map(val => val.rawChannel) as any
+          },
+        },
+        {
+          text: t('no'),
+          id: 'cancel',
+          role: 'cancel',
         },
       ],
     }
-
     displayStore.showDialog = true
-    return
+    if (await displayStore.onDialogDismiss()) {
+      toast.error(t('canceled-delete'))
+      return
+    }
+  }
+
+  if (unlink.length > 0) {
+    const { data: unknownVersion, error: unknownError } = await supabase
+      .from('app_versions')
+      .select()
+      .eq('app_id', props.appId)
+      .eq('name', 'unknown')
+      .single()
+
+    if (unknownError) {
+      toast.error(t('cannot-find-unknown-version'))
+      console.error('Cannot find unknown', JSON.stringify(unknownError))
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('channels')
+      .update({ version: unknownVersion.id })
+      .in('id', unlink.map(c => c.id).flat())
+
+    if (updateError) {
+      toast.error(t('unlink-error'))
+      console.error('unlink error (updateError)', updateError)
+      return
+    }
   }
 
   if (didCancelRes === 'normal') {
     const { error: updateError } = await supabase
       .from('app_versions')
       .update({ deleted: true })
-      .in('id', selectedElements.value.map(val => val.id))
+      .in('id', (selectedElements.value as any).map((val: Element) => val.id))
 
     if (updateError) {
       toast.error(t('cannot-delete-bundles'))
     }
     else {
-      toast.success(t('bundle-deleted'))
+      toast.success(t('bundles-deleted'))
       await refreshData()
     }
   }
@@ -398,13 +504,13 @@ async function massDelete() {
     const { error: delAppError } = await supabase
       .from('app_versions')
       .delete()
-      .in('id', selectedElements.value.map(val => val.id))
+      .in('id', (selectedElements.value as any).map((val: Element) => val.id))
 
     if (delAppError) {
       toast.error(t('cannot-delete-bundles'))
     }
     else {
-      toast.success(t('bundle-deleted'))
+      toast.success(t('bundles-deleted'))
       await refreshData()
     }
   }
@@ -412,7 +518,7 @@ async function massDelete() {
 
 function selectedElementsFilter(val: boolean[]) {
   console.log('selectedElementsFilter', val)
-  selectedElements.value = elements.value.filter((_, i) => val[i])
+  selectedElements.value = (elements.value as any).filter((_: any, i: number) => val[i])
 }
 
 async function openOne(one: Element) {
@@ -420,10 +526,6 @@ async function openOne(one: Element) {
     return
   router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)
 }
-onMounted(async () => {
-  await refreshData()
-  role.value = await organizationStore.getCurrentRoleForApp(props.appId)
-})
 watch(props, async () => {
   await refreshData()
   role.value = await organizationStore.getCurrentRoleForApp(props.appId)
@@ -433,16 +535,20 @@ watch(props, async () => {
 <template>
   <div>
     <Table
+      v-if="!showSteps"
       v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
-      :total="total" row-click :element-list="elements"
-      filter-text="filters"
+      :total="total"
+      :show-add="!isMobile"
+      :element-list="elements"
+      filter-text="Filters"
       mass-select
       :is-loading="isLoading"
       :search-placeholder="t('search-bundle-id')"
+      @add="showSteps = !showSteps"
       @reload="reload()" @reset="refreshData()"
-      @row-click="openOne"
       @mass-delete="massDelete()"
       @select-row="selectedElementsFilter"
     />
+    <StepsBundle v-else :onboarding="!total" :app-id="props.appId" @done="onboardingDone" @close-step="showSteps = !showSteps" />
   </div>
 </template>

@@ -1,21 +1,26 @@
-import type { Env } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
+import type { BlankSchema } from 'hono/types'
+import type { MiddlewareKeyVariables } from './hono'
 import { Hono } from 'hono/tiny'
 
 const KEY_EXPIRATION_TIME = 20 * 60 * 1000 // 20 minutes
 
+interface Env {
+  ATTACHMENT_BUCKET: R2Bucket
+}
+
 export class TemporaryKeyHandler {
   state: DurableObjectState
   env: Env
-  router: Hono
+  router: Hono<MiddlewareKeyVariables, BlankSchema, '/'>
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state
     this.env = env
-    this.router = new Hono()
+    this.router = new Hono<MiddlewareKeyVariables>()
 
-    this.router.post('/create', this.createKey.bind(this))
-    this.router.get('/validate', this.validateKey.bind(this))
+    this.router.post('/create', this.createKey.bind(this) as any)
+    this.router.get('/validate', this.validateKey.bind(this) as any)
   }
 
   async fetch(request: Request): Promise<Response> {

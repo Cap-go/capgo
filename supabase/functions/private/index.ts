@@ -1,14 +1,15 @@
-import type { MiddlewareHandler } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../_backend/utils/hono.ts'
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
-import { Hono } from 'hono/tiny'
 
+import { Hono } from 'hono/tiny'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
+import { app as events } from '../_backend/private/events.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../_backend/private/latency_postres.ts'
@@ -24,13 +25,13 @@ import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
 
 const functionName = 'private'
-const appGlobal = new Hono().basePath(`/${functionName}`)
+const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
 if (sentryDsn) {
   appGlobal.use('*', sentry({
     dsn: sentryDsn,
-  }) as unknown as MiddlewareHandler)
+  }))
 }
 
 appGlobal.use('*', logger())
@@ -55,5 +56,6 @@ appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
+appGlobal.route('/events', events)
 
 Deno.serve(appGlobal.fetch)

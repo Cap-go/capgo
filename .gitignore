@@ -72,7 +72,6 @@ scripts/local_cf_backend/spawn
 temp_cli_test*
 internal/netlify/.env.prod
 internal/supabase/.env.prod
-cloudflare_workers/files/*
 cloudflare_workers/files/.wrangler/*
 cloudflare_workers/plugin/.wrangler/*
 tmp/*
@@ -84,3 +83,4 @@ internal/files-api-dev/go.sum
 ._.DS_Store
 internal/forgr-key.jks
 internal/forgr-key.jks.base64
+internal/electric/.env.prod

@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
-import { deleteUser, hashEmail, useSupabase } from '~/services/supabase'
+import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
@@ -29,48 +29,47 @@ async function deleteAccount() {
         role: 'danger',
         handler: async () => {
           const supabaseClient = useSupabase()
-
-          const authUser = await supabase.auth.getUser()
-          if (authUser.error)
-            return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+          isLoading.value = true
 
           try {
+            const authUser = await supabase.auth.getUser()
+            if (authUser.error) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
+
             const { data: user } = await supabaseClient
               .from('users')
               .select()
               .eq('id', authUser.data.user.id)
               .single()
-            if (!user)
-              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
 
-            if (user.customer_id) {
-              await supabaseClient
-                .from('stripe_info')
-                .delete()
-                .eq('customer_id', user.customer_id)
+            if (!user) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
             }
 
-            const hashedEmail = await hashEmail(authUser.data.user.email!)
+            // Delete user using RPC function
+            const { error: deleteError } = await supabase.rpc('delete_user')
 
-            await supabaseClient
-              .from('deleted_account')
-              .insert({
-                email: hashedEmail,
-              })
+            if (deleteError) {
+              console.error('Delete error:', deleteError)
+              isLoading.value = false
+              return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
 
-            await supabaseClient
-              .from('users')
-              .delete()
-              .eq('id', user.id)
-
-            await deleteUser()
-
+            // Sign out and redirect to login page
             await supabase.auth.signOut()
+            toast.success(t('account-deleted-successfully'))
             router.replace('/login')
           }
           catch (error) {
             console.error(error)
+            isLoading.value = false
             return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+          }
+          finally {
+            isLoading.value = false
           }
         },
       },

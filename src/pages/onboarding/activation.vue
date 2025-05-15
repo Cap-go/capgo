@@ -4,7 +4,6 @@ import { PushNotifications } from '@capacitor/push-notifications'
 import { useI18n } from 'petite-vue-i18n'
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import Navbar from '~/components/Navbar.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
@@ -47,8 +46,8 @@ async function submit() {
     errorMessage.value = error.message
   }
   else {
-    router.push('/app/home')
-    window.location.href = '/app/home'
+    router.push('/app')
+    window.location.href = '/app'
   }
 }
 </script>

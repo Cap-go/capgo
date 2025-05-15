@@ -10,17 +10,8 @@
   "files.associations": {
     "*.css": "css"
   },
-  "editor.formatOnSave": false,
-  "deno.enable": true,
-  "deno.lint": true,
-  "deno.cacheOnSave": true,
-  "editor.defaultFormatter": "denoland.vscode-deno",
-  "deno.enablePaths": [
-    "./supabase/functions",
-    "./netlify/edge-functions",
-    "./tests_backend"
-  ],
-  "typescript.preferences.autoImportFileExcludePatterns": ["vue-router"],
-  "deno.importMap": "./supabase/functions/import_map.json",
-  "deno.documentPreloadLimit": 1000000
+  "editor.formatOnSave": true,
+  "typescript.preferences.autoImportFileExcludePatterns": [
+    "vue-router"
+  ]
 }

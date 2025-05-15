@@ -273,7 +273,7 @@ export function initS3() {
     // signingEscapePath: storageEndpoint !== '127.0.0.1:54321/storage/v1/s3',
   }
 
-  console.log({ context: 'initS3', params })
+  console.log({ message: 'initS3', params })
 
   return new S3Client({ ...params })
 }

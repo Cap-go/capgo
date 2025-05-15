@@ -18,7 +18,7 @@ function openLink(link: string) {
   emit('update:activeTab', link)
 }
 function isActive(to: string) {
-  return router.currentRoute.value.path.includes(to)
+  return router.currentRoute.value.path === to
 }
 
 function findTab(key: string) {
@@ -36,6 +36,9 @@ watch(props, (p) => {
   else {
     router.push(tab.key)
   }
+})
+watch(router.currentRoute, (p) => {
+  emit('update:activeTab', p.path)
 })
 onMounted(() => {
   if (props.activeTab && props.activeTab !== router.currentRoute.value.path) {

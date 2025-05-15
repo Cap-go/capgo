@@ -1,18 +1,16 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-// website_stats
-
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.get('/', async (c: Context) => {
+app.get('/', async (c) => {
   try {
     const date_id = new Date().toISOString().slice(0, 10)
-    const { data, error } = await supabaseAdmin(c)
+    const { data, error } = await supabaseAdmin(c as any)
       .from('global_stats')
       .select()
       .eq('date_id', date_id)
@@ -24,7 +22,7 @@ app.get('/', async (c: Context) => {
         stars: data.stars,
       })
     }
-    console.log({ requestId: c.get('requestId'), context: 'Supabase error:', error })
+    console.log({ requestId: c.get('requestId'), message: 'Supabase error:', error })
     return c.json({
       apps: 750,
       updates: 23500638,

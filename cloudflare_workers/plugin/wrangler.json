@@ -20,17 +20,24 @@
     {
       "pattern": "api.capgo.app/stats",
       "zone_name": "capgo.app"
+    },
+    {
+      "pattern": "updater.spencer.co/*",
+      "zone_name": "capgo.app"
     }
   ],
-  "compatibility_date": "2024-09-23",
+  "compatibility_date": "2025-04-01",
   "main": "./index.ts",
-  "compatibility_flags": ["nodejs_compat_v2"],
-  "placement": {
-    "mode": "smart"
-  },
+  "compatibility_flags": [
+    "nodejs_compat_v2"
+  ],
   "workers_dev": false,
   "observability": {
-    "enabled": false
+    "enabled": true,
+    "head_sampling_rate": 0.001
+  },
+  "placement": {
+    "mode": "smart"
   },
   "upload_source_maps": true,
   "analytics_engine_datasets": [
@@ -78,55 +85,6 @@
       "id": "0f1d77550db142fbb17cb6b3ee659a06"
     }
   ],
-  "unsafe": {
-    "bindings": [
-      {
-        "name": "PUBLIC_API_DEVICE_CHANNEL_SELF_POST_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1001",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "PUBLIC_API_DEVICE_CHANNEL_SELF_DELETE_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1002",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "PUBLIC_API_DEVICE_CHANNEL_SELF_PUT_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1003",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "PUBLIC_API_DEVICE_CHANNEL_SELF_GET_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1004",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "PUBLIC_API_DEVICE_ALL_UPDATES_POST_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1005",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      }
-    ]
-  },
   "env": {
     "preprod": {
       "name": "capgo_plugin-preprod",
@@ -152,6 +110,9 @@
           "zone_name": "capgo.app"
         }
       ],
+      "observability": {
+        "enabled": true
+      },
       "d1_databases": [
         {
           "binding": "DB_DEVICES",
@@ -200,6 +161,9 @@
     },
     "alpha": {
       "name": "capgo_plugin-alpha",
+      "observability": {
+        "enabled": true
+      },
       "routes": [
         {
           "pattern": "plugin-alpha.capgo.app",

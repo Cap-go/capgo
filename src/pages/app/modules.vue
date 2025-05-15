@@ -30,7 +30,7 @@ function openLink(url?: string) {
 }
 // console.log('modules', modules.value)
 displayStore.NavTitle = t('module-heading')
-displayStore.defaultBack = '/app/home'
+displayStore.defaultBack = '/app'
 </script>
 
 <template>

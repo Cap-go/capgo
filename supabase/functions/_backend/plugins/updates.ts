@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
@@ -66,13 +66,13 @@ const jsonRequestSchema = z.object({
   return val
 })
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', async (c: Context) => {
+app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppInfos>()
-    console.log({ requestId: c.get('requestId'), context: 'post updates body', body })
-    if (isLimited(c, body.app_id)) {
+    console.log({ requestId: c.get('requestId'), message: 'post updates body', body })
+    if (isLimited(c as any, body.app_id)) {
       return c.json({
         status: 'Too many requests',
         error: 'too_many_requests',
@@ -81,20 +81,20 @@ app.post('/', async (c: Context) => {
     const parseResult = jsonRequestSchema.safeParse(body)
     if (!parseResult.success) {
       const error = parseResult.error.errors[0]
-      console.log({ requestId: c.get('requestId'), context: 'parseResult', error: error.message })
+      console.log({ requestId: c.get('requestId'), message: 'parseResult', error: error.message })
       return c.json({
         error: `Cannot parse json: ${error.message}`,
       }, 400)
     }
 
-    return update(c, body)
+    return update(c as any, body)
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), context: 'error', error: JSON.stringify(e) })
+    console.log({ requestId: c.get('requestId'), message: 'error', error: JSON.stringify(e) })
     return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 400)
   }
 })
 
-app.get('/', (c: Context) => {
+app.get('/', (c) => {
   return c.json({ status: 'ok' })
 })

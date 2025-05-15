@@ -1,3 +1,4 @@
+import process from 'node:process'
 import antfu from '@antfu/eslint-config'
 
 export default antfu(
@@ -9,6 +10,7 @@ export default antfu(
     },
     ignores: [
       'dist',
+      'scripts',
       'public',
       'supabase/functions/_script',
       '**/supabase.types*',

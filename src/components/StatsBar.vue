@@ -7,9 +7,10 @@ const refStats = toRef(() => props.stats)
 </script>
 
 <template>
-  <template v-for="s, i in refStats" :key="i">
+  <template v-for="(s, i) in refStats" :key="i">
     <component
       :is="s.link ? 'a' : 'div'"
+      :id="i"
       :href="s.link || undefined"
       class="flex flex-col items-center w-full"
       :class="{
@@ -40,7 +41,7 @@ const refStats = toRef(() => props.stats)
             <span :class="{ 'group-hover:hidden': s.link && (s.hoverLabel || s.link) }">{{ s.label }}</span>
             <span v-if="s.link && (s.hoverLabel || s.link)" class="hidden group-hover:inline first-letter:uppercase">{{ s.hoverLabel || s.label }}</span>
           </h3>
-          <InformationInfo v-if="!!s.informationIcon" class="ml-1 first-letter:uppercase" @click="s.informationIcon" />
+          <InformationInfo v-if="!!s.informationIcon" class="ml-1 first-letter:uppercase" @click="(s.informationIcon as any)" />
         </div>
       </span>
     </component>

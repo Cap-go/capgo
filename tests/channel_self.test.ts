@@ -1,9 +1,10 @@
-import type { HttpMethod } from './test-utils.ts'
+import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData } from './test-utils.ts'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.self_assign'
+const id = randomUUID()
+const APPNAME = `com.sa.${id}`
 
 async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
   const url = new URL(`${BASE_URL}/channel_self`)
@@ -29,6 +30,10 @@ async function getResponseError(response: Response) {
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
+})
+afterAll(async () => {
+  await resetAppData(APPNAME)
+  await resetAppDataStats(APPNAME)
 })
 
 describe('invalids /channel_self tests', () => {
@@ -109,6 +114,8 @@ describe('invalids /channel_self tests', () => {
 
   it('[POST] with a channel that does not allow self assign', async () => {
     const data = getBaseData(APPNAME)
+    if (!data.channel)
+      throw new Error('channel is undefined')
 
     const { error } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', data.channel).eq('app_id', APPNAME).select('id').single()
 
@@ -232,7 +239,13 @@ it('[POST] /channel_self with default channel', async () => {
   const data = getBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
-  const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', 'no_access').eq('app_id', APPNAME).select('id, owner_org, public').single()
+  const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient()
+    .from('channels')
+    .update({ allow_device_self_set: true })
+    .eq('name', 'no_access')
+    .eq('app_id', APPNAME)
+    .select('id, owner_org, public')
+    .single()
 
   expect(channelUpdateError).toBeNull()
   expect(noAccessData).toBeTruthy()
@@ -244,7 +257,7 @@ it('[POST] /channel_self with default channel', async () => {
       channel_id: noAccessData!.id,
       device_id: data.device_id,
       owner_org: noAccessData!.owner_org,
-    })
+    }, { onConflict: 'device_id, app_id' })
 
     expect(overwriteUpsertError).toBeNull()
 
@@ -253,7 +266,11 @@ it('[POST] /channel_self with default channel', async () => {
     expect(response.ok).toBeTruthy()
     expect(await response.json()).toEqual({ status: 'ok' })
 
-    const { data: channelDevice, error: channelDeviceError } = await getSupabaseClient().from('channel_devices').select('*').eq('device_id', data.device_id).eq('app_id', APPNAME)
+    const { data: channelDevice, error: channelDeviceError } = await getSupabaseClient()
+      .from('channel_devices')
+      .select('*')
+      .eq('device_id', data.device_id)
+      .eq('app_id', APPNAME)
 
     expect(channelDeviceError).toBeNull()
     expect(channelDevice).toBeTruthy()
@@ -305,7 +322,7 @@ it('[PUT] /channel_self (with overwrite)', async () => {
     channel_id: noAccessId,
     device_id: data.device_id,
     owner_org: ownerOrg,
-  })
+  }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
 
@@ -328,6 +345,35 @@ it('[PUT] /channel_self (with overwrite)', async () => {
 
     expect(error).toBeNull()
   }
+})
+
+it('[PUT] /channel_self with defaultChannel parameter', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  const data = getBaseData(APPNAME) as DeviceLink
+  data.device_id = randomUUID().toLowerCase()
+  data.defaultChannel = 'no_access'
+
+  const response = await fetchEndpoint('PUT', data)
+  expect(response.ok).toBe(true)
+
+  const responseJSON = await response.json<{ channel: string, status: string }>()
+  expect(responseJSON.channel).toBe('no_access')
+  expect(responseJSON.status).toBe('default')
+})
+
+it('[PUT] /channel_self with non-existent defaultChannel', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  const data = getBaseData(APPNAME) as DeviceLink
+  data.device_id = randomUUID().toLowerCase()
+  data.defaultChannel = 'non_existent_channel'
+
+  const response = await fetchEndpoint('PUT', data)
+  expect(response.ok).toBe(false)
+
+  const error = await getResponseError(response)
+  expect(error).toBe('channel_not_found')
 })
 
 it('[POST] /channel_self ok', async () => {
@@ -397,7 +443,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     channel_id: productionId,
     device_id: data.device_id,
     owner_org: ownerOrg,
-  })
+  }, { onConflict: 'device_id, app_id' })
 
   expect(error).toBeNull()
 
@@ -418,4 +464,69 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
     expect(error).toBeNull()
     throw e
   }
+})
+
+it('verify channel stays after deleting channel_device', async () => {
+  await resetAndSeedAppData(APPNAME)
+
+  // 1. Get a channel to use for the test
+  const { data: channel, error: channelError } = await getSupabaseClient()
+    .from('channels')
+    .select('id, name, owner_org')
+    .eq('name', 'production')
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(channelError).toBeNull()
+  expect(channel).toBeTruthy()
+  const channelId = channel!.id
+  const channelName = channel!.name
+  const ownerOrg = channel!.owner_org
+
+  // 2. Create a device linked to this channel
+  const deviceId = randomUUID().toLowerCase()
+  const { error: insertError } = await getSupabaseClient()
+    .from('channel_devices')
+    .insert({
+      channel_id: channelId,
+      device_id: deviceId,
+      app_id: APPNAME,
+      owner_org: ownerOrg,
+    })
+
+  expect(insertError).toBeNull()
+
+  // 3. Verify the device exists
+  const { data: deviceBefore, error: deviceBeforeError } = await getSupabaseClient()
+    .from('channel_devices')
+    .select('*')
+    .eq('device_id', deviceId)
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(deviceBeforeError).toBeNull()
+  expect(deviceBefore).toBeTruthy()
+  expect(deviceBefore!.channel_id).toBe(channelId)
+
+  // 4. Delete the device
+  const { error: deleteError } = await getSupabaseClient()
+    .from('channel_devices')
+    .delete()
+    .eq('device_id', deviceId)
+    .eq('app_id', APPNAME)
+
+  expect(deleteError).toBeNull()
+
+  // 5. Verify the channel still exists
+  const { data: channelAfter, error: channelAfterError } = await getSupabaseClient()
+    .from('channels')
+    .select('id, name')
+    .eq('id', channelId)
+    .eq('app_id', APPNAME)
+    .single()
+
+  expect(channelAfterError).toBeNull()
+  expect(channelAfter).toBeTruthy()
+  expect(channelAfter!.id).toBe(channelId)
+  expect(channelAfter!.name).toBe(channelName)
 })

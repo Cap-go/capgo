@@ -34,10 +34,23 @@ async function guard(next: any, to: string, from: string) {
           .select()
           .eq('id', main.auth?.id)
           .single()
-        if (!error && data)
+        if (!error && data) {
+          console.log('set user', data)
+          if (main.auth?.email && data.email !== main.auth?.email) {
+            // update email after user updated is uath email
+            const { error: updateError } = await supabase
+              .from('users')
+              .update({ email: main.auth?.email })
+              .eq('id', main.auth?.id)
+            if (updateError)
+              console.error('update error', updateError)
+            data.email = main.auth?.email
+          }
           main.user = data
-        else
+        }
+        else {
           return next('/onboarding/verify_email')
+        }
       }
       catch (error) {
         console.error('auth', error)

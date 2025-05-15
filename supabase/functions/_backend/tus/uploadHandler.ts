@@ -1,5 +1,7 @@
-import type { DurableObjectState, Env, R2UploadedPart } from '@cloudflare/workers-types'
+import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from '@hono/hono'
+import type { BlankSchema } from 'hono/types'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Digester } from './digest.ts'
 import type {
   RetryMultipartUpload,
@@ -56,7 +58,7 @@ interface StoredUploadInfo {
   multipartUploadId?: string
 }
 
-function optionsHandler(c: Context): Response {
+function optionsHandler(c: Context) {
   console.log('in DO', 'optionsHandler')
   return c.newResponse(null, 204, {
     'Access-Control-Allow-Origin': '*',
@@ -68,10 +70,14 @@ function optionsHandler(c: Context): Response {
   })
 }
 
+interface Env {
+  ATTACHMENT_BUCKET: R2Bucket
+}
+
 export class UploadHandler {
   state: DurableObjectState
   env: Env
-  router: Hono
+  router: Hono<MiddlewareKeyVariables, BlankSchema, '/'>
   parts: StoredR2Part[]
   multipart: RetryMultipartUpload | undefined
   retryBucket: RetryBucket
@@ -86,25 +92,24 @@ export class UploadHandler {
     this.parts = []
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
-    this.router = new Hono()
+    this.router = new Hono<MiddlewareKeyVariables>()
     this.router.use('*', logger())
-    this.router.options('/files/upload/:bucket', optionsHandler)
-    this.router.post('/files/upload/:bucket', this.exclusive(this.create))
-    this.router.options('/files/upload/:bucket/:id{.+}', optionsHandler)
-    this.router.patch('/files/upload/:bucket/:id{.+}', this.exclusive(this.patch))
-    this.router.get('/files/upload/:bucket/:id{.+}', this.exclusive(this.head))
+    this.router.options('/files/upload/:bucket', optionsHandler as any)
+    this.router.post('/files/upload/:bucket', this.exclusive(this.create) as any)
+    this.router.options('/files/upload/:bucket/:id{.+}', optionsHandler as any)
+    this.router.patch('/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
+    this.router.get('/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
     // TODO: remove this when all users have been migrated
-    this.router.options('/private/files/upload/:bucket', optionsHandler)
-    this.router.post('/private/files/upload/:bucket', this.exclusive(this.create))
-    this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler)
-    this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch))
-    this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head))
-    this.router.all('*', c => c.notFound())
+    this.router.options('/private/files/upload/:bucket', optionsHandler as any)
+    this.router.post('/private/files/upload/:bucket', this.exclusive(this.create) as any)
+    this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler as any)
+    this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
+    this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
+    // this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
-      console.log('in DO', 'onError', e)
+      console.log('in DO onError', e)
       if (e instanceof HTTPException)
         return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
-      console.log('app', 'onError', e)
       return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
     })
   }
@@ -520,7 +525,7 @@ export class UploadHandler {
 
   async r2Put(r2Key: string, bytes: Uint8Array, checksum?: Uint8Array) {
     try {
-      await this.retryBucket.put(r2Key, bytes, checksum)
+      await this.retryBucket.put(r2Key, bytes, checksum as any)
     }
     catch (e) {
       if (isR2ChecksumError(e)) {

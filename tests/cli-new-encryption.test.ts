@@ -3,9 +3,9 @@ import { createDecipheriv, createHash, publicDecrypt, randomUUID } from 'node:cr
 import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
-import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, responseOk } from './test-utils'
+import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk } from './test-utils'
 
 describe('test key generation', () => {
   const id = randomUUID()
@@ -13,6 +13,11 @@ describe('test key generation', () => {
   beforeEach(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
   })
 
   it('test key generation', async () => {
@@ -36,7 +41,6 @@ describe('test key generation', () => {
     expect(publicKeyData.length).toBeGreaterThan(1)
     expect(publicKeyData).toContain('PUBLIC KEY')
   })
-  cleanupCli(id)
 })
 
 describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
@@ -47,6 +51,9 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
   })
   async function testEncryption(publicKey: string, output2: string, skipUpdate = false) {
     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1) as string
@@ -77,6 +84,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
       await responseOk(response, 'Update new bundle')
 
       const responseJson = await response.json<{ url: string, version: string }>()
+      // console.log('responseJson', responseJson)
       expect(responseJson.url).toBeDefined()
       expect(responseJson.version).toBe(semver)
 
@@ -157,9 +165,9 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
   it('test upload bundle with auto encryption ', async () => {
     const publicKeyFile = readFileSync(join(tempFileFolder(id), '.capgo_key_v2.pub'), 'utf-8')
     semver = getSemver(semver)
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
+    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false)
     expect(output2).toContain('Time to share your update to the world')
-    expect(output2).toContain('Encrypting your bundle')
+    expect(output2).toContain('Encrypting your bundle with V2')
 
     await testEncryption(publicKeyFile, output2)
   })
@@ -169,7 +177,7 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     const privateKeyFile = readFileSync(join(tempFileFolder(id), '.capgo_key_v2'), 'utf-8')
     const output4 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-data-v2', `'${privateKeyFile}'`], id, false)
     expect(output4).toContain('Time to share your update to the world')
-    expect(output4).toContain('Encrypting your bundle')
+    expect(output4).toContain('Encrypting your bundle with V2')
 
     await testEncryption(privateKeyFile, output4, true)
   })
@@ -185,11 +193,10 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
     semver = getSemver(semver)
     const output3 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--key-v2', 'wierd_file'], id, false)
     expect(output3).toContain('Time to share your update to the world')
-    expect(output3).toContain('Encrypting your bundle')
+    expect(output3).toContain('Encrypting your bundle with V2')
 
     await testEncryption(privateKeyFile, output3, true)
   })
-  cleanupCli(id)
 })
 
 describe('tests CLI upload no encryption', () => {
@@ -200,6 +207,9 @@ describe('tests CLI upload no encryption', () => {
   beforeEach(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME, id)
+  })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
   })
 
   it('test upload without encryption NEW', async () => {
@@ -215,11 +225,11 @@ describe('tests CLI upload no encryption', () => {
     semver = getSemver(semver)
     const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-key'], id, false)
     expect(output2).toContain('Time to share your update to the world')
-    expect(output2).not.toContain('Encrypting your bundle')
+    expect(output2).not.toContain('Encrypting your bundle with V2')
 
     const checksum = output2.split('\n').find(line => line.includes('Checksum'))?.split(' ').at(-1) as string
     expect(checksum).toBeDefined()
-    expect(checksum?.length).toBe(8)
+    expect(checksum?.length).toBe(64)
 
     const supabase = getSupabaseClient()
     const { data, error } = await supabase
@@ -250,5 +260,4 @@ describe('tests CLI upload no encryption', () => {
 
     expect(zipEntries.length).toBe(2)
   })
-  cleanupCli(id)
 })

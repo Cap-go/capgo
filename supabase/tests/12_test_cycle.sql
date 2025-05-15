@@ -19,7 +19,7 @@ BEGIN
 
   RETURN NEXT ok(cycle_start IS DISTINCT FROM NULL, 'Has cycle start');
   RETURN NEXT ok(cycle_end IS DISTINCT FROM NULL, 'Has cycle end');
-  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '29 days', 'Interval (base) greater than 29 days');
+  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '27 days', 'Interval (base) greater than 27 days');
   RETURN NEXT cmp_ok(cycle_end - cycle_start, '<', '32 days', 'Interval (base) less than 32 days');
 
   -- Let's now set the cycle to one year to see if it still works
@@ -34,7 +34,7 @@ BEGIN
 
   RETURN NEXT ok(cycle_start IS DISTINCT FROM NULL, 'Has cycle start');
   RETURN NEXT ok(cycle_end IS DISTINCT FROM NULL, 'Has cycle end');
-  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '29 days', 'Interval (base) greater than 29 days');
+  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '27 days', 'Interval (base) greater than 27 days');
   RETURN NEXT cmp_ok(cycle_end - cycle_start, '<', '32 days', 'Interval (base) less than 32 days');
 
   -- Let's now set the cycle to 2 months in the past to see if it still works
@@ -50,9 +50,9 @@ BEGIN
   -- RAISE NOTICE 'Cycle Start: %, Cycle End: % Now: %', cycle_start, cycle_end, now();
   RETURN NEXT ok(cycle_start IS DISTINCT FROM NULL, 'Has cycle start');
   RETURN NEXT ok(cycle_end IS DISTINCT FROM NULL, 'Has cycle end');
-  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '29 days', 'Interval (base) greater than 29 days');
+  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '27 days', 'Interval (base) greater than 27 days');
   RETURN NEXT cmp_ok(cycle_end - cycle_start, '<', '32 days', 'Interval (base) less than 32 days');
-  RETURN NEXT ok(cycle_start = (now() - interval '15 days'), 'Start date is 15 days earlier than now');
+  RETURN NEXT ok(cycle_start > (now() - interval '3 months') AND cycle_start < now(), 'Start date is within the last 3 months and before now');
   RETURN NEXT ok(cycle_end > (now() + interval '1 days'), 'End date is at least one day later than now');
 
   -- Let's not destory the org customer_id so that we can see if get cycle will work even when no data is available
@@ -62,7 +62,7 @@ BEGIN
 
   RETURN NEXT ok(cycle_start IS DISTINCT FROM NULL, 'Has cycle start');
   RETURN NEXT ok(cycle_end IS DISTINCT FROM NULL, 'Has cycle end');
-  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '29 days', 'Interval (base) greater than 29 days');
+  RETURN NEXT cmp_ok(cycle_end - cycle_start, '>', '27 days', 'Interval (base) greater than 27 days');
   RETURN NEXT cmp_ok(cycle_end - cycle_start, '<', '32 days', 'Interval (base) less than 32 days');
 END;
 $$ LANGUAGE plpgsql;

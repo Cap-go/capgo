@@ -435,6 +435,9 @@ SELECT cron.schedule(
     $$SELECT process_d1_replication_batch();$$
 );
 
+-- Remove the cron job for process_replicate_data_queue
+SELECT cron.unschedule('process_replicate_data_queue');
+
 -- Update trigger_http_queue_post_to_function function
 CREATE OR REPLACE FUNCTION "public"."trigger_http_queue_post_to_function"()
 RETURNS "trigger"
@@ -519,7 +522,7 @@ $$;
 -- Clean up job run details for frequent jobs
 SELECT cron.schedule(
     'cleanup-frequent-job-details',
-    '5 seconds', -- Run every hour
+    '0 * * * *', -- Run every hour
     $$
     DELETE FROM cron.job_run_details 
     WHERE job_id IN (
@@ -530,6 +533,3 @@ SELECT cron.schedule(
     AND end_time < now() - interval '1 hour'
     $$
 );
-
--- alter system set pg_net.batch_size to 2000;
--- select net.worker_restart();
