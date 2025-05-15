@@ -146,12 +146,16 @@ async function post(c: Context, body: AppStats) {
     }
     const statsActions: StatsActions[] = []
 
+    let allowedDeleted = false
+    if (version_name === 'builtin' || version_name === 'unknown') {
+      allowedDeleted = true
+    }
     const { data: appVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id, owner_org')
       .eq('app_id', app_id)
       .or(`name.eq.${version_name}`)
-      .eq('deleted', false)
+      .eq('deleted', allowedDeleted)
       .single()
     console.log({ requestId: c.get('requestId'), message: `appVersion ${JSON.stringify(appVersion)}` })
     if (!appVersion) {
