@@ -74,11 +74,9 @@ BEGIN
             FROM net._http_response 
             WHERE id = (payload->>'request_id')::bigint;
             
-            IF (payload->>'request_id') IS NOT NULL AND FOUND AND response.status_code IS NOT NULL AND response.error_msg IS NULL THEN
+            IF (payload->>'request_id') IS NOT NULL AND FOUND AND response.status_code IS NULL AND response.error_msg IS NULL THEN
               -- We decremented the read_ct to not count this message as a retry
               PERFORM decrement_read_ct(queue_name, msg.msg_id);
-              -- Query exist but response is not ready, skip
-            ELSIF (payload->>'request_id') IS NOT NULL AND FOUND AND response.status_code IS NOT NULL AND response.error_msg IS NOT NULL THEN
               -- Query exist but response is not ready, skip
             ELSIF (payload->>'request_id') IS NOT NULL AND FOUND AND response.error_msg IS NULL AND response.status_code >= 200 AND response.status_code < 300 THEN
               -- Query exist and response is Success, delete message
