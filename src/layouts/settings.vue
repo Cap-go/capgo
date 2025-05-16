@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { FunctionalComponent, SVGAttributes } from 'vue'
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
-import { ref, shallowRef, watch, watchEffect } from 'vue'
+import { h, ref, shallowRef, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
+import CurrencyIcon from '~icons/heroicons/currency-euro'
 import IconPlans from '~icons/material-symbols/price-change'
 import IconNotification from '~icons/mdi/message-notification'
 import IconPassword from '~icons/mdi/password'
@@ -88,6 +90,19 @@ watchEffect(() => {
   }
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
+  }
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+    && !organizationTabs.value.find(tab => tab.label === 'tokens')) {
+    organizationTabs.value.push(
+      {
+        label: 'tokens',
+        icon: CurrencyIcon,
+        key: '/dashboard/settings/organization/tokens',
+      },
+    )
+  }
+  else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'tokens')
   }
   if (!Capacitor.isNativePlatform()
     && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])

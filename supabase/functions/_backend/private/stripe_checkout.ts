@@ -2,16 +2,17 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { createCheckout } from '../utils/stripe.ts'
+import { createCheckout, createCheckoutForOneOff } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 interface PortalData {
   priceId: string
   clientReferenceId?: string
-  reccurence: 'month' | 'year'
+  reccurence: 'month' | 'year' | 'one_off'
   successUrl: string
   cancelUrl: string
+  howMany: number
   orgId: string
 }
 
@@ -48,8 +49,10 @@ app.post('/', middlewareAuth, async (c) => {
     if (!await hasOrgRight(c as any, body.orgId, auth.user.id, 'super_admin'))
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 
-    console.log({ requestId: c.get('requestId'), message: 'user', org })
-    const checkout = await createCheckout(c as any, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+    console.log({ requestId: c.get('requestId'), context: 'user', org })
+    const checkout = !body.howMany
+      ? await createCheckout(c as any, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+      : await createCheckoutForOneOff(c as any, org.customer_id, body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/dashboard/settings/organization/tokens?thankYou=true`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.howMany)
     return c.json({ url: checkout.url })
   }
   catch (error) {
