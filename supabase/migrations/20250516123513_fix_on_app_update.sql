@@ -1,1 +1,2 @@
-CREATE INDEX idx_http_response_id ON net._http_response(id);
+-- This had to be run manually as the migration cannot modify the net schema
+-- CREATE INDEX idx_http_response_id ON net._http_response(id);

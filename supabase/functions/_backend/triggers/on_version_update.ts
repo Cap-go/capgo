@@ -39,6 +39,9 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
       if (error)
         console.log({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
     }
+    else {
+      console.log({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
+    }
   }
   else {
     console.log({ requestId: c.get('requestId'), message: 'no v2 path' })
