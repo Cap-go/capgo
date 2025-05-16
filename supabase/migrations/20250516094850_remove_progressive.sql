@@ -11,7 +11,7 @@ LANGUAGE "plpgsql"
 AS $$
 BEGIN
     DELETE FROM cron.job_run_details 
-    WHERE job_id IN (
+    WHERE job_pid IN (
         SELECT jobid 
         FROM cron.job 
         WHERE schedule = '5 seconds' OR schedule = '1 seconds'
