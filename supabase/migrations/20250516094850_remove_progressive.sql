@@ -22,8 +22,6 @@ $$;
 
 SELECT cron.schedule('Cleanup frequent job details', '0 * * * *', $$CALL cleanup_frequent_job_details()$$);
 
-DROP FUNCTION IF EXISTS "public"."cleanup_frequent_job_details";
-
 CREATE OR REPLACE FUNCTION "public"."remove_old_jobs"() RETURNS void
 LANGUAGE "plpgsql"
 AS $$
