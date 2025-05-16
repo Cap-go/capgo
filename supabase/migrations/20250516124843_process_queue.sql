@@ -75,16 +75,21 @@ BEGIN
             WHERE id = (payload->>'request_id')::bigint;
             
             IF (payload->>'request_id') IS NOT NULL AND FOUND AND response.status_code IS NULL AND response.error_msg IS NULL THEN
-              -- We decremented the read_ct to not count this message as a retry
-              PERFORM decrement_read_ct(queue_name, msg.msg_id);
               -- Query exist but response is not ready, skip
+              IF (CURRENT_TIMESTAMP - msg.enqueued_at) <= INTERVAL '3 minutes' THEN
+                -- Only decrement read_ct if the message hasn't been in the queue for too long
+                PERFORM decrement_read_ct(queue_name, msg.msg_id);
+              ELSE
+                -- Archive if the message has been in the queue for too long
+                PERFORM pgmq.archive(queue_name, msg.msg_id);
+              END IF;
             ELSIF (payload->>'request_id') IS NOT NULL AND FOUND AND response.error_msg IS NULL AND response.status_code >= 200 AND response.status_code < 300 THEN
               -- Query exist and response is Success, delete message
               PERFORM pgmq.delete(queue_name, msg.msg_id);
               -- Delete the request_id from the _http_response table
               PERFORM delete_http_response((payload->>'request_id')::bigint);
-            ELSIF (payload->>'request_id') IS NOT NULL AND FOUND AND msg.read_ct >= 5 THEN
-              -- Query exist and max retries reached, archive message
+            ELSIF msg.read_ct >= 5 THEN
+              -- Max retries reached, archive message
               PERFORM pgmq.archive(queue_name, msg.msg_id);
             ELSIF (payload->>'request_id') IS NOT NULL AND FOUND AND response.error_msg IS NOT NULL THEN
               -- Delete the request_id from the payload to make it retry while keeping the request response
