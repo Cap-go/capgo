@@ -36,22 +36,21 @@ app.post('/', middlewareAPISecret, async (c) => {
         return errorOut(c as any, `Cannot find user_id for app_id ${version.app_id} because of no app found`)
       version.user_id = app.user_id
     }
-    const v2Path = await getPath(c as any, version)
-    console.log({ requestId: c.get('requestId'), message: 'v2Path', v2Path })
-    if (!v2Path) {
-      await supabase.from('app_versions')
-        .delete()
-        .eq('id', version.id)
-      return c.json(BRES)
-    }
+
     let notFound = false
     try {
+      const v2Path = await getPath(c as any, version)
+      console.log({ requestId: c.get('requestId'), message: 'v2Path', v2Path })
+      if (!v2Path) {
+        notFound = true
+        throw new Error(`no_path ${version.id}`)
+      }
       const size = await s3.getSize(c as any, v2Path)
       if (!size) {
         console.log({ requestId: c.get('requestId'), message: `No size for ${v2Path}, ${size}` })
         // throw error to trigger the deletion
         notFound = true
-        throw new Error('no_size')
+        throw new Error(`no_size ${version.id} ${v2Path}`)
       }
       // get checksum from table app_versions
       const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c as any)
@@ -80,7 +79,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         }, { onConflict: 'id' })
     }
     catch (errorSize) {
-      console.error({ requestId: c.get('requestId'), message: 'errorSize', notFound, v2Path, error: errorSize })
+      console.error({ requestId: c.get('requestId'), message: 'errorSize', notFound, error: errorSize })
       // Ensure that the version is not linked anywhere
       const { count, error, data } = await supabase.from('channels')
         .select('id', { count: 'exact' })
