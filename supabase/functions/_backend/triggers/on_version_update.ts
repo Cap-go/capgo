@@ -168,8 +168,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     const record = body.record
     console.log({ requestId: c.get('requestId'), message: 'record', record })
 
-    if (!record.app_id || !record.user_id) {
-      console.log({ requestId: c.get('requestId'), message: 'no app_id or user_id' })
+    if (!record.app_id) {
+      console.log({ requestId: c.get('requestId'), message: 'no app_id', record })
       return c.json(BRES)
     }
     if (!record.r2_path && !record.manifest) {
