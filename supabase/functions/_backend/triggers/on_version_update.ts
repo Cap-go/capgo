@@ -45,6 +45,20 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   }
   else {
     console.log({ requestId: c.get('requestId'), message: 'no v2 path' })
+    const { error: errorUpdate } = await supabaseAdmin(c)
+      .from('app_versions_meta')
+      .upsert({
+        id: record.id,
+        app_id: record.app_id,
+        owner_org: record.owner_org,
+        size: 0,
+        checksum: record.checksum ?? '',
+      }, {
+        onConflict: 'id',
+      })
+      .eq('id', record.id)
+    if (errorUpdate)
+      console.log({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
   }
 
   // Handle manifest entries
