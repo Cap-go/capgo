@@ -173,6 +173,7 @@ async function getData() {
 
     // Inform the parent component if there are any misconfigured channels
     emit('misconfigured', anyMisconfigured)
+    versionId.value = await findUnknownVersion()
   }
   catch (error) {
     console.error(error)
@@ -188,7 +189,6 @@ async function refreshData(keepCurrentPage = false) {
 
     elements.value.length = 0
     await getData()
-    versionId.value = await findUnknownVersion()
     if (keepCurrentPage)
       currentPage.value = page
   }
