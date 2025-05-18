@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
+import { cloudlog } from './loggin.ts'
 import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
 
@@ -19,7 +20,7 @@ export async function getBundleUrl(
   r2_path: string | null,
   deviceId: string,
 ) {
-  console.log({ requestId: c.get('requestId'), message: 'getBundleUrlV2 version', versionId })
+  cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrlV2 version', versionId })
 
   const { data: bundleMeta } = await supabaseAdmin(c)
     .from('app_versions_meta')
@@ -27,14 +28,14 @@ export async function getBundleUrl(
     .eq('id', versionId)
     .single()
 
-  console.log({ requestId: c.get('requestId'), message: 'path', r2_path })
+  cloudlog({ requestId: c.get('requestId'), message: 'path', r2_path })
   if (!r2_path)
     return null
 
   if (getRuntimeKey() !== 'workerd') {
     try {
       const signedUrl = await s3.getSignedUrl(c, r2_path, EXPIRATION_SECONDS)
-      console.log({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
+      cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl, size: bundleMeta?.size })
 
       const url = signedUrl
 

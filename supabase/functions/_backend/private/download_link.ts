@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
 interface DataDownload {
@@ -19,7 +20,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   try {
     const body = await c.req.json<DataDownload>()
-    console.log({ requestId: c.get('requestId'), message: 'post download link body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
     const authorization = c.req.header('authorization')
     if (!authorization)
       return c.json({ status: 'Cannot find authorization' }, 400)

@@ -4,12 +4,13 @@ import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
   if (!record.s3_path) {
-    console.log({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id })
+    cloudlog({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id })
     return c.json(BRES)
   }
 
@@ -21,11 +22,11 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
         .update({ file_size: size })
         .eq('id', record.id)
       if (updateError)
-        console.log({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
+        cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
     }
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), message: 'Cannot get s3 size', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot get s3 size', error })
   }
 
   return c.json(BRES)
@@ -38,18 +39,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'manifest'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log({ requestId: c.get('requestId'), message: 'Not INSERT' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.app_version_id || !record.s3_path) {
-      console.log({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })
+      cloudlog({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })
       return c.json(BRES)
     }
 

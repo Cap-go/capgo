@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -24,8 +25,8 @@ app.post('/', middlewareAuth, async (c) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log({ requestId: c.get('requestId'), message: 'set_org_email body', body })
-      console.log({ requestId: c.get('requestId'), message: 'parsedBodyResult.error', error: parsedBodyResult.error })
+      cloudlog({ requestId: c.get('requestId'), message: 'set_org_email body', body })
+      cloudlog({ requestId: c.get('requestId'), message: 'parsedBodyResult.error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 

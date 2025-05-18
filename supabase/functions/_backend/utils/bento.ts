@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import ky from 'ky'
+import { cloudlog } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 function hasBento(c: Context) {
@@ -58,7 +59,7 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
     return true
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), message: 'trackBentoEvent error', error: e })
+    cloudlog({ requestId: c.get('requestId'), message: 'trackBentoEvent error', error: e })
     return false
   }
 }
@@ -98,11 +99,11 @@ export async function addTagBento(c: Context, email: string, segments: { segment
       }).json(),
     ))
 
-    console.log({ requestId: c.get('requestId'), message: 'addTagBento', email, commands, results })
+    cloudlog({ requestId: c.get('requestId'), message: 'addTagBento', email, commands, results })
     return true
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), message: 'addTagBento error', error: e })
+    cloudlog({ requestId: c.get('requestId'), message: 'addTagBento error', error: e })
     return false
   }
 }

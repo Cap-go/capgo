@@ -3,6 +3,7 @@ import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -14,20 +15,20 @@ app.post('/', middlewareAPISecret, async (c) => {
     const body = await c.req.json<DeletePayload<typeof table>>()
 
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
 
     if (body.type !== 'DELETE') {
-      console.log({ requestId: c.get('requestId'), message: 'Not DELETE' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not DELETE' })
       return c.json({ status: 'Not DELETE' }, 200)
     }
 
     const record = body.old_record
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record || !record.id) {
-      console.log({ requestId: c.get('requestId'), message: 'no user id' })
+      cloudlog({ requestId: c.get('requestId'), message: 'no user id' })
       return c.json(BRES)
     }
 
@@ -37,7 +38,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
       // 1. Cancel Stripe subscriptions if customer_id exists
       if (record.customer_id) {
-        console.log({ requestId: c.get('requestId'), message: 'canceling stripe subscription', customer_id: record.customer_id })
+        cloudlog({ requestId: c.get('requestId'), message: 'canceling stripe subscription', customer_id: record.customer_id })
         // Use type assertion to resolve type compatibility issue
         await cancelSubscription(c as any, record.customer_id)
       }
@@ -49,7 +50,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('created_by', record.id)
 
       if (orgs && orgs.length > 0) {
-        console.log({ requestId: c.get('requestId'), message: 'cleaning up orgs', count: orgs.length })
+        cloudlog({ requestId: c.get('requestId'), message: 'cleaning up orgs', count: orgs.length })
 
         for (const org of orgs) {
           // Cancel org subscriptions if they exist

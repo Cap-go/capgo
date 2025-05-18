@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { checkPlanOrg } from '../utils/plans.ts'
 
 interface orgToGet {
@@ -12,7 +13,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   try {
     const body = await c.req.json<orgToGet>()
-    console.log({ requestId: c.get('requestId'), message: 'post cron plan body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'post cron plan body', body })
     if (!body.orgId)
       return c.json({ status: 'No orgId' }, 400)
 

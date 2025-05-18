@@ -4,6 +4,7 @@ import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import dayjs from 'dayjs'
 import ky from 'ky'
+import { cloudlog } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
@@ -88,7 +89,7 @@ export async function trackDevicesCF(
   is_emulator: boolean,
 ) {
   const device_id = device_id_raw.toLowerCase()
-  console.log({ requestId: c.get('requestId'), message: 'trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
+  cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
 
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
@@ -113,7 +114,7 @@ export async function trackDevicesCF(
       || !!existingRow.is_emulator !== is_emulator
     )) {
       // If no existing row or update needed, perform upsert
-      console.log({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
+      cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
       const upsertQuery = `
         INSERT INTO devices (
           updated_at, device_id, version, app_id, platform, 
@@ -146,10 +147,10 @@ export async function trackDevicesCF(
           is_emulator,
         )
         .run()
-      console.log({ requestId: c.get('requestId'), message: 'Upsert result:', res })
+      cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
     }
     else {
-      console.log({ requestId: c.get('requestId'), message: 'No update needed' })
+      cloudlog({ requestId: c.get('requestId'), message: 'No update needed' })
     }
   }
   catch (e) {
@@ -241,7 +242,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     AND timestamp < toDateTime('${formatDateCF(period_end)}')
   ORDER BY date`
 
-  console.log({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
   try {
     const res = await runQueryToCFA<DeviceUsageAllCF>(c, query)
     // First, filter to keep only the first appearance of each device_id
@@ -250,7 +251,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
       uniqueDevices.set(entry.device_id, entry)
     })
     const arr = Array.from(uniqueDevices.values())
-    console.log({ requestId: c.get('requestId'), message: 'uniqueDevices', arrLength: arr.length })
+    cloudlog({ requestId: c.get('requestId'), message: 'uniqueDevices', arrLength: arr.length })
 
     // Now calculate MAU based on the unique devices
     const groupedByDay = arr.reduce((acc, curr) => {
@@ -284,7 +285,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
   if (!c.env.BANDWIDTH_USAGE)
     return []
 
-  console.log({ requestId: c.get('requestId'), message: 'rawAnalyticsQuery query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'rawAnalyticsQuery query', query })
   try {
     return await runQueryToCFA<any>(c, query)
   }
@@ -309,7 +310,7 @@ WHERE
 GROUP BY date, app_id
 ORDER BY date, app_id`
 
-  console.log({ requestId: c.get('requestId'), message: 'readBandwidthUsageCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readBandwidthUsageCF query', query })
   try {
     return await runQueryToCFA<BandwidthUsageCF>(c, query)
   }
@@ -378,7 +379,7 @@ WHERE
 GROUP BY date, app_id, version_id
 ORDER BY date`
 
-  console.log({ requestId: c.get('requestId'), message: 'readStatsVersionCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readStatsVersionCF query', query })
   try {
     return await runQueryToCFA<VersionUsageCF>(c, query)
   }
@@ -408,7 +409,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
 
   const query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1`
 
-  console.log({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
     const readD1 = c.env.DB_DEVICES
       .prepare(query)
@@ -431,7 +432,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   let rangeStart = range_start
   let rangeEnd = range_end
   if (deviceIds && deviceIds.length) {
-    console.log({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
       rangeStart = 0
@@ -446,7 +447,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   }
   let searchFilter = ''
   if (search) {
-    console.log({ requestId: c.get('requestId'), message: 'search', search })
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search })
     if (deviceIds && deviceIds.length)
       searchFilter = `AND custom_id LIKE '%${search}%')`
     else
@@ -460,7 +461,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   if (order && order.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
+        cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
         orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
       }
     })
@@ -485,15 +486,15 @@ WHERE
 ${orderFilter}
 LIMIT ${rangeEnd} OFFSET ${rangeStart}`
 
-  console.log({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
-    console.log({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
     const readD1 = c.env.DB_DEVICES
       .prepare(query)
       .all()
-    console.log({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
     const res = await readD1
-    console.log({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
     return res.results as DeviceRowCF[]
   }
   catch (e) {
@@ -517,7 +518,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start?: str
   let deviceFilter = ''
 
   if (deviceIds && deviceIds.length) {
-    console.log({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
     }
@@ -538,7 +539,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start?: str
   if (order && order.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
+        cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
         orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
       }
     })
@@ -559,7 +560,7 @@ GROUP BY app_id, created_at, action, device_id, version_id
 ${orderFilter}
 LIMIT ${limit}`
 
-  console.log({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
     return await runQueryToCFA<StatRowCF>(c, query)
   }
@@ -574,7 +575,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
     return Promise.resolve([])
 
   const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''`
-  console.log({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
   // use c.env.DB_STOREAPPS and table store_apps
   try {
     const readD1 = c.env.DB_STOREAPPS
@@ -597,7 +598,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
   // use countUpdatesFromStoreApps exemple to make it work with Cloudflare
   const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
 
-  console.log({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -615,7 +616,7 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
   // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
 
-  console.log({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
   try {
     const readAnalytics = await runQueryToCFA<{ count: number }>(c, query)
     return readAnalytics[0].count
@@ -630,7 +631,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
   // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'`
 
-  console.log({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })
   try {
     const readAnalytics = await runQueryToCFA<{ count: number }>(c, query)
     return readAnalytics[0].count
@@ -644,7 +645,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
 export async function readActiveAppsCF(c: Context) {
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get' GROUP BY app_id`
-  console.log({ requestId: c.get('requestId'), message: 'readActiveAppsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readActiveAppsCF query', query })
   try {
     const response = await runQueryToCFA<{ app_id: string }>(c, query)
     const app_ids = response.map(app => app.app_id)
@@ -661,10 +662,10 @@ export async function readActiveAppsCF(c: Context) {
 export async function readLastMonthUpdatesCF(c: Context) {
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const query = `SELECT sum(if(blob2 = 'get', 1, 0)) AS count FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
-  console.log({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF query', query })
   try {
     const response = await runQueryToCFA<{ count: number }>(c, query)
-    console.log({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF response', response })
+    cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF response', response })
     return response[0].count ?? 0
   }
   catch (e) {
@@ -678,7 +679,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
     return Promise.resolve([] as StoreApp[])
   const query = `SELECT * FROM store_apps WHERE ${flag} = 1 ORDER BY created_at ASC LIMIT ${limit}`
 
-  console.log({ requestId: c.get('requestId'), message: 'getAppsToProcessCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getAppsToProcessCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -723,7 +724,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 
   const query = `SELECT url, title, icon, summary, installs, category FROM store_apps WHERE ${modeQuery} ORDER BY installs DESC LIMIT ${limit}`
 
-  console.log({ requestId: c.get('requestId'), message: 'getTopAppsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getTopAppsCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -760,7 +761,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 
   const query = `SELECT COUNT(*) AS total FROM store_apps WHERE ${modeQuery}`
 
-  console.log({ requestId: c.get('requestId'), message: 'getTotalAppsByModeCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getTotalAppsByModeCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -779,7 +780,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return Promise.resolve({} as StoreApp)
   const query = `SELECT * FROM store_apps WHERE app_id = '${appId}' LIMIT 1`
 
-  console.log({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -818,7 +819,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
         .bind(...values)
         .run()
 
-      console.log({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo result', res })
+      cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo result', res })
     }
   }
   catch (e) {
@@ -845,7 +846,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
       .prepare(query)
       .bind(app.app_id, ...values)
       .run()
-    console.log({ requestId: c.get('requestId'), message: 'saveStoreInfoCF result', res })
+    cloudlog({ requestId: c.get('requestId'), message: 'saveStoreInfoCF result', res })
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), message: 'Error saving store info', error: e })
@@ -880,7 +881,7 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
       .prepare(query)
       .bind(appId, updates, updates)
       .run()
-    console.log({ requestId: c.get('requestId'), message: 'updateStoreApp result', res })
+    cloudlog({ requestId: c.get('requestId'), message: 'updateStoreApp result', res })
   }
   catch (e) {
     console.error({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: e })
@@ -922,7 +923,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     GROUP BY blob1
   `
 
-  console.log({ requestId: c.get('requestId'), message: 'getUpdateStatsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getUpdateStatsCF query', query })
   try {
     const result = await runQueryToCFA<{ app_id: string, failed: number, set: number, get: number }>(c, query)
 
