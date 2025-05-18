@@ -22,7 +22,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   try {
     const body = await c.req.json<PortalData>()
-    console.log({ requestId: c.get('requestId'), context: 'post stripe checkout body', body })
+    console.log({ requestId: c.get('requestId'), message: 'post stripe checkout body', body })
     const authorization = c.get('authorization')
     const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
       authorization?.split('Bearer ')[1],
@@ -34,7 +34,7 @@ app.post('/', middlewareAuth, async (c) => {
     if (error || !auth || !auth.user || !auth.user.id)
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
-    console.log({ requestId: c.get('requestId'), context: 'auth', auth: auth.user.id })
+    console.log({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
     const { data: org, error: dbError } = await supabaseAdmin(c as any)
       .from('orgs')
       .select('customer_id')
@@ -48,12 +48,12 @@ app.post('/', middlewareAuth, async (c) => {
     if (!await hasOrgRight(c as any, body.orgId, auth.user.id, 'super_admin'))
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 
-    console.log({ requestId: c.get('requestId'), context: 'user', org })
+    console.log({ requestId: c.get('requestId'), message: 'user', org })
     const checkout = await createCheckout(c as any, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return c.json({ url: checkout.url })
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'error', error })
+    console.error({ requestId: c.get('requestId'), message: 'error', error })
     if (error instanceof HTTPError) {
       const errorJson = await error.response.json()
       return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(errorJson) }, 500)

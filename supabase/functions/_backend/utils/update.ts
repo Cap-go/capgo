@@ -44,7 +44,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean) {
   try {
-    console.log({ requestId: c.get('requestId'), context: 'body', body, date: new Date().toISOString() })
+    console.log(({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() }))
     let {
       version_name,
       version_build,
@@ -73,7 +73,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           capgo: true,
         }))
       }
-      console.log({ requestId: c.get('requestId'), context: 'App not found', id: app_id, date: new Date().toISOString() })
+      console.log({ requestId: c.get('requestId'), message: 'App not found', id: app_id, date: new Date().toISOString() })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
@@ -91,7 +91,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1'))
-      console.log({ requestId: c.get('requestId'), context: 'semver_issue', app_id, version_build })
+      console.log({ requestId: c.get('requestId'), message: 'semver_issue', app_id, version_build })
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
@@ -108,7 +108,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      console.log({ requestId: c.get('requestId'), context: 'missing_info', app_id, device_id, version_build, version_name, platform })
+      console.log({ requestId: c.get('requestId'), message: 'missing_info', app_id, device_id, version_build, version_name, platform })
       return c.json({
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
@@ -127,10 +127,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       platform: platform as Database['public']['Enums']['platform_os'],
       updated_at: new Date().toISOString(),
     }
-    const start = performance.now()
     const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
     if (!planValid) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot update, upgrade plan to continue to update', id: app_id })
+      console.log({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
       await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
       return c.json({
         message: 'Cannot update, upgrade plan to continue to update',
@@ -139,21 +138,17 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     await backgroundTask(c, createStatsMau(c, device_id, app_id))
 
-    console.log({ requestId: c.get('requestId'), context: 'vals', platform, device })
+    console.log({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
     const requestedInto = isV2
       ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
       : await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
-
-    const end = performance.now()
-    console.log({ requestId: c.get('requestId'), context: 'requestInfosPostgres', duration: `${end - start}ms` })
-
     const { versionData, channelOverride } = requestedInto
     let { channelData } = requestedInto
-    console.log({ requestId: c.get('requestId'), context: 'requestedInto', message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
+    console.log({ requestId: c.get('requestId'), message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
 
     if (!versionData) {
-      console.log({ requestId: c.get('requestId'), context: 'No version data found' })
+      console.log({ requestId: c.get('requestId'), message: 'No version data found' })
       return c.json({
         message: 'Couldn\'t find version data',
         error: 'no-version_data',
@@ -161,7 +156,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     if (!channelData && !channelOverride) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot get channel or override', id: app_id, date: new Date().toISOString() })
+      console.log({ requestId: c.get('requestId'), message: 'Cannot get channel or override', id: app_id, date: new Date().toISOString() })
       if (versionData)
         await sendStatsAndDevice(c, device, [{ action: 'NoChannelOrOverride', versionId: versionData.id }])
 
@@ -203,7 +198,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     // }
 
     if (!version.external_url && !version.r2_path && version.name !== 'builtin' && (!manifestEntries || manifestEntries.length === 0)) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
+      console.log({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
         message: 'Cannot get bundle',
@@ -213,7 +208,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     // console.log(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
     if (version_name === version.name) {
-      console.log({ requestId: c.get('requestId'), context: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
+      console.log({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
       // TODO: check why this event is send with wrong version_name
       await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
       return c.json({
@@ -224,7 +219,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     if (channelData) {
     // console.log(c.get('requestId'), 'check disableAutoUpdateToMajor', device_id)
       if (!channelData.channels.ios && platform === 'ios') {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot update, ios is disabled', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot update, ios is disabled', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disablePlatformIos' }])
         return c.json({
           message: 'Cannot update, ios it\'s disabled',
@@ -234,9 +229,9 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
       if (!channelData.channels.android && platform === 'android') {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot update, android is disabled', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot update, android is disabled', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disablePlatformAndroid' }])
-        console.log({ requestId: c.get('requestId'), context: 'sendStats', date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'sendStats', date: new Date().toISOString() })
         return c.json({
           message: 'Cannot update, android is disabled',
           error: 'disabled_platform_android',
@@ -245,7 +240,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
       if (version.name !== 'builtin' && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor' }])
         return c.json({
           major: true,
@@ -257,7 +252,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       if (!channelData.channels.allow_device_self_set && !channelData.channels.public) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot update via a private channel', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot update via a private channel', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel' }])
         return c.json({
           message: 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self dissociate/associate" set to true',
@@ -266,7 +261,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'minor' && parse(version.name).minor > parse(version_build).minor) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor' }])
         return c.json({
           major: true,
@@ -277,13 +272,13 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
 
-      console.log({ requestId: c.get('requestId'), context: 'version', version: version.name, old: version_name })
+      console.log({ requestId: c.get('requestId'), message: 'version', version: version.name, old: version_name })
       if (version.name !== 'builtin' && channelData.channels.disable_auto_update === 'patch' && !(
         parse(version.name).patch > parse(version_build).patch
         && parse(version.name).major === parse(version_build).major
         && parse(version.name).minor === parse(version_build).minor
       )) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch' }])
         return c.json({
           major: true,
@@ -299,7 +294,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
         // The channel is misconfigured
         if (minUpdateVersion === null) {
-          console.log({ requestId: c.get('requestId'), context: 'Channel is misconfigured', channel: channelData.channels.name, date: new Date().toISOString() })
+          console.log({ requestId: c.get('requestId'), message: 'Channel is misconfigured', channel: channelData.channels.name, date: new Date().toISOString() })
           await sendStatsAndDevice(c, device, [{ action: 'channelMisconfigured' }])
           return c.json({
             message: `Channel ${channelData.channels.name} is misconfigured`,
@@ -311,7 +306,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
         // Check if the minVersion is greater then the current version
         if (greaterThan(parse(minUpdateVersion), parse(version_build))) {
-          console.log({ requestId: c.get('requestId'), context: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
+          console.log({ requestId: c.get('requestId'), message: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
           await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata' }])
           return c.json({
             major: true,
@@ -325,7 +320,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
       // console.log(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
       if (version.name !== 'builtin' && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
         return c.json({
           message: 'Cannot revert under native version',
@@ -336,7 +331,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
 
       if (!channelData.channels.allow_dev && !is_prod) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild' }])
         return c.json({
           message: 'Cannot update, dev build is disabled',
@@ -346,7 +341,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }, 200)
       }
       if (!channelData.channels.allow_emulator && is_emulator) {
-        console.log({ requestId: c.get('requestId'), context: 'Cannot update emulator is disabled', id: device_id, date: new Date().toISOString() })
+        console.log({ requestId: c.get('requestId'), message: 'Cannot update emulator is disabled', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableEmulator' }])
         return c.json({
           message: 'Cannot update, emulator is disabled',
@@ -370,6 +365,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'revert_to_builtin_plugin_version_too_old',
       }, 200)
     }
+    const startBundleUrl = performance.now()
     let signedURL = version.external_url || ''
     let manifest: ManifestEntry[] = []
     if (!version.external_url) {
@@ -383,9 +379,11 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }
       manifest = await getManifestUrl(c, version.id, manifestEntries, device_id)
     }
+    const endBundleUrl = performance.now()
+    console.log({ requestId: c.get('requestId'), message: 'bundle_url_timing', duration: `${endBundleUrl - startBundleUrl}ms`, date: new Date().toISOString() })
     //  check signedURL and if it's url
     if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {
-      console.log({ requestId: c.get('requestId'), context: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
+      console.log({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
         message: 'Cannot get bundle url',
@@ -401,10 +399,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       createStatsVersion(c, version.id, app_id, 'get'),
       sendStatsAndDevice(c, device, [{ action: 'get' }]),
     ]))
-    console.log({ requestId: c.get('requestId'), context: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
+    console.log({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
     const res = resToVersion(plugin_version, signedURL, version as any, manifest)
     if (!res.url && !res.manifest) {
-      console.log({ requestId: c.get('requestId'), context: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
+      console.log({ requestId: c.get('requestId'), message: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
       return c.json({
         message: 'No url or manifest',
         error: 'no_url_or_manifest',
@@ -413,7 +411,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     return c.json(res, 200)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'update', error: JSON.stringify(e), body })
+    console.error({ requestId: c.get('requestId'), message: 'update', error: JSON.stringify(e), body })
     return c.json({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',
@@ -423,17 +421,17 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
 export async function update(c: Context, body: AppInfos) {
   let pgClient
-  let isV2 = false
+  let isV2 = getRuntimeKey() === 'workerd'
   if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
     isV2 = true
   }
   // if (!isV2 && getRuntimeKey() === 'workerd') {
-  //   // make 20% chance to be v2
-  //   isV2 = Math.random() < 0.3
+  //   // make 10% chance to use v2 with D1 read replicate to test the performance
+  //   isV2 = Math.random() < 0.1
   // }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
-    console.log({ requestId: c.get('requestId'), context: 'update2', isV2 })
+    console.log({ requestId: c.get('requestId'), message: 'update2', isV2 })
     pgClient = null
   }
   else {
@@ -442,10 +440,10 @@ export async function update(c: Context, body: AppInfos) {
 
   let res
   try {
-    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c, body.device_id) : getDrizzleClient(pgClient as any), isV2)
+    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), isV2)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'update', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'update', error: e })
     return c.json({
       message: `Error unknow ${JSON.stringify(e)}`,
       error: 'unknow_error',

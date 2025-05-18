@@ -22,7 +22,7 @@ function logsnag(c: Context) {
 }
 
 function logsnagInsights(c: Context, data: { title: string, value: string | boolean | number, icon: string }[]) {
-  console.log({ requestId: c.get('requestId'), context: 'logsnagInsights', data })
+  console.log({ requestId: c.get('requestId'), message: 'logsnagInsights', data })
   const ls = getEnv(c, 'LOGSNAG_TOKEN')
   const project = getEnv(c, 'LOGSNAG_PROJECT')
   if (!ls || !project)
@@ -44,7 +44,7 @@ function logsnagInsights(c: Context, data: { title: string, value: string | bool
       },
     }).then(res => res.json())
       .catch((e) => {
-        console.error({ requestId: c.get('requestId'), context: 'logsnagInsights', error: e, payload })
+        console.error({ requestId: c.get('requestId'), message: 'logsnagInsights', error: e, payload })
         return false
       }),
     )

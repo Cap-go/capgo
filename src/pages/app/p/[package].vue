@@ -6,9 +6,11 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/heroicons/chart-bar'
 import IconHistory from '~icons/heroicons/clock'
+import IconCog from '~icons/heroicons/cog-6-tooth'
 import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
+import AppSetting from '~/components/dashboard/AppSetting.vue'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -39,6 +41,11 @@ const tabs: Tab[] = [
     label: 'overview',
     icon: IconChart,
     key: 'overview',
+  },
+  {
+    label: 'info',
+    icon: IconCog,
+    key: 'info',
   },
   {
     label: 'bundles',
@@ -177,6 +184,12 @@ watchEffect(() => {
             <StatsBar :stats="stats" />
           </template>
         </BlurBg>
+      </div>
+
+      <div v-if="ActiveTab === 'info'" class="mt-0 md:mt-4">
+        <div class="flex flex-col mx-auto overflow-y-auto bg-white border md:rounded-lg shadow-lg border-slate-300 md:mt-5 md:w-2/3 dark:border-slate-900 dark:bg-gray-800">
+          <AppSetting :app-id="id" />
+        </div>
       </div>
 
       <div v-if="ActiveTab === 'bundles'" class="mt-0 md:mt-4">

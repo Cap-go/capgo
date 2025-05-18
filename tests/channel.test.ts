@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.channel'
+const id = randomUUID()
+const APPNAME = `com.app.c.${id}`
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)

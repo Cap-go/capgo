@@ -7,8 +7,13 @@ export async function get(c: Context, appId: string, apikey: Database['public'][
     console.error('Cannot get app', 'Missing app_id')
     return c.json({ status: 'Missing app_id' }, 400)
   }
+  console.log('apikeysubkey', apikey)
 
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'read', apikey.key))) {
+    console.error('Cannot get app', 'You can\'t access this app', appId)
+    return c.json({ status: 'You can\'t access this app', app_id: appId }, 400)
+  }
+  if (apikey.limited_to_apps && apikey.limited_to_apps.length > 0 && !apikey.limited_to_apps.includes(appId)) {
     console.error('Cannot get app', 'You can\'t access this app', appId)
     return c.json({ status: 'You can\'t access this app', app_id: appId }, 400)
   }
@@ -98,7 +103,7 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
       return c.json({ status: 'Cannot get apps', error: JSON.stringify(dbError) }, 400)
     }
 
-    return c.json({ data })
+    return c.json(data)
   }
   catch (e) {
     console.error('Cannot get apps', e)

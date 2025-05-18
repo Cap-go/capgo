@@ -68,7 +68,7 @@ export function supabaseAdmin(c: Context) {
 }
 
 export function supabaseApikey(c: Context, apikey: string) {
-  console.log({ requestId: c.get('requestId'), context: 'supabaseApikey', apikey })
+  console.log({ requestId: c.get('requestId'), message: 'supabaseApikey', apikey })
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), {
     auth: {
       persistSession: false,
@@ -93,7 +93,7 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
       .range(page * limit, (page + 1) * limit - 1)
 
     if (error) {
-      console.error({ requestId: c.get('requestId'), context: 'Error getting apps from Supabase', error })
+      console.error({ requestId: c.get('requestId'), message: 'Error getting apps from Supabase', error })
       break
     }
 
@@ -108,9 +108,9 @@ export async function getAppsFromSB(c: Context): Promise<string[]> {
 }
 
 export async function updateOrCreateChannel(c: Context, update: Database['public']['Tables']['channels']['Insert']) {
-  console.log({ requestId: c.get('requestId'), context: 'updateOrCreateChannel', update })
+  console.log({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
-    console.log({ requestId: c.get('requestId'), context: 'missing app_id, name, or created_by' })
+    console.log({ requestId: c.get('requestId'), message: 'missing app_id, name, or created_by' })
     return Promise.resolve({ error: new Error('missing app_id, name, or created_by'), requestId: c.get('requestId') })
   }
 
@@ -147,9 +147,9 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
 }
 
 export async function updateOrCreateChannelDevice(c: Context, update: Database['public']['Tables']['channel_devices']['Insert']) {
-  console.log({ requestId: c.get('requestId'), context: 'updateOrCreateChannelDevice', update })
+  console.log({ requestId: c.get('requestId'), message: 'updateOrCreateChannelDevice', update })
   if (!update.device_id || !update.channel_id || !update.app_id) {
-    console.log({ requestId: c.get('requestId'), context: 'missing device_id, channel_id, or app_id' })
+    console.log({ requestId: c.get('requestId'), message: 'missing device_id, channel_id, or app_id' })
     return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
   }
   update.device_id = update.device_id.toLowerCase()
@@ -167,7 +167,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
       (update as any)[key] !== (existingChannelDevice as any)[key] && key !== 'created_at' && key !== 'updated_at',
     )
     if (!fieldsDiffer) {
-      console.log({ requestId: c.get('requestId'), context: 'No fields differ, no update needed' })
+      console.log({ requestId: c.get('requestId'), message: 'No fields differ, no update needed' })
       return Promise.resolve()
     }
   }
@@ -204,7 +204,7 @@ export async function hasAppRight(c: Context, appId: string | undefined, userid:
     .rpc('has_app_right_userid', { appid: appId, right, userid })
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'has_app_right_userid error', error })
+    console.error({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
     return false
   }
 
@@ -215,13 +215,13 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
   if (!appId)
     return false
 
-  console.log({ requestId: c.get('requestId'), context: 'hasAppRightApikey', appId, userid, right, apikey })
+  console.log({ requestId: c.get('requestId'), message: 'hasAppRightApikey', appId, userid, right, apikey })
 
   const { data, error } = await supabaseAdmin(c)
     .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey })
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'has_app_right_userid error', error })
+    console.error({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
     return false
   }
 
@@ -243,10 +243,10 @@ export async function hasOrgRight(c: Context, orgId: string, userId: string, rig
     app_id: null as any,
   })
 
-  console.log({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight)', userRight })
+  console.log({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
 
   if (userRight.error || !userRight.data) {
-    console.error({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight) error', error: userRight.error })
+    console.error({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
     return false
   }
 
@@ -262,10 +262,10 @@ export async function hasOrgRightApikey(c: Context, orgId: string, userId: strin
     app_id: null as any,
   })
 
-  console.log({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight)', userRight })
+  console.log({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
 
   if (userRight.error || !userRight.data) {
-    console.error({ requestId: c.get('requestId'), context: 'check_min_rights (hasOrgRight) error', error: userRight.error })
+    console.error({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
     return false
   }
 
@@ -335,7 +335,7 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isGoodPlan error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isGoodPlan error', orgId, error })
   }
   return false
 }
@@ -349,7 +349,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isOnboarded error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isOnboarded error', orgId, error })
   }
   return false
 }
@@ -357,7 +357,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
 export async function set_mau_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
   const { error } = await supabaseAdmin(c).rpc('set_mau_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'set_mau_exceeded error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId, error })
     return false
   }
   return true
@@ -366,7 +366,7 @@ export async function set_mau_exceeded(c: Context, orgId: string, disabled: bool
 export async function set_storage_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
   const { error } = await supabaseAdmin(c).rpc('set_storage_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'set_download_disabled error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'set_download_disabled error', orgId, error })
     return false
   }
   return true
@@ -375,7 +375,7 @@ export async function set_storage_exceeded(c: Context, orgId: string, disabled: 
 export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
   const { error } = await supabaseAdmin(c).rpc('set_bandwidth_exceeded_by_org', { org_id: orgId, disabled })
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'set_bandwidth_exceeded error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId, error })
     return false
   }
   return true
@@ -390,7 +390,7 @@ export async function isOnboardingNeeded(c: Context, userId: string): Promise<bo
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isOnboardingNeeded error', userId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isOnboardingNeeded error', userId, error })
   }
   return false
 }
@@ -404,7 +404,7 @@ export async function isCanceledOrg(c: Context, orgId: string): Promise<boolean>
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isCanceled error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isCanceled error', orgId, error })
   }
   return false
 }
@@ -418,7 +418,7 @@ export async function isPayingOrg(c: Context, orgId: string): Promise<boolean> {
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isPayingOrg error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isPayingOrg error', orgId, error })
   }
   return false
 }
@@ -432,7 +432,7 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
     return data || 0
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isTrialOrg error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isTrialOrg error', orgId, error })
   }
   return 0
 }
@@ -456,7 +456,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
     return data || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg error', orgId, error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg error', orgId, error })
   }
   return false
 }
@@ -464,7 +464,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
 export async function createApiKey(c: Context, userId: string) {
   // check if user has apikeys
   if (!userId) {
-    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'userId is null' })
+    console.error({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'userId is null' })
     return
   }
   const total = await supabaseAdmin(c)
@@ -473,7 +473,7 @@ export async function createApiKey(c: Context, userId: string) {
     .eq('user_id', userId)
     .then(res => res.count || null)
   if (total === null) {
-    console.error({ requestId: c.get('requestId'), context: 'createApiKey error', userId, error: 'total is null' })
+    console.error({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is null' })
     return
   }
   if (total === 0) {
@@ -603,10 +603,10 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   trial_at.setDate(trial_at.getDate() + 15)
   const soloPlan = await getDefaultPlan(c)
   if (!soloPlan) {
-    console.log({ requestId: c.get('requestId'), context: 'no default plan' })
+    console.log({ requestId: c.get('requestId'), message: 'no default plan' })
     throw new Error('no default plan')
   }
-  console.log({ requestId: c.get('requestId'), context: 'createInfo', soloPlan, customer })
+  console.log({ requestId: c.get('requestId'), message: 'createInfo', soloPlan, customer })
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({
@@ -615,7 +615,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
       trial_at: trial_at.toISOString(),
     })
   if (createInfoError)
-    console.log({ requestId: c.get('requestId'), context: 'createInfoError', createInfoError })
+    console.log({ requestId: c.get('requestId'), message: 'createInfoError', createInfoError })
 
   const { error: updateUserError } = await supabaseAdmin(c)
     .from('orgs')
@@ -624,8 +624,8 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     })
     .eq('id', org.id)
   if (updateUserError)
-    console.log({ requestId: c.get('requestId'), context: 'updateUserError', updateUserError })
-  console.log({ requestId: c.get('requestId'), context: 'stripe_info done' })
+    console.log({ requestId: c.get('requestId'), message: 'updateUserError', updateUserError })
+  console.log({ requestId: c.get('requestId'), message: 'stripe_info done' })
 }
 
 export function trackBandwidthUsageSB(
@@ -683,7 +683,7 @@ export function trackMetaSB(
   version_id: number,
   size: number,
 ) {
-  console.log({ requestId: c.get('requestId'), context: 'createStatsMeta', app_id, version_id, size })
+  console.log({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
   return supabaseAdmin(c)
     .from('version_meta')
     .insert([
@@ -696,7 +696,7 @@ export function trackMetaSB(
 }
 
 export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  console.log({ requestId: c.get('requestId'), context: 'trackDevicesSB', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
+  console.log({ requestId: c.get('requestId'), message: 'trackDevicesSB', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
   return supabaseAdmin(c)
     .from('devices')
     .upsert(
@@ -771,7 +771,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
     query = query.lt('created_at', new Date(period_end).toISOString())
 
   if (deviceIds && deviceIds.length) {
-    console.log({ requestId: c.get('requestId'), context: 'deviceIds', deviceIds })
+    console.log({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1)
       query = query.eq('device_id', deviceIds[0])
     else
@@ -779,7 +779,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   }
 
   if (search) {
-    console.log({ requestId: c.get('requestId'), context: 'search', search })
+    console.log({ requestId: c.get('requestId'), message: 'search', search })
     if (deviceIds && deviceIds.length)
       query = query.ilike('version_build', `${search}%`)
     else
@@ -789,7 +789,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log({ requestId: c.get('requestId'), context: 'order', key: col.key, sortable: col.sortable })
+        console.log({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
@@ -798,7 +798,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   const { data, error } = await query
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading stats list', error })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading stats list', error })
     return []
   }
 
@@ -808,7 +808,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
 export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
   const supabase = supabaseAdmin(c)
 
-  console.log({ requestId: c.get('requestId'), context: 'readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search })
+  console.log({ requestId: c.get('requestId'), message: 'readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search })
   let query = supabase
     .from('devices')
     .select('*')
@@ -817,7 +817,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
     .limit(limit)
 
   if (deviceIds && deviceIds.length) {
-    console.log({ requestId: c.get('requestId'), context: 'deviceIds', deviceIds })
+    console.log({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1)
       query = query.eq('device_id', deviceIds[0])
     else
@@ -825,7 +825,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   }
 
   if (search) {
-    console.log({ requestId: c.get('requestId'), context: 'search', search })
+    console.log({ requestId: c.get('requestId'), message: 'search', search })
     if (deviceIds && deviceIds.length)
       query = query.ilike('custom_id', `${search}%`)
     else
@@ -834,7 +834,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log({ requestId: c.get('requestId'), context: 'order', key: col.key, sortable: col.sortable })
+        console.log({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
@@ -845,7 +845,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
   const { data, error } = await query
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device list', error })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error })
     return []
   }
 
@@ -897,7 +897,7 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
     .rpc('get_update_stats')
 
   if (error) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting update stats', error })
     return {
       apps: [],
       total: {

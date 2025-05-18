@@ -146,7 +146,7 @@ describe('app creation permission tests', () => {
       })
 
       // We expect this to fail either with a 400 (missing required field) or a 403 (not authorized)
-      expect(response.status).toBe(500)
+      expect(response.status).toBe(400)
     })
   })
 })

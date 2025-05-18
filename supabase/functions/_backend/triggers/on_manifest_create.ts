@@ -9,7 +9,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
   if (!record.s3_path) {
-    console.log({ requestId: c.get('requestId'), context: 'No s3 path', id: record.id })
+    console.log({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id })
     return c.json(BRES)
   }
 
@@ -21,11 +21,11 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
         .update({ file_size: size })
         .eq('id', record.id)
       if (updateError)
-        console.log({ requestId: c.get('requestId'), context: 'error update manifest size', error: updateError })
+        console.log({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
     }
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'Cannot get s3 size', error })
+    console.log({ requestId: c.get('requestId'), message: 'Cannot get s3 size', error })
   }
 
   return c.json(BRES)
@@ -38,18 +38,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'manifest'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
+      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log({ requestId: c.get('requestId'), context: 'Not INSERT' })
+      console.log({ requestId: c.get('requestId'), message: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), context: 'record', record })
+    console.log({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.app_version_id || !record.s3_path) {
-      console.log({ requestId: c.get('requestId'), context: 'no app_version_id or s3_path' })
+      console.log({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })
       return c.json(BRES)
     }
 

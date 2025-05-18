@@ -183,5 +183,8 @@ async function createNewOrg() {
         </li>
       </ul>
     </details>
+    <button v-show="!currentOrganization" class="btn btn-outline border-gray-300 dark:border-gray-600 w-full btn-sm text-slate-300 dark:text-white" @click="createNewOrg">
+      <Plus class="mx-auto" />
+    </button>
   </div>
 </template>

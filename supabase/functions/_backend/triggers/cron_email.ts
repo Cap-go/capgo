@@ -92,7 +92,7 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    console.error({ requestId: c.get('requestId'), context: 'Cannot send email for app', appId, error: generateStatsError, email })
+    console.error({ requestId: c.get('requestId'), message: 'Cannot send email for app', appId, error: generateStatsError, email })
     return c.json({ status: 'Cannot generate stats' }, 500)
   }
 

@@ -12,18 +12,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'channels'
     const body = await c.req.json<UpdatePayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
+      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'UPDATE') {
-      console.log({ requestId: c.get('requestId'), context: 'Not UPDATE' })
+      console.log({ requestId: c.get('requestId'), message: 'Not UPDATE' })
       return c.json({ status: 'Not UPDATE' }, 200)
     }
     const record = body.record as Database['public']['Tables']['channels']['Row']
-    console.log({ requestId: c.get('requestId'), context: 'record', record })
+    console.log({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.id) {
-      console.log({ requestId: c.get('requestId'), context: 'No id' })
+      console.log({ requestId: c.get('requestId'), message: 'No id' })
       return c.json(BRES)
     }
     if (!record.app_id) {
@@ -47,7 +47,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('android', false)
         .eq('ios', false)
       if (iosError || hiddenError)
-        console.log({ requestId: c.get('requestId'), context: 'error', error: iosError || hiddenError })
+        console.log({ requestId: c.get('requestId'), message: 'error', error: iosError || hiddenError })
     }
 
     if (record.public && record.android) {
@@ -64,7 +64,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('android', false)
         .eq('ios', false)
       if (androidError || hiddenError)
-        console.log({ requestId: c.get('requestId'), context: 'error', error: androidError || hiddenError })
+        console.log({ requestId: c.get('requestId'), message: 'error', error: androidError || hiddenError })
     }
 
     if (record.public && (record.ios === record.android)) {
@@ -75,7 +75,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('public', true)
         .neq('id', record.id)
       if (error)
-        console.log({ requestId: c.get('requestId'), context: 'error', error })
+        console.log({ requestId: c.get('requestId'), message: 'error', error })
     }
 
     return c.json(BRES)

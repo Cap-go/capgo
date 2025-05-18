@@ -2,9 +2,11 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { createStripeCustomer } from '../utils/supabase.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -13,18 +15,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'orgs'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
+      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log({ requestId: c.get('requestId'), context: 'Not INSERT' })
+      console.log({ requestId: c.get('requestId'), message: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record as Database['public']['Tables']['orgs']['Row']
-    console.log({ requestId: c.get('requestId'), context: 'record', record })
+    console.log({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.id) {
-      console.log({ requestId: c.get('requestId'), context: 'No id' })
+      console.log({ requestId: c.get('requestId'), message: 'No id' })
       return c.json(BRES)
     }
 
@@ -32,13 +34,17 @@ app.post('/', middlewareAPISecret, async (c) => {
       await createStripeCustomer(c as any, record as any)
 
     const LogSnag = logsnag(c as any)
-    LogSnag.track({
+    await backgroundTask(c as any, LogSnag.track({
       channel: 'org-created',
       event: 'Org Created',
       icon: '🎉',
       user_id: record.id,
-      notify: true,
-    })
+      notify: false,
+    }))
+    await backgroundTask(c as any, trackBentoEvent(c as any, record.management_email, {
+      org_id: record.id,
+      org_name: record.name,
+    }, 'org:created'))
 
     return c.json(BRES)
   }

@@ -13,19 +13,19 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'users'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
+      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log({ requestId: c.get('requestId'), context: 'Not INSERT' })
+      console.log({ requestId: c.get('requestId'), message: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), context: 'record', record })
+    console.log({ requestId: c.get('requestId'), message: 'record', record })
     await Promise.all([
       createApiKey(c as any, record.id),
     ])
-    console.log({ requestId: c.get('requestId'), context: 'createCustomer stripe' })
+    console.log({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
     if (record.customer_id)
       return c.json(BRES)
     const LogSnag = logsnag(c as any)
@@ -34,7 +34,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       event: 'User Joined',
       icon: '🎉',
       user_id: record.id,
-      notify: true,
+      notify: false,
     }).catch()
     return c.json(BRES)
   }

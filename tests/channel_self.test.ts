@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getBaseData, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.self_assign'
+const id = randomUUID()
+const APPNAME = `com.sa.${id}`
 
 async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
   const url = new URL(`${BASE_URL}/channel_self`)
@@ -28,7 +29,7 @@ async function getResponseError(response: Response) {
 }
 
 beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
+  await resetAndSeedAppData(APPNAME)
 })
 afterAll(async () => {
   await resetAppData(APPNAME)
@@ -241,8 +242,10 @@ it('[POST] /channel_self with default channel', async () => {
   const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient()
     .from('channels')
     .update({ allow_device_self_set: true })
-    .eq('name', 'no_access').eq('app_id', APPNAME)
-    .select('id, owner_org').single()
+    .eq('name', 'no_access')
+    .eq('app_id', APPNAME)
+    .select('id, owner_org')
+    .single()
 
   expect(channelUpdateError).toBeNull()
   expect(noAccessData).toBeTruthy()
@@ -467,7 +470,7 @@ it('[DELETE] /channel_self (with overwrite)', async () => {
   }
 })
 
-it('Verify channel stays after deleting channel_device', async () => {
+it('verify channel stays after deleting channel_device', async () => {
   await resetAndSeedAppData(APPNAME)
 
   // 1. Get a channel to use for the test
@@ -492,7 +495,7 @@ it('Verify channel stays after deleting channel_device', async () => {
       channel_id: channelId,
       device_id: deviceId,
       app_id: APPNAME,
-      owner_org: ownerOrg
+      owner_org: ownerOrg,
     })
 
   expect(insertError).toBeNull()

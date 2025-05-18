@@ -95,20 +95,28 @@ function sortClick(key: number) {
 }
 
 function updateUrlParams() {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams(window.location.search)
   if (searchVal.value)
     params.set('search', searchVal.value)
+  else
+    params.delete('search')
   if (props.filters) {
     Object.entries(props.filters).forEach(([key, value]) => {
       if (value)
         params.append('filter', key)
+      else
+        params.delete('filter', key)
     })
   }
   if (props.currentPage)
     params.set('page', props.currentPage.toString())
+  else
+    params.delete('page')
   props.columns.forEach((col) => {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
+    else
+      params.delete(`sort_${col.key}`)
   })
   window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
 }
@@ -116,24 +124,27 @@ function updateUrlParams() {
 function loadFromUrlParams() {
   const params = new URLSearchParams(window.location.search)
   const searchParam = params.get('search')
-  if (searchParam) {
+  if (searchParam && searchParam !== searchVal.value) {
     searchVal.value = searchParam
     emit('update:search', searchVal.value)
   }
   const pageParam = params.get('page')
-  if (pageParam) {
+  if (pageParam && pageParam !== props.currentPage.toString()) {
     const page = Number.parseInt(pageParam, 10)
     if (!Number.isNaN(page) && page !== props.currentPage) {
       emit('update:currentPage', page)
     }
   }
-  if (props.filters) {
-    const filterParams = params.getAll('filter')
+  const filterParams = params.getAll('filter')
+  if (props.filters && filterParams.length > 0) {
     const newFilters = { ...props.filters }
     Object.keys(newFilters).forEach((key) => {
       newFilters[key] = filterParams.includes(key)
     })
-    emit('update:filters', newFilters)
+    if (JSON.stringify(newFilters) !== JSON.stringify(props.filters)) {
+      console.log('update filters', newFilters, props.filters)
+      emit('update:filters', newFilters)
+    }
   }
   const newColumns = [...props.columns]
   props.columns.forEach((col) => {
@@ -142,8 +153,9 @@ function loadFromUrlParams() {
       newColumns[props.columns.indexOf(col)].sortable = sortParam
     }
   })
-  emit('update:columns', newColumns)
-  emit('reload')
+  if (newColumns.length > 0) {
+    emit('update:columns', newColumns)
+  }
 }
 
 // Cleanup on unmount
@@ -163,26 +175,38 @@ onMounted(() => {
   loadFromUrlParams()
 })
 
-watch(props.columns, useDebounceFn(() => {
-  updateUrlParams()
+const debouncedReload = useDebounceFn(() => {
   emit('reload')
-}, 500), { deep: true })
+}, 1000)
 
-watch(() => props.filters, useDebounceFn(() => {
+const debouncedUpdateUrlParams = useDebounceFn(() => {
   updateUrlParams()
-  emit('reload')
-}, 500), { deep: true, immediate: true })
+}, 1000)
 
-watch(searchVal, useDebounceFn(() => {
+const debouncedSearch = useDebounceFn(() => {
   emit('update:search', searchVal.value)
-  updateUrlParams()
-  emit('reload')
-}, 500))
+}, 1000)
 
-watch(() => props.currentPage, useDebounceFn(() => {
-  updateUrlParams()
-  emit('reload')
-}, 500))
+watch(() => props.columns, () => {
+  debouncedUpdateUrlParams()
+  debouncedReload()
+}, { deep: true })
+
+watch(() => props.filters, () => {
+  debouncedUpdateUrlParams()
+  debouncedReload()
+}, { deep: true, immediate: true })
+
+watch(searchVal, () => {
+  debouncedSearch()
+  debouncedUpdateUrlParams()
+  debouncedReload()
+})
+
+watch(() => props.currentPage, () => {
+  debouncedUpdateUrlParams()
+  debouncedReload()
+})
 
 function displayValueKey(elem: any, col: TableColumn | undefined) {
   if (!col)
@@ -206,35 +230,27 @@ function canPrev() {
 }
 
 async function next() {
-  console.log('next')
   if (canNext()) {
     emit('next')
     emit('update:currentPage', props.currentPage + 1)
-    emit('reload')
   }
 }
 async function fastForward() {
-  console.log('fastForward')
   if (canNext()) {
     emit('fastForward')
     emit('update:currentPage', Math.ceil(props.total / offset.value))
-    emit('reload')
   }
 }
 async function prev() {
-  console.log('prev')
   if (canPrev()) {
     emit('prev')
     emit('update:currentPage', props.currentPage - 1)
-    emit('reload')
   }
 }
 async function fastBackward() {
-  console.log('fastBackward')
   if (canPrev()) {
     emit('fastBackward')
     emit('update:currentPage', 1)
-    emit('reload')
   }
 }
 watch(props.elementList, () => {
@@ -354,10 +370,26 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4 cursor-pointer" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
-                  <button
-                    class="flex items-center p-3 mx-auto truncate rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 cursor-pointer" v-html="col.icon"
-                  />
+                <td v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4">
+                  <div class="flex items-center space-x-1">
+                    <template v-if="col.actions">
+                      <button
+                        v-for="(action, actionIndex) in col.actions"
+                        :key="actionIndex"
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        @click.stop="action.onClick(elem)"
+                      >
+                        <component :is="action.icon" />
+                      </button>
+                    </template>
+                    <template v-else-if="col.icon">
+                      <button
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        @click.stop="col.onClick ? col.onClick(elem) : () => {}"
+                        v-html="col.icon"
+                      />
+                    </template>
+                  </div>
                 </td>
                 <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-1 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />

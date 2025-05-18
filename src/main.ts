@@ -6,6 +6,9 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router/auto'
 import { routes } from 'vue-router/auto-routes'
+import { posthogLoader } from '~/services/posthog'
+import { getLocalConfig } from '~/services/supabase'
+
 import App from './App.vue'
 
 import { initPlausible } from './services/plausible'
@@ -52,12 +55,18 @@ const router = createRouter({
     { path: '/app/p/:package/devices', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=devices` },
     { path: '/app/p/:package/logs', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=logs` },
     { path: '/app/package/:package', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=logs` },
+    { path: '/app/package/:package/settings', redirect: to => `/app/p/${(to.params as { package: string }).package}?tab=info` },
     ...setupLayouts(newRoutes),
   ],
   history: createWebHistory(import.meta.env.BASE_URL),
 })
 app.use(router)
+
+// if (window.location.hostname !== 'localhost') {
+const config = getLocalConfig()
 initPlausible(import.meta.env.pls_domain as string)
+posthogLoader(config.supaHost)
+// }
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void
 

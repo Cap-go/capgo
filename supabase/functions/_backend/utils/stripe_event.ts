@@ -35,9 +35,9 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
   let isUpgrade = false
   let previousProductId: string | undefined
 
-  console.log({ requestId: c.get('requestId'), context: 'event', event: JSON.stringify(event, null, 2) })
+  console.log({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
   if (event && event.data && event.data.object) {
-    if (event.type === 'customer.subscription.updated') {
+    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.created') {
       const subscription = event.data.object
       const previousAttributes = event.data.previous_attributes as Partial<Stripe.Subscription>
 
@@ -52,12 +52,25 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       // current_period_start is epoch and current_period_end is epoch
       // subscription_anchor_start is date and subscription_anchor_end is date
       // convert epoch to date
-      data.subscription_anchor_start = new Date(subscription.current_period_start * 1000).toISOString()
-      data.subscription_anchor_end = new Date(subscription.current_period_end * 1000).toISOString()
+      const firstItem = subscription.items.data.length > 0 ? subscription.items.data[0] : null
+      data.subscription_anchor_start = firstItem?.current_period_start
+        ? new Date(firstItem.current_period_start * 1000).toISOString()
+        : undefined
+      data.subscription_anchor_end = firstItem?.current_period_end
+        ? new Date(firstItem.current_period_end * 1000).toISOString()
+        : undefined
       data.subscription_metered = res.meteredData
       data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
       data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
-      data.status = subscription.cancel_at ? 'canceled' : 'updated'
+      if (event.type === 'customer.subscription.deleted') {
+        data.status = 'deleted'
+      }
+      else if (event.type === 'customer.subscription.created') {
+        data.status = 'created'
+      }
+      else {
+        data.status = subscription.cancel_at ? 'canceled' : 'updated'
+      }
       data.subscription_id = subscription.id
       data.customer_id = String(subscription.customer)
 
@@ -66,14 +79,31 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
         isUpgrade = true
       }
     }
-    else if (event.type === 'customer.subscription.deleted') {
+    else if (event.type === 'charge.failed') {
       const charge = event.data.object
-      data.status = 'canceled'
+      data.status = 'failed'
       data.customer_id = String(charge.customer)
-      data.subscription_id = charge.id
+    }
+    else if (event.type === 'invoice.upcoming') {
+      const invoice = event.data.object
+      data.status = 'updated'
+      data.customer_id = String(invoice.customer)
+
+      const plan = invoice.lines.data[0]
+      if (plan) {
+        if (plan.parent?.subscription_item_details?.subscription) {
+          data.subscription_id = plan.parent.subscription_item_details.subscription as string
+        }
+        if (plan.pricing?.price_details?.product) {
+          data.product_id = plan.pricing.price_details.product as string
+        }
+        if (plan.pricing?.price_details?.price) {
+          data.price_id = plan.pricing.price_details.price as string
+        }
+      }
     }
     else {
-      console.error({ requestId: c.get('requestId'), context: 'Other event', event })
+      console.error({ requestId: c.get('requestId'), message: 'Other event', event })
     }
   }
   return { data, isUpgrade, previousProductId }

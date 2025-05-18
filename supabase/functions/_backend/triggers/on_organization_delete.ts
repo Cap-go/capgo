@@ -12,22 +12,22 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'orgs'
     const body = await c.req.json<DeletePayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
+      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'DELETE') {
-      console.log({ requestId: c.get('requestId'), context: 'Not DELETE' })
+      console.log({ requestId: c.get('requestId'), message: 'Not DELETE' })
       return c.json({ status: 'Not DELETE' }, 200)
     }
     const record = body.old_record
-    console.log({ requestId: c.get('requestId'), context: 'record', record })
+    console.log({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.id || !record.customer_id) {
-      console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id' })
+      console.log({ requestId: c.get('requestId'), message: 'no app_id or user_id' })
       return c.json(BRES)
     }
 
-    console.log({ requestId: c.get('requestId'), context: 'org delete', record })
+    console.log({ requestId: c.get('requestId'), message: 'org delete', record })
     cancelSubscription(c as any, record.customer_id)
     return c.json(BRES)
   }

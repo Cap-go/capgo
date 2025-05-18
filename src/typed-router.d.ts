@@ -27,7 +27,6 @@ declare module 'vue-router/auto-routes' {
     '/app/p/[package].bundle.[bundle]': RouteRecordInfo<'/app/p/[package].bundle.[bundle]', '/app/p/:package/bundle/:bundle', { package: ParamValue<true>, bundle: ParamValue<true> }, { package: ParamValue<false>, bundle: ParamValue<false> }>,
     '/app/p/[package].channel.[channel]': RouteRecordInfo<'/app/p/[package].channel.[channel]', '/app/p/:package/channel/:channel', { package: ParamValue<true>, channel: ParamValue<true> }, { package: ParamValue<false>, channel: ParamValue<false> }>,
     '/app/p/[package].d.[device]': RouteRecordInfo<'/app/p/[package].d.[device]', '/app/p/:package/d/:device', { package: ParamValue<true>, device: ParamValue<true> }, { package: ParamValue<false>, device: ParamValue<false> }>,
-    '/app/p/[package].settings': RouteRecordInfo<'/app/p/[package].settings', '/app/p/:package/settings', { package: ParamValue<true> }, { package: ParamValue<false> }>,
     '/confirm-signup': RouteRecordInfo<'/confirm-signup', '/confirm-signup', Record<never, never>, Record<never, never>>,
     '/delete_account': RouteRecordInfo<'/delete_account', '/delete_account', Record<never, never>, Record<never, never>>,
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,

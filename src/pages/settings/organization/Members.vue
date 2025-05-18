@@ -6,9 +6,10 @@ import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import Trash from '~icons/heroicons/trash?raw'
+// Import actual components instead of raw svg
+import IconTrash from '~icons/heroicons/trash'
+import IconWrench from '~icons/heroicons/wrench'
 
-import Wrench from '~icons/heroicons/wrench?raw'
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -25,14 +26,6 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-
-// Add type declarations for window functions
-declare global {
-  interface Window {
-    changeMemberPermission: (member: ExtendedOrganizationMember) => void
-    deleteMember: (member: ExtendedOrganizationMember) => void
-  }
-}
 
 const members = ref([] as ExtendedOrganizationMembers)
 
@@ -75,38 +68,29 @@ columns.value = [
   {
     key: 'actions',
     label: t('actions'),
-    allowHtml: true,
     mobile: true,
-    displayFunction: (member: ExtendedOrganizationMember) => {
-      let buttons = ''
-      if (canEdit(member)) {
-        buttons += `
-          <button onclick='window.changeMemberPermission(${JSON.stringify(member)})' class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-700 rounded-md" data-test="edit-member">
-            ${Wrench}
-          </button>
-        `
-      }
-      if (canDelete(member)) {
-        buttons += `
-          <button onclick='window.deleteMember(${JSON.stringify(member)})' class="p-2 text-red-600 hover:text-red-700 hover:bg-gray-700 rounded-md" data-test="delete-member">
-            ${Trash}
-          </button>
-        `
-      }
-      return `<div class="flex items-center justify-end space-x-2">${buttons}</div>`
-    },
+    actions: computed(() => [
+      {
+        icon: IconWrench,
+        onClick: (member: ExtendedOrganizationMember) => {
+          if (canEdit(member))
+            changeMemberPermission(member)
+          else
+            toast.error(t('no-permission'))
+        },
+      },
+      {
+        icon: IconTrash,
+        onClick: (member: ExtendedOrganizationMember) => {
+          if (canDelete(member))
+            deleteMember(member)
+          else
+            toast.error(t('no-permission'))
+        },
+      },
+    ]).value,
   },
 ]
-
-// Expose functions to window object
-if (typeof window !== 'undefined') {
-  window.changeMemberPermission = (member: ExtendedOrganizationMember) => {
-    changeMemberPermission(member)
-  }
-  window.deleteMember = (member: ExtendedOrganizationMember) => {
-    deleteMember(member)
-  }
-}
 
 async function reloadData() {
   isLoading.value = true
@@ -322,6 +306,20 @@ async function deleteMember(member: ExtendedOrganizationMember) {
 
   isLoading.value = true
   try {
+    // if member.aid is the one who created the org, we need to update it to the current user
+    if (member.uid === currentOrganization.value?.created_by) {
+      // update the org to have the current user as created_by
+      const { error } = await supabase
+        .from('orgs')
+        .update({ created_by: main.user?.id })
+        .eq('id', currentOrganization.value?.gid)
+      if (error) {
+        console.error('Error updating owner: ', error)
+        toast.error(`${t('cannot-update-owner')}: ${error.message}`)
+        return
+      }
+    }
+
     const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
     if (error) {
       console.error('Error deleting member: ', error)
@@ -416,23 +414,17 @@ function isSuperAdmin() {
 function canDelete(member: ExtendedOrganizationMember) {
   const role = organizationStore.currentRole
   const currentUserId = main.user?.id
-  const ownerId = currentOrganization?.value?.created_by
-  if (!role || !currentUserId || !ownerId)
+  if (!role || !currentUserId)
     return false
 
   const isSelf = member.uid === currentUserId
-  const isOwner = member.uid === ownerId
-
-  if (isOwner)
-    return false
 
   if (isSelf)
     return true
 
-  const currentUserIsOwner = currentUserId === ownerId
   const currentUserIsAdmin = role === 'admin' || role === 'super_admin'
 
-  return currentUserIsOwner || currentUserIsAdmin
+  return currentUserIsAdmin
 }
 </script>
 

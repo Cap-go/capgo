@@ -4,7 +4,7 @@ import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconTrash from '~icons/heroicons/trash?raw'
@@ -311,9 +311,6 @@ async function openOneVersion(one: Element) {
 async function openOne(one: Element) {
   router.push(`/app/p/${appIdToUrl(props.appId)}/channel/${one.id}`)
 }
-onMounted(async () => {
-  await refreshData()
-})
 watch(props, async () => {
   await refreshData()
 })

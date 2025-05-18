@@ -639,6 +639,19 @@ function redirectToAppSettings() {
           </template>
         </div>
       </div>
+      <div
+        v-if="channel && ActiveTab === 'history'"
+        class="flex flex-col"
+      >
+        <div
+          class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
+        >
+          <HistoryTable
+            :channel-id="id"
+            :app-id="channel.app_id"
+          />
+        </div>
+      </div>
     </div>
     <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
       <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
@@ -651,19 +664,6 @@ function redirectToAppSettings() {
       <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
         {{ t('back-to-channels') }}
       </button>
-    </div>
-    <div
-      v-if="channel && ActiveTab === 'history'"
-      class="flex flex-col"
-    >
-      <div
-        class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800"
-      >
-        <HistoryTable
-          :channel-id="id"
-          :app-id="channel.app_id"
-        />
-      </div>
     </div>
   </div>
 </template>

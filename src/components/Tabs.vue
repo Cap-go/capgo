@@ -22,12 +22,12 @@ function activeTabColor(tab: string) {
 
 <template>
   <div>
-    <div class="bg-gray-100 dark:bg-gray-800/90">
+    <div class="bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
       <ul class="flex -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400" :class="{ 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar': noWrap }">
         <li v-for="(tab, i) in tabs" :key="i" class="mr-2">
           <button class="block p-2 text-gray-500 group md:inline-flex md:p-4 cursor-pointer" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
             <component :is="tab.icon" class="mx-auto h-5 w-5 transition-all duration-100 md:mr-2 md:-ml-0.5" :class="{ 'group-hover:dark:text-gray-300 group-hover:text-gray-600': props.activeTab !== tab.key, 'text-blue-600': props.activeTab === tab.key }" />
-            <span class="text-xs md:font-md transition-all duration-100 first-letter:uppercase" :class="{ 'group-hover:dark:text-gray-300 group-hover:text-gray-600': props.activeTab !== tab.key, 'text-blue-600': props.activeTab === tab.key }">{{ t(tab.label) }}</span>
+            <span class="text-xs hidden md:block font-md transition-all duration-100 first-letter:uppercase" :class="{ 'group-hover:dark:text-gray-300 group-hover:text-gray-600': props.activeTab !== tab.key, 'text-blue-600': props.activeTab === tab.key }">{{ t(tab.label) }}</span>
           </button>
         </li>
       </ul>
