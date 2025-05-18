@@ -6,6 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconRedirect from '~icons/heroicons/arrow-right-on-rectangle'
 import IconHistory from '~icons/heroicons/clock'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
@@ -23,6 +24,7 @@ import { useOrganizationStore } from '~/stores/organization'
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
   second_version: Database['public']['Tables']['app_versions']['Row']
+  app_id: Database['public']['Tables']['apps']['Row']
 }
 const router = useRouter()
 const displayStore = useDisplayStore()
@@ -244,8 +246,6 @@ async function getChannel() {
       .select(`
           id,
           name,
-          public,
-          owner_org,
           version (
             id,
             name,
@@ -257,7 +257,11 @@ async function getChannel() {
             comment
           ),
           created_at,
-          app_id,
+          app_id (
+            id,
+            default_channel_android,
+            default_channel_ios
+          ),
           allow_emulator,
           allow_dev,
           allow_device_self_set,
@@ -328,88 +332,6 @@ watchEffect(async () => {
   }
 })
 
-async function makeDefault(val = true) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-  const buttonMessage = channel.value?.ios && !channel.value.android
-    ? t('make-default-ios')
-    : channel.value?.android && !channel.value.ios
-      ? t('make-default-android')
-      : t('channel-make-now')
-
-  displayStore.dialogOption = {
-    header: t('are-u-sure'),
-    message: val ? t('confirm-public-desc') : t('making-this-channel-'),
-    buttons: [
-      {
-        text: val ? buttonMessage : t('make-normal'),
-        id: 'confirm-button',
-        handler: async () => {
-          if (!channel.value || !id.value)
-            return
-          const { error } = await supabase
-            .from('channels')
-            .update({ public: val })
-            .eq('id', id.value)
-
-          // This code is here because the backend has a 20 second delay between setting a channel to public
-          // and the backend changing other channels to be not public
-          // In these 20 seconds the updates are broken
-          if (val && channel.value.ios) {
-            const { error: iosError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('ios', true)
-              .neq('id', channel.value.id)
-            const { error: hiddenError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', false)
-              .eq('ios', false)
-            if (iosError || hiddenError)
-              console.log('error', iosError || hiddenError)
-          }
-
-          if (val && channel.value.android) {
-            const { error: androidError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', true)
-              .neq('id', channel.value.id)
-            const { error: hiddenError } = await supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', channel.value.app_id)
-              .eq('android', false)
-              .eq('ios', false)
-            if (androidError || hiddenError)
-              console.log('error', androidError || hiddenError)
-          }
-
-          if (error) {
-            console.error(error)
-          }
-          else {
-            channel.value.public = val
-            toast.success(val ? t('defined-as-public') : t('defined-as-private'))
-          }
-        },
-      },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-    ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
-}
-
 async function getUnknownVersion(): Promise<number> {
   if (!channel.value)
     return 0
@@ -417,7 +339,7 @@ async function getUnknownVersion(): Promise<number> {
     const { data, error } = await supabase
       .from('app_versions')
       .select('id, app_id, name')
-      .eq('app_id', channel.value.version.app_id)
+      .eq('app_id', channel.value.app_id.app_id)
       .eq('name', 'unknown')
       .single()
     if (error) {
@@ -566,6 +488,12 @@ function openSelectVersion() {
   }
   displayStore.showBundleLinkDialogChannel = channel.value as any // YOLO, if this doesn't work, we don't care
 }
+
+function redirectToAppSettings() {
+  if (!channel.value)
+    return
+  router.push(`/app/p/${appIdToUrl(packageId.value)}/settings`)
+}
 </script>
 
 <template>
@@ -615,10 +543,12 @@ function openSelectVersion() {
               {{ channel.version.comment }}
             </InfoRow>
             <InfoRow :label="t('channel-is-public')">
-              <Toggle
-                :value="channel?.public"
-                @change="() => (makeDefault(!channel?.public))"
-              />
+              <div class="flex items-center flex-row gap-2">
+                {{ (channel.app_id.default_channel_android || channel.app_id.default_channel_ios) === id ? t('yes') : t('no') }}
+                <button @click="redirectToAppSettings()">
+                  <IconRedirect class="w-6 h-6 text-[#3B82F6]" />
+                </button>
+              </div>
             </InfoRow>
             <InfoRow label="iOS">
               <Toggle
