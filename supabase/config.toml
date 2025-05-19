@@ -292,6 +292,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 # PUBLIC ENDPOINTS
 
+[functions.queue_consumer]
+verify_jwt = false
+
 [functions.ok]
 verify_jwt = false
 
