@@ -5,6 +5,13 @@ export function cloudlog(message: any) {
     console.log(message)
   }
   else {
-    console.log(...message)
+    if (typeof message === 'object' && message !== null) {
+      const entries = Object.entries(message)
+      const logArgs = entries.flatMap(([key, value]) => [key, value])
+      console.log(...logArgs)
+    }
+    else {
+      console.log(message)
+    }
   }
 }
