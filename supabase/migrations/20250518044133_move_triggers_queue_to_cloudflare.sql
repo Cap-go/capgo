@@ -13,7 +13,11 @@ SELECT cron.unschedule('process_version_delete_queue');
 SELECT cron.unschedule('process_version_update_queue');
 SELECT cron.unschedule('process_app_delete_queue');
 
--- Create or replace the process_queue_remote function
+DROP FUNCTION public.process_function_queue(queue_name text);
+DROP FUNCTION "public"."edit_request_id"(queue_name text, msg_id bigint, new_request_id bigint);
+DROP FUNCTION "public"."decrement_read_ct"(queue_name text, msg_id bigint);
+
+-- Create or replace the process_function_queue function
 CREATE OR REPLACE FUNCTION public.process_function_queue(queue_name text)
 RETURNS bigint
 LANGUAGE plpgsql
@@ -41,22 +45,22 @@ END;
 $$;
 
 -- -- Make the function private to service_role
--- ALTER FUNCTION public.process_queue_remote(queue_name text) OWNER TO postgres;
--- REVOKE ALL ON FUNCTION public.process_queue_remote(queue_name text) FROM PUBLIC;
--- GRANT ALL ON FUNCTION public.process_queue_remote(queue_name text) TO service_role;
+ALTER FUNCTION public.process_function_queue(queue_name text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.process_function_queue(queue_name text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.process_function_queue(queue_name text) TO service_role;
 
--- Reschedule each queue to run every 10 seconds using process_queue_remote
--- SELECT cron.schedule('process_cron_email_queue', '10 seconds', $$SELECT public.process_queue_remote('cron_email_queue')$$);
--- SELECT cron.schedule('process_cron_stats_queue', '10 seconds', $$SELECT public.process_queue_remote('cron_stats_queue')$$);
--- SELECT cron.schedule('process_cron_plan_queue', '10 seconds', $$SELECT public.process_queue_remote('cron_plan_queue')$$);
--- SELECT cron.schedule('process_cron_clear_versions_queue', '10 seconds', $$SELECT public.process_queue_remote('cron_clear_versions_queue')$$);
--- SELECT cron.schedule('process_app_events_queue', '10 seconds', $$SELECT public.process_queue_remote('app_events_queue')$$);
--- SELECT cron.schedule('process_channel_update_queue', '10 seconds', $$SELECT public.process_queue_remote('channel_update_queue')$$);
--- SELECT cron.schedule('process_organization_create_queue', '10 seconds', $$SELECT public.process_queue_remote('organization_create_queue')$$);
--- SELECT cron.schedule('process_organization_delete_queue', '10 seconds', $$SELECT public.process_queue_remote('organization_delete_queue')$$);
--- SELECT cron.schedule('process_user_create_queue', '10 seconds', $$SELECT public.process_queue_remote('user_create_queue')$$);
--- SELECT cron.schedule('process_user_update_queue', '10 seconds', $$SELECT public.process_queue_remote('user_update_queue')$$);
--- SELECT cron.schedule('process_version_create_queue', '10 seconds', $$SELECT public.process_queue_remote('version_create_queue')$$);
--- SELECT cron.schedule('process_version_delete_queue', '10 seconds', $$SELECT public.process_queue_remote('version_delete_queue')$$);
--- SELECT cron.schedule('process_version_update_queue', '10 seconds', $$SELECT public.process_queue_remote('version_update_queue')$$);
--- SELECT cron.schedule('process_app_delete_queue', '10 seconds', $$SELECT public.process_queue_remote('app_delete_queue')$$);
+-- Reschedule each queue to run every 10 seconds using process_function_queue
+SELECT cron.schedule('process_cron_email_queue', '10 seconds', $$SELECT public.process_function_queue('cron_email_queue')$$);
+SELECT cron.schedule('process_cron_stats_queue', '10 seconds', $$SELECT public.process_function_queue('cron_stats_queue')$$);
+SELECT cron.schedule('process_cron_plan_queue', '10 seconds', $$SELECT public.process_function_queue('cron_plan_queue')$$);
+SELECT cron.schedule('process_cron_clear_versions_queue', '10 seconds', $$SELECT public.process_function_queue('cron_clear_versions_queue')$$);
+SELECT cron.schedule('process_app_events_queue', '10 seconds', $$SELECT public.process_function_queue('app_events_queue')$$);
+SELECT cron.schedule('process_channel_update_queue', '10 seconds', $$SELECT public.process_function_queue('channel_update_queue')$$);
+SELECT cron.schedule('process_organization_create_queue', '10 seconds', $$SELECT public.process_function_queue('organization_create_queue')$$);
+SELECT cron.schedule('process_organization_delete_queue', '10 seconds', $$SELECT public.process_function_queue('organization_delete_queue')$$);
+SELECT cron.schedule('process_user_create_queue', '10 seconds', $$SELECT public.process_function_queue('user_create_queue')$$);
+SELECT cron.schedule('process_user_update_queue', '10 seconds', $$SELECT public.process_function_queue('user_update_queue')$$);
+SELECT cron.schedule('process_version_create_queue', '10 seconds', $$SELECT public.process_function_queue('version_create_queue')$$);
+SELECT cron.schedule('process_version_delete_queue', '10 seconds', $$SELECT public.process_function_queue('version_delete_queue')$$);
+SELECT cron.schedule('process_version_update_queue', '10 seconds', $$SELECT public.process_function_queue('version_update_queue')$$);
+SELECT cron.schedule('process_app_delete_queue', '10 seconds', $$SELECT public.process_function_queue('app_delete_queue')$$);

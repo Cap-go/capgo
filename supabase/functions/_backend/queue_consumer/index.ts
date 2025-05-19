@@ -1,6 +1,5 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { timingSafeEqual } from 'hono/utils/buffer'
 // --- Worker logic imports ---
 import { z } from 'zod'
 import { middlewareAPISecret } from '../utils/hono.ts'
@@ -9,7 +8,7 @@ import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
-const BATCH_SIZE = 200 // Batch size for queue reads
+const BATCH_SIZE = 950 // Batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 
 // Zod schema for a message object
 export const messageSchema = z.object({
@@ -80,7 +79,7 @@ async function processQueue(sql: any, queueName: string, envGetters: any) {
 
 // Reads messages from the queue and logs them
 async function readQueue(sql: any, queueName: string) {
-  const queueKey = 'replicate_data'
+  const queueKey = 'readQueue'
   const startTime = Date.now()
   console.log(`[${queueKey}] Starting queue read at ${startTime}.`)
 
@@ -121,44 +120,6 @@ async function readQueue(sql: any, queueName: string) {
   }
 }
 
-// Helper to get the Netlify function URL from the environment
-function get_netlify_function_url(envGetters: any): string {
-  const url = envGetters('NETLIFY_FUNCTION_URL')
-  if (!url)
-    throw new Error('NETLIFY_FUNCTION_URL not set in environment')
-  return url
-}
-
-// Helper to get the API secret from the environment
-function get_apikey(envGetters: any): string {
-  const key = envGetters('APISECRET')
-  if (!key)
-    throw new Error('APISECRET not set in environment')
-  return key
-}
-
-// Add other get_*_function_url helpers as needed, or use stubs for now
-function get_cloudflare_function_url(envGetters: any): string {
-  const url = envGetters('CLOUDFLARE_FUNCTION_URL')
-  if (!url)
-    throw new Error('CLOUDFLARE_FUNCTION_URL not set in environment')
-  return url
-}
-
-function get_cloudflare_pp_function_url(envGetters: any): string {
-  const url = envGetters('CLOUDFLARE_PP_FUNCTION_URL')
-  if (!url)
-    throw new Error('CLOUDFLARE_PP_FUNCTION_URL not set in environment')
-  return url
-}
-
-function get_db_url(envGetters: any): string {
-  const url = envGetters('DB_URL')
-  if (!url)
-    throw new Error('DB_URL not set in environment')
-  return url
-}
-
 // The main HTTP POST helper function
 export async function http_post_helper(
   envGetters: any,
@@ -168,23 +129,21 @@ export async function http_post_helper(
 ): Promise<Response> {
   const headers = {
     'Content-Type': 'application/json',
-    'apisecret': get_apikey(envGetters),
+    'apisecret': envGetters('API_SECRET'),
   }
 
   let url: string
-  switch (function_type) {
-    case 'netlify':
-      url = `${get_netlify_function_url(envGetters)}/triggers/${function_name}`
-      break
-    case 'cloudflare':
-      url = `${get_cloudflare_function_url(envGetters)}/triggers/${function_name}`
-      break
-    case 'cloudflare_pp':
-      url = `${get_cloudflare_pp_function_url(envGetters)}/triggers/${function_name}`
-      break
-    default:
-      url = `${get_db_url(envGetters)}/functions/v1/triggers/${function_name}`
-      break
+  if (function_type === 'cloudflare_pp' && envGetters('CLOUDFLARE_PP_FUNCTION_URL')) {
+    url = `${envGetters('CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
+  }
+  else if (function_type === 'cloudflare' && envGetters('CLOUDFLARE_FUNCTION_URL')) {
+    url = `${envGetters('CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
+  }
+  else if (function_type === 'netlify' && envGetters('NETLIFY_FUNCTION_URL')) {
+    url = `${envGetters('NETLIFY_FUNCTION_URL')}/triggers/${function_name}`
+  }
+  else {
+    url = `${envGetters('SUPABASE_URL')}/functions/v1/triggers/${function_name}`
   }
 
   // Create an AbortController for timeout
