@@ -1,6 +1,5 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { timingSafeEqual } from 'hono/utils/buffer'
 // --- Worker logic imports ---
 import { z } from 'zod'
 import { middlewareAPISecret } from '../utils/hono.ts'

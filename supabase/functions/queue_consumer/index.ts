@@ -6,15 +6,14 @@ import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app as queue_consumer } from '../_backend/queue_consumer/index.ts'
 
-
 const functionName = 'queue_consumer'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
 
 const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
 if (sentryDsn) {
-    appGlobal.use('*', sentry({
-        dsn: sentryDsn,
-    }))
+  appGlobal.use('*', sentry({
+    dsn: sentryDsn,
+  }))
 }
 
 appGlobal.use('*', logger())
