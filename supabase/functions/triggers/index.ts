@@ -14,6 +14,7 @@ import { app as logsnag_insights } from '../_backend/triggers/logsnag_insights.t
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../_backend/triggers/on_app_delete.ts'
 import { app as on_channel_update } from '../_backend/triggers/on_channel_update.ts'
+import { app as on_deploy_history_create } from '../_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../_backend/triggers/on_manifest_create.ts'
 import { app as on_organization_create } from '../_backend/triggers/on_organization_create.ts'
 import { app as on_organization_delete } from '../_backend/triggers/on_organization_delete.ts'
@@ -58,5 +59,6 @@ appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
+appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 
 Deno.serve(appGlobal.fetch)

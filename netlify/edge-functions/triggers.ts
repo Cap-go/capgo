@@ -13,6 +13,7 @@ import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cro
 import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
+import { app as on_deploy_history_create } from '../../supabase/functions/_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../../supabase/functions/_backend/triggers/on_user_delete.ts'
@@ -50,5 +51,6 @@ appGlobal.route('/on_manifest_create', on_manifest_create)
 appGlobal.route('/stripe_event', stripe_event)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
+appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 
 export default handle(appGlobal as any)

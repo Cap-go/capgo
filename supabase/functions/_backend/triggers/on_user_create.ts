@@ -22,9 +22,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     }
     const record = body.record
     console.log({ requestId: c.get('requestId'), message: 'record', record })
-    await Promise.all([
-      createApiKey(c as any, record.id),
-    ])
+    await createApiKey(c as any, record.id)
     console.log({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
     if (record.customer_id)
       return c.json(BRES)

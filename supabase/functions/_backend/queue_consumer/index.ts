@@ -1,10 +1,11 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
 import { z } from 'zod'
+import { sendDiscordAlert } from '../utils/discord.ts'
 import { middlewareAPISecret } from '../utils/hono.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
-
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
@@ -23,7 +24,7 @@ export const messageSchema = z.object({
 
 export const messagesArraySchema = z.array(messageSchema)
 
-async function processQueue(sql: any, queueName: string, envGetters: any) {
+async function processQueue(c: Context, sql: any, queueName: string) {
   try {
     const messages = await readQueue(sql, queueName)
 
@@ -50,7 +51,7 @@ async function processQueue(sql: any, queueName: string, envGetters: any) {
       const function_name = message.message.function_name
       const function_type = message.message.function_type
       const body = message.message.payload
-      const httpResponse = await http_post_helper(envGetters, function_name, function_type, body)
+      const httpResponse = await http_post_helper(c as any, function_name, function_type, body)
 
       return {
         httpResponse,
@@ -59,10 +60,33 @@ async function processQueue(sql: any, queueName: string, envGetters: any) {
     }))
 
     // Batch remove all messages that have succeeded
-    const successMessages = results.filter(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
+    // const successMessages = results.filter(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
+    const [successMessages, messagesFailed] = results.reduce((acc, result) => {
+      acc[(result.httpResponse.status >= 200 && result.httpResponse.status < 300) ? 0 : 1].push(result)
+      return acc
+    }, [[], []] as [typeof results, typeof results])
     if (successMessages.length > 0) {
       console.log(`[${queueName}] Deleting ${successMessages.length} successful messages from queue.`)
       await delete_queue_message_batch(sql, queueName, successMessages.map(msg => msg.msg_id))
+    }
+    if (messagesFailed.length > 0) {
+      console.log(`[${queueName}] Failed to process ${messagesFailed.length} messages.`)
+      await sendDiscordAlert(c as any, {
+        content: `Queue: ${queueName}`,
+        embeds: [
+          {
+            title: `Failed to process ${messagesFailed.length} messages.`,
+            description: `Queue: ${queueName}`,
+            fields: [
+              {
+                name: 'Messages',
+                value: messagesFailed.map(msg => msg.message.function_name).join(', '),
+              },
+            ],
+          },
+        ],
+      })
+      // set visibility timeout to random number to prevent Auto DDOS
     }
 
     if (successMessages.length !== messagesToProcess.length) {
@@ -122,33 +146,34 @@ async function readQueue(sql: any, queueName: string) {
 
 // The main HTTP POST helper function
 export async function http_post_helper(
-  envGetters: any,
+  c: Context,
   function_name: string,
   function_type: string | null | undefined,
   body: any,
 ): Promise<Response> {
   const headers = {
     'Content-Type': 'application/json',
-    'apisecret': envGetters('API_SECRET'),
+    'apisecret': getEnv(c as any, 'API_SECRET'),
   }
 
   let url: string
-  if (function_type === 'cloudflare_pp' && envGetters('CLOUDFLARE_PP_FUNCTION_URL')) {
-    url = `${envGetters('CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
+  if (function_type === 'cloudflare_pp' && getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')) {
+    url = `${getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
   }
-  else if (function_type === 'cloudflare' && envGetters('CLOUDFLARE_FUNCTION_URL')) {
-    url = `${envGetters('CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
+  else if (function_type === 'cloudflare' && getEnv(c as any, 'CLOUDFLARE_FUNCTION_URL')) {
+    url = `${getEnv(c as any, 'CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
   }
-  else if (function_type === 'netlify' && envGetters('NETLIFY_FUNCTION_URL')) {
-    url = `${envGetters('NETLIFY_FUNCTION_URL')}/triggers/${function_name}`
+  else if (function_type === 'netlify' && getEnv(c as any, 'NETLIFY_FUNCTION_URL')) {
+    url = `${getEnv(c as any, 'NETLIFY_FUNCTION_URL')}/triggers/${function_name}`
   }
   else {
-    url = `${envGetters('SUPABASE_URL')}/functions/v1/triggers/${function_name}`
+    url = `${getEnv(c as any, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
   }
 
   // Create an AbortController for timeout
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+  // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
 
   try {
     const response = await fetch(url, {
@@ -233,7 +258,7 @@ app.post('/sync', async (c) => {
       let sql: ReturnType<typeof getPgClient> | null = null
       try {
         sql = getPgClient(c as any)
-        await processQueue(sql, queueName, (key: string) => getEnv(c as any, key))
+        await processQueue(c as any, sql, queueName)
         console.log(`[Background Queue Sync] Background execution finished successfully.`)
       }
       finally {

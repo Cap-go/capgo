@@ -48,6 +48,7 @@ BEGIN
   END IF;
 END;
 $$;
+
 ALTER FUNCTION "public"."process_d1_replication_batch"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."process_d1_replication_batch"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."process_d1_replication_batch"() TO "service_role";
