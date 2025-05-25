@@ -473,43 +473,72 @@ Requires:
   - pg_tle: https://github.com/aws/pg_tle
   - pgsql-http: https://github.com/pramsey/pgsql-http
 -- */
-create extension if not exists http with schema extensions;
-create extension if not exists pg_tle;
-drop extension if exists "supabase-dbdev";
-select pgtle.uninstall_extension_if_exists('supabase-dbdev');
-select
-    pgtle.install_extension(
-        'supabase-dbdev',
-        resp.contents ->> 'version',
-        'PostgreSQL package manager',
-        resp.contents ->> 'sql'
-    )
-from http(
-    (
-        'GET',
-        'https://api.database.dev/rest/v1/'
-        || 'package_versions?select=sql,version'
-        || '&package_name=eq.supabase-dbdev'
-        || '&order=version.desc'
-        || '&limit=1',
-        array[
-            ('apiKey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyYndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzIsImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJrzM0AQKsu_5k134s')::http_header
-        ],
-        null,
-        null
-    )
-) x,
-lateral (
-    select
-        ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
-) resp(contents);
-create extension "supabase-dbdev";
-select dbdev.install('supabase-dbdev');
-drop extension if exists "supabase-dbdev";
-create extension "supabase-dbdev";
 
-select dbdev.install('basejump-supabase_test_helpers');
+DO $$
+BEGIN
+    -- Only attempt dbdev installation if extensions are available
+    IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'http') AND 
+       EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_tle') THEN
+        
+        BEGIN
+            create extension if not exists http with schema extensions;
+            create extension if not exists pg_tle;
+            drop extension if exists "supabase-dbdev";
+            
+            PERFORM pgtle.uninstall_extension_if_exists('supabase-dbdev');
+            
+            PERFORM pgtle.install_extension(
+                'supabase-dbdev',
+                resp.contents ->> 'version',
+                'PostgreSQL package manager',
+                resp.contents ->> 'sql'
+            )
+            from http(
+                (
+                    'GET',
+                    'https://api.database.dev/rest/v1/'
+                    || 'package_versions?select=sql,version'
+                    || '&package_name=eq.supabase-dbdev'
+                    || '&order=version.desc'
+                    || '&limit=1',
+                    array[
+                        ('apiKey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdXB0cHBsZnZpaWZyYndtbXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODAxMDczNzIsImV4cCI6MTk5NTY4MzM3Mn0.z2CN0mvO2No8wSi46Gw59DFGCTJrzM0AQKsu_5k134s')::http_header
+                    ],
+                    null,
+                    null
+                )
+            ) x,
+            lateral (
+                select
+                    ((row_to_json(x) -> 'content') #>> '{}')::json -> 0
+            ) resp(contents);
+            
+            create extension if not exists "supabase-dbdev";
+            
+            -- Check if dbdev schema exists before using it
+            IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'dbdev') THEN
+                PERFORM dbdev.install('supabase-dbdev');
+                drop extension if exists "supabase-dbdev";
+                create extension "supabase-dbdev";
+                PERFORM dbdev.install('basejump-supabase_test_helpers');
+            END IF;
+            
+        EXCEPTION WHEN OTHERS THEN
+            -- Log the error but continue with seed data
+            RAISE NOTICE 'dbdev installation failed: %', SQLERRM;
+        END;
+    ELSE
+        RAISE NOTICE 'Required extensions (http, pg_tle) not available for dbdev installation';
+    END IF;
+END $$;
 
 -- Seed data
--- select reset_and_seed_data();
--- select reset_and_seed_stats_data();
+DO $$
+BEGIN
+    -- Execute seeding functions
+    PERFORM reset_and_seed_data();
+    PERFORM reset_and_seed_stats_data();
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Seeding failed: %', SQLERRM;
+    RAISE;
+END $$;

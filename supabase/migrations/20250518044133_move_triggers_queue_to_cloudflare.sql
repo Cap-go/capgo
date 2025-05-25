@@ -93,18 +93,18 @@ SELECT cron.schedule('process_version_update_queue', '10 seconds', $$SELECT publ
 SELECT cron.schedule('process_app_delete_queue', '10 seconds', $$SELECT public.process_function_queue('on_app_delete')$$);
 
 
-SELECT cron.schedule('process_cron_plan_queue', '2 hours', $$SELECT public.process_function_queue('cron_plan_queue')$$);
-SELECT cron.schedule('process_admin_stats', '2 hours', $$SELECT public.process_function_queue('admin_stats')$$);
-SELECT cron.schedule('process_cron_clear_versions_queue', '2 hours', $$SELECT public.process_function_queue('cron_clear_versions_queue')$$);
-SELECT cron.schedule('process_cron_email_queue', '2 hours', $$SELECT public.process_function_queue('cron_email_queue')$$);
-SELECT cron.schedule('process_app_create_queue', '2 hours', $$SELECT public.process_function_queue('on_app_create')$$);
-SELECT cron.schedule('process_version_create_queue', '2 hours', $$SELECT public.process_function_queue('on_version_create')$$);
-SELECT cron.schedule('process_organization_create_queue', '2 hours', $$SELECT public.process_function_queue('on_organization_create')$$);
-SELECT cron.schedule('process_organization_delete_queue', '2 hours', $$SELECT public.process_function_queue('on_organization_delete')$$);
+SELECT cron.schedule('process_cron_plan_queue', '0 */2 * * *', $$SELECT public.process_function_queue('cron_plan_queue')$$);
+SELECT cron.schedule('process_admin_stats', '0 */2 * * *', $$SELECT public.process_function_queue('admin_stats')$$);
+SELECT cron.schedule('process_cron_clear_versions_queue', '0 */2 * * *', $$SELECT public.process_function_queue('cron_clear_versions_queue')$$);
+SELECT cron.schedule('process_cron_email_queue', '0 */2 * * *', $$SELECT public.process_function_queue('cron_email_queue')$$);
+SELECT cron.schedule('process_app_create_queue', '0 */2 * * *', $$SELECT public.process_function_queue('on_app_create')$$);
+SELECT cron.schedule('process_version_create_queue', '0 */2 * * *', $$SELECT public.process_function_queue('on_version_create')$$);
+SELECT cron.schedule('process_organization_create_queue', '0 */2 * * *', $$SELECT public.process_function_queue('on_organization_create')$$);
+SELECT cron.schedule('process_organization_delete_queue', '0 */2 * * *', $$SELECT public.process_function_queue('on_organization_delete')$$);
 
 -- new queue for deploy history create
 SELECT pgmq.create('on_deploy_history_create');
-SELECT cron.schedule('process_deploy_history_create_queue', '2 hours', $$SELECT public.process_function_queue('on_deploy_history_create')$$);
+SELECT cron.schedule('process_deploy_history_create_queue', '0 */2 * * *', $$SELECT public.process_function_queue('on_deploy_history_create')$$);
 
 
 
