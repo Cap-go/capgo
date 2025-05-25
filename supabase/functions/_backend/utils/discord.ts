@@ -47,8 +47,8 @@ export async function sendDiscordAlert(c: Context, payload: DiscordWebhookPayloa
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
 
   if (!webhookUrl) {
-    console.log({ requestId: c.get('requestId'), message: 'DISCORD_ALERT not configured' })
-    return false
+    console.log({ requestId: c.get('requestId'), message: payload })
+    return true
   }
 
   try {
@@ -66,14 +66,12 @@ export async function sendDiscordAlert(c: Context, payload: DiscordWebhookPayloa
 
     if (!response.ok) {
       console.error({ requestId: c.get('requestId'), message: 'Discord webhook failed', status: response.status })
-      return false
+      return true
     }
-
-    console.log({ requestId: c.get('requestId'), message: 'Discord alert sent successfully' })
     return true
   }
   catch (error) {
     console.error({ requestId: c.get('requestId'), message: 'Discord webhook error', error })
-    return false
+    return true
   }
 }

@@ -542,3 +542,6 @@ EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Seeding failed: %', SQLERRM;
     RAISE;
 END $$;
+
+-- We create a test queue to test the queue consumer
+SELECT pgmq.create('test_queue_consumer');

@@ -24,7 +24,9 @@ import { app as on_user_update } from '../_backend/triggers/on_user_update.ts'
 import { app as on_version_create } from '../_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
+import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
+import { BRES } from '../_backend/utils/hono.ts'
 
 const functionName = 'triggers'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
@@ -39,6 +41,12 @@ if (sentryDsn) {
 appGlobal.use('*', logger())
 appGlobal.use('*', requestId())
 
+appGlobal.post('/ok', (c) => {
+  return c.json(BRES)
+})
+appGlobal.post('/ko', (c) => {
+  return c.json({ status: 'KO' }, 500)
+})
 appGlobal.route('/clear_app_cache', clear_app_cache)
 appGlobal.route('/clear_device_cache', clear_device_cache)
 appGlobal.route('/cron_email', cron_email)
@@ -60,5 +68,6 @@ appGlobal.route('/cron_plan', cron_plan)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
+appGlobal.route('/queue_consumer', queue_consumer)
 
 Deno.serve(appGlobal.fetch)

@@ -28,21 +28,42 @@ DECLARE
   request_id text;
   headers jsonb;
   url text;
+  queue_size bigint;
+  queue_table_name text;
+  calls_needed int;
+  i int;
 BEGIN
-  headers := jsonb_build_object(
-    'Content-Type', 'application/json',
-    'apisecret', get_apikey()
-  );
-  url := get_db_url() || '/functions/v1/queue_consumer/sync';
+  -- Construct the queue table name
+  queue_table_name := 'pgmq.q_' || queue_name;
+  
+  -- Check if the queue has elements
+  EXECUTE format('SELECT count(*) FROM %I', queue_table_name) INTO queue_size;
+  
+  -- Only make the HTTP request if the queue is not empty
+  IF queue_size > 0 THEN
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apisecret', get_apikey()
+    );
+    url := get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
 
-  -- Make an async HTTP POST request using pg_net
-  SELECT INTO request_id net.http_post(
-    url := url,
-    headers := headers,
-    body := jsonb_build_object('queue_name', queue_name),
-    timeout_milliseconds := 15000
-  );
-  RETURN request_id;
+    -- Calculate how many times to call the sync endpoint (1 call per 1000 items, max 10 calls)
+    calls_needed := least(ceil(queue_size / 1000.0)::int, 10);
+
+    -- Call the endpoint multiple times if needed
+    FOR i IN 1..calls_needed LOOP
+      SELECT INTO request_id net.http_post(
+        url := url,
+        headers := headers,
+        body := jsonb_build_object('queue_name', queue_name),
+        timeout_milliseconds := 15000
+      );
+    END LOOP;
+    
+    RETURN request_id;
+  END IF;
+  
+  RETURN NULL;
 END;
 $$;
 

@@ -24,7 +24,7 @@ export const messageSchema = z.object({
 
 export const messagesArraySchema = z.array(messageSchema)
 
-async function processQueue(c: Context, sql: any, queueName: string) {
+async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
   try {
     const messages = await readQueue(sql, queueName)
 
@@ -102,7 +102,7 @@ async function processQueue(c: Context, sql: any, queueName: string) {
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(sql: any, queueName: string) {
+async function readQueue(sql: ReturnType<typeof getPgClient>, queueName: string) {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   console.log(`[${queueKey}] Starting queue read at ${startTime}.`)
@@ -194,7 +194,7 @@ export async function http_post_helper(
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
-async function delete_queue_message_batch(sql: any, queueName: string, msgIds: number[]) {
+async function delete_queue_message_batch(sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
@@ -209,7 +209,7 @@ async function delete_queue_message_batch(sql: any, queueName: string, msgIds: n
 }
 
 // Helper function to archive multiple messages from the queue in a single batch
-async function archive_queue_messages(sql: any, queueName: string, msgIds: number[]) {
+async function archive_queue_messages(sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return

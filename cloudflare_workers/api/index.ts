@@ -46,6 +46,7 @@ import { app as on_user_update } from '../../supabase/functions/_backend/trigger
 import { app as on_version_create } from '../../supabase/functions/_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
+import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 
 const app = new Hono<MiddlewareKeyVariables>()
@@ -105,6 +106,7 @@ appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)
 appTriggers.route('/cron_plan', cron_plan)
+appTriggers.route('/queue_consumer', queue_consumer)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
