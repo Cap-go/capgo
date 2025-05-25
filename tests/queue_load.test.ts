@@ -35,7 +35,7 @@ describe('queue Load Test', () => {
     const validResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
       method: 'POST',
       headers: headersInternal,
-      body: JSON.stringify({ queue_name: 'on_version_delete' }),
+      body: JSON.stringify({ queue_name: queueName }),
     })
 
     expect(validResponse.status).toBe(202)
@@ -141,7 +141,7 @@ describe('queue Load Test', () => {
         fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
           method: 'POST',
           headers: headersInternal,
-          body: JSON.stringify({ queue_name: 'on_version_delete' }),
+          body: JSON.stringify({ queue_name: queueName }),
         }),
       )
     }
@@ -189,7 +189,7 @@ describe('queue Load Test', () => {
     const processResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
       method: 'POST',
       headers: headersInternal,
-      body: JSON.stringify({ queue_name: 'on_version_delete' }),
+      body: JSON.stringify({ queue_name: queueName }),
     })
 
     expect(processResponse.status).toBe(202)
@@ -225,7 +225,7 @@ describe('queue Load Test', () => {
     const deleteProcessResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
       method: 'POST',
       headers: headersInternal,
-      body: JSON.stringify({ queue_name: 'on_version_delete' }),
+      body: JSON.stringify({ queue_name: queueName }),
     })
 
     expect(deleteProcessResponse.status).toBe(202)
