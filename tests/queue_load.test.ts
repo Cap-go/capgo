@@ -89,7 +89,7 @@ describe('queue Load Test', () => {
       }
 
       // Use postgres client to call pgmq.send directly
-      await sql`SELECT pgmq.send(${queueName}, ${JSON.stringify(fakeMessage)})`
+      await sql`SELECT pgmq.send(${queueName}, ${sql.json(fakeMessage)})`
     }
 
     // Verify messages were added to queue
@@ -106,7 +106,7 @@ describe('queue Load Test', () => {
     expect(await response.text()).toBe('Queue read scheduled')
 
     // Wait for processing to complete
-    await new Promise(resolve => setTimeout(resolve, 10000))
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // Verify queue is empty after processing
     const [{ count: finalCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
@@ -127,7 +127,7 @@ describe('queue Load Test', () => {
         },
       }
 
-      await sql`SELECT pgmq.send(${queueName}, ${JSON.stringify(fakeMessage)})`
+      await sql`SELECT pgmq.send(${queueName}, ${sql.json(fakeMessage)})`
     }
 
     // Verify messages were added
