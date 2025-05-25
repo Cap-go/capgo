@@ -33,6 +33,8 @@ jobs:
           version: 2.22.12
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Set edge runtime policy to per_worker
+        run: sed -i 's/policy = "oneshot"/policy = "per_worker"/g' supabase/config.toml
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
       - name: Run Supabase Test DB
