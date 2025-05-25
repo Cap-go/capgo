@@ -18,7 +18,7 @@ export const messageSchema = z.object({
   message: z.object({
     payload: z.unknown(),
     function_name: z.string(),
-    function_type: z.enum(['netlify', 'cloudflare', 'cloudflare_pp']).nullable().optional(),
+    function_type: z.enum(['netlify', 'cloudflare', 'cloudflare_pp', '']).nullable().optional(),
   }),
 })
 
@@ -176,11 +176,12 @@ export async function http_post_helper(
   // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
 
   try {
+    console.log(`[${function_name}] Making HTTP POST request to "${url}" with body:`, body)
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: controller.signal,
+      // signal: controller.signal,
     })
     return response
   }

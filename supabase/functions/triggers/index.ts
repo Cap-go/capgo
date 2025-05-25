@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../_backend/utils/hono.ts'
 // Triggers API
 import { sentry } from '@hono/sentry'
+import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
@@ -70,4 +71,20 @@ appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
 
+appGlobal.all('*', (c) => {
+  console.log('all files', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
+})
+appGlobal.onError((e, c) => {
+  console.log('app onError', e)
+  c.get('sentry')?.captureException(e)
+  if (e instanceof HTTPException) {
+    console.log('HTTPException found', e.status)
+    if (e.status === 429) {
+      return c.json({ error: 'you are beeing rate limited' }, e.status)
+    }
+    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
+  }
+  return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
+})
 Deno.serve(appGlobal.fetch)

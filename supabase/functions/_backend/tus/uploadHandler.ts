@@ -107,9 +107,15 @@ export class UploadHandler {
     this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
     // this.router.all('*', c => c.notFound())
     this.router.onError((e, c) => {
-      console.log('in DO onError', e)
-      if (e instanceof HTTPException)
-        return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
+      console.log('app onError', e)
+      c.get('sentry')?.captureException(e)
+      if (e instanceof HTTPException) {
+        console.log('HTTPException found', e.status)
+        if (e.status === 429) {
+          return c.json({ error: 'you are beeing rate limited' }, e.status)
+        }
+        return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
+      }
       return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
     })
   }

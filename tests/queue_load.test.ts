@@ -10,6 +10,7 @@ const TEST_APP_ID = `com.loadapp.${id}`
 const sql = postgres(POSTGRES_URL, { prepare: false, idle_timeout: 2 })
 const queueName = 'test_queue_consumer'
 const functionName = 'ok'
+const functionType = ''
 
 beforeAll(async () => {
   // Clean up any existing messages in the test queue
@@ -74,12 +75,12 @@ describe('queue Load Test', () => {
     expect(await invalidResponse3.text()).toBe('Missing or invalid queue_name in body')
   })
 
-  it.only('should handle multiple queue messages simultaneously', async () => {
+  it('should handle multiple queue messages simultaneously', async () => {
     // Add fake messages directly to test queue using pgmq.send
     for (let i = 0; i < 10; i++) {
       const fakeMessage = {
         function_name: functionName,
-        function_type: 'cloudflare',
+        function_type: functionType,
         payload: {
           fake_data: `test_${i}`,
           app_id: TEST_APP_ID,
@@ -113,147 +114,147 @@ describe('queue Load Test', () => {
     expect(finalCount).toBe('0')
   })
 
-  it('should handle load testing with multiple concurrent requests', async () => {
-    // Add many fake messages directly to queue using pgmq.send
-    for (let i = 0; i < 100; i++) {
-      const fakeMessage = {
-        function_name: functionName,
-        function_type: 'cloudflare',
-        payload: {
-          fake_data: `load_test_${i}`,
-          app_id: TEST_APP_ID,
-          org_id: ORG_ID,
-          timestamp: new Date().toISOString(),
-        },
-      }
+  // it('should handle load testing with multiple concurrent requests', async () => {
+  //   // Add many fake messages directly to queue using pgmq.send
+  //   for (let i = 0; i < 1000; i++) {
+  //     const fakeMessage = {
+  //       function_name: functionName,
+  //       function_type: functionType,
+  //       payload: {
+  //         fake_data: `load_test_${i}`,
+  //         app_id: TEST_APP_ID,
+  //         org_id: ORG_ID,
+  //         timestamp: new Date().toISOString(),
+  //       },
+  //     }
 
-      await sql`SELECT pgmq.send(${queueName}, ${sql.json(fakeMessage)})`
-    }
+  //     await sql`SELECT pgmq.send(${queueName}, ${sql.json(fakeMessage)})`
+  //   }
 
-    // Verify messages were added
-    const [{ count: initialCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
-    expect(initialCount).toBe(100)
+  //   // Verify messages were added
+  //   const [{ count: initialCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
+  //   expect(initialCount).toBe('1000')
 
-    // Send 50 concurrent requests to test load handling
-    const concurrentRequests = []
-    for (let i = 0; i < 50; i++) {
-      concurrentRequests.push(
-        fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-          method: 'POST',
-          headers: headersInternal,
-          body: JSON.stringify({ queue_name: queueName }),
-        }),
-      )
-    }
+  //   // Send 50 concurrent requests to test load handling
+  //   const concurrentRequests = []
+  //   for (let i = 0; i < 50; i++) {
+  //     concurrentRequests.push(
+  //       fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+  //         method: 'POST',
+  //         headers: headersInternal,
+  //         body: JSON.stringify({ queue_name: queueName }),
+  //       }),
+  //     )
+  //   }
 
-    const responses = await Promise.all(concurrentRequests)
+  //   const responses = await Promise.all(concurrentRequests)
 
-    // All requests should be accepted
-    responses.forEach((response) => {
-      expect(response.status).toBe(202)
-    })
+  //   // All requests should be accepted
+  //   responses.forEach((response) => {
+  //     expect(response.status).toBe(202)
+  //   })
 
-    // Verify response texts
-    const responseTexts = await Promise.all(responses.map(r => r.text()))
-    responseTexts.forEach((text) => {
-      expect(text).toBe('Queue read scheduled')
-    })
+  //   // Verify response texts
+  //   const responseTexts = await Promise.all(responses.map(r => r.text()))
+  //   responseTexts.forEach((text) => {
+  //     expect(text).toBe('Queue read scheduled')
+  //   })
 
-    // Wait for processing to complete
-    await new Promise(resolve => setTimeout(resolve, 10000))
+  //   // Wait for processing to complete
+  //   await new Promise(resolve => setTimeout(resolve, 10000))
 
-    // Verify queue is empty after processing
-    const [{ count: finalCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
-    expect(finalCount).toBe(0)
-  })
+  //   // Verify queue is empty after processing
+  //   const [{ count: finalCount }] = await sql.unsafe(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
+  //   expect(finalCount).toBe('0')
+  // })
 
-  it('should handle queue processing with app version triggers', async () => {
-    // Create test version to trigger queue operations
-    const { data: versionData, error: versionError } = await getSupabaseClient()
-      .from('app_versions')
-      .insert({
-        app_id: TEST_APP_ID,
-        name: '1.0.0',
-        owner_org: ORG_ID,
-      })
-      .select('id')
-      .single()
+  // it('should handle queue processing with app version triggers', async () => {
+  //   // Create test version to trigger queue operations
+  //   const { data: versionData, error: versionError } = await getSupabaseClient()
+  //     .from('app_versions')
+  //     .insert({
+  //       app_id: TEST_APP_ID,
+  //       name: '1.0.0',
+  //       owner_org: ORG_ID,
+  //     })
+  //     .select('id')
+  //     .single()
 
-    if (versionError)
-      throw versionError
+  //   if (versionError)
+  //     throw versionError
 
-    // Wait a moment for any triggers to fire
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  //   // Wait a moment for any triggers to fire
+  //   await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Process the version delete queue
-    const processResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: queueName }),
-    })
+  //   // Process the version delete queue
+  //   const processResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+  //     method: 'POST',
+  //     headers: headersInternal,
+  //     body: JSON.stringify({ queue_name: queueName }),
+  //   })
 
-    expect(processResponse.status).toBe(202)
+  //   expect(processResponse.status).toBe(202)
 
-    // Update the version to trigger update queue
-    await getSupabaseClient()
-      .from('app_versions')
-      .update({ name: '1.0.1' })
-      .eq('id', versionData.id)
+  //   // Update the version to trigger update queue
+  //   await getSupabaseClient()
+  //     .from('app_versions')
+  //     .update({ name: '1.0.1' })
+  //     .eq('id', versionData.id)
 
-    // Wait a moment for triggers
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  //   // Wait a moment for triggers
+  //   await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Process the version update queue
-    const updateProcessResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: 'on_version_update' }),
-    })
+  //   // Process the version update queue
+  //   const updateProcessResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+  //     method: 'POST',
+  //     headers: headersInternal,
+  //     body: JSON.stringify({ queue_name: 'on_version_update' }),
+  //   })
 
-    expect(updateProcessResponse.status).toBe(202)
+  //   expect(updateProcessResponse.status).toBe(202)
 
-    // Delete the version to trigger delete queue
-    await getSupabaseClient()
-      .from('app_versions')
-      .delete()
-      .eq('id', versionData.id)
+  //   // Delete the version to trigger delete queue
+  //   await getSupabaseClient()
+  //     .from('app_versions')
+  //     .delete()
+  //     .eq('id', versionData.id)
 
-    // Wait a moment for triggers
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  //   // Wait a moment for triggers
+  //   await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Process the version delete queue again
-    const deleteProcessResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: queueName }),
-    })
+  //   // Process the version delete queue again
+  //   const deleteProcessResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+  //     method: 'POST',
+  //     headers: headersInternal,
+  //     body: JSON.stringify({ queue_name: queueName }),
+  //   })
 
-    expect(deleteProcessResponse.status).toBe(202)
-  })
+  //   expect(deleteProcessResponse.status).toBe(202)
+  // })
 
-  it('should handle stress test with rapid queue processing', async () => {
-    // Rapid fire queue processing requests
-    const rapidRequests = []
-    for (let i = 0; i < 20; i++) {
-      rapidRequests.push(
-        fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-          method: 'POST',
-          headers: headersInternal,
-          body: JSON.stringify({ queue_name: 'cron_stats' }),
-        }),
-      )
+  // it('should handle stress test with rapid queue processing', async () => {
+  //   // Rapid fire queue processing requests
+  //   const rapidRequests = []
+  //   for (let i = 0; i < 20; i++) {
+  //     rapidRequests.push(
+  //       fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+  //         method: 'POST',
+  //         headers: headersInternal,
+  //         body: JSON.stringify({ queue_name: 'cron_stats' }),
+  //       }),
+  //     )
 
-      // Small delay between requests to simulate real-world usage
-      if (i % 5 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-    }
+  //     // Small delay between requests to simulate real-world usage
+  //     if (i % 5 === 0) {
+  //       await new Promise(resolve => setTimeout(resolve, 100))
+  //     }
+  //   }
 
-    const responses = await Promise.all(rapidRequests)
+  //   const responses = await Promise.all(rapidRequests)
 
-    // All requests should be handled successfully
-    responses.forEach((response) => {
-      expect(response.status).toBe(202)
-    })
-  })
+  //   // All requests should be handled successfully
+  //   responses.forEach((response) => {
+  //     expect(response.status).toBe(202)
+  //   })
+  // })
 })

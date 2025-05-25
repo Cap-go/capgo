@@ -37,15 +37,19 @@ app.route('/updates_v2', updates)
 app.route('/updates_lite', updates_lite)
 app.route('/updates_lite_v2', updates_lite)
 app.route('/stats', stats)
-
+app.all('*', (c) => {
+  console.log('Not found', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
+})
 app.onError((e, c) => {
   console.log('app onError', e)
-  c.get('sentry').captureException(e)
+  c.get('sentry')?.captureException(e)
   if (e instanceof HTTPException) {
+    console.log('HTTPException found', e.status)
     if (e.status === 429) {
-      return c.json({ error: 'you are beeing rate limited' }, 429)
+      return c.json({ error: 'you are beeing rate limited' }, e.status)
     }
-    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
+    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
   }
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
