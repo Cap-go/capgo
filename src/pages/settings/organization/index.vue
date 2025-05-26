@@ -16,6 +16,7 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
+const router = useRouter()
 const isLoading = ref(true)
 
 onMounted(async () => {
@@ -203,6 +204,8 @@ async function deleteOrganization() {
 
           toast.success(t('org-deleted'))
           await organizationStore.fetchOrganizations()
+          await organizationStore.setCurrentOrganizationToFirst()
+          router.push('/app')
         },
       },
     ],

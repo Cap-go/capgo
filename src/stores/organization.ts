@@ -132,6 +132,12 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     currentOrganization.value = organization
   }
+  const setCurrentOrganizationToFirst = () => {
+    if (organizations.value.length === 0)
+      return
+    const organization = organizations.value[0]
+    currentOrganization.value = organization
+  }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
     const currentOrgId = currentOrganization.value?.gid
@@ -224,6 +230,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganization,
     setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
+    setCurrentOrganizationToFirst,
     getMembers,
     getCurrentRoleForApp,
     getCurrentRole,
