@@ -8,8 +8,8 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconTrash from '~icons/heroicons/trash'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
+import IconTrash from '~icons/heroicons/trash'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -375,7 +375,7 @@ columns.value = [
       },
       {
         icon: IconTrash,
-        visible: (elem: Element) => role.value ? organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin']) : false,
+        visible: () => role.value ? organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin']) : false,
         onClick: (elem: Element) => deleteOne(elem),
       },
     ],

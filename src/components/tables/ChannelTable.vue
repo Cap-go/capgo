@@ -7,8 +7,8 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconTrash from '~icons/heroicons/trash'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
+import IconTrash from '~icons/heroicons/trash'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -262,7 +262,7 @@ columns.value = [
       },
       {
         icon: IconTrash,
-        visible: (elem: Element) => organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']),
+        visible: () => organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']),
         onClick: (elem: Element) => deleteOne(elem),
       },
     ],

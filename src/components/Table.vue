@@ -280,14 +280,14 @@ function getSkeletonWidth(columnIndex?: number) {
   const visibleColumns = props.columns.filter(col => col.mobile !== false)
   const totalVisibleColumns = visibleColumns.length
   const hasMassSelect = props.massSelect
-  
+
   if (columnIndex === undefined) {
     // Mass select column - tiny fixed width for checkbox
     return '60px'
   }
-  
+
   // Data columns - distribute remaining width equally
-  const remainingWidth = hasMassSelect ? 'calc((100% - 60px) / ' + totalVisibleColumns + ')' : `${100 / totalVisibleColumns}%`
+  const remainingWidth = hasMassSelect ? `calc((100% - 60px) / ${totalVisibleColumns})` : `${100 / totalVisibleColumns}%`
   return remainingWidth
 }
 </script>
@@ -391,8 +391,8 @@ function getSkeletonWidth(columnIndex?: number) {
                     <template v-if="col.actions">
                       <button
                         v-for="(action, actionIndex) in col.actions"
-                        :key="actionIndex"
                         v-show="!action.visible || action.visible(elem)"
+                        :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
                         class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
                         @click.stop="action.onClick(elem)"
@@ -427,13 +427,13 @@ function getSkeletonWidth(columnIndex?: number) {
           </tr>
         </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': isLoading }" >
+          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': isLoading }">
             <td v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4" :style="`width: ${getSkeletonWidth()}`">
-              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5"  />
+              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5" />
             </td>
-                         <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 md:px-6 py-2 md:py-4" :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`">
-               <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }"  />
-             </td>
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 md:px-6 py-2 md:py-4" :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`">
+              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
+            </td>
           </tr>
         </tbody>
       </table>
