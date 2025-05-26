@@ -8,7 +8,8 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconTrash from '~icons/heroicons/trash?raw'
+import IconTrash from '~icons/heroicons/trash'
+import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -217,11 +218,6 @@ async function refreshData() {
 async function deleteOne(one: Element) {
   // console.log('deleteBundle', bundle)
 
-  if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-
   try {
     // todo: fix this for AB testing
     const { data: channelFound, error: errorChannel } = await supabase
@@ -369,12 +365,20 @@ columns.value = [
     },
   },
   {
+    key: 'actions',
     label: t('action'),
-    key: 'action',
     mobile: true,
-    icon: IconTrash,
-    class: 'text-red-500',
-    onClick: deleteOne,
+    actions: [
+      {
+        icon: IconSettings,
+        onClick: (elem: Element) => openOne(elem),
+      },
+      {
+        icon: IconTrash,
+        visible: (elem: Element) => role.value ? organizationStore.hasPermisisonsInRole(role.value, ['admin', 'write', 'super_admin']) : false,
+        onClick: (elem: Element) => deleteOne(elem),
+      },
+    ],
   },
 ]
 

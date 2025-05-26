@@ -72,20 +72,16 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
+        visible: (member: ExtendedOrganizationMember) => canEdit(member),
         onClick: (member: ExtendedOrganizationMember) => {
-          if (canEdit(member))
-            changeMemberPermission(member)
-          else
-            toast.error(t('no-permission'))
+          changeMemberPermission(member)
         },
       },
       {
         icon: IconTrash,
+        visible: (member: ExtendedOrganizationMember) => canDelete(member),
         onClick: (member: ExtendedOrganizationMember) => {
-          if (canDelete(member))
-            deleteMember(member)
-          else
-            toast.error(t('no-permission'))
+          deleteMember(member)
         },
       },
     ]).value,

@@ -313,7 +313,7 @@ async function copyOrganizationId() {
             <div class="flex flex-col px-6 py-5 border-t border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="p-2 mb-2 mr-4 text-white border border-red-400 rounded-lg btn hover:bg-red-600"
+                  class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
                   color="secondary"
                   shape="round"
                   type="button"
@@ -329,7 +329,7 @@ async function copyOrganizationId() {
                 </button>
                 <button
                   id="save-changes"
-                  class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-hidden dark:focus:ring-blue-800"
+                  class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
                   type="submit"
                   color="secondary"
                   shape="round"
