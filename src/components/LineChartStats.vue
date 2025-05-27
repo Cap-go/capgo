@@ -13,7 +13,6 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
 import { Line } from 'vue-chartjs'
 import { getCurrentDayMonth, getDaysInCurrentMonth } from '~/services/date'
-import { isDark } from '../composables/dark'
 import { inlineAnnotationPlugin } from '../services/chartAnnotations'
 
 const props = defineProps({
@@ -26,7 +25,7 @@ const props = defineProps({
   limits: { type: Object, default: () => ({}) },
   data: { type: Array, default: Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[] },
 })
-
+const isDark = useDark()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
@@ -142,7 +141,7 @@ function createAnotation(id: string, y: number, title: string, lineColor: string
     font: {
       size: 10,
     },
-    color: '#000',
+    color: `${isDark.value ? '#fff' : '#000'}`,
   }
   return obj
 }
