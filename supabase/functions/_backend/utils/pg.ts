@@ -6,13 +6,14 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { cloudlog } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
-  // console.log({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent })
+  // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
@@ -44,7 +45,7 @@ export function getDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
-  console.log({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
+  cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
   return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
 

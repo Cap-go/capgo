@@ -3,6 +3,7 @@ import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF } from './cloudflare.ts'
+import { cloudlog } from './loggin.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 
 export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices']['Insert'], 'created_at'>
@@ -60,7 +61,7 @@ export function createStatsDevices(c: Context, app_id: string, device_id: string
 export function createStatsMeta(c: Context, app_id: string, version_id: number, size: number) {
   if (size === 0)
     return { error: 'size is 0' }
-  console.log({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
+  cloudlog({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
   return trackMetaSB(c, app_id, version_id, size)
 }
 
@@ -121,7 +122,7 @@ export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, s
 
   return backgroundTask(c, Promise.all(jobs)
     .catch((error) => {
-      console.log({ requestId: c.get('requestId'), message: '[sendStatsAndDevice] rejected with error', error })
+      cloudlog({ requestId: c.get('requestId'), message: '[sendStatsAndDevice] rejected with error', error })
     }))
 }
 

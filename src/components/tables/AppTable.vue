@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
-import IconSettings from '~icons/heroicons/cog-8-tooth?raw'
+import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -105,8 +105,12 @@ const columns = ref<TableColumn[]>([
     label: '',
     key: 'actions',
     mobile: true,
-    onClick: item => openSettngs(item),
-    icon: IconSettings,
+    actions: [
+      {
+        icon: IconSettings,
+        onClick: item => openSettngs(item),
+      },
+    ],
   },
 ])
 

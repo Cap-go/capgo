@@ -9,6 +9,7 @@ import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
 import { middlewareKey } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as download_link } from './download_link.ts'
@@ -134,7 +135,7 @@ async function uploadHandler(c: Context) {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
-  console.log({ requestId: c.get('requestId'), message: 'upload handler' })
+  cloudlog({ requestId: c.get('requestId'), message: 'upload handler' })
   return await handler.fetch(c.req.url, {
     body: c.req.raw.body,
     method: c.req.method,
@@ -146,7 +147,7 @@ async function uploadHandler(c: Context) {
 async function setKeyFromMetadata(c: Context, next: Next) {
   const fileId = parseUploadMetadata(c.req.raw.headers).filename
   if (fileId == null) {
-    console.log({ requestId: c.get('requestId'), message: 'fileId is null' })
+    cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
   // Decode base64 if necessary
@@ -165,7 +166,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
 async function setKeyFromIdParam(c: Context, next: Next) {
   const fileId = c.req.param('id')
   if (fileId == null) {
-    console.log({ requestId: c.get('requestId'), message: 'fileId is null' })
+    cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
   const normalizedFileId = decodeURIComponent(fileId)
@@ -184,16 +185,16 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   }
   console.log('checkWriteAppAccess', app_id, owner_org)
   const capgkey = c.get('capgkey') as string
-  console.log({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
+  cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
     .rpc('get_user_id', { apikey: capgkey, app_id })
   if (_errorUserId) {
-    console.log({ requestId: c.get('requestId'), message: '_errorUserId', error: _errorUserId })
+    cloudlog({ requestId: c.get('requestId'), message: '_errorUserId', error: _errorUserId })
     throw new HTTPException(400, { message: 'Error User not found' })
   }
 
   if (!(await hasAppRightApikey(c as any, app_id, userId, 'read', capgkey))) {
-    console.log({ requestId: c.get('requestId'), message: 'no read' })
+    cloudlog({ requestId: c.get('requestId'), message: 'no read' })
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
 
@@ -203,11 +204,11 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     .eq('app_id', app_id)
     .single()
   if (errorApp) {
-    console.log({ requestId: c.get('requestId'), message: 'errorApp', error: errorApp })
+    cloudlog({ requestId: c.get('requestId'), message: 'errorApp', error: errorApp })
     throw new HTTPException(400, { message: 'Error App not found' })
   }
   if (app.owner_org !== owner_org) {
-    console.log({ requestId: c.get('requestId'), message: 'owner_org' })
+    cloudlog({ requestId: c.get('requestId'), message: 'owner_org' })
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
   await next()

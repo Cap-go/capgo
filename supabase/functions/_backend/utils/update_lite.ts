@@ -16,6 +16,7 @@ import { getRuntimeKey } from 'hono/adapter'
 import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
+import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1Session, getPgClient, isAllowedActionOrgActionD1, isAllowedActionOrgActionPg, requestInfosPostgresLite, requestInfosPostgresLiteV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
@@ -44,7 +45,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean = false) {
   try {
-    console.log({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
+    cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
     let {
       version_name,
       version_build,
@@ -72,7 +73,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           capgo: true,
         }))
       }
-      console.log({ requestId: c.get('requestId'), message: 'App not found', id: app_id, date: new Date().toISOString() })
+      cloudlog({ requestId: c.get('requestId'), message: 'App not found', id: app_id, date: new Date().toISOString() })
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
@@ -90,7 +91,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         version_id: version_build,
         app_id_url: appIdToUrl(app_id),
       }, appOwner.owner_org, app_id, '0 0 * * 1'))
-      console.log({ requestId: c.get('requestId'), message: 'semver_issue', app_id, version_build })
+      cloudlog({ requestId: c.get('requestId'), message: 'semver_issue', app_id, version_build })
       return c.json({
         message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
         error: 'semver_error',
@@ -107,7 +108,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
     if (!app_id || !device_id || !version_build || !version_name || !platform) {
-      console.log({ requestId: c.get('requestId'), message: 'missing_info', app_id, device_id, version_build, version_name, platform })
+      cloudlog({ requestId: c.get('requestId'), message: 'missing_info', app_id, device_id, version_build, version_name, platform })
       return c.json({
         message: 'Cannot find device_id or appi_id',
         error: 'missing_info',
@@ -128,7 +129,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
     if (!planValid) {
-      console.log({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
       await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
       return c.json({
         message: 'Cannot update, upgrade plan to continue to update',
@@ -137,7 +138,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     await backgroundTask(c, createStatsMau(c, device_id, app_id))
 
-    console.log({ requestId: c.get('requestId'), message: 'vals', platform, device })
+    cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
     const requestedInto = isV2 ? await requestInfosPostgresLiteV2(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
 
@@ -145,7 +146,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     const { channelData } = requestedInto
 
     if (!versionData) {
-      console.log({ requestId: c.get('requestId'), message: 'No version data found' })
+      cloudlog({ requestId: c.get('requestId'), message: 'No version data found' })
       return c.json({
         message: 'Couldn\'t find version data',
         error: 'no-version_data',
@@ -153,7 +154,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     if (!channelData) {
-      console.log({ requestId: c.get('requestId'), message: 'Cannot get channel', id: app_id, date: new Date().toISOString() })
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot get channel', id: app_id, date: new Date().toISOString() })
       if (versionData)
         await sendStatsAndDevice(c, device, [{ action: 'update_fail', versionId: versionData.id }])
 
@@ -167,7 +168,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     device.version = versionData ? versionData.id : version.id
 
     if (!version.external_url && !version.r2_path && version.name !== 'builtin') {
-      console.log({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version })
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version })
       await sendStatsAndDevice(c, device, [{ action: 'missingBundle' }])
       return c.json({
         message: 'Cannot get bundle',
@@ -176,7 +177,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     if (version_name === version.name) {
-      console.log({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
+      cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
       return c.json({
         message: 'No new version available',
@@ -212,7 +213,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
     //  check signedURL and if it's url
     if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
-      console.log({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
       return c.json({
         message: 'Cannot get bundle url',
@@ -223,10 +224,10 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       createStatsVersion(c, version.id, app_id, 'get'),
       sendStatsAndDevice(c, device, [{ action: 'get' }]),
     ]))
-    console.log({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
+    cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
     const res = resToVersion(plugin_version, signedURL, version as any, manifest)
     if (!res.url && !res.manifest) {
-      console.log({ requestId: c.get('requestId'), message: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
+      cloudlog({ requestId: c.get('requestId'), message: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
       return c.json({
         message: 'No url or manifest',
         error: 'no_url_or_manifest',
@@ -255,7 +256,7 @@ export async function update(c: Context, body: AppInfos) {
   }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
-    console.log({ requestId: c.get('requestId'), message: 'update2', isV2 })
+    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
     pgClient = null
   }
   else {
