@@ -184,17 +184,23 @@ const chartData = ref<ChartData<'line'>>({
     pointBorderWidth: 0,
   }],
 })
-const chartOptions = ref<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions } }>({
+const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions } }>(() => ({
   maintainAspectRatio: false,
   scales: {
     y: {
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
       },
+      grid: {
+        color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+      },
     },
     x: {
       ticks: {
         color: `${isDark.value ? 'white' : 'black'}`,
+      },
+      grid: {
+        color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
       },
     },
   },
@@ -207,7 +213,7 @@ const chartOptions = ref<ChartOptions & { plugins: { inlineAnnotationPlugin: Ann
       display: false,
     },
   },
-})
+}))
 </script>
 
 <template>

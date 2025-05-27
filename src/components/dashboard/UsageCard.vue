@@ -26,6 +26,9 @@ const props = defineProps({
 })
 const { t } = useI18n()
 const main = useMainStore()
+const organizationStore = useOrganizationStore()
+const subscription_anchor_start = dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D')
+const subscription_anchor_end = dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D')
 function sum(arr: number[]) {
   return arr.reduce((a, b) => a + b, 0)
 }
@@ -85,13 +88,16 @@ function nextRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="tooltip">
-          <div class="tooltip-content">
+        <div class="tooltip tooltip-bottom">
+          <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
             <div class="max-w-xs whitespace-normal">
               {{ lastRunDate() }}
             </div>
             <div class="max-w-xs whitespace-normal">
               {{ nextRunDate() }}
+            </div>
+            <div class="max-w-xs whitespace-normal">
+              {{ t('billing-cycle') }} {{ subscription_anchor_start }} {{ t('to') }} {{ subscription_anchor_end }}
             </div>
           </div>
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">

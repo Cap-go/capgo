@@ -26,12 +26,17 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   maintainAspectRatio: false,
   scales: {
     x: {
-      grid: { display: false },
+      grid: {
+        color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+      },
       ticks: { color: isDark.value ? 'white' : 'black' },
     },
     y: {
       min: 0,
       max: 100,
+      grid: {
+        color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
+      },
       ticks: {
         callback: (value: number) => `${value}%`,
         color: isDark.value ? 'white' : 'black',
@@ -47,22 +52,12 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
 const chartData = ref<any>(null)
 
 async function loadData() {
+  console.log('loadData mobile data')
   isLoading.value = true
 
   const { startDate, endDate } = getDateRange(30)
   chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
   isLoading.value = false
-}
-
-function getLast30Days() {
-  const dates = []
-  const endDate = new Date()
-  for (let i = 30; i > 0; i--) {
-    const date = new Date(endDate)
-    date.setDate(endDate.getDate() - i)
-    dates.push(date.toISOString().slice(0, 10))
-  }
-  return dates
 }
 
 function getDateRange(days: number) {
@@ -135,7 +130,7 @@ function nextRunDate() {
       </div>
     </div>
     <div class="w-full h-full p-6">
-      <Line v-if="!isLoading" :data="{ labels: getLast30Days(), datasets: chartData.datasets }" :options="chartOptions" />
+      <Line v-if="!isLoading" :data="chartData" :options="chartOptions" />
       <div v-else class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
       </div>
