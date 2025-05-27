@@ -27,7 +27,9 @@ import { app as on_version_delete } from '../_backend/triggers/on_version_delete
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
+import { sendDiscordAlert } from '../_backend/utils/discord.ts'
 import { BRES } from '../_backend/utils/hono.ts'
+import { backgroundTask } from '../_backend/utils/utils.ts'
 
 const functionName = 'triggers'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
@@ -75,7 +77,7 @@ appGlobal.all('*', (c) => {
   console.log('all files', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
-appGlobal.onError((e, c) => {
+appGlobal.onError(async (e, c) => {
   console.log('app onError', e)
   c.get('sentry')?.captureException(e)
   if (e instanceof HTTPException) {
@@ -85,6 +87,21 @@ appGlobal.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
   }
+  await backgroundTask(c as any, sendDiscordAlert(c as any, {
+    content: `Function: ${functionName}`,
+    embeds: [
+      {
+        title: `Failed to process ${functionName}`,
+        description: `Function: ${functionName}`,
+        fields: [
+          {
+            name: 'Error',
+            value: JSON.stringify(e),
+          },
+        ],
+      },
+    ],
+  }))
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 Deno.serve(appGlobal.fetch)

@@ -5,6 +5,8 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app } from '../_backend/public/app/index.ts'
+import { sendDiscordAlert } from '../_backend/utils/discord.ts'
+import { backgroundTask } from '../_backend/utils/utils.ts'
 
 const functionName = 'app'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
@@ -24,7 +26,7 @@ appGlobal.all('*', (c) => {
   console.log('Not found', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
-appGlobal.onError((e, c) => {
+appGlobal.onError(async (e, c) => {
   console.log('app onError', e)
   c.get('sentry')?.captureException(e)
   if (e instanceof HTTPException) {
@@ -34,6 +36,21 @@ appGlobal.onError((e, c) => {
     }
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
   }
+  await backgroundTask(c as any, sendDiscordAlert(c as any, {
+    content: `Function: ${functionName}`,
+    embeds: [
+      {
+        title: `Failed to process ${functionName}`,
+        description: `Function: ${functionName}`,
+        fields: [
+          {
+            name: 'Error',
+            value: JSON.stringify(e),
+          },
+        ],
+      },
+    ],
+  }))
   return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
 })
 Deno.serve(appGlobal.fetch)
