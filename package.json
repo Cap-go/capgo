@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.7.9",
+  "version": "12.7.10",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
