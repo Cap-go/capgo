@@ -8,6 +8,7 @@ import { format, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { BRES, getBody } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
@@ -51,7 +52,7 @@ export const jsonRequestSchema = z.object({
 })
 
 async function post(c: Context, body: DeviceLink): Promise<Response> {
-  console.log({ requestId: c.get('requestId'), message: 'post channel self body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success) {
     console.error({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
@@ -166,7 +167,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .eq('name', channel)
       .single()
     if (dbError || !dataChannel) {
-      console.log({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
       console.error({ requestId: c.get('requestId'), message: 'Cannot find channel', dbError, dataChannel })
       return c.json({
         message: `Cannot find channel ${JSON.stringify(dbError)}`,
@@ -220,17 +221,17 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
           error: 'override_not_allowed',
         }, 400)
       }
-      console.log({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
+      cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
     }
     else {
       // if dataChannelOverride is same from dataChannel and exist then do nothing
       if (channelId && channelId.id === dataChannel.id) {
         // already set
-        console.log({ requestId: c.get('requestId'), message: 'channel already set' })
+        cloudlog({ requestId: c.get('requestId'), message: 'channel already set' })
         return c.json(BRES)
       }
 
-      console.log({ requestId: c.get('requestId'), message: 'setting channel' })
+      cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
       if (dataChannelOverride) {
         const { error: dbErrorDev } = await supabaseAdmin(c)
           .from('channel_devices')
@@ -267,7 +268,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function put(c: Context, body: DeviceLink): Promise<Response> {
-  console.log({ requestId: c.get('requestId'), message: 'put channel self body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
   let {
     version_name,
     version_build,
@@ -411,7 +412,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
-  console.log({ requestId: c.get('requestId'), message: 'delete channel self body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
   let {
     version_build,
   } = body
@@ -476,7 +477,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log({ requestId: c.get('requestId'), message: 'post body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
     return post(c as any, body)
   }
   catch (e) {
@@ -488,7 +489,7 @@ app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
   try {
     const body = await c.req.json<DeviceLink>()
-    console.log({ requestId: c.get('requestId'), message: 'put body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
     return put(c as any, body)
   }
   catch (e) {
@@ -500,7 +501,7 @@ app.delete('/', async (c) => {
   try {
     const body = await getBody<DeviceLink>(c as any)
     // const body = await c.req.json<DeviceLink>()
-    console.log({ requestId: c.get('requestId'), message: 'delete body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
     return deleteOverride(c as any, body)
   }
   catch (e) {

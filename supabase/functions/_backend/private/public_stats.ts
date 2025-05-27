@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -22,7 +23,7 @@ app.get('/', async (c) => {
         stars: data.stars,
       })
     }
-    console.log({ requestId: c.get('requestId'), message: 'Supabase error:', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'Supabase error:', error })
     return c.json({
       apps: 750,
       updates: 23500638,

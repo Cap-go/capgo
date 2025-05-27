@@ -4,6 +4,7 @@ import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -16,7 +17,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 
   if (v2Path && record.storage_provider === 'r2') {
     // pdate size and checksum
-    console.log({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
+    cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
     // set checksum in s3
     const size = await s3.getSize(c, v2Path)
     if (size) {
@@ -34,17 +35,17 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
         })
         .eq('id', record.id)
       if (errorUpdate)
-        console.log({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+        cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
       const { error } = await createStatsMeta(c, record.app_id, record.id, size)
       if (error)
-        console.log({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
+        cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
     }
     else {
-      console.log({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
+      cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
     }
   }
   else {
-    console.log({ requestId: c.get('requestId'), message: 'no v2 path' })
+    cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
     const { error: errorUpdate } = await supabaseAdmin(c)
       .from('app_versions_meta')
       .upsert({
@@ -58,12 +59,12 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
       })
       .eq('id', record.id)
     if (errorUpdate)
-      console.log({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
   }
 
   // Handle manifest entries
   if (record.manifest) {
-    console.log({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
+    cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
     const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
 
     // Check if entries exist
@@ -90,7 +91,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
           .from('manifest')
           .insert(validEntries)
         if (insertError)
-          console.log({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
+          cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
       }
     }
     // delete manifest in app_versions
@@ -99,18 +100,18 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
       .update({ manifest: null })
       .eq('id', record.id)
     if (deleteError)
-      console.log({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
+      cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
   }
 
   return c.json(BRES)
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  console.log({ requestId: c.get('requestId'), message: 'Delete', r2_path: record.r2_path })
+  cloudlog({ requestId: c.get('requestId'), message: 'Delete', r2_path: record.r2_path })
 
   const v2Path = await getPath(c, record)
   if (!v2Path) {
-    console.log({ requestId: c.get('requestId'), message: 'No r2 path' })
+    cloudlog({ requestId: c.get('requestId'), message: 'No r2 path' })
     return c.json(BRES)
   }
 
@@ -118,7 +119,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     await s3.deleteObject(c, v2Path)
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
     return c.json(BRES)
   }
 
@@ -128,7 +129,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .eq('id', record.id)
     .single()
   if (dbError || !data) {
-    console.log({ requestId: c.get('requestId'), message: 'Cannot find version meta', id: record.id })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find version meta', id: record.id })
     return c.json(BRES)
   }
   await createStatsMeta(c, record.app_id, record.id, -data.size)
@@ -138,7 +139,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .update({ size: 0 })
     .eq('id', record.id)
   if (errorUpdate)
-    console.log({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
+    cloudlog({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
 
   // Delete manifest entries
   const { error: deleteError } = await supabaseAdmin(c)
@@ -146,7 +147,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .delete()
     .eq('app_version_id', record.id)
   if (deleteError)
-    console.log({ requestId: c.get('requestId'), message: 'error delete manifest', error: deleteError })
+    cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest', error: deleteError })
 
   return c.json(BRES)
 }
@@ -158,29 +159,29 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<UpdatePayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'UPDATE') {
-      console.log({ requestId: c.get('requestId'), message: 'Not UPDATE' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not UPDATE' })
       return c.json({ status: 'Not UPDATE' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.app_id) {
-      console.log({ requestId: c.get('requestId'), message: 'no app_id', record })
+      cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
       return c.json(BRES)
     }
     if (!record.r2_path && !record.manifest) {
-      console.log({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
+      cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
       return c.json(BRES)
     }
     // // check if not deleted it's present in s3 storage
     if (record.deleted && record.deleted !== body.old_record.deleted)
       return deleteIt(c as any, body.record as any)
 
-    console.log({ requestId: c.get('requestId'), message: 'Update but not deleted' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
     return updateIt(c as any, body)
   }
   catch (e) {

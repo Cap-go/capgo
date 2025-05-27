@@ -20,6 +20,8 @@ export interface TableSort {
 export interface TableAction {
   icon: FunctionalComponent | ShallowRef<FunctionalComponent<any>>
   onClick: (item: any) => void
+  visible?: (item: any) => boolean
+  disabled?: (item: any) => boolean
 }
 
 export interface TableColumn {

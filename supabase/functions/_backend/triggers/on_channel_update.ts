@@ -3,6 +3,7 @@ import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -12,18 +13,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'channels'
     const body = await c.req.json<UpdatePayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'UPDATE') {
-      console.log({ requestId: c.get('requestId'), message: 'Not UPDATE' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not UPDATE' })
       return c.json({ status: 'Not UPDATE' }, 200)
     }
     const record = body.record as Database['public']['Tables']['channels']['Row']
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.id) {
-      console.log({ requestId: c.get('requestId'), message: 'No id' })
+      cloudlog({ requestId: c.get('requestId'), message: 'No id' })
       return c.json(BRES)
     }
     if (!record.app_id) {
@@ -47,7 +48,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('android', false)
         .eq('ios', false)
       if (iosError || hiddenError)
-        console.log({ requestId: c.get('requestId'), message: 'error', error: iosError || hiddenError })
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error: iosError || hiddenError })
     }
 
     if (record.public && record.android) {
@@ -64,7 +65,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('android', false)
         .eq('ios', false)
       if (androidError || hiddenError)
-        console.log({ requestId: c.get('requestId'), message: 'error', error: androidError || hiddenError })
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error: androidError || hiddenError })
     }
 
     if (record.public && (record.ios === record.android)) {
@@ -75,7 +76,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('public', true)
         .neq('id', record.id)
       if (error)
-        console.log({ requestId: c.get('requestId'), message: 'error', error })
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error })
     }
 
     return c.json(BRES)

@@ -7,7 +7,8 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import IconTrash from '~icons/heroicons/trash?raw'
+import IconSettings from '~icons/heroicons/cog-8-tooth'
+import IconTrash from '~icons/heroicons/trash'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -172,6 +173,7 @@ async function getData() {
 
     // Inform the parent component if there are any misconfigured channels
     emit('misconfigured', anyMisconfigured)
+    versionId.value = await findUnknownVersion()
   }
   catch (error) {
     console.error(error)
@@ -187,7 +189,6 @@ async function refreshData(keepCurrentPage = false) {
 
     elements.value.length = 0
     await getData()
-    versionId.value = await findUnknownVersion()
     if (keepCurrentPage)
       currentPage.value = page
   }
@@ -197,11 +198,6 @@ async function refreshData(keepCurrentPage = false) {
 }
 async function deleteOne(one: Element) {
   // console.log('deleteBundle', bundle)
-  if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(one.app_id), ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    return
-  }
-
   if (await didCancel(t('channel')))
     return
   try {
@@ -255,12 +251,20 @@ columns.value = [
     displayFunction: (elem: Element) => elem.misconfigured ? t('yes') : t('no'),
   },
   {
-    label: t('action'),
     key: 'action',
+    label: t('action'),
     mobile: true,
-    icon: IconTrash,
-    class: 'text-red-500',
-    onClick: (elem: Element) => deleteOne(elem),
+    actions: [
+      {
+        icon: IconSettings,
+        onClick: (elem: Element) => openOne(elem),
+      },
+      {
+        icon: IconTrash,
+        visible: () => organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']),
+        onClick: (elem: Element) => deleteOne(elem),
+      },
+    ],
   },
 ]
 

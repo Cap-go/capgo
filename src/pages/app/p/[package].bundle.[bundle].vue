@@ -13,7 +13,7 @@ import IconTrash from '~icons/heroicons/trash'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -131,7 +131,7 @@ async function getUnknowBundleId() {
     .single()
   return data?.id
 }
-
+// add check compatibility here
 async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
   return supabase
     .from('channels')
@@ -154,6 +154,39 @@ async function ASChannelChooser() {
     if (!version.value)
       return
     try {
+      const {
+        finalCompatibility,
+        localDependencies,
+      } = await checkCompatibilityNativePackages(version.value.app_id, chan.name, (version.value.native_packages as any) ?? [])
+
+      // Check if any package is incompatible
+      if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+        toast.error(t('bundle-not-compatible-with-channel', { channel: chan.name }))
+        toast.info(t('channel-not-compatible-with-channel-description').replace('%', 'npx @capgo/cli@latest bundle compatibility'))
+        displayStore.dialogOption = {
+          header: t('confirm-action'),
+          message: t('set-even-not-compatible').replace('%', 'npx @capgo/cli@latest bundle compatibility'),
+          buttons: [
+            {
+              text: t('button-cancel'),
+              role: 'cancel',
+            },
+            {
+              text: t('button-confirm'),
+              role: 'confirm',
+            },
+          ],
+        }
+        displayStore.showDialog = true
+        if (await displayStore.onDialogDismiss())
+          return
+      }
+      else if (localDependencies.length === 0) {
+        toast.info('ignore-compatibility')
+      }
+      else {
+        toast.info(t('bundle-compatible-with-channel').replace('%', chan.name))
+      }
       await setChannel(chan, version.value.id)
       await getChannels()
     }

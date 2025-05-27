@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { extractDataEvent, parseStripeEvent } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
@@ -12,13 +13,13 @@ app.post('/', async (c) => {
   try {
     const LogSnag = logsnag(c as any)
     if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
-      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       return c.json({ status: 'Webhook Error: no secret found' }, 400)
     }
 
     const signature = c.req.raw.headers.get('stripe-signature')
     if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
-      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
       return c.json({ status: 'Webhook Error: no signature' }, 400)
     }
     // event.headers
@@ -27,7 +28,7 @@ app.post('/', async (c) => {
     const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '') {
-      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
       return c.json({ status: 'Webhook Error: no customer found' }, 400)
     }
 
@@ -38,11 +39,11 @@ app.post('/', async (c) => {
       .eq('customer_id', stripeData.customer_id)
       .single()
     if (dbError) {
-      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no user found' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no user found' })
       return c.json({ status: 'Webhook Error: no user found' }, 400)
     }
     if (!org) {
-      console.log({ requestId: c.get('requestId'), message: 'Webhook Error: no user found' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no user found' })
       return c.json({ status: 'Webhook Error: no user found' }, 400)
     }
 
@@ -53,12 +54,12 @@ app.post('/', async (c) => {
       .single()
 
     if (!customer) {
-      console.log({ requestId: c.get('requestId'), message: 'no customer found' })
+      cloudlog({ requestId: c.get('requestId'), message: 'no customer found' })
       return c.json({ status: 'ok' }, 200)
     }
     if (!customer.subscription_id)
       stripeData.status = 'succeeded'
-    console.log({ requestId: c.get('requestId'), message: 'stripeData', stripeData })
+    cloudlog({ requestId: c.get('requestId'), message: 'stripeData', stripeData })
 
     if (stripeEvent.type === 'customer.source.expiring') {
       await trackBentoEvent(c as any, org.management_email, {}, 'org:card_expiring')
@@ -95,7 +96,7 @@ app.post('/', async (c) => {
           .eq('stripe_id', stripeData.product_id)
           .single()
         if (!plan) {
-          console.log({ requestId: c.get('requestId'), message: 'failed to get plan' })
+          cloudlog({ requestId: c.get('requestId'), message: 'failed to get plan' })
           return c.json({ status: 'failed to get plan' }, 500)
         }
         planName = plan.name
@@ -154,7 +155,7 @@ app.post('/', async (c) => {
         }
 
         if (dbError2) {
-          console.log({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
+          cloudlog({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
           return c.json({ error: `succeeded: customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
         }
 
@@ -201,7 +202,7 @@ app.post('/', async (c) => {
         .update(stripeData)
         .eq('customer_id', stripeData.customer_id)
       if (dbError2) {
-        console.log({ requestId: c.get('requestId'), message: 'customer_id not found', error: dbError2 })
+        cloudlog({ requestId: c.get('requestId'), message: 'customer_id not found', error: dbError2 })
         return c.json({ error: `canceled:  customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
       }
     }
@@ -213,7 +214,7 @@ app.post('/', async (c) => {
         .update({ canceled_at: new Date().toISOString() })
         .eq('customer_id', stripeData.customer_id)
       if (dbError2) {
-        console.log({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
         return c.json({ error: `USER CANCELLED, customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
       }
     }
@@ -224,14 +225,14 @@ app.post('/', async (c) => {
         .update({ canceled_at: null })
         .eq('customer_id', stripeData.customer_id)
       if (dbError2) {
-        console.log({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error: dbError2 })
         return c.json({ error: `USER UNCANCELED, customer_id not found: ${stripeData.customer_id}`, dbError2, stripeData }, 500)
       }
     }
     return c.json({ received: true })
   }
   catch (e) {
-    console.log({ requestId: c.get('requestId'), message: 'error', error: e })
+    cloudlog({ requestId: c.get('requestId'), message: 'error', error: e })
     return c.json({ status: 'Cannot parse event', error: JSON.stringify(e) }, 500)
   }
 })
