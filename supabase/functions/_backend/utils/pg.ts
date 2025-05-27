@@ -258,14 +258,14 @@ export function requestInfosPostgres(
     .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
-          sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
-          eq(channelAlias.app_id, app_id),
-          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
-        )
-      : and (
-          eq(channelAlias.app_id, app_id),
-          eq(channelAlias.name, defaultChannel),
-        ),
+        sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
+        eq(channelAlias.app_id, app_id),
+        eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+      )
+      : and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
+      ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -384,14 +384,14 @@ export function requestInfosPostgresV2(
     .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
-          eq(channelAlias.public, true),
-          eq(channelAlias.app_id, app_id),
-          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
-        )
-      : and (
-          eq(channelAlias.app_id, app_id),
-          eq(channelAlias.name, defaultChannel),
-        ),
+        sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schemaV2.apps} WHERE app_id = ${app_id}) = true`,
+        eq(channelAlias.app_id, app_id),
+        eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+      )
+      : and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
+      ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)

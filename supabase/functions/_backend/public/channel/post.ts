@@ -101,11 +101,34 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
+    } else {
+      const { data: appData, error: appError } = await supabaseAdmin(c).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()
+      if (appError) {
+        console.log('Cannot get app', appError)
+        return c.json({ status: 'Cannot get app', error: JSON.stringify(appError) }, 400)
+      }
+      if (appData.default_channel_android === channelId) {
+        const { error: dbError } = await supabaseAdmin(c).from('apps').update({
+          default_channel_android: null,
+        }).eq('app_id', body.app_id)
+        if (dbError) {
+          console.log('Cannot update default channel', dbError)
+          return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
+        }
+      }
+      if (appData.default_channel_ios === channelId) {
+        const { error: dbError } = await supabaseAdmin(c).from('apps').update({
+          default_channel_ios: null,
+        }).eq('app_id', body.app_id)
+        if (dbError) {
+          console.log('Cannot update default channel', dbError)
+          return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
+        }
+      }
     }
-  }
-  catch (e) {
+    return c.json(BRES)
+  } catch (e) {
     console.log('Cannot create channel', e)
     return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
-  return c.json(BRES)
 }
