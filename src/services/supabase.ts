@@ -3,8 +3,8 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
-
 import ky from 'ky'
+import subset from 'semver/ranges/subset'
 
 let supaClient: SupabaseClient<Database> = null as any
 
@@ -454,4 +454,118 @@ export async function getAppMetrics(orgId: string, startDate?: string, endDate?:
     throw new Error(error.message)
 
   return data
+}
+
+export function convertNativePackages(nativePackages: { name: string, version: string }[]) {
+  if (!nativePackages) {
+    throw new Error(`Error parsing native packages, perhaps the metadata does not exist in Capgo?`)
+  }
+
+  // Check types
+  nativePackages.forEach((data: any) => {
+    if (typeof data !== 'object') {
+      throw new TypeError(`Invalid remote native package data: ${data}, expected object, got ${typeof data}`)
+    }
+
+    const { name, version } = data
+    if (!name || typeof name !== 'string') {
+      throw new Error(`Invalid remote native package name: ${name}, expected string, got ${typeof name}`)
+    }
+
+    if (!version || typeof version !== 'string') {
+      throw new TypeError(`Invalid remote native package version: ${version}, expected string, got ${typeof version}`)
+    }
+  })
+
+  const mappedRemoteNativePackages = new Map((nativePackages)
+    .map(a => [a.name, a]))
+
+  return mappedRemoteNativePackages
+}
+
+export async function getRemoteDepenencies(appId: string, channel: string) {
+  const { data: remoteNativePackages, error } = await useSupabase()
+    .from('channels')
+    .select(`version ( 
+            native_packages 
+        )`)
+    .eq('name', channel)
+    .eq('app_id', appId)
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
+}
+
+export async function getVersionRemoteDepenencies(appId: string, bundleId: string) {
+  const { data, error } = await useSupabase()
+    .from('app_versions')
+    .select()
+    .eq('name', bundleId)
+    .eq('app_id', appId)
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return convertNativePackages((data.native_packages as any) ?? [])
+}
+
+interface Compatibility {
+  name: string
+  localVersion: string | undefined
+  remoteVersion: string | undefined
+}
+
+export function isCompatible(pkg: Compatibility): boolean {
+  // Only check compatibility if there's a local version
+  // If there's a local version but no remote version, or versions don't match, it's incompatible
+  if (!pkg.localVersion)
+    return true // If no local version, it's compatible (remote-only package)
+  if (!pkg.remoteVersion)
+    return false // If local version but no remote version, it's incompatible
+  try {
+    return subset(pkg.localVersion, pkg.remoteVersion)
+  }
+  catch {
+    return false // If version comparison fails, consider it incompatible
+  }
+}
+
+export async function checkCompatibilityNativePackages(appId: string, channel: string, nativePackages: { name: string, version: string }[]) {
+  const mappedRemoteNativePackages = await getRemoteDepenencies(appId, channel)
+
+  const finalDepenencies: Compatibility[] = nativePackages
+    .map((local) => {
+      const remotePackage = mappedRemoteNativePackages.get(local.name)
+      if (remotePackage) {
+        return {
+          name: local.name,
+          localVersion: local.version,
+          remoteVersion: remotePackage.version,
+        }
+      }
+
+      return {
+        name: local.name,
+        localVersion: local.version,
+        remoteVersion: undefined,
+      }
+    })
+
+  // Only include remote packages that are not in local for informational purposes
+  // These won't affect compatibility
+  const removeNotInLocal = [...mappedRemoteNativePackages]
+    .filter(([remoteName]) => nativePackages.find(a => a.name === remoteName) === undefined)
+    .map(([name, version]) => ({ name, localVersion: undefined, remoteVersion: version.version }))
+
+  finalDepenencies.push(...removeNotInLocal)
+
+  return {
+    finalCompatibility: finalDepenencies,
+    localDependencies: nativePackages,
+  }
 }

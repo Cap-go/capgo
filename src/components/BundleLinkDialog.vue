@@ -18,7 +18,7 @@ const versions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const supabase = useSupabase()
 const searchVal = ref('')
 const open = ref(false)
-
+// add check compatibility here
 const { showBundleLinkDialogChannel } = storeToRefs(displayStore)
 
 watch(showBundleLinkDialogChannel, async () => {
