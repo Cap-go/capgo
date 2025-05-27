@@ -46,6 +46,10 @@ appGlobal.onError(async (e, c) => {
             name: 'Error',
             value: JSON.stringify(e),
           },
+          {
+            name: 'Request',
+            value: JSON.stringify(c.req.raw),
+          },
         ],
       },
     ],

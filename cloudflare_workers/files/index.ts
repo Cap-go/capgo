@@ -43,7 +43,7 @@ app.onError(async (e, c) => {
     return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
   }
   await backgroundTask(c as any, sendDiscordAlert(c as any, {
-    content: 'Cloudflare Worker Error',
+    content: 'Cloudflare Worker Error Files',
     embeds: [
       {
         title: 'Failed to process',
@@ -52,6 +52,10 @@ app.onError(async (e, c) => {
           {
             name: 'Error',
             value: JSON.stringify(e),
+          },
+          {
+            name: 'Request',
+            value: JSON.stringify(c.req.raw),
           },
         ],
       },
