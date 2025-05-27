@@ -28,15 +28,11 @@ DECLARE
   headers jsonb;
   url text;
   queue_size bigint;
-  queue_table_name text;
   calls_needed int;
   i int;
 BEGIN
-  -- Construct the queue table name
-  queue_table_name := 'pgmq.q_' || queue_name;
-  
   -- Check if the queue has elements
-  EXECUTE format('SELECT count(*) FROM %I', queue_table_name) INTO queue_size;
+  EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
   
   -- Only make the HTTP request if the queue is not empty
   IF queue_size > 0 THEN
