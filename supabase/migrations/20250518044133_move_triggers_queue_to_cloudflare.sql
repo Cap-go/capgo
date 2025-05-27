@@ -12,8 +12,7 @@ SELECT cron.unschedule('process_version_create_queue');
 SELECT cron.unschedule('process_version_delete_queue');
 SELECT cron.unschedule('process_version_update_queue');
 SELECT cron.unschedule('process_app_delete_queue');
-SELECT cron.unschedule('Update insights');
-SELECT cron.unschedule('Update plan');
+SELECT cron.unschedule('Update web stats');
 
 DROP FUNCTION public.process_function_queue(queue_name text);
 DROP FUNCTION "public"."edit_request_id"(queue_name text, msg_id bigint, new_request_id bigint);
