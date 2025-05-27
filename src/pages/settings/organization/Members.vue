@@ -328,7 +328,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
     if (member.uid === main.user?.id) {
       console.log('Current user deleted themselves from the org.')
       await organizationStore.fetchOrganizations()
-      organizationStore.setCurrentOrganizationToMain()
+      await organizationStore.setCurrentOrganizationToMain()
     }
     else {
       await reloadData()

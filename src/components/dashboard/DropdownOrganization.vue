@@ -24,6 +24,10 @@ onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
+    .catch((error) => {
+      console.error('Cannot get orgs!', error)
+      createNewOrg()
+    })
 })
 
 async function handleOrganizationInvitation(org: Organization) {

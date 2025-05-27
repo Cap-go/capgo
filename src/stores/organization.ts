@@ -186,15 +186,17 @@ export const useOrganizationStore = defineStore('organization', () => {
     const { data, error } = await supabase
       .rpc('get_orgs_v6')
 
-    if (error)
+    if (error) {
+      console.error('Cannot get orgs!', error)
       throw error
+    }
 
     const organization = data
       .filter(org => !org.role.includes('invite'))
       .sort((a, b) => b.app_count - a.app_count)[0]
     if (!organization) {
       console.log('user has no main organization')
-      return
+      throw error
     }
 
     const mappedData = data.map((item, id) => {
