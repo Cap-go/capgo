@@ -300,7 +300,7 @@ const hightLights = computed<Stat[]>(() => ([
 
       displayStore.dialogOption = {
         header: t('detailed-usage-plan'),
-        message: `${t('your-ussage')}\n${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
+        message: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
         buttons: [
           {
             text: t('ok'),
