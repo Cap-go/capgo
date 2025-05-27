@@ -2,7 +2,8 @@
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
-import IcBaselineInfo from '~icons/ic/baseline-info'
+import InformationInfo from '~icons/heroicons/information-circle'
+
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
 
@@ -101,7 +102,7 @@ function nextRunDate() {
             </div>
           </div>
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
+            <InformationInfo class="hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
           </div>
         </div>
       </div>

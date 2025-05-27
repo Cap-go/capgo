@@ -6,7 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useRoute } from 'vue-router'
-import IcBaselineInfo from '~icons/ic/baseline-info'
+import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
@@ -101,9 +101,9 @@ function nextRunDate() {
         </h2>
         <div class="tooltip">
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
+            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
           </div>
-          <div class="tooltip-content">
+          <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
             <div class="max-w-xs whitespace-normal">
               {{ lastRunDate() }}
             </div>

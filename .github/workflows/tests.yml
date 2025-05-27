@@ -34,7 +34,7 @@ jobs:
       - name: Set edge runtime policy to per_worker
         run: sed -i 's/policy = "oneshot"/policy = "per_worker"/g' supabase/config.toml
       - name: Run Supabase Start
-        run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
+        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Setup bun
