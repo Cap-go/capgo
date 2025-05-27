@@ -1350,7 +1350,7 @@ ALTER FUNCTION "public"."http_post_helper"("function_name" "text", "function_typ
 
 -- Cron jobs for insights and plan
 select
-    cron.schedule('Update insights', '22 1 * * *', $$SELECT http_post_helper('logsnag_insights', 'cloudflare', '{}'::jsonb)$$);
+    cron.schedule('Update web stats', '22 1 * * *', $$SELECT http_post_helper('logsnag_insights', 'cloudflare', '{}'::jsonb)$$);
 SELECT cron.schedule('Update plan', '0 1 * * *', $$SELECT http_post_helper('cron_good_plan', '', '{}'::jsonb)$$);
 
 
