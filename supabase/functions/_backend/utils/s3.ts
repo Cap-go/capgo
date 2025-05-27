@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../utils/supabase.types.ts'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
+import { cloudlog } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 async function initS3(c: Context) {
@@ -24,16 +25,16 @@ async function initS3(c: Context) {
 
 export async function getPath(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   if (!record.r2_path) {
-    console.log({ requestId: c.get('requestId'), context: 'no r2_path' })
+    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path' })
     return null
   }
   if (!record.r2_path && (!record.app_id || !record.user_id || !record.id)) {
-    console.log({ requestId: c.get('requestId'), context: 'no app_id or user_id or id' })
+    cloudlog({ requestId: c.get('requestId'), message: 'no app_id or user_id or id' })
     return null
   }
   const exist = await checkIfExist(c, record.r2_path)
   if (!exist) {
-    console.log({ requestId: c.get('requestId'), context: 'not exist', vPath: record.r2_path })
+    cloudlog({ requestId: c.get('requestId'), message: 'not exist', vPath: record.r2_path })
     return null
   }
   return record.r2_path
@@ -68,7 +69,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
     return file.size > 0
   }
   catch {
-    // console.log({ requestId: c.get('requestId'), context: 'checkIfExist', fileId, error })
+    // cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist', fileId, error  })
     return false
   }
 }
@@ -90,11 +91,11 @@ async function getSize(c: Context, fileId: string) {
   const client = await initS3(c)
   try {
     const file = await client.statObject(fileId)
-    console.log({ requestId: c.get('requestId'), context: 'getSize', file, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })
+    cloudlog({ requestId: c.get('requestId'), message: 'getSize', file, fileId, bucket: getEnv(c, 'S3_BUCKET'), endpoint: getEnv(c, 'S3_ENDPOINT') })
     return file.size ?? 0
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'getSize', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'getSize', error })
     return 0
   }
 }

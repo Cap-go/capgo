@@ -74,6 +74,7 @@
   "api-keys-are-used-for-cli-and-public-api": "API 키는 CLI 및 공개 API에 사용됩니다.",
   "app": "앱",
   "app-deleted": "앱 삭제됨",
+  "app-id": "앱 ID",
   "app-info": "앱 정보",
   "app-info-desc": "여기에서 앱 정보를 변경할 수 있습니다.",
   "app-logo-deleted": "앱 사진이 삭제되었습니다.",

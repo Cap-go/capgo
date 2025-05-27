@@ -74,6 +74,7 @@
   "api-keys-are-used-for-cli-and-public-api": "API anahtarları CLI ve genel API için kullanılır",
   "app": "Uygulama",
   "app-deleted": "Uygulama silindi",
+  "app-id": "Uygulama Kimliği",
   "app-info": "Uygulama bilgileri",
   "app-info-desc": "Uygulama bilgilerinizi buradan değiştirebilirsiniz",
   "app-logo-deleted": "Uygulama resmi başarıyla silindi",

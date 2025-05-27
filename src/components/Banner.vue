@@ -46,6 +46,14 @@ watchEffect(async () => {
 
 const isMobile = Capacitor.isNativePlatform()
 
+const bannerLeftText = computed(() => {
+  const org = organizationStore.currentOrganization
+  if (org?.paying)
+    return t('billing')
+
+  return t('free-trial')
+})
+
 const bannerText = computed(() => {
   const org = organizationStore.currentOrganization
   if (!org)
@@ -100,15 +108,15 @@ const bannerColor = computed(() => {
 </script>
 
 <template>
-  <div v-if="bannerText" class="navbar bg-gray-100 dark:bg-gray-800/90">
+  <div v-if="bannerText" class="navbar bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
     <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
-      {{ t('free-trial') }}
+      {{ bannerLeftText }}
     </div>
     <div class="navbar-center lg:flex">
       <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a href="/settings/organization/plans" class="btn" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <a href="/settings/organization/plans" class="btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
     </div>
   </div>
 </template>

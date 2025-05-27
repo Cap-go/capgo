@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { BASE_URL, getBaseData, getSupabaseClient, postUpdate, PRODUCT_ID, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.cron_plan'
+const id = randomUUID()
+const APPNAME = `com.cp.${id}`
 const ORG_ID = '046a36ac-e03c-4190-9257-bd6c9dba9ee9'
 const STRIPE_INFO_CUSTOMER_ID = 'cus_Q38uE91NP8Ufq1'
 const headers = {

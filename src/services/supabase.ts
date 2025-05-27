@@ -208,7 +208,7 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
       }).then((res) => {
         if (res.error)
           throw new Error(res.error.message)
-        return (res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string, get: number }[] }).statistics
+        return (res.data as { mau: number, storage: number, bandwidth: number, date: string, get: number }[])
       }),
       // Get app statistics for all apps
       Promise.all(resAppIds.map(appId =>
@@ -217,8 +217,8 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
         }).then((res) => {
           if (res.error)
             throw new Error(res.error.message)
-          const typedData = res.data as { statistics: { mau: number, storage: number, bandwidth: number, date: string, get: number }[] }
-          return typedData.statistics.map(stat => ({
+          const typedData = res.data as { mau: number, storage: number, bandwidth: number, date: string, get: number }[]
+          return typedData.map(stat => ({
             app_id: appId,
             date: stat.date,
             mau: stat.mau,

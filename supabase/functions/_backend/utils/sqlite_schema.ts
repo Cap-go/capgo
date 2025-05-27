@@ -35,7 +35,6 @@ export const app_versions = sqliteTable('app_versions', {
   session_key: text('session_key'),
   storage_provider: text('storage_provider').default('r2').notNull(),
   min_update_version: text('min_update_version'),
-  manifest: text('manifest', { mode: 'json' }),
 })
 
 export const manifest = sqliteTable('manifest', {
@@ -44,7 +43,6 @@ export const manifest = sqliteTable('manifest', {
   file_name: text('file_name').notNull(),
   s3_path: text('s3_path').notNull(),
   file_hash: text('file_hash').notNull(),
-  file_size: integer('file_size', { mode: 'number' }).default(0),
 })
 
 export const channels = sqliteTable('channels', {
@@ -82,7 +80,7 @@ export const orgs = sqliteTable('orgs', {
 })
 
 export const stripe_info = sqliteTable('stripe_info', {
-  id: text('id').primaryKey().notNull(),
+  id: integer('id', { mode: 'number' }).primaryKey().notNull(),
   customer_id: text('customer_id'),
   status: text('status'),
   trial_at: text('trial_at'),
@@ -91,6 +89,3 @@ export const stripe_info = sqliteTable('stripe_info', {
   storage_exceeded: boolean('storage_exceeded'),
   bandwidth_exceeded: boolean('bandwidth_exceeded'),
 })
-
-export type AppVersionsType = typeof app_versions.$inferInsert
-export type ManifestType = typeof manifest.$inferInsert

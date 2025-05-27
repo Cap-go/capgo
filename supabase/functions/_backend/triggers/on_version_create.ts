@@ -2,8 +2,12 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
+import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -12,18 +16,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'app_versions'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), context: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log({ requestId: c.get('requestId'), context: 'Not INSERT' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), context: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.id) {
-      console.log({ requestId: c.get('requestId'), context: 'No id' })
+      cloudlog({ requestId: c.get('requestId'), message: 'No id' })
       return c.json(BRES)
     }
 
@@ -35,28 +39,38 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('app_id', record.app_id)
       .eq('owner_org', record.owner_org)
     if (errorUpdate)
-      console.log({ requestId: c.get('requestId'), context: 'errorUpdate', errorUpdate })
+      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
 
-    if (!record.app_id) {
-      return c.json({
-        status: 'error app_id',
-        error: 'Np app id included the request',
-      }, 500)
-    }
-
-    // create app version meta
-    const { error: dbError } = await supabaseAdmin(c as any)
-      .from('app_versions_meta')
-      .insert({
-        id: record.id,
+    const LogSnag = logsnag(c as any)
+    await backgroundTask(c as any, LogSnag.track({
+      channel: 'bundle-created',
+      event: 'Bundle Created',
+      icon: '🎉',
+      user_id: record.owner_org,
+      tags: {
         app_id: record.app_id,
-        owner_org: record.owner_org,
-        checksum: '',
-        size: 0,
-      })
-    if (dbError)
-      console.error({ requestId: c.get('requestId'), context: 'Cannot create app version meta', error: dbError })
-    return c.json(BRES) // skip delete s3 and increment size in new upload
+        bundle_name: record.name,
+      },
+      notify: false,
+    }))
+    await backgroundTask(c as any, supabaseAdmin(c as any)
+      .from('orgs')
+      .select('*')
+      .eq('id', record.owner_org)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
+          return c.json({ status: 'Error fetching organization' }, 500)
+        }
+        return trackBentoEvent(c as any, data.management_email, {
+          org_id: record.owner_org,
+          app_id: record.app_id,
+          bundle_name: record.name,
+        }, 'bundle:created') as any
+      }))
+
+    return c.json(BRES)
   }
   catch (e) {
     return c.json({ status: 'Cannot create version', error: JSON.stringify(e) }, 500)

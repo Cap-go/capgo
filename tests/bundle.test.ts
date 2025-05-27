@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, createAppVersions, fetchBundle, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
-const APPNAME = 'com.demo.app.bundle'
+const id = randomUUID()
+const APPNAME = `com.app.b.${id}`
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -26,7 +28,7 @@ describe('[GET] /bundle operations', () => {
 
 describe('[POST] /bundle/metadata operations', () => {
   let versionId: number
-  
+
   beforeAll(async () => {
     // Create a test version to update
     const version = await createAppVersions('1.0.0-test-metadata', APPNAME)
@@ -41,10 +43,10 @@ describe('[POST] /bundle/metadata operations', () => {
         app_id: APPNAME,
         version_id: versionId,
         link: 'https://example.com/docs',
-        comment: 'Test bundle comment'
+        comment: 'Test bundle comment',
       }),
     })
-    
+
     const data = await response.json() as { status: string }
     expect(response.status).toBe(200)
     expect(data.status).toBe('success')
@@ -72,10 +74,10 @@ describe('[POST] /bundle/metadata operations', () => {
       body: JSON.stringify({
         // Missing app_id
         version_id: versionId,
-        link: 'https://example.com'
+        link: 'https://example.com',
       }),
     })
-    
+
     expect(response.status).toBe(400)
     const data = await response.json() as { status: string, error: string }
     expect(data.status).toBe('Missing required fields')
@@ -88,10 +90,10 @@ describe('[POST] /bundle/metadata operations', () => {
       body: JSON.stringify({
         app_id: APPNAME,
         version_id: 999999, // Non-existent version ID
-        link: 'https://example.com'
+        link: 'https://example.com',
       }),
     })
-    
+
     expect(response.status).toBe(400)
     const data = await response.json() as { status: string }
     expect(data.status).toBe('Cannot find version')
@@ -104,10 +106,10 @@ describe('[POST] /bundle/metadata operations', () => {
       body: JSON.stringify({
         app_id: 'invalid_app',
         version_id: versionId,
-        link: 'https://example.com'
+        link: 'https://example.com',
       }),
     })
-    
+
     expect(response.status).toBe(400)
     const data = await response.json() as { status: string }
     expect(data.status).toBe('Cannot find version')

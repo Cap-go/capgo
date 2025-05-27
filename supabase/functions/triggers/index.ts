@@ -58,9 +58,5 @@ appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/on_organization_delete', on_organization_delete)
-appGlobal.post('/replicate_data', (c) => {
-  // for self deploy allow to make job success
-  return c.json({ status: 'ok' })
-})
 
 Deno.serve(appGlobal.fetch)

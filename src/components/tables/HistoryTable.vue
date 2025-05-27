@@ -275,7 +275,9 @@ async function handleRollback(item: DeployHistory) {
   displayStore.showDialog = true
 }
 
-watch([() => props.channelId, () => props.appId, sort, page, pageSize, search], fetchDeployHistory, { immediate: true })
+watch([() => props.channelId, () => props.appId], () => {
+  fetchDeployHistory()
+})
 </script>
 
 <template>

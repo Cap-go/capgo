@@ -3,7 +3,7 @@ import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import ky from 'ky'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
@@ -186,7 +186,6 @@ async function getData() {
 }
 
 async function reload() {
-  // console.log('reload')
   try {
     elements.value.length = 0
     await getData()
@@ -217,10 +216,6 @@ async function openOneVersion(one: Element) {
 function handleAddDevice() {
   emit('addDevice')
 }
-
-onMounted(async () => {
-  await refreshData()
-})
 </script>
 
 <template>

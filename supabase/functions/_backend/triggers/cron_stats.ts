@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -17,7 +18,7 @@ app.use('/', useCors)
 app.post('/', middlewareAPISecret, async (c) => {
   try {
     const body = await c.req.json<dataToGet>()
-    console.log({ requestId: c.get('requestId'), context: 'postcron stats body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'postcron stats body', body })
     if (!body.appId || !body.orgId)
       return c.json({ status: 'No appId' }, 400)
 
@@ -29,7 +30,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (!cycleInfo || !cycleInfo.subscription_anchor_start || !cycleInfo.subscription_anchor_end)
       return c.json({ status: 'Cannot get cycle info' }, 400)
 
-    console.log({ requestId: c.get('requestId'), context: 'cycleInfo', cycleInfo })
+    cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })
     const startDate = cycleInfo.subscription_anchor_start
     const endDate = cycleInfo.subscription_anchor_end
 
@@ -49,10 +50,10 @@ app.post('/', middlewareAPISecret, async (c) => {
       versionUsage = versionUsage.slice(-1)
     }
 
-    console.log({ requestId: c.get('requestId'), context: 'mau', mauLength: mau.length, mauCount: mau.reduce((acc, curr) => acc + curr.mau, 0), mau: JSON.stringify(mau) })
-    console.log({ requestId: c.get('requestId'), context: 'bandwidth', bandwidthLength: bandwidth.length, bandwidthCount: bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), bandwidth: JSON.stringify(bandwidth) })
-    console.log({ requestId: c.get('requestId'), context: 'storage', storageLength: storage.length, storageCount: storage.reduce((acc, curr) => acc + curr.storage, 0), storage: JSON.stringify(storage) })
-    console.log({ requestId: c.get('requestId'), context: 'versionUsage', versionUsageLength: versionUsage.length, versionUsageCount: versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0), versionUsage: JSON.stringify(versionUsage) })
+    cloudlog({ requestId: c.get('requestId'), message: 'mau', mauLength: mau.length, mauCount: mau.reduce((acc, curr) => acc + curr.mau, 0), mau: JSON.stringify(mau) })
+    cloudlog({ requestId: c.get('requestId'), message: 'bandwidth', bandwidthLength: bandwidth.length, bandwidthCount: bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), bandwidth: JSON.stringify(bandwidth) })
+    cloudlog({ requestId: c.get('requestId'), message: 'storage', storageLength: storage.length, storageCount: storage.reduce((acc, curr) => acc + curr.storage, 0), storage: JSON.stringify(storage) })
+    cloudlog({ requestId: c.get('requestId'), message: 'versionUsage', versionUsageLength: versionUsage.length, versionUsageCount: versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0), versionUsage: JSON.stringify(versionUsage) })
 
     // save to daily_mau, daily_bandwidth and daily_storage
     await Promise.all([
@@ -74,11 +75,11 @@ app.post('/', middlewareAPISecret, async (c) => {
         .throwOnError(),
     ])
 
-    console.log({ requestId: c.get('requestId'), context: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
+    cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
     return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting stats', e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting stats', e })
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })

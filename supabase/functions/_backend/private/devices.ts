@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
@@ -24,7 +25,7 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   try {
     const body = await c.req.json<dataDevice>()
-    console.log({ requestId: c.get('requestId'), context: 'post devices body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
     const devicesIds = body.devicesId || body.deviceIds || []
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')

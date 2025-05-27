@@ -63,54 +63,105 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   try {
-    const { email, appId } = await c.req.json()
+    const { email, appId, type } = await c.req.json()
 
-    if (!email || !appId) {
-      return c.json({ status: 'Missing email or appId' }, 400)
+    if (!email || !appId || !type) {
+      return c.json({ status: 'Missing email, appId, or type' }, 400)
     }
 
-    const supabase = await supabaseAdmin(c as any)
-
-    const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
-      app_id: appId,
-    }).single()
-
-    if (!weeklyStats || generateStatsError) {
-      console.error({ requestId: c.get('requestId'), context: 'Cannot send email for app', appId, error: generateStatsError, email })
-      return c.json({ status: 'Cannot generate stats' }, 500)
+    if (type === 'weekly_install_stats') {
+      return await handleWeeklyInstallStats(c, email, appId)
     }
-
-    if (weeklyStats.all_updates === 0) {
-      return c.json({ status: 'No updates this week' }, 200)
+    else if (type === 'monthly_create_stats') {
+      return await handleMonthlyCreateStats(c, email, appId)
     }
-
-    const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
-    // TODO: uncomment this when better stats are available and enabled back betetr email
-    if (sucessUpdates < 0) {
-      console.error(c.get('requestId'), 'Cannot send email for app, sucessUpdates < 0', weeklyStats, { app_id: appId, email })
-      console.error(c.get('requestId'), 'Invalid stats detected', weeklyStats, { app_id: appId, email })
-      return c.json({ status: 'No valid stats available' }, 200)
+    else {
+      return c.json({ status: 'Invalid email type' }, 400)
     }
-
-    const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
-
-    const metadata = {
-      app_id: appId,
-      weekly_updates: (weeklyStats.all_updates).toString(),
-      fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
-      weekly_install: sucessUpdates.toString(),
-      weekly_install_success: (successPercantage * 100).toString(),
-      fun_comparison_2: getFunComparison('failRate', successPercantage),
-      weekly_fail: (weeklyStats.failed_updates).toString(),
-      weekly_open: (weeklyStats.open_app).toString(),
-      fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
-    }
-
-    await trackBentoEvent(c as any, email, metadata, 'user:weekly_stats')
-
-    return c.json(BRES)
   }
   catch (e) {
     return c.json({ status: 'Cannot process email', error: JSON.stringify(e) }, 500)
   }
 })
+
+async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
+  const supabase = await supabaseAdmin(c as any)
+
+  const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
+    app_id: appId,
+  }).single()
+
+  if (!weeklyStats || generateStatsError) {
+    console.error({ requestId: c.get('requestId'), message: 'Cannot send email for app', appId, error: generateStatsError, email })
+    return c.json({ status: 'Cannot generate stats' }, 500)
+  }
+
+  if (weeklyStats.all_updates === 0) {
+    return c.json({ status: 'No updates this week' }, 200)
+  }
+
+  const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
+  if (sucessUpdates < 0) {
+    console.error(c.get('requestId'), 'Cannot send email for app, sucessUpdates < 0', weeklyStats, { app_id: appId, email })
+    console.error(c.get('requestId'), 'Invalid stats detected', weeklyStats, { app_id: appId, email })
+    return c.json({ status: 'No valid stats available' }, 200)
+  }
+
+  const successPercantage = Math.round((sucessUpdates / weeklyStats.all_updates) * 10_000) / 10_000
+
+  const metadata = {
+    app_id: appId,
+    weekly_updates: (weeklyStats.all_updates).toString(),
+    fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
+    weekly_install: sucessUpdates.toString(),
+    weekly_install_success: (successPercantage * 100).toString(),
+    fun_comparison_2: getFunComparison('failRate', successPercantage),
+    weekly_fail: (weeklyStats.failed_updates).toString(),
+    weekly_open: (weeklyStats.open_app).toString(),
+    fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
+  }
+
+  await trackBentoEvent(c as any, email, metadata, 'user:weekly_stats')
+
+  return c.json(BRES)
+}
+
+async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
+  const supabase = await supabaseAdmin(c as any)
+  // Fetch additional stats for bundle creation, channel creation, and publishing
+  const { data: appVersions, error: _appVersionsError } = await supabase
+    .from('app_versions')
+    .select('id, created_at')
+    .eq('app_id', appId)
+    .gte('created_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
+    .lte('created_at', new Date().toISOString())
+
+  const { data: channels, error: _channelsError } = await supabase
+    .from('channels')
+    .select('id, created_at')
+    .eq('app_id', appId)
+    .gte('created_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
+    .lte('created_at', new Date().toISOString())
+
+  const { data: deployHistory, error: _deployHistoryError } = await supabase
+    .from('deploy_history')
+    .select('id, deployed_at')
+    .eq('app_id', appId)
+    .gte('deployed_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
+    .lte('deployed_at', new Date().toISOString())
+
+  const bundleCount = appVersions && appVersions.length ? appVersions.length : 0
+  const channelCount = channels && channels.length ? channels.length : 0
+  const publishCount = deployHistory && deployHistory.length ? deployHistory.length : 0
+
+  const metadata = {
+    app_id: appId,
+    monthly_bundles_created: bundleCount.toString(),
+    monthly_channels_created: channelCount.toString(),
+    monthly_publishes: publishCount.toString(),
+  }
+
+  await trackBentoEvent(c as any, email, metadata, 'org:monthly_create_stats')
+
+  return c.json(BRES)
+}

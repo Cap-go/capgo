@@ -2,6 +2,7 @@ import type { Context } from '@hono/hono'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './supabase.types.ts'
 import { env, getRuntimeKey } from 'hono/adapter'
+import { cloudlog } from './loggin.ts'
 
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
 
@@ -71,12 +72,34 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       .eq('key', authorization)
       .in('mode', allowed)
       .single()
+    if (!data || error) {
+      console.log('Invalid apikey', authorization, allowed, error)
+      return null
+    }
+    return data
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKey error', error })
+    return null
+  }
+}
+
+export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+  if (!id)
+    return null
+  try {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .select('*')
+      .eq('id', id)
+      .in('mode', allowed)
+      .single()
     if (!data || error)
       return null
     return data
   }
   catch (error) {
-    console.log({ requestId: c.get('requestId'), context: 'checkKey error', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'checkKeyById error', error })
     return null
   }
 }

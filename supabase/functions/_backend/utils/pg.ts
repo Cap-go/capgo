@@ -6,13 +6,14 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { cloudlog } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
-  // console.log({ requestId: c.get('requestId'), context: 'clientContinent', clientContinent })
+  // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
@@ -44,7 +45,7 @@ export function getDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
-  console.log({ requestId: c.get('requestId'), context: 'SUPABASE_DB_URL', dbUrl })
+  cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
   return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
 
@@ -60,9 +61,10 @@ export function getDrizzleClientD1(c: Context) {
 }
 
 export function getDrizzleClientD1Session(c: Context) {
-  // TODO: try when available in Cloudflare
-  const token = c.req.raw.headers.get('x-d1-token') ?? 'first-unconditional'
-  const session = c.env.DB_REPLICATE.withSession(token)
+  if (!existInEnv(c, 'DB_REPLICATE')) {
+    throw new Error('DB_REPLICATE is not set')
+  }
+  const session = c.env.DB_REPLICATE.withSession('first-unconstrained')
   return drizzleD1(session)
 }
 
@@ -83,7 +85,7 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -109,7 +111,7 @@ export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrgActionD1', error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
   }
   return false
 }
@@ -125,7 +127,7 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'isAllowedActionOrg', error })
+    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -142,6 +144,21 @@ function getAliasV2() {
   const channelAlias = aliasV2(schemaV2.channels, 'channels')
   return { versionAlias, channelDevicesAlias, channelAlias }
 }
+
+// Helper function to parse manifestEntries
+function parseManifestEntries(data: any, source: string) {
+  const result = data.at(0)
+  if (result && typeof result.manifestEntries === 'string') {
+    try {
+      result.manifestEntries = JSON.parse(result.manifestEntries)
+    }
+    catch (e) {
+      console.error(`Error parsing manifestEntries for ${source}:`, e)
+    }
+  }
+  return result
+}
+
 export function requestInfosPostgres(
   platform: string,
   app_id: string,
@@ -152,16 +169,17 @@ export function requestInfosPostgres(
 ) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
-  const appVersions = drizzleCient
+  const appVersionsQuery = drizzleCient
     .select({
       id: versionAlias.id,
     })
     .from(versionAlias)
     .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
-    .then(data => data.at(0))
+  console.log('appVersions Query:', appVersionsQuery.toSQL())
+  const appVersions = appVersionsQuery.then(data => data.at(0))
 
-  const channelDevice = drizzleCient
+  const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
@@ -204,9 +222,10 @@ export function requestInfosPostgres(
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  const channelDevice = channelDeviceQuery.then(data => data.at(0))
 
-  const channel = drizzleCient
+  const channelQuery = drizzleCient
     .select({
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -253,7 +272,8 @@ export function requestInfosPostgres(
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+  console.log('channel Query:', channelQuery.toSQL())
+  const channel = channelQuery.then(data => data.at(0))
 
   return Promise.all([channelDevice, channel, appVersions])
     .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
@@ -281,7 +301,7 @@ export function requestInfosPostgresV2(
     .limit(1)
     .then(data => data.at(0))
 
-  const channelDevice = drizzleCient
+  const channelDeviceQuery = drizzleCient
     .select({
       channel_devices: {
         device_id: channelDevicesAlias.device_id,
@@ -324,9 +344,14 @@ export function requestInfosPostgresV2(
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
 
-  const channel = drizzleCient
+  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  const channelDevice = channelDeviceQuery.then((data) => {
+    console.log('channelDevice data:', data)
+    return parseManifestEntries(data, 'channelDevice')
+  })
+
+  const channelQuery = drizzleCient
     .select({
       version: {
         id: sql<number>`${versionAlias.id}`.as('vid'),
@@ -354,7 +379,7 @@ export function requestInfosPostgresV2(
       manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
         'file_name', ${schemaV2.manifest.file_name},
         'file_hash', ${schemaV2.manifest.file_hash},
-        's3_path', ${schemaV2.manifest.s3_path},
+        's3_path', ${schemaV2.manifest.s3_path}
       ))`,
     })
     .from(channelAlias)
@@ -373,10 +398,19 @@ export function requestInfosPostgresV2(
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => data.at(0))
+
+  console.log('channel Query:', channelQuery.toSQL())
+  const channel = channelQuery.then((data) => {
+    console.log('channel data:', data)
+    return parseManifestEntries(data, 'channel')
+  })
 
   return Promise.all([channelDevice, channel, appVersions])
-    .then(([channelOverride, channelData, versionData]) => ({ versionData, channelData, channelOverride }))
+    .then(([channelOverride, channelData, versionData]) => {
+      const responseData = { versionData, channelData, channelOverride }
+      console.log('Final response data:', responseData)
+      return responseData
+    })
     .catch((e) => {
       throw e
     })
@@ -388,6 +422,7 @@ export async function getAppOwnerPostgresV2(
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
+    console.log('appOwner', appId)
     const appOwner = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
@@ -401,11 +436,12 @@ export async function getAppOwnerPostgresV2(
       .innerJoin(aliasV2(schemaV2.orgs, 'orgs'), eq(schemaV2.apps.owner_org, schemaV2.orgs.id))
       .limit(1)
       .then(data => data[0])
-
+    console.log('appOwner result', appOwner)
     return appOwner
   }
   catch (e: any) {
-    console.error({ requestId: c.get('requestId'), context: 'getAppOwnerPostgres', error: e })
+    console.log('appOwner error', e)
+    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }
@@ -433,7 +469,123 @@ export async function getAppOwnerPostgres(
     return appOwner
   }
   catch (e: any) {
-    console.error({ requestId: c.get('requestId'), context: 'getAppOwnerPostgres', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
+}
+
+export function requestInfosPostgresLite(
+  app_id: string,
+  version_name: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+) {
+  const { versionAlias, channelAlias } = getAlias()
+
+  const appVersions = drizzleCient
+    .select({
+      id: versionAlias.id,
+    })
+    .from(versionAlias)
+    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  const channel = drizzleCient
+    .select({
+      version: {
+        id: sql<number>`${versionAlias.id}`.as('vid'),
+        name: sql<string>`${versionAlias.name}`.as('vname'),
+        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+      },
+      channels: {
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        public: channelAlias.public,
+      },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
+        'file_name', ${schema.manifest.file_name},
+        'file_hash', ${schema.manifest.file_hash},
+        's3_path', ${schema.manifest.s3_path}
+      ))`,
+    })
+    .from(channelAlias)
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    .where(and(
+      eq(channelAlias.public, true),
+      eq(channelAlias.app_id, app_id),
+    ))
+    .groupBy(channelAlias.id, versionAlias.id)
+    .limit(1)
+    .then(data => parseManifestEntries(data, 'channel'))
+
+  return Promise.all([channel, appVersions])
+    .then(([channelData, versionData]) => ({ versionData, channelData }))
+    .catch((e) => {
+      throw e
+    })
+}
+
+export function requestInfosPostgresLiteV2(
+  app_id: string,
+  version_name: string,
+  drizzleCient: ReturnType<typeof getDrizzleClientD1>,
+) {
+  const { versionAlias, channelAlias } = getAliasV2()
+
+  const appVersions = drizzleCient
+    .select({
+      id: versionAlias.id,
+    })
+    .from(versionAlias)
+    .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
+    .limit(1)
+    .then(data => data.at(0))
+
+  const channel = drizzleCient
+    .select({
+      version: {
+        id: sql<number>`${versionAlias.id}`.as('vid'),
+        name: sql<string>`${versionAlias.name}`.as('vname'),
+        checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
+        session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
+        storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+        external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
+        min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
+        r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
+      },
+      channels: {
+        id: channelAlias.id,
+        name: channelAlias.name,
+        app_id: channelAlias.app_id,
+        public: channelAlias.public,
+      },
+      manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`json_group_array(json_object(
+        'file_name', ${schemaV2.manifest.file_name},
+        'file_hash', ${schemaV2.manifest.file_hash},
+        's3_path', ${schemaV2.manifest.s3_path}
+      ))`,
+    })
+    .from(channelAlias)
+    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
+    .where(and(
+      eq(channelAlias.public, true),
+      eq(channelAlias.app_id, app_id),
+    ))
+    .groupBy(channelAlias.id, versionAlias.id)
+    .limit(1)
+    .then(data => parseManifestEntries(data, 'channel'))
+
+  return Promise.all([channel, appVersions])
+    .then(([channelData, versionData]) => ({ versionData, channelData }))
+    .catch((e) => {
+      throw e
+    })
 }

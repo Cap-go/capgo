@@ -69,28 +69,6 @@
       ]
     }
   ],
-  "unsafe": {
-    "bindings": [
-      {
-        "name": "FILES_READ_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1001",
-        "simple": {
-          "limit": 200,
-          "period": 10
-        }
-      },
-      {
-        "name": "FILES_UPLOAD_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1002",
-        "simple": {
-          "limit": 200,
-          "period": 10
-        }
-      }
-    ]
-  },
   "env": {
     "preprod": {
       "name": "capgo_files-preprod",

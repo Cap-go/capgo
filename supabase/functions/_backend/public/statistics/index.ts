@@ -2,65 +2,23 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { z } from 'zod'
-import { honoFactory, useCors } from '../../utils/hono.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin, supabaseClient as useSupabaseClient } from '../../utils/supabase.ts'
-import { checkKey } from '../../utils/utils.ts'
+import { honoFactory, middlewareV2, useCors } from '../../utils/hono.ts'
+import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 
-const useAuth = honoFactory.createMiddleware(async (c, next) => {
-  const authToken = c.req.header('authorization')
-  const capgkey = c.req.header('capgkey')
-
-  if (authToken) {
-    // JWT auth
-    const supabaseClient = useSupabaseClient(c as any, authToken)
-    const { data: user, error: userError } = await supabaseClient.auth.getUser()
-    if (userError)
-      return c.json({ status: 'Unauthorized', error: 'Invalid JWT token' }, 401)
-
-    c.set('auth', {
-      userId: user.user?.id,
-      authType: 'jwt',
-      apikey: null,
-    } as AuthInfo)
-  }
-  else if (capgkey) {
-    // API key auth
-    const apikey = await checkKey(c as any, capgkey, supabaseAdmin(c as any), ['all'])
-    if (!apikey)
-      return c.json({ status: 'Unauthorized', error: 'Invalid API key' }, 401)
-
-    c.set('auth', {
-      userId: apikey.user_id,
-      authType: 'apikey',
-      apikey,
-    } as AuthInfo)
-  }
-  else {
-    return c.json({ status: 'Unauthorized', error: 'No authentication provided' }, 401)
-  }
-
-  await next()
-})
-
 export const app = honoFactory.createApp()
 app.use('*', useCors)
-app.use('*', useAuth)
+app.use('*', middlewareV2(['all', 'read']))
 
 const bundleUsageSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
-  graph: z.string().optional().superRefine((val, ctx) => {
-    if (val && val !== 'true' && val !== 'false')
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid graph value. Must be true or false.' })
-  }).transform(val => val === 'true'),
 })
 
 const normalStatsSchema = z.object({
   from: z.coerce.date(),
   to: z.coerce.date(),
-  graph: z.enum(['mau', 'storage', 'bandwidth']).optional(),
 })
 
 interface VersionName {
@@ -82,29 +40,36 @@ app.get('/app/:app_id', async (c) => {
     const appId = c.req.param('app_id')
     const query = c.req.query()
     const bodyParsed = normalStatsSchema.safeParse(query)
-    if (!bodyParsed.success)
+    if (!bodyParsed.success) {
+      console.log('Invalid body', bodyParsed.error)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key))
+      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
+        console.log('Invalid apikey', auth)
         return c.json({ status: 'You can\'t access this app' }, 400)
+      }
     }
     else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
+      console.log('Invalid jwt', auth.userId)
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
     const supabase = supabaseAdmin(c as any)
     const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
-    if (error)
+    if (error) {
+      console.log('Cannot get app statistics', error)
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
+    }
 
-    return c.json({ status: 'ok', statistics: finalStats })
+    return c.json(finalStats)
   }
   catch (e) {
-    console.error(e)
+    console.error('Error in app statistics', e)
     return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(e) }, 500)
   }
 })
@@ -118,31 +83,40 @@ app.get('/org/:org_id', async (c) => {
     const supabase = supabaseAdmin(c as any)
 
     const bodyParsed = normalStatsSchema.safeParse(query)
-    if (!bodyParsed.success)
+    if (!bodyParsed.success) {
+      console.log('Invalid body', bodyParsed.error)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
-    if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read')))
+    if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read'))) {
+      console.log('Invalid jwt', auth.userId)
       return c.json({ status: 'You can\'t access this organization' }, 400)
+    }
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-      if (!auth.apikey!.limited_to_orgs.includes(orgId))
+      if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
+        console.log('Invalid apikey', auth.apikey!.key)
         return c.json({ status: 'You can\'t access this organization' }, 400)
+      }
     }
 
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+      console.log('Invalid apikey', auth.apikey!.key)
       return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
     const { data: finalStats, error } = await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
-    if (error)
+    if (error) {
+      console.log('Cannot get organization statistics', error)
       return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
+    }
 
-    return c.json({ status: 'ok', statistics: finalStats })
+    return c.json(finalStats)
   }
   catch (e) {
-    console.error(e)
+    console.error('Error in organization statistics', e)
     return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(e) }, 500)
   }
 })
@@ -154,29 +128,36 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     const useDashbord = false
 
     const bodyParsed = bundleUsageSchema.safeParse(query)
-    if (!bodyParsed.success)
+    if (!bodyParsed.success) {
+      console.log('Invalid body', bodyParsed.error)
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key))
+      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
+        console.log('Invalid apikey', auth.apikey!.key)
         return c.json({ status: 'You can\'t access this app' }, 400)
+      }
     }
     else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
+      console.log('Invalid jwt', auth.userId)
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
     const supabase = supabaseAdmin(c as any)
     const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
-    if (error)
+    if (error) {
+      console.log('Cannot get app statistics. Cannot get bundle usage', error)
       return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
+    }
 
-    return c.json({ status: 'ok', data })
+    return c.json(data)
   }
   catch (e) {
-    console.error(e)
+    console.error('Error in app statistics. Cannot get bundle usage', e)
     return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(e) }, 500)
   }
 })
@@ -187,31 +168,46 @@ app.get('/user', async (c) => {
 
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)
-  if (!bodyParsed.success)
+  if (!bodyParsed.success) {
+    console.log('Invalid body', bodyParsed.error)
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+  }
   const body = bodyParsed.data
 
   const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
     orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
   }
-  else if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    orgsReq.in('app_id', auth.apikey!.limited_to_apps)
-  }
   const orgs = await orgsReq
-  if (orgs.error)
+  if (orgs.error) {
+    console.log('Cannot get user statistics', orgs.error)
     return c.json({ status: 'User not found', error: JSON.stringify(orgs.error) }, 404)
+  }
+
+  console.log('orgs', orgs.data)
 
   // Deduplicate organizations by org_id using Set for better performance
   const uniqueOrgs = Array.from(
     new Map(orgs.data.map(org => [org.org_id, org])).values(),
   )
-  if (uniqueOrgs.length === 0)
-    return c.json({ status: 'No organizations found', error: 'No organizations found' }, 404)
-  const stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+  if (uniqueOrgs.length === 0) {
+    console.log('No organizations found', auth.userId)
+    return c.json({ status: 'No organizations found', error: 'No organizations found' }, 401)
+  }
+
+  let stats: Array<{ data: any, error: any }> = []
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+  }
+  else {
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+  }
+
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
-  if (errors.length > 0)
+  if (errors.length > 0) {
+    console.log('Cannot get user statistics', errors)
     return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
+  }
 
   const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
     const current = acc.get(curr.date)
@@ -226,7 +222,7 @@ app.get('/user', async (c) => {
     return acc
   }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
 
-  return c.json({ status: 'ok', statistics: finalStats })
+  return c.json(finalStats)
 })
 
 async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {

@@ -4,10 +4,10 @@ CREATE TABLE IF NOT EXISTS "public"."deploy_history" (
     "created_at" timestamp with time zone DEFAULT NOW(),
     "updated_at" timestamp with time zone DEFAULT NOW(),
     "channel_id" bigint NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-    "app_id" character varying NOT NULL REFERENCES apps(app_id),
-    "version_id" bigint NOT NULL REFERENCES app_versions(id),
+    "app_id" character varying NOT NULL REFERENCES apps(app_id) ON DELETE CASCADE,
+    "version_id" bigint NOT NULL REFERENCES app_versions(id) ON DELETE CASCADE,
     "deployed_at" timestamp with time zone DEFAULT NOW(),
-    "created_by" uuid NOT NULL REFERENCES public.users(id),
+    "created_by" uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     "owner_org" uuid NOT NULL
 );
 

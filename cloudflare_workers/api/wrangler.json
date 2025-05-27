@@ -15,7 +15,7 @@
   "workers_dev": false,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 0.01
+    "head_sampling_rate": 1
   },
   "upload_source_maps": true,
   "analytics_engine_datasets": [
@@ -57,82 +57,6 @@
       "database_id": "7f267d86-f4f7-49f5-9622-e44373aa00dc"
     }
   ],
-  "unsafe": {
-    "bindings": [
-      {
-        "name": "API_BUNDLE_GET_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1001",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_BUNDLE_DELETE_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1002",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_CHANNEL_GET_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1003",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_CHANNEL_POST_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1004",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_CHANNEL_DELETE_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1005",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_DEVICE_GET_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1006",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_DEVICE_POST_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1007",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      },
-      {
-        "name": "API_DEVICE_DELETE_RATE_LIMITER",
-        "type": "ratelimit",
-        "namespace_id": "1008",
-        "simple": {
-          "limit": 20,
-          "period": 10
-        }
-      }
-    ]
-  },
   "env": {
     "preprod": {
       "name": "capgo_api-preprod",

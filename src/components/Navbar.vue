@@ -53,8 +53,8 @@ const { t } = useI18n()
         </div>
 
         <!-- Centered title -->
-        <div class="absolute inset-0 flex items-center justify-center md:justify-start pointer-events-none">
-          <div class="font-bold text-md md:text-2xl text-dark dark:text-white">
+        <div class="flex-1 px-4 text-center lg:text-left">
+          <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white">
             {{ displayStore.NavTitle }}
           </div>
         </div>

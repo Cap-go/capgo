@@ -4,6 +4,7 @@ import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import dayjs from 'dayjs'
 import ky from 'ky'
+import { cloudlog } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
@@ -88,7 +89,7 @@ export async function trackDevicesCF(
   is_emulator: boolean,
 ) {
   const device_id = device_id_raw.toLowerCase()
-  console.log({ requestId: c.get('requestId'), context: 'trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
+  cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesCF', app_id, device_id, version_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
 
   if (!c.env.DB_DEVICES)
     return Promise.resolve()
@@ -113,7 +114,7 @@ export async function trackDevicesCF(
       || !!existingRow.is_emulator !== is_emulator
     )) {
       // If no existing row or update needed, perform upsert
-      console.log({ requestId: c.get('requestId'), context: existingRow ? 'Updating existing device' : 'Inserting new device' })
+      cloudlog({ requestId: c.get('requestId'), message: existingRow ? 'Updating existing device' : 'Inserting new device' })
       const upsertQuery = `
         INSERT INTO devices (
           updated_at, device_id, version, app_id, platform, 
@@ -146,14 +147,14 @@ export async function trackDevicesCF(
           is_emulator,
         )
         .run()
-      console.log({ requestId: c.get('requestId'), context: 'Upsert result:', res })
+      cloudlog({ requestId: c.get('requestId'), message: 'Upsert result:', res })
     }
     else {
-      console.log({ requestId: c.get('requestId'), context: 'No update needed' })
+      cloudlog({ requestId: c.get('requestId'), message: 'No update needed' })
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error tracking device', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error tracking device', error: e })
   }
 
   return Promise.resolve()
@@ -190,7 +191,7 @@ function convertDataToJsTypes<T>(apiResponse: AnalyticsApiResponse) {
   })
 }
 
-async function runQueryToCF<T>(c: Context, query: string) {
+async function runQueryToCFA<T>(c: Context, query: string) {
   const CF_ANALYTICS_TOKEN = getEnv(c, 'CF_ANALYTICS_TOKEN')
   const CF_ACCOUNT_ID = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
 
@@ -201,8 +202,16 @@ async function runQueryToCF<T>(c: Context, query: string) {
       'Accept-Encoding': 'gzip, zlib, deflate, zstd, br',
     },
     body: query,
+  }).catch(async (e) => {
+    if (e.name === 'HTTPError') {
+      const errorJson = await e.response.json()
+      console.error({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: errorJson })
+    }
+    else {
+      console.error({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: e })
+    }
+    throw new Error('runQueryToCFA encountered an error')
   })
-
   const res = await response.json<AnalyticsApiResponse & { data: T[] }>()
   return convertDataToJsTypes<T>(res)
 }
@@ -233,16 +242,16 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     AND timestamp < toDateTime('${formatDateCF(period_end)}')
   ORDER BY date`
 
-  console.log({ requestId: c.get('requestId'), context: 'readDeviceUsageCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
   try {
-    const res = await runQueryToCF<DeviceUsageAllCF>(c, query)
+    const res = await runQueryToCFA<DeviceUsageAllCF>(c, query)
     // First, filter to keep only the first appearance of each device_id
     const uniqueDevices = new Map<string, DeviceUsageAllCF>()
     res.reverse().forEach((entry) => {
       uniqueDevices.set(entry.device_id, entry)
     })
     const arr = Array.from(uniqueDevices.values())
-    console.log({ requestId: c.get('requestId'), context: 'uniqueDevices', arrLength: arr.length })
+    cloudlog({ requestId: c.get('requestId'), message: 'uniqueDevices', arrLength: arr.length })
 
     // Now calculate MAU based on the unique devices
     const groupedByDay = arr.reduce((acc, curr) => {
@@ -261,7 +270,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     return result
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device usage', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device usage', error: e })
   }
   return [] as DeviceUsageCF[]
 }
@@ -276,12 +285,12 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
   if (!c.env.BANDWIDTH_USAGE)
     return []
 
-  console.log({ requestId: c.get('requestId'), context: 'rawAnalyticsQuery query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'rawAnalyticsQuery query', query })
   try {
-    return await runQueryToCF<any>(c, query)
+    return await runQueryToCFA<any>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading rawAnalyticsQuery', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: e })
   }
   return []
 }
@@ -301,12 +310,12 @@ WHERE
 GROUP BY date, app_id
 ORDER BY date, app_id`
 
-  console.log({ requestId: c.get('requestId'), context: 'readBandwidthUsageCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readBandwidthUsageCF query', query })
   try {
-    return await runQueryToCF<BandwidthUsageCF>(c, query)
+    return await runQueryToCFA<BandwidthUsageCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading bandwidth usage', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: e })
   }
   return [] as BandwidthUsageCF[]
 }
@@ -370,12 +379,12 @@ WHERE
 GROUP BY date, app_id, version_id
 ORDER BY date`
 
-  console.log({ requestId: c.get('requestId'), context: 'readStatsVersionCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readStatsVersionCF query', query })
   try {
-    return await runQueryToCF<VersionUsageCF>(c, query)
+    return await runQueryToCFA<VersionUsageCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading version usage', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading version usage', error: e })
   }
   return [] as VersionUsageCF[]
 }
@@ -400,7 +409,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
 
   const query = `SELECT count(*) AS total FROM devices WHERE app_id = ?1`
 
-  console.log({ requestId: c.get('requestId'), context: 'countDevicesCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
     const readD1 = c.env.DB_DEVICES
       .prepare(query)
@@ -410,7 +419,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device list', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
   }
   return [] as DeviceRowCF[]
 }
@@ -423,7 +432,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   let rangeStart = range_start
   let rangeEnd = range_end
   if (deviceIds && deviceIds.length) {
-    console.log({ requestId: c.get('requestId'), context: 'deviceIds', deviceIds })
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
       rangeStart = 0
@@ -438,7 +447,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   }
   let searchFilter = ''
   if (search) {
-    console.log({ requestId: c.get('requestId'), context: 'search', search })
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search })
     if (deviceIds && deviceIds.length)
       searchFilter = `AND custom_id LIKE '%${search}%')`
     else
@@ -452,7 +461,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   if (order && order.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log({ requestId: c.get('requestId'), context: 'order', colKey: col.key, colSortable: col.sortable })
+        cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
         orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
       }
     })
@@ -477,19 +486,19 @@ WHERE
 ${orderFilter}
 LIMIT ${rangeEnd} OFFSET ${rangeStart}`
 
-  console.log({ requestId: c.get('requestId'), context: 'readDevicesCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
-    console.log({ requestId: c.get('requestId'), context: 'readDevicesCF exec' })
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec' })
     const readD1 = c.env.DB_DEVICES
       .prepare(query)
       .all()
-    console.log({ requestId: c.get('requestId'), context: 'readDevicesCF exec await' })
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF exec await' })
     const res = await readD1
-    console.log({ requestId: c.get('requestId'), context: 'readDevicesCF res', res })
+    cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF res', res })
     return res.results as DeviceRowCF[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading device list', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
   }
   return [] as DeviceRowCF[]
 }
@@ -509,7 +518,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start?: str
   let deviceFilter = ''
 
   if (deviceIds && deviceIds.length) {
-    console.log({ requestId: c.get('requestId'), context: 'deviceIds', deviceIds })
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
     }
@@ -530,7 +539,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start?: str
   if (order && order.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
-        console.log({ requestId: c.get('requestId'), context: 'order', colKey: col.key, colSortable: col.sortable })
+        cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
         orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
       }
     })
@@ -551,12 +560,12 @@ GROUP BY app_id, created_at, action, device_id, version_id
 ${orderFilter}
 LIMIT ${limit}`
 
-  console.log({ requestId: c.get('requestId'), context: 'readStatsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
-    return await runQueryToCF<StatRowCF>(c, query)
+    return await runQueryToCFA<StatRowCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading stats list', error: e, query })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading stats list', error: e, query })
   }
   return [] as StatRowCF[]
 }
@@ -566,7 +575,7 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
     return Promise.resolve([])
 
   const query = `SELECT app_id FROM store_apps WHERE (onprem = 1 OR capgo = 1) AND url != ''`
-  console.log({ requestId: c.get('requestId'), context: 'getAppsFromCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
   // use c.env.DB_STOREAPPS and table store_apps
   try {
     const readD1 = c.env.DB_STOREAPPS
@@ -574,11 +583,11 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
       .all()
     const res = await readD1
     if (res.error || !res.results || !res.success)
-      console.error({ requestId: c.get('requestId'), context: 'getAppsFromCF error', error: res.error })
+      console.error({ requestId: c.get('requestId'), message: 'getAppsFromCF error', error: res.error })
     return res.results as { app_id: string }[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading app list', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading app list', error: e })
   }
   return []
 }
@@ -589,7 +598,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
   // use countUpdatesFromStoreApps exemple to make it work with Cloudflare
   const query = `SELECT SUM(updates) + SUM(installs) AS count FROM store_apps WHERE onprem = 1 OR capgo = 1`
 
-  console.log({ requestId: c.get('requestId'), context: 'countUpdatesFromStoreAppsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -598,7 +607,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from store apps', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from store apps', error: e })
   }
   return 0
 }
@@ -607,13 +616,13 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
   // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
 
-  console.log({ requestId: c.get('requestId'), context: 'countUpdatesFromLogsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
   try {
-    const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
+    const readAnalytics = await runQueryToCFA<{ count: number }>(c, query)
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from logs', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: e })
   }
   return 0
 }
@@ -622,13 +631,13 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
   // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'`
 
-  console.log({ requestId: c.get('requestId'), context: 'countUpdatesFromLogsExternalCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })
   try {
-    const readAnalytics = await runQueryToCF<{ count: number }>(c, query)
+    const readAnalytics = await runQueryToCFA<{ count: number }>(c, query)
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting updates from logs', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from external logs', error: e })
   }
   return 0
 }
@@ -636,16 +645,16 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
 export async function readActiveAppsCF(c: Context) {
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get' GROUP BY app_id`
-  console.log({ requestId: c.get('requestId'), context: 'readActiveAppsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readActiveAppsCF query', query })
   try {
-    const response = await runQueryToCF<{ app_id: string }>(c, query)
+    const response = await runQueryToCFA<{ app_id: string }>(c, query)
     const app_ids = response.map(app => app.app_id)
     // deduplicate them
     const unique = Array.from(new Set(app_ids))
     return unique
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error counting active apps', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error counting active apps', error: e })
   }
   return []
 }
@@ -653,14 +662,14 @@ export async function readActiveAppsCF(c: Context) {
 export async function readLastMonthUpdatesCF(c: Context) {
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const query = `SELECT sum(if(blob2 = 'get', 1, 0)) AS count FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
-  console.log({ requestId: c.get('requestId'), context: 'readLastMonthUpdatesCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF query', query })
   try {
-    const response = await runQueryToCF<{ count: number }>(c, query)
-    console.log({ requestId: c.get('requestId'), context: 'readLastMonthUpdatesCF response', response })
+    const response = await runQueryToCFA<{ count: number }>(c, query)
+    cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF response', response })
     return response[0].count ?? 0
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error reading last month updates', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error reading last month updates', error: e })
   }
   return 0
 }
@@ -670,7 +679,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
     return Promise.resolve([] as StoreApp[])
   const query = `SELECT * FROM store_apps WHERE ${flag} = 1 ORDER BY created_at ASC LIMIT ${limit}`
 
-  console.log({ requestId: c.get('requestId'), context: 'getAppsToProcessCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getAppsToProcessCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -679,7 +688,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
     return res.results as StoreApp[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting apps to process', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting apps to process', error: e })
   }
   return [] as StoreApp[]
 }
@@ -715,7 +724,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 
   const query = `SELECT url, title, icon, summary, installs, category FROM store_apps WHERE ${modeQuery} ORDER BY installs DESC LIMIT ${limit}`
 
-  console.log({ requestId: c.get('requestId'), context: 'getTopAppsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getTopAppsCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -724,7 +733,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
     return res.results as StoreApp[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting top apps', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting top apps', error: e })
   }
   return [] as StoreApp[]
 }
@@ -752,7 +761,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 
   const query = `SELECT COUNT(*) AS total FROM store_apps WHERE ${modeQuery}`
 
-  console.log({ requestId: c.get('requestId'), context: 'getTotalAppsByModeCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getTotalAppsByModeCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -761,7 +770,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting total apps by mode', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting total apps by mode', error: e })
   }
   return 0
 }
@@ -771,7 +780,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return Promise.resolve({} as StoreApp)
   const query = `SELECT * FROM store_apps WHERE app_id = '${appId}' LIMIT 1`
 
-  console.log({ requestId: c.get('requestId'), context: 'getStoreAppByIdCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
   try {
     const readD1 = c.env.DB_STOREAPPS
       .prepare(query)
@@ -780,7 +789,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting store app by id', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: e })
   }
   return {} as StoreApp
 }
@@ -804,17 +813,17 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
       const values = columns.map(column => app[column as keyof StoreApp])
 
       const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
-
+      console.log('query', query, placeholders, values)
       const res = await c.env.DB_STOREAPPS
         .prepare(query)
         .bind(...values)
         .run()
 
-      console.log({ requestId: c.get('requestId'), context: 'createIfNotExistStoreInfo result', res })
+      cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo result', res })
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error creating store info', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error creating store info', error: e })
   }
 
   return Promise.resolve()
@@ -837,10 +846,10 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
       .prepare(query)
       .bind(app.app_id, ...values)
       .run()
-    console.log({ requestId: c.get('requestId'), context: 'saveStoreInfoCF result', res })
+    cloudlog({ requestId: c.get('requestId'), message: 'saveStoreInfoCF result', res })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error saving store info', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error saving store info', error: e })
   }
 
   return Promise.resolve()
@@ -872,10 +881,10 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
       .prepare(query)
       .bind(appId, updates, updates)
       .run()
-    console.log({ requestId: c.get('requestId'), context: 'updateStoreApp result', res })
+    cloudlog({ requestId: c.get('requestId'), message: 'updateStoreApp result', res })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error updating StoreApp', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: e })
   }
 
   return Promise.resolve()
@@ -914,9 +923,9 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     GROUP BY blob1
   `
 
-  console.log({ requestId: c.get('requestId'), context: 'getUpdateStatsCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'getUpdateStatsCF query', query })
   try {
-    const result = await runQueryToCF<{ app_id: string, failed: number, set: number, get: number }>(c, query)
+    const result = await runQueryToCFA<{ app_id: string, failed: number, set: number, get: number }>(c, query)
 
     const apps = result
       .filter(app => app.get > 0)
@@ -950,7 +959,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), context: 'Error getting update stats', error: e })
+    console.error({ requestId: c.get('requestId'), message: 'Error getting update stats', error: e })
     return {
       apps: [],
       total: {

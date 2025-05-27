@@ -164,7 +164,7 @@ async function logOut() {
         <div class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="openSupport">
           {{ t('support') }}
         </div>
-        <div v-if="main.isAdmin && !isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
+        <div v-if="main.isAdmin && !isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
           <span v-if="!isLoading">{{ t('log-as') }}</span>
           <span v-else class="flex items-center">
             <Spinner size="w-4 h-4" class="mr-2" />

@@ -74,6 +74,7 @@
   "api-keys-are-used-for-cli-and-public-api": "Kunci API digunakan untuk CLI dan API publik",
   "app": "Aplikasi",
   "app-deleted": "Aplikasi dihapus",
+  "app-id": "ID Aplikasi",
   "app-info": "Informasi aplikasi",
   "app-info-desc": "Di sini Anda dapat mengubah informasi aplikasi Anda",
   "app-logo-deleted": "Gambar aplikasi berhasil dihapus",

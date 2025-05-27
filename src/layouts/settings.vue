@@ -103,8 +103,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
   }
 
-  if (organizationStore.currentOrganization?.paying
-    && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
     // push it 2 before the last tab
     organizationTabs.value.splice(tabs.value.length - 2, 0, {

@@ -74,6 +74,7 @@
   "api-keys-are-used-for-cli-and-public-api": "Le chiavi API vengono utilizzate per la CLI e l'API pubblica",
   "app": "App",
   "app-deleted": "Applicazione eliminata",
+  "app-id": "ID dell'app",
   "app-info": "Informazioni sull'app",
   "app-info-desc": "Puoi modificare qui le informazioni sulla tua app",
   "app-logo-deleted": "Immagine dell'app eliminata correttamente",
