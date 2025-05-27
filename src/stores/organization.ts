@@ -132,6 +132,12 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     currentOrganization.value = organization
   }
+  const setCurrentOrganizationToFirst = () => {
+    if (organizations.value.length === 0)
+      return
+    const organization = organizations.value[0]
+    currentOrganization.value = organization
+  }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
     const currentOrgId = currentOrganization.value?.gid
@@ -180,15 +186,17 @@ export const useOrganizationStore = defineStore('organization', () => {
     const { data, error } = await supabase
       .rpc('get_orgs_v6')
 
-    if (error)
+    if (error) {
+      console.error('Cannot get orgs!', error)
       throw error
+    }
 
     const organization = data
       .filter(org => !org.role.includes('invite'))
       .sort((a, b) => b.app_count - a.app_count)[0]
     if (!organization) {
       console.log('user has no main organization')
-      return
+      throw error
     }
 
     const mappedData = data.map((item, id) => {
@@ -224,6 +232,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganization,
     setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
+    setCurrentOrganizationToFirst,
     getMembers,
     getCurrentRoleForApp,
     getCurrentRole,

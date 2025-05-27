@@ -24,6 +24,10 @@ onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
+    .catch((error) => {
+      console.error('Cannot get orgs!', error)
+      createNewOrg()
+    })
 })
 
 async function handleOrganizationInvitation(org: Organization) {
@@ -111,8 +115,6 @@ function onOrganizationClick(org: Organization) {
 }
 
 async function createNewOrg() {
-  console.log('new org!')
-
   displayStore.dialogOption = {
     header: t('create-new-org'),
     message: `${t('type-new-org-name')}`,
@@ -130,11 +132,11 @@ async function createNewOrg() {
         text: t('button-confirm'),
         id: 'confirm-button',
         handler: async () => {
-          console.log('new org', displayStore.dialogInputText)
-
+          const orgName = displayStore.dialogInputText
+          // console.log('new org', orgName)
           const { error } = await supabase.from('orgs')
             .insert({
-              name: displayStore.dialogInputText,
+              name: orgName,
               created_by: main.auth?.id ?? '',
               management_email: main.auth?.email ?? '',
             })
@@ -147,6 +149,16 @@ async function createNewOrg() {
 
           toast.success(t('org-created-successfully'))
           await organizationStore.fetchOrganizations()
+          const org = organizationStore.organizations.find(org => org.name === orgName)
+          if (org) {
+            console.log('org found', org)
+            organizationStore.setCurrentOrganization(org.gid)
+            currentOrganization.value = org
+            router.push('/app')
+          }
+          else {
+            console.log('org not found', organizationStore.organizations)
+          }
         },
       },
     ],

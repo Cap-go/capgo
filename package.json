@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.6.38",
+  "version": "12.7.12",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -71,8 +71,8 @@
     "deploy:cloudflare_env:plugin:prod": "node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.prod capgo_plugin-prod",
     "deploy:cloudflare_env:plugin:preprod": "node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.preprod capgo_plugin-preprod",
     "deploy:cloudflare_env:plugin:alpha": "node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.alpha capgo_plugin-alpha",
-    "deploy:supabase:prod": "bunx supabase functions deploy",
-    "deploy:supabase:preprod": "bunx supabase functions deploy",
+    "deploy:supabase:prod": "bunx supabase functions deploy --project-ref xvwzpoazmxkqosrdewyv",
+    "deploy:supabase:preprod": "bunx supabase functions deploy --project-ref aucsybvnhavogdmzwtcw",
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
     "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.preprod",
     "deploy:supabase_env:alpha": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
@@ -211,7 +211,7 @@
     "vite-plugin-vue-devtools": "^7.7.5",
     "vite-plugin-vue-layouts": "0.11.0",
     "vite-plugin-webfont-dl": "^3.10.4",
-    "vitest": "3.1.2",
+    "vitest": "3.1.3",
     "vue-tsc": "2.2.10",
     "wrangler": "^4.13.0"
   },

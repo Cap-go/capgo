@@ -2,6 +2,7 @@ import type { Context } from '@hono/hono'
 import type { MeteredData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
+import { cloudlog } from './loggin.ts'
 import { getStripe, parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
@@ -35,7 +36,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
   let isUpgrade = false
   let previousProductId: string | undefined
 
-  console.log({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
+  cloudlog({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
   if (event && event.data && event.data.object) {
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.created') {
       const subscription = event.data.object

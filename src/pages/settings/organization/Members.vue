@@ -72,20 +72,16 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
+        visible: (member: ExtendedOrganizationMember) => canEdit(member),
         onClick: (member: ExtendedOrganizationMember) => {
-          if (canEdit(member))
-            changeMemberPermission(member)
-          else
-            toast.error(t('no-permission'))
+          changeMemberPermission(member)
         },
       },
       {
         icon: IconTrash,
+        visible: (member: ExtendedOrganizationMember) => canDelete(member),
         onClick: (member: ExtendedOrganizationMember) => {
-          if (canDelete(member))
-            deleteMember(member)
-          else
-            toast.error(t('no-permission'))
+          deleteMember(member)
         },
       },
     ]).value,
@@ -332,7 +328,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
     if (member.uid === main.user?.id) {
       console.log('Current user deleted themselves from the org.')
       await organizationStore.fetchOrganizations()
-      organizationStore.setCurrentOrganizationToMain()
+      await organizationStore.setCurrentOrganizationToMain()
     }
     else {
       await reloadData()

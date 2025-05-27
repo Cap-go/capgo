@@ -41,7 +41,7 @@ const refStats = toRef(() => props.stats)
             <span :class="{ 'group-hover:hidden': s.link && (s.hoverLabel || s.link) }">{{ s.label }}</span>
             <span v-if="s.link && (s.hoverLabel || s.link)" class="hidden group-hover:inline first-letter:uppercase">{{ s.hoverLabel || s.label }}</span>
           </h3>
-          <InformationInfo v-if="!!s.informationIcon" class="ml-1 first-letter:uppercase" @click="(s.informationIcon as any)" />
+          <InformationInfo v-if="!!s.informationIcon" class="ml-1 hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" @click="(s.informationIcon as any)" />
         </div>
       </span>
     </component>
