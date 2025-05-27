@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import postgres from 'postgres'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headersInternal, ORG_ID, POSTGRES_URL } from './test-utils.ts'
+import { BASE_URL, headersInternal, ORG_ID, POSTGRES_URL } from './test-utils.ts'
 
 const BASE_URL_TRIGGER = `${BASE_URL}/triggers`
 const id = randomUUID()
