@@ -101,7 +101,8 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
-    } else {
+    }
+    else {
       const { data: appData, error: appError } = await supabaseAdmin(c).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()
       if (appError) {
         console.log('Cannot get app', appError)
@@ -127,7 +128,8 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
       }
     }
     return c.json(BRES)
-  } catch (e) {
+  }
+  catch (e) {
     console.log('Cannot create channel', e)
     return c.json({ status: 'Cannot create channel', error: JSON.stringify(e) }, 500)
   }
