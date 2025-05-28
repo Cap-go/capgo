@@ -115,7 +115,7 @@
     "@capgo/capacitor-flash": "^7.0.4",
     "@capgo/capacitor-mute": "^7.1.26",
     "@capgo/capacitor-native-biometric": "^7.1.7",
-    "@capgo/capacitor-screen-recorder": "7.1.5",
+    "@capgo/capacitor-screen-recorder": "7.1.7",
     "@capgo/capacitor-updater": "^7.0.50",
     "@capgo/inappbrowser": "^7.9.0",
     "@capgo/native-audio": "^7.3.21",
