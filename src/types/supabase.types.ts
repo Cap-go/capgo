@@ -1245,6 +1245,10 @@ export type Database = {
         Args: { appid: string }
         Returns: number
       }
+      cleanup_frequent_job_details: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_queue_messages: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1291,6 +1295,10 @@ export type Database = {
           plan_name: string
           count: number
         }[]
+      }
+      delete_http_response: {
+        Args: { request_id: number }
+        Returns: undefined
       }
       delete_old_deleted_apps: {
         Args: Record<PropertyKey, never>
@@ -1342,14 +1350,6 @@ export type Database = {
       get_app_versions: {
         Args: { appid: string; name_version: string; apikey: string }
         Returns: number
-      }
-      get_cloudflare_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_cloudflare_pp_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_current_plan_max_org: {
         Args: { orgid: string }
@@ -1457,10 +1457,6 @@ export type Database = {
       get_metered_usage: {
         Args: Record<PropertyKey, never> | { orgid: string }
         Returns: Database["public"]["CompositeTypes"]["stats_table"]
-      }
-      get_netlify_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
@@ -1653,10 +1649,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      http_post_helper: {
-        Args: { function_name: string; function_type: string; body: Json }
-        Returns: number
-      }
       invite_user_to_org: {
         Args: {
           email: string
@@ -1783,6 +1775,10 @@ export type Database = {
         Args: { pattern: string }
         Returns: number
       }
+      process_admin_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_cron_stats_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1801,7 +1797,7 @@ export type Database = {
       }
       process_function_queue: {
         Args: { queue_name: string }
-        Returns: undefined
+        Returns: number
       }
       process_stats_email_monthly: {
         Args: Record<PropertyKey, never>
@@ -1850,6 +1846,10 @@ export type Database = {
           install: number
           uninstall: number
         }[]
+      }
+      remove_old_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       reset_and_seed_app_data: {
         Args: { p_app_id: string } | { p_app_id: string }

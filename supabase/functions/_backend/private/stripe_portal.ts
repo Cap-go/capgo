@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { createPortal } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -46,7 +46,7 @@ app.post('/', middlewareAuth, async (c) => {
     return c.json({ url: link.url })
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'error', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'error', error })
     if (error instanceof HTTPError) {
       const errorJson = await error.response.json()
       return c.json({ status: 'Cannot get portal url', error: JSON.stringify(errorJson) }, 500)

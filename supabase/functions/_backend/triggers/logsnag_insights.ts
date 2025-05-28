@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import ky from 'ky'
 import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -84,7 +84,7 @@ function getStats(c: Context): GlobalStats {
         return { apps: app_ids.length, users: res2.data || 0 }
       }
       catch (e) {
-        console.error({ requestId: c.get('requestId'), message: 'count_active_users error', error: e })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'count_active_users error', error: e })
       }
       return { apps: app_ids.length, users: 0 }
     }),
@@ -152,7 +152,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       .from('global_stats')
       .upsert(newData)
     if (error)
-      console.error({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
     await logsnag(c as any).track({
       channel: 'updates-stats',
       event: 'Updates last month',
@@ -162,7 +162,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       },
       icon: '📲',
     }).catch((e) => {
-      console.error({ requestId: c.get('requestId'), message: 'insights error', e })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
     })
     await logsnagInsights(c as any, [
       {
@@ -261,13 +261,13 @@ app.post('/', middlewareAPISecret, async (c) => {
         icon: '📈',
       },
     ]).catch((e) => {
-      console.error({ requestId: c.get('requestId'), message: 'insights error', e })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
     })
     cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
     return c.json(BRES)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'general insights error', e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'general insights error', e })
     return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
   }
 })

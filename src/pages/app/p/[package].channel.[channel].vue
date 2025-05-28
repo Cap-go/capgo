@@ -22,7 +22,6 @@ import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
-  second_version: Database['public']['Tables']['app_versions']['Row']
 }
 const router = useRouter()
 const displayStore = useDisplayStore()

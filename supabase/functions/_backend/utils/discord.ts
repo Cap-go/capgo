@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import { getEnv } from './utils.ts'
+import { cloudlogErr } from './loggin.ts'
 
 interface DiscordEmbed {
   title?: string
@@ -65,13 +66,13 @@ export async function sendDiscordAlert(c: Context, payload: DiscordWebhookPayloa
     })
 
     if (!response.ok) {
-      console.error({ requestId: c.get('requestId'), message: 'Discord webhook failed', status: response.status })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Discord webhook failed', status: response.status })
       return true
     }
     return true
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'Discord webhook error', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Discord webhook error', error })
     return true
   }
 }

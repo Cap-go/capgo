@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
 interface DataDownload {
@@ -46,12 +46,12 @@ app.post('/', middlewareAuth, async (c) => {
     const ownerOrg = (bundle?.owner_org as any).created_by
 
     if (getBundleError) {
-      console.error({ requestId: c.get('requestId'), message: 'getBundleError', error: getBundleError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBundleError', error: getBundleError })
       return c.json({ status: 'Error unknown' }, 500)
     }
 
     if (!ownerOrg) {
-      console.error({ requestId: c.get('requestId'), message: 'cannotGetOwnerOrg', bundle })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'cannotGetOwnerOrg', bundle })
       return c.json({ status: 'Error unknown' }, 500)
     }
 
@@ -63,7 +63,7 @@ app.post('/', middlewareAuth, async (c) => {
         .eq('id', body.id)
 
       if (getManifestError) {
-        console.error({ requestId: c.get('requestId'), message: 'getManifestError', error: getManifestError })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'getManifestError', error: getManifestError })
         return c.json({ status: 'Error unknown' }, 500)
       }
       const manifestEntries = getManifestUrl(c as any, bundle.id, manifest, userId)

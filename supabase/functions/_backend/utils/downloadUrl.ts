@@ -1,7 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { s3 } from './s3.ts'
 import { supabaseAdmin } from './supabase.ts'
 
@@ -42,7 +42,7 @@ export async function getBundleUrl(
       return { url, size: bundleMeta?.size }
     }
     catch (error) {
-      console.error({ requestId: c.get('requestId'), message: 'getBundleUrl', error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBundleUrl', error })
     }
   }
   const url = new URL(c.req.url)
@@ -83,7 +83,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
     }).filter(entry => entry !== null) as ManifestEntry[]
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'getManifestUrl', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getManifestUrl', error })
     return []
   }
 }
