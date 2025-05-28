@@ -41,14 +41,14 @@ app.post('/', middlewareAPISecret, async (c) => {
     let notFound = false
     try {
       const v2Path = await getPath(c as any, version)
-      .catch((e) => {
-        cloudlog({ requestId: c.get('requestId'), message: 'error getPath', error: e })
-        // if error is rate limit this terminate the function
-        if (e.message.includes('Rate limit exceeded')) {
-          throw new Error('Rate limit exceeded')
-        }
-        return null
-      })
+        .catch((e) => {
+          cloudlog({ requestId: c.get('requestId'), message: 'error getPath', error: e })
+          // if error is rate limit this terminate the function
+          if (e.message.includes('Rate limit exceeded')) {
+            throw new Error('Rate limit exceeded')
+          }
+          return null
+        })
       cloudlog({ requestId: c.get('requestId'), message: 'v2Path', v2Path })
       if (!v2Path) {
         notFound = true
