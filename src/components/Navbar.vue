@@ -50,7 +50,7 @@ const { t } = useI18n()
             <span class="sr-only">{{ t('open-sidebar') }}</span>
             <IconMenu class="w-6 h-6 fill-current" />
           </button>
-          
+
           <!-- Title on desktop -->
           <div class="hidden lg:block">
             <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white">
@@ -70,7 +70,7 @@ const { t } = useI18n()
         <div class="hidden lg:flex">
           <Banner desktop />
         </div>
-        
+
         <!-- Mobile placeholder -->
         <div class="w-[72px] lg:hidden" />
       </div>
