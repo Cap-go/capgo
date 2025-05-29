@@ -1,11 +1,8 @@
 import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
-import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
-import { sendDiscordAlert } from 'supabase/functions/_backend/utils/discord.ts'
-import { backgroundTask } from 'supabase/functions/_backend/utils/utils.ts'
 import { version } from '../../package.json'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
@@ -13,6 +10,7 @@ import { app as updates } from '../../supabase/functions/_backend/plugins/update
 import { app as updates_lite } from '../../supabase/functions/_backend/plugins/updates_lite.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
+import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
@@ -43,37 +41,7 @@ app.all('*', (c) => {
   console.log('Not found', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
-app.onError(async (e, c) => {
-  console.log('app onError', e)
-  c.get('sentry')?.captureException(e)
-  if (e instanceof HTTPException) {
-    console.log('HTTPException found', e.status)
-    if (e.status === 429) {
-      return c.json({ error: 'you are beeing rate limited' }, e.status)
-    }
-    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
-  }
-  await backgroundTask(c as any, sendDiscordAlert(c as any, {
-    content: 'Cloudflare Worker Error Plugin',
-    embeds: [
-      {
-        title: 'Failed to process',
-        description: 'Cloudflare Worker Error',
-        fields: [
-          {
-            name: 'Error',
-            value: JSON.stringify(e),
-          },
-          {
-            name: 'Request',
-            value: JSON.stringify(c.req.raw),
-          },
-        ],
-      },
-    ],
-  }))
-  return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
-})
+app.onError(onError('Worker Plugin'))
 
 export default {
   fetch: app.fetch,

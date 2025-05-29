@@ -1,6 +1,5 @@
 import type { MiddlewareKeyVariables } from '../_backend/utils/hono.ts'
 import { sentry } from '@hono/sentry'
-import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 
@@ -24,8 +23,7 @@ import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
-import { sendDiscordAlert } from '../_backend/utils/discord.ts'
-import { backgroundTask } from '../_backend/utils/utils.ts'
+import { onError } from '../_backend/utils/on_error.ts'
 
 const functionName = 'private'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
@@ -64,35 +62,5 @@ appGlobal.all('*', (c) => {
   console.log('Not found', c.req.url)
   return c.json({ error: 'Not Found' }, 404)
 })
-appGlobal.onError(async (e, c) => {
-  console.log('app onError', e)
-  c.get('sentry')?.captureException(e)
-  if (e instanceof HTTPException) {
-    console.log('HTTPException found', e.status)
-    if (e.status === 429) {
-      return c.json({ error: 'you are beeing rate limited' }, e.status)
-    }
-    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
-  }
-  await backgroundTask(c as any, sendDiscordAlert(c as any, {
-    content: `Function: ${functionName}`,
-    embeds: [
-      {
-        title: `Failed to process ${functionName}`,
-        description: `Function: ${functionName}`,
-        fields: [
-          {
-            name: 'Error',
-            value: JSON.stringify(e),
-          },
-          {
-            name: 'Request',
-            value: JSON.stringify(c.req.raw),
-          },
-        ],
-      },
-    ],
-  }))
-  return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
-})
+appGlobal.onError(onError(functionName))
 Deno.serve(appGlobal.fetch)
