@@ -1,6 +1,6 @@
 import { HTTPException } from 'hono/http-exception'
-import { sendDiscordAlert } from './discord'
-import { backgroundTask } from './utils'
+import { sendDiscordAlert } from './discord.ts'
+import { backgroundTask } from './utils.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: any) => {
