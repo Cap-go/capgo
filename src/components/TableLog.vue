@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DatePickerInstance } from '@vuepic/vue-datepicker'
 import type { TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import { FormKit } from '@formkit/vue'
@@ -44,6 +45,7 @@ const emit = defineEmits([
   'update:columns',
   'update:currentPage',
 ])
+const datepicker = ref<DatePickerInstance>(null)
 const dropdown = useTemplateRef('dropdown')
 function closeDropdown() {
   if (dropdown.value) {
