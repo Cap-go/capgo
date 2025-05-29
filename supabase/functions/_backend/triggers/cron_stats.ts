@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -79,7 +79,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error getting stats', e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting stats', e })
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
   }
 })

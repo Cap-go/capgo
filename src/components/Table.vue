@@ -301,11 +301,13 @@ function getSkeletonWidth(columnIndex?: number) {
           <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
-        <button v-if="showAdd" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
-          <plusOutline v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
-          <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
-          <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
-        </button>
+        <div v-if="showAdd" class="mr-2 p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+          <button class="inline-flex items-center rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
+            <plusOutline v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
+            <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
+            <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
+          </button>
+        </div>
         <div v-if="filterText && filterList.length" class="dropdown">
           <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">

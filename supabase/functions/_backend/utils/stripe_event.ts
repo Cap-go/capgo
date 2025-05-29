@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import type { MeteredData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getStripe, parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
@@ -104,7 +104,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
       }
     }
     else {
-      console.error({ requestId: c.get('requestId'), message: 'Other event', event })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Other event', event })
     }
   }
   return { data, isUpgrade, previousProductId }

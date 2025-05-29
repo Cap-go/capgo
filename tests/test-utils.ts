@@ -3,7 +3,9 @@ import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 
+export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 export const BASE_URL = `${env.SUPABASE_URL}/functions/v1`
+export const API_SECRET = 'testsecret'
 export const APIKEY_TEST_ALL = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea' // all key
 export const APIKEY_TEST_UPLOAD = 'c591b04e-cf29-4945-b9a0-776d0672061b' // upload key
 export const ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
@@ -18,6 +20,10 @@ export const APP_NAME = 'com.demo'
 export const headers = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_TEST_ALL,
+}
+export const headersInternal = {
+  'Content-Type': 'application/json',
+  'apisecret': API_SECRET,
 }
 
 export function makeBaseData(appId: string) {

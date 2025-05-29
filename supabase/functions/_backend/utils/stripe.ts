@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import Stripe from 'stripe'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
@@ -80,7 +80,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
       cloudlog({ requestId: c.get('requestId'), message: 'Subscription not found', subscriptionId, error: error.code })
     }
     else {
-      console.error({ requestId: c.get('requestId'), message: 'getSubscriptionData', error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getSubscriptionData', error })
     }
     return null
   }
@@ -154,11 +154,11 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
       .eq('customer_id', customerId)
 
     if (updateError) {
-      console.error({ requestId: c.get('requestId'), message: 'syncSubscriptionData', error: updateError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'syncSubscriptionData', error: updateError })
     }
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'syncSubscriptionData', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'syncSubscriptionData', error })
   }
 }
 
@@ -188,7 +188,7 @@ export async function cancelSubscription(c: Context, customerId: string) {
   return Promise.all(
     allSubscriptions.data.map(sub => getStripe(c).subscriptions.cancel(sub.id)),
   ).catch((err) => {
-    console.error({ requestId: c.get('requestId'), message: 'cancelSubscription', error: err })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'cancelSubscription', error: err })
   })
 }
 

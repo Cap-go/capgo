@@ -1,5 +1,5 @@
 import type { Context } from '@hono/hono'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 function getAllMetrics(c: Context): Promise<string[]> {
@@ -12,7 +12,7 @@ function getAllMetrics(c: Context): Promise<string[]> {
     .then(response => response.text())
     .then(data => data.split('\n'))
     .catch((err) => {
-      console.error({ requestId: c.get('requestId'), message: 'getAllMetrics', error: err })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getAllMetrics', error: err })
       return [] as string[]
     })
 }

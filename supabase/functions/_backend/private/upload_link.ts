@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareKey } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
@@ -99,7 +99,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
       .eq('id', version.id)
 
     if (changeError) {
-      console.error({ requestId: c.get('requestId'), message: 'Cannot update supabase', changeError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update supabase', changeError })
       return c.json({ status: 'Error unknow' }, 500)
     }
 

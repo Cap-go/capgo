@@ -1,7 +1,6 @@
 import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
-import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
 import { version } from '../../package.json'
@@ -37,6 +36,7 @@ import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cr
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
+import { app as on_deploy_history_create } from '../../supabase/functions/_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { app as on_organization_create } from '../../supabase/functions/_backend/triggers/on_organization_create.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
@@ -45,7 +45,9 @@ import { app as on_user_update } from '../../supabase/functions/_backend/trigger
 import { app as on_version_create } from '../../supabase/functions/_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
+import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
+import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
 
 const app = new Hono<MiddlewareKeyVariables>()
 const appTriggers = new Hono<MiddlewareKeyVariables>()
@@ -99,25 +101,20 @@ appTriggers.route('/on_version_create', on_version_create)
 appTriggers.route('/on_version_update', on_version_update)
 appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/on_manifest_create', on_manifest_create)
+appTriggers.route('/on_deploy_history_create', on_deploy_history_create)
 appTriggers.route('/stripe_event', stripe_event)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stats', cron_stats)
 appTriggers.route('/cron_plan', cron_plan)
+appTriggers.route('/queue_consumer', queue_consumer)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
-
-app.onError((e, c) => {
-  console.log('app onError', e)
-  c.get('sentry').captureException(e)
-  if (e instanceof HTTPException) {
-    if (e.status === 429) {
-      return c.json({ error: 'you are beeing rate limited' }, 429)
-    }
-    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
-  }
-  return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
+app.all('*', (c) => {
+  console.log('Not found', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
 })
+app.onError(onError('Worker API'))
 
 export default {
   fetch: app.fetch,

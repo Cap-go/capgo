@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import { parseCronExpression } from 'cron-schedule'
 import dayjs from 'dayjs'
 import { trackBentoEvent } from './bento.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 interface EventData {
@@ -29,7 +29,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
       .eq('uniq_id', uniqId)
       .eq('owner_org', orgId)
     if (error) {
-      console.error({ requestId: c.get('requestId'), message: 'update notif', error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'update notif', error })
       return false
     }
   }
@@ -43,7 +43,7 @@ async function sendNow(c: Context, eventName: string, eventData: EventData, emai
         last_send_at: dayjs().toISOString(),
       })
     if (error) {
-      console.error({ requestId: c.get('requestId'), message: 'insert notif', error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insert notif', error })
       return false
     }
   }
