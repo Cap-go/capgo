@@ -13,6 +13,7 @@ import { app as cron_plan } from '../../supabase/functions/_backend/triggers/cro
 import { app as cron_stats } from '../../supabase/functions/_backend/triggers/cron_stats.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
+import { app as on_deploy_history_create } from '../../supabase/functions/_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../../supabase/functions/_backend/triggers/on_user_delete.ts'
@@ -20,6 +21,7 @@ import { app as on_user_update } from '../../supabase/functions/_backend/trigger
 import { app as on_version_create } from '../../supabase/functions/_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../../supabase/functions/_backend/triggers/on_version_delete.ts'
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
+import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 
 const functionName = 'triggers'
@@ -50,5 +52,7 @@ appGlobal.route('/on_manifest_create', on_manifest_create)
 appGlobal.route('/stripe_event', stripe_event)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
+appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
+appGlobal.route('/queue_consumer', queue_consumer)
 
 export default handle(appGlobal as any)

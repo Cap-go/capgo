@@ -4,7 +4,7 @@ import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import dayjs from 'dayjs'
 import ky from 'ky'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 // type is require for the bindings no interface
@@ -154,7 +154,7 @@ export async function trackDevicesCF(
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error tracking device', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error tracking device', error: e })
   }
 
   return Promise.resolve()
@@ -205,10 +205,10 @@ async function runQueryToCFA<T>(c: Context, query: string) {
   }).catch(async (e) => {
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      console.error({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: errorJson })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: errorJson })
     }
     else {
-      console.error({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: e })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: e })
     }
     throw new Error('runQueryToCFA encountered an error')
   })
@@ -270,7 +270,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     return result
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading device usage', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device usage', error: e })
   }
   return [] as DeviceUsageCF[]
 }
@@ -290,7 +290,7 @@ export async function rawAnalyticsQuery(c: Context, query: string) {
     return await runQueryToCFA<any>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading rawAnalyticsQuery', error: e })
   }
   return []
 }
@@ -315,7 +315,7 @@ ORDER BY date, app_id`
     return await runQueryToCFA<BandwidthUsageCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading bandwidth usage', error: e })
   }
   return [] as BandwidthUsageCF[]
 }
@@ -384,7 +384,7 @@ ORDER BY date`
     return await runQueryToCFA<VersionUsageCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading version usage', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: e })
   }
   return [] as VersionUsageCF[]
 }
@@ -419,7 +419,7 @@ export async function countDevicesCF(c: Context, app_id: string) {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
   }
   return [] as DeviceRowCF[]
 }
@@ -498,7 +498,7 @@ LIMIT ${rangeEnd} OFFSET ${rangeStart}`
     return res.results as DeviceRowCF[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device list', error: e })
   }
   return [] as DeviceRowCF[]
 }
@@ -565,7 +565,7 @@ LIMIT ${limit}`
     return await runQueryToCFA<StatRowCF>(c, query)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading stats list', error: e, query })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats list', error: e, query })
   }
   return [] as StatRowCF[]
 }
@@ -583,11 +583,11 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
       .all()
     const res = await readD1
     if (res.error || !res.results || !res.success)
-      console.error({ requestId: c.get('requestId'), message: 'getAppsFromCF error', error: res.error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getAppsFromCF error', error: res.error })
     return res.results as { app_id: string }[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading app list', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading app list', error: e })
   }
   return []
 }
@@ -607,7 +607,7 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from store apps', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from store apps', error: e })
   }
   return 0
 }
@@ -622,7 +622,7 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from logs', error: e })
   }
   return 0
 }
@@ -637,7 +637,7 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
     return readAnalytics[0].count
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error counting updates from external logs', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting updates from external logs', error: e })
   }
   return 0
 }
@@ -654,7 +654,7 @@ export async function readActiveAppsCF(c: Context) {
     return unique
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error counting active apps', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting active apps', error: e })
   }
   return []
 }
@@ -669,7 +669,7 @@ export async function readLastMonthUpdatesCF(c: Context) {
     return response[0].count ?? 0
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error reading last month updates', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month updates', error: e })
   }
   return 0
 }
@@ -688,7 +688,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
     return res.results as StoreApp[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error getting apps to process', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting apps to process', error: e })
   }
   return [] as StoreApp[]
 }
@@ -733,7 +733,7 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
     return res.results as StoreApp[]
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error getting top apps', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting top apps', error: e })
   }
   return [] as StoreApp[]
 }
@@ -770,7 +770,7 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error getting total apps by mode', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting total apps by mode', error: e })
   }
   return 0
 }
@@ -789,7 +789,7 @@ export async function getStoreAppByIdCF(c: Context, appId: string): Promise<Stor
     return res
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: e })
   }
   return {} as StoreApp
 }
@@ -823,7 +823,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error creating store info', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error creating store info', error: e })
   }
 
   return Promise.resolve()
@@ -849,7 +849,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
     cloudlog({ requestId: c.get('requestId'), message: 'saveStoreInfoCF result', res })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error saving store info', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error saving store info', error: e })
   }
 
   return Promise.resolve()
@@ -884,7 +884,7 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
     cloudlog({ requestId: c.get('requestId'), message: 'updateStoreApp result', res })
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating StoreApp', error: e })
   }
 
   return Promise.resolve()
@@ -959,7 +959,7 @@ export async function getUpdateStatsCF(c: Context): Promise<UpdateStats> {
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error getting update stats', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting update stats', error: e })
     return {
       apps: [],
       total: {

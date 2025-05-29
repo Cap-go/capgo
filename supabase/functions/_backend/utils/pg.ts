@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
@@ -85,7 +85,7 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -111,7 +111,7 @@ export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
   }
   return false
 }
@@ -127,7 +127,7 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -441,7 +441,7 @@ export async function getAppOwnerPostgresV2(
   }
   catch (e: any) {
     console.log('appOwner error', e)
-    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }
@@ -469,7 +469,7 @@ export async function getAppOwnerPostgres(
     return appOwner
   }
   catch (e: any) {
-    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }

@@ -1366,10 +1366,6 @@ export type Database = {
           count: number
         }[]
       }
-      decrement_read_ct: {
-        Args: { queue_name: string; msg_id: number }
-        Returns: undefined
-      }
       delete_http_response: {
         Args: { request_id: number }
         Returns: undefined
@@ -1380,10 +1376,6 @@ export type Database = {
       }
       delete_user: {
         Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      edit_request_id: {
-        Args: { queue_name: string; msg_id: number; new_request_id: number }
         Returns: undefined
       }
       exist_app_v2: {
@@ -1427,14 +1419,6 @@ export type Database = {
       get_app_versions: {
         Args: { appid: string; name_version: string; apikey: string }
         Returns: number
-      }
-      get_cloudflare_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_cloudflare_pp_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_current_plan_max_org: {
         Args: { orgid: string }
@@ -1529,10 +1513,6 @@ export type Database = {
       get_metered_usage: {
         Args: Record<PropertyKey, never> | { orgid: string }
         Returns: Database["public"]["CompositeTypes"]["stats_table"]
-      }
-      get_netlify_function_url: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
@@ -1722,10 +1702,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      http_post_helper: {
-        Args: { function_name: string; function_type: string; body: Json }
-        Returns: number
-      }
       invite_user_to_org: {
         Args: {
           email: string
@@ -1860,6 +1836,10 @@ export type Database = {
         Args: { pattern: string }
         Returns: number
       }
+      process_admin_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_cron_stats_jobs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1878,7 +1858,7 @@ export type Database = {
       }
       process_function_queue: {
         Args: { queue_name: string }
-        Returns: undefined
+        Returns: number
       }
       process_stats_email_monthly: {
         Args: Record<PropertyKey, never>

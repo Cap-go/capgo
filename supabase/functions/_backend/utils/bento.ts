@@ -1,6 +1,6 @@
 import type { Context } from '@hono/hono'
 import ky from 'ky'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 function hasBento(c: Context) {
@@ -54,7 +54,7 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
       json: payload,
     }).json<{ results: number, failed: number }>()
     if (res.failed > 0) {
-      console.error({ requestId: c.get('requestId'), message: 'trackBentoEvent', error: res })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'trackBentoEvent', error: res })
       return false
     }
     return true

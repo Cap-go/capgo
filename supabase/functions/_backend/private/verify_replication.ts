@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -63,7 +63,7 @@ app.get('/', async (c) => {
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error in db_comparison:', e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in db_comparison:', e })
     return c.json({ status: 'Error in db comparison', error: JSON.stringify(e) }, 500)
   }
 })

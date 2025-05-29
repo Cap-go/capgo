@@ -25,6 +25,8 @@ import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
+import { onError } from '../_backend/utils/on_error.ts'
+
 const functionName = 'private'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
 
@@ -60,4 +62,9 @@ appGlobal.route('/latency_postres', latency_postres)
 appGlobal.route('/events', events)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
+appGlobal.all('*', (c) => {
+  console.log('Not found', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
+})
+appGlobal.onError(onError(functionName))
 Deno.serve(appGlobal.fetch)

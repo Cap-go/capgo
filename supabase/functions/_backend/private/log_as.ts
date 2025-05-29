@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -33,7 +33,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
     if (adminError) {
-      console.error({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
       return c.json({ error: 'is_admin_error' }, 500)
     }
 
@@ -45,7 +45,7 @@ app.post('/', middlewareAuth, async (c) => {
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id)
 
     if (userError || !userData?.user?.email) {
-      console.error({ requestId: c.get('requestId'), message: 'user_does_not_exist', error: userError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'user_does_not_exist', error: userError })
       return c.json({ error: 'user_does_not_exist' }, 400)
     }
 
@@ -57,7 +57,7 @@ app.post('/', middlewareAuth, async (c) => {
     })
 
     if (magicError) {
-      console.error({ requestId: c.get('requestId'), message: 'generate_magic_link_error', error: magicError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'generate_magic_link_error', error: magicError })
       return c.json({ error: 'generate_magic_link_error' }, 500)
     }
 
@@ -65,7 +65,7 @@ app.post('/', middlewareAuth, async (c) => {
     const { data: authData, error: authError } = await tmpSupabaseClient.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
     if (authError) {
-      console.error({ requestId: c.get('requestId'), message: 'auth_error', error: authError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'auth_error', error: authError })
       return c.json({ error: 'auth_error' }, 500)
     }
 
@@ -73,7 +73,7 @@ app.post('/', middlewareAuth, async (c) => {
     const refreshToken = authData.session?.refresh_token
 
     if (!jwt) {
-      console.error({ requestId: c.get('requestId'), message: 'no_jwt', authData })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'no_jwt', authData })
       return c.json({ error: 'no_jwt' }, 500)
     }
 

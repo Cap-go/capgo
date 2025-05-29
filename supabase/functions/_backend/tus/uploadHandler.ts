@@ -10,6 +10,7 @@ import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
+import { onError } from '../utils/on_error.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
 import {
@@ -105,13 +106,7 @@ export class UploadHandler {
     this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler as any)
     this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
     this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
-    // this.router.all('*', c => c.notFound())
-    this.router.onError((e, c) => {
-      console.log('in DO onError', e)
-      if (e instanceof HTTPException)
-        return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
-      return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
-    })
+    this.router.onError(onError('TUS handler'))
   }
 
   // forbid concurrent requests while running clsMethod

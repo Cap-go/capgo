@@ -134,12 +134,12 @@ async function logOut() {
 
 <template>
   <div>
-    <div class="relative">
-      <div class="flex flex-col p-4 space-y-2 bg-gray-300 shadow dark:bg-base-200 rounded-box">
+    <div class="relative text-gray-300">
+      <div class="flex flex-col p-4 space-y-2">
         <div class="flex items-center mb-4">
           <img v-if="main.user?.image_url" class="w-10 h-10 mr-3 mask mask-squircle" :src="main.user?.image_url" alt="User" width="32" height="32">
           <div v-else class="p-2 mr-3 bg-gray-700 mask mask-squircle">
-            <span class="font-medium text-gray-300">
+            <span class="font-medium">
               {{ acronym }}
             </span>
           </div>
@@ -147,34 +147,34 @@ async function logOut() {
             <p class="font-medium truncate">
               {{ `${main.user?.first_name} ${main.user?.last_name}` }}
             </p>
-            <p class="text-sm text-gray-600 truncate dark:text-gray-400">
+            <p class="text-sm text-gray-400 truncate">
               {{ main.user?.email }}
             </p>
           </div>
         </div>
-        <router-link to="/settings/account" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <router-link to="/settings/account" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50">
           {{ t('settings') }}
         </router-link>
-        <router-link v-if="isMobile" to="/app/modules" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <router-link v-if="isMobile" to="/app/modules" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50">
           {{ t('module-heading') }}
         </router-link>
-        <router-link v-if="isMobile" to="/app/modules_test" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+        <router-link v-if="isMobile" to="/app/modules_test" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50">
           {{ t('module-heading') }} {{ t('tests') }}
         </router-link>
-        <div class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="openSupport">
+        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="openSupport">
           {{ t('support') }}
         </div>
-        <div v-if="main.isAdmin && !isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
+        <div v-if="main.isAdmin && !isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
           <span v-if="!isLoading">{{ t('log-as') }}</span>
           <span v-else class="flex items-center">
             <Spinner size="w-4 h-4" class="mr-2" />
             {{ t('loading') }}
           </span>
         </div>
-        <div v-if="isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="resetSpoofedUser">
+        <div v-if="isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="resetSpoofedUser">
           {{ t('reset-spoofed-user') }}
         </div>
-        <div class="block px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" @click="logOut">
+        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="logOut">
           {{ t('sign-out') }}
         </div>
       </div>

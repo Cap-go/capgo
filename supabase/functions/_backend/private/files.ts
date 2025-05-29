@@ -226,8 +226,3 @@ app.route('/config', files_config)
 app.route('/download_link', download_link)
 app.route('/upload_link', upload_link)
 app.route('/ok', ok)
-
-app.all('*', (c) => {
-  console.log('all files', c.req.url)
-  return c.json({ error: 'Not Found' }, 404)
-})

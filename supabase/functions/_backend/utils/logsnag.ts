@@ -2,7 +2,7 @@ import type { Context } from '@hono/hono'
 import { LogSnag } from '@logsnag/node'
 
 import ky from 'ky'
-import { cloudlog } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 function logsnag(c: Context) {
@@ -45,7 +45,7 @@ function logsnagInsights(c: Context, data: { title: string, value: string | bool
       },
     }).then(res => res.json())
       .catch((e) => {
-        console.error({ requestId: c.get('requestId'), message: 'logsnagInsights', error: e, payload })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights', error: e, payload })
         return false
       }),
     )
