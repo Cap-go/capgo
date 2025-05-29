@@ -1,3 +1,3 @@
 export function openSupport() {
-  window.location.href = 'support.capgo.app'
+  window.location.href = 'https://support.capgo.app'
 }
