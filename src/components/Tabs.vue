@@ -22,7 +22,7 @@ function activeTabColor(tab: string) {
 
 <template>
   <div>
-    <div class="bg-gray-200 dark:bg-gray-100">
+    <div class="bg-slate-200/60 dark:bg-slate-800/60">
       <ul class="flex -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400" :class="{ 'flex-wrap': !noWrap, 'flex-nowrap overflow-x-scroll no-scrollbar': noWrap }">
         <li v-for="(tab, i) in tabs" :key="i" class="mr-2">
           <button class="block p-2 text-gray-500 group md:inline-flex md:p-4 cursor-pointer" :class="activeTabColor(tab.key)" @click="emit('update:activeTab', tab.key)">
