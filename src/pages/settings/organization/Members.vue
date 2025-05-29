@@ -259,8 +259,8 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
           {
             text: t('ok'),
             role: 'ok',
-          }
-        ]
+          },
+        ],
       }
       displayStore.showDialog = true
       break
@@ -294,10 +294,10 @@ async function rescindInvitation(email: string) {
   })
 
   if (error) {
-      console.error('Error rescinding invitation: ', error)
-      toast.error(`${t('cannot-rescind-invitation')}`)
-      return
-    }
+    console.error('Error rescinding invitation: ', error)
+    toast.error(`${t('cannot-rescind-invitation')}`)
+    return
+  }
 
   if (!error && data) {
     // Handle different response codes from the rescind_invitation function
@@ -352,12 +352,13 @@ async function deleteMember(member: ExtendedOrganizationMember) {
     if (member.is_tmp) {
       // Handle invitation rescinding for temporary users
       await rescindInvitation(member.email)
-    } else {
+    }
+    else {
       const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
       if (error) {
-          console.error('Error deleting member: ', error)
-          toast.error(`${t('cannot-delete-member')}: ${error.message}`)
-          return
+        console.error('Error deleting member: ', error)
+        toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+        return
       }
 
       toast.success(t('member-deleted'))
@@ -369,7 +370,7 @@ async function deleteMember(member: ExtendedOrganizationMember) {
       }
       else {
         await reloadData()
-      }      
+      }
     }
   }
   catch (error) {
@@ -396,7 +397,7 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
       const { data, error } = await supabase.rpc('modify_permissions_tmp', {
         email: member.email,
         org_id: currentOrganization.value?.gid ?? '',
-        new_role: perm
+        new_role: perm,
       })
 
       if (error) {
@@ -413,9 +414,10 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
         default:
           toast.warning(`${t('unexpected-response')}: ${data}`)
       }
-      
+
       await reloadData()
-    } else {
+    }
+    else {
       // Handle regular users as before
       const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
       if (error) {

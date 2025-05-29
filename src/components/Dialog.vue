@@ -116,7 +116,7 @@ onMounted(() => {
                     N/A
                   </span>
                 </div>
-              <span :class="{ 'ml-[6.344px]': !!org.logo }">{{ org.name }}</span>
+                <span :class="{ 'ml-[6.344px]': !!org.logo }">{{ org.name }}</span>
               </div>
             </div>
           </div>
