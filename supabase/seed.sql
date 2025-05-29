@@ -353,10 +353,11 @@ BEGIN
     FROM inserted_channels c;
 
     -- Update app table with default channels based on platform
-    UPDATE "public"."apps" 
-    SET 
-        default_channel_android = (select id from channels where name = 'production' and app_id = p_app_id),
-        default_channel_ios = (select id from channels where name = 'development' and app_id = p_app_id)
+    UPDATE "public"."apps"
+    SET
+        default_channel_android = (SELECT id FROM channels WHERE name = 'production' AND app_id = p_app_id),
+        default_channel_ios     = (SELECT id FROM channels WHERE name = 'development' AND app_id = p_app_id),
+        default_channel_sync    = false
     WHERE app_id = p_app_id;
 END;
 $$;
