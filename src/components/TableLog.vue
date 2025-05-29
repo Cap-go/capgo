@@ -16,6 +16,7 @@ import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconReload from '~icons/tabler/reload'
 import '@vuepic/vue-datepicker/dist/main.css'
+import type { DatePickerInstance } from "@vuepic/vue-datepicker"
 
 interface Props {
   isLoading?: boolean
@@ -30,6 +31,7 @@ interface Props {
   appId: string
 }
 
+const datepicker = ref<DatePickerInstance>(null);
 const props = defineProps<Props>()
 const emit = defineEmits([
   'reload',
@@ -160,12 +162,11 @@ async function setTime(time: Minutes) {
 }
 
 function formatValue(previewValue: Date[] | undefined) {
-  // console.log('previewValue', previewValue)
   // previewValue is an array of Date objects
   // we want to return object { start: time, end: time} and handle if it's not an array or empty
   // time should be in format HH:MM
   if (!previewValue)
-    return { start: '00:00', end: '00:00' }
+    return { start: dayjs().subtract(2, 'hour').format('HH:mm'), end: dayjs().format('HH:mm') }
   return {
     start: dayjs(previewValue[0]).format('HH:mm'),
     end: dayjs(previewValue[1]).format('HH:mm'),
@@ -185,6 +186,11 @@ function updateUrlParams() {
       params.set(`sort_${col.key}`, col.sortable)
   })
   window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+}
+
+function openTimePicker() {
+  console.log('openTimePicker')
+  datepicker.value?.switchView('time')
 }
 
 function loadFromUrlParams() {
@@ -289,6 +295,7 @@ onMounted(async () => {
         <div class="flex items-center justify-center flex-auto rounded-r-md cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
+              ref="datepicker"
               v-model="preciseDates"
               position="right"
               :min-date="dayjs().subtract(30, 'day').toDate()"
@@ -311,8 +318,8 @@ onMounted(async () => {
                 </div>
               </template>
               <template #top-extra="{ value }">
-                <div class="flex items-center justify-center">
-                  <div class="flex items-center space-x-2 text-black dark:text-white bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
+                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 mb-2 rounded-full" @click="openTimePicker">
+                  <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="24"
@@ -323,12 +330,12 @@ onMounted(async () => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5 text-black dark:text-white"
+                      class="w-5 h-5"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="font-mono text-black dark:text-white">{{ formatValue(value as any).start }}</span>
+                    <span class="font-inter">{{ formatValue(value as any).start }}</span>
                   </div>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -340,12 +347,12 @@ onMounted(async () => {
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-5 h-5 mx-4 text-black dark:text-white"
+                    class="w-5 h-5 mx-4 text-neutral-600 dark:text-neutral-400"
                   >
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
                   </svg>
-                  <div class="flex items-center space-x-2 bg-[#eee] dark:bg-[#444] px-3 py-2 rounded-full">
+                  <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="24"
@@ -356,12 +363,12 @@ onMounted(async () => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="w-5 h-5 text-black dark:text-white"
+                      class="w-5 h-5"
                     >
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="font-mono text-black dark:text-white">{{ formatValue(value as any).end }}</span>
+                    <span class="font-inter">{{ formatValue(value as any).end }}</span>
                   </div>
                 </div>
               </template>
@@ -444,16 +451,162 @@ onMounted(async () => {
 
 <style>
 @plugin "daisyui";
+@reference "../styles/style.css";
+
+/* VueDatePicker theming using CSS variables - Capgo theme */
+.dp__theme_light {
+  --dp-background-color: var(--color-white);
+  --dp-text-color: var(--color-black-light);
+  --dp-hover-color: var(--color-gray-300);
+  --dp-hover-text-color: var(--color-black-light);
+  --dp-hover-icon-color: var(--color-grey-500);
+  --dp-primary-color: var(--color-primary-500);
+  --dp-primary-disabled-color: var(--color-grey-500);
+  --dp-primary-text-color: var(--color-white);
+  --dp-secondary-color: var(--color-grey-500);
+  --dp-border-color: var(--color-grey-500);
+  --dp-menu-border-color: var(--color-misty-rose-300);
+  --dp-border-color-hover: var(--color-grey-500);
+  --dp-border-color-focus: var(--color-primary-500);
+  --dp-disabled-color: var(--color-misty-rose-50);
+  --dp-disabled-color-text: var(--color-grey-500);
+  --dp-scroll-bar-background: var(--color-misty-rose-400);
+  --dp-scroll-bar-color: var(--color-grey-500);
+  --dp-success-color: var(--color-success-500);
+  --dp-success-color-disabled: var(--color-vista-blue-200);
+  --dp-icon-color: var(--color-grey-500);
+  --dp-danger-color: var(--color-danger-500);
+  --dp-marker-color: var(--color-primary-500);
+  --dp-tooltip-color: var(--color-misty-rose-50);
+  --dp-highlight-color: color-mix(in srgb, var(--color-primary-500) 10%, transparent);
+  --dp-range-between-dates-background-color: color-mix(in srgb, var(--color-primary-500) 10%, transparent);
+  --dp-range-between-dates-text-color: var(--color-primary-500);
+  --dp-range-between-border-color: color-mix(in srgb, var(--color-primary-500) 20%, transparent);
+}
+
+.dp__theme_dark {
+  --dp-background-color: var(--color-base-100);
+  --dp-text-color: var(--color-base-content);
+  --dp-hover-color: var(--color-gray-700);
+  --dp-hover-text-color: var(--color-base-content);
+  --dp-hover-icon-color: var(--color-grey-500);
+  --dp-primary-color: var(--color-secondary-500);
+  --dp-primary-disabled-color: var(--color-dusk-700);
+  --dp-primary-text-color: var(--color-white);
+  --dp-secondary-color: var(--color-grey-500);
+  --dp-border-color: var(--color-dusk-700);
+  --dp-menu-border-color: var(--color-dusk-800);
+  --dp-border-color-hover: var(--color-grey-500);
+  --dp-border-color-focus: var(--color-secondary-500);
+  --dp-disabled-color: var(--color-dusk-800);
+  --dp-disabled-color-text: var(--color-grey-500);
+  --dp-scroll-bar-background: var(--color-base-100);
+  --dp-scroll-bar-color: var(--color-dusk-700);
+  --dp-success-color: var(--color-success-500);
+  --dp-success-color-disabled: var(--color-vista-blue-900);
+  --dp-icon-color: var(--color-grey-500);
+  --dp-danger-color: var(--color-muted-blue-500);
+  --dp-marker-color: var(--color-secondary-500);
+  --dp-tooltip-color: var(--color-dusk-800);
+  --dp-highlight-color: color-mix(in srgb, var(--color-secondary-500) 20%, transparent);
+  --dp-range-between-dates-background-color: color-mix(in srgb, var(--color-secondary-500) 20%, transparent);
+  --dp-range-between-dates-text-color: var(--color-base-content);
+  --dp-range-between-border-color: color-mix(in srgb, var(--color-secondary-500) 30%, transparent);
+}
+
+/* Global datepicker variables matching Capgo design */
+:root {
+  --dp-font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --dp-border-radius: 0.5rem;
+  --dp-cell-border-radius: 0.375rem;
+  --dp-common-transition: all 0.2s ease-in-out;
+  --dp-button-height: 2.5rem;
+  --dp-month-year-row-height: 2.5rem;
+  --dp-month-year-row-button-size: 2rem;
+  --dp-button-icon-height: 1.25rem;
+  --dp-cell-size: 2.5rem;
+  --dp-cell-padding: 0.5rem;
+  --dp-common-padding: 0.75rem;
+  --dp-input-icon-padding: 2.5rem;
+  --dp-input-padding: 0.5rem 0.75rem;
+  --dp-menu-min-width: 20rem;
+  --dp-action-buttons-padding: 0.5rem;
+  --dp-row-margin: 0.25rem 0;
+  --dp-calendar-header-cell-padding: 0.75rem;
+  --dp-two-calendars-spacing: 1rem;
+  --dp-overlay-col-padding: 0.5rem;
+  --dp-time-inc-dec-button-size: 2rem;
+  --dp-menu-padding: 1rem;
+  --dp-font-size: 0.875rem;
+  --dp-preview-font-size: 0.75rem;
+  --dp-time-font-size: 2rem;
+  --dp-animation-duration: 0.2s;
+  --dp-menu-appear-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+  --dp-transition-timing: ease-out;
+}
+
+/* Custom action buttons styling for Capgo */
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
-  @apply btn btn-outline  btn-sm;
+  @apply btn btn-outline btn-sm;
+  width: 49%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
-  @apply btn btn-primary  btn-sm;
+  @apply btn btn-outline btn-primary btn-sm;
+  width: 49%;
+}
+.custom-timepicker-button > .dp__action_row > .dp__action_buttons {
+  display: contents !important;
+}
+.dp__calendar_item {
+  display: contents !important;
+}
+.dp--tp-wrap > .dp__btn.dp__button {
+  display: none !important;
+}
+.dp__btn.dp__month_year_select {
+  margin-left: 0.5rem !important;
+  margin-right: 0.5rem !important;
 }
 
 /* Make date picker popup fixed to viewport */
 .dp__menu {
   position: fixed !important;
   z-index: 1000 !important;
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: 320px !important;
+}
+
+/* Prevent calendar from resizing during range selection */
+.dp__calendar {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.dp__calendar_wrap {
+  width: 100% !important;
+}
+
+/* Fix calendar row width */
+.dp__calendar_row {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: space-between !important;
+}
+
+/* Ensure consistent calendar item sizing */
+.dp__calendar_item {
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+/* Fix range selection display */
+.dp__range_between,
+.dp__range_start,
+.dp__range_end {
+  width: 100% !important;
 }
 </style>
