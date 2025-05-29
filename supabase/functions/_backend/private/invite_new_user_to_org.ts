@@ -1,13 +1,13 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
+import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
 import { z } from 'zod'
+import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-import { trackBentoEvent } from '../utils/bento.ts'
-import dayjs from 'dayjs'
-import type { Database } from '../utils/supabase.types.ts'
 
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
@@ -31,17 +31,17 @@ app.post('/', middlewareAuth, async (c) => {
   try {
     const rawBody = await c.req.json()
     console.log({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
-    
+
     // Validate the request body using Zod
     const validationResult = inviteUserSchema.safeParse(rawBody)
     if (!validationResult.success) {
       console.error({ requestId: c.get('requestId'), context: 'validation_error', error: validationResult.error.format() })
       return c.json({ status: 'Invalid request', errors: validationResult.error.format() }, 400)
     }
-    
+
     const body = validationResult.data
     console.log({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
-    
+
     const authorization = c.get('authorization')
     const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
       authorization?.split('Bearer ')[1],
@@ -123,7 +123,8 @@ app.post('/', middlewareAuth, async (c) => {
       }
 
       newInvitation = updatedInvitationData
-    } else {
+    }
+    else {
       const { error: createUserError, data: newInvitationData } = await supabaseAdmin(c as any).from('tmp_users').insert({
         email: body.email,
         org_id: body.org_id,
@@ -131,7 +132,7 @@ app.post('/', middlewareAuth, async (c) => {
         first_name: body.first_name,
         last_name: body.last_name,
       }).select('*').single()
-  
+
       if (createUserError) {
         return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
       }
@@ -139,7 +140,7 @@ app.post('/', middlewareAuth, async (c) => {
       newInvitation = newInvitationData
     }
 
-    const bentoEvent = await trackBentoEvent(c as any, body.email, { 
+    const bentoEvent = await trackBentoEvent(c as any, body.email, {
       org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
       org_name: org.name,
       invite_link: `${getEnv(c as any, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
@@ -175,7 +176,7 @@ async function verifyCaptchaToken(c: any, token: string): Promise<boolean> {
     }
 
     // "/siteverify" API endpoint.
-    const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+    const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
     const result = await fetch(url, {
       body: JSON.stringify({
         secret: captchaSecret,
@@ -183,9 +184,9 @@ async function verifyCaptchaToken(c: any, token: string): Promise<boolean> {
       }),
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+        'Content-Type': 'application/json',
+      },
+    })
 
     const captchaResult = await result.json()
     const captchaResultData = captchaSchema.safeParse(captchaResult)
@@ -195,7 +196,8 @@ async function verifyCaptchaToken(c: any, token: string): Promise<boolean> {
     }
     console.log({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
     return captchaResultData.data.success === true
-  } catch (error) {
+  }
+  catch (error) {
     console.error({ requestId: c.get('requestId'), context: 'captcha_verify_error', error })
     return false
   }

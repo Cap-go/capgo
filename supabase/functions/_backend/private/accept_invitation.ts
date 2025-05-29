@@ -7,12 +7,9 @@ import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supab
 
 // Define the schema for the accept invitation request
 const acceptInvitationSchema = z.object({
-  password: z.string().min(12, 'Password must be at least 12 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number')
-    .regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?].*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least two special characters'),
+  password: z.string().min(12, 'Password must be at least 12 characters').regex(/[A-Z]/, 'Password must contain at least one uppercase letter').regex(/\d/, 'Password must contain at least one number').regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?].*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least two special characters'),
   magic_invite_string: z.string().min(1, 'Magic invite string is required'),
-  optForNewsletters: z.boolean()
+  optForNewsletters: z.boolean(),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -23,17 +20,17 @@ app.post('/', async (c) => {
   try {
     const rawBody = await c.req.json()
     console.log({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody })
-    
+
     // Validate the request body using Zod
     const validationResult = acceptInvitationSchema.safeParse(rawBody)
     if (!validationResult.success) {
       console.error({ requestId: c.get('requestId'), context: 'validation_error', error: validationResult.error.format() })
       return c.json({ status: 'Invalid request', errors: validationResult.error.format() }, 400)
     }
-    
+
     const body = validationResult.data
     console.log({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body })
-    
+
     // For now, we're just doing validation without additional logic
     // This will be expanded with the actual invitation acceptance logic
 
@@ -42,7 +39,7 @@ app.post('/', async (c) => {
       .select('*')
       .eq('invite_magic_string', body.magic_invite_string)
       .single()
-    
+
     if (invitationError) {
       console.error({ requestId: c.get('requestId'), context: 'error', error: invitationError })
       return c.json({ status: 'Failed to accept invitation', error: invitationError.message }, 500)
@@ -64,8 +61,8 @@ app.post('/', async (c) => {
           formFilled: true,
           enableNotifications: false,
           legal: true,
-          optForNewsletters: false
-        }
+          optForNewsletters: false,
+        },
       },
     })
 
@@ -121,10 +118,10 @@ app.post('/', async (c) => {
       console.error({ requestId: c.get('requestId'), context: 'error', error: insertIntoMainTableError })
       return c.json({ status: 'Failed to accept invitation', error: insertIntoMainTableError.message }, 500)
     }
-    
-    return c.json({ 
+
+    return c.json({
       access_token: session.session?.access_token,
-      refresh_token: session.session?.refresh_token
+      refresh_token: session.session?.refresh_token,
     })
   }
   catch (error) {

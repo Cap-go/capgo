@@ -176,7 +176,7 @@ async function createNewOrg() {
       <summary class="justify-between w-full btn btn-outline border-gray-300 dark:border-gray-600 btn-sm text-slate-300 dark:text-white">
         <div class="flex items-center w-4/5 text-left">
           <span class="truncate">{{ currentOrganization?.name }}</span>
-          <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full"></div>
+          <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
         <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
@@ -187,7 +187,7 @@ async function createNewOrg() {
             @click="onOrganizationClick(org)"
           >
             <span>{{ org.name }}</span>
-            <div v-if="org.role.startsWith('invite')" class="w-3 h-3 ml-1 bg-red-500 rounded-full"></div>
+            <div v-if="org.role.startsWith('invite')" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
           </a>
         </li>
         <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
