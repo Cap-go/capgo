@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DatePickerInstance } from '@vuepic/vue-datepicker'
 import type { TableColumn } from './comp_def'
 import type { Organization } from '~/stores/organization'
 import { FormKit } from '@formkit/vue'
@@ -16,7 +17,6 @@ import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
 import IconReload from '~icons/tabler/reload'
 import '@vuepic/vue-datepicker/dist/main.css'
-import type { DatePickerInstance } from "@vuepic/vue-datepicker"
 
 interface Props {
   isLoading?: boolean
@@ -31,7 +31,6 @@ interface Props {
   appId: string
 }
 
-const datepicker = ref<DatePickerInstance>(null);
 const props = defineProps<Props>()
 const emit = defineEmits([
   'reload',
@@ -46,6 +45,7 @@ const emit = defineEmits([
   'update:columns',
   'update:currentPage',
 ])
+const datepicker = ref<DatePickerInstance>(null)
 const dropdown = useTemplateRef('dropdown')
 function closeDropdown() {
   if (dropdown.value) {
