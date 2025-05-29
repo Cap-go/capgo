@@ -1,3 +1,3 @@
 export function openSupport() {
-  window.location.href = 'mailto:support@capgo.app'
+  window.location.href = 'support.capgo.app'
 }
