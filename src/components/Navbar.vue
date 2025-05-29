@@ -32,12 +32,12 @@ const { t } = useI18n()
 
 <template>
   <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
-    <div class="px-2 lg:px-8 sm:px-6">
+    <div class="px-2 lg:px-6 sm:px-4">
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
-            <button class="flex p-2 rounded-sm hover:bg-slate-600 dark:hover:bg-slate-50 hover:text-white dark:hover:text-slate-500 text-slate-500 dark:text-white" @click="back()">
+            <button class="flex p-2 rounded-sm hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-500 dark:text-white" @click="back()">
               <IconBack class="w-6 h-6 fill-current" />
               <span class="hidden md:block">{{ t('button-back') }}</span>
             </button>

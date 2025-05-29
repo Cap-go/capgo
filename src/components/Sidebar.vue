@@ -10,7 +10,7 @@ import IconDiscord from '~icons/ic/round-discord'
 import IconDashboard from '~icons/ic/round-space-dashboard'
 // import FluentLive20Filled from '~icons/fluent/live-20-filled'
 import IconApiKey from '~icons/mdi/shield-key'
-import UserMenu from '../components/dashboard/DropdownProfile.vue'
+import DropdownProfile from '../components/dashboard/DropdownProfile.vue'
 
 const props = defineProps <{
   sidebarOpen: boolean
@@ -85,14 +85,14 @@ const tabs = ref<Tab[]>([
     <div
       id="sidebar"
       ref="sidebar"
-      class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col overflow-y-scroll bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:w-64 lg:h-full lg:bg-slate-800 lg:rounded-none lg:shadow-none lg:translate-x-0 lg:overflow-y-auto"
+      class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:w-64 lg:h-full lg:bg-slate-800 lg:rounded-none lg:shadow-none lg:translate-x-0"
       :class="{
         'translate-x-0': props.sidebarOpen,
         '-translate-x-[120%]': !props.sidebarOpen,
       }"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between px-3 py-4 border-b border-slate-800 lg:px-6 lg:py-6 lg:border-b lg:border-slate-700">
+      <div class="flex justify-between px-3 py-4 border-b border-slate-800 lg:px-6 lg:py-6 lg:border-b lg:border-slate-700 flex-shrink-0">
         <router-link class="flex items-center space-x-2 cursor-pointer lg:space-x-3" to="/app">
           <img src="/capgo.webp" alt="logo" class="w-8 h-8">
           <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 hover:text-white lg:text-slate-200 lg:hover:text-white">Capgo</span>
@@ -100,12 +100,12 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- Organization dropdown -->
-      <div class="px-3 py-4 lg:px-6 lg:py-4">
+      <div class="px-3 py-4 lg:px-6 lg:py-4 flex-shrink-0">
         <dropdown-organization v-if="main.user" />
       </div>
 
       <!-- Navigation -->
-      <div class="px-3 py-4 space-y-4 lg:px-6 lg:py-6 lg:flex-1">
+      <div class="px-3 py-4 space-y-4 lg:px-6 lg:py-6 flex-1 overflow-y-auto">
         <div>
           <h3 class="mb-3 text-xs font-semibold uppercase text-slate-500 lg:text-slate-500 lg:tracking-wider lg:mb-4">
             {{ t('pages') }}
@@ -132,9 +132,9 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- User menu -->
-      <div class="px-3 py-4 mt-auto lg:px-6 lg:py-6 lg:border-t lg:border-slate-700 lg:mt-0">
+      <div class="pt-4 mt-auto lg:pt-6 lg:border-t lg:border-slate-700 lg:mt-0 flex-shrink-0">
         <div v-if="main.user" class="flex items-center">
-          <UserMenu class="w-full" />
+          <DropdownProfile class="w-full" />
         </div>
       </div>
     </div>
