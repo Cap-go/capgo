@@ -532,6 +532,20 @@ BEGIN
     END IF;
 END $$;
 
+-- Seed the capgo_tokens_steps table with initial pricing tiers
+-- INSERT INTO capgo_tokens_steps (step_min, step_max, price_per_unit, price_id) VALUES
+--     (0, 100, 1.00, 'price_1QnHc0GH46eYKnWweRZjvNWL'),
+--     (100, 250, 0.80, 'price_1QnID2GH46eYKnWweJ1VAw0h'),
+--     (250, 2147483647, 0.50, 'price_1QnIDGGH46eYKnWwRc1HMo6h');
+INSERT INTO capgo_tokens_steps (step_min, step_max, price_per_unit) VALUES
+    (0, 1000000, 0.003),
+    (1000000, 3000000,0.0022),
+    (3000000, 10000000,0.0016),
+    (10000000, 15000000,0.0014),
+    (15000000, 25000000,0.00115),
+    (25000000, 40000000,0.001),
+    (40000000, 100000000,0.0009),
+    (100000000, 9223372036854775807, 0.0007);
 -- Seed data
 DO $$
 BEGIN

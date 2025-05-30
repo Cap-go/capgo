@@ -100,3 +100,29 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
     toast.error('Cannot get your checkout')
   }
 }
+
+export async function openCheckoutForOneOff(priceId: string, successUrl: string, cancelUrl: string, orgId: string, howMany: number) {
+  //   console.log('openCheckout')
+    const supabase = useSupabase()
+    const session = await supabase.auth.getSession()
+    if (!session)
+      return
+    try {
+      const resp = await supabase.functions.invoke('private/stripe_checkout', {
+        body: JSON.stringify({
+          priceId,
+          successUrl,
+          cancelUrl,
+          reccurence: 'one_off',
+          orgId,
+          howMany,
+        }),
+      })
+      if (!resp.error && resp.data && resp.data.url)
+        openBlank(resp.data.url)
+    }
+    catch (error) {
+      console.error(error)
+      toast.error('Cannot get your checkout')
+    }
+  }
