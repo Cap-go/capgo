@@ -14,7 +14,7 @@ describe('tests CLI upload', () => {
   const APPNAME = `com.demo.app.cli_${id}`
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, id)
+    await prepareCli(APPNAME)
   })
   afterAll(async () => {
     await cleanupCli(APPNAME)
@@ -24,7 +24,7 @@ describe('tests CLI upload', () => {
 
   let semver = getSemver()
   it('should upload bundle successfully', async () => {
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], APPNAME, false)
     expect(output).toContain('Bundle uploaded')
   })
   it('should download and verify uploaded bundle', async () => {
@@ -53,12 +53,12 @@ describe('tests CLI upload', () => {
   })
   it ('should not upload same hash twice', async () => {
     semver = getSemver(semver)
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], id, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], APPNAME, false)
     expect(output).toContain('Cannot upload the same bundle content')
   })
   it ('should upload an external bundle', async () => {
     semver = getSemver(semver)
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--external', 'https://example.com'], id, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--external', 'https://example.com'], APPNAME, false)
     expect(output).toContain('Time to share your update to the world')
 
     const supabase = getSupabaseClient()
@@ -84,7 +84,7 @@ describe('tests CLI upload options in parallel', () => {
     const id = randomUUID()
     const APPNAME = `com.demo.app.cli_${id}`
     await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, id)
+    await prepareCli(APPNAME)
     return { id, APPNAME }
   }
   const cleanupApp = async (id: string) => {
@@ -94,7 +94,7 @@ describe('tests CLI upload options in parallel', () => {
   }
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME_one)
-    await prepareCli(APPNAME_one, id_one)
+    await prepareCli(APPNAME_one)
   })
   afterAll(async () => {
     console.log('cleanupApp', APPNAME_one)
@@ -102,20 +102,20 @@ describe('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('test code check (missing notifyAppReady)', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
-    writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
+    writeFileSync(join(tempFileFolder(APPNAME), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false)
     expect(output).toContain('notifyAppReady() is missing in')
   })
   it.concurrent('test --iv-session-key with cloud upload', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb'], id_one, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb'], APPNAME_one, false)
     expect(output).toContain('You need to provide an external url if you want to use the --iv-session-key option')
   })
   it.concurrent('test --iv-session-key with external upload', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb', '--external', 'https://example.com'], id_one, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--iv-session-key', 'aaa:bbb', '--external', 'https://example.com'], APPNAME_one, false)
     expect(output).toContain('Time to share your update to the world')
 
     const supabase = getSupabaseClient()
@@ -132,12 +132,12 @@ describe('tests CLI upload options in parallel', () => {
   })
   it.concurrent('test --encrypted-checksum with cloud upload', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa'], id_one, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa'], APPNAME_one, false)
     expect(output).toContain('You need to provide an external url if you want to use the --encrypted-checksum option')
   })
   it.concurrent('test --min-update-version', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0', '--ignore-checksum-check'], id_one, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--min-update-version', '1.0.0', '--ignore-checksum-check'], APPNAME_one, false)
     expect(output).toContain('Time to share your update to the world')
 
     const supabase = getSupabaseClient()
@@ -154,7 +154,7 @@ describe('tests CLI upload options in parallel', () => {
   })
   it.concurrent('test --encrypted-checksum with external upload', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa', '--external', 'https://example.com'], id_one, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--encrypted-checksum', 'aaaa', '--external', 'https://example.com'], APPNAME_one, false)
     expect(output).toContain('Time to share your update to the world')
 
     const supabase = getSupabaseClient()
@@ -170,30 +170,30 @@ describe('tests CLI upload options in parallel', () => {
     expect(data?.checksum).toBe('aaaa')
   })
   it.concurrent('test code check (missing index.html)', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
-    rmSync(join(tempFileFolder(id), 'dist', 'index.html'))
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false)
+    rmSync(join(tempFileFolder(APPNAME), 'dist', 'index.html'))
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false)
     expect(output).toContain('index.html is missing')
   })
   it.concurrent('test --no-code-check', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     let semver = getSemver()
-    rmSync(join(tempFileFolder(id), 'dist', 'index.html'))
+    rmSync(join(tempFileFolder(APPNAME), 'dist', 'index.html'))
     semver = getSemver(semver)
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-code-check'], id, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--no-code-check'], APPNAME, false)
     expect(output).toContain('Time to share your update to the world')
   })
   it.concurrent('cannot upload with wrong api key', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const testApiKey = randomUUID()
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false, testApiKey)
     expect(output).toContain('Invalid API key or insufficient permissions.')
   })
 
   it.concurrent('should test selectable disallow upload', async () => {
-    const { id, APPNAME } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const supabase = getSupabaseClient()
     const semver = getSemver()
     await supabase.from('channels').update({ disable_auto_update: 'version_number' }).eq('name', 'no_access').eq('app_id', APPNAME).throwOnError()
@@ -203,10 +203,10 @@ describe('tests CLI upload options in parallel', () => {
     expect(channel?.disable_auto_update).toBe('version_number')
 
     try {
-      const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'no_access'], id)
+      const output1 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'no_access'], APPNAME)
       expect(output1).toContain('to provide a min-update-version')
 
-      const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'no_access', '--min-update-version', 'invalid', '--ignore-metadata-check'], id)
+      const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'no_access', '--min-update-version', 'invalid', '--ignore-metadata-check'], APPNAME)
       expect(output2).toContain('should follow semver convention')
     }
     finally {
@@ -214,7 +214,7 @@ describe('tests CLI upload options in parallel', () => {
     }
   })
   it.concurrent('should test upload with organization', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     let semver = getSemver()
     const testApiKey = randomUUID()
     const testUserId = USER_ID_2
@@ -237,7 +237,7 @@ describe('tests CLI upload options in parallel', () => {
 
         try {
           semver = getSemver(semver)
-          const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
+          const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], APPNAME, false, testApiKey)
           expect(output).toContain('Bundle uploaded')
         }
         finally {
@@ -262,7 +262,7 @@ describe('tests CLI upload options in parallel', () => {
     }
   })
   it.concurrent('should not allow setting channel with APIKEY_TEST_UPLOAD but allow upload', async () => {
-    const { id, APPNAME } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
 
     const supabase = getSupabaseClient()
@@ -275,7 +275,7 @@ describe('tests CLI upload options in parallel', () => {
       .single()
       .throwOnError()
 
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, APIKEY_TEST_UPLOAD)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false, APIKEY_TEST_UPLOAD)
     expect(output).toContain('The upload key is not allowed to set the version in the channel')
     expect(output).toContain('Bundle uploaded')
 
@@ -291,7 +291,7 @@ describe('tests CLI upload options in parallel', () => {
     expect(channelAfter.version).toBe(channelBefore.version)
   })
   it.concurrent('should test upload with org-limited API key', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
     const testApiKey = randomUUID()
     const testUserId = USER_ID
@@ -308,7 +308,7 @@ describe('tests CLI upload options in parallel', () => {
         })
         .throwOnError()
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], APPNAME, false, testApiKey)
       expect(output).toContain('Bundle uploaded')
     }
     finally {
@@ -320,7 +320,7 @@ describe('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('should test upload with app-limited API key', async () => {
-    const { id, APPNAME } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
     const testApiKey = randomUUID()
     const testUserId = USER_ID
@@ -337,7 +337,7 @@ describe('tests CLI upload options in parallel', () => {
         })
         .throwOnError()
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false, testApiKey)
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], APPNAME, false, testApiKey)
       expect(output).toContain('Bundle uploaded')
     }
     finally {
@@ -349,7 +349,7 @@ describe('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('should fail upload with wrong org-limited API key', async () => {
-    const { id, APPNAME } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
     const testApiKey = randomUUID()
     const wrongOrgId = randomUUID()
@@ -367,7 +367,7 @@ describe('tests CLI upload options in parallel', () => {
         })
         .throwOnError()
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false, testApiKey)
       expect(output).toContain(`Cannot get organization id for app id ${APPNAME}`)
     }
     finally {
@@ -379,7 +379,7 @@ describe('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('should fail upload with wrong app-limited API key', async () => {
-    const { id, APPNAME } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
     const testApiKey = randomUUID()
     const wrongAppId = 'com.wrong.app'
@@ -397,7 +397,7 @@ describe('tests CLI upload options in parallel', () => {
         })
         .throwOnError()
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false, testApiKey)
       expect(output).toContain(`Cannot get organization id for app id ${APPNAME}`)
     }
     finally {
@@ -409,7 +409,7 @@ describe('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('should fail upload when using read-only API key with org limitation', async () => {
-    const { id } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
     const testApiKey = randomUUID()
     const testUserId = USER_ID
@@ -426,7 +426,7 @@ describe('tests CLI upload options in parallel', () => {
         })
         .throwOnError()
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false, testApiKey)
       expect(output).toContain('Invalid API key or insufficient permissions.')
     }
     finally {
@@ -438,7 +438,7 @@ describe('tests CLI upload options in parallel', () => {
   })
 
   it.concurrent('should fail upload when using read-only API key with app limitation', async () => {
-    const { id, APPNAME } = await prepareApp()
+    const { APPNAME } = await prepareApp()
     const semver = getSemver()
     const testApiKey = randomUUID()
     const testUserId = USER_ID
@@ -455,7 +455,7 @@ describe('tests CLI upload options in parallel', () => {
         })
         .throwOnError()
 
-      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], id, false, testApiKey)
+      const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME, false, testApiKey)
       expect(output).toContain('Invalid API key or insufficient permissions.')
     }
     finally {

@@ -1,28 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { cleanupCli, prepareCli, runCli } from './cli-utils'
+import { runCli } from './cli-utils'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData } from './test-utils'
 
 describe('tests CLI channel commands', () => {
   const id = randomUUID()
-  const APPNAME = `com.demo.app.cli_${id}`
+  const APPNAME = `com.cli_channel_${id}`
   const channelName = `test-channel-${Math.floor(Math.random() * 10000)}`
   const invalidAppName = `invalid-app-${Math.floor(Math.random() * 10000)}`
   const invalidChannelName = `invalid-channel-${Math.floor(Math.random() * 10000)}`
 
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, id)
   })
 
   afterAll(async () => {
-    await cleanupCli(APPNAME)
     await resetAppData(APPNAME)
   })
 
   describe('channel creation', () => {
     it('should create a channel', async () => {
-      const output = await runCli(['channel', 'add', channelName, APPNAME], id, false)
+      const output = await runCli(['channel', 'add', channelName, APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain(`Create channel`)
       expect(output).toContain(`Done ✅`)
 
@@ -37,7 +35,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should fail to create a channel with invalid app ID', async () => {
-      const output = await runCli(['channel', 'add', channelName, invalidAppName], id, false)
+      const output = await runCli(['channel', 'add', channelName, invalidAppName], APPNAME, false, undefined, true, true)
       expect(output).toContain('does not exist')
 
       // Verify channel wasn't created
@@ -50,7 +48,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should fail to create a duplicate channel', async () => {
-      const output = await runCli(['channel', 'add', channelName, APPNAME], id, false)
+      const output = await runCli(['channel', 'add', channelName, APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain('Cannot create Channel 🙀')
       expect(output).not.toContain(`Done ✅`)
     })
@@ -58,7 +56,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel listing', () => {
     it('should list channels', async () => {
-      const output = await runCli(['channel', 'list', APPNAME], id, false)
+      const output = await runCli(['channel', 'list', APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain(channelName)
       expect(output).toContain(`Done ✅`)
 
@@ -72,7 +70,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should show empty list for invalid app ID', async () => {
-      const output = await runCli(['channel', 'list', invalidAppName], id, false)
+      const output = await runCli(['channel', 'list', invalidAppName], APPNAME, false, undefined, true, true)
       expect(output).not.toContain(channelName)
 
       // Optional: verify no channels exist for invalid app
@@ -87,7 +85,7 @@ describe('tests CLI channel commands', () => {
   describe('channel bundle operations', () => {
     it('should set channel bundle', async () => {
       const bundle = '1.0.0'
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--bundle', bundle], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--bundle', bundle], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to @${bundle}`)
       expect(output).toContain(`Done ✅`)
 
@@ -105,14 +103,14 @@ describe('tests CLI channel commands', () => {
 
     it('should fail to set bundle for invalid channel name', async () => {
       const bundle = '1.0.0'
-      const output = await runCli(['channel', 'set', invalidChannelName, APPNAME, '--bundle', bundle], id, false)
+      const output = await runCli(['channel', 'set', invalidChannelName, APPNAME, '--bundle', bundle], APPNAME, false, undefined, true, true)
       expect(output).toContain('Cannot find channel')
       expect(output).not.toContain(`Done ✅`)
     })
 
     it('should fail to set invalid bundle version', async () => {
       const invalidBundle = 'not-a-version'
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--bundle', invalidBundle], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--bundle', invalidBundle], APPNAME, false, undefined, true, true)
       expect(output).toContain('Cannot find version')
       expect(output).not.toContain(`Done ✅`)
 
@@ -129,7 +127,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel state operations', () => {
     it('should set channel state to default', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', 'default'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', 'default'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to default`)
       expect(output).toContain(`Done ✅`)
 
@@ -146,7 +144,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should set channel state to public', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', 'normal'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', 'normal'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to normal`)
       expect(output).toContain(`Done ✅`)
 
@@ -164,7 +162,7 @@ describe('tests CLI channel commands', () => {
 
     it('should fail to set invalid state', async () => {
       const invalidState = 'invalid-state'
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', invalidState], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', invalidState], APPNAME, false, undefined, true, true)
       expect(output).toContain('State invalid-state is not known. The possible values are: normal, default.')
       expect(output).not.toContain(`Done ✅`)
     })
@@ -172,7 +170,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel policy operations', () => {
     it('should set channel downgrade policy', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--downgrade'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--downgrade'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to allow downgrade`)
       expect(output).toContain(`Done ✅`)
 
@@ -191,7 +189,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel platform operations', () => {
     it('should set channel platform to ios', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--ios'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--ios'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to allow ios update`)
       expect(output).toContain(`Done ✅`)
 
@@ -208,7 +206,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should set channel platform to android', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--android'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--android'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to allow android update`)
       expect(output).toContain(`Done ✅`)
 
@@ -225,7 +223,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should set both platforms simultaneously', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--ios', '--android'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--ios', '--android'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to allow ios update`)
       expect(output).toContain(`channel: ${channelName} to allow android update`)
       expect(output).toContain(`Done ✅`)
@@ -246,7 +244,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel self-assign operations', () => {
     it('should set channel self-assign', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--self-assign'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--self-assign'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to allow self assign`)
       expect(output).toContain(`Done ✅`)
 
@@ -264,7 +262,7 @@ describe('tests CLI channel commands', () => {
   })
 
   it('should disable auto update for channel', async () => {
-    const output = await runCli(['channel', 'set', channelName, APPNAME, '--disable-auto-update', 'major'], id, false)
+    const output = await runCli(['channel', 'set', channelName, APPNAME, '--disable-auto-update', 'major'], APPNAME, false, undefined, true, true)
     expect(output).toContain(`channel: ${channelName} to major disable update strategy to this channel`)
     expect(output).toContain(`Done ✅`)
     // Verify in databases
@@ -280,7 +278,7 @@ describe('tests CLI channel commands', () => {
   })
 
   it('should set channel for dev environment', async () => {
-    const output = await runCli(['channel', 'set', channelName, APPNAME, '--dev'], id, false)
+    const output = await runCli(['channel', 'set', channelName, APPNAME, '--dev'], APPNAME, false, undefined, true, true)
     expect(output).toContain(`channel: ${channelName} to allow dev devices`)
     expect(output).toContain(`Done ✅`)
 
@@ -297,7 +295,7 @@ describe('tests CLI channel commands', () => {
   })
 
   it('should set channel for emulator environment', async () => {
-    const output = await runCli(['channel', 'set', channelName, APPNAME, '--emulator'], id, false)
+    const output = await runCli(['channel', 'set', channelName, APPNAME, '--emulator'], APPNAME, false, undefined, true, true)
     expect(output).toContain(`channel: ${channelName} to allow emulator devices`)
     expect(output).toContain(`Done ✅`)
 
@@ -315,7 +313,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel info operations', () => {
     it('should get current bundle of channel', async () => {
-      const output = await runCli(['channel', 'currentBundle', channelName, APPNAME], id, false)
+      const output = await runCli(['channel', 'currentBundle', channelName, APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain(`Current bundle for channel ${channelName}`)
 
       // Verify in database
@@ -331,7 +329,7 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should fail to get bundle for non-existent channel', async () => {
-      const output = await runCli(['channel', 'currentBundle', invalidChannelName, APPNAME], id, false)
+      const output = await runCli(['channel', 'currentBundle', invalidChannelName, APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain('Error')
       expect(output).not.toContain(`Done ✅`)
     })
@@ -339,7 +337,7 @@ describe('tests CLI channel commands', () => {
 
   describe('combined operations', () => {
     it('should set multiple properties in a single command', async () => {
-      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', 'default', '--downgrade', '--ios'], id, false)
+      const output = await runCli(['channel', 'set', channelName, APPNAME, '--state', 'default', '--downgrade', '--ios'], APPNAME, false, undefined, true, true)
       expect(output).toContain(`channel: ${channelName} to default`)
       expect(output).toContain(`channel: ${channelName} to allow downgrade`)
       expect(output).toContain(`channel: ${channelName} to allow ios update`)
@@ -362,7 +360,7 @@ describe('tests CLI channel commands', () => {
 
   describe('channel deletion', () => {
     it('should delete a channel', async () => {
-      const output = await runCli(['channel', 'delete', channelName, APPNAME], id, false)
+      const output = await runCli(['channel', 'delete', channelName, APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain(`Deleting channel ${APPNAME}#${channelName} from Capgo`)
       expect(output).toContain(`Done ✅`)
 
@@ -378,13 +376,13 @@ describe('tests CLI channel commands', () => {
     })
 
     it('should fail to delete non-existent channel', async () => {
-      const output = await runCli(['channel', 'delete', invalidChannelName, APPNAME], id, false)
+      const output = await runCli(['channel', 'delete', invalidChannelName, APPNAME], APPNAME, false, undefined, true, true)
       expect(output).toContain('Cannot delete Channel')
       expect(output).not.toContain(`Done ✅`)
     })
 
     it('should fail to delete channel with invalid app ID', async () => {
-      const output = await runCli(['channel', 'delete', channelName, invalidAppName], id, false)
+      const output = await runCli(['channel', 'delete', channelName, invalidAppName], APPNAME, false, undefined, true, true)
       expect(output).toContain(`App ${invalidAppName} does not exist`)
       expect(output).not.toContain(`Done ✅`)
     })

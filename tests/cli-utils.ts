@@ -60,9 +60,9 @@ const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(ap
 export default config;\n`
 }
 
-export function setDependencies(dependencies: Record<string, string>, id: string, appId: string) {
+export function setDependencies(dependencies: Record<string, string>, appId: string) {
   // write package.json
-  const pathPack = join(tempFileFolder(id), 'package.json')
+  const pathPack = join(tempFileFolder(appId), 'package.json')
   const res = BASE_PACKAGE_JSON.replace('%APPID%', appId).replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
   writeFileSync(pathPack, res)
 }
@@ -71,9 +71,9 @@ export function deleteAllTempFolders() {
   rimrafSync(TEMP_DIR_NAME)
 }
 
-export function deleteTempFolders(id: string) {
-  if (existsSync(tempFileFolder(id))) {
-    rimrafSync(tempFileFolder(id))
+export function deleteTempFolders(appId: string) {
+  if (existsSync(tempFileFolder(appId))) {
+    rimrafSync(tempFileFolder(appId))
   }
 }
 
@@ -83,20 +83,20 @@ export function getSemver(semver = `1.0.${Date.now()}`) {
   return newSemver
 }
 
-export async function prepareCli(appId: string, id: string, old = false) {
+export async function prepareCli(appId: string, old = false) {
   const defaultConfig = generateCliConfig(appId)
-  deleteTempFolders(id)
-  mkdirSync(tempFileFolder(id), { recursive: true })
+  deleteTempFolders(appId)
+  mkdirSync(tempFileFolder(appId), { recursive: true })
 
-  const capacitorConfigPath = join(tempFileFolder(id), 'capacitor.config.ts')
+  const capacitorConfigPath = join(tempFileFolder(appId), 'capacitor.config.ts')
   writeFileSync(capacitorConfigPath, defaultConfig)
 
-  mkdirSync(join(tempFileFolder(id), 'dist'), { recursive: true })
-  writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
-  writeFileSync(join(tempFileFolder(id), 'dist', 'index.html'), '')
-  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, id, appId)
+  mkdirSync(join(tempFileFolder(appId), 'dist'), { recursive: true })
+  writeFileSync(join(tempFileFolder(appId), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
+  writeFileSync(join(tempFileFolder(appId), 'dist', 'index.html'), '')
+  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, appId)
 
-  npmInstall(id)
+  npmInstall(appId)
 }
 
 // cleanup CLI
@@ -104,9 +104,9 @@ export function cleanupCli(id: string) {
   deleteTempFolders(id)
 }
 
-export function npmInstall(id: string) {
+export function npmInstall(appId: string) {
   try {
-    execSync('bun install', { cwd: tempFileFolder(id), stdio: 'ignore' })
+    execSync('bun install', { cwd: tempFileFolder(appId), stdio: 'ignore' })
   }
   catch (error) {
     console.error('bun install failed', error)
@@ -114,28 +114,32 @@ export function npmInstall(id: string) {
   }
 }
 
-export function runCli(params: string[], id: string, logOutput = false, overwriteApiKey?: string): string {
+export function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): string {
   let localCliPath = env.LOCAL_CLI_PATH
+  const basePath = noFolder ? cwd() : tempFileFolder(appId)
+  const basePathCommand = noFolder ? '' : '../../'
   if (localCliPath === 'true') {
-    localCliPath = '../../../CLI/dist/index.js'
+    localCliPath = `${basePathCommand}../CLI/dist/index.js`
   }
+
   const command = [
     localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath || '@capgo/cli@latest',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
+    ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
   ].join(' ')
 
   const options: ExecSyncOptions = {
-    cwd: tempFileFolder(id),
+    cwd: basePath,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...env, FORCE_COLOR: '1' },
   }
 
   try {
+    // console.log('command', command)
     const output = execSync(command, options)
-
     if (logOutput) {
       // console.log('CLI execution successful')
       console.log(output)

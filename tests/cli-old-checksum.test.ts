@@ -5,12 +5,12 @@ import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-uti
 
 describe('tests CLI old checksum', () => {
   const id = randomUUID()
-  const APPNAME = `com.demo.app.cli_${id}`
+  const APPNAME = `com.cli_old_checksum_${id}`
   let semver = getSemver()
 
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, id, true)
+    await prepareCli(APPNAME, true)
   })
   afterAll(async () => {
     await cleanupCli(APPNAME)
@@ -20,7 +20,7 @@ describe('tests CLI old checksum', () => {
 
   it('test upload bundle with auto encryption ', async () => {
     semver = getSemver(semver)
-    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], id, false)
+    const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check'], APPNAME, false)
     expect(output2).toContain('Time to share your update to the world')
     expect(output2).toContain('Checksum')
 
