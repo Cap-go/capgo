@@ -131,7 +131,7 @@ export async function npmInstall(appId: string) {
 
 export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
   const basePath = noFolder ? cwd() : tempFileFolder(appId)
-  
+
   // When noFolder is true, always use bunx @capgo/cli@latest
   // When noFolder is false, check for local CLI setup
   let localCliPath = env.LOCAL_CLI_PATH
@@ -166,9 +166,9 @@ export async function runCli(params: string[], appId: string, logOutput = false,
       stderr += data.toString()
     })
 
-    child.on('close', (code) => {
+    child.on('close', (_code) => {
       const output = stdout || stderr
-      
+
       if (logOutput) {
         console.log(output)
       }
@@ -185,7 +185,7 @@ export async function runCli(params: string[], appId: string, logOutput = false,
 // Keep sync version for compatibility
 export function runCliSync(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): string {
   const basePath = noFolder ? cwd() : tempFileFolder(appId)
-  
+
   // When noFolder is true, always use bunx @capgo/cli@latest
   // When noFolder is false, check for local CLI setup
   let localCliPath = env.LOCAL_CLI_PATH
@@ -234,10 +234,8 @@ export async function batchRunCli(
     overwriteApiKey?: string
     overwriteSupaHost?: boolean
     noFolder?: boolean
-  }>
+  }>,
 ): Promise<string[]> {
-  const results: string[] = []
-  
   // Group operations by appId to reuse setup
   const grouped = operations.reduce((acc, op) => {
     if (!acc[op.appId]) {
@@ -248,7 +246,7 @@ export async function batchRunCli(
   }, {} as Record<string, typeof operations>)
 
   // Execute operations in parallel by appId
-  const promises = Object.entries(grouped).map(async ([appId, ops]) => {
+  const promises = Object.entries(grouped).map(async ([_appId, ops]) => {
     const appResults: string[] = []
     for (const op of ops) {
       const result = await runCli(
@@ -257,7 +255,7 @@ export async function batchRunCli(
         false,
         op.overwriteApiKey,
         op.overwriteSupaHost,
-        op.noFolder
+        op.noFolder,
       )
       appResults.push(result)
     }
@@ -274,19 +272,20 @@ export async function testCliCommand(
   appId: string,
   expectedOutput: string,
   shouldContain = true,
-  overwriteApiKey?: string
+  overwriteApiKey?: string,
 ): Promise<string> {
   const output = await runCli(params, appId, false, overwriteApiKey, true, true)
-  
+
   if (shouldContain) {
     if (!output.includes(expectedOutput)) {
       throw new Error(`Expected output to contain "${expectedOutput}", but got: ${output}`)
     }
-  } else {
+  }
+  else {
     if (output.includes(expectedOutput)) {
       throw new Error(`Expected output NOT to contain "${expectedOutput}", but got: ${output}`)
     }
   }
-  
+
   return output
 }

@@ -269,11 +269,17 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
     metricsByApp = { [appId]: metricsByApp[appId] }
   }
 
+  for (const key in metricsByApp) {
+    if (!metricsByApp[key]) {
+      metricsByApp[key] = []
+    }
+  }
+
   Object.values(metricsByApp)
     .forEach((arrItem) => {
       const sortedArrItem = arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       console.log(sortedArrItem)
-      arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
+      arrItem?.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
         if (item.date) {
           const dayNumber = i
           if (mau[dayNumber])

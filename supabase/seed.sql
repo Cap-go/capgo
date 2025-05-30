@@ -254,24 +254,18 @@ GRANT ALL ON FUNCTION "public"."reset_and_seed_stats_data"() TO "service_role";
 CREATE OR REPLACE FUNCTION "public"."reset_app_data"("p_app_id" character varying) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
-DECLARE
-    max_version_id bigint;
-    max_channel_id bigint;
 BEGIN
-    -- Delete existing data for the specified app_id
+    -- Use advisory lock to prevent concurrent execution for the same app
+    PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
+    
+    -- Delete in dependency order to avoid foreign key conflicts
     DELETE FROM deploy_history WHERE app_id = p_app_id;
     DELETE FROM channel_devices WHERE app_id = p_app_id;
     DELETE FROM channels WHERE app_id = p_app_id;
     DELETE FROM app_versions WHERE app_id = p_app_id;
     DELETE FROM apps WHERE app_id = p_app_id;
-
-    -- Get the current max ids and reset the sequences
-    SELECT COALESCE(MAX(id), 0) + 1 INTO max_version_id FROM app_versions;
-    SELECT COALESCE(MAX(id), 0) + 1 INTO max_channel_id FROM channels;
     
-    -- Reset both sequences
-    PERFORM setval('app_versions_id_seq', max_version_id, false);
-    PERFORM setval('channel_id_seq', max_channel_id, false);
+    -- Advisory lock is automatically released at transaction end
 END;
 $$;
 
@@ -285,22 +279,32 @@ CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data"("p_app_id" charact
 DECLARE
     org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
     user_id uuid := '6aa76066-55ef-4238-ade6-0b32334a4097';
-    max_version_id bigint;
-    max_channel_id bigint;
+    builtin_version_id bigint;
+    unknown_version_id bigint;
+    v1_0_1_version_id bigint;
+    v1_0_0_version_id bigint;
+    v1_361_0_version_id bigint;
+    v1_360_0_version_id bigint;
+    v1_359_0_version_id bigint;
+    production_channel_id bigint;
+    beta_channel_id bigint;
+    development_channel_id bigint;
+    no_access_channel_id bigint;
 BEGIN
-    -- Lock the tables to prevent concurrent inserts
-    LOCK TABLE app_versions, channels IN EXCLUSIVE MODE;
-
-    PERFORM reset_app_data(p_app_id);
+    -- Use advisory lock to prevent concurrent execution for the same app
+    PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
     
+    -- Clean up existing data first
+    PERFORM reset_app_data(p_app_id);
+
     -- Insert new app data
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id")
     VALUES (now(), p_app_id, '', 'Seeded App', '1.0.0', now(), org_id, user_id);
 
-    -- Insert app versions in a single statement
-    WITH inserted_versions AS (
+    -- Insert app versions with RETURNING to get IDs atomically
+    WITH version_inserts AS (
         INSERT INTO "public"."app_versions" ("created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "storage_provider", "owner_org", "comment", "link", "user_id")
-        VALUES 
+        VALUES
             (now(), p_app_id, 'builtin', NULL, now(), 't', NULL, NULL, 'supabase', org_id, NULL, NULL, NULL),
             (now(), p_app_id, 'unknown', NULL, now(), 't', NULL, NULL, 'supabase', org_id, NULL, NULL, NULL),
             (now(), p_app_id, '1.0.1', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.0.1.zip', now(), 'f', NULL, '', 'r2-direct', org_id, 'Bug fixes and minor improvements', 'https://github.com/Cap-go/capgo/releases/tag/v1.0.1', user_id),
@@ -309,48 +313,45 @@ BEGIN
             (now(), p_app_id, '1.360.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.360.0.zip', now(), 'f', NULL, '44913a9f', 'r2', org_id, 'Pre-release version with experimental features', 'https://github.com/Cap-go/capgo/releases/tag/v1.360.0', user_id),
             (now(), p_app_id, '1.359.0', 'orgs/'||org_id||'/apps/'||p_app_id||'/1.359.0.zip', now(), 'f', NULL, '9f74e70a', 'r2', org_id, 'Stability improvements', 'https://github.com/Cap-go/capgo/releases/tag/v1.359.0', user_id)
         RETURNING id, name
-    ),
-    inserted_channels AS (
-        -- Insert channels using the version IDs from the CTE
-        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by")
-        SELECT 
-            now(),
-            c.name,
-            p_app_id,
-            v.id,
-            now(),
-            c.is_public,
-            't',
-            'major',
-            c.ios,
-            c.android,
-            't',
-            't',
-            't',
-            c.created_by
-        FROM (
-            VALUES 
-                ('production', '1.0.0', true, false, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-                ('beta', '1.361.0', false, true, true, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-                ('development', '1.359.0', true, true, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-                ('no_access', '1.361.0', false, false, false, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid)
-        ) as c(name, version_name, is_public, ios, android, created_by)
-        JOIN inserted_versions v ON v.name = c.version_name
-        RETURNING id, name, version, created_by
     )
-    -- Insert deploy history data
-    INSERT INTO "public"."deploy_history" ("created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by")
-    SELECT
-        now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
-        now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
-        c.id,
-        p_app_id,
-        c.version,
-        now() - (row_number() OVER (ORDER BY c.id)) * interval '5 days',
-        org_id,
-        c.created_by
-    FROM inserted_channels c;
+    SELECT 
+        MAX(CASE WHEN name = 'builtin' THEN id END),
+        MAX(CASE WHEN name = 'unknown' THEN id END),
+        MAX(CASE WHEN name = '1.0.1' THEN id END),
+        MAX(CASE WHEN name = '1.0.0' THEN id END),
+        MAX(CASE WHEN name = '1.361.0' THEN id END),
+        MAX(CASE WHEN name = '1.360.0' THEN id END),
+        MAX(CASE WHEN name = '1.359.0' THEN id END)
+    INTO builtin_version_id, unknown_version_id, v1_0_1_version_id, v1_0_0_version_id, v1_361_0_version_id, v1_360_0_version_id, v1_359_0_version_id
+    FROM version_inserts;
 
+    -- Insert channels with explicit version IDs
+    WITH channel_inserts AS (
+        INSERT INTO "public"."channels" ("created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by", "owner_org")
+        VALUES
+            (now(), 'production', p_app_id, v1_0_0_version_id, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', user_id, org_id),
+            (now(), 'beta', p_app_id, v1_361_0_version_id, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', user_id, org_id),
+            (now(), 'development', p_app_id, v1_359_0_version_id, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', user_id, org_id),
+            (now(), 'no_access', p_app_id, v1_361_0_version_id, now(), 'f', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', user_id, org_id)
+        RETURNING id, name
+    )
+    SELECT 
+        MAX(CASE WHEN name = 'production' THEN id END),
+        MAX(CASE WHEN name = 'beta' THEN id END),
+        MAX(CASE WHEN name = 'development' THEN id END),
+        MAX(CASE WHEN name = 'no_access' THEN id END)
+    INTO production_channel_id, beta_channel_id, development_channel_id, no_access_channel_id
+    FROM channel_inserts;
+
+    -- Insert deploy history atomically
+    INSERT INTO "public"."deploy_history" ("created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by")
+    VALUES
+        (now() - interval '15 days', now() - interval '15 days', production_channel_id, p_app_id, v1_0_0_version_id, now() - interval '15 days', org_id, user_id),
+        (now() - interval '10 days', now() - interval '10 days', beta_channel_id, p_app_id, v1_361_0_version_id, now() - interval '10 days', org_id, user_id),
+        (now() - interval '5 days', now() - interval '5 days', development_channel_id, p_app_id, v1_359_0_version_id, now() - interval '5 days', org_id, user_id),
+        (now() - interval '3 days', now() - interval '3 days', no_access_channel_id, p_app_id, v1_361_0_version_id, now() - interval '3 days', org_id, user_id);
+
+    -- Advisory lock is automatically released at transaction end
 END;
 $$;
 
@@ -362,7 +363,10 @@ CREATE OR REPLACE FUNCTION "public"."reset_app_stats_data"("p_app_id" character 
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
 BEGIN
-  -- Delete existing data for the specified app_id
+  -- Use advisory lock to prevent concurrent execution for the same app
+  PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
+  
+  -- Delete existing data for the specified app_id in dependency order
   DELETE FROM daily_mau WHERE app_id = p_app_id;
   DELETE FROM daily_bandwidth WHERE app_id = p_app_id;
   DELETE FROM daily_storage WHERE app_id = p_app_id;
@@ -373,6 +377,8 @@ BEGIN
   DELETE FROM bandwidth_usage WHERE app_id = p_app_id;
   DELETE FROM devices WHERE app_id = p_app_id;
   DELETE FROM stats WHERE app_id = p_app_id;
+  
+  -- Advisory lock is automatically released at transaction end
 END;
 $$;
 
@@ -393,72 +399,74 @@ DECLARE
   random_storage BIGINT;
   random_file_size BIGINT;
   random_uuid UUID;
+  random_fixed_uuid UUID := '00000000-0000-0000-0000-000000000000';
   random_version_id BIGINT := 3;
   random_action VARCHAR(20);
   random_timestamp TIMESTAMP;
 BEGIN
+  -- Use advisory lock to prevent concurrent execution for the same app
+  PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
+  
+  -- Clean up existing stats data
   PERFORM reset_app_stats_data(p_app_id);
-
-  -- Generate a random UUID
+  
+  -- Generate random UUIDs
   random_uuid := gen_random_uuid();
 
-  -- Insert device data
-  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+  -- Insert device data atomically
+  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) 
+  VALUES
     (now(), random_uuid, random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't'),
-    (now(), '00000000-0000-0000-0000-000000000000', random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
-
-  -- Insert stats data
-  INSERT INTO stats (created_at, action, device_id, version, app_id) VALUES
+    (now(), random_fixed_uuid, random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
+  
+  -- Insert stats data atomically
+  INSERT INTO stats (created_at, action, device_id, version, app_id) 
+  VALUES
     (now(), 'get'::"public"."stats_action", random_uuid, random_version_id, p_app_id),
     (now(), 'set'::"public"."stats_action", random_uuid, random_version_id, p_app_id);
 
-  -- Seed data for daily_mau, daily_bandwidth, and daily_storage
+  -- Seed daily aggregated data in batches
   curr_date := start_date::DATE;
   WHILE curr_date <= end_date::DATE LOOP
     random_mau := FLOOR(RANDOM() * 1000) + 1;
     random_bandwidth := FLOOR(RANDOM() * 1000000000) + 1;
     random_storage := FLOOR(RANDOM() * 1000000000) + 1;
     
+    -- Insert daily metrics atomically
     INSERT INTO daily_mau (app_id, date, mau) VALUES (p_app_id, curr_date, random_mau);
     INSERT INTO daily_bandwidth (app_id, date, bandwidth) VALUES (p_app_id, curr_date, random_bandwidth);
     INSERT INTO daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
-    
-    curr_date := curr_date + INTERVAL '1 day';
-  END LOOP;
-
-  -- Seed data for daily_version
-  curr_date := start_date::DATE;
-  WHILE curr_date <= end_date::DATE LOOP
     INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
     VALUES (curr_date, p_app_id, random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
     
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
+  
+  -- Batch insert storage usage data
+  INSERT INTO storage_usage (device_id, app_id, file_size)
+  SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) - 5242880
+  FROM generate_series(1, 20);
 
-  -- Seed data for storage_usage
-  FOR i IN 1..20 LOOP
-    random_file_size := FLOOR(RANDOM() * 10485760) - 5242880; -- Random size between -5MB and 5MB
-    INSERT INTO storage_usage (device_id, app_id, file_size) VALUES (random_uuid, p_app_id, random_file_size);
-  END LOOP;
+  -- Batch insert version usage data
+  INSERT INTO version_usage (timestamp, app_id, version_id, action)
+  SELECT 
+    start_date + (RANDOM() * (end_date - start_date)),
+    p_app_id,
+    random_version_id,
+    (ARRAY['get', 'fail', 'install', 'uninstall'])[FLOOR(RANDOM() * 4) + 1]::"public"."version_action"
+  FROM generate_series(1, 30);
 
-  -- Seed data for version_usage
-  FOR i IN 1..30 LOOP
-    random_timestamp := start_date + (RANDOM() * (end_date - start_date));
-    random_action := (ARRAY['get', 'fail', 'install', 'uninstall'])[FLOOR(RANDOM() * 4) + 1];
-    INSERT INTO version_usage (timestamp, app_id, version_id, action)
-    VALUES (random_timestamp, p_app_id, random_version_id, random_action::"public"."version_action");
-  END LOOP;
+  -- Batch insert device usage data
+  INSERT INTO device_usage (device_id, app_id)
+  SELECT random_uuid, p_app_id
+  FROM generate_series(1, 50);
 
-  -- Seed data for device_usage
-  FOR i IN 1..50 LOOP
-    INSERT INTO device_usage (device_id, app_id) VALUES (random_uuid, p_app_id);
-  END LOOP;
+  -- Batch insert bandwidth usage data
+  INSERT INTO bandwidth_usage (device_id, app_id, file_size)
+  SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) + 1
+  FROM generate_series(1, 40);
 
-  -- Seed data for bandwidth_usage
-  FOR i IN 1..40 LOOP
-    random_file_size := FLOOR(RANDOM() * 10485760) + 1; -- Random size between 1 byte and 10MB
-    INSERT INTO bandwidth_usage (device_id, app_id, file_size) VALUES (random_uuid, p_app_id, random_file_size);
-  END LOOP;
+  -- Advisory lock is automatically released at transaction end
 END;
 $$;
 

@@ -198,8 +198,8 @@ describe('[GET] /app operations with subkey', () => {
       headers,
     })
     expect(getAllApps.status).toBe(200)
-    const appsDataWithoutSubkey = await getAllApps.json() as { name: string }[]
-    const appNamesWithoutSubkey = appsDataWithoutSubkey.map(app => app.name)
+    const appsDataWithoutSubkey = await getAllApps.json() as { app_id: string }[]
+    const appNamesWithoutSubkey = appsDataWithoutSubkey.map(app => app.app_id)
     expect(appNamesWithoutSubkey).toContain(APPNAME)
   })
 })
