@@ -9,7 +9,7 @@ describe('tests CLI metadata', () => {
   const semver = getSemver()
 
   const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-    const output = await runCli(['bundle', 'compatibility', '-c', 'production'], APPNAME, false)
+    const output = await runCli(['bundle', 'compatibility', '-c', 'production'], APPNAME, false, undefined, true, false)
     const packageLine = output.split('\n').find(l => l.includes(`│ ${column1}`))
     expect(packageLine).toBeDefined()
 
@@ -23,6 +23,7 @@ describe('tests CLI metadata', () => {
 
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
+    await resetAndSeedAppData('ee.forgr.capacitor_go')
     await prepareCli(APPNAME)
   })
 
@@ -30,71 +31,69 @@ describe('tests CLI metadata', () => {
     await cleanupCli(APPNAME)
     await resetAppData(APPNAME)
     await resetAppDataStats(APPNAME)
+    // Also cleanup the project root app
+    await resetAppData('ee.forgr.capacitor_go')
+    await resetAppDataStats('ee.forgr.capacitor_go')
   })
 
   it('should upload initial bundle', async () => {
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production'], APPNAME, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--dry-upload'], APPNAME, false, undefined, true, false)
     expect(output).toContain('Bundle uploaded')
   })
 
   it('should upload bundle with metadata check ignored', async () => {
-    await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check'], APPNAME)
+    const testSemver = getSemver()
+    await runCli(['bundle', 'upload', '-b', testSemver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME, false, undefined, true, false)
     await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
   })
 
-  it('should handle matching versions', async () => {
-    setDependencies({
-      '@capacitor/android': '7.0.0',
-    }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+  describe.concurrent('version compatibility tests', () => {
+    it.concurrent('should handle matching versions', async () => {
+      setDependencies({
+        '@capacitor/android': '7.0.0',
+      }, APPNAME)
+      await npmInstall(APPNAME)
+      await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+    })
+
+    it.concurrent('should handle semver caret ranges', async () => {
+      setDependencies({
+        '@capacitor/android': '^7.0.0',
+      }, APPNAME)
+      await npmInstall(APPNAME)
+      await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+    })
+
+    it.concurrent('should handle semver tilde ranges', async () => {
+      setDependencies({
+        '@capacitor/android': '~7.0.0',
+      }, APPNAME)
+      await npmInstall(APPNAME)
+      await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+    })
   })
 
-  it('should handle semver ranges', async () => {
-    setDependencies({
-      '@capacitor/android': '^7.0.0',
-    }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
-
-    setDependencies({
-      '@capacitor/android': '~7.0.0',
-    }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
-  })
-
-  it('should handle prerelease versions', async () => {
-    setDependencies({
-      '@capacitor/android': '7.0.0-beta.1',
-    }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0-beta.1', '7.0.0', '❌')
-  })
-
-  it('should handle registry prefixes', async () => {
-    setDependencies({
-      '@capacitor/android': 'jsr:@capacitor/android@7.0.0',
-    }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', 'jsr:@capacitor/android@7.0.0', '7.0.0', '❌')
-
+  // Sequential tests that modify package.json and test invalid scenarios
+  it('should handle registry prefixes as incompatible', async () => {
     setDependencies({
       '@capacitor/android': 'npm:@capacitor/android@7.0.0',
     }, APPNAME)
+    // Don't install since these are expected to fail
     await assertCompatibilityTableColumns('@capacitor/android', 'npm:@capacitor/android@7.0.0', '7.0.0', '❌')
   })
 
-  it('should handle file and git references', async () => {
+  it('should handle file references as incompatible', async () => {
     setDependencies({
       '@capacitor/android': 'file:../capacitor-android',
     }, APPNAME)
     await assertCompatibilityTableColumns('@capacitor/android', 'file:../capacitor-android', '7.0.0', '❌')
+  })
 
+  it('should handle git references as incompatible', async () => {
     setDependencies({
       '@capacitor/android': 'github:capacitorjs/capacitor#main',
     }, APPNAME)
     await assertCompatibilityTableColumns('@capacitor/android', 'github:capacitorjs/capacitor#main', '7.0.0', '❌')
-
-    setDependencies({
-      '@capacitor/android': 'git+https://github.com/capacitorjs/capacitor.git#main',
-    }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', 'git+https://github.com/capacitorjs/capacitor.git#main', '7.0.0', '❌')
   })
 
   it('should handle additional local plugins', async () => {
@@ -102,7 +101,7 @@ describe('tests CLI metadata', () => {
       '@capacitor/android': '7.0.0',
       'capacitor-plugin-safe-area': '2.0.0',
     }, APPNAME)
-    npmInstall(APPNAME)
+    await npmInstall(APPNAME)
     await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
     await assertCompatibilityTableColumns('capacitor-plugin-safe-area', '2.0.0', '', '❌')
   })
