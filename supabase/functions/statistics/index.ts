@@ -4,6 +4,7 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app } from '../_backend/public/statistics/index.ts'
+import { onError } from '../_backend/utils/on_error.ts'
 
 const functionName = 'statistics'
 const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
@@ -18,5 +19,9 @@ if (sentryDsn) {
 appGlobal.use('*', logger())
 appGlobal.use('*', requestId())
 appGlobal.route('/', app)
-
+appGlobal.all('*', (c) => {
+  console.log('Not found', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
+})
+appGlobal.onError(onError(functionName))
 Deno.serve(appGlobal.fetch)

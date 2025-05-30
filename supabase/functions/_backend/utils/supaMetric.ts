@@ -1,4 +1,5 @@
 import type { Context } from '@hono/hono'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
 function getAllMetrics(c: Context): Promise<string[]> {
@@ -11,7 +12,7 @@ function getAllMetrics(c: Context): Promise<string[]> {
     .then(response => response.text())
     .then(data => data.split('\n'))
     .catch((err) => {
-      console.error({ requestId: c.get('requestId'), message: 'getAllMetrics', error: err })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getAllMetrics', error: err })
       return [] as string[]
     })
 }
@@ -102,7 +103,7 @@ export function getCpu(c: Context) {
       // console.log(c.get('requestId'), 'CPU total: ', cpuInfo.total)
       // console.log(c.get('requestId'), 'CPU used: ', cpuInfo.used)
       // console.log(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
-      console.log({ requestId: c.get('requestId'), message: 'CPU %', cpu: cpuUsage })
+      cloudlog({ requestId: c.get('requestId'), message: 'CPU %', cpu: cpuUsage })
       return cpuUsage
     })
 }
@@ -143,7 +144,7 @@ export function getMem(c: Context) {
       const usedPercentageRound = Math.round(percentUsed * 100) / 100
       // console.log(c.get('requestId'), 'Memory available: ', available)
       // console.log(c.get('requestId'), 'Memory free: ', total)
-      console.log({ requestId: c.get('requestId'), message: 'Memory %', memory: usedPercentageRound })
+      cloudlog({ requestId: c.get('requestId'), message: 'Memory %', memory: usedPercentageRound })
       return usedPercentageRound
     })
 }

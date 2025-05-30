@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 const thresholds = {
@@ -92,7 +93,7 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    console.error({ requestId: c.get('requestId'), message: 'Cannot send email for app', appId, error: generateStatsError, email })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app', appId, error: generateStatsError, email })
     return c.json({ status: 'Cannot generate stats' }, 500)
   }
 

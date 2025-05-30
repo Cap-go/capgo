@@ -9,7 +9,7 @@ import IconsResolver from 'unplugin-icons/resolver'
 import Icons from 'unplugin-icons/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import svgLoader from 'vite-svg-loader'
-
+import devtoolsJson from 'vite-plugin-devtools-json';
 import Components from 'unplugin-vue-components/vite'
 import VueMacros from 'unplugin-vue-macros/vite'
 import { VueRouterAutoImports } from 'unplugin-vue-router'
@@ -52,6 +52,7 @@ export default defineConfig({
     svgLoader(),
     tailwindcss(),
     formkit({}),
+    devtoolsJson(),
     VueMacros({
       plugins: {
         vue: Vue({

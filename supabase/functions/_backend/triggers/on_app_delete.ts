@@ -3,6 +3,7 @@ import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -13,20 +14,20 @@ app.post('/', middlewareAPISecret, async (c) => {
     const body = await c.req.json<DeletePayload<typeof table>>()
 
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
 
     if (body.type !== 'DELETE') {
-      console.log({ requestId: c.get('requestId'), message: 'Not DELETE' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not DELETE' })
       return c.json({ status: 'Not DELETE' }, 200)
     }
 
     const record = body.old_record
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record || !record.app_id) {
-      console.log({ requestId: c.get('requestId'), message: 'no app id' })
+      cloudlog({ requestId: c.get('requestId'), message: 'no app id' })
       return c.json(BRES)
     }
 

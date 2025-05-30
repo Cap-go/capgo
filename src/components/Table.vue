@@ -274,6 +274,22 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
   }
   previousSelectedRow.value = i
 }
+
+function getSkeletonWidth(columnIndex?: number) {
+  // Count visible columns (mobile-friendly columns on mobile, all on desktop)
+  const visibleColumns = props.columns.filter(col => col.mobile !== false)
+  const totalVisibleColumns = visibleColumns.length
+  const hasMassSelect = props.massSelect
+
+  if (columnIndex === undefined) {
+    // Mass select column - tiny fixed width for checkbox
+    return '60px'
+  }
+
+  // Data columns - distribute remaining width equally
+  const remainingWidth = hasMassSelect ? `calc((100% - 60px) / ${totalVisibleColumns})` : `${100 / totalVisibleColumns}%`
+  return remainingWidth
+}
 </script>
 
 <template>
@@ -281,23 +297,25 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
     <div class="flex items-start justify-between p-3 pb-4 md:items-center">
       <div class="flex">
         <button class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('reset')">
-          <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
-          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+          <IconReload v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
+          <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
         </button>
-        <button v-if="showAdd" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
-          <plusOutline v-if="!isLoading" class="m-1 md:mr-2" />
-          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
-          <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
-        </button>
+        <div v-if="showAdd" class="mr-2 p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+          <button class="inline-flex items-center rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer" type="button" @click="emit('add')">
+            <plusOutline v-if="!isLoading" class="w-4 h-4 mr-0 md:mr-2" />
+            <Spinner v-else size="w-4 h-4 mr-0 md:mr-2" />
+            <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
+          </button>
+        </div>
         <div v-if="filterText && filterList.length" class="dropdown">
           <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               {{ filterActivated }}
             </div>
-            <IconFilter class="m-1 mr-2" />
+            <IconFilter class="w-4 h-4 mr-2" />
             <span class="hidden md:block">{{ t(filterText) }}</span>
-            <IconDown class="hidden m-1 ml-2 md:block" />
+            <IconDown class="hidden w-4 h-4 ml-2 md:block" />
           </button>
           <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
@@ -339,8 +357,8 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
       <table id="custom_table" class="w-full text-sm text-left text-gray-500 dark:text-gray-400 md:pb-0 pb-14">
         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
           <tr>
-            <th v-if="props.massSelect" class="ml-2" />
-            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3" :class="{ 'px-1 md:px-6': ((i !== 0 && props.massSelect) || !props.massSelect), 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
+            <th v-if="props.massSelect" class="px-4 md:px-6" />
+            <th v-for="(col, i) in columns" :key="i" scope="col" class="py-1 md:py-3 px-4 md:px-6" :class="{ 'cursor-pointer': col.sortable, 'hidden md:table-cell': !col.mobile }" @click="sortClick(i)">
               <div class="flex items-center first-letter:uppercase">
                 {{ col.label }}
                 <div v-if="col.sortable">
@@ -358,25 +376,27 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
             class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600"
           >
             <template v-if="true">
-              <th v-if="props.massSelect" class="pl-4 pr-2">
+              <th v-if="props.massSelect" class="px-4 md:px-6">
                 <input
                   id="select-rows" :checked="selectedRows[i]" class="scale-checkbox" type="checkbox" @click="(e: MouseEvent) => { handleCheckboxClick(i, e) }"
                 >
               </th>
               <template v-for="(col, _y) in columns" :key="`${i}_${_y}`">
-                <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''}${((_y !== 0 && props.massSelect) || !props.massSelect) ? ' px-1 md:px-6' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <th v-if="col.head" :class="`${col.class ?? ''}${!col.mobile ? ' hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''}`" scope="row" class="py-2 md:py-4 px-4 md:px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
                   </template>
                 </th>
-                <td v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-1 md:px-6 py-2 md:py-4">
+                <td v-else-if="col.actions || col.icon" :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''}`" class="px-4 md:px-6 py-2 md:py-4">
                   <div class="flex items-center space-x-1">
                     <template v-if="col.actions">
                       <button
                         v-for="(action, actionIndex) in col.actions"
+                        v-show="!action.visible || action.visible(elem)"
                         :key="actionIndex"
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        :disabled="action.disabled && action.disabled(elem)"
+                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
                         @click.stop="action.onClick(elem)"
                       >
                         <component :is="action.icon" />
@@ -391,7 +411,7 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
                     </template>
                   </div>
                 </td>
-                <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-1 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
+                <td v-else :class="`${col.class ?? ''} ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.onClick ? 'cursor-pointer hover:underline clickable-cell' : ''} overflow-hidden text-ellipsis whitespace-nowrap`" class="px-4 md:px-6 py-2 md:py-4" @click.stop="col.onClick ? col.onClick(elem) : () => {}">
                   <div v-if="col.allowHtml" v-html="displayValueKey(elem, col)" />
                   <template v-else>
                     {{ displayValueKey(elem, col) }}
@@ -403,15 +423,18 @@ async function handleCheckboxClick(i: number, e: MouseEvent) {
         </tbody>
         <tbody v-else-if="!isLoading && elementList.length === 0">
           <tr>
-            <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-1 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
+            <td :colspan="columns.length + (props.massSelect ? 1 : 0)" class="px-4 md:px-6 py-2 md:py-4 text-center text-gray-500 dark:text-gray-400">
               {{ t('no_elements_found') }}
             </td>
           </tr>
         </tbody>
         <tbody v-else>
-          <tr v-for="i in 10" :key="i" class="max-w-sm" :class="{ 'animate-pulse duration-1000': isLoading }">
-            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-1 md:px-6 py-2 md:py-4">
-              <div class="max-w-[300px] rounded-full bg-gray-200 dark:bg-gray-700" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
+          <tr v-for="i in 10" :key="i" :class="{ 'animate-pulse duration-1000': isLoading }">
+            <td v-if="props.massSelect" class="px-4 md:px-6 py-2 md:py-4" :style="`width: ${getSkeletonWidth()}`">
+              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full mb-4 h-2.5" />
+            </td>
+            <td v-for="(col, y) in columns" :key="`${i}_${y}`" class="px-4 md:px-6 py-2 md:py-4" :class="{ 'hidden md:table-cell': !col.mobile }" :style="`width: ${getSkeletonWidth(y)}`">
+              <div class="rounded-full bg-gray-200 dark:bg-gray-700 w-full" :class="{ 'mb-4 h-2.5': col.head, 'h-2 mb-2.5': !col.head }" />
             </td>
           </tr>
         </tbody>

@@ -1,7 +1,6 @@
 import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
 import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
-import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
 import { version } from '../../package.json'
@@ -11,6 +10,7 @@ import { app as updates } from '../../supabase/functions/_backend/plugins/update
 import { app as updates_lite } from '../../supabase/functions/_backend/plugins/updates_lite.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
+import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
@@ -37,18 +37,11 @@ app.route('/updates_v2', updates)
 app.route('/updates_lite', updates_lite)
 app.route('/updates_lite_v2', updates_lite)
 app.route('/stats', stats)
-
-app.onError((e, c) => {
-  console.log('app onError', e)
-  c.get('sentry').captureException(e)
-  if (e instanceof HTTPException) {
-    if (e.status === 429) {
-      return c.json({ error: 'you are beeing rate limited' }, 429)
-    }
-    return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, 500)
-  }
-  return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
+app.all('*', (c) => {
+  console.log('Not found', c.req.url)
+  return c.json({ error: 'Not Found' }, 404)
 })
+app.onError(onError('Worker Plugin'))
 
 export default {
   fetch: app.fetch,

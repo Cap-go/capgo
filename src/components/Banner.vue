@@ -8,10 +8,12 @@ import { urlToAppId } from '~/services/conversion'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-defineProps({
+const props = defineProps({
   text: { type: String, default: '' },
   color: { type: String, default: '' },
+  desktop: { type: Boolean, default: false },
 })
+
 const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
@@ -108,7 +110,21 @@ const bannerColor = computed(() => {
 </script>
 
 <template>
-  <div v-if="bannerText" class="navbar bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
+  <!-- Desktop inline version -->
+  <div v-if="props.desktop && bannerText" class="flex items-center space-x-3 ml-auto">
+    <span class="text-sm font-medium text-slate-600 dark:text-slate-400">
+      {{ bannerLeftText }}:
+    </span>
+    <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+      {{ bannerText }}
+    </span>
+    <a href="/settings/organization/plans" class="btn btn-sm border-none" :class="bannerColor">
+      {{ t('upgrade') }}
+    </a>
+  </div>
+
+  <!-- Mobile/original version -->
+  <div v-else-if="!props.desktop && bannerText" class="navbar bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
     <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
       {{ bannerLeftText }}
     </div>

@@ -6,13 +6,14 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
 import postgres from 'postgres'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import * as schema from './postgress_schema.ts'
 import * as schemaV2 from './sqlite_schema.ts'
 
 export function getDatabaseURL(c: Context): string {
   // TODO: uncomment when we enable back replicate
   // const clientContinent = (c.req.raw as any)?.cf?.continent
-  // console.log({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent })
+  // cloudlog({ requestId: c.get('requestId'), message: 'clientContinent', clientContinent  })
   let DEFAULT_DB_URL = getEnv(c, 'SUPABASE_DB_URL')
   if (existInEnv(c, 'CUSTOM_SUPABASE_DB_URL'))
     DEFAULT_DB_URL = getEnv(c, 'CUSTOM_SUPABASE_DB_URL')
@@ -44,7 +45,7 @@ export function getDatabaseURL(c: Context): string {
 
 export function getPgClient(c: Context) {
   const dbUrl = getDatabaseURL(c)
-  console.log({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
+  cloudlog({ requestId: c.get('requestId'), message: 'SUPABASE_DB_URL', dbUrl })
   return postgres(dbUrl, { prepare: false, idle_timeout: 2 })
 }
 
@@ -84,7 +85,7 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -110,7 +111,7 @@ export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: Retur
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
   }
   return false
 }
@@ -126,7 +127,7 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
     return result[0]?.is_allowed || false
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
   }
   return false
 }
@@ -440,7 +441,7 @@ export async function getAppOwnerPostgresV2(
   }
   catch (e: any) {
     console.log('appOwner error', e)
-    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }
@@ -468,7 +469,7 @@ export async function getAppOwnerPostgres(
     return appOwner
   }
   catch (e: any) {
-    console.error({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
 }

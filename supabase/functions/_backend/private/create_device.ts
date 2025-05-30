@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { createStatsDevices } from '../utils/stats.ts'
 import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -26,8 +27,8 @@ app.post('/', middlewareAuth, async (c) => {
     const body = await c.req.json<any>()
     const parsedBodyResult = bodySchema.safeParse(body)
     if (!parsedBodyResult.success) {
-      console.log({ requestId: c.get('requestId'), message: 'post create device body', body })
-      console.log({ requestId: c.get('requestId'), message: 'post create device error', error: parsedBodyResult.error })
+      cloudlog({ requestId: c.get('requestId'), message: 'post create device body', body })
+      cloudlog({ requestId: c.get('requestId'), message: 'post create device error', error: parsedBodyResult.error })
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
@@ -38,7 +39,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData || !clientData.data || clientData.error) {
-      console.error({ requestId: c.get('requestId'), message: 'Cannot get supabase user', error: clientData.error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get supabase user', error: clientData.error })
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }
 
@@ -48,7 +49,7 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (appError) {
-      console.error({ requestId: c.get('requestId'), message: 'app error', error: appError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'app error', error: appError })
       return c.json({ status: 'app_not_found', app_id: safeBody.app_id }, 400)
     }
 
@@ -63,12 +64,12 @@ app.post('/', middlewareAuth, async (c) => {
     })
 
     if (userRight.error) {
-      console.error({ requestId: c.get('requestId'), message: 'Cannot get user right', error: userRight.error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get user right', error: userRight.error })
       return c.json({ status: 'internal_auth_error' }, 500)
     }
 
     if (!userRight.data) {
-      console.error({ requestId: c.get('requestId'), message: 'No user right', userId, appId: safeBody.app_id })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'No user right', userId, appId: safeBody.app_id })
       return c.json({ status: 'not_authorized' }, 403)
     }
 

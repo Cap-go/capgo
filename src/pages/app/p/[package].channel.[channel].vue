@@ -15,14 +15,13 @@ import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
+import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
-  second_version: Database['public']['Tables']['app_versions']['Row']
 }
 const router = useRouter()
 const displayStore = useDisplayStore()
@@ -550,6 +549,39 @@ async function handleRevertToBuiltin() {
 async function handleLink(appVersion: Database['public']['Tables']['app_versions']['Row']) {
   if (!channel.value)
     return
+  const {
+    finalCompatibility,
+    localDependencies,
+  } = await checkCompatibilityNativePackages(appVersion.app_id, channel.value.name, (appVersion.native_packages as any) ?? [])
+
+  // Check if any package is incompatible
+  if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+    toast.error(t('bundle-not-compatible-with-channel', { channel: channel.value.name }))
+    toast.info(t('channel-not-compatible-with-channel-description').replace('%', 'npx @capgo/cli@latest bundle compatibility'))
+    displayStore.dialogOption = {
+      header: t('confirm-action'),
+      message: t('set-even-not-compatible').replace('%', 'npx @capgo/cli@latest bundle compatibility'),
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('button-confirm'),
+          role: 'confirm',
+        },
+      ],
+    }
+    displayStore.showDialog = true
+    if (await displayStore.onDialogDismiss())
+      return
+  }
+  else if (localDependencies.length === 0) {
+    toast.info('ignore-compatibility')
+  }
+  else {
+    toast.info(t('bundle-compatible-with-channel').replace('%', channel.value.name))
+  }
   await saveChannelChange('version', appVersion.id)
   toast.success(t('linked-bundle'))
 }
@@ -561,7 +593,7 @@ function openSelectVersion() {
       openPannel()
     },
     onLink: async (appVersion: Database['public']['Tables']['app_versions']['Row']) => {
-      await handleLink(appVersion)
+      handleLink(appVersion)
     },
   }
   displayStore.showBundleLinkDialogChannel = channel.value as any // YOLO, if this doesn't work, we don't care

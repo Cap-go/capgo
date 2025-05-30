@@ -88,6 +88,8 @@ BEGIN
 END;
 $$;
 
+SELECT cron.unschedule('Update plan');
+
 -- Update process_subscribed_orgs function
 CREATE OR REPLACE FUNCTION "public"."process_subscribed_orgs"()
 RETURNS "void"

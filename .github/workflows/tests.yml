@@ -6,8 +6,6 @@ concurrency:
 
 on:
   push:
-    branches:
-      - renovate/**
     tags:
       - "*"
   pull_request:
@@ -30,11 +28,13 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.22.4
+          version: 2.23.4
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Set edge runtime policy to per_worker
+        run: sed -i 's/policy = "oneshot"/policy = "per_worker"/g' supabase/config.toml
       - name: Run Supabase Start
-        run: supabase start -x imgproxy,studio,realtime,studio,logflare,vector,inbucket
+        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Setup bun
@@ -47,8 +47,8 @@ jobs:
         run: bunx @capgo/cli@latest -v
       - name: Install dependencies
         run: bun install
-      - name: Install playwright
-        run: bunx playwright install
+      # - name: Install playwright
+      #   run: bunx playwright install
       - uses: JarvusInnovations/background-action@v1
         name: Bootstrap Edge server
         with:

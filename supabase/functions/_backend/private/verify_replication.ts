@@ -1,5 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -24,7 +25,7 @@ app.get('/', async (c) => {
         d1.prepare(`SELECT COUNT(*) as count FROM ${table}`).first(),
       ),
     )
-    console.log({ requestId: c.get('requestId'), message: 'd1Counts', d1Counts })
+    cloudlog({ requestId: c.get('requestId'), message: 'd1Counts', d1Counts })
 
     // Count from update.ts (PostgreSQL database)
     const pgCounts = await Promise.all(
@@ -33,12 +34,12 @@ app.get('/', async (c) => {
           .from(table)
           .select('*', { count: 'exact', head: true })
           .then((v) => {
-            console.log({ requestId: c.get('requestId'), message: 'v', v })
+            cloudlog({ requestId: c.get('requestId'), message: 'v', v })
             return { count: v.count }
           }),
       ),
     )
-    console.log({ requestId: c.get('requestId'), message: 'pgCounts', pgCounts })
+    cloudlog({ requestId: c.get('requestId'), message: 'pgCounts', pgCounts })
     const diff = await tables.reduce(async (acc: Promise<Record<TableNames, { d1: number, supabase: number, percent: number }>>, table: TableNames, index: number) => {
       const result = await acc
       const d1Count = (d1Counts[index]?.count as number) || 0
@@ -62,7 +63,7 @@ app.get('/', async (c) => {
     }
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'Error in db_comparison:', e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in db_comparison:', e })
     return c.json({ status: 'Error in db comparison', error: JSON.stringify(e) }, 500)
   }
 })

@@ -5,6 +5,7 @@ import { Hono } from 'hono/tiny'
 import ky from 'ky'
 import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -53,22 +54,22 @@ function getStats(c: Context): GlobalStats {
     stars: getGithubStars(),
     customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
+        cloudlog({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
       return res.data || { total: 0, yearly: 0, monthly: 0 }
     }),
     onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
+        cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
       return res.data || 0
     }),
     need_upgrade: supabase.rpc('count_all_need_upgrade', {}).single().then((res) => {
       if (res.error || !res.data)
-        console.log({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
+        cloudlog({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
       return res.data || 0
     }),
     plans: supabase.rpc('count_all_plans_v2').then((res) => {
       if (res.error || !res.data)
-        console.log({ requestId: c.get('requestId'), message: 'count_all_plans_v2', error: res.error })
+        cloudlog({ requestId: c.get('requestId'), message: 'count_all_plans_v2', error: res.error })
       return res.data || {}
     }).then((data: any) => {
       const total: PlanTotal = {}
@@ -83,7 +84,7 @@ function getStats(c: Context): GlobalStats {
         return { apps: app_ids.length, users: res2.data || 0 }
       }
       catch (e) {
-        console.error({ requestId: c.get('requestId'), message: 'count_active_users error', error: e })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'count_active_users error', error: e })
       }
       return { apps: app_ids.length, users: 0 }
     }),
@@ -124,7 +125,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       res.updates_last_month,
     ])
     const not_paying = users - customers.total - plans.Trial
-    console.log({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
+    cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
     // console.log(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
@@ -146,12 +147,12 @@ app.post('/', middlewareAPISecret, async (c) => {
       not_paying,
       updates_last_month,
     }
-    console.log({ requestId: c.get('requestId'), message: 'newData', newData })
+    cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
     const { error } = await supabaseAdmin(c as any)
       .from('global_stats')
       .upsert(newData)
     if (error)
-      console.error({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
     await logsnag(c as any).track({
       channel: 'updates-stats',
       event: 'Updates last month',
@@ -161,7 +162,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       },
       icon: '📲',
     }).catch((e) => {
-      console.error({ requestId: c.get('requestId'), message: 'insights error', e })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
     })
     await logsnagInsights(c as any, [
       {
@@ -260,13 +261,13 @@ app.post('/', middlewareAPISecret, async (c) => {
         icon: '📈',
       },
     ]).catch((e) => {
-      console.error({ requestId: c.get('requestId'), message: 'insights error', e })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
     })
-    console.log({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
     return c.json(BRES)
   }
   catch (e) {
-    console.error({ requestId: c.get('requestId'), message: 'general insights error', e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'general insights error', e })
     return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
   }
 })

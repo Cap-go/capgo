@@ -6,7 +6,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watchEffect } from 'vue'
 import { Line } from 'vue-chartjs'
 import { useRoute } from 'vue-router'
-import IcBaselineInfo from '~icons/ic/baseline-info'
+import InformationInfo from '~icons/heroicons/information-circle'
 import { useChartData } from '~/services/chartDataService'
 import { urlToAppId } from '~/services/conversion'
 import { useSupabase } from '~/services/supabase'
@@ -14,6 +14,7 @@ import { useMainStore } from '~/stores/main'
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 
+const isDark = useDark()
 const { t } = useI18n()
 const route = useRoute('/app/p/[package]')
 const main = useMainStore()
@@ -25,12 +26,17 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   maintainAspectRatio: false,
   scales: {
     x: {
-      grid: { display: false },
+      grid: {
+        color: `${isDark.value ? '#424e5f' : '#bfc9d6'}`,
+      },
       ticks: { color: isDark.value ? 'white' : 'black' },
     },
     y: {
       min: 0,
       max: 100,
+      grid: {
+        color: `${isDark.value ? '#323e4e' : '#cad5e2'}`,
+      },
       ticks: {
         callback: (value: number) => `${value}%`,
         color: isDark.value ? 'white' : 'black',
@@ -46,22 +52,12 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
 const chartData = ref<any>(null)
 
 async function loadData() {
+  console.log('loadData mobile data')
   isLoading.value = true
 
   const { startDate, endDate } = getDateRange(30)
   chartData.value = await useChartData(useSupabase(), appId.value, startDate, endDate)
   isLoading.value = false
-}
-
-function getLast30Days() {
-  const dates = []
-  const endDate = new Date()
-  for (let i = 30; i > 0; i--) {
-    const date = new Date(endDate)
-    date.setDate(endDate.getDate() - i)
-    dates.push(date.toISOString().slice(0, 10))
-  }
-  return dates
 }
 
 function getDateRange(days: number) {
@@ -105,9 +101,9 @@ function nextRunDate() {
         </h2>
         <div class="tooltip">
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
-            <IcBaselineInfo class="w-4 h-4 text-slate-400 dark:text-white" />
+            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
           </div>
-          <div class="tooltip-content">
+          <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
             <div class="max-w-xs whitespace-normal">
               {{ lastRunDate() }}
             </div>
@@ -134,7 +130,7 @@ function nextRunDate() {
       </div>
     </div>
     <div class="w-full h-full p-6">
-      <Line v-if="!isLoading" :data="{ labels: getLast30Days(), datasets: chartData.datasets }" :options="chartOptions" />
+      <Line v-if="!isLoading" :data="chartData" :options="chartOptions" />
       <div v-else class="flex items-center justify-center h-full">
         <Spinner size="w-40 h-40" />
       </div>
