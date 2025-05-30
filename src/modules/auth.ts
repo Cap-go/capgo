@@ -1,10 +1,10 @@
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
+import { setUser } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { getPlans, isAdmin } from './../services/supabase'
-import { setUser } from '~/services/posthog'
 
 async function guard(next: any, to: string, from: string) {
   const supabase = useSupabase()
