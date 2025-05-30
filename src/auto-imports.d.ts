@@ -307,7 +307,7 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { ActionSheetOptionButton, ActionSheetOption, AppPreviewOptions } from './stores/display'
+  export type { ActionSheetOptionButton, ActionSheetOption, AppPreviewOptions, InviteNewUserWithoutAccountDialogOption } from './stores/display'
   import('./stores/display')
   // @ts-ignore
   export type { Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
