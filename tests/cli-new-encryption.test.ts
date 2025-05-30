@@ -3,7 +3,7 @@ import { createDecipheriv, createHash, publicDecrypt, randomUUID } from 'node:cr
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
 import { getSupabaseClient, getUpdate, getUpdateBaseData, resetAndSeedAppData, resetAppData, resetAppDataStats, responseOk } from './test-utils'
 

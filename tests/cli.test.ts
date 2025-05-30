@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { rmSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli, tempFileFolder } from './cli-utils'
