@@ -206,7 +206,6 @@ export function requestInfosPostgres(
         ios: channelAlias.ios,
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
       },
       manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
         'file_name', ${schema.manifest.file_name},
@@ -248,7 +247,6 @@ export function requestInfosPostgres(
         ios: channelAlias.ios,
         android: channelAlias.android,
         allow_device_self_set: channelAlias.allow_device_self_set,
-        public: channelAlias.public,
       },
       manifestEntries: sql<{ file_name: string, file_hash: string, s3_path: string }[]>`array_agg(json_build_object(
         'file_name', ${schema.manifest.file_name},
@@ -261,11 +259,11 @@ export function requestInfosPostgres(
     .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
-          eq(channelAlias.public, true),
+          sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
           eq(channelAlias.app_id, app_id),
           eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
         )
-      : and (
+      : and(
           eq(channelAlias.app_id, app_id),
           eq(channelAlias.name, defaultChannel),
         ),
@@ -387,11 +385,11 @@ export function requestInfosPostgresV2(
     .leftJoin(schemaV2.manifest, eq(schemaV2.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
-          eq(channelAlias.public, true),
+          sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schemaV2.apps} WHERE app_id = ${app_id}) = true`,
           eq(channelAlias.app_id, app_id),
           eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
         )
-      : and (
+      : and(
           eq(channelAlias.app_id, app_id),
           eq(channelAlias.name, defaultChannel),
         ),
