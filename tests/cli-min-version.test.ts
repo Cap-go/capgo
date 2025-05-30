@@ -3,16 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, prepareCli, runCli } from './cli-utils'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
-
-const uploadWithAutoFlagWithAssert = async (providedSemver: string, expectedSemver: string, appId: string) => {
-  const output = await runCli(['bundle', 'upload', '-b', providedSemver, '-c', 'production', '--auto-min-update-version', '--ignore-checksum-check'], appId)
-  console.log('output', output)
-  const min_update_version = output.split('\n').find(l => l.includes('Auto set min-update-version'))
-  expect(min_update_version).toBeDefined()
-  expect(min_update_version).toContain(expectedSemver)
-  return output
-}
-
 describe('tests min version', () => {
   const id = randomUUID()
   const APPNAME = `com.cli_min_version_${id}`
@@ -20,11 +10,11 @@ describe('tests min version', () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME)
   })
-  // afterAll(async () => {
-  //   await cleanupCli(APPNAME)
-  //   await resetAppData(APPNAME)
-  //   await resetAppDataStats(APPNAME)
-  // })
+  afterAll(async () => {
+    await cleanupCli(APPNAME)
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
+  })
   it('should test auto min version flag', async () => {
     const supabase = getSupabaseClient()
     const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()

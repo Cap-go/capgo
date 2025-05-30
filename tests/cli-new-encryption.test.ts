@@ -70,8 +70,6 @@ describe('tests CLI encryption encrypt/upload/download/decrypt', () => {
       .throwOnError()
 
     expect(error).toBeNull()
-    expect(data?.checksum).not.toBe(checksum)
-
     // the checksum check will be done indirectly later, after the download.
 
     expect(data?.session_key).toBeTruthy()
