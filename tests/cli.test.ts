@@ -11,7 +11,7 @@ import { APIKEY_TEST_UPLOAD, getSupabaseClient, getUpdate, getUpdateBaseData, OR
 
 describe('tests CLI upload', () => {
   const id = randomUUID()
-  const APPNAME = `com.demo.app.cli_${id}`
+  const APPNAME = `com.cli_${id}`
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME)
