@@ -128,7 +128,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
     const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
     const percentUsage = await getPlanUsagePercent(c, orgId)
     if (!is_good_plan && is_onboarded) {
-      cloudlog({ requestId: c.get('requestId'), message: 'is_good_plan_v5', orgId, is_good_plan })
+      cloudlog({ requestId: c.get('requestId'), message: 'is_good_plan_v5_org', orgId, is_good_plan })
       // create dateid var with yyyy-mm with dayjs
       const get_total_stats = await getTotalStats(c, orgId)
       const current_plan = await getCurrentPlanNameOrg(c, orgId)

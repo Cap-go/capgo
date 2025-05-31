@@ -35,7 +35,7 @@ export const BASE_DEPENDENCIES_OLD = {
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
 
-export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
+export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
 function generateDefaultJsonCliConfig(appId: string) {
   return {
@@ -74,14 +74,11 @@ export function setDependencies(dependencies: Record<string, string>, appId: str
   writeFileSync(pathPack, res)
 }
 
-export function deleteAllTempFolders() {
-  rimrafSync(TEMP_DIR_NAME)
-  preparedApps.clear()
-}
-
 export function deleteTempFolders(appId: string) {
-  if (existsSync(tempFileFolder(appId))) {
-    rimrafSync(tempFileFolder(appId))
+  const tempFolder = tempFileFolder(appId)
+  if (existsSync(tempFolder)) {
+    // console.log('Deleting temp folder', tempFolder)
+    rimrafSync(tempFolder)
   }
   preparedApps.delete(appId)
 }
@@ -115,8 +112,8 @@ export async function prepareCli(appId: string, old = false) {
 }
 
 // cleanup CLI
-export function cleanupCli(id: string) {
-  deleteTempFolders(id)
+export function cleanupCli(appId: string) {
+  deleteTempFolders(appId)
 }
 
 export async function npmInstall(appId: string) {

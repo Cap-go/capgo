@@ -3,23 +3,24 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { cleanupCli, getSemver, npmInstall, prepareCli, runCli, setDependencies } from './cli-utils'
 import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
+async function assertCompatibilityTableColumns(appId: string, column1: string, column2: string, column3: string, column4: string) {
+  const output = await runCli(['bundle', 'compatibility', '-c', 'production'], appId, false, undefined, true, false)
+  const packageLine = output.split('\n').find(l => l.includes(`│ ${column1}`))
+  console.log('packageLine', packageLine)
+  expect(packageLine).toBeDefined()
+
+  const columns = packageLine!.split('│').slice(2, -1)
+  expect(columns.length).toBe(4)
+  expect(columns[0]).toContain(column1)
+  expect(columns[1]).toContain(column2)
+  expect(columns[2]).toContain(column3)
+  expect(columns[3]).toContain(column4)
+}
+
 describe('tests CLI metadata', () => {
   const id = randomUUID()
   const APPNAME = `com.cli_meta_${id}`
   const semver = getSemver()
-
-  const assertCompatibilityTableColumns = async (column1: string, column2: string, column3: string, column4: string) => {
-    const output = await runCli(['bundle', 'compatibility', '-c', 'production'], APPNAME, false, undefined, true, false)
-    const packageLine = output.split('\n').find(l => l.includes(`│ ${column1}`))
-    expect(packageLine).toBeDefined()
-
-    const columns = packageLine!.split('│').slice(2, -1)
-    expect(columns.length).toBe(4)
-    expect(columns[0]).toContain(column1)
-    expect(columns[1]).toContain(column2)
-    expect(columns[2]).toContain(column3)
-    expect(columns[3]).toContain(column4)
-  }
 
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
@@ -44,7 +45,7 @@ describe('tests CLI metadata', () => {
   it('should upload bundle with metadata check ignored', async () => {
     const testSemver = getSemver()
     await runCli(['bundle', 'upload', '-b', testSemver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME, false, undefined, true, false)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+    await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
   })
 
   describe.concurrent('version compatibility tests', () => {
@@ -52,24 +53,21 @@ describe('tests CLI metadata', () => {
       setDependencies({
         '@capacitor/android': '7.0.0',
       }, APPNAME)
-      await npmInstall(APPNAME)
-      await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+      await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
     })
 
     it.concurrent('should handle semver caret ranges', async () => {
       setDependencies({
         '@capacitor/android': '^7.0.0',
       }, APPNAME)
-      await npmInstall(APPNAME)
-      await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+      await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
     })
 
     it.concurrent('should handle semver tilde ranges', async () => {
       setDependencies({
         '@capacitor/android': '~7.0.0',
       }, APPNAME)
-      await npmInstall(APPNAME)
-      await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
+      await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
     })
   })
 
@@ -79,21 +77,21 @@ describe('tests CLI metadata', () => {
       '@capacitor/android': 'npm:@capacitor/android@7.0.0',
     }, APPNAME)
     // Don't install since these are expected to fail
-    await assertCompatibilityTableColumns('@capacitor/android', 'npm:@capacitor/android@7.0.0', '7.0.0', '❌')
+    await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', 'npm:@capacitor/android@7.0.0', '7.0.0', '❌')
   })
 
   it('should handle file references as incompatible', async () => {
     setDependencies({
       '@capacitor/android': 'file:../capacitor-android',
     }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', 'file:../capacitor-android', '7.0.0', '❌')
+    await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', 'file:../capacitor-android', '7.0.0', '❌')
   })
 
   it('should handle git references as incompatible', async () => {
     setDependencies({
       '@capacitor/android': 'github:capacitorjs/capacitor#main',
     }, APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', 'github:capacitorjs/capacitor#main', '7.0.0', '❌')
+    await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', 'github:capacitorjs/capacitor#main', '7.0.0', '❌')
   })
 
   it('should handle additional local plugins', async () => {
@@ -102,7 +100,7 @@ describe('tests CLI metadata', () => {
       'capacitor-plugin-safe-area': '2.0.0',
     }, APPNAME)
     await npmInstall(APPNAME)
-    await assertCompatibilityTableColumns('@capacitor/android', '7.0.0', '7.0.0', '✅')
-    await assertCompatibilityTableColumns('capacitor-plugin-safe-area', '2.0.0', '', '❌')
+    await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
+    await assertCompatibilityTableColumns(APPNAME, 'capacitor-plugin-safe-area', '2.0.0', '', '❌')
   })
 })
