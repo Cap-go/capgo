@@ -71,18 +71,75 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
     }
     if (messagesFailed.length > 0) {
       console.log(`[${queueName}] Failed to process ${messagesFailed.length} messages.`)
+
+      const timestamp = new Date().toISOString()
+      const failureDetails = messagesFailed.map(msg => ({
+        function_name: msg.message.function_name,
+        function_type: msg.message.function_type || 'supabase',
+        msg_id: msg.msg_id,
+        read_count: msg.read_ct,
+        status: msg.httpResponse.status,
+        status_text: msg.httpResponse.statusText,
+        payload_size: JSON.stringify(msg.message.payload).length,
+      }))
+
+      const groupedByFunction = failureDetails.reduce((acc, detail) => {
+        const key = detail.function_name
+        if (!acc[key])
+          acc[key] = []
+        acc[key].push(detail)
+        return acc
+      }, {} as Record<string, typeof failureDetails>)
+
       await sendDiscordAlert(c as any, {
-        content: `Queue: ${queueName}`,
+        content: `🚨 **Queue Processing Failures** - ${queueName}`,
         embeds: [
           {
-            title: `Failed to process ${messagesFailed.length} messages.`,
-            description: `Queue: ${queueName}`,
+            title: `❌ ${messagesFailed.length} Messages Failed Processing`,
+            description: `**Queue:** ${queueName}\n**Failed Functions:** ${Object.keys(groupedByFunction).length}\n**Total Failures:** ${messagesFailed.length}`,
+            color: 0xFF6B35, // Orange color for warnings
+            timestamp,
             fields: [
               {
-                name: 'Messages',
-                value: messagesFailed.map(msg => msg.message.function_name).join(', '),
+                name: '📊 Failure Summary',
+                value: Object.entries(groupedByFunction)
+                  .map(([funcName, failures]) =>
+                    `**${funcName}** (${failures[0].function_type}): ${failures.length} failures`,
+                  )
+                  .join('\n'),
+                inline: false,
+              },
+              {
+                name: '🔍 Detailed Failures',
+                value: failureDetails.slice(0, 10).map(detail =>
+                  `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | ID: ${detail.msg_id}`,
+                ).join('\n') + (failureDetails.length > 10 ? `\n... and ${failureDetails.length - 10} more` : ''),
+                inline: false,
+              },
+              {
+                name: '📈 Status Code Distribution',
+                value: Object.entries(
+                  failureDetails.reduce((acc, detail) => {
+                    acc[detail.status] = (acc[detail.status] || 0) + 1
+                    return acc
+                  }, {} as Record<number, number>),
+                ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),
+                inline: false,
+              },
+              {
+                name: '⚠️ Retry Analysis',
+                value: `**Will Retry:** ${failureDetails.filter(d => d.read_count < 5).length}\n**Will Archive:** ${failureDetails.filter(d => d.read_count >= 5).length}`,
+                inline: true,
+              },
+              {
+                name: '📦 Payload Info',
+                value: `**Avg Size:** ${Math.round(failureDetails.reduce((sum, d) => sum + d.payload_size, 0) / failureDetails.length)} bytes\n**Max Size:** ${Math.max(...failureDetails.map(d => d.payload_size))} bytes`,
+                inline: true,
               },
             ],
+            footer: {
+              text: `Queue: ${queueName} | Environment: ${Deno.env.get('ENVIRONMENT') || 'unknown'}`,
+            },
           },
         ],
       })
