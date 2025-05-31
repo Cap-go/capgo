@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CategoryScale, Chart, ChartData, ChartOptions, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
+import { CategoryScale, Chart, ChartData, ChartOptions, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
@@ -16,12 +16,20 @@ import { openCheckoutForOneOff } from '~/services/stripe'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-import CurrencyIcon from '../../../../assets/mau.svg'
+import CurrencyIconMau from '../../../assets/mau.svg'
+import CurrencyIconStorage from '../../../assets/storage.svg'
 
 // Hiragino Sans Bold is the font for the icon of MAU
-const pageType = 'mau'
+const pageType = ref('mau')
 
 const { t } = useI18n()
+const isDark = useDark()
+
+// Computed icon based on current page type
+const CurrencyIcon = computed(() => {
+  return pageType.value === 'mau' ? CurrencyIconMau : CurrencyIconStorage
+})
+
 const historyExpanded = ref(true)
 const buyTokensExpanded = ref(true)
 const calculatorOpen = ref(false)
@@ -243,8 +251,8 @@ function formatTokens(tokens: number) {
 
 function explainTokens() {
   displayStore.dialogOption = {
-    header: t(`tokens-explanation-${pageType}`),
-    message: t(`tokens-explanation-message-${pageType}`),
+    header: t(`tokens-explanation-${pageType.value}`),
+    message: t(`tokens-explanation-message-${pageType.value}`),
     textStyle: 'mb-2',
     buttons: [
       {
@@ -259,6 +267,30 @@ function explainTokens() {
 
 <template>
   <div v-if="!thankYouPage && !historyPage" class="h-full pb-8 overflow-y-auto grow md:pb-0">
+    <!-- Token Type Switch -->
+    <div class="flex justify-center pt-4 pb-2">
+      <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-full p-1 shadow-lg">
+        <div class="flex items-center space-x-1">
+          <button
+            @click="pageType = 'mau'"
+            class="flex items-center space-x-2 px-4 py-2 rounded-full transition-all duration-200"
+            :class="pageType === 'mau' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          >
+            <CurrencyIconMau class="w-5 h-5" />
+            <span class="font-medium">MAU</span>
+          </button>
+          <button
+            @click="pageType = 'storage'"
+            class="flex items-center space-x-2 px-4 py-2 rounded-full transition-all duration-200"
+            :class="pageType === 'storage' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          >
+            <CurrencyIconStorage class="w-5 h-5" />
+            <span class="font-medium">Storage</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="px-4 pt-6 mx-autolg:px-8 sm:px-6">
       <div class="sm:align-center flex flex-col">
         <h1 class="text-5xl font-extrabold text-gray-900 sm:text-center dark:text-white">
@@ -269,7 +301,7 @@ function explainTokens() {
             {{ t(`manage-your`) }} {{ t(`capgo-tokens-${pageType}`) }} {{ t(`here`) }}
           </p>
           <button @click="() => { explainTokens() }">
-            <IcBaselineInfo class="w-5 h-5 ml-2" />
+            <IcBaselineInfo class="w-5 h-5 ml-2 text-gray-600 dark:text-gray-400" />
           </button>
         </div>
       </div>
@@ -285,13 +317,13 @@ function explainTokens() {
       </div>
       <div class="flex flex-col xl:flex-row mt-12 space-x-24 pb-10">
         <div class="w-full flex flex-col">
-          <div class="w-full bg-base-100 rounded-tr-4xl rounded-tl-4xl h-6">
-            <h5 class="text-center">
+          <div class="w-full bg-gray-300 dark:bg-base-100 rounded-tr-4xl rounded-tl-4xl h-6">
+            <h5 class="text-center text-gray-800 dark:text-gray-300 font-semibold">
               {{ t(`tokens-key-${pageType}`) }} {{ t(`history`) }}
             </h5>
           </div>
-          <div class="w-full bg-gray-700  rounded-br-4xl rounded-bl-4xl " @click.capture="() => { if (!historyExpanded) historyExpanded = !historyExpanded }">
-            <ArrowDown v-if="!historyExpanded" class="mx-auto" />
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-br-4xl rounded-bl-4xl " @click.capture="() => { if (!historyExpanded) historyExpanded = !historyExpanded }">
+            <ArrowDown v-if="!historyExpanded" class="mx-auto text-gray-600 dark:text-gray-300" />
             <div v-else class="flex flex-col h-[32rem]">
               <div class="w-[90%] h-96 mt-[1rem] mx-auto">
                 <Line :data="chartData" :options="chartOptions" />
@@ -304,19 +336,19 @@ function explainTokens() {
               </button>
               <div class="flex-grow" />
               <button @click="() => { historyExpanded = false }">
-                <ArrowDown v-if="historyExpanded" class="mx-auto rotate-180 mb-4 bg-gray-700" />
+                <ArrowDown v-if="historyExpanded" class="mx-auto rotate-180 mb-4 text-gray-600 dark:text-gray-300" />
               </button>
             </div>
           </div>
         </div>
         <div class="w-full flex flex-col">
-          <div class="w-full bg-base-100 rounded-tr-4xl rounded-tl-4xl h-6">
-            <h5 class="text-center">
-              {{ t('buy') }} {{ t(`tokens-key-${pageType}`) }}
+          <div class="w-full bg-gray-300 dark:bg-base-100 rounded-tr-4xl rounded-tl-4xl h-6">
+            <h5 class="text-center text-gray-800 dark:text-gray-300 font-semibold">
+              {{ t('buy') }} {{ pageType === 'mau' ? t(`tokens-key-${pageType}`) : t(`tokens-key-${pageType}`).toLowerCase() }}
             </h5>
           </div>
-          <div class="w-full bg-gray-700  rounded-br-4xl rounded-bl-4xl " @click.capture="() => { if (!buyTokensExpanded) buyTokensExpanded = !buyTokensExpanded }">
-            <ArrowDown v-if="!buyTokensExpanded" class="mx-auto" />
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-br-4xl rounded-bl-4xl " @click.capture="() => { if (!buyTokensExpanded) buyTokensExpanded = !buyTokensExpanded }">
+            <ArrowDown v-if="!buyTokensExpanded" class="mx-auto text-gray-600 dark:text-gray-300" />
             <div v-else class="flex flex-col h-[32rem]">
               <div class="w-[90%] h-[27rem] mt-[1rem] flex flex-row mx-auto">
                 <template v-if="!calculatorOpen">
@@ -344,26 +376,26 @@ function explainTokens() {
                 <template v-else>
                   <div class="w-full h-full flex flex-col">
                     <div class="w-full h-fit max-w-full flex flex-row items-center justify-center">
-                      <h1 class="2xl:text-3xl text-xl">
+                      <h1 class="2xl:text-3xl text-xl text-gray-900 dark:text-white">
                         {{ t('buy-any-amount') }}
                       </h1>
                       <CurrencyIcon class="ml-2 w-[40px] h-[40px]" />
                     </div>
                     <div class="w-full flex-1 flex flex-col mt-4">
                       <div class="w-full h-fit flex flex-col items-center">
-                        <h2 class="text-base 2xl:text-lg font-semibold text-center">
+                        <h2 class="text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
                           {{ t('how-many-tokens') }}
                         </h2>
-                        <input v-model="tokensToBuy" type="number" min="1" step="1" class="mt-2 bg-gray-700 rounded-full text-center text-white" @input="tokensToBuy = Math.max(1, Math.floor(Math.abs(tokensToBuy)))">
+                        <input v-model="tokensToBuy" type="number" min="1" step="1" class="mt-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-full text-center text-gray-900 dark:text-white" @input="tokensToBuy = Math.max(1, Math.floor(Math.abs(tokensToBuy)))">
                       </div>
                       <div class="my-[9px] w-[70%] h-[3px] bg-base-100 mx-auto" />
                       <div class="w-full h-full flex flex-row">
                         <div class="w-full h-full mt-2 flex flex-col items-center">
-                          <h2 class="text-base 2xl:text-lg font-semibold text-center">
+                          <h2 class="text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
                             {{ t('tokens-cost') }} {{ computedPriceUp }}$
                           </h2>
                           <div class="flex flex-row justify-center items-center">
-                            <h2 class="text-base 2xl:text-lg font-semibold text-center">
+                            <h2 class="text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
                               {{ t(`it-will-increase-your-${pageType}-by`) }} {{ computeTokens(computedPriceUp) }}
                             </h2>
                             <CurrencyIcon class="ml-2 w-[30px] h-[30px]" />
@@ -372,7 +404,7 @@ function explainTokens() {
                       </div>
                     </div>
                     <div class="flex items-center justify-center h-fit">
-                      <button class="w-24 h-8 mt-4 text-gray-900 rounded-full mx-auto bg-[#f8b324] transform transition-transform hover:scale-120" @click="() => { historyPage = true }">
+                      <button class="w-24 h-8 mt-4 text-gray-900 rounded-full mx-auto bg-[#f8b324] transform transition-transform hover:scale-120" @click="() => { buyTokens(computeTokens(computedPriceUp)) }">
                         <div class="flex items-center justify-center">
                           {{ t('buy') }}
                           <ShoppingCartIcon class="w-4 h-4 ml-2" />
@@ -385,10 +417,10 @@ function explainTokens() {
               <div class="flex-grow" />
               <div class="w-full h-fit gap-x-3 flex flex-row items-center justify-center">
                 <button v-if="calculatorOpen" @click="() => { calculatorOpen = false }">
-                  <IconBack v-if="calculatorOpen" class="rotate-180 mb-4 bg-gray-700" />
+                  <IconBack v-if="calculatorOpen" class="rotate-180 mb-4 text-gray-600 dark:text-gray-300" />
                 </button>
                 <button @click="() => { buyTokensExpanded = false; calculatorOpen = false }">
-                  <ArrowDown v-if="buyTokensExpanded" class="rotate-180 mb-4 bg-gray-700" />
+                  <ArrowDown v-if="buyTokensExpanded" class="rotate-180 mb-4 text-gray-600 dark:text-gray-300" />
                 </button>
               </div>
             </div>
@@ -417,14 +449,14 @@ function explainTokens() {
           {{ t(`capgo-tokens-${pageType}-history`) }}
         </h1>
         <p class="mt-5 text-xl text-gray-700 sm:text-center dark:text-white">
-          {{ t(`see-your`) }} {{ t(`tokens-key-${pageType}`) }} {{ t(`history`) }}<br>
+          {{ t(`see-your`) }} {{ pageType === 'mau' ? t(`tokens-key-${pageType}`) : t(`tokens-key-${pageType}`).toLowerCase() }} {{ t(`history`) }}<br>
         </p>
       </div>
       <div class="w-full h-full flex flex-col items-center bg-base-100 rounded-4xl border-12 border-base-100 py-2 max-w-[38rem] overflow-y-auto">
         <ol v-if="tokensHistory.length > 0" class="w-full">
           <li v-for="token in tokensHistory.toReversed()" :key="token.id">
             <div
-              class="flex flex-column justify-between bg-gray-800 mx-4 rounded-2xl mb-2" :class="{ 'h-14': !expandedHashset.has(token.id.toString()), 'h-24': expandedHashset.has(token.id.toString()) }" @click="() => {
+              class="flex flex-column justify-between bg-gray-100 dark:bg-gray-800 mx-4 rounded-2xl mb-2" :class="{ 'h-14': !expandedHashset.has(token.id.toString()), 'h-24': expandedHashset.has(token.id.toString()) }" @click="() => {
                 if (expandedHashset.has(token.id.toString())) { expandedHashset.delete(token.id.toString()) }
                 else { expandedHashset.add(token.id.toString()) }
               }"
@@ -437,19 +469,19 @@ function explainTokens() {
                     </h2>
                   </div>
                   <div class="flex items-center h-14">
-                    <h2 class="mx-auto text-base 2xl:text-lg font-semibold text-center">
+                    <h2 class="mx-auto text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
                       {{ token.reason }}
                     </h2>
                   </div>
                   <div class="flex items-center h-14">
-                    <h2 class="mr-2 text-base 2xl:text-lg font-semibold text-center">
+                    <h2 class="mr-2 text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
                       {{ dayjs(token.created_at).format('DD/MM/YYYY') }}
                     </h2>
                   </div>
                 </div>
                 <div v-if="expandedHashset.has(token.id.toString())" class="flex flex-col w-full h-10 justify-between">
                   <div class="flex flex-row items-center h-10">
-                    <h2 class="ml-2 text-base 2xl:text-lg font-semibold text-center">
+                    <h2 class="ml-2 text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
                       {{ t('total-tokens') }}: {{ formatTokens(token.running_total) }}
                     </h2>
                   </div>

@@ -97,7 +97,7 @@ watchEffect(() => {
       {
         label: 'tokens',
         icon: CurrencyIcon,
-        key: '/dashboard/settings/organization/tokens',
+        key: '/settings/organization/tokens',
       },
     )
   }

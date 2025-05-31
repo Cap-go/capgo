@@ -3,7 +3,6 @@ import Stripe from 'stripe'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { existInEnv, getEnv } from './utils.ts'
-import { supabaseAdmin } from './supabase.ts';
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
@@ -305,11 +304,11 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
         : `Price per token: ${step.price_per_unit} after ${toMilion(step.step_min)}`
       : `Price per token: ${step.price_per_unit} up to ${toMilion(step.step_max)}`
 
-    const formatedAmmount = 
-      howManyInStep % 1000000 === 0 && howManyInStep > 0 ? 
-        toMilion(howManyInStep) : 
-        howManyInStep % 1000 === 0 && howManyInStep > 0 ? 
-          `${howManyInStep / 1000}K` : 
+    const formatedAmmount =
+      howManyInStep % 1000000 === 0 && howManyInStep > 0 ?
+        toMilion(howManyInStep) :
+        howManyInStep % 1000 === 0 && howManyInStep > 0 ?
+          `${howManyInStep / 1000}K` :
           `${howManyInStep}`
 
     prices.push({
@@ -330,8 +329,9 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
   }
 
   const totalPrice = prices.reduce((acc, price) => acc + price.price_data.unit_amount, 0)
+  cloudlog({ requestId: c.get('requestId'), context: 'totalPrice', totalPrice })
   if (totalPrice % 100 !== 0) {
-    console.log({ requestId: c.get('requestId'), context: 'totalPrice', error: 'totalPrice is not divisible by 100' })
+    cloudlog({ requestId: c.get('requestId'), context: 'totalPrice', error: `totalPrice (${totalPrice}) is not divisible by 100` })
     return { url: '' }
   }
 

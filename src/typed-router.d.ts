@@ -43,6 +43,7 @@ declare module 'vue-router/auto-routes' {
     '/settings/organization/': RouteRecordInfo<'/settings/organization/', '/settings/organization', Record<never, never>, Record<never, never>>,
     '/settings/organization/Members': RouteRecordInfo<'/settings/organization/Members', '/settings/organization/Members', Record<never, never>, Record<never, never>>,
     '/settings/organization/Plans': RouteRecordInfo<'/settings/organization/Plans', '/settings/organization/Plans', Record<never, never>, Record<never, never>>,
+    '/settings/organization/Tokens': RouteRecordInfo<'/settings/organization/Tokens', '/settings/organization/Tokens', Record<never, never>, Record<never, never>>,
     '/settings/organization/Usage': RouteRecordInfo<'/settings/organization/Usage', '/settings/organization/Usage', Record<never, never>, Record<never, never>>,
   }
 }
