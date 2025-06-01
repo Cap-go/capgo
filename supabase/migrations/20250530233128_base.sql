@@ -3824,7 +3824,7 @@ CREATE TABLE IF NOT EXISTS "public"."stats" (
     "device_id" character varying(36) NOT NULL,
     "version" bigint NOT NULL,
     "app_id" character varying(50) NOT NULL,
-    "id" bigint NOT NULL
+    "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY
 );
 
 
