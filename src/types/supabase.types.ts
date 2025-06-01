@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikeys: {
@@ -324,28 +349,28 @@ export type Database = {
         Row: {
           created_at: string
           id: number
-          price_id: string
           price_per_unit: number
           step_max: number
           step_min: number
+          type: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: number
-          price_id: string
           price_per_unit: number
           step_max: number
           step_min: number
+          type: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: number
-          price_id?: string
           price_per_unit?: number
           step_max?: number
           step_min?: number
+          type?: string
           updated_at?: string
         }
         Relationships: []
@@ -582,7 +607,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -1009,6 +1034,7 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           bandwidth: number
@@ -1031,6 +1057,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           bandwidth?: number
@@ -1053,6 +1080,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1285,10 +1313,6 @@ export type Database = {
         Args: { org_id: string }
         Returns: string
       }
-      calculate_daily_app_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_min_rights: {
         Args:
           | {
@@ -1350,10 +1374,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      count_all_paying: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       count_all_plans_v2: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1399,7 +1419,6 @@ export type Database = {
         Args:
           | { org_id: string }
           | { org_id: string; start_date: string; end_date: string }
-          | { p_org_id: string; p_start_date: string; p_end_date: string }
         Returns: {
           app_id: string
           date: string
@@ -1447,22 +1466,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_daily_version: {
-        Args: {
-          app_id_param: string
-          start_date_param?: string
-          end_date_param?: string
-        }
-        Returns: {
-          date: string
-          app_id: string
-          version_id: number
-          percent: number
-        }[]
-      }
       get_db_url: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_extra_mau_for_org: {
+        Args: { orgid: string }
+        Returns: number
       }
       get_global_metrics: {
         Args:
@@ -1510,14 +1520,6 @@ export type Database = {
           app_id: string
         }
         Returns: string
-      }
-      get_infos: {
-        Args: { appid: string; deviceid: string; versionname: string }
-        Returns: {
-          current_version_id: number
-          versiondata: Json
-          channel: Json
-        }[]
       }
       get_metered_usage: {
         Args: Record<PropertyKey, never> | { orgid: string }
@@ -1609,9 +1611,7 @@ export type Database = {
         }[]
       }
       get_tokens_history: {
-        Args: {
-          orgid: string
-        }
+        Args: { orgid: string }
         Returns: {
           id: number
           sum: number
@@ -1622,6 +1622,10 @@ export type Database = {
       }
       get_total_app_storage_size_orgs: {
         Args: { org_id: string; app_id: string }
+        Returns: number
+      }
+      get_total_mau_tokens: {
+        Args: { orgid: string }
         Returns: number
       }
       get_total_metrics: {
@@ -1637,10 +1641,6 @@ export type Database = {
           install: number
           uninstall: number
         }[]
-      }
-      get_total_storage_size: {
-        Args: { appid: string } | { userid: string; appid: string }
-        Returns: number
       }
       get_total_storage_size_org: {
         Args: { org_id: string }
@@ -1928,12 +1928,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      replicate_to_d1: {
+        Args: {
+          record: Json
+          old_record: Json
+          operation: string
+          table_name: string
+        }
+        Returns: undefined
+      }
       reset_and_seed_app_data: {
-        Args: { p_app_id: string } | { p_app_id: string }
+        Args: { p_app_id: string }
         Returns: undefined
       }
       reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string } | { p_app_id: string }
+        Args: { p_app_id: string }
         Returns: undefined
       }
       reset_and_seed_data: {
@@ -1968,18 +1977,6 @@ export type Database = {
         Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
       }
-      update_app_usage: {
-        Args: Record<PropertyKey, never> | { minutes_interval: number }
-        Returns: undefined
-      }
-      update_notification: {
-        Args: { p_event: string; p_uniq_id: string; p_owner_org: string }
-        Returns: undefined
-      }
-      upsert_notification: {
-        Args: { p_event: string; p_uniq_id: string; p_owner_org: string }
-        Returns: undefined
-      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -1987,10 +1984,8 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -2046,7 +2041,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -2066,9 +2061,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      match_plan: {
-        name: string | null
       }
       orgs_table: {
         id: string | null
@@ -2200,13 +2192,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth"],
-      app_mode: ["prod", "dev", "livereload"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2264,7 +2257,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
+      usage_mode: ["last_saved", "5min", "day", "cycle"],
       user_min_right: [
         "invite_read",
         "invite_upload",
@@ -2282,3 +2275,4 @@ export const Constants = {
     },
   },
 } as const
+

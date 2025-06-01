@@ -15,6 +15,7 @@ interface PortalData {
   cancelUrl: string
   howMany: number
   orgId: string
+  type: 'mau' | 'storage' | 'bandwidth'
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -53,7 +54,7 @@ app.post('/', middlewareAuth, async (c) => {
     cloudlog({ requestId: c.get('requestId'), context: 'user', org })
     const checkout = !body.howMany
       ? await createCheckout(c as any, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
-      : await createCheckoutForOneOff(c as any, org.customer_id, body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/dashboard/settings/organization/tokens?thankYou=true`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.howMany)
+      : await createCheckoutForOneOff(c as any, org.customer_id, body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/dashboard/settings/organization/tokens?thankYou=true`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.howMany, body.type)
     return c.json({ url: checkout.url })
   }
   catch (error) {

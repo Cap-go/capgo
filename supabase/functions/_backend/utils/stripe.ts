@@ -285,7 +285,7 @@ function toMilion(price: number) {
   return `${price / 1000000}M`
 }
 
-export async function createCheckoutForOneOff(c: Context, customerId: string, successUrl: string, cancelUrl: string, howMany: number) {
+export async function createCheckoutForOneOff(c: Context, customerId: string, successUrl: string, cancelUrl: string, howMany: number, type: 'mau' | 'storage' | 'bandwidth') {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return { url: '' }
   const { data: tokensSteps, error } = await supabaseAdmin(c).from('capgo_tokens_steps').select('*').order('step_min', { ascending: true })
@@ -298,11 +298,19 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
   while (true) {
     const step = tokensSteps[i]
     const howManyInStep = Math.min(howMany, step.step_max) - Math.max(0, step.step_min)
-    const description = step.step_min > 0
-      ? step.step_max !== 9223372036854775807
-        ? `Price per token: ${step.price_per_unit} between ${toMilion(step.step_min)} and ${toMilion(step.step_max)}`
-        : `Price per token: ${step.price_per_unit} after ${toMilion(step.step_min)}`
-      : `Price per token: ${step.price_per_unit} up to ${toMilion(step.step_max)}`
+
+    const description = type === 'mau' ? (
+      step.step_min > 0
+        ? step.step_max !== 9223372036854775807
+          ? `Price per token: ${step.price_per_unit} between ${toMilion(step.step_min)} and ${toMilion(step.step_max)}`
+          : `Price per token: ${step.price_per_unit} after ${toMilion(step.step_min)}`
+        : `Price per token: ${step.price_per_unit} up to ${toMilion(step.step_max)}`)
+      : (
+        step.step_min > 0
+          ? step.step_max !== 9223372036854775807
+            ? `Price per GB: ${step.price_per_unit} between ${step.step_min} GB and ${step.step_max} GB`
+            : `Price per GB: ${step.price_per_unit} after ${step.step_min} GB`
+          : `Price per GB: ${step.price_per_unit} up to ${step.step_max} GB`)
 
     const formatedAmmount =
       howManyInStep % 1000000 === 0 && howManyInStep > 0 ?
@@ -317,7 +325,7 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
         unit_amount: Math.ceil(step.price_per_unit * howManyInStep * 100),
         currency: 'usd',
         product_data: {
-          name: `${formatedAmmount} tokens`,
+          name: `${formatedAmmount}${type === 'mau' ? ' tokens' : (type === 'storage' ? ' storage GB' : ' bandwidth GB')}`,
           description,
         },
       },
@@ -330,7 +338,7 @@ export async function createCheckoutForOneOff(c: Context, customerId: string, su
 
   const totalPrice = prices.reduce((acc, price) => acc + price.price_data.unit_amount, 0)
   cloudlog({ requestId: c.get('requestId'), context: 'totalPrice', totalPrice })
-  if (totalPrice % 100 !== 0) {
+  if (type === 'mau' && totalPrice % 100 !== 0) {
     cloudlog({ requestId: c.get('requestId'), context: 'totalPrice', error: `totalPrice (${totalPrice}) is not divisible by 100` })
     return { url: '' }
   }

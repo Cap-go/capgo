@@ -18,16 +18,77 @@ import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 import CurrencyIconMau from '../../../assets/mau.svg'
 import CurrencyIconStorage from '../../../assets/storage.svg'
+import CurrencyIconBandwidth from '../../../assets/bandwidth.svg'
 
 // Hiragino Sans Bold is the font for the icon of MAU
-const pageType = ref('mau')
+const pageType = ref('mau') as Ref<keyof typeof stepsPerTokenType.value>
 
 const { t } = useI18n()
 const isDark = useDark()
 
 // Computed icon based on current page type
 const CurrencyIcon = computed(() => {
-  return pageType.value === 'mau' ? CurrencyIconMau : CurrencyIconStorage
+  return pageType.value === 'mau' ? CurrencyIconMau : pageType.value === 'storage' ? CurrencyIconStorage : CurrencyIconBandwidth
+})
+
+const stepsPerTokenType = ref({
+  mau: [
+    {
+      ammount: 10_000,
+      text: '10K'
+    },
+    {
+      ammount: 100_000,
+      text: '100K'
+    },
+    {
+      ammount: 500_000,
+      text: '500K'
+    },
+    {
+      ammount: 1_000_000,
+      text: '1M'
+    }
+  ],
+  // We say you buy 3 things, but in practice you buy 3 * 1024 tokens
+  // It's just that it's simpler to do prices per GB and do tokens per MB
+  // We'll calculate the thing in the backend
+  storage: [
+    {
+      ammount: 3,
+      text: `3${t(`GB`)}`
+    },
+    {
+      ammount: 5,
+      text: `5${t(`GB`)}`
+    },
+    {
+      ammount: 10,
+      text: `10${t(`GB`)}`
+    },
+    {
+      ammount: 20,
+      text: `20${t(`GB`)}`
+    } 
+  ],
+  bandwidth: [
+  {
+      ammount: 3,
+      text: `3${t(`GB`)}`
+    },
+    {
+      ammount: 5,
+      text: `5${t(`GB`)}`
+    },
+    {
+      ammount: 10,
+      text: `10${t(`GB`)}`
+    },
+    {
+      ammount: 20,
+      text: `20${t(`GB`)}`
+    } 
+  ]
 })
 
 const historyExpanded = ref(true)
@@ -153,7 +214,7 @@ async function loadData() {
   }
   const [tokensHistoryValue, tokensStepsValue] = await Promise.all([
     supabase.rpc('get_tokens_history', { orgid: orgId }),
-    supabase.from('capgo_tokens_steps').select('*').order('step_min', { ascending: true }),
+    supabase.from('capgo_tokens_steps').select('*').eq('type', pageType.value.toLowerCase()).order('step_min', { ascending: true }),
   ])
   if (tokensHistoryValue.error) {
     console.error('tokensHistory.error', tokensHistoryValue.error)
@@ -175,6 +236,10 @@ watch(thankYouPage, async () => {
   await loadData()
 })
 
+watch(pageType, async () => {
+  await loadData()
+})
+
 watch(tokensHistory, async () => {
   expandedHashset.value = new Set()
 })
@@ -192,7 +257,7 @@ function computePrice(howMany: number) {
       }
       i++
     }
-    return price
+    return Math.ceil(price * 100) / 100
   }
   else {
     return 0
@@ -238,7 +303,7 @@ async function buyTokens(howMany: number) {
   if (howMany < 1) {
     return
   }
-  openCheckoutForOneOff('', 'https://capgo.app', 'https://capgo.app', orgId, howMany)
+  openCheckoutForOneOff('', 'https://capgo.app', 'https://capgo.app', orgId, howMany, pageType.value.toLowerCase())
 }
 
 function toMilion(price: number) {
@@ -286,6 +351,14 @@ function explainTokens() {
           >
             <CurrencyIconStorage class="w-5 h-5" />
             <span class="font-medium">Storage</span>
+          </button>
+          <button
+            @click="pageType = 'bandwidth'"
+            class="flex items-center space-x-2 px-4 py-2 rounded-full transition-all duration-200"
+            :class="pageType === 'bandwidth' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          >
+            <CurrencyIconBandwidth class="w-5 h-5" />
+            <span class="font-medium">Bandwidth</span>
           </button>
         </div>
       </div>
@@ -355,20 +428,20 @@ function explainTokens() {
                   <div class="w-1/2 h-full mr-3">
                     <div class="flex flex-col h-full w-full">
                       <div class="w-full h-full mb-3">
-                        <BuyTokens :price="computePrice(10)" :amount="10" :custom="false" :icon="CurrencyIcon" @click="() => { buyTokens(10) }" />
+                        <BuyTokens :price="computePrice(stepsPerTokenType[pageType][0].ammount)" :amount="stepsPerTokenType[pageType][0].text" :custom="false" :icon="CurrencyIcon" @click="() => { buyTokens(stepsPerTokenType[pageType][0].ammount) }" />
                       </div>
                       <div class="w-full h-full mt-3">
-                        <BuyTokens :price="computePrice(30)" :amount="30" :custom="false" :icon="CurrencyIcon" @click="() => { buyTokens(30) }" />
+                        <BuyTokens :price="computePrice(stepsPerTokenType[pageType][2].ammount)" :amount="stepsPerTokenType[pageType][2].text" :custom="false" :icon="CurrencyIcon" @click="() => { buyTokens(stepsPerTokenType[pageType][2].ammount) }" />
                       </div>
                     </div>
                   </div>
                   <div class="w-1/2 h-full ml-3">
                     <div class="flex flex-col h-full w-full">
                       <div class="w-full h-full mb-3">
-                        <BuyTokens :price="computePrice(50)" :amount="50" :custom="false" :icon="CurrencyIcon" @click="() => { buyTokens(50) }" />
+                        <BuyTokens :price="computePrice(stepsPerTokenType[pageType][1].ammount)" :amount="stepsPerTokenType[pageType][1].text" :custom="false" :icon="CurrencyIcon" @click="() => { buyTokens(stepsPerTokenType[pageType][1].ammount) }" />
                       </div>
                       <div class="w-full h-full mt-3">
-                        <BuyTokens :price="computePrice(0)" :amount="0" :custom="true" :icon="CurrencyIcon" @click="() => { calculatorOpen = true }" />
+                        <BuyTokens :price="computePrice(0)" :amount="t('custom')" :custom="true" :icon="CurrencyIcon" @click="() => { calculatorOpen = true }" />
                       </div>
                     </div>
                   </div>
@@ -392,11 +465,11 @@ function explainTokens() {
                       <div class="w-full h-full flex flex-row">
                         <div class="w-full h-full mt-2 flex flex-col items-center">
                           <h2 class="text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
-                            {{ t('tokens-cost') }} {{ computedPriceUp }}$
+                            {{ t('tokens-cost') }} {{ pageType === 'mau' ? computedPriceUp : computedPrice }}$
                           </h2>
                           <div class="flex flex-row justify-center items-center">
                             <h2 class="text-base 2xl:text-lg font-semibold text-center text-gray-900 dark:text-white">
-                              {{ t(`it-will-increase-your-${pageType}-by`) }} {{ computeTokens(computedPriceUp) }}
+                              {{ t(`it-will-increase-your-${pageType}-by`) }} {{ pageType === 'mau' ? computeTokens(computedPriceUp) : computeTokens(computedPrice) }}{{ pageType !== 'mau' ? t('GB') : '' }}
                             </h2>
                             <CurrencyIcon class="ml-2 w-[30px] h-[30px]" />
                           </div>

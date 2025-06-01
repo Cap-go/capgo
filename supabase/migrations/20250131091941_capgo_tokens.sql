@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS capgo_tokens_steps (
     step_min bigint NOT NULL,
     step_max bigint NOT NULL,
     price_per_unit FLOAT NOT NULL,
+    type TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT step_range_check CHECK (step_min < step_max)

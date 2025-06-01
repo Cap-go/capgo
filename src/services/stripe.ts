@@ -77,7 +77,7 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
-//   console.log('openCheckout')
+  //   console.log('openCheckout')
   const supabase = useSupabase()
   const session = await supabase.auth.getSession()
   if (!session)
@@ -101,28 +101,29 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   }
 }
 
-export async function openCheckoutForOneOff(priceId: string, successUrl: string, cancelUrl: string, orgId: string, howMany: number) {
+export async function openCheckoutForOneOff(priceId: string, successUrl: string, cancelUrl: string, orgId: string, howMany: number, type: string) {
   //   console.log('openCheckout')
-    const supabase = useSupabase()
-    const session = await supabase.auth.getSession()
-    if (!session)
-      return
-    try {
-      const resp = await supabase.functions.invoke('private/stripe_checkout', {
-        body: JSON.stringify({
-          priceId,
-          successUrl,
-          cancelUrl,
-          reccurence: 'one_off',
-          orgId,
-          howMany,
-        }),
-      })
-      if (!resp.error && resp.data && resp.data.url)
-        openBlank(resp.data.url)
-    }
-    catch (error) {
-      console.error(error)
-      toast.error('Cannot get your checkout')
-    }
+  const supabase = useSupabase()
+  const session = await supabase.auth.getSession()
+  if (!session)
+    return
+  try {
+    const resp = await supabase.functions.invoke('private/stripe_checkout', {
+      body: JSON.stringify({
+        priceId,
+        successUrl,
+        cancelUrl,
+        reccurence: 'one_off',
+        orgId,
+        howMany,
+        type,
+      }),
+    })
+    if (!resp.error && resp.data && resp.data.url)
+      openBlank(resp.data.url)
   }
+  catch (error) {
+    console.error(error)
+    toast.error('Cannot get your checkout')
+  }
+}

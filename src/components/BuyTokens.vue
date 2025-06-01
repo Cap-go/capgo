@@ -5,7 +5,7 @@ import CalculatorIcon from '~icons/heroicons/calculator'
 
 const props = defineProps<{
   price: number,
-  amount: number,
+  amount: string,
   custom: boolean
   icon: string
 }>()
