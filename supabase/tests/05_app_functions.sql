@@ -1,7 +1,7 @@
 BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(13);
+SELECT plan(12);
 
 
 SELECT tests.authenticate_as('test_user');
@@ -29,8 +29,6 @@ SELECT
     is(get_user_main_org_id('046a36ac-e03c-4590-9257-bd6c9dba9ee8'), null, 'get_user_main_org_id test - find the org');
 SELECT
     is(is_member_of_org('6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'), true, 'is_member_of_org test - user is member of org');
-SELECT
-    is(is_owner_of_org('6aa76066-55ef-4238-ade6-0b32334a4097', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'), true, 'is_owner_of_org test - user is member of org');
 SELECT
     is((SELECT user_id FROM apikeys WHERE key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'), '6aa76066-55ef-4238-ade6-0b32334a4097', 'Check if apikey is associated with the correct user');
 SELECT

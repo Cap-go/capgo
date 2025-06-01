@@ -1,13 +1,7 @@
 BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
-SELECT plan(12);
-
--- Test is_owner_of_org
-SELECT
-    is(is_owner_of_org(tests.get_supabase_uid('test_admin'), '22dbad8a-b885-4309-9b3b-a09f8460fb6d'), true, 'is_owner_of_org test - user is owner');
-SELECT
-    is(is_owner_of_org(tests.get_supabase_uid('test_user'), '22dbad8a-b885-4309-9b3b-a09f8460fb6d'), false, 'is_owner_of_org test - user is not owner');
+SELECT plan(10);
 
 -- Test is_member_of_org
 SELECT

@@ -972,11 +972,8 @@ Begin
   WHERE app_id=appid
   AND name=name_version
   AND owner_org=(select public.get_user_main_org_id_by_app_id(appid))
-  AND (
-    public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
-    OR
-    public.is_owner_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
-  ));
+  AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
+  );
 End;  
 $$;
 
@@ -1470,7 +1467,7 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members"("guild_id" "uuid") RETURNS
     LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
     AS $$
 begin
-  IF NOT (public.is_owner_of_org((select auth.uid()), get_org_members.guild_id) OR public.check_min_rights('read'::"public"."user_min_right", (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint)) THEN
+  IF NOT public.check_min_rights('read'::"public"."user_min_right", (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint) THEN
     raise exception 'NO_RIGHTS';
   END IF;
 
@@ -1489,7 +1486,7 @@ begin
   return query select o.id as aid, users.id as uid, users.email, users.image_url, o.user_right as role FROM public.org_users as o
   JOIN public.users on users.id = o.user_id
   where o.org_id=get_org_members.guild_id
-  AND (public.is_member_of_org(users.id, o.org_id) OR public.is_owner_of_org(users.id, o.org_id));
+  AND public.is_member_of_org(users.id, o.org_id);
 End;
 $$;
 
@@ -1508,13 +1505,12 @@ Begin
   SELECT apps.user_id FROM public.apps WHERE apps.app_id=get_org_owner_id.app_id into org_owner_id;
   SELECT public.get_user_main_org_id_by_app_id(app_id) INTO org_id;
 
-  -- (public.is_member_of_org((select auth.uid()), org_id) OR public.is_owner_of_org((select auth.uid()), org_id))
   SELECT user_id
   INTO real_user_id
   FROM public.apikeys
   WHERE key=apikey;
 
-  IF (public.is_member_of_org(real_user_id, org_id) IS FALSE AND public.is_owner_of_org(real_user_id, org_id) IS FALSE)
+  IF (public.is_member_of_org(real_user_id, org_id) IS FALSE)
   THEN
     raise exception 'NO_RIGHTS';
   END IF;
@@ -2103,7 +2099,7 @@ DECLARE
 Begin
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
-  RETURN (public.is_owner_of_org(userid, org_id) OR public.check_min_rights("right", userid, org_id, "appid", NULL::bigint));
+  RETURN public.check_min_rights("right", userid, org_id, "appid", NULL::bigint);
 End;
 $$;
 
@@ -2480,26 +2476,6 @@ $$;
 
 
 ALTER FUNCTION "public"."is_org_yearly"("orgid" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."is_owner_of_org"("user_id" "uuid", "org_id" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
-    AS $$
-Declare
- is_found integer;
-Begin
-  SELECT count(*)
-  INTO is_found
-  FROM public.orgs
-  WHERE orgs.id = org_id
-  AND orgs.created_by = user_id;
-  RETURN is_found != 0;
-End;
-$$;
-
-
-ALTER FUNCTION "public"."is_owner_of_org"("user_id" "uuid", "org_id" "uuid") OWNER TO "postgres";
-
 
 CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
@@ -4799,7 +4775,7 @@ CREATE POLICY "Allow insert for auth, api keys (write, all) (admin+)" ON "public
 
 
 
-CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users" FOR SELECT TO "authenticated", "anon" USING (("public"."is_member_of_org"(( SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_users"."org_id") AS "get_identity_org_allowed"), "org_id") OR "public"."is_owner_of_org"(( SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_users"."org_id") AS "get_identity_org_allowed"), "org_id")));
+CREATE POLICY "Allow memeber and owner to select" ON "public"."org_users" FOR SELECT TO "authenticated", "anon" USING ("public"."is_member_of_org"(( SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_users"."org_id") AS "get_identity_org_allowed"), "org_id"));
 
 
 
@@ -6089,13 +6065,6 @@ GRANT ALL ON FUNCTION "public"."is_onboarding_needed_org"("orgid" "uuid") TO "se
 GRANT ALL ON FUNCTION "public"."is_org_yearly"("orgid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_org_yearly"("orgid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_org_yearly"("orgid" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."is_owner_of_org"("user_id" "uuid", "org_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_owner_of_org"("user_id" "uuid", "org_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_owner_of_org"("user_id" "uuid", "org_id" "uuid") TO "service_role";
-
 
 
 GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") TO "anon";
