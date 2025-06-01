@@ -6,14 +6,14 @@ CREATE TYPE message_update AS (
 );
 
 CREATE OR REPLACE FUNCTION mass_edit_queue_messages_cf_ids(
-  updates message_update[]
+  updates public.message_update[]
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  update_record message_update;
+  update_record public.message_update;
   current_message jsonb;
   current_cf_ids jsonb;
 BEGIN

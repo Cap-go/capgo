@@ -53,7 +53,6 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
     // Process messages that have been read less than 5 times
     const results = await Promise.all(messagesToProcess.map(async (message) => {
-      message.msg_id
       const function_name = message.message.function_name
       const function_type = message.message.function_type
       const body = message.message.payload
@@ -132,7 +131,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               },
               {
                 name: '🔍 Detailed Failures',
-                value: failureDetails.slice(0, 10).map(detail => {
+                value: failureDetails.slice(0, 10).map((detail) => {
                   const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c as any, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22id%22%3A%221%22%2C%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
                   return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
                 }).join('\n'),
@@ -308,12 +307,12 @@ async function archive_queue_messages(sql: ReturnType<typeof getPgClient>, queue
 // Helper function to mass update queue messages with CF IDs
 async function mass_edit_queue_messages_cf_ids(
   sql: ReturnType<typeof getPgClient>,
-  updates: Array<{ msg_id: number; cf_id: string; queue: string }>
+  updates: Array<{ msg_id: number, cf_id: string, queue: string }>,
 ) {
   try {
     // Build the array of ROW values as a string
     const rowValues = updates.map(u =>
-      `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`
+      `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`,
     ).join(',')
 
     await sql.unsafe(`
