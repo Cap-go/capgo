@@ -4,6 +4,7 @@ import { defineAsyncComponent } from 'vue'
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
 const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleLinkDialog.vue'))
+const InviteNewUserWithoutAccountDialog = defineAsyncComponent(() => import('~/components/InviteNewUserWithoutAccountDialog.vue'))
 </script>
 
 <template>
@@ -12,5 +13,6 @@ const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleL
     <Toast />
     <Dialog />
     <BundleLinkDialog />
+    <InviteNewUserWithoutAccountDialog />
   </div>
 </template>

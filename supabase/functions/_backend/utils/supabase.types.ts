@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikeys: {
@@ -517,7 +542,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -944,6 +969,7 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           bandwidth: number
@@ -966,6 +992,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           bandwidth?: number
@@ -988,6 +1015,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1110,6 +1138,56 @@ export type Database = {
           },
         ]
       }
+      tmp_users: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          email: string
+          first_name: string
+          future_uuid: string
+          id: number
+          invite_magic_string: string
+          last_name: string
+          org_id: string
+          role: Database["public"]["Enums"]["user_min_right"]
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          email: string
+          first_name: string
+          future_uuid?: string
+          id?: number
+          invite_magic_string?: string
+          last_name: string
+          org_id: string
+          role: Database["public"]["Enums"]["user_min_right"]
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          future_uuid?: string
+          id?: number
+          invite_magic_string?: string
+          last_name?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["user_min_right"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tmp_users_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
@@ -1220,10 +1298,6 @@ export type Database = {
         Args: { org_id: string }
         Returns: string
       }
-      calculate_daily_app_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_min_rights: {
         Args:
           | {
@@ -1285,10 +1359,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      count_all_paying: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       count_all_plans_v2: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1334,7 +1404,6 @@ export type Database = {
         Args:
           | { org_id: string }
           | { org_id: string; start_date: string; end_date: string }
-          | { p_org_id: string; p_start_date: string; p_end_date: string }
         Returns: {
           app_id: string
           date: string
@@ -1381,19 +1450,6 @@ export type Database = {
       get_d1_webhook_signature: {
         Args: Record<PropertyKey, never>
         Returns: string
-      }
-      get_daily_version: {
-        Args: {
-          app_id_param: string
-          start_date_param?: string
-          end_date_param?: string
-        }
-        Returns: {
-          date: string
-          app_id: string
-          version_id: number
-          percent: number
-        }[]
       }
       get_db_url: {
         Args: Record<PropertyKey, never>
@@ -1446,12 +1502,12 @@ export type Database = {
         }
         Returns: string
       }
-      get_infos: {
-        Args: { appid: string; deviceid: string; versionname: string }
+      get_invite_by_magic_lookup: {
+        Args: { lookup: string }
         Returns: {
-          current_version_id: number
-          versiondata: Json
-          channel: Json
+          org_name: string
+          org_logo: string
+          role: Database["public"]["Enums"]["user_min_right"]
         }[]
       }
       get_metered_usage: {
@@ -1474,6 +1530,7 @@ export type Database = {
           email: string
           image_url: string
           role: Database["public"]["Enums"]["user_min_right"]
+          is_tmp: boolean
         }[]
       }
       get_org_owner_id: {
@@ -1560,10 +1617,6 @@ export type Database = {
           install: number
           uninstall: number
         }[]
-      }
-      get_total_storage_size: {
-        Args: { appid: string } | { userid: string; appid: string }
-        Returns: number
       }
       get_total_storage_size_org: {
         Args: { org_id: string }
@@ -1763,6 +1816,14 @@ export type Database = {
         Args: { orgid: string }
         Returns: number
       }
+      modify_permissions_tmp: {
+        Args: {
+          email: string
+          org_id: string
+          new_role: Database["public"]["Enums"]["user_min_right"]
+        }
+        Returns: string
+      }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1851,12 +1912,25 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      replicate_to_d1: {
+        Args: {
+          record: Json
+          old_record: Json
+          operation: string
+          table_name: string
+        }
+        Returns: undefined
+      }
+      rescind_invitation: {
+        Args: { email: string; org_id: string }
+        Returns: string
+      }
       reset_and_seed_app_data: {
-        Args: { p_app_id: string } | { p_app_id: string }
+        Args: { p_app_id: string }
         Returns: undefined
       }
       reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string } | { p_app_id: string }
+        Args: { p_app_id: string }
         Returns: undefined
       }
       reset_and_seed_data: {
@@ -1891,17 +1965,13 @@ export type Database = {
         Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
       }
-      update_app_usage: {
-        Args: Record<PropertyKey, never> | { minutes_interval: number }
-        Returns: undefined
+      transform_role_to_invite: {
+        Args: { role_input: Database["public"]["Enums"]["user_min_right"] }
+        Returns: Database["public"]["Enums"]["user_min_right"]
       }
-      update_notification: {
-        Args: { p_event: string; p_uniq_id: string; p_owner_org: string }
-        Returns: undefined
-      }
-      upsert_notification: {
-        Args: { p_event: string; p_uniq_id: string; p_owner_org: string }
-        Returns: undefined
+      transform_role_to_non_invite: {
+        Args: { role_input: Database["public"]["Enums"]["user_min_right"] }
+        Returns: Database["public"]["Enums"]["user_min_right"]
       }
       verify_mfa: {
         Args: Record<PropertyKey, never>
@@ -1910,10 +1980,8 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -1969,7 +2037,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -1989,9 +2057,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      match_plan: {
-        name: string | null
       }
       orgs_table: {
         id: string | null
@@ -2123,13 +2188,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth"],
-      app_mode: ["prod", "dev", "livereload"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2187,7 +2253,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
+      usage_mode: ["last_saved", "5min", "day", "cycle"],
       user_min_right: [
         "invite_read",
         "invite_upload",
@@ -2205,3 +2271,4 @@ export const Constants = {
     },
   },
 } as const
+

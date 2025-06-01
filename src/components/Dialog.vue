@@ -6,6 +6,7 @@ import DOMPurify from 'dompurify'
 import { onMounted, watch } from 'vue'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+
 /*
 * $targetEl: required
 * options: optional
