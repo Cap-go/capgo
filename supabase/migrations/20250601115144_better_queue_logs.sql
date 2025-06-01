@@ -1,17 +1,9 @@
 -- Create the type for the input array first
-CREATE TYPE message_update AS (
-  msg_id bigint,
-  cf_id varchar,
-  queue varchar
-);
+CREATE TYPE message_update AS (msg_id bigint, cf_id varchar, queue varchar);
 
-CREATE OR REPLACE FUNCTION mass_edit_queue_messages_cf_ids(
-  updates public.message_update[]
-) RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
+CREATE OR REPLACE FUNCTION mass_edit_queue_messages_cf_ids (updates public.message_update[]) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+SET
+  search_path = '' AS $$
 DECLARE
   update_record public.message_update;
   current_message jsonb;
@@ -56,6 +48,9 @@ END;
 $$;
 
 -- Grant execute permission to postgres role only
-REVOKE ALL ON FUNCTION mass_edit_queue_messages_cf_ids(message_update[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION mass_edit_queue_messages_cf_ids(message_update[]) TO postgres;
+REVOKE ALL ON FUNCTION mass_edit_queue_messages_cf_ids (message_update[])
+FROM
+  PUBLIC;
 
+GRANT
+EXECUTE ON FUNCTION mass_edit_queue_messages_cf_ids (message_update[]) TO postgres;
