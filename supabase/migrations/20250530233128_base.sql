@@ -2845,9 +2845,9 @@ BEGIN
   IF queue_size > 0 THEN
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'apisecret', get_apikey()
+      'apisecret', public.get_apikey()
     );
-    url := get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
+    url := public.get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
 
     -- Calculate how many times to call the sync endpoint (1 call per 1000 items, max 10 calls)
     calls_needed := least(ceil(queue_size / 1000.0)::int, 10);
@@ -2883,7 +2883,7 @@ BEGIN
     SELECT a.app_id, o.management_email                            
     FROM public.apps a                                                    
     JOIN public.orgs o ON a.owner_org = o.id                              
-  )                                                                
+  )
   LOOP                                                             
     PERFORM pgmq.send('cron_email',                                
       jsonb_build_object(                                          
