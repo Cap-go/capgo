@@ -24,6 +24,11 @@ export const messageSchema = z.object({
 
 export const messagesArraySchema = z.array(messageSchema)
 
+// Helper function to generate UUID v4
+function generateUUID(): string {
+  return crypto.randomUUID()
+}
+
 async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
   try {
     const messages = await readQueue(sql, queueName)
@@ -48,16 +53,31 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
     // Process messages that have been read less than 5 times
     const results = await Promise.all(messagesToProcess.map(async (message) => {
+      message.msg_id
       const function_name = message.message.function_name
       const function_type = message.message.function_type
       const body = message.message.payload
-      const httpResponse = await http_post_helper(c as any, function_name, function_type, body)
+      const cfId = generateUUID()
+      const httpResponse = await http_post_helper(c as any, function_name, function_type, body, cfId)
 
       return {
         httpResponse,
+        cfId,
         ...message,
       }
     }))
+
+    // Update all messages with their CF IDs
+    const cfIdUpdates = results.map(result => ({
+      msg_id: result.msg_id,
+      cf_id: result.cfId,
+      queue: queueName,
+    }))
+
+    if (cfIdUpdates.length > 0) {
+      console.log(`[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.`)
+      await mass_edit_queue_messages_cf_ids(sql, cfIdUpdates)
+    }
 
     // Batch remove all messages that have succeeded
     // const successMessages = results.filter(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
@@ -81,6 +101,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
         status: msg.httpResponse.status,
         status_text: msg.httpResponse.statusText,
         payload_size: JSON.stringify(msg.message.payload).length,
+        cf_id: msg.cfId,
       }))
 
       const groupedByFunction = failureDetails.reduce((acc, detail) => {
@@ -111,9 +132,10 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               },
               {
                 name: '🔍 Detailed Failures',
-                value: failureDetails.slice(0, 10).map(detail =>
-                  `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | ID: ${detail.msg_id}`,
-                ).join('\n') + (failureDetails.length > 10 ? `\n... and ${failureDetails.length - 10} more` : ''),
+                value: failureDetails.slice(0, 10).map(detail => {
+                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c as any, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22id%22%3A%221%22%2C%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
+                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
+                }).join('\n'),
                 inline: false,
               },
               {
@@ -207,10 +229,12 @@ export async function http_post_helper(
   function_name: string,
   function_type: string | null | undefined,
   body: any,
+  cfId: string,
 ): Promise<Response> {
   const headers = {
     'Content-Type': 'application/json',
     'apisecret': getEnv(c as any, 'API_SECRET'),
+    'x-capgo-cf-id': cfId,
   }
 
   let url: string
@@ -277,6 +301,29 @@ async function archive_queue_messages(sql: ReturnType<typeof getPgClient>, queue
   }
   catch (error) {
     console.error(`[Archive Queue Messages] Error archiving messages ${msgIds.join(', ')} from queue ${queueName}:`, error)
+    throw error
+  }
+}
+
+// Helper function to mass update queue messages with CF IDs
+async function mass_edit_queue_messages_cf_ids(
+  sql: ReturnType<typeof getPgClient>,
+  updates: Array<{ msg_id: number; cf_id: string; queue: string }>
+) {
+  try {
+    // Build the array of ROW values as a string
+    const rowValues = updates.map(u =>
+      `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`
+    ).join(',')
+
+    await sql.unsafe(`
+      SELECT mass_edit_queue_messages_cf_ids(
+        ARRAY[${rowValues}]
+      )
+    `)
+  }
+  catch (error) {
+    console.error('[Mass Edit CF IDs] Error updating CF IDs:', error)
     throw error
   }
 }

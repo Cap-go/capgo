@@ -47,9 +47,6 @@ export default defineConfig({
       '~/': `${path.resolve(__dirname, 'src')}/`,
     },
   },
-  experimental: {
-    enableNativePlugin: true,
-  },
   plugins: [
     tailwindcss(),
     formkit({}),
