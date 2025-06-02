@@ -1,3 +1,5 @@
+-- We create a test queue to test the queue consumer
+SELECT pgmq.create('test_queue_consumer');
 -- Create secrets
 DO $$
 BEGIN
@@ -15,8 +17,9 @@ BEGIN
     END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION "public"."reset_and_seed_data"() RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+-- We cannot use SET search_path = 'public, extensions' because the digest function is not available in the public schema
+CREATE OR REPLACE FUNCTION "public"."reset_and_seed_data"()  RETURNS "void"
+    LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
     AS $_$
 BEGIN
     -- Truncate tables
@@ -43,7 +46,7 @@ BEGIN
     ('00000000-0000-0000-0000-000000000000', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'authenticated', 'authenticated', 'test2@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', now(), now(), 'oljikwwipqrkwilfsytt', now(), '', NULL, '', '', NULL, now(), '{"provider": "email", "providers": ["email"]}', '{"activation": {"legal": true, "formFilled": true, "optForNewsletters": true, "enableNotifications": true}, "test_identifier": "test_user2"}', 'f', now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
     INSERT INTO "public"."deleted_account" ("created_at", "email", "id") VALUES
-    (now(), encode(digest('deleted@capgo.app', 'sha256'), 'hex'), '00000000-0000-0000-0000-000000000001');
+    (now(), encode(extensions.digest('deleted@capgo.app'::bytea, 'sha256'::text)::bytea, 'hex'::text), '00000000-0000-0000-0000-000000000001');
 
     INSERT INTO "public"."plans" ("created_at", "updated_at", "name", "description", "price_m", "price_y", "stripe_id", "version", "id", "price_m_id", "price_y_id", "storage", "bandwidth", "mau", "market_desc", "storage_unit", "bandwidth_unit", "mau_unit", "price_m_storage_id", "price_m_bandwidth_id", "price_m_mau_id") VALUES
     (now(), now(), 'Maker', 'plan.maker.desc', 39, 396, 'prod_LQIs1Yucml9ChU', 100, '440cfd69-0cfd-486e-b59b-cb99f7ae76a0', 'price_1KjSGyGH46eYKnWwL4h14DsK', 'price_1KjSKIGH46eYKnWwFG9u4tNi', 3221225472, 268435456000, 10000, 'Best for small business owners', 0, 0, 0, NULL, NULL, NULL),
@@ -63,27 +66,27 @@ BEGIN
     (now(), now(), 'sub_4', 'cus_NonOwner', 'succeeded', 'prod_LQIregjtNduh4q', now() + interval '15 days', NULL, 't', 2, '{}', now() - interval '15 days', now() + interval '15 days');
 
     -- Do not insert new orgs
-    ALTER TABLE users DISABLE TRIGGER generate_org_on_user_create;
+    ALTER TABLE public.users DISABLE TRIGGER generate_org_on_user_create;
     INSERT INTO "public"."users" ("created_at", "image_url", "first_name", "last_name", "country", "email", "id", "updated_at", "enableNotifications", "optForNewsletters", "legalAccepted", "customer_id", "billing_email") VALUES
     ('2022-06-03 05:54:15+00', '', 'admin', 'Capgo', NULL, 'admin@capgo.app', 'c591b04e-cf29-4945-b9a0-776d0672061a', now(), 'f', 'f', 'f', NULL, NULL),
     ('2022-06-03 05:54:15+00', '', 'test', 'Capgo', NULL, 'test@capgo.app', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), 'f', 'f', 'f', NULL, NULL),
     ('2022-06-03 05:54:15+00', '', 'test2', 'Capgo', NULL, 'test2@capgo.app', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), 'f', 'f', 'f', NULL, NULL);
-    ALTER TABLE users ENABLE TRIGGER generate_org_on_user_create;
+    ALTER TABLE public.users ENABLE TRIGGER generate_org_on_user_create;
 
-    ALTER TABLE orgs DISABLE TRIGGER generate_org_user_on_org_create;
+    ALTER TABLE public.orgs DISABLE TRIGGER generate_org_user_on_org_create;
     INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name", "management_email", "customer_id") VALUES
     ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', now(), now(), '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A'),
     ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', now(), now(), '', 'Demo org', 'test@capgo.app', 'cus_Q38uE91NP8Ufqc'),
     ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q'),
     ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', now(), now(), '', 'Non-Owner Org', 'test2@capgo.app', 'cus_NonOwner');
-    ALTER TABLE orgs ENABLE TRIGGER generate_org_user_on_org_create;
+    ALTER TABLE public.orgs ENABLE TRIGGER generate_org_user_on_org_create;
 
     INSERT INTO "public"."org_users" ("org_id", "user_id", "user_right", "app_id", "channel_id") VALUES
-    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"user_min_right", null, null),
-    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"user_min_right", null, null),
-    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"user_min_right", null, null),
-    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'upload'::"user_min_right", null, null),
-    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6aa76066-55ef-4238-ade6-0b32334a4097', 'read'::"user_min_right", null, null);
+    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'super_admin'::"public"."user_min_right", null, null),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'super_admin'::"public"."user_min_right", null, null),
+    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'super_admin'::"public"."user_min_right", null, null),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', 'upload'::"public"."user_min_right", null, null),
+    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6aa76066-55ef-4238-ade6-0b32334a4097', 'read'::"public"."user_min_right", null, null);
 
     INSERT INTO "public"."apikeys" ("id", "created_at", "user_id", "key", "mode", "updated_at") VALUES
     (1, now(), 'c591b04e-cf29-4945-b9a0-776d0672061a', 'c591b04e-cf29-4945-b9a0-776d0672061e', 'upload', now()),
@@ -127,11 +130,11 @@ BEGIN
     (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
 
     -- Drop replicated orgs but keet the the seed ones
-    DELETE from "orgs" where POSITION('organization' in orgs.name)=1;
-    PERFORM setval('apikeys_id_seq', 10, false);
-    PERFORM setval('app_versions_id_seq', 8, false);
-    PERFORM setval('channel_id_seq', 4, false);
-    PERFORM setval('deploy_history_id_seq', 4, false);
+    DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
+    PERFORM setval('public.apikeys_id_seq', 10, false);
+    PERFORM setval('public.app_versions_id_seq', 8, false);
+    PERFORM setval('public.channel_id_seq', 4, false);
+    PERFORM setval('public.deploy_history_id_seq', 4, false);
 END;
 $_$;
 
@@ -140,7 +143,7 @@ REVOKE ALL ON FUNCTION "public"."reset_and_seed_data"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."reset_and_seed_data"() TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."reset_and_seed_stats_data"() RETURNS "void"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SET search_path = ''
     AS $$
 DECLARE
   start_date TIMESTAMP := CURRENT_DATE - INTERVAL '15 days';
@@ -160,19 +163,19 @@ DECLARE
   current_version_id BIGINT := 4;
 BEGIN
   -- Truncate all tables
-  TRUNCATE TABLE daily_mau, daily_bandwidth, daily_storage, daily_version, storage_usage, version_usage, device_usage, bandwidth_usage, devices, stats;
+  TRUNCATE TABLE public.daily_mau, public.daily_bandwidth, public.daily_storage, public.daily_version, public.storage_usage, public.version_usage, public.device_usage, public.bandwidth_usage, public.devices, public.stats;
 
   -- Generate a random UUID
   random_uuid := gen_random_uuid();
 
-  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+  INSERT INTO public.devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
     (now(), random_uuid, random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
   --  insert a fix device id for test
-  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
+  INSERT INTO public.devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) VALUES
     (now(), '00000000-0000-0000-0000-000000000000', random_version_id, 'com.demo.app', 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
 
-  INSERT INTO stats (created_at, action, device_id, version, app_id) VALUES
+  INSERT INTO public.stats (created_at, action, device_id, version, app_id) VALUES
     (now(), 'get'::"public"."stats_action", random_uuid, random_version_id, 'com.demo.app'),
     (now(), 'set'::"public"."stats_action", random_uuid, random_version_id, 'com.demo.app');
 
@@ -183,9 +186,9 @@ BEGIN
     random_bandwidth := FLOOR(RANDOM() * 1000000000) + 1;
     random_storage := FLOOR(RANDOM() * 1000000000) + 1;
     
-    INSERT INTO daily_mau (app_id, date, mau) VALUES ('com.demo.app', curr_date, random_mau);
-    INSERT INTO daily_bandwidth (app_id, date, bandwidth) VALUES ('com.demo.app', curr_date, random_bandwidth);
-    INSERT INTO daily_storage (app_id, date, storage) VALUES ('com.demo.app', curr_date, random_storage);
+    INSERT INTO public.daily_mau (app_id, date, mau) VALUES ('com.demo.app', curr_date, random_mau);
+    INSERT INTO public.daily_bandwidth (app_id, date, bandwidth) VALUES ('com.demo.app', curr_date, random_bandwidth);
+    INSERT INTO public.daily_storage (app_id, date, storage) VALUES ('com.demo.app', curr_date, random_storage);
     
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
@@ -203,16 +206,16 @@ BEGIN
         current_version_id := 3;
       END IF;
 
-      INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+      INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
       VALUES (curr_date, 'com.demo.app', previous_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, 0, previous_install * random_daily_change);
       
-      INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+      INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
       VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install * random_daily_change, 0);
       previous_version_id := current_version_id;
       previous_install := previous_install * random_daily_change;
     ELSE
       previous_install := FLOOR(RANDOM() * 50000) + 1;
-      INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+      INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
       VALUES (curr_date, 'com.demo.app', current_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, previous_install, 0);
     END IF;
 
@@ -222,26 +225,26 @@ BEGIN
   -- Seed data for storage_usage
   FOR i IN 1..20 LOOP
     random_file_size := FLOOR(RANDOM() * 10485760) - 5242880; -- Random size between -5MB and 5MB
-    INSERT INTO storage_usage (device_id, app_id, file_size) VALUES (random_uuid, 'com.demo.app', random_file_size);
+    INSERT INTO public.storage_usage (device_id, app_id, file_size) VALUES (random_uuid, 'com.demo.app', random_file_size);
   END LOOP;
 
   -- Seed data for version_usage
   FOR i IN 1..30 LOOP
     random_timestamp := start_date + (RANDOM() * (end_date - start_date));
     random_action := (ARRAY['get', 'fail', 'install', 'uninstall'])[FLOOR(RANDOM() * 4) + 1];
-    INSERT INTO version_usage (timestamp, app_id, version_id, action)
+    INSERT INTO public.version_usage (timestamp, app_id, version_id, action)
     VALUES (random_timestamp, 'com.demo.app', random_version_id, random_action::"public"."version_action");
   END LOOP;
 
   -- Seed data for device_usage
   FOR i IN 1..50 LOOP
-    INSERT INTO device_usage (device_id, app_id) VALUES (random_uuid, 'com.demo.app');
+    INSERT INTO public.device_usage (device_id, app_id) VALUES (random_uuid, 'com.demo.app');
   END LOOP;
 
   -- Seed data for bandwidth_usage
   FOR i IN 1..40 LOOP
     random_file_size := FLOOR(RANDOM() * 10485760) + 1; -- Random size between 1 byte and 10MB
-    INSERT INTO bandwidth_usage (device_id, app_id, file_size) VALUES (random_uuid, 'com.demo.app', random_file_size);
+    INSERT INTO public.bandwidth_usage (device_id, app_id, file_size) VALUES (random_uuid, 'com.demo.app', random_file_size);
   END LOOP;
 END;
 $$;
@@ -252,18 +255,18 @@ GRANT ALL ON FUNCTION "public"."reset_and_seed_stats_data"() TO "service_role";
 
 
 CREATE OR REPLACE FUNCTION "public"."reset_app_data"("p_app_id" character varying) RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
     AS $$
 BEGIN
     -- Use advisory lock to prevent concurrent execution for the same app
     PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
     
     -- Delete in dependency order to avoid foreign key conflicts
-    DELETE FROM deploy_history WHERE app_id = p_app_id;
-    DELETE FROM channel_devices WHERE app_id = p_app_id;
-    DELETE FROM channels WHERE app_id = p_app_id;
-    DELETE FROM app_versions WHERE app_id = p_app_id;
-    DELETE FROM apps WHERE app_id = p_app_id;
+    DELETE FROM public.deploy_history WHERE app_id = p_app_id;
+    DELETE FROM public.channel_devices WHERE app_id = p_app_id;
+    DELETE FROM public.channels WHERE app_id = p_app_id;
+    DELETE FROM public.app_versions WHERE app_id = p_app_id;
+    DELETE FROM public.apps WHERE app_id = p_app_id;
     
     -- Advisory lock is automatically released at transaction end
 END;
@@ -274,7 +277,7 @@ REVOKE ALL ON FUNCTION "public"."reset_app_data"("p_app_id" character varying) F
 GRANT ALL ON FUNCTION "public"."reset_app_data"("p_app_id" character varying) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character varying) RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
     AS $$
 DECLARE
     org_id uuid := '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
@@ -295,7 +298,7 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtext(p_app_id));
     
     -- Clean up existing data first
-    PERFORM reset_app_data(p_app_id);
+    PERFORM public.reset_app_data(p_app_id);
 
     -- Insert new app data
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id")
@@ -360,23 +363,23 @@ REVOKE ALL ON FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character v
 GRANT ALL ON FUNCTION "public"."reset_and_seed_app_data"("p_app_id" character varying) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."reset_app_stats_data"("p_app_id" character varying) RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
     AS $$
 BEGIN
   -- Use advisory lock to prevent concurrent execution for the same app
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
   
   -- Delete existing data for the specified app_id in dependency order
-  DELETE FROM daily_mau WHERE app_id = p_app_id;
-  DELETE FROM daily_bandwidth WHERE app_id = p_app_id;
-  DELETE FROM daily_storage WHERE app_id = p_app_id;
-  DELETE FROM daily_version WHERE app_id = p_app_id;
-  DELETE FROM storage_usage WHERE app_id = p_app_id;
-  DELETE FROM version_usage WHERE app_id = p_app_id;
-  DELETE FROM device_usage WHERE app_id = p_app_id;
-  DELETE FROM bandwidth_usage WHERE app_id = p_app_id;
-  DELETE FROM devices WHERE app_id = p_app_id;
-  DELETE FROM stats WHERE app_id = p_app_id;
+  DELETE FROM public.daily_mau WHERE app_id = p_app_id;
+  DELETE FROM public.daily_bandwidth WHERE app_id = p_app_id;
+  DELETE FROM public.daily_storage WHERE app_id = p_app_id;
+  DELETE FROM public.daily_version WHERE app_id = p_app_id;
+  DELETE FROM public.storage_usage WHERE app_id = p_app_id;
+  DELETE FROM public.version_usage WHERE app_id = p_app_id;
+  DELETE FROM public.device_usage WHERE app_id = p_app_id;
+  DELETE FROM public.bandwidth_usage WHERE app_id = p_app_id;
+  DELETE FROM public.devices WHERE app_id = p_app_id;
+  DELETE FROM public.stats WHERE app_id = p_app_id;
   
   -- Advisory lock is automatically released at transaction end
 END;
@@ -388,7 +391,7 @@ GRANT ALL ON FUNCTION "public"."reset_app_stats_data"("p_app_id" character varyi
 
 
 CREATE OR REPLACE FUNCTION "public"."reset_and_seed_app_stats_data"("p_app_id" character varying) RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SET search_path = '' SECURITY DEFINER
     AS $$
 DECLARE
   start_date TIMESTAMP := CURRENT_DATE - INTERVAL '15 days';
@@ -408,19 +411,19 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
   
   -- Clean up existing stats data
-  PERFORM reset_app_stats_data(p_app_id);
+  PERFORM public.reset_app_stats_data(p_app_id);
   
   -- Generate random UUIDs
   random_uuid := gen_random_uuid();
 
   -- Insert device data atomically
-  INSERT INTO devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) 
+  INSERT INTO public.devices (updated_at, device_id, version, app_id, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator) 
   VALUES
     (now(), random_uuid, random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't'),
     (now(), random_fixed_uuid, random_version_id, p_app_id, 'android', '4.15.3', '9', '1.223.0', '', 't', 't');
   
   -- Insert stats data atomically
-  INSERT INTO stats (created_at, action, device_id, version, app_id) 
+  INSERT INTO public.stats (created_at, action, device_id, version, app_id) 
   VALUES
     (now(), 'get'::"public"."stats_action", random_uuid, random_version_id, p_app_id),
     (now(), 'set'::"public"."stats_action", random_uuid, random_version_id, p_app_id);
@@ -433,22 +436,22 @@ BEGIN
     random_storage := FLOOR(RANDOM() * 1000000000) + 1;
     
     -- Insert daily metrics atomically
-    INSERT INTO daily_mau (app_id, date, mau) VALUES (p_app_id, curr_date, random_mau);
-    INSERT INTO daily_bandwidth (app_id, date, bandwidth) VALUES (p_app_id, curr_date, random_bandwidth);
-    INSERT INTO daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
-    INSERT INTO daily_version (date, app_id, version_id, get, fail, install, uninstall)
+    INSERT INTO public.daily_mau (app_id, date, mau) VALUES (p_app_id, curr_date, random_mau);
+    INSERT INTO public.daily_bandwidth (app_id, date, bandwidth) VALUES (p_app_id, curr_date, random_bandwidth);
+    INSERT INTO public.daily_storage (app_id, date, storage) VALUES (p_app_id, curr_date, random_storage);
+    INSERT INTO public.daily_version (date, app_id, version_id, get, fail, install, uninstall)
     VALUES (curr_date, p_app_id, random_version_id, FLOOR(RANDOM() * 100) + 1, FLOOR(RANDOM() * 10) + 1, FLOOR(RANDOM() * 50) + 1, FLOOR(RANDOM() * 20) + 1);
     
     curr_date := curr_date + INTERVAL '1 day';
   END LOOP;
   
   -- Batch insert storage usage data
-  INSERT INTO storage_usage (device_id, app_id, file_size)
+  INSERT INTO public.storage_usage (device_id, app_id, file_size)
   SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) - 5242880
   FROM generate_series(1, 20);
 
   -- Batch insert version usage data
-  INSERT INTO version_usage (timestamp, app_id, version_id, action)
+  INSERT INTO public.version_usage (timestamp, app_id, version_id, action)
   SELECT 
     start_date + (RANDOM() * (end_date - start_date)),
     p_app_id,
@@ -457,12 +460,12 @@ BEGIN
   FROM generate_series(1, 30);
 
   -- Batch insert device usage data
-  INSERT INTO device_usage (device_id, app_id)
+  INSERT INTO public.device_usage (device_id, app_id)
   SELECT random_uuid, p_app_id
   FROM generate_series(1, 50);
 
   -- Batch insert bandwidth usage data
-  INSERT INTO bandwidth_usage (device_id, app_id, file_size)
+  INSERT INTO public.bandwidth_usage (device_id, app_id, file_size)
   SELECT random_uuid, p_app_id, FLOOR(RANDOM() * 10485760) + 1
   FROM generate_series(1, 40);
 
@@ -544,12 +547,11 @@ END $$;
 DO $$
 BEGIN
     -- Execute seeding functions
-    PERFORM reset_and_seed_data();
-    PERFORM reset_and_seed_stats_data();
+    PERFORM public.reset_and_seed_data();
+    PERFORM public.reset_and_seed_stats_data();
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Seeding failed: %', SQLERRM;
     RAISE;
 END $$;
 
--- We create a test queue to test the queue consumer
-SELECT pgmq.create('test_queue_consumer');
+

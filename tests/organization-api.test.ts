@@ -281,7 +281,7 @@ describe('[DELETE] /organization', () => {
     // Should be forbidden since the user isn't the owner
     expect(response.status).toBe(403)
     const responseData = await response.json() as { status: string }
-    expect(responseData.status).toBe('Only the organization owner can delete an organization')
+    expect(responseData.status).toBe('You don\'t have permission to delete this organization')
 
     // Verify the organization still exists
     const { data: dataOrgAfter, error: errorOrgAfter } = await getSupabaseClient().from('orgs').select().eq('id', id).single()

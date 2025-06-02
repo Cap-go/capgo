@@ -1,1 +1,0 @@
-CREATE POLICY "Allow org delete for super_admin" ON "public"."orgs" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "id", NULL::character varying, NULL::bigint));

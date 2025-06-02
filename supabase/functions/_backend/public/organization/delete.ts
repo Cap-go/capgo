@@ -16,26 +16,9 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
 
   // Check if user has right to delete the organization
   const userId = apikey.user_id
-  if (!(await hasOrgRightApikey(c, orgId, userId, 'admin', c.get('capgkey') as string))) {
+  if (!(await hasOrgRightApikey(c, orgId, userId, 'super_admin', c.get('capgkey') as string))) {
     console.error('You can\'t delete this organization', orgId)
     return c.json({ status: 'You don\'t have permission to delete this organization', orgId }, 403)
-  }
-
-  // Check if the user is the owner of the organization
-  const { data: isOwner, error: ownerError } = await supabaseAdmin(c)
-    .rpc('is_owner_of_org', {
-      user_id: userId,
-      org_id: orgId,
-    })
-
-  if (ownerError) {
-    console.error('Error checking organization ownership', ownerError)
-    return c.json({ status: 'Error checking organization ownership' }, 500)
-  }
-
-  if (!isOwner) {
-    console.error('User is not the owner of this organization')
-    return c.json({ status: 'Only the organization owner can delete an organization' }, 403)
   }
 
   try {
