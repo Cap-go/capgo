@@ -134,7 +134,7 @@
     "@revenuecat/purchases-capacitor": "10.2.3",
     "@sentry/cli": "^2.43.0",
     "@std/semver": "npm:@jsr/std__semver@1.0.5",
-    "@supabase/supabase-js": "2.49.4",
+    "@supabase/supabase-js": "2.49.8",
     "@tailwindcss/forms": "^0.5.10",
     "@types/semver": "^7.7.0",
     "@vuepic/vue-datepicker": "^11.0.2",
