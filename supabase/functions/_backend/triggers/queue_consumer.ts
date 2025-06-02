@@ -132,7 +132,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               {
                 name: '🔍 Detailed Failures',
                 value: failureDetails.slice(0, 10).map((detail) => {
-                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c as any, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22id%22%3A%221%22%2C%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
+                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c as any, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
                   return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
                 }).join('\n'),
                 inline: false,
@@ -235,6 +235,7 @@ export async function http_post_helper(
     'apisecret': getEnv(c as any, 'API_SECRET'),
     'x-capgo-cf-id': cfId,
   }
+
 
   let url: string
   if (function_type === 'cloudflare_pp' && getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')) {
