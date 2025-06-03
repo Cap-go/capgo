@@ -422,7 +422,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
 export async function update(c: Context, body: AppInfos) {
   let pgClient
-  let isV2 = getRuntimeKey() === 'workerd'
+  let isV2 = false
+  // let isV2 = getRuntimeKey() === 'workerd'
   if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
     isV2 = true
   }

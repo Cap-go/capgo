@@ -31,6 +31,7 @@
   "compatibility_flags": [
     "nodejs_compat_v2"
   ],
+  "logpush": true,
   "workers_dev": false,
   "observability": {
     "enabled": true,
