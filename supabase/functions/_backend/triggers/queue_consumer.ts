@@ -236,7 +236,6 @@ export async function http_post_helper(
     'x-capgo-cf-id': cfId,
   }
 
-
   let url: string
   if (function_type === 'cloudflare_pp' && getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')) {
     url = `${getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
