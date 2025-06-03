@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from '@capacitor/cli'
+import pkg from './package.json'
 
 const config: CapacitorConfig = {
   appId: 'ee.forgr.capacitor_go',
@@ -17,6 +18,7 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_CROP',
     },
     CapacitorUpdater: {
+      version: pkg.version,
     },
   },
   android: {
