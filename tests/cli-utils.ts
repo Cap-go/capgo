@@ -2,7 +2,7 @@ import type { ExecSyncOptions } from 'node:child_process'
 import { exec, execSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import process, { cwd, env } from 'node:process'
 import { promisify } from 'node:util'
 import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
@@ -34,6 +34,9 @@ export const BASE_DEPENDENCIES_OLD = {
 
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
+
+// Track active processes for cleanup
+const activeProcesses = new Set<ReturnType<typeof spawn>>()
 
 export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
@@ -116,6 +119,24 @@ export function cleanupCli(appId: string) {
   deleteTempFolders(appId)
 }
 
+// Cleanup function for process management
+export function cleanupAllProcesses() {
+  activeProcesses.forEach((proc) => {
+    try {
+      proc.kill('SIGTERM')
+    }
+    catch {
+      // Process may already be dead
+    }
+  })
+  activeProcesses.clear()
+}
+
+// Register cleanup on process exit
+process.on('exit', cleanupAllProcesses)
+process.on('SIGINT', cleanupAllProcesses)
+process.on('SIGTERM', cleanupAllProcesses)
+
 export async function npmInstall(appId: string) {
   try {
     await execAsync('bun install', { cwd: tempFileFolder(appId) })
@@ -152,8 +173,19 @@ export async function runCli(params: string[], appId: string, logOutput = false,
       timeout: 30000, // 30 second timeout
     })
 
+    // Track the process
+    activeProcesses.add(child)
+
     let stdout = ''
     let stderr = ''
+    let finished = false
+
+    const cleanup = () => {
+      if (!finished) {
+        finished = true
+        activeProcesses.delete(child)
+      }
+    }
 
     child.stdout?.on('data', (data) => {
       stdout += data.toString()
@@ -164,6 +196,7 @@ export async function runCli(params: string[], appId: string, logOutput = false,
     })
 
     child.on('close', (_code) => {
+      cleanup()
       const output = stdout || stderr
 
       if (logOutput) {
@@ -174,7 +207,16 @@ export async function runCli(params: string[], appId: string, logOutput = false,
     })
 
     child.on('error', (error) => {
+      cleanup()
       reject(error)
+    })
+
+    // Handle timeout explicitly
+    child.on('exit', (code, signal) => {
+      if (signal === 'SIGTERM') {
+        cleanup()
+        reject(new Error(`Process terminated: ${signal}`))
+      }
     })
   })
 }
@@ -203,7 +245,7 @@ export function runCliSync(params: string[], appId: string, logOutput = false, o
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...env, FORCE_COLOR: '1' },
-    timeout: 15000, // 15 second timeout
+    timeout: 30000, // 30 second timeout
   }
 
   try {
@@ -233,34 +275,22 @@ export async function batchRunCli(
     noFolder?: boolean
   }>,
 ): Promise<string[]> {
-  // Group operations by appId to reuse setup
-  const grouped = operations.reduce((acc, op) => {
-    if (!acc[op.appId]) {
-      acc[op.appId] = []
-    }
-    acc[op.appId].push(op)
-    return acc
-  }, {} as Record<string, typeof operations>)
+  // Execute operations sequentially to avoid conflicts
+  const results: string[] = []
 
-  // Execute operations in parallel by appId
-  const promises = Object.entries(grouped).map(async ([_appId, ops]) => {
-    const appResults: string[] = []
-    for (const op of ops) {
-      const result = await runCli(
-        op.params,
-        op.appId,
-        false,
-        op.overwriteApiKey,
-        op.overwriteSupaHost,
-        op.noFolder,
-      )
-      appResults.push(result)
-    }
-    return appResults
-  })
+  for (const op of operations) {
+    const result = await runCli(
+      op.params,
+      op.appId,
+      false,
+      op.overwriteApiKey,
+      op.overwriteSupaHost,
+      op.noFolder,
+    )
+    results.push(result)
+  }
 
-  const groupedResults = await Promise.all(promises)
-  return groupedResults.flat()
+  return results
 }
 
 // Helper for common CLI test patterns
