@@ -149,7 +149,7 @@ export async function runCli(params: string[], appId: string, logOutput = false,
       cwd: basePath,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...env, FORCE_COLOR: '1' },
-      timeout: 15000, // 15 second timeout
+      timeout: 30000, // 30 second timeout
     })
 
     let stdout = ''
