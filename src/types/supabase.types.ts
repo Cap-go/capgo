@@ -642,6 +642,7 @@ export type Database = {
           app_id: string
           custom_id: string
           device_id: string
+          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -655,6 +656,7 @@ export type Database = {
           app_id: string
           custom_id?: string
           device_id: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -668,6 +670,7 @@ export type Database = {
           app_id?: string
           custom_id?: string
           device_id?: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -997,6 +1000,7 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
+          id: number
           version: number
         }
         Insert: {
@@ -1004,6 +1008,7 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
+          id?: never
           version: number
         }
         Update: {
@@ -1011,6 +1016,7 @@ export type Database = {
           app_id?: string
           created_at?: string
           device_id?: string
+          id?: never
           version?: number
         }
         Relationships: []
@@ -1220,10 +1226,6 @@ export type Database = {
         Args: { org_id: string }
         Returns: string
       }
-      calculate_daily_app_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       check_min_rights: {
         Args:
           | {
@@ -1285,10 +1287,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      count_all_paying: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       count_all_plans_v2: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1334,7 +1332,6 @@ export type Database = {
         Args:
           | { org_id: string }
           | { org_id: string; start_date: string; end_date: string }
-          | { p_org_id: string; p_start_date: string; p_end_date: string }
         Returns: {
           app_id: string
           date: string
@@ -1381,19 +1378,6 @@ export type Database = {
       get_d1_webhook_signature: {
         Args: Record<PropertyKey, never>
         Returns: string
-      }
-      get_daily_version: {
-        Args: {
-          app_id_param: string
-          start_date_param?: string
-          end_date_param?: string
-        }
-        Returns: {
-          date: string
-          app_id: string
-          version_id: number
-          percent: number
-        }[]
       }
       get_db_url: {
         Args: Record<PropertyKey, never>
@@ -1446,14 +1430,6 @@ export type Database = {
         }
         Returns: string
       }
-      get_infos: {
-        Args: { appid: string; deviceid: string; versionname: string }
-        Returns: {
-          current_version_id: number
-          versiondata: Json
-          channel: Json
-        }[]
-      }
       get_metered_usage: {
         Args: Record<PropertyKey, never> | { orgid: string }
         Returns: Database["public"]["CompositeTypes"]["stats_table"]
@@ -1487,24 +1463,6 @@ export type Database = {
       get_organization_cli_warnings: {
         Args: { orgid: string; cli_version: string }
         Returns: Json[]
-      }
-      get_orgs_v5: {
-        Args: Record<PropertyKey, never> | { userid: string }
-        Returns: {
-          gid: string
-          created_by: string
-          logo: string
-          name: string
-          role: string
-          paying: boolean
-          trial_left: number
-          can_use_more: boolean
-          is_canceled: boolean
-          app_count: number
-          subscription_start: string
-          subscription_end: string
-          management_email: string
-        }[]
       }
       get_orgs_v6: {
         Args: Record<PropertyKey, never> | { userid: string }
@@ -1560,10 +1518,6 @@ export type Database = {
           install: number
           uninstall: number
         }[]
-      }
-      get_total_storage_size: {
-        Args: { appid: string } | { userid: string; appid: string }
-        Returns: number
       }
       get_total_storage_size_org: {
         Args: { org_id: string }
@@ -1763,6 +1717,12 @@ export type Database = {
         Args: { orgid: string }
         Returns: number
       }
+      mass_edit_queue_messages_cf_ids: {
+        Args: {
+          updates: Database["public"]["CompositeTypes"]["message_update"][]
+        }
+        Returns: undefined
+      }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1851,30 +1811,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      reset_and_seed_app_data: {
-        Args: { p_app_id: string } | { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string } | { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      reset_and_seed_stats_data: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      reset_app_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
       set_bandwidth_exceeded_by_org: {
         Args: { org_id: string; disabled: boolean }
         Returns: undefined
@@ -1889,18 +1825,6 @@ export type Database = {
       }
       transfer_app: {
         Args: { p_app_id: string; p_new_org_id: string }
-        Returns: undefined
-      }
-      update_app_usage: {
-        Args: Record<PropertyKey, never> | { minutes_interval: number }
-        Returns: undefined
-      }
-      update_notification: {
-        Args: { p_event: string; p_uniq_id: string; p_owner_org: string }
-        Returns: undefined
-      }
-      upsert_notification: {
-        Args: { p_event: string; p_uniq_id: string; p_owner_org: string }
         Returns: undefined
       }
       verify_mfa: {
@@ -1992,6 +1916,11 @@ export type Database = {
       }
       match_plan: {
         name: string | null
+      }
+      message_update: {
+        msg_id: number | null
+        cf_id: string | null
+        queue: string | null
       }
       orgs_table: {
         id: string | null
