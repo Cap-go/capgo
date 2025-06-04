@@ -42,15 +42,16 @@ describe('tests CLI upload', () => {
 describe.concurrent('tests CLI upload options in parallel', () => {
   // Single shared app for most tests to reduce setup overhead
   const sharedId = randomUUID()
-  const SHARED_APPNAME = `com.demo.app.cli_shared_${sharedId}`
+  const SHARED_APPNAME = `com.cli_shared_${sharedId}`
 
   // Pre-create minimal apps for file modification tests
   const fileTestApps: Array<{ id: string, APPNAME: string }> = []
   const apiTestApps: Array<{ id: string, APPNAME: string }> = []
+  const usedApps: Array<string> = []
 
   const prepareApp = async () => {
     const id = randomUUID()
-    const APPNAME = `com.demo.app.cli_${id}`
+    const APPNAME = `com.cli_${id}`
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME)
     return { id, APPNAME }
@@ -78,7 +79,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   })
 
   afterAll(async () => {
-    const allApps = [SHARED_APPNAME, ...fileTestApps.map(a => a.APPNAME), ...apiTestApps.map(a => a.APPNAME)]
+    const allApps = [SHARED_APPNAME, ...usedApps]
 
     for (const appName of allApps) {
       await cleanupCli(appName)
@@ -92,6 +93,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     const app = fileTestApps.shift()
     if (!app)
       throw new Error('No file test app available')
+    usedApps.push(app.APPNAME)
 
     const semver = getSemver()
     writeFileSync(join(tempFileFolder(app.APPNAME), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
@@ -129,6 +131,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     const app = apiTestApps.shift()
     if (!app)
       throw new Error('No API test app available')
+    usedApps.push(app.APPNAME)
 
     const semver = getSemver()
     const testApiKey = randomUUID()
@@ -156,6 +159,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     const app = apiTestApps.shift()
     if (!app)
       throw new Error('No API test app available')
+    usedApps.push(app.APPNAME)
 
     const semver = getSemver()
     const testApiKey = randomUUID()

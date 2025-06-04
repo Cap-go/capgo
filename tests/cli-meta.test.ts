@@ -6,7 +6,7 @@ import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-uti
 async function assertCompatibilityTableColumns(appId: string, column1: string, column2: string, column3: string, column4: string) {
   const output = await runCli(['bundle', 'compatibility', '-c', 'production'], appId, false, undefined, true, false)
   const packageLine = output.split('\n').find(l => l.includes(`│ ${column1}`))
-  console.log('packageLine', packageLine)
+  // console.log('packageLine', packageLine)
   expect(packageLine).toBeDefined()
 
   const columns = packageLine!.split('│').slice(2, -1)
