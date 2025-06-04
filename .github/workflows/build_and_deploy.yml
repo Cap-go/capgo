@@ -43,7 +43,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.23.4
+          version: 2.24.4
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Prepare Supabase
