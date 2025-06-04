@@ -51,7 +51,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
 
   const prepareApp = async () => {
     const id = randomUUID()
-    const APPNAME = `com.cli_${id}`
+    const APPNAME = `com.cli_ccr_${id}`
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME)
     return { id, APPNAME }
