@@ -285,6 +285,36 @@ export type Database = {
         }
         Relationships: []
       }
+      capgo_credits_steps: {
+        Row: {
+          created_at: string
+          id: number
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          price_per_unit?: number
+          step_max?: number
+          step_min?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channel_devices: {
         Row: {
           app_id: string
