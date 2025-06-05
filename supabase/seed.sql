@@ -38,6 +38,7 @@ BEGIN
     TRUNCATE TABLE "public"."channels" CASCADE;
     TRUNCATE TABLE "public"."deploy_history" CASCADE;
     TRUNCATE TABLE "public"."devices" CASCADE;
+    TRUNCATE TABLE "public"."capgo_credits_steps" CASCADE;
 
     -- Insert seed data
     -- (Include all your INSERT statements here)
@@ -56,6 +57,53 @@ BEGIN
     (now(), now(), 'Pay as you go', 'plan.payasyougo.desc', 239, 4799, 'prod_MH5Jh6ajC9e7ZH', 1000, '745d7ab3-6cd6-4d65-b257-de6782d5ba50', 'price_1LYX8yGH46eYKnWwzeBjISvW', 'price_1LYX8yGH46eYKnWwzeBjISvW', 12884901888, 3221225472000, 1000000, 'Best for scalling enterprises', 0.05, 0.1, 0.0002, 'price_1LYXD8GH46eYKnWwaVvggvyy', 'price_1LYXDoGH46eYKnWwPEYVZXui', 'price_1LYXE2GH46eYKnWwo5qd4BTU'),
     (now(), now(), 'Solo', 'plan.solo.desc', 14, 146, 'prod_LQIregjtNduh4q', 10, '526e11d8-3c51-4581-ac92-4770c602f47c', 'price_1LVvuZGH46eYKnWwuGKOf4DK', 'price_1LVvuIGH46eYKnWwHMDCrxcH', 1073741824, 13958643712, 1000, 'Best for independent developers', 0, 0, 0, NULL, NULL, NULL),
     (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
+
+    INSERT INTO capgo_credits_steps (type, step_min, step_max, price_per_unit)
+  VALUES
+    ('mau', 0, 1000000, 0.003),
+    ('mau', 1000000, 3000000, 0.0022),
+    ('mau', 3000000, 10000000, 0.0016),
+    ('mau', 10000000, 15000000, 0.0014),
+    ('mau', 15000000, 25000000, 0.00115),
+    ('mau', 25000000, 40000000, 0.001),
+    ('mau', 40000000, 100000000, 0.0009),
+    ('mau', 100000000, 9223372036854775807, 0.0007),
+    ('bandwidth', 0, 1374000000000, 0.12), -- 0–10 TB
+    ('bandwidth', 1374000000000, 2749000000000, 0.10), -- 10–20 TB
+    ('bandwidth', 2749000000000, 6872000000000, 0.085), -- 20–50 TB
+    ('bandwidth', 6872000000000, 13740000000000, 0.07), -- 50–100 TB
+    (
+      'bandwidth',
+      13740000000000,
+      27490000000000,
+      0.055
+    ), -- 100–200 TB
+    ('bandwidth', 27490000000000, 68720000000000, 0.04), -- 200–500 TB
+    (
+      'bandwidth',
+      68720000000000,
+      137400000000000,
+      0.03
+    ), -- 500–1000 TB
+    (
+      'bandwidth',
+      137400000000000,
+      9223372036854775807,
+      0.02
+    ), -- 1000+ TB
+    ('storage', 0, 1342000000, 0.09), -- 0–10 GB
+    ('storage', 1342000000, 6711000000, 0.08), -- 10–50 GB
+    ('storage', 6711000000, 26840000000, 0.065), -- 50–200 GB
+    ('storage', 26840000000, 67110000000, 0.05), -- 200–500 GB
+    ('storage', 67110000000, 268400000000, 0.04), -- 500–2000 GB
+    ('storage', 268400000000, 687200000000, 0.03), -- 2–5 TB
+    ('storage', 687200000000, 1374000000000, 0.025), -- 5–10 TB
+    (
+      'storage',
+      1374000000000,
+      9223372036854775807,
+      0.021
+    );
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, now(), now(), 't'),
