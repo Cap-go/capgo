@@ -3,9 +3,11 @@ import { requestId } from '@hono/hono/request-id'
 import { sentry } from '@hono/sentry'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
+import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
 import { version } from '../../package.json'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
+import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
 import { app as deleted_failed_version } from '../../supabase/functions/_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
@@ -47,7 +49,6 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
 
 const app = new Hono<MiddlewareKeyVariables>()
 const appTriggers = new Hono<MiddlewareKeyVariables>()
@@ -71,6 +72,7 @@ app.route('/app', appEndpoint)
 
 // Private API
 appPrivate.route('/plans', plans)
+appPrivate.route('/credits', credits)
 appPrivate.route('/store_top', storeTop)
 appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/config', config)

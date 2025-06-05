@@ -6,6 +6,7 @@ import { handle } from 'hono/netlify'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
+import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
@@ -37,6 +38,7 @@ appGlobal.use('*', requestId())
 // Webapps API
 
 appGlobal.route('/plans', plans)
+appGlobal.route('/credits', credits)
 appGlobal.route('/store_top', storeTop)
 appGlobal.route('/website_stats', publicStats)
 appGlobal.route('/config', config)
