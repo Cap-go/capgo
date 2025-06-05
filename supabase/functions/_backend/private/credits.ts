@@ -23,9 +23,11 @@ interface CostCalculationRequest {
 
 interface TierUsage {
   tier_id: number
-  range: string
-  units_used: number // GB for bandwidth/storage, count for MAU
-  price_per_unit: number // Price per GB for bandwidth/storage, price per unit for MAU
+  step_min: number
+  step_max: number
+  unit_factor: number
+  units_used: number // billing units (GB for bandwidth/storage, count for MAU)
+  price_per_unit: number // Price per billing unit
   cost: number
 }
 
@@ -112,9 +114,9 @@ app.post('/', async (c) => {
 
           tiersUsed.push({
             tier_id: step.id,
-            range: unitFactor > 1
-              ? `${stepMin / unitFactor}-${stepMax / unitFactor} GB`
-              : `${stepMin}-${stepMax}`,
+            step_min: stepMin,
+            step_max: stepMax,
+            unit_factor: step.unit_factor || 1,
             units_used: tierUsage,
             price_per_unit: step.price_per_unit,
             cost: tierCost,
@@ -142,9 +144,9 @@ app.post('/', async (c) => {
 
           tiersUsed.push({
             tier_id: highestStep.id,
-            range: unitFactor > 1
-              ? `${stepMin / unitFactor}+ GB`
-              : `${stepMin}+`,
+            step_min: stepMin,
+            step_max: highestStep.step_max,
+            unit_factor: highestStep.unit_factor || 1,
             units_used: tierUsage,
             price_per_unit: highestStep.price_per_unit,
             cost: tierCost,
