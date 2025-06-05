@@ -4,6 +4,39 @@ import { bytesToGb } from '../utils/conversion.ts'
 import { useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
+interface CostCalculationRequest {
+  mau: number
+  bandwidth: number // in bytes
+  storage: number // in bytes
+}
+
+interface TierUsage {
+  tier_id: number
+  range: string
+  units_used: number // GB for bandwidth/storage, count for MAU
+  price_per_unit: number // Price per GB for bandwidth/storage, price per unit for MAU
+  cost: number
+}
+
+interface MetricBreakdown {
+  cost: number
+  tiers: TierUsage[]
+}
+
+interface CostCalculationResponse {
+  total_cost: number
+  breakdown: {
+    mau: MetricBreakdown
+    bandwidth: MetricBreakdown
+    storage: MetricBreakdown
+  }
+  usage: {
+    mau: number
+    bandwidth: number
+    storage: number
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
@@ -14,20 +47,7 @@ app.get('/', async (c) => {
       .from('capgo_credits_steps')
       .select()
       .order('price_per_unit')
-    // use bytesToGb function to convert all column storage and bandwidth to GB
-    const creditsFinal = credits?.map((credit) => {
-      // convert type bandwidth to gb and storage to gb
-      if (credit.type === 'bandwidth') {
-        credit.step_min = bytesToGb(credit.step_min)
-        credit.step_max = bytesToGb(credit.step_max)
-      }
-      else if (credit.type === 'storage') {
-        credit.step_min = bytesToGb(credit.step_min)
-        credit.step_max = bytesToGb(credit.step_max)
-      }
-      return credit
-    })
-    return c.json(creditsFinal || [])
+    return c.json(credits || [])
   }
   catch (e) {
     return c.json({ status: 'Cannot get credits', error: JSON.stringify(e) }, 500)
@@ -36,98 +56,130 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   try {
-    const body = await c.req.json()
-    const { mau, bandwidth, storage_hours, plan_id } = body
+    const body = await c.req.json<CostCalculationRequest>()
+    const { mau, bandwidth, storage } = body
 
     // Validate inputs
-    if (!mau || !bandwidth || !storage_hours || !plan_id) {
-      return c.json({ error: 'Missing required fields: mau, bandwidth, storage_hours, plan_id' }, 400)
-    }
-
-    // Get plan details to find included amounts
-    const { data: plan, error: planError } = await supabaseAdmin(c as any)
-      .from('plans')
-      .select('mau, bandwidth, storage')
-      .eq('id', plan_id)
-      .single()
-
-    if (planError || !plan) {
-      return c.json({ error: 'Failed to fetch plan data' }, 500)
+    if (mau === undefined || bandwidth === undefined || storage === undefined) {
+      return c.json({ error: 'Missing required fields: mau, bandwidth, storage' }, 400)
     }
 
     // Get pricing steps from database
     const { data: credits, error } = await supabaseAdmin(c as any)
       .from('capgo_credits_steps')
       .select()
-      .eq('plan_id', plan_id)
+      .order('type, step_min')
 
     if (error || !credits) {
       return c.json({ error: 'Failed to fetch pricing data' }, 500)
     }
 
-    let totalCost = 0
-
-    // Calculate excess usage (usage above plan included amounts)
-    const excessMau = Math.max(0, mau - (plan.mau || 0))
-    const excessBandwidth = Math.max(0, bandwidth - bytesToGb(plan.bandwidth || 0))
-    const excessStorage = Math.max(0, storage_hours - bytesToGb(plan.storage || 0))
-
-    // Calculate cost for each metric type
-    const calculateMetricCost = (value: number, type: string) => {
+    // Calculate cost for each metric type with tier breakdown
+    const calculateMetricCost = (value: number, type: string): MetricBreakdown => {
       if (value <= 0)
-        return 0
+        return { cost: 0, tiers: [] }
 
       const applicableSteps = credits.filter(credit => credit.type === type)
+      const tiersUsed: TierUsage[] = []
+      let remainingValue = value
+      let totalCost = 0
 
       for (const step of applicableSteps) {
-        const stepMin = type === 'bandwidth' || type === 'storage' ? bytesToGb(step.step_min) : step.step_min
-        const stepMax = type === 'bandwidth' || type === 'storage' ? bytesToGb(step.step_max) : step.step_max
+        const stepMin = step.step_min
+        const stepMax = step.step_max
 
-        if (value >= stepMin && value <= stepMax) {
-          return value * step.price_per_unit
+        if (remainingValue > 0 && value >= stepMin) {
+          const tierUsageBytes = Math.min(remainingValue, stepMax - stepMin)
+
+          // For bandwidth and storage, convert bytes to GB and round up for pricing
+          let tierUsage = tierUsageBytes
+          let tierCost = 0
+
+          if (type === 'bandwidth' || type === 'storage') {
+            // Convert to GB and round up (any partial GB counts as full GB for pricing)
+            tierUsage = Math.ceil(bytesToGb(tierUsageBytes))
+            tierCost = tierUsage * step.price_per_unit
+          }
+          else {
+            // For MAU, use as-is
+            tierCost = tierUsage * step.price_per_unit
+          }
+
+          tiersUsed.push({
+            tier_id: step.id,
+            range: type === 'bandwidth' || type === 'storage'
+              ? `${bytesToGb(stepMin)}-${bytesToGb(stepMax)} GB`
+              : `${stepMin}-${stepMax}`,
+            units_used: tierUsage,
+            price_per_unit: step.price_per_unit,
+            cost: tierCost,
+          })
+
+          totalCost += tierCost
+          remainingValue -= tierUsageBytes
+
+          if (remainingValue <= 0)
+            break
         }
       }
 
-      // If no matching step found, use the highest tier
-      const highestStep = applicableSteps[applicableSteps.length - 1]
-      if (highestStep) {
-        return value * highestStep.price_per_unit
+      // If there's still remaining value, use the highest tier
+      if (remainingValue > 0) {
+        const highestStep = applicableSteps[applicableSteps.length - 1]
+        if (highestStep) {
+          let tierUsage = remainingValue
+          let tierCost = 0
+
+          if (type === 'bandwidth' || type === 'storage') {
+            // Convert to GB and round up
+            tierUsage = Math.ceil(bytesToGb(remainingValue))
+            tierCost = tierUsage * highestStep.price_per_unit
+          }
+          else {
+            tierCost = tierUsage * highestStep.price_per_unit
+          }
+
+          const stepMin = highestStep.step_min
+
+          tiersUsed.push({
+            tier_id: highestStep.id,
+            range: type === 'bandwidth' || type === 'storage'
+              ? `${bytesToGb(stepMin)}+ GB`
+              : `${stepMin}+`,
+            units_used: tierUsage,
+            price_per_unit: highestStep.price_per_unit,
+            cost: tierCost,
+          })
+
+          totalCost += tierCost
+        }
       }
 
-      return 0
+      return { cost: totalCost, tiers: tiersUsed }
     }
 
     // Calculate costs
-    const mauCost = calculateMetricCost(excessMau, 'mau')
-    const bandwidthCost = calculateMetricCost(excessBandwidth, 'bandwidth')
-    const storageCost = calculateMetricCost(excessStorage, 'storage')
+    const mauResult = calculateMetricCost(mau, 'mau')
+    const bandwidthResult = calculateMetricCost(bandwidth, 'bandwidth')
+    const storageResult = calculateMetricCost(storage, 'storage')
 
-    totalCost = mauCost + bandwidthCost + storageCost
+    const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost
 
-    return c.json({
+    const response: CostCalculationResponse = {
       total_cost: totalCost,
       breakdown: {
-        mau_cost: mauCost,
-        bandwidth_cost: bandwidthCost,
-        storage_cost: storageCost,
+        mau: mauResult,
+        bandwidth: bandwidthResult,
+        storage: storageResult,
       },
       usage: {
         mau,
         bandwidth,
-        storage_hours,
-        plan_id,
+        storage,
       },
-      included: {
-        mau: plan.mau || 0,
-        bandwidth: bytesToGb(plan.bandwidth || 0),
-        storage: bytesToGb(plan.storage || 0),
-      },
-      excess: {
-        mau: excessMau,
-        bandwidth: excessBandwidth,
-        storage: excessStorage,
-      },
-    })
+    }
+
+    return c.json(response)
   }
   catch (e) {
     return c.json({ status: 'Cannot calculate cost', error: JSON.stringify(e) }, 500)
