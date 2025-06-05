@@ -59,7 +59,7 @@ BEGIN
     (now(), now(), 'Team', 'plan.team.desc', 99, 998, 'prod_LQIugvJcPrxhda', 1000, 'abd76414-8f90-49a5-b3a4-8ff4d2e12c77', 'price_1KjSIUGH46eYKnWwWHvg8XYs', 'price_1KjSLlGH46eYKnWwAwMW2wiW', 6442450944, 536870912000, 100000, 'Best for medium enterprises', 0, 0, 0, NULL, NULL, NULL);
 
     INSERT INTO
-      capgo_credits_steps (
+      "public"."capgo_credits_steps" (
         type,
         step_min,
         step_max,
