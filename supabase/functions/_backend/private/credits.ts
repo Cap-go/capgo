@@ -1,8 +1,19 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { bytesToGb } from '../utils/conversion.ts'
 import { useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+
+interface CreditStep {
+  id: number
+  step_min: number
+  step_max: number
+  price_per_unit: number
+  type: string
+  unit_factor: number
+  stripe_id?: string | null
+  created_at: string
+  updated_at: string
+}
 
 interface CostCalculationRequest {
   mau: number
@@ -74,12 +85,15 @@ app.post('/', async (c) => {
       return c.json({ error: 'Failed to fetch pricing data' }, 500)
     }
 
+    // Type assertion for credits
+    const typedCredits = credits as CreditStep[]
+
     // Calculate cost for each metric type with tier breakdown
     const calculateMetricCost = (value: number, type: string): MetricBreakdown => {
       if (value <= 0)
         return { cost: 0, tiers: [] }
 
-      const applicableSteps = credits.filter(credit => credit.type === type)
+      const applicableSteps = typedCredits.filter(credit => credit.type === type)
       const tiersUsed: TierUsage[] = []
       let remainingValue = value
       let totalCost = 0
@@ -87,28 +101,19 @@ app.post('/', async (c) => {
       for (const step of applicableSteps) {
         const stepMin = step.step_min
         const stepMax = step.step_max
+        const unitFactor = step.unit_factor || 1
 
         if (remainingValue > 0 && value >= stepMin) {
           const tierUsageBytes = Math.min(remainingValue, stepMax - stepMin)
 
-          // For bandwidth and storage, convert bytes to GB and round up for pricing
-          let tierUsage = tierUsageBytes
-          let tierCost = 0
-
-          if (type === 'bandwidth' || type === 'storage') {
-            // Convert to GB and round up (any partial GB counts as full GB for pricing)
-            tierUsage = Math.ceil(bytesToGb(tierUsageBytes))
-            tierCost = tierUsage * step.price_per_unit
-          }
-          else {
-            // For MAU, use as-is
-            tierCost = tierUsage * step.price_per_unit
-          }
+          // Convert using unit_factor and round up for pricing
+          const tierUsage = Math.ceil(tierUsageBytes / unitFactor)
+          const tierCost = tierUsage * step.price_per_unit
 
           tiersUsed.push({
             tier_id: step.id,
-            range: type === 'bandwidth' || type === 'storage'
-              ? `${bytesToGb(stepMin)}-${bytesToGb(stepMax)} GB`
+            range: unitFactor > 1
+              ? `${stepMin / unitFactor}-${stepMax / unitFactor} GB`
               : `${stepMin}-${stepMax}`,
             units_used: tierUsage,
             price_per_unit: step.price_per_unit,
@@ -127,24 +132,18 @@ app.post('/', async (c) => {
       if (remainingValue > 0) {
         const highestStep = applicableSteps[applicableSteps.length - 1]
         if (highestStep) {
-          let tierUsage = remainingValue
-          let tierCost = 0
+          const unitFactor = highestStep.unit_factor || 1
 
-          if (type === 'bandwidth' || type === 'storage') {
-            // Convert to GB and round up
-            tierUsage = Math.ceil(bytesToGb(remainingValue))
-            tierCost = tierUsage * highestStep.price_per_unit
-          }
-          else {
-            tierCost = tierUsage * highestStep.price_per_unit
-          }
+          // Convert using unit_factor and round up
+          const tierUsage = Math.ceil(remainingValue / unitFactor)
+          const tierCost = tierUsage * highestStep.price_per_unit
 
           const stepMin = highestStep.step_min
 
           tiersUsed.push({
             tier_id: highestStep.id,
-            range: type === 'bandwidth' || type === 'storage'
-              ? `${bytesToGb(stepMin)}+ GB`
+            range: unitFactor > 1
+              ? `${stepMin / unitFactor}+ GB`
               : `${stepMin}+`,
             units_used: tierUsage,
             price_per_unit: highestStep.price_per_unit,
