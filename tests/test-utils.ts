@@ -109,7 +109,7 @@ export async function resetAndSeedAppData(appId: string): Promise<void> {
       while (retries > 0) {
         try {
           // Execute in a transaction with repeatable read isolation
-          const { error } = await supabase.rpc('reset_and_seed_app_data', { p_app_id: appId })
+          const { error } = await supabase.rpc('reset_and_seed_app_data' as any, { p_app_id: appId })
           if (error) {
             throw error
           }
@@ -143,7 +143,7 @@ export async function resetAppData(appId: string): Promise<void> {
     let retries = 3
     while (retries > 0) {
       try {
-        const { error } = await supabase.rpc('reset_app_data', { p_app_id: appId })
+        const { error } = await supabase.rpc('reset_app_data' as any, { p_app_id: appId })
         if (error) {
           throw error
         }
@@ -172,7 +172,7 @@ export async function resetAndSeedAppDataStats(appId: string): Promise<void> {
     let retries = 3
     while (retries > 0) {
       try {
-        const { error } = await supabase.rpc('reset_and_seed_app_stats_data', { p_app_id: appId })
+        const { error } = await supabase.rpc('reset_and_seed_app_stats_data' as any, { p_app_id: appId })
         if (error) {
           throw error
         }
@@ -199,7 +199,7 @@ export async function resetAppDataStats(appId: string): Promise<void> {
     let retries = 3
     while (retries > 0) {
       try {
-        const { error } = await supabase.rpc('reset_app_stats_data', { p_app_id: appId })
+        const { error } = await supabase.rpc('reset_app_stats_data' as any, { p_app_id: appId })
         if (error) {
           throw error
         }

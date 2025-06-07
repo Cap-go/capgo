@@ -247,13 +247,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 export async function update(c: Context, body: AppInfos) {
   let pgClient
   let isV2 = false
+  // let isV2 = getRuntimeKey() === 'workerd'
   if (c.req.url.endsWith('/updates_lite_v2') && getRuntimeKey() === 'workerd') {
     isV2 = true
   }
-  if (!isV2 && getRuntimeKey() === 'workerd') {
-    // make 10% chance to use v2 with D1 read replicate to test the performance
-    isV2 = Math.random() < 0.1
-  }
+  // if (!isV2 && getRuntimeKey() === 'workerd') {
+  //   // make 10% chance to use v2 with D1 read replicate to test the performance
+  //   isV2 = Math.random() < 0.1
+  // }
   // check if URL ends with update_v2 if yes do not init PG
   if (isV2) {
     cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })

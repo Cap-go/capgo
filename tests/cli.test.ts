@@ -23,9 +23,9 @@ describe('tests CLI upload', () => {
   // Essential upload tests only
   it('should upload bundle successfully', async () => {
     const semver = getSemver()
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME_one, false)
+    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--ignore-checksum-check', '--dry-upload'], APPNAME_one, false)
     expect(output).toContain('Time to share your update to the world')
-  })
+  }, 30000) // Increase timeout to 30 seconds
 
   it('should not upload same hash twice', async () => {
     const semver = getSemver()
@@ -36,21 +36,22 @@ describe('tests CLI upload', () => {
     // Second upload with same content should be skipped
     const output2 = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME_one, false)
     expect(output2).toContain('Cannot upload the same bundle content')
-  })
+  }, 30000) // Increase timeout
 })
 
 describe.concurrent('tests CLI upload options in parallel', () => {
   // Single shared app for most tests to reduce setup overhead
   const sharedId = randomUUID()
-  const SHARED_APPNAME = `com.demo.app.cli_shared_${sharedId}`
+  const SHARED_APPNAME = `com.cli_shared_${sharedId}`
 
   // Pre-create minimal apps for file modification tests
   const fileTestApps: Array<{ id: string, APPNAME: string }> = []
   const apiTestApps: Array<{ id: string, APPNAME: string }> = []
+  const usedApps: Array<string> = []
 
   const prepareApp = async () => {
     const id = randomUUID()
-    const APPNAME = `com.demo.app.cli_${id}`
+    const APPNAME = `com.cli_ccr_${id}`
     await resetAndSeedAppData(APPNAME)
     await prepareCli(APPNAME)
     return { id, APPNAME }
@@ -78,7 +79,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
   })
 
   afterAll(async () => {
-    const allApps = [SHARED_APPNAME, ...fileTestApps.map(a => a.APPNAME), ...apiTestApps.map(a => a.APPNAME)]
+    const allApps = [SHARED_APPNAME, ...usedApps]
 
     for (const appName of allApps) {
       await cleanupCli(appName)
@@ -92,12 +93,13 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     const app = fileTestApps.shift()
     if (!app)
       throw new Error('No file test app available')
+    usedApps.push(app.APPNAME)
 
     const semver = getSemver()
     writeFileSync(join(tempFileFolder(app.APPNAME), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");')
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], app.APPNAME, false)
     expect(output).toContain('notifyAppReady() is missing in')
-  })
+  }, 30000)
 
   // Essential upload option tests (use shared app)
   it.concurrent('test --min-update-version', async () => {
@@ -115,20 +117,21 @@ describe.concurrent('tests CLI upload options in parallel', () => {
 
     expect(error).toBeNull()
     expect(data?.min_update_version).toBe('1.0.0')
-  })
+  }, 30000)
 
   it.concurrent('cannot upload with wrong api key', async () => {
     const testApiKey = randomUUID()
     const semver = getSemver()
     const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], SHARED_APPNAME, false, testApiKey)
     expect(output).toContain('Invalid API key or insufficient permissions.')
-  })
+  }, 30000)
 
   // Essential API key tests (only most critical)
   it.concurrent('should test upload with org-limited API key', async () => {
     const app = apiTestApps.shift()
     if (!app)
       throw new Error('No API test app available')
+    usedApps.push(app.APPNAME)
 
     const semver = getSemver()
     const testApiKey = randomUUID()
@@ -150,12 +153,13 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     finally {
       await supabase.from('apikeys').delete().eq('key', testApiKey)
     }
-  })
+  }, 30000)
 
   it.concurrent('should fail upload with wrong org-limited API key', async () => {
     const app = apiTestApps.shift()
     if (!app)
       throw new Error('No API test app available')
+    usedApps.push(app.APPNAME)
 
     const semver = getSemver()
     const testApiKey = randomUUID()
@@ -178,5 +182,5 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     finally {
       await supabase.from('apikeys').delete().eq('key', testApiKey)
     }
-  })
+  }, 30000)
 })

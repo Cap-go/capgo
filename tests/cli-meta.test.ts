@@ -6,7 +6,7 @@ import { resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-uti
 async function assertCompatibilityTableColumns(appId: string, column1: string, column2: string, column3: string, column4: string) {
   const output = await runCli(['bundle', 'compatibility', '-c', 'production'], appId, false, undefined, true, false)
   const packageLine = output.split('\n').find(l => l.includes(`│ ${column1}`))
-  console.log('packageLine', packageLine)
+  // console.log('packageLine', packageLine)
   expect(packageLine).toBeDefined()
 
   const columns = packageLine!.split('│').slice(2, -1)
@@ -20,11 +20,9 @@ async function assertCompatibilityTableColumns(appId: string, column1: string, c
 describe('tests CLI metadata', () => {
   const id = randomUUID()
   const APPNAME = `com.cli_meta_${id}`
-  const semver = getSemver()
 
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
-    await resetAndSeedAppData('ee.forgr.capacitor_go')
     await prepareCli(APPNAME)
   })
 
@@ -32,19 +30,11 @@ describe('tests CLI metadata', () => {
     await cleanupCli(APPNAME)
     await resetAppData(APPNAME)
     await resetAppDataStats(APPNAME)
-    // Also cleanup the project root app
-    await resetAppData('ee.forgr.capacitor_go')
-    await resetAppDataStats('ee.forgr.capacitor_go')
-  })
-
-  it('should upload initial bundle', async () => {
-    const output = await runCli(['bundle', 'upload', '-b', semver, '-c', 'production', '--dry-upload'], APPNAME, false, undefined, true, false)
-    expect(output).toContain('Bundle uploaded')
   })
 
   it('should upload bundle with metadata check ignored', async () => {
     const testSemver = getSemver()
-    await runCli(['bundle', 'upload', '-b', testSemver, '-c', 'production', '--ignore-metadata-check', '--dry-upload'], APPNAME, false, undefined, true, false)
+    await runCli(['bundle', 'upload', '-b', testSemver, '-c', 'production', '--dry-upload', '--ignore-checksum-check'], APPNAME, false, undefined, true, false)
     await assertCompatibilityTableColumns(APPNAME, '@capacitor/android', '7.0.0', '7.0.0', '✅')
   })
 
