@@ -84,3 +84,6 @@ internal/files-api-dev/go.sum
 internal/forgr-key.jks
 internal/forgr-key.jks.base64
 internal/electric/.env.prod
+scripts/*.json
+scripts/*.txt
+scripts/*.csv
