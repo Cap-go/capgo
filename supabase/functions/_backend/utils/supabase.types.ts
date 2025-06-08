@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikeys: {
@@ -292,7 +317,9 @@ export type Database = {
           price_per_unit: number
           step_max: number
           step_min: number
+          stripe_id: string | null
           type: string
+          unit_factor: number
           updated_at: string
         }
         Insert: {
@@ -301,7 +328,9 @@ export type Database = {
           price_per_unit: number
           step_max: number
           step_min: number
+          stripe_id?: string | null
           type: string
+          unit_factor?: number
           updated_at?: string
         }
         Update: {
@@ -310,7 +339,9 @@ export type Database = {
           price_per_unit?: number
           step_max?: number
           step_min?: number
+          stripe_id?: string | null
           type?: string
+          unit_factor?: number
           updated_at?: string
         }
         Relationships: []
@@ -547,7 +578,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email?: string
+          email: string
           id?: string
         }
         Update: {
@@ -672,7 +703,6 @@ export type Database = {
           app_id: string
           custom_id: string
           device_id: string
-          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -686,7 +716,6 @@ export type Database = {
           app_id: string
           custom_id?: string
           device_id: string
-          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -700,7 +729,6 @@ export type Database = {
           app_id?: string
           custom_id?: string
           device_id?: string
-          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -977,6 +1005,7 @@ export type Database = {
           storage_unit: number | null
           stripe_id: string
           updated_at: string
+          version: number
         }
         Insert: {
           bandwidth: number
@@ -999,6 +1028,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           bandwidth?: number
@@ -1021,6 +1051,7 @@ export type Database = {
           storage_unit?: number | null
           stripe_id?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1720,10 +1751,6 @@ export type Database = {
         Args: { orgid: string }
         Returns: boolean
       }
-      is_owner_of_org: {
-        Args: { user_id: string; org_id: string }
-        Returns: boolean
-      }
       is_paying_and_good_plan_org: {
         Args: { orgid: string }
         Returns: boolean
@@ -1841,6 +1868,30 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      reset_and_seed_app_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_and_seed_stats_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      reset_app_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
       set_bandwidth_exceeded_by_org: {
         Args: { org_id: string; disabled: boolean }
         Returns: undefined
@@ -1857,6 +1908,10 @@ export type Database = {
         Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
       }
+      upsert_version_meta: {
+        Args: { p_app_id: string; p_version_id: number; p_size: number }
+        Returns: boolean
+      }
       verify_mfa: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -1864,10 +1919,8 @@ export type Database = {
     }
     Enums: {
       action_type: "mau" | "storage" | "bandwidth"
-      app_mode: "prod" | "dev" | "livereload"
       disable_update: "major" | "minor" | "patch" | "version_number" | "none"
       key_mode: "read" | "write" | "all" | "upload"
-      pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
         | "delete"
@@ -1923,7 +1976,7 @@ export type Database = {
         | "failed"
         | "deleted"
         | "canceled"
-      usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
+      usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
         | "invite_read"
         | "invite_upload"
@@ -1943,9 +1996,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      match_plan: {
-        name: string | null
       }
       message_update: {
         msg_id: number | null
@@ -2082,13 +2132,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth"],
-      app_mode: ["prod", "dev", "livereload"],
       disable_update: ["major", "minor", "patch", "version_number", "none"],
       key_mode: ["read", "write", "all", "upload"],
-      pay_as_you_go_type: ["base", "units"],
       platform_os: ["ios", "android"],
       stats_action: [
         "delete",
@@ -2146,7 +2197,7 @@ export const Constants = {
         "deleted",
         "canceled",
       ],
-      usage_mode: ["5min", "day", "month", "cycle", "last_saved"],
+      usage_mode: ["last_saved", "5min", "day", "cycle"],
       user_min_right: [
         "invite_read",
         "invite_upload",
@@ -2164,3 +2215,4 @@ export const Constants = {
     },
   },
 } as const
+
