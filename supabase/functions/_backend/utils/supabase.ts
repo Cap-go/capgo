@@ -677,14 +677,11 @@ export function trackMetaSB(
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
   return supabaseAdmin(c)
-    .from('version_meta')
-    .insert([
-      {
-        app_id,
-        version_id,
-        size,
-      },
-    ])
+    .rpc('upsert_version_meta', {
+      p_app_id: app_id,
+      p_version_id: version_id,
+      p_size: size,
+    })
 }
 
 export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {

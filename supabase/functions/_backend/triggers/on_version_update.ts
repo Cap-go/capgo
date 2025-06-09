@@ -132,7 +132,9 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find version meta', id: record.id })
     return c.json(BRES)
   }
-  await createStatsMeta(c, record.app_id, record.id, -data.size)
+  const { error: errorCreateStatsMeta } = await createStatsMeta(c, record.app_id, record.id, -data.size)
+  if (errorCreateStatsMeta)
+    cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error: errorCreateStatsMeta })
   // set app_versions_meta versionSize = 0
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('app_versions_meta')
