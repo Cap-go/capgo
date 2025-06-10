@@ -163,3 +163,96 @@ BEGIN
     ) dups
   );
 END $$;
+
+-- Additional cleanup: Handle orphaned delete records
+
+-- Step 1: Delete orphaned delete records (have delete but no create AND not in app_versions)
+DO $$ 
+DECLARE
+  orphaned_deletes_count INTEGER;
+BEGIN
+  -- Count orphaned deletes before removal
+  SELECT COUNT(DISTINCT (vm_negative.app_id, vm_negative.version_id)) INTO orphaned_deletes_count
+  FROM version_meta vm_negative
+  WHERE vm_negative.size < 0
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM version_meta vm_positive 
+      WHERE vm_positive.app_id = vm_negative.app_id 
+      AND vm_positive.version_id = vm_negative.version_id 
+      AND vm_positive.size > 0
+  )
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM app_versions av 
+      WHERE av.app_id = vm_negative.app_id 
+      AND av.id = vm_negative.version_id
+  );
+
+  RAISE NOTICE 'Found % orphaned delete records to remove', orphaned_deletes_count;
+
+  -- Delete the orphaned delete records
+  DELETE FROM version_meta vm_negative
+  WHERE vm_negative.size < 0
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM version_meta vm_positive 
+      WHERE vm_positive.app_id = vm_negative.app_id 
+      AND vm_positive.version_id = vm_negative.version_id 
+      AND vm_positive.size > 0
+  )
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM app_versions av 
+      WHERE av.app_id = vm_negative.app_id 
+      AND av.id = vm_negative.version_id
+  );
+
+  RAISE NOTICE 'Removed % orphaned delete records', orphaned_deletes_count;
+END $$;
+
+-- Step 2: Add missing create records for deletes that have corresponding app_versions
+DO $$ 
+DECLARE
+  missing_creates_count INTEGER;
+BEGIN
+  -- Count missing creates before adding
+  SELECT COUNT(DISTINCT (vm_negative.app_id, vm_negative.version_id)) INTO missing_creates_count
+  FROM version_meta vm_negative
+  WHERE vm_negative.size < 0
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM version_meta vm_positive 
+      WHERE vm_positive.app_id = vm_negative.app_id 
+      AND vm_positive.version_id = vm_negative.version_id 
+      AND vm_positive.size > 0
+  )
+  AND EXISTS (
+      SELECT 1 
+      FROM app_versions av 
+      WHERE av.app_id = vm_negative.app_id 
+      AND av.id = vm_negative.version_id
+  );
+
+  RAISE NOTICE 'Found % delete records missing corresponding create records', missing_creates_count;
+
+  -- Insert missing create records using app_versions.created_at as timestamp
+  INSERT INTO version_meta (timestamp, app_id, version_id, size)
+  SELECT DISTINCT
+      av.created_at,
+      vm_negative.app_id,
+      vm_negative.version_id,
+      ABS(vm_negative.size) -- Convert negative size to positive
+  FROM version_meta vm_negative
+  JOIN app_versions av ON av.app_id = vm_negative.app_id AND av.id = vm_negative.version_id
+  WHERE vm_negative.size < 0
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM version_meta vm_positive 
+      WHERE vm_positive.app_id = vm_negative.app_id 
+      AND vm_positive.version_id = vm_negative.version_id 
+      AND vm_positive.size > 0
+  );
+
+  RAISE NOTICE 'Added % missing create records', missing_creates_count;
+END $$;

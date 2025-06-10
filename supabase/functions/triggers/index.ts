@@ -10,6 +10,7 @@ import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_vers
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
 import { app as cron_plan } from '../_backend/triggers/cron_plan.ts'
 import { app as cron_stats } from '../_backend/triggers/cron_stats.ts'
+import { app as cron_hourly_storage } from '../_backend/triggers/cron_hourly_storage.ts'
 import { app as logsnag_insights } from '../_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../_backend/triggers/on_app_delete.ts'
@@ -67,6 +68,7 @@ appGlobal.route('/on_organization_create', on_organization_create)
 appGlobal.route('/cron_stats', cron_stats)
 appGlobal.route('/cron_plan', cron_plan)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
+appGlobal.route('/cron_hourly_storage', cron_hourly_storage)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)

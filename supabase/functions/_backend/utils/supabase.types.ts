@@ -1082,6 +1082,67 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_hourly: {
+        Row: {
+          app_id: string
+          date: string
+          id: number
+          size: number
+        }
+        Insert: {
+          app_id: string
+          date: string
+          id?: number
+          size: number
+        }
+        Update: {
+          app_id?: string
+          date?: string
+          id?: number
+          size?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_hourly_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+        ]
+      }
+      storage_hourly_cache: {
+        Row: {
+          app_id: string
+          cache: Json
+          created_at: string | null
+          id: number
+          updated_at: string | null
+        }
+        Insert: {
+          app_id: string
+          cache: Json
+          created_at?: string | null
+          id?: number
+          updated_at?: string | null
+        }
+        Update: {
+          app_id?: string
+          cache?: Json
+          created_at?: string | null
+          id?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_hourly_cache_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+        ]
+      }
       storage_usage: {
         Row: {
           app_id: string
