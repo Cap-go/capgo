@@ -877,8 +877,25 @@ BEGIN
         DateSeries ds
     LEFT JOIN 
         public.daily_mau dm ON aa.app_id = dm.app_id AND ds.date = dm.date
-    LEFT JOIN 
-        public.daily_storage dst ON aa.app_id = dst.app_id AND ds.date = dst.date
+    LEFT JOIN LATERAL (
+        SELECT sh.size as storage
+        FROM public.storage_hourly sh
+        WHERE sh.app_id = aa.app_id 
+        AND (
+            -- Check for midnight of next day first (most accurate end-of-day value)
+            (sh.date = (ds.date + INTERVAL '1 day')::date AND EXTRACT(HOUR FROM sh.date) = 0)
+            OR 
+            -- Otherwise get latest from current date
+            sh.date::date = ds.date
+        )
+        ORDER BY 
+            CASE 
+                WHEN sh.date::date = (ds.date + INTERVAL '1 day')::date AND EXTRACT(HOUR FROM sh.date) = 0 THEN 1
+                ELSE 2
+            END,
+            sh.date DESC
+        LIMIT 1
+    ) dst ON true
     LEFT JOIN 
         public.daily_bandwidth db ON aa.app_id = db.app_id AND ds.date = db.date
     LEFT JOIN 
