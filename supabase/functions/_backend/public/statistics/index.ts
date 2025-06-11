@@ -250,7 +250,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   }
 
   let mau = createUndefinedArray(graphDays) as number[]
-  let storage = createUndefinedArray(graphDays) as number[]
+  const storage = createUndefinedArray(graphDays) as number[]
   let bandwidth = createUndefinedArray(graphDays) as number[]
   let gets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
 
@@ -319,7 +319,6 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
     storage[0] = initValue
   }
 
-  // eslint-disable-next-line style/max-statements-per-line
   // storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
   // eslint-disable-next-line style/max-statements-per-line
   mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
