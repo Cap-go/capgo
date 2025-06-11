@@ -8,10 +8,11 @@ CREATE TABLE storage_hourly_cache (
 );
 
 -- Create index on app_id for better query performance
-CREATE INDEX idx_storage_hourly_cache_app_id ON storage_hourly_cache(app_id);
+CREATE UNIQUE INDEX idx_storage_hourly_cache_app_id ON storage_hourly_cache(app_id);
 
 -- Create index on created_at for time-based queries
 CREATE INDEX idx_storage_hourly_cache_created_at ON storage_hourly_cache(created_at);
+
 
 -- Create storage_hourly table
 CREATE TABLE storage_hourly (
@@ -33,3 +34,5 @@ CREATE UNIQUE INDEX idx_storage_hourly_app_id_date ON storage_hourly(app_id, dat
 -- Enable RLS for both tables
 ALTER TABLE storage_hourly_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE storage_hourly ENABLE ROW LEVEL SECURITY;
+
+UPDATE plans set storage = plans.storage * 31 * 24;

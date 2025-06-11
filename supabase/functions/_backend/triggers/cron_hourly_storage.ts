@@ -9,6 +9,8 @@ import dayjs from "dayjs"
 import { sendDiscordAlert } from "../utils/discord.ts"
 import { Context } from "@hono/hono"
 import utc from 'dayjs/plugin/utc'
+import { closeClient, getPgClient } from "../utils/pg.ts"
+import { Database } from "../utils/supabase.types.ts"
 
 dayjs.extend(utc)
 
@@ -17,6 +19,85 @@ export const app = new Hono<MiddlewareKeyVariables>()
 const inputBodySchema = z.object({
     app_id: z.string()
 })
+
+const maxCacheAge = 65; // 1 hour 5 minutes in minutes
+
+const cacheSchema = z.object({
+    storageChanges: z.array(z.object({
+        version: z.coerce.number(),
+        storage_added: z.string().datetime().optional(),
+        storage_removed: z.string().datetime().optional(),
+        size: z.coerce.number()
+    }))
+})
+
+const cacheFinalSchema = z.object({
+    storageChanges: z.array(z.object({
+        version: z.coerce.number(),
+        storage_added: z.string().datetime().optional(),
+        storage_removed: z.string().datetime().optional(),
+        size: z.coerce.number()
+    })),
+    cacheModified: z.string().datetime()
+})
+
+// Cache helper functions
+async function getCacheForApp(supabase: any, app_id: string) {
+    const { data, error } = await supabase
+        .from('storage_hourly_cache')
+        .select('cache, updated_at')
+        .eq('app_id', app_id)
+        .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error getting cache:', error)
+        return null
+    }
+
+    if (!data) {
+        return null
+    }
+
+    const cache = cacheFinalSchema.safeParse(data.cache)
+
+    if (!cache.success) {
+        cloudlogErr(cache.error)
+        return null
+    }
+
+    const cacheModified = dayjs(cache.data.cacheModified)
+    const now = dayjs()
+    const diff = now.diff(cacheModified, 'milliseconds')
+    if (diff > maxCacheAge * 60 * 1000) {
+        return null
+    }
+
+    return cache.data
+}
+
+async function setCacheForApp(supabase: any, app_id: string, cacheData: z.infer<typeof cacheSchema>, cacheDate: Dayjs) {
+    const finalCache = {
+        ...cacheData,
+        cacheModified: cacheDate.toISOString()
+    }
+    const { error } = await supabase
+        .from('storage_hourly_cache')
+        .upsert({
+            app_id,
+            cache: finalCache,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'app_id'
+        })
+
+    if (error) {
+        console.error('Error setting cache:', error)
+        return false
+    }
+
+    return true
+}
+
 // This will be called by a cron job every hour
 // For now, we won't do cache, but later we will
 app.post('/', middlewareAPISecret, async (c) => {
@@ -48,11 +129,35 @@ app.post('/', middlewareAPISecret, async (c) => {
         if (diffDays > 34)
             return c.json({ status: 'Billing date is more than 34 days apart' }, 400)
 
+        // Step three and a half: get the cache
+        const cache = await getCacheForApp(supabase, app_id)
+
         // Step four: get the storage per hour raw data
-        const { data, error } = await supabase.from('version_meta').select('*').eq('app_id', app_id).limit(100_000)
+        let data: any = null
+        let error: any = null
+        let date: Dayjs | null = null
+        try {
+            const pgClient = getPgClient(c as any)
+            if (cache) {
+                data = await pgClient`select * from version_meta where app_id = ${app_id} and timestamp > ${cache.cacheModified}`
+                date = dayjs(cache.cacheModified)
+            } else {
+                data = await pgClient`select * from version_meta where app_id = ${app_id}`
+                date = dayjs()
+            }
+            closeClient(c as any, pgClient)
+        } catch (e) {
+            error = e
+            data = null
+        }
+
         if (error) {
             console.error(error)
             return c.json({ status: 'Cannot get storage per hour', error: JSON.stringify(error) }, 500)
+        }
+
+        if (!data) {
+            return c.json({ status: 'No data received' }, 500)
         }
 
         // Step five: generate an array of the hours between the start and end date
@@ -68,10 +173,10 @@ app.post('/', middlewareAPISecret, async (c) => {
         }
 
         // Step six: Generate a reference map for each version. It will contain the creation and deletion timestamps
-
-        const semiSortedData: typeof data = []
-        const positiveData: typeof data = []
-        const negativeData: typeof data = []
+        // Here we take very different approaches if the cache is valid or not.
+        const semiSortedData: Database['public']['Tables']['version_meta']['Row'][] = []
+        const positiveData: Database['public']['Tables']['version_meta']['Row'][] = []
+        const negativeData: Database['public']['Tables']['version_meta']['Row'][] = []
         for (const item of data) {
             if (item.size > 0) {
                 positiveData.push(item)
@@ -82,6 +187,14 @@ app.post('/', middlewareAPISecret, async (c) => {
 
         semiSortedData.push(...positiveData)
         semiSortedData.push(...negativeData)
+
+        const acc = new Map<number, { storage_added: Dayjs | null, storage_removed: Dayjs | null, size: number }>()
+
+        if (cache) {
+            for (const item of cache.storageChanges) {
+                acc.set(item.version, { storage_added: item.storage_added ? dayjs(item.storage_added) : null, storage_removed: item.storage_removed ? dayjs(item.storage_removed) : null, size: item.size })
+            }
+        }
 
         const storageChanggesPerVersion = semiSortedData.reduce((acc, item) => {
             if (item.size > 0) {
@@ -105,7 +218,23 @@ app.post('/', middlewareAPISecret, async (c) => {
                 acc.set(item.version_id, itemInfo)
             }
             return acc
-        }, new Map<number, { storage_added: Dayjs | null, storage_removed: Dayjs | null, size: number }>())
+        }, acc)
+
+        const cacheData = cacheSchema.safeParse({
+            storageChanges: Array.from(storageChanggesPerVersion.entries()).map(([version, x]) => ({
+                version,
+                storage_added: x.storage_added?.toISOString(),
+                storage_removed: x.storage_removed?.toISOString(),
+                size: x.size
+            }))
+        })
+
+        // We messed up the schema, don't do cache
+        if (!cacheData.success) {
+            cloudlogErr(cacheData.error)
+        } else {
+            await setCacheForApp(supabase, app_id, cacheData.data, date!)
+        }
 
         // Step seven: Generate the storage per hour data
         const now = dayjs()

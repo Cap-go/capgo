@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { computed } from 'vue'
 import InformationInfo from '~icons/heroicons/information-circle'
+import ExclamationCircle from '~icons/heroicons/exclamation-circle'
 
 import { getDaysInCurrentMonth } from '~/services/date'
 import { useMainStore } from '~/stores/main'
@@ -11,6 +12,10 @@ const props = defineProps({
   title: { type: String, default: '' },
   unit: { type: String, default: '' },
   colors: { type: Object, default: () => ({}) },
+  storage: {
+    type: Boolean,
+    default: false,
+  },
   limits: {
     type: Object,
     default: () => ({
@@ -89,7 +94,7 @@ function nextRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="tooltip tooltip-bottom">
+        <div class="tooltip tooltip-bottom mb-2">
           <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
             <div class="max-w-xs whitespace-normal">
               {{ lastRunDate() }}
@@ -103,6 +108,16 @@ function nextRunDate() {
           </div>
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
             <InformationInfo class="hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
+          </div>
+        </div>
+        <div v-if="props.storage" class="font-medium badge badge-error self-end ml-auto mb-2">
+          <div class="tooltip tooltip-bottom">
+            <ExclamationCircle class="w-4 h-4" />
+            <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
+              <div class="max-w-xs whitespace-normal">
+                {{ t('storage-warning') }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
