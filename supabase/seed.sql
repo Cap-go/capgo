@@ -24,20 +24,14 @@ CREATE OR REPLACE FUNCTION "public"."reset_and_seed_data" () RETURNS "void" LANG
 SET
   search_path = '' SECURITY DEFINER AS $_$
 BEGIN
-    -- Truncate tables
+    -- Suppress cascade notices during truncation
+    SET LOCAL client_min_messages = WARNING;
+
+    -- Truncate main parent tables - CASCADE will handle dependencies
     TRUNCATE TABLE "auth"."users" CASCADE;
-    TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "storage"."buckets" CASCADE;
     TRUNCATE TABLE "public"."stripe_info" CASCADE;
-    TRUNCATE TABLE "public"."users" CASCADE;
-    TRUNCATE TABLE "public"."orgs" CASCADE;
-    TRUNCATE TABLE "public"."apikeys" CASCADE;
-    TRUNCATE TABLE "public"."apps" CASCADE;
-    TRUNCATE TABLE "public"."app_versions" CASCADE;
-    TRUNCATE TABLE "public"."app_versions_meta" CASCADE;
-    TRUNCATE TABLE "public"."channels" CASCADE;
-    TRUNCATE TABLE "public"."deploy_history" CASCADE;
-    TRUNCATE TABLE "public"."devices" CASCADE;
+    TRUNCATE TABLE "public"."plans" CASCADE;
     TRUNCATE TABLE "public"."capgo_credits_steps" CASCADE;
 
     -- Insert seed data
@@ -557,7 +551,7 @@ DECLARE
   random_version_id BIGINT := 3;
   random_action VARCHAR(20);
   random_timestamp TIMESTAMP;
-BEGIN
+BEGIN  
   -- Use advisory lock to prevent concurrent execution for the same app
   PERFORM pg_advisory_xact_lock(hashtext(p_app_id || '_stats'));
   
@@ -640,16 +634,21 @@ Requires:
 - pgsql-http: https://github.com/pramsey/pgsql-http
 -- */
 DO $$
+DECLARE
+    internet_available BOOLEAN := FALSE;
+    connectivity_error TEXT;
 BEGIN
     -- Only attempt dbdev installation if extensions are available
     IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'http') AND 
        EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_tle') THEN
         
+        -- Create extensions first
+        create extension if not exists http with schema extensions;
+        create extension if not exists pg_tle;
+        
+        -- Attempt dbdev installation directly, catching network errors
         BEGIN
-            create extension if not exists http with schema extensions;
-            create extension if not exists pg_tle;
             drop extension if exists "supabase-dbdev";
-            
             PERFORM pgtle.uninstall_extension_if_exists('supabase-dbdev');
             
             PERFORM pgtle.install_extension(
@@ -658,7 +657,7 @@ BEGIN
                 'PostgreSQL package manager',
                 resp.contents ->> 'sql'
             )
-            from http(
+            from extensions.http(
                 (
                     'GET',
                     'https://api.database.dev/rest/v1/'
@@ -686,11 +685,20 @@ BEGIN
                 drop extension if exists "supabase-dbdev";
                 create extension "supabase-dbdev";
                 PERFORM dbdev.install('basejump-supabase_test_helpers');
+                RAISE NOTICE 'supabase-dbdev extension installed successfully';
             END IF;
             
         EXCEPTION WHEN OTHERS THEN
-            -- Log the error but continue with seed data
-            RAISE NOTICE 'dbdev installation failed: %', SQLERRM;
+            -- Check if it's a network-related error
+            IF SQLERRM ILIKE '%could not connect%' OR 
+               SQLERRM ILIKE '%network%' OR 
+               SQLERRM ILIKE '%timeout%' OR 
+               SQLERRM ILIKE '%unreachable%' OR
+               SQLERRM ILIKE '%connection%' THEN
+                RAISE NOTICE 'No internet connection available - skipping supabase-dbdev installation';
+            ELSE
+                RAISE NOTICE 'dbdev installation failed: %', SQLERRM;
+            END IF;
         END;
     ELSE
         RAISE NOTICE 'Required extensions (http, pg_tle) not available for dbdev installation';
