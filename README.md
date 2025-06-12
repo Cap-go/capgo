@@ -32,11 +32,11 @@
 
 ## Features
 
-- ⚡️ Test webapp directly in your phone with native API
+- ⚡️ Test webapp directly on your phone with the native API
 
-- 😃 Share your dev with your teamate
+- 😃 Share your new features with your teammate
 
-- ↕️ Manage your channels for auto update system.
+- ↕️ Manage your channels for auto-update system
 
 <br>
 
@@ -48,7 +48,7 @@ https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
 
 ## Plugins
 
-All official plugin are install and preconfigured
+All the following official plugins are already installed and preconfigured:
 
 - [Action Sheet](https://github.com/ionic-team/capacitor-plugins/tree/main/action-sheet) -
   Provides access to native Action Sheets.
@@ -141,16 +141,16 @@ All official plugin are install and preconfigured
 
 ## Usage
 
-Capgo is deployed in production in Cloudflare workers, netlify and supabase.
+Capgo is deployed in production in Cloudflare workers, Netlify and Supabase.
 
 Cloudlare workers take 99% of the traffic. Supabase is used for internal calls,
-like cron database who call functions. Netlify is nor used it's a backup
+like CRON database that call functions. Netlify is not used: it's a backup for Cloudflare.
 
-When deploy self hosted you should look only at Supabase it will be enought.
+When deployed in self-hosted, you should only install Supabase, it will be enough.
 
 ### Deploy on Cloudflare Pages
 
-use the CLI to deploy preprod
+Use the CLI to deploy in preprod
 
 ```bash
 bun run dev-build
@@ -170,20 +170,20 @@ bun run deploy:cloudflare_frontend:prod
 
 You will need to start each local server in separate terminals.
 
-Before you continue, you need to have these installed:
+Before continuing, you need to have those installed:
 
 - [Docker](https://www.docker.com/)
 - [bun](https://bun.sh/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
 You can install the `supabase` CLI globally with `bun install supabase -g` and
-you can invoke `supabase` from anywhere.
+you'll be able to invoke `supabase` from anywhere.
 
-Alternatively, you can install the CLI inside this repo with
-`bun install supabase --save-dev` but to invoke it use:
+Alternatively, you can install the `supabase` CLI inside this repo with
+`bun install supabase --save-dev` but, to invoke it, you have to use:
 `./node_modules/supabase/bin/supabase`.
 
-The rest of this guide assumes that you installed the `supabase` CLI globally.
+In the following guideline, we will assume that you installed the `supabase` CLI globally.
 
 #### Start Supabase DB Locally
 
@@ -193,8 +193,7 @@ Start the Supabase DB:
 supabase start
 ```
 
-If the command completed successfully, your console output should be similar to
-the output below:
+If the command is completed successfully, your console should output:
 
 ```bash
 Started supabase local development setup.
@@ -209,15 +208,16 @@ Started supabase local development setup.
 service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
 ```
 
-#### Seed Supabase DB Locally
+#### Seed Supabase DB locally
 
-You need make sure Docker is running.
+[!WARNING]
+⚠️ Make sure that Docker is running.
 
 ```bash
 supabase db reset
 ```
 
-#### Start Frontend Locally
+#### Start Frontend locally
 
 ```bash
 bun install
@@ -235,18 +235,19 @@ There are two login credentials you can use:
 | Demo User  | test@capgo.app  | testtest   |
 | Admin User | admin@capgo.app | adminadmin |
 
-The _demo user_ account has some demo data in it. If the data is not fresh just
-reset the db with `supabase db reset`. The seed has been made in the way the
+The _demo user_ account has some demo data in it. If the data is not fresh, just
+reset the db with `supabase db reset`. The seed has been made in a way that ensure the
 data is always fresh.
 
-The _admin user_ has admininstrative rights so he can impersonate other users.
-You can find the menu for that in the account section.
+The _admin user_ account has admininstration rights so the user can impersonate other users.
+You can find the interface for that in the "Account" section.
 
 #### Supabase DB Reset
 
-Make sure you have Docker running.
+[!WARNING]
+⚠️ Make sure that Docker is running.
 
-This will seed the DB with demo data again.
+This will seed the DB with demo data.
 
 ```bash
 supabase db reset
@@ -254,12 +255,12 @@ supabase db reset
 
 ### Deploy Supabase self hosted
 
-To deploy the supabase instance self hosted, use the
+To deploy the supabase instance in self-hosted, use the
 [Supabase offical guide](https://supabase.com/docs/guides/self-hosting).
 
 ### Deploy Supabase cloud
 
-To deploy the supabase instance on cloud, you need a paid account at $25/month.
+To deploy the Supabase instance on cloud, you need a paid account, which costs $25/month.
 
 Link the project to the cloud with the following command:
 
@@ -299,11 +300,11 @@ supabase functions deploy
 
 ### Build
 
-To build the webApp in mobile, to push to store, run
+To build the web app in mobile, in order to push to mobile stores, run:
 
 ```bash
 bun install
 bun mobile
 ```
 
-And you will see the generated file in `dist` that ready to be served.
+And you will see the generated files in the `dist` directory, ready to be served on stores.
