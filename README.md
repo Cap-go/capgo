@@ -219,7 +219,7 @@ supabase db reset
 
 ```bash
 bun install
-bun serve-dev
+bun serve:dev
 ```
 
 #### Login
