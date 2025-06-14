@@ -32,11 +32,11 @@
 
 ## Features
 
-- ⚡️ Test webapp directly in your phone with native API
+- ⚡️ Test the web app directly on your phone using the native API
 
-- 😃 Share your dev with your teamate
+- 😃 Share your new features with your teammates
 
-- ↕️ Manage your channels for auto update system.
+- ↕️ Manage your channels for auto-update system
 
 <br>
 
@@ -44,11 +44,11 @@
 
 https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
 
-- [Changing supabase](supabase/migration_guide.md)
+- [Changing Supabase](supabase/migration_guide.md)
 
 ## Plugins
 
-All official plugin are install and preconfigured
+All the following official plugins are already installed and pre-configured:
 
 - [Action Sheet](https://github.com/ionic-team/capacitor-plugins/tree/main/action-sheet) -
   Provides access to native Action Sheets.
@@ -122,7 +122,7 @@ All official plugin are install and preconfigured
 ### Dev tools
 
 - [TypeScript](https://www.typescriptlang.org/)
-- [bun](https://bun.sh/) - fast javascipt runtime, package manager, bundler,
+- [bun](https://bun.sh/) - fast javascript runtime, package manager, bundler,
   test runner an all-in-one toolkit
 - [critters](https://github.com/GoogleChromeLabs/critters) - Critical CSS
 - [Cloudflare](https://www.cloudflare.com/) - zero-config deployment
@@ -141,16 +141,15 @@ All official plugin are install and preconfigured
 
 ## Usage
 
-Capgo is deployed in production in Cloudflare workers, netlify and supabase.
+Capgo is deployed to production on Cloudflare workers, Netlify and Supabase.
 
-Cloudlare workers take 99% of the traffic. Supabase is used for internal calls,
-like cron database who call functions. Netlify is nor used it's a backup
+Cloudflare workers take 99% of the traffic. Supabase is used for internal calls, for internal tasks such as CRON jobs that call functions. Netlify is used only as a backup for Cloudflare.
 
-When deploy self hosted you should look only at Supabase it will be enought.
+When self-hosted, installing only Supabase is sufficient.
 
 ### Deploy on Cloudflare Pages
 
-use the CLI to deploy preprod
+Use the CLI to deploy to preprod
 
 ```bash
 bun run dev-build
@@ -170,20 +169,19 @@ bun run deploy:cloudflare_frontend:prod
 
 You will need to start each local server in separate terminals.
 
-Before you continue, you need to have these installed:
+Before continuing, ensure you have the following installed:
 
 - [Docker](https://www.docker.com/)
 - [bun](https://bun.sh/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
-You can install the `supabase` CLI globally with `bun install supabase -g` and
-you can invoke `supabase` from anywhere.
+You can install the `supabase` CLI globally with `bun install supabase -g` and you'll be able to invoke `supabase` from anywhere.
 
-Alternatively, you can install the CLI inside this repo with
-`bun install supabase --save-dev` but to invoke it use:
+Alternatively, you can install the `supabase` CLI locally with
+`bun install supabase --save-dev` but, to invoke it, you have to use:
 `./node_modules/supabase/bin/supabase`.
 
-The rest of this guide assumes that you installed the `supabase` CLI globally.
+In the following guideline, we will assume that you have installed the `supabase` CLI globally.
 
 #### Start Supabase DB Locally
 
@@ -193,8 +191,7 @@ Start the Supabase DB:
 supabase start
 ```
 
-If the command completed successfully, your console output should be similar to
-the output below:
+If the command is completed successfully, your console should output:
 
 ```bash
 Started supabase local development setup.
@@ -209,19 +206,20 @@ Started supabase local development setup.
 service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
 ```
 
-#### Seed Supabase DB Locally
+#### Seed Supabase DB locally
 
-You need make sure Docker is running.
+[!WARNING]
+⚠️ Ensure Docker is running.
 
 ```bash
 supabase db reset
 ```
 
-#### Start Frontend Locally
+#### Start Frontend locally
 
 ```bash
 bun install
-bun serve-dev
+bun serve:dev
 ```
 
 #### Login
@@ -235,18 +233,19 @@ There are two login credentials you can use:
 | Demo User  | test@capgo.app  | testtest   |
 | Admin User | admin@capgo.app | adminadmin |
 
-The _demo user_ account has some demo data in it. If the data is not fresh just
-reset the db with `supabase db reset`. The seed has been made in the way the
+The _demo user_ account has some demo data in it. If the data is not fresh, just
+reset the db with `supabase db reset`. The seed has been made in a way that ensures the
 data is always fresh.
 
-The _admin user_ has admininstrative rights so he can impersonate other users.
-You can find the menu for that in the account section.
+The _admin user_ account has administration rights so the user can impersonate other users.
+You can find the interface for that in the "Account" section.
 
 #### Supabase DB Reset
 
-Make sure you have Docker running.
+[!WARNING]
+⚠️ Ensure Docker is running.
 
-This will seed the DB with demo data again.
+This will seed the DB with demo data.
 
 ```bash
 supabase db reset
@@ -254,12 +253,12 @@ supabase db reset
 
 ### Deploy Supabase self hosted
 
-To deploy the supabase instance self hosted, use the
-[Supabase offical guide](https://supabase.com/docs/guides/self-hosting).
+To deploy the supabase instance in self-hosted, use the
+[Supabase official guide](https://supabase.com/docs/guides/self-hosting).
 
 ### Deploy Supabase cloud
 
-To deploy the supabase instance on cloud, you need a paid account at $25/month.
+To deploy the Supabase instance on cloud, you need a paid account, which costs $25/month.
 
 Link the project to the cloud with the following command:
 
@@ -299,11 +298,11 @@ supabase functions deploy
 
 ### Build
 
-To build the webApp in mobile, to push to store, run
+To build the web app in mobile, in order to push to mobile stores, run:
 
 ```bash
 bun install
 bun mobile
 ```
 
-And you will see the generated file in `dist` that ready to be served.
+And you will see the generated files in the `dist` directory, ready to be served on stores.
