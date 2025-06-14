@@ -5,7 +5,7 @@
       "name": "capgo-app",
       "dependencies": {
         "@aws-sdk/client-s3": "^3.821.0",
-        "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.0",
+        "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.1",
         "@capacitor-community/in-app-review": "^7.0.0",
         "@capacitor-community/keep-awake": "^7.0.0",
         "@capacitor/action-sheet": "^7.0.1",
@@ -428,7 +428,7 @@
 
     "@babel/types": ["@babel/types@7.27.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.25.9", "@babel/helper-validator-identifier": "^7.25.9" } }, "sha512-H45s8fVLYjbhFH62dIJ3WtmJ6RSPt/3DRO0ZcT2SUiYiQyz3BLVb9ADEnLl91m74aQPS3AzzeajZHYOalWe3bg=="],
 
-    "@bradenmacdonald/s3-lite-client": ["@jsr/bradenmacdonald__s3-lite-client@0.9.0", "https://npm.jsr.io/~/11/@jsr/bradenmacdonald__s3-lite-client/0.9.0.tgz", {}, "sha512-EMuyyi6UPcr/ILsf13illKH+YlF16LnwIPptqs/LLUr/GHrMtEG5QzoLZZ0bXr3njk+v5/vIMJq4eNar3k2niQ=="],
+    "@bradenmacdonald/s3-lite-client": ["@jsr/bradenmacdonald__s3-lite-client@0.9.1", "https://npm.jsr.io/~/11/@jsr/bradenmacdonald__s3-lite-client/0.9.1.tgz", {}, "sha512-XnAxxeuEOE5QMnkAswPpmT/kEQHKFPI/aF2SOb/m2lnQdrmN05cPOFU9d5iB2HJ5FdILi/Vu6lLMTADTFANgaQ=="],
 
     "@capacitor-community/in-app-review": ["@capacitor-community/in-app-review@7.0.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-4byRlQuQQX4vgacIMF24bVmC2iM7uVplvKjXnjJtbvW2lVq+aSKUM39tuTzdXJqJEV/KblPtyIxLZNUEynReRw=="],
 
