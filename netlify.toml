@@ -116,7 +116,7 @@ for = "/manifest.webmanifest"
 Content-Type = "application/manifest+json"
 
 [functions]
-deno_import_map = "./supabase/functions/import_map.json"
+deno_import_map = "./supabase/functions/deno.json"
 
 [[edge_functions]]
 path = "/api-edge/channel_self"
