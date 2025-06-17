@@ -142,7 +142,7 @@ onMounted(() => {
                     }"
                   />
                 </div>
-                <img v-if="!!app.icon_url" :src="app.icon_url" class="w-[78px] h-[78px] rounded-full">
+                <img v-if="!!app.icon_url" :src="app.icon_url" :alt="app.name ?? 'App Icon'" class="w-[78px] h-[78px] rounded-full">
                 <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
                   <span class="font-medium text-gray-300">
                     {{ calculateAcronym(app.name ?? 'Unknown App') }}
