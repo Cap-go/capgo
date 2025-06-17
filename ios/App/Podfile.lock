@@ -70,7 +70,7 @@ PODS:
     - Capacitor
   - CapgoCapacitorNativeBiometric (0.0.1):
     - Capacitor
-  - CapgoCapacitorScreenRecorder (7.1.8):
+  - CapgoCapacitorScreenRecorder (7.1.9):
     - Capacitor
   - CapgoCapacitorUpdater (7.2.6):
     - Alamofire (= 5.10.2)
@@ -80,7 +80,7 @@ PODS:
     - Version (= 0.8.0)
   - CapgoInappbrowser (7.10.0):
     - Capacitor
-  - CapgoNativeAudio (7.3.32):
+  - CapgoNativeAudio (7.3.33):
     - Capacitor
   - CapgoNativeMarket (0.0.1):
     - Capacitor
@@ -269,10 +269,10 @@ SPEC CHECKSUMS:
   CapgoCapacitorFlash: cf9699d50b5c01a44f94ca28aa7ea02677bb4196
   CapgoCapacitorMute: 7eaaf948bf463e7db0ca7c588fec0680fb7d7704
   CapgoCapacitorNativeBiometric: ef4244ffac92fb918ec8aaf19dc0aaef54e24a99
-  CapgoCapacitorScreenRecorder: 2b22b04734ad5f8bde8ad5d2a3e59411cf53f674
+  CapgoCapacitorScreenRecorder: 45286f49ac71a5c2eef874b6211a0995247d9500
   CapgoCapacitorUpdater: a91acd03fa23e119317704319deb3932e11cf197
   CapgoInappbrowser: 8e0b4b6bd8238b1abe1eba34791a4da117325eb7
-  CapgoNativeAudio: 06a0ef9542ac82966fac164a3549ce3d10e8caee
+  CapgoNativeAudio: b1d207d8279259c9feac83cbfadb7f346cd104f2
   CapgoNativeMarket: 5f74fd7e2b40ba85c5fcf3fd6f5196e5eb619fb9
   Crisp: 6747c96b2b2c2a81babf1eaecd1688a65d98edd4
   IONFilesystemLib: ceacae793975039530458eabab0c495c70515a0d

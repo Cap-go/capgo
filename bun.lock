@@ -39,10 +39,10 @@
         "@capgo/capacitor-flash": "^7.0.6",
         "@capgo/capacitor-mute": "^7.1.39",
         "@capgo/capacitor-native-biometric": "^7.1.7",
-        "@capgo/capacitor-screen-recorder": "7.1.8",
+        "@capgo/capacitor-screen-recorder": "7.1.9",
         "@capgo/capacitor-updater": "^7.2.6",
         "@capgo/inappbrowser": "^7.10.0",
-        "@capgo/native-audio": "^7.3.32",
+        "@capgo/native-audio": "^7.3.33",
         "@capgo/native-market": "^7.1.5",
         "@capgo/tailwind-capacitor": "^1.0.10",
         "@formkit/auto-animate": "0.8.2",
@@ -502,13 +502,13 @@
 
     "@capgo/capacitor-native-biometric": ["@capgo/capacitor-native-biometric@7.1.7", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-H0wvqYjuTWrf+ioy63ZGXtIDcoKDRvPlSD/gllWy9sRqFN0tb+AzgJxpoaoOsLYxPWNfxelJkjWlrUX1REtA2Q=="],
 
-    "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@7.1.8", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-YlOspqKQoDubQBZfsxLXdeY1JVnd9RN4cY9KYZOH4BeKLVshf03a7a2K1nQsVCx2WtrxA45oi+g5ACa6PAntLQ=="],
+    "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@7.1.9", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-extcX94S0u1W1LzCKcnUrM/yXEQ6YdJDjpqRHTTd7PurcCFHrvH4/kADm5qLe6RseInTn+/OX8kJZCRWPt0jfA=="],
 
     "@capgo/capacitor-updater": ["@capgo/capacitor-updater@7.2.6", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-7dz8TiMlyQFjRJbIR78i6+ozpUhHCqiB6d0f/Dc8nkmhK01J94S336sKnUV3+WdwORWnarnE0v+IKTAyIevFIQ=="],
 
     "@capgo/inappbrowser": ["@capgo/inappbrowser@7.10.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-ynhM0tHkfk2tsHKZC8QuVvnNJ/n34YJ3qrFSddv8pE4LGYhxxo7p85Jd368CwpM4VL0QwaDydg0PEV1yGP/Iuw=="],
 
-    "@capgo/native-audio": ["@capgo/native-audio@7.3.32", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-lnpNqnuvlspcuJdns7kwp7FSl6ebk8I1EeL4cz83PF+hqhC4tjmc4vfFb5icQPQgSPRbqQHAhZW1BYhMAhAENw=="],
+    "@capgo/native-audio": ["@capgo/native-audio@7.3.33", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-XyvjkZ8+kN08y108mR5pPjYKnljaatalJEpPjGkZK8Opg/udHRGqitfutlwUG8jOSdD/Rp4rJGq+2lekoP/AMQ=="],
 
     "@capgo/native-market": ["@capgo/native-market@7.1.5", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-sahIp53A0A2YOegbhq+DZyVpZrnEuPboQ7OlhppwtWQ5n3NEvN2zSb8Nlz5Sic4o5Q3QXT9T4tTKTvyjD/nkMA=="],
 
