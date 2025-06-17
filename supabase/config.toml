@@ -294,51 +294,65 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.ok]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.bundle]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.device]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.channel]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.organization]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.app]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 # PLUGIN ENDPOINTS
 
 [functions.channel_self]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.updates]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.stats]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 # PRIVATE ENDPOINTS
 
 [functions.private]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 # STATISTICS ENDPOINTS
 [functions.statistics]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 # TRIGGERS ENDPOINTS
 
 [functions.triggers]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.apikey]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 # FILES ENDPOINTS
 
 [functions.files]
 verify_jwt = false
+import_map = "./functions/deno.json"

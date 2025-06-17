@@ -266,11 +266,17 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
       break
     }
     case 'NO_EMAIL': {
-      displayStore.showInviteNewUserWithoutAccountDialog = {
-        email,
-        role: type,
-        orgId: currentOrganization.value?.gid ?? '',
-        refreshFunction: reloadData,
+      const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
+      if (captchaKey) {
+        displayStore.showInviteNewUserWithoutAccountDialog = {
+          email,
+          role: type,
+          orgId: currentOrganization.value?.gid ?? '',
+          refreshFunction: reloadData,
+        }
+      }
+      else {
+        toast.error(t('cannot_invite_user_without_account'))
       }
       break
     }
