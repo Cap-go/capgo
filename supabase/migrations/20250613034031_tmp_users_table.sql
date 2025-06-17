@@ -32,7 +32,7 @@ ALTER TABLE public.tmp_users ENABLE ROW LEVEL SECURITY;
 -- Function to transform role to invite_role
 CREATE OR REPLACE FUNCTION public.transform_role_to_invite (role_input public.user_min_right) RETURNS public.user_min_right LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 BEGIN
   CASE role_input
     WHEN 'read'::public.user_min_right THEN RETURN 'invite_read'::public.user_min_right;
@@ -67,7 +67,7 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members" (user_id "uuid", "guild_id
   "is_tmp" boolean
 ) LANGUAGE "plpgsql" SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 begin
   return query select o.id as aid, users.id as uid, users.email, users.image_url, o.user_right as role, false as is_tmp from org_users as o
   join users on users.id = o.user_id
@@ -98,7 +98,7 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members" ("guild_id" "uuid") RETURN
   "is_tmp" boolean
 ) LANGUAGE "plpgsql" SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 begin
   IF NOT (public.check_min_rights('read'::public.user_min_right, (select auth.uid()), get_org_members.guild_id, NULL::character varying, NULL::bigint)) THEN
     raise exception 'NO_RIGHTS';
@@ -122,7 +122,7 @@ CREATE OR REPLACE FUNCTION "public"."invite_user_to_org" (
   "invite_type" "public"."user_min_right"
 ) RETURNS character varying LANGUAGE "plpgsql" SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 Declare  
   org record;
   invited_user record;
@@ -248,7 +248,7 @@ EXECUTE ON FUNCTION "public"."rescind_invitation" (TEXT, UUID) TO authenticated;
 -- Function to transform invite_role to regular role
 CREATE OR REPLACE FUNCTION public.transform_role_to_non_invite (role_input public.user_min_right) RETURNS public.user_min_right LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 BEGIN
   CASE role_input
     WHEN 'invite_read'::public.user_min_right THEN RETURN 'read'::public.user_min_right;
@@ -276,7 +276,7 @@ CREATE OR REPLACE FUNCTION "public"."modify_permissions_tmp" (
   "new_role" "public"."user_min_right"
 ) RETURNS character varying LANGUAGE "plpgsql" SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 DECLARE
   tmp_user record;
   org record;
@@ -346,7 +346,7 @@ CREATE OR REPLACE FUNCTION "public"."get_invite_by_magic_lookup" ("lookup" TEXT)
   role public.user_min_right
 ) LANGUAGE "plpgsql" SECURITY DEFINER
 SET
-  search_path = 'public' AS $$
+  search_path = '' AS $$
 BEGIN
   RETURN QUERY 
   SELECT 
@@ -371,7 +371,7 @@ EXECUTE ON FUNCTION "public"."get_invite_by_magic_lookup" (TEXT) TO authenticate
 
 CREATE OR REPLACE FUNCTION "public"."check_org_user_privilages" () RETURNS "trigger" LANGUAGE "plpgsql"
 SET
-  search_path = 'public' AS $$BEGIN
+  search_path = '' AS $$BEGIN
   
   -- here we check if the user is a service role in order to bypass this permission check
   IF (((SELECT auth.jwt() ->> 'role')='service_role') OR ((select current_user) IS NOT DISTINCT FROM 'postgres')) THEN
