@@ -20,6 +20,7 @@ declare module 'vue' {
     Dashboard: typeof import('./components/dashboard/Dashboard.vue')['default']
     DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
     Dialog: typeof import('./components/Dialog.vue')['default']
+    DialogV2: typeof import('./components/DialogV2.vue')['default']
     DropdownOrganization: typeof import('./components/dashboard/DropdownOrganization.vue')['default']
     DropdownProfile: typeof import('./components/dashboard/DropdownProfile.vue')['default']
     HistoryTable: typeof import('./components/tables/HistoryTable.vue')['default']

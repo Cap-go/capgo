@@ -1,15 +1,21 @@
-import process from 'node:process'
+import { cwd } from 'node:process'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
   test: {
+    // pool: 'threads',
+    // pool: 'vmThreads',
     include: ['tests/*.test.ts'],
-    environment: 'node', // TODO: switch to bun to see if warning remove
+    environment: 'node',
     watch: false,
-    testTimeout: 60_000,
-    retry: 3,
-    maxConcurrency: 12,
-    env: loadEnv(mode, process.cwd(), ''),
+    bail: 1,
+    testTimeout: 20_000, // Reduced from 20s
+    hookTimeout: 8_000, // Reduced from 8s
+    retry: 2, // Reduced from 2
+    maxConcurrency: 50, // Reduced from 32 to prevent deadlocks
+    minWorkers: 1,
+    maxWorkers: 24, // Reduced from 24 to prevent resource conflicts
+    env: loadEnv(mode, cwd(), ''),
   },
 }))

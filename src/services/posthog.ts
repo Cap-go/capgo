@@ -10,8 +10,9 @@ export function posthogLoader(supaHost: string) {
   if (isLocal(supaHost))
     return
   posthog.init('phc_NXDyDajQaTQVwb25DEhIVZfxVUn4R0Y348Z7vWYHZUi', {
-    api_host: 'https://eu.i.posthog.com',
+    api_host: 'https://psthg.digitalshift-ee.workers.dev/',
     person_profiles: 'identified_only',
+    defaults: '2025-05-24',
     disable_external_dependency_loading: true,
   })
 }

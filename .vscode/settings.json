@@ -13,5 +13,7 @@
   "editor.formatOnSave": true,
   "typescript.preferences.autoImportFileExcludePatterns": [
     "vue-router"
-  ]
+  ],
+  "SQL-Formatter-VSCode.dialect": "postgresql",
+  "SQL-Formatter-VSCode.linesBetweenQueries": 1
 }

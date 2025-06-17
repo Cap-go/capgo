@@ -310,6 +310,36 @@ export type Database = {
         }
         Relationships: []
       }
+      capgo_credits_steps: {
+        Row: {
+          created_at: string
+          id: number
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          price_per_unit?: number
+          step_max?: number
+          step_min?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channel_devices: {
         Row: {
           app_id: string
@@ -667,6 +697,7 @@ export type Database = {
           app_id: string
           custom_id: string
           device_id: string
+          id: number
           is_emulator: boolean | null
           is_prod: boolean | null
           os_version: string | null
@@ -680,6 +711,7 @@ export type Database = {
           app_id: string
           custom_id?: string
           device_id: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -693,6 +725,7 @@ export type Database = {
           app_id?: string
           custom_id?: string
           device_id?: string
+          id?: never
           is_emulator?: boolean | null
           is_prod?: boolean | null
           os_version?: string | null
@@ -1025,6 +1058,7 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
+          id: number
           version: number
         }
         Insert: {
@@ -1032,6 +1066,7 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
+          id?: never
           version: number
         }
         Update: {
@@ -1039,6 +1074,7 @@ export type Database = {
           app_id?: string
           created_at?: string
           device_id?: string
+          id?: never
           version?: number
         }
         Relationships: []
@@ -1544,24 +1580,6 @@ export type Database = {
       get_organization_cli_warnings: {
         Args: { orgid: string; cli_version: string }
         Returns: Json[]
-      }
-      get_orgs_v5: {
-        Args: Record<PropertyKey, never> | { userid: string }
-        Returns: {
-          gid: string
-          created_by: string
-          logo: string
-          name: string
-          role: string
-          paying: boolean
-          trial_left: number
-          can_use_more: boolean
-          is_canceled: boolean
-          app_count: number
-          subscription_start: string
-          subscription_end: string
-          management_email: string
-        }[]
       }
       get_orgs_v6: {
         Args: Record<PropertyKey, never> | { userid: string }

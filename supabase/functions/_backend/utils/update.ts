@@ -20,7 +20,7 @@ import { cloudlog, cloudlogErr } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppOwnerPostgresV2, getDrizzleClient, getDrizzleClientD1Session, getPgClient, isAllowedActionOrgActionD1, isAllowedActionOrgActionPg, requestInfosPostgres, requestInfosPostgresV2 } from './pg.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, fixSemver } from './utils.ts'
+import { backgroundTask, fixSemver, getEnv } from './utils.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
@@ -422,16 +422,13 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
 export async function update(c: Context, body: AppInfos) {
   let pgClient
-  let isV2 = getRuntimeKey() === 'workerd'
+  let isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
   if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
-    isV2 = true
+    // force v2 for update v2
+    isV2 = 1.0
   }
-  // if (!isV2 && getRuntimeKey() === 'workerd') {
-  //   // make 10% chance to use v2 with D1 read replicate to test the performance
-  //   isV2 = Math.random() < 0.1
-  // }
   // check if URL ends with update_v2 if yes do not init PG
-  if (isV2) {
+  if (isV2 && Math.random() < isV2) {
     cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
     pgClient = null
   }
@@ -441,7 +438,7 @@ export async function update(c: Context, body: AppInfos) {
 
   let res
   try {
-    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), isV2)
+    res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'update', error: e })

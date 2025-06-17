@@ -1,10 +1,13 @@
 import type { ExecSyncOptions } from 'node:child_process'
-import { execSync } from 'node:child_process'
+import { exec, execSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import process, { cwd, env } from 'node:process'
+import { promisify } from 'node:util'
 import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
+
+const execAsync = promisify(exec)
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
@@ -28,7 +31,14 @@ export const BASE_DEPENDENCIES_OLD = {
   '@capacitor/core': '6.0.0',
   '@capgo/capacitor-updater': '6.14.17',
 }
-export const tempFileFolder = (id: string) => join(cwd(), TEMP_DIR_NAME, id)
+
+// Cache for prepared apps to avoid repeated setup
+const preparedApps = new Set<string>()
+
+// Track active processes for cleanup
+const activeProcesses = new Set<ReturnType<typeof spawn>>()
+
+export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
 function generateDefaultJsonCliConfig(appId: string) {
   return {
@@ -60,21 +70,20 @@ const config: CapacitorConfig = ${JSON.stringify(generateDefaultJsonCliConfig(ap
 export default config;\n`
 }
 
-export function setDependencies(dependencies: Record<string, string>, id: string, appId: string) {
+export function setDependencies(dependencies: Record<string, string>, appId: string) {
   // write package.json
-  const pathPack = join(tempFileFolder(id), 'package.json')
+  const pathPack = join(tempFileFolder(appId), 'package.json')
   const res = BASE_PACKAGE_JSON.replace('%APPID%', appId).replace('%DEPENDENCIES%', JSON.stringify(dependencies, null, 2))
   writeFileSync(pathPack, res)
 }
-export function deleteAllTempFolders() {
-  // console.log('Deleting all temp folders')
-  rimrafSync(TEMP_DIR_NAME)
-}
 
-export function deleteTempFolders(id: string) {
-  if (existsSync(tempFileFolder(id))) {
-    rimrafSync(tempFileFolder(id))
+export function deleteTempFolders(appId: string) {
+  const tempFolder = tempFileFolder(appId)
+  if (existsSync(tempFolder)) {
+    // console.log('Deleting temp folder', tempFolder)
+    rimrafSync(tempFolder)
   }
+  preparedApps.delete(appId)
 }
 
 export function getSemver(semver = `1.0.${Date.now()}`) {
@@ -83,30 +92,54 @@ export function getSemver(semver = `1.0.${Date.now()}`) {
   return newSemver
 }
 
-export async function prepareCli(appId: string, id: string, old = false) {
-  const defaultConfig = generateCliConfig(appId)
-  deleteTempFolders(id)
-  mkdirSync(tempFileFolder(id), { recursive: true })
+export async function prepareCli(appId: string, old = false) {
+  // Skip if already prepared
+  if (preparedApps.has(appId)) {
+    return
+  }
 
-  const capacitorConfigPath = join(tempFileFolder(id), 'capacitor.config.ts')
+  const defaultConfig = generateCliConfig(appId)
+  deleteTempFolders(appId)
+  mkdirSync(tempFileFolder(appId), { recursive: true })
+
+  const capacitorConfigPath = join(tempFileFolder(appId), 'capacitor.config.ts')
   writeFileSync(capacitorConfigPath, defaultConfig)
 
-  mkdirSync(join(tempFileFolder(id), 'dist'), { recursive: true })
-  writeFileSync(join(tempFileFolder(id), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
-  writeFileSync(join(tempFileFolder(id), 'dist', 'index.html'), '')
-  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, id, appId)
+  mkdirSync(join(tempFileFolder(appId), 'dist'), { recursive: true })
+  writeFileSync(join(tempFileFolder(appId), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
+  writeFileSync(join(tempFileFolder(appId), 'dist', 'index.html'), '')
+  setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, appId)
 
-  npmInstall(id)
+  await npmInstall(appId)
+  preparedApps.add(appId)
 }
 
 // cleanup CLI
-export function cleanupCli(id: string) {
-  deleteTempFolders(id)
+export function cleanupCli(appId: string) {
+  deleteTempFolders(appId)
 }
 
-export function npmInstall(id: string) {
+// Cleanup function for process management
+export function cleanupAllProcesses() {
+  activeProcesses.forEach((proc) => {
+    try {
+      proc.kill('SIGTERM')
+    }
+    catch {
+      // Process may already be dead
+    }
+  })
+  activeProcesses.clear()
+}
+
+// Register cleanup on process exit
+process.on('exit', cleanupAllProcesses)
+process.on('SIGINT', cleanupAllProcesses)
+process.on('SIGTERM', cleanupAllProcesses)
+
+export async function npmInstall(appId: string) {
   try {
-    execSync('bun install', { cwd: tempFileFolder(id), stdio: 'ignore' })
+    await execAsync('bun install', { cwd: tempFileFolder(appId) })
   }
   catch (error) {
     console.error('bun install failed', error)
@@ -114,33 +147,112 @@ export function npmInstall(id: string) {
   }
 }
 
-export function runCli(params: string[], id: string, logOutput = false, overwriteApiKey?: string): string {
+export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
+  const basePath = noFolder ? cwd() : tempFileFolder(appId)
+
+  // When noFolder is true, always use bunx @capgo/cli@latest
+  // When noFolder is false, check for local CLI setup
   let localCliPath = env.LOCAL_CLI_PATH
-  if (localCliPath === 'true') {
+  if (!noFolder && localCliPath === 'true') {
     localCliPath = '../../../CLI/dist/index.js'
   }
+
   const command = [
-    localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
-    localCliPath || '@capgo/cli@latest',
+    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
+    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
+    ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
+  ]
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command[0], command.slice(1), {
+      cwd: basePath,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...env, FORCE_COLOR: '1' },
+      timeout: 30000, // 30 second timeout
+    })
+
+    // Track the process
+    activeProcesses.add(child)
+
+    let stdout = ''
+    let stderr = ''
+    let finished = false
+
+    const cleanup = () => {
+      if (!finished) {
+        finished = true
+        activeProcesses.delete(child)
+      }
+    }
+
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    child.stderr?.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    child.on('close', (_code) => {
+      cleanup()
+      const output = stdout || stderr
+
+      if (logOutput) {
+        console.log(output)
+      }
+
+      resolve(output) // Always resolve with output for consistent error checking
+    })
+
+    child.on('error', (error) => {
+      cleanup()
+      reject(error)
+    })
+
+    // Handle timeout explicitly
+    child.on('exit', (code, signal) => {
+      if (signal === 'SIGTERM') {
+        cleanup()
+        reject(new Error(`Process terminated: ${signal}`))
+      }
+    })
+  })
+}
+
+// Keep sync version for compatibility
+export function runCliSync(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): string {
+  const basePath = noFolder ? cwd() : tempFileFolder(appId)
+
+  // When noFolder is true, always use bunx @capgo/cli@latest
+  // When noFolder is false, check for local CLI setup
+  let localCliPath = env.LOCAL_CLI_PATH
+  if (!noFolder && localCliPath === 'true') {
+    localCliPath = '../../../CLI/dist/index.js'
+  }
+
+  const command = [
+    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
+    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
+    ...params,
+    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
+    ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
   ].join(' ')
 
   const options: ExecSyncOptions = {
-    cwd: tempFileFolder(id),
+    cwd: basePath,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...env, FORCE_COLOR: '1' },
+    timeout: 30000, // 30 second timeout
   }
 
   try {
     const output = execSync(command, options)
-
     if (logOutput) {
-      // console.log('CLI execution successful')
       console.log(output)
     }
-
     return output.toString()
   }
   catch (error: any) {
@@ -148,7 +260,59 @@ export function runCli(params: string[], id: string, logOutput = false, overwrit
       console.error('CLI execution failed')
       console.error(error.stdout)
     }
-
     return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message
   }
+}
+
+// Batch CLI operations to reduce setup overhead
+export async function batchRunCli(
+  operations: Array<{
+    params: string[]
+    expectedOutput?: string
+    appId: string
+    overwriteApiKey?: string
+    overwriteSupaHost?: boolean
+    noFolder?: boolean
+  }>,
+): Promise<string[]> {
+  // Execute operations sequentially to avoid conflicts
+  const results: string[] = []
+
+  for (const op of operations) {
+    const result = await runCli(
+      op.params,
+      op.appId,
+      false,
+      op.overwriteApiKey,
+      op.overwriteSupaHost,
+      op.noFolder,
+    )
+    results.push(result)
+  }
+
+  return results
+}
+
+// Helper for common CLI test patterns
+export async function testCliCommand(
+  params: string[],
+  appId: string,
+  expectedOutput: string,
+  shouldContain = true,
+  overwriteApiKey?: string,
+): Promise<string> {
+  const output = await runCli(params, appId, false, overwriteApiKey, true, true)
+
+  if (shouldContain) {
+    if (!output.includes(expectedOutput)) {
+      throw new Error(`Expected output to contain "${expectedOutput}", but got: ${output}`)
+    }
+  }
+  else {
+    if (output.includes(expectedOutput)) {
+      throw new Error(`Expected output NOT to contain "${expectedOutput}", but got: ${output}`)
+    }
+  }
+
+  return output
 }

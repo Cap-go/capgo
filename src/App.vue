@@ -3,6 +3,7 @@ import { defineAsyncComponent } from 'vue'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const Dialog = defineAsyncComponent(() => import('~/components/Dialog.vue'))
+const DialogV2 = defineAsyncComponent(() => import('~/components/DialogV2.vue'))
 const BundleLinkDialog = defineAsyncComponent(() => import('~/components/BundleLinkDialog.vue'))
 const InviteNewUserWithoutAccountDialog = defineAsyncComponent(() => import('~/components/InviteNewUserWithoutAccountDialog.vue'))
 </script>
@@ -12,6 +13,7 @@ const InviteNewUserWithoutAccountDialog = defineAsyncComponent(() => import('~/c
     <RouterView class="h-full overflow-hidden" />
     <Toast />
     <Dialog />
+    <DialogV2 />
     <BundleLinkDialog />
     <InviteNewUserWithoutAccountDialog />
   </div>

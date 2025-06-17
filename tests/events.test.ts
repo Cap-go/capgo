@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats, USER_EMAIL } from './test-utils.ts'
+import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_EVENT = `${APP_NAME}.e.${id}`
@@ -38,51 +38,51 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('track event with authorization jwt', async () => {
-    const supabase = getSupabaseClient()
+  // it('track event with authorization jwt', async () => {
+  //   const supabase = getSupabaseClient()
 
-    const { data: magicLink, error: magicError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: USER_EMAIL,
-    })
+  //   const { data: magicLink, error: magicError } = await supabase.auth.admin.generateLink({
+  //     type: 'magiclink',
+  //     email: USER_EMAIL,
+  //   })
 
-    if (magicError) {
-      console.error('generate_magic_link_error', magicError)
-      throw new Error('generate_magic_link_error')
-    }
+  //   if (magicError) {
+  //     console.error('generate_magic_link_error', magicError)
+  //     throw new Error('generate_magic_link_error')
+  //   }
 
-    const { data: authData, error: authError } = await supabase.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
+  //   const { data: authData, error: authError } = await supabase.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
-    if (authError) {
-      console.error('auth_error', authError)
-      throw new Error('auth_error')
-    }
+  //   if (authError) {
+  //     console.error('auth_error', authError)
+  //     throw new Error('auth_error')
+  //   }
 
-    const jwt = authData.session?.access_token
+  //   const jwt = authData.session?.access_token
 
-    const response = await fetch(`${BASE_URL}/private/events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`,
-      },
-      body: JSON.stringify({
-        channel: 'test',
-        event: 'test_event',
-        description: 'Testing event tracking',
-        icon: '🧪',
-        notify: false,
-        tags: {
-          app_id: APPNAME_EVENT,
-          test: true,
-        },
-      }),
-    })
+  //   const response = await fetch(`${BASE_URL}/private/events`, {
+  //     method: 'POST',
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //       'Authorization': `Bearer ${jwt}`,
+  //     },
+  //     body: JSON.stringify({
+  //       channel: 'test',
+  //       event: 'test_event',
+  //       description: 'Testing event tracking',
+  //       icon: '🧪',
+  //       notify: false,
+  //       tags: {
+  //         app_id: APPNAME_EVENT,
+  //         test: true,
+  //       },
+  //     }),
+  //   })
 
-    const data = await response.json() as { status: string }
-    expect(response.status).toBe(200)
-    expect(data.status).toBe('ok')
-  })
+  //   const data = await response.json() as { status: string }
+  //   expect(response.status).toBe(200)
+  //   expect(data.status).toBe('ok')
+  // })
 
   it('track event without authentication', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {

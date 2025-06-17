@@ -24,6 +24,11 @@ export const messageSchema = z.object({
 
 export const messagesArraySchema = z.array(messageSchema)
 
+// Helper function to generate UUID v4
+function generateUUID(): string {
+  return crypto.randomUUID()
+}
+
 async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
   try {
     const messages = await readQueue(sql, queueName)
@@ -51,13 +56,27 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
       const function_name = message.message.function_name
       const function_type = message.message.function_type
       const body = message.message.payload
-      const httpResponse = await http_post_helper(c as any, function_name, function_type, body)
+      const cfId = generateUUID()
+      const httpResponse = await http_post_helper(c as any, function_name, function_type, body, cfId)
 
       return {
         httpResponse,
+        cfId,
         ...message,
       }
     }))
+
+    // Update all messages with their CF IDs
+    const cfIdUpdates = results.map(result => ({
+      msg_id: result.msg_id,
+      cf_id: result.cfId,
+      queue: queueName,
+    }))
+
+    if (cfIdUpdates.length > 0) {
+      console.log(`[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.`)
+      await mass_edit_queue_messages_cf_ids(sql, cfIdUpdates)
+    }
 
     // Batch remove all messages that have succeeded
     // const successMessages = results.filter(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
@@ -71,18 +90,77 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
     }
     if (messagesFailed.length > 0) {
       console.log(`[${queueName}] Failed to process ${messagesFailed.length} messages.`)
+
+      const timestamp = new Date().toISOString()
+      const failureDetails = messagesFailed.map(msg => ({
+        function_name: msg.message.function_name,
+        function_type: msg.message.function_type || 'supabase',
+        msg_id: msg.msg_id,
+        read_count: msg.read_ct,
+        status: msg.httpResponse.status,
+        status_text: msg.httpResponse.statusText,
+        payload_size: JSON.stringify(msg.message.payload).length,
+        cf_id: msg.cfId,
+      }))
+
+      const groupedByFunction = failureDetails.reduce((acc, detail) => {
+        const key = detail.function_name
+        if (!acc[key])
+          acc[key] = []
+        acc[key].push(detail)
+        return acc
+      }, {} as Record<string, typeof failureDetails>)
+
       await sendDiscordAlert(c as any, {
-        content: `Queue: ${queueName}`,
+        content: `🚨 **Queue Processing Failures** - ${queueName}`,
         embeds: [
           {
-            title: `Failed to process ${messagesFailed.length} messages.`,
-            description: `Queue: ${queueName}`,
+            title: `❌ ${messagesFailed.length} Messages Failed Processing`,
+            description: `**Queue:** ${queueName}\n**Failed Functions:** ${Object.keys(groupedByFunction).length}\n**Total Failures:** ${messagesFailed.length}`,
+            color: 0xFF6B35, // Orange color for warnings
+            timestamp,
             fields: [
               {
-                name: 'Messages',
-                value: messagesFailed.map(msg => msg.message.function_name).join(', '),
+                name: '📊 Failure Summary',
+                value: Object.entries(groupedByFunction)
+                  .map(([funcName, failures]) =>
+                    `**${funcName}** (${failures[0].function_type}): ${failures.length} failures`,
+                  )
+                  .join('\n'),
+                inline: false,
+              },
+              {
+                name: '🔍 Detailed Failures',
+                value: failureDetails.slice(0, 10).map((detail) => {
+                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c as any, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
+                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
+                }).join('\n'),
+                inline: false,
+              },
+              {
+                name: '📈 Status Code Distribution',
+                value: Object.entries(
+                  failureDetails.reduce((acc, detail) => {
+                    acc[detail.status] = (acc[detail.status] || 0) + 1
+                    return acc
+                  }, {} as Record<number, number>),
+                ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),
+                inline: false,
+              },
+              {
+                name: '⚠️ Retry Analysis',
+                value: `**Will Retry:** ${failureDetails.filter(d => d.read_count < 5).length}\n**Will Archive:** ${failureDetails.filter(d => d.read_count >= 5).length}`,
+                inline: true,
+              },
+              {
+                name: '📦 Payload Info',
+                value: `**Avg Size:** ${Math.round(failureDetails.reduce((sum, d) => sum + d.payload_size, 0) / failureDetails.length)} bytes\n**Max Size:** ${Math.max(...failureDetails.map(d => d.payload_size))} bytes`,
+                inline: true,
               },
             ],
+            footer: {
+              text: `Queue: ${queueName} | Environment: ${Deno.env.get('ENVIRONMENT') || 'unknown'}`,
+            },
           },
         ],
       })
@@ -150,10 +228,12 @@ export async function http_post_helper(
   function_name: string,
   function_type: string | null | undefined,
   body: any,
+  cfId: string,
 ): Promise<Response> {
   const headers = {
     'Content-Type': 'application/json',
     'apisecret': getEnv(c as any, 'API_SECRET'),
+    'x-capgo-cf-id': cfId,
   }
 
   let url: string
@@ -220,6 +300,29 @@ async function archive_queue_messages(sql: ReturnType<typeof getPgClient>, queue
   }
   catch (error) {
     console.error(`[Archive Queue Messages] Error archiving messages ${msgIds.join(', ')} from queue ${queueName}:`, error)
+    throw error
+  }
+}
+
+// Helper function to mass update queue messages with CF IDs
+async function mass_edit_queue_messages_cf_ids(
+  sql: ReturnType<typeof getPgClient>,
+  updates: Array<{ msg_id: number, cf_id: string, queue: string }>,
+) {
+  try {
+    // Build the array of ROW values as a string
+    const rowValues = updates.map(u =>
+      `ROW(${u.msg_id}::bigint, '${u.cf_id}'::varchar, '${u.queue}'::varchar)::message_update`,
+    ).join(',')
+
+    await sql.unsafe(`
+      SELECT mass_edit_queue_messages_cf_ids(
+        ARRAY[${rowValues}]
+      )
+    `)
+  }
+  catch (error) {
+    console.error('[Mass Edit CF IDs] Error updating CF IDs:', error)
     throw error
   }
 }

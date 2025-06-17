@@ -1,50 +1,11 @@
 import type { Context } from '@hono/hono'
+import type {
+  RESTPostAPIWebhookWithTokenJSONBody,
+} from 'discord-api-types/v10'
 import { cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
-interface DiscordEmbed {
-  title?: string
-  description?: string
-  url?: string
-  timestamp?: string
-  color?: number
-  footer?: {
-    text: string
-    icon_url?: string
-  }
-  image?: {
-    url: string
-  }
-  thumbnail?: {
-    url: string
-  }
-  author?: {
-    name: string
-    url?: string
-    icon_url?: string
-  }
-  fields?: {
-    name: string
-    value: string
-    inline?: boolean
-  }[]
-}
-
-interface DiscordWebhookPayload {
-  content?: string
-  username?: string
-  avatar_url?: string
-  tts?: boolean
-  embeds?: DiscordEmbed[]
-  allowed_mentions?: {
-    parse?: ('everyone' | 'users' | 'roles')[]
-    roles?: string[]
-    users?: string[]
-    replied_user?: boolean
-  }
-}
-
-export async function sendDiscordAlert(c: Context, payload: DiscordWebhookPayload): Promise<boolean> {
+export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWithTokenJSONBody): Promise<boolean> {
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
 
   if (!webhookUrl) {

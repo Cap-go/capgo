@@ -310,6 +310,42 @@ export type Database = {
         }
         Relationships: []
       }
+      capgo_credits_steps: {
+        Row: {
+          created_at: string
+          id: number
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          stripe_id: string | null
+          type: string
+          unit_factor: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          price_per_unit: number
+          step_max: number
+          step_min: number
+          stripe_id?: string | null
+          type: string
+          unit_factor?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          price_per_unit?: number
+          step_max?: number
+          step_min?: number
+          stripe_id?: string | null
+          type?: string
+          unit_factor?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       channel_devices: {
         Row: {
           app_id: string
@@ -1025,6 +1061,7 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
+          id: number
           version: number
         }
         Insert: {
@@ -1032,6 +1069,7 @@ export type Database = {
           app_id: string
           created_at: string
           device_id: string
+          id?: never
           version: number
         }
         Update: {
@@ -1039,6 +1077,7 @@ export type Database = {
           app_id?: string
           created_at?: string
           device_id?: string
+          id?: never
           version?: number
         }
         Relationships: []
@@ -1545,24 +1584,6 @@ export type Database = {
         Args: { orgid: string; cli_version: string }
         Returns: Json[]
       }
-      get_orgs_v5: {
-        Args: Record<PropertyKey, never> | { userid: string }
-        Returns: {
-          gid: string
-          created_by: string
-          logo: string
-          name: string
-          role: string
-          paying: boolean
-          trial_left: number
-          can_use_more: boolean
-          is_canceled: boolean
-          app_count: number
-          subscription_start: string
-          subscription_end: string
-          management_email: string
-        }[]
-      }
       get_orgs_v6: {
         Args: Record<PropertyKey, never> | { userid: string }
         Returns: {
@@ -1787,10 +1808,6 @@ export type Database = {
       }
       is_org_yearly: {
         Args: { orgid: string }
-        Returns: boolean
-      }
-      is_owner_of_org: {
-        Args: { user_id: string; org_id: string }
         Returns: boolean
       }
       is_paying_and_good_plan_org: {

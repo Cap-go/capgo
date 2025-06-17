@@ -7,6 +7,7 @@ import { Hono } from 'hono/tiny'
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
+import { app as credits } from '../_backend/private/credits.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
@@ -43,6 +44,7 @@ appGlobal.use('*', requestId())
 // Webapps API
 
 appGlobal.route('/plans', plans)
+appGlobal.route('/credits', credits)
 appGlobal.route('/store_top', storeTop)
 appGlobal.route('/website_stats', publicStats)
 appGlobal.route('/config', config)

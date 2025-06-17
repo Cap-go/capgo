@@ -1,6 +1,7 @@
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
-import { useSupabase } from '~/services/supabase'
+import { setUser } from '~/services/posthog'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { getPlans, isAdmin } from './../services/supabase'
@@ -10,6 +11,7 @@ async function guard(next: any, to: string, from: string) {
   const { data: auth } = await supabase.auth.getUser()
 
   const main = useMainStore()
+  const config = getLocalConfig()
 
   // TOTP means the user was force logged using the "email" tactic
   // In practice this means the user is beeing spoofed by an admin
@@ -47,6 +49,11 @@ async function guard(next: any, to: string, from: string) {
             data.email = main.auth?.email
           }
           main.user = data
+          setUser(main.auth?.id, {
+            email: main.auth?.email,
+            nickname: main.auth?.user_metadata?.nickname,
+            avatar: main.auth?.user_metadata?.avatar_url,
+          }, config.supaHost)
         }
         else {
           return next('/onboarding/verify_email')

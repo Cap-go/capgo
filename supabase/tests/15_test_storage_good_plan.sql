@@ -1,12 +1,12 @@
 BEGIN;
--- CREATE EXTENSION "basejump-supabase_test_helpers";
 
+-- CREATE EXTENSION "basejump-supabase_test_helpers";
 -- + 2 is for the count(*)
 -- -1 is for the pay as you go if statenent
-SELECT plan(16);
+SELECT
+  plan (16);
 
-CREATE OR REPLACE FUNCTION my_tests(
-) RETURNS SETOF TEXT AS $$
+CREATE OR REPLACE FUNCTION my_tests () RETURNS SETOF TEXT AS $$
 DECLARE
   plan RECORD;
   usage RECORD;
@@ -49,7 +49,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT my_tests();
+SELECT
+  my_tests ();
 
-SELECT * FROM finish();
+SELECT
+  *
+FROM
+  finish ();
+
 ROLLBACK;

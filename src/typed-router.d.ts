@@ -29,6 +29,7 @@ declare module 'vue-router/auto-routes' {
     '/app/p/[package].d.[device]': RouteRecordInfo<'/app/p/[package].d.[device]', '/app/p/:package/d/:device', { package: ParamValue<true>, device: ParamValue<true> }, { package: ParamValue<false>, device: ParamValue<false> }>,
     '/confirm-signup': RouteRecordInfo<'/confirm-signup', '/confirm-signup', Record<never, never>, Record<never, never>>,
     '/delete_account': RouteRecordInfo<'/delete_account', '/delete_account', Record<never, never>, Record<never, never>>,
+    '/demo_dialog': RouteRecordInfo<'/demo_dialog', '/demo_dialog', Record<never, never>, Record<never, never>>,
     '/forgot_password': RouteRecordInfo<'/forgot_password', '/forgot_password', Record<never, never>, Record<never, never>>,
     '/invitation': RouteRecordInfo<'/invitation', '/invitation', Record<never, never>, Record<never, never>>,
     '/login': RouteRecordInfo<'/login', '/login', Record<never, never>, Record<never, never>>,
