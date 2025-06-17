@@ -353,7 +353,7 @@ async function cannotDeleteOwner() {
         role: 'cancel',
       },
       {
-        text: t('button-ok'),
+        text: t('ok'),
         role: 'ok',
         id: 'confirm-button',
       },
