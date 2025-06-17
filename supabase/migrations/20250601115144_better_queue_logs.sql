@@ -3,7 +3,7 @@ CREATE TYPE message_update AS (msg_id bigint, cf_id varchar, queue varchar);
 
 CREATE OR REPLACE FUNCTION mass_edit_queue_messages_cf_ids (updates public.message_update[]) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+  search_path = 'public' AS $$
 DECLARE
   update_record public.message_update;
   current_message jsonb;

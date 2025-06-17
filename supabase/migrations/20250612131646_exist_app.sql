@@ -3,7 +3,7 @@ CREATE OR REPLACE FUNCTION "public"."exist_app_versions" (
   "name_version" character varying
 ) RETURNS boolean LANGUAGE "plpgsql"
 SET
-  search_path = '' AS $$
+  search_path = 'public' AS $$
 Begin
   RETURN (SELECT EXISTS (SELECT 1
   FROM public.app_versions
