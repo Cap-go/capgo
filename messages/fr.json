@@ -616,5 +616,8 @@
   "your-role-in-org": "Votre rôle dans l'organisation",
   "your-settings": "Vos paramètres",
   "your-ussage": "Votre utilisation :",
-  "zip-bundle": "Paquet d'application Zip"
+  "zip-bundle": "Paquet d'application Zip",
+  "alert-cannot-delete-owner-title": "Impossible de supprimer le dernier utilisateur Super Admin",
+  "alert-cannot-delete-owner-body": "Vous ne pouvez supprimer cet utilisateur car c'est le dernier utilisateur super admin de cette organisation. Vous pouvez soit déléguer le rôle super admin à un autre utilisateur, soit supprimer l'organisation dans les 'Informations générales' de l'organisation.",
+  "button-ok": "Ok"
 }

@@ -616,5 +616,8 @@
   "your-role-in-org": "O seu papel na organização",
   "your-settings": "Suas configurações",
   "your-ussage": "Seu uso:",
-  "zip-bundle": "Aplicativo ZIP em pacote"
+  "zip-bundle": "Aplicativo ZIP em pacote",
+  "alert-cannot-delete-owner-title": "Não é possível excluir o último usuário super administrador",
+  "alert-cannot-delete-owner-body": "Você não pode excluir esse usuário porque eles são o último super administrador desta organização. \nVocê pode atribuir a função Super Admin a outro usuário ou excluir a organização da seção \"Informações gerais\" da organização.",
+  "button-ok": "OK"
 }

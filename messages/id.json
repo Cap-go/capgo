@@ -616,5 +616,8 @@
   "your-role-in-org": "Peran Anda dalam organisasi",
   "your-settings": "Pengaturan Anda",
   "your-ussage": "Penggunaan Anda:",
-  "zip-bundle": "Paket bundel aplikasi ZIP"
+  "zip-bundle": "Paket bundel aplikasi ZIP",
+  "alert-cannot-delete-owner-title": "Tidak dapat menghapus pengguna admin super terakhir",
+  "alert-cannot-delete-owner-body": "Anda tidak dapat menghapus pengguna ini karena mereka adalah admin super terakhir dari organisasi ini. \nAnda dapat menetapkan peran super admin ke pengguna lain atau menghapus organisasi dari bagian 'informasi umum' organisasi.",
+  "button-ok": "Oke"
 }
