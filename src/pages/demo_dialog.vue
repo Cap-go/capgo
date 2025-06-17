@@ -168,7 +168,7 @@ function readExternalInput() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === 'Dialog with Custom Input'" to="#dialog-v2-content">
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium mb-2">Custom Input Field</label>
+          <label for="custom-input" class="block text-sm font-medium mb-2">Custom Input Field</label>
           <input
             v-model="customInputValue"
             type="text"
@@ -187,7 +187,7 @@ function readExternalInput() {
       <div class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-2">First Name</label>
+            <label for="first-name" class="block text-sm font-medium mb-2">First Name</label>
             <input
               type="text"
               placeholder="John"
@@ -195,7 +195,7 @@ function readExternalInput() {
             >
           </div>
           <div>
-            <label class="block text-sm font-medium mb-2">Last Name</label>
+            <label for="last-name" class="block text-sm font-medium mb-2">Last Name</label>
             <input
               type="text"
               placeholder="Doe"
@@ -205,7 +205,7 @@ function readExternalInput() {
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-2">Email</label>
+          <label for="email" class="block text-sm font-medium mb-2">Email</label>
           <input
             type="email"
             placeholder="john.doe@example.com"
@@ -214,7 +214,7 @@ function readExternalInput() {
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-2">Role</label>
+          <label for="role" class="block text-sm font-medium mb-2">Role</label>
           <select class="select select-bordered w-full">
             <option disabled selected>
               Select a role

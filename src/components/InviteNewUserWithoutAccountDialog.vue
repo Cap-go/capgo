@@ -263,7 +263,7 @@ async function handleSubmit() {
           <form @submit.prevent="handleSubmit">
             <!-- Email (not editable) -->
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ t('email', 'Email') }}
               </label>
               <FormKit
@@ -279,7 +279,7 @@ async function handleSubmit() {
 
             <!-- Role (not editable) -->
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ t('role', 'Role') }}
               </label>
               <FormKit
@@ -295,7 +295,7 @@ async function handleSubmit() {
 
             <!-- First Name -->
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="first-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ t('first-name', 'First Name') }}
               </label>
               <FormKit
@@ -310,7 +310,7 @@ async function handleSubmit() {
 
             <!-- Last Name -->
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="last-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ t('last-name', 'Last Name') }}
               </label>
               <FormKit
@@ -325,7 +325,7 @@ async function handleSubmit() {
 
             <!-- Captcha -->
             <div class="mb-4 mt-4">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="captcha" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {{ t('captcha', 'Captcha') }}
               </label>
               <VueTurnstile v-if="captchaKey" ref="captchaElement" v-model="captchaToken" size="flexible" :site-key="captchaKey" />

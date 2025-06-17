@@ -195,7 +195,7 @@ function openPrivacy() {
                   </h2>
 
                   <div class="mb-4">
-                    <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Password:</label>
+                    <label for="password" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Password:</label>
                     <input
                       v-model="password"
                       type="password"
