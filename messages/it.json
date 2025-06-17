@@ -618,6 +618,5 @@
   "your-ussage": "Il tuo utilizzo:",
   "zip-bundle": "Pacchetto app ZIP",
   "alert-cannot-delete-owner-title": "Impossibile eliminare l'ultimo utente super admin",
-  "alert-cannot-delete-owner-body": "Non è possibile eliminare questo utente perché sono l'ultimo super admin di questa organizzazione. \nÈ possibile assegnare il ruolo di Super Admin a un altro utente o eliminare l'organizzazione dalla sezione \"Informazioni generali\" dell'organizzazione.",
-  "button-ok": "OK"
+  "alert-cannot-delete-owner-body": "Non è possibile eliminare questo utente perché sono l'ultimo super admin di questa organizzazione. \nÈ possibile assegnare il ruolo di Super Admin a un altro utente o eliminare l'organizzazione dalla sezione \"Informazioni generali\" dell'organizzazione."
 }

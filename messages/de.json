@@ -618,6 +618,5 @@
   "your-ussage": "Ihre Nutzung:",
   "zip-bundle": "ZIP-App-Bündel",
   "alert-cannot-delete-owner-title": "Den letzten Super -Administrator -Benutzer kann nicht gelöscht werden",
-  "alert-cannot-delete-owner-body": "Sie können diesen Benutzer nicht löschen, da er der letzte Superadministrator dieser Organisation ist. \nSie können entweder die Super -Administrator -Rolle einem anderen Benutzer zuweisen oder die Organisation aus dem Abschnitt \"Allgemeine Informationen\" der Organisation löschen.",
-  "button-ok": "OK"
+  "alert-cannot-delete-owner-body": "Sie können diesen Benutzer nicht löschen, da er der letzte Superadministrator dieser Organisation ist. \nSie können entweder die Super -Administrator -Rolle einem anderen Benutzer zuweisen oder die Organisation aus dem Abschnitt \"Allgemeine Informationen\" der Organisation löschen."
 }

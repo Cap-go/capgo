@@ -623,6 +623,5 @@
   "your-ussage": "Your usage:",
   "zip-bundle": "Zip app bundle",
   "alert-cannot-delete-owner-title": "Cannot delete the last super admin user",
-  "alert-cannot-delete-owner-body": "You cannot delete this user because they are the last super admin of this organization. You can either assign the super admin role to another user or delete the organization from the ‘General Information’ section of the organization.",
-  "button-ok": "Ok"
+  "alert-cannot-delete-owner-body": "You cannot delete this user because they are the last super admin of this organization. You can either assign the super admin role to another user or delete the organization from the ‘General Information’ section of the organization."
 }

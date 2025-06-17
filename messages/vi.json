@@ -618,6 +618,5 @@
   "your-ussage": "Cách sử dụng của bạn:",
   "zip-bundle": "Gói ứng dụng ZIP",
   "alert-cannot-delete-owner-title": "Không thể xóa người dùng Super Admin cuối cùng",
-  "alert-cannot-delete-owner-body": "Bạn không thể xóa người dùng này vì họ là siêu quản trị viên cuối cùng của tổ chức này. \nBạn có thể gán vai trò Super Admin cho người dùng khác hoặc xóa tổ chức khỏi phần ‘Thông tin chung của tổ chức.",
-  "button-ok": "Được rồi"
+  "alert-cannot-delete-owner-body": "Bạn không thể xóa người dùng này vì họ là siêu quản trị viên cuối cùng của tổ chức này. \nBạn có thể gán vai trò Super Admin cho người dùng khác hoặc xóa tổ chức khỏi phần ‘Thông tin chung của tổ chức."
 }
