@@ -19,6 +19,7 @@ const { t } = useI18n()
 const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
+const hasNewInvitation = ref(false)
 
 onClickOutside(dropdown, () => closeDropdown())
 
@@ -28,6 +29,7 @@ onMounted(async () => {
       console.error('Cannot get orgs!', error)
       createNewOrg()
     })
+  hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
 })
 
 async function handleOrganizationInvitation(org: Organization) {
@@ -172,18 +174,20 @@ async function createNewOrg() {
   <div>
     <details v-show="currentOrganization" ref="dropdown" class="w-full dropdown dropdown-end">
       <summary class="justify-between w-full btn btn-outline border-gray-300 dark:border-gray-600 btn-sm text-slate-300 dark:text-white">
-        <div class="w-4/5 text-left truncate">
-          {{ currentOrganization?.name }}
+        <div class="flex items-center w-4/5 text-left">
+          <span class="truncate">{{ currentOrganization?.name }}</span>
+          <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
         <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
       <ul class="dropdown-content dark:bg-base-200 bg-white rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
         <li v-for="org in organizationStore.organizations" :key="org.gid" class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">
           <a
-            class="block px-4 py-2 text-center hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+            class="flex items-center justify-center text-center px-3 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
             @click="onOrganizationClick(org)"
           >
-            {{ org.name }}
+            <span>{{ org.name }}</span>
+            <div v-if="org.role.startsWith('invite')" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
           </a>
         </li>
         <li class="block px-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600">

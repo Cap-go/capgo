@@ -4,6 +4,7 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 
 import { Hono } from 'hono/tiny'
+import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as credits } from '../_backend/private/credits.ts'
@@ -11,6 +12,7 @@ import { app as deleted_failed_version } from '../_backend/private/delete_failed
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
 import { app as events } from '../_backend/private/events.ts'
+import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
 import { app as latency_postres } from '../_backend/private/latency_postres.ts'
@@ -60,6 +62,8 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/latency_drizzle', latency_drizzle)
 appGlobal.route('/latency_postres', latency_postres)
 appGlobal.route('/events', events)
+appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
+appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.all('*', (c) => {
   console.log('Not found', c.req.url)
   return c.json({ error: 'Not Found' }, 404)

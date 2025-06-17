@@ -230,7 +230,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
       return
     }
 
-    handleSendInvitationOutput(data)
+    handleSendInvitationOutput(data, email, type)
     await reloadData()
   }
   catch (error) {
@@ -242,7 +242,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   }
 }
 
-function handleSendInvitationOutput(output: string | null | undefined) {
+function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']) {
   console.log('Output: ', output)
   if (!output)
     return
@@ -251,8 +251,33 @@ function handleSendInvitationOutput(output: string | null | undefined) {
       toast.success(t('org-invited-user'))
       break
     }
+    case 'TOO_RECENT_INVITATION_CANCELATION': {
+      displayStore.dialogOption = {
+        header: t('error'),
+        message: t('too-recent-invitation-cancelation'),
+        buttons: [
+          {
+            text: t('ok'),
+            role: 'ok',
+          },
+        ],
+      }
+      displayStore.showDialog = true
+      break
+    }
     case 'NO_EMAIL': {
-      toast.error(t('please-ask-the-user-to-create-account-first'))
+      const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
+      if (captchaKey) {
+        displayStore.showInviteNewUserWithoutAccountDialog = {
+          email,
+          role: type,
+          orgId: currentOrganization.value?.gid ?? '',
+          refreshFunction: reloadData,
+        }
+      }
+      else {
+        toast.error(t('cannot_invite_user_without_account'))
+      }
       break
     }
     case 'ALREADY_INVITED': {
@@ -266,6 +291,34 @@ function handleSendInvitationOutput(output: string | null | undefined) {
     default:
       toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
   }
+}
+
+async function rescindInvitation(email: string) {
+  const { data, error } = await supabase.rpc('rescind_invitation', {
+    email,
+    org_id: currentOrganization.value?.gid ?? '',
+  })
+
+  if (error) {
+    console.error('Error rescinding invitation: ', error)
+    toast.error(`${t('cannot-rescind-invitation')}`)
+    return
+  }
+
+  if (!error && data) {
+    // Handle different response codes from the rescind_invitation function
+    switch (data) {
+      case 'OK':
+        // Success is handled in the calling function
+        toast.success(t('invitation-rescinded'))
+        await reloadData()
+        break
+      default:
+        toast.warning(`${t('unexpected-rescind-response')}: ${data}`)
+    }
+  }
+
+  return error
 }
 
 async function didCancel() {
@@ -302,36 +355,28 @@ async function deleteMember(member: ExtendedOrganizationMember) {
 
   isLoading.value = true
   try {
-    // if member.aid is the one who created the org, we need to update it to the current user
-    if (member.uid === currentOrganization.value?.created_by) {
-      // update the org to have the current user as created_by
-      const { error } = await supabase
-        .from('orgs')
-        .update({ created_by: main.user?.id })
-        .eq('id', currentOrganization.value?.gid)
-      if (error) {
-        console.error('Error updating owner: ', error)
-        toast.error(`${t('cannot-update-owner')}: ${error.message}`)
-        return
-      }
-    }
-
-    const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
-    if (error) {
-      console.error('Error deleting member: ', error)
-      toast.error(`${t('cannot-delete-member')}: ${error.message}`)
-      return
-    }
-
-    toast.success(t('member-deleted'))
-
-    if (member.uid === main.user?.id) {
-      console.log('Current user deleted themselves from the org.')
-      await organizationStore.fetchOrganizations()
-      await organizationStore.setCurrentOrganizationToMain()
+    if (member.is_tmp) {
+      // Handle invitation rescinding for temporary users
+      await rescindInvitation(member.email)
     }
     else {
-      await reloadData()
+      const { error } = await supabase.from('org_users').delete().eq('id', member.aid)
+      if (error) {
+        console.error('Error deleting member: ', error)
+        toast.error(`${t('cannot-delete-member')}: ${error.message}`)
+        return
+      }
+
+      toast.success(t('member-deleted'))
+
+      if (member.uid === main.user?.id) {
+        console.log('Current user deleted themselves from the org.')
+        await organizationStore.fetchOrganizations()
+        organizationStore.setCurrentOrganizationToMain()
+      }
+      else {
+        await reloadData()
+      }
     }
   }
   catch (error) {
@@ -353,15 +398,43 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
 
   isLoading.value = true
   try {
-    const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
-    if (error) {
-      console.error('Error changing permission: ', error)
-      toast.error(`${t('cannot-change-permission')}: ${error.message}`)
-      return
-    }
+    if (member.is_tmp) {
+      // Handle modifying permissions for temporary users
+      const { data, error } = await supabase.rpc('modify_permissions_tmp', {
+        email: member.email,
+        org_id: currentOrganization.value?.gid ?? '',
+        new_role: perm,
+      })
 
-    toast.success(t('permission-changed'))
-    await reloadData()
+      if (error) {
+        console.error('Error changing permission for invitation: ', error)
+        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+        return
+      }
+
+      // Handle response codes
+      switch (data) {
+        case 'OK':
+          toast.success(t('permission-changed'))
+          break
+        default:
+          toast.warning(`${t('unexpected-response')}: ${data}`)
+      }
+
+      await reloadData()
+    }
+    else {
+      // Handle regular users as before
+      const { error } = await supabase.from('org_users').update({ user_right: perm }).eq('id', member.aid)
+      if (error) {
+        console.error('Error changing permission: ', error)
+        toast.error(`${t('cannot-change-permission')}: ${error.message}`)
+        return
+      }
+
+      toast.success(t('permission-changed'))
+      await reloadData()
+    }
   }
   catch (error) {
     console.error('Permission change failed:', error)

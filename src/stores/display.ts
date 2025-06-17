@@ -33,12 +33,20 @@ export interface AppPreviewOptions {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
+export interface InviteNewUserWithoutAccountDialogOption {
+  email: string
+  role: Database['public']['Enums']['user_min_right']
+  orgId: string
+  refreshFunction: () => Promise<void>
+}
+
 export const useDisplayStore = defineStore('display', () => {
   const dialogOption = ref<ActionSheetOption>()
   const toastOption = ref<ActionSheetOption>()
   const dialogCanceled = ref<boolean>(false)
   const showDialog = ref<boolean>(false)
   const showBundleLinkDialogChannel = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
+  const showInviteNewUserWithoutAccountDialog = ref<InviteNewUserWithoutAccountDialogOption | null>(null)
   const showBundleLinkDialogCallbacks = ref<{
     onUnlink: () => Promise<void>
     onRevert: () => Promise<void>
@@ -92,6 +100,7 @@ export const useDisplayStore = defineStore('display', () => {
     selectedOrganizations,
     showBundleLinkDialogChannel,
     showBundleLinkDialogCallbacks,
+    showInviteNewUserWithoutAccountDialog,
   }
 })
 

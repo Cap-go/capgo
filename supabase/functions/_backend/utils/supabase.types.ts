@@ -1177,6 +1177,56 @@ export type Database = {
           },
         ]
       }
+      tmp_users: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          email: string
+          first_name: string
+          future_uuid: string
+          id: number
+          invite_magic_string: string
+          last_name: string
+          org_id: string
+          role: Database["public"]["Enums"]["user_min_right"]
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          email: string
+          first_name: string
+          future_uuid?: string
+          id?: number
+          invite_magic_string?: string
+          last_name: string
+          org_id: string
+          role: Database["public"]["Enums"]["user_min_right"]
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          future_uuid?: string
+          id?: number
+          invite_magic_string?: string
+          last_name?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["user_min_right"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tmp_users_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
@@ -1491,6 +1541,14 @@ export type Database = {
         }
         Returns: string
       }
+      get_invite_by_magic_lookup: {
+        Args: { lookup: string }
+        Returns: {
+          org_name: string
+          org_logo: string
+          role: Database["public"]["Enums"]["user_min_right"]
+        }[]
+      }
       get_metered_usage: {
         Args: Record<PropertyKey, never> | { orgid: string }
         Returns: Database["public"]["CompositeTypes"]["stats_table"]
@@ -1511,6 +1569,7 @@ export type Database = {
           email: string
           image_url: string
           role: Database["public"]["Enums"]["user_min_right"]
+          is_tmp: boolean
         }[]
       }
       get_org_owner_id: {
@@ -1774,11 +1833,13 @@ export type Database = {
         Args: { orgid: string }
         Returns: number
       }
-      mass_edit_queue_messages_cf_ids: {
+      modify_permissions_tmp: {
         Args: {
-          updates: Database["public"]["CompositeTypes"]["message_update"][]
+          email: string
+          org_id: string
+          new_role: Database["public"]["Enums"]["user_min_right"]
         }
-        Returns: undefined
+        Returns: string
       }
       one_month_ahead: {
         Args: Record<PropertyKey, never>
@@ -1868,6 +1929,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      replicate_to_d1: {
+        Args: {
+          record: Json
+          old_record: Json
+          operation: string
+          table_name: string
+        }
+        Returns: undefined
+      }
+      rescind_invitation: {
+        Args: { email: string; org_id: string }
+        Returns: string
+      }
       reset_and_seed_app_data: {
         Args: { p_app_id: string }
         Returns: undefined
@@ -1908,9 +1982,13 @@ export type Database = {
         Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
       }
-      upsert_version_meta: {
-        Args: { p_app_id: string; p_version_id: number; p_size: number }
-        Returns: boolean
+      transform_role_to_invite: {
+        Args: { role_input: Database["public"]["Enums"]["user_min_right"] }
+        Returns: Database["public"]["Enums"]["user_min_right"]
+      }
+      transform_role_to_non_invite: {
+        Args: { role_input: Database["public"]["Enums"]["user_min_right"] }
+        Returns: Database["public"]["Enums"]["user_min_right"]
       }
       verify_mfa: {
         Args: Record<PropertyKey, never>
@@ -1996,11 +2074,6 @@ export type Database = {
         file_name: string | null
         s3_path: string | null
         file_hash: string | null
-      }
-      message_update: {
-        msg_id: number | null
-        cf_id: string | null
-        queue: string | null
       }
       orgs_table: {
         id: string | null
