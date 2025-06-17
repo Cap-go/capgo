@@ -15,6 +15,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { hasExactlyOneMatch } from '~/utils/arrayUtils'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -342,13 +343,39 @@ async function didCancel() {
   return didCancel
 }
 
+async function cannotDeleteOwner() {
+  displayStore.dialogOption = {
+    header: t('alert-cannot-delete-owner-title'),
+    message: `${t('alert-cannot-delete-owner-body')}`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-ok'),
+        role: 'ok',
+        id: 'confirm-button',
+      },
+    ],
+  }
+  displayStore.showDialog = true
+  const didCancel = await displayStore.onDialogDismiss()
+  return didCancel
+}
+
 async function deleteMember(member: ExtendedOrganizationMember) {
-  if (await didCancel()) {
+  if (hasExactlyOneMatch(members.value, 'role', 'super_admin')) {
+    await cannotDeleteOwner()
+    return
+  }
+
+  else if (await didCancel()) {
     console.log('Member deletion cancelled.')
     return
   }
 
-  if (member.aid === 0) {
+  else if (member.aid === 0) {
     toast.error(t('cannot-delete-owner'))
     return
   }
