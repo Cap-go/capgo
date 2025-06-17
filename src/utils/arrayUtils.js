@@ -6,6 +6,6 @@
  * @returns {boolean} - True if exactly one match is found, false otherwise
  */
 export function hasExactlyOneMatch(array, property, value) {
-  const matches = array.filter(obj => obj[property] === value);
-  return matches.length === 1;
+  const matches = array.filter(obj => obj[property] === value)
+  return matches.length === 1
 }
