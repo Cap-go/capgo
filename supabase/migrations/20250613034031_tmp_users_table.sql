@@ -69,12 +69,12 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members" (user_id "uuid", "guild_id
 SET
   search_path = '' AS $$
 begin
-  return query select o.id as aid, users.id as uid, users.email, users.image_url, o.user_right as role, false as is_tmp from org_users as o
-  join users on users.id = o.user_id
+  return query select o.id as aid, public.users.id as uid, public.users.email, public.users.image_url, o.user_right as role, false as is_tmp from public.org_users as o
+  join public.users on public.users.id = o.user_id
   where o.org_id=get_org_members.guild_id
-  AND (public.is_member_of_org(users.id, o.org_id))
+  AND (public.is_member_of_org(public.users.id, o.org_id))
   UNION
-  select ((select max(id) from org_users) + tmp.id) as aid, tmp.future_uuid as uid, tmp.email, '' as image_url, public.transform_role_to_invite(tmp.role) as role, true as is_tmp from tmp_users as tmp
+  select ((select max(id) from public.org_users) + tmp.id) as aid, tmp.future_uuid as uid, tmp.email, '' as image_url, public.transform_role_to_invite(tmp.role) as role, true as is_tmp from public.tmp_users as tmp
   where tmp.org_id=get_org_members.guild_id
   AND tmp.cancelled_at IS NULL
   AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days');
@@ -154,7 +154,7 @@ Begin
     -- INSERT INTO org_users (user_id, org_id, user_right)
     -- VALUES (invited_user.id, invite_user_to_org.org_id, invite_type);
 
-    SELECT public.org_users.id from public.org_users 
+    SELECT public.org_users.id from public.org_users
     INTO current_record
     WHERE public.org_users.user_id=invited_user.id
     AND public.org_users.org_id=invite_user_to_org.org_id;
@@ -280,7 +280,7 @@ SET
 DECLARE
   tmp_user record;
   org record;
-  non_invite_role user_min_right;
+  non_invite_role "public"."user_min_right";
 BEGIN
   -- Convert the role to non-invite format for permission checks
   non_invite_role := transform_role_to_non_invite(new_role);
