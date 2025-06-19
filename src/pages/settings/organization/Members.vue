@@ -15,7 +15,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { hasExactlyOneMatch } from '~/utils/arrayUtils'
+import { hasExactlyOneMatch } from '~/utils/arrayUtils.ts'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -349,10 +349,6 @@ async function cannotDeleteOwner() {
     message: `${t('alert-cannot-delete-owner-body')}`,
     buttons: [
       {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
         text: t('ok'),
         role: 'ok',
         id: 'confirm-button',
@@ -365,7 +361,7 @@ async function cannotDeleteOwner() {
 }
 
 async function deleteMember(member: ExtendedOrganizationMember) {
-  if (hasExactlyOneMatch(members.value, 'role', 'super_admin')) {
+  if (hasExactlyOneMatch(members.value, 'role', m => m.role === 'super_admin' && m.uid === member.uid)) {
     await cannotDeleteOwner()
     return
   }
