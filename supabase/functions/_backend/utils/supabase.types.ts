@@ -18,9 +18,9 @@ export type Database = {
       graphql: {
         Args: {
           operationName?: string
-          extensions?: Json
-          variables?: Json
           query?: string
+          variables?: Json
+          extensions?: Json
         }
         Returns: Json
       }
@@ -746,6 +746,7 @@ export type Database = {
           apps_active: number | null
           created_at: string | null
           date_id: string
+          devices_last_month: number | null
           need_upgrade: number | null
           not_paying: number | null
           onboarded: number | null
@@ -765,6 +766,7 @@ export type Database = {
           apps_active?: number | null
           created_at?: string | null
           date_id: string
+          devices_last_month?: number | null
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -784,6 +786,7 @@ export type Database = {
           apps_active?: number | null
           created_at?: string | null
           date_id?: string
+          devices_last_month?: number | null
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -1340,17 +1343,17 @@ export type Database = {
       check_min_rights: {
         Args:
           | {
-              org_id: string
+              app_id: string
               channel_id: number
               min_right: Database["public"]["Enums"]["user_min_right"]
-              app_id: string
+              org_id: string
             }
           | {
-              user_id: string
-              channel_id: number
               app_id: string
-              org_id: string
+              user_id: string
               min_right: Database["public"]["Enums"]["user_min_right"]
+              org_id: string
+              channel_id: number
             }
         Returns: boolean
       }
@@ -1401,8 +1404,8 @@ export type Database = {
       count_all_plans_v2: {
         Args: Record<PropertyKey, never>
         Returns: {
-          plan_name: string
           count: number
+          plan_name: string
         }[]
       }
       delete_http_response: {
@@ -1423,16 +1426,16 @@ export type Database = {
       }
       exist_app_versions: {
         Args:
-          | { appid: string; name_version: string }
-          | { appid: string; name_version: string; apikey: string }
+          | { appid: string; apikey: string; name_version: string }
+          | { name_version: string; appid: string }
         Returns: boolean
       }
       find_best_plan_v3: {
-        Args: { bandwidth: number; mau: number; storage: number }
+        Args: { storage: number; bandwidth: number; mau: number }
         Returns: string
       }
       find_fit_plan_v3: {
-        Args: { storage: number; mau: number; bandwidth: number }
+        Args: { storage: number; bandwidth: number; mau: number }
         Returns: {
           name: string
         }[]
@@ -1444,29 +1447,29 @@ export type Database = {
       get_app_metrics: {
         Args:
           | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+          | { org_id: string; end_date: string; start_date: string }
         Returns: {
-          uninstall: number
+          storage: number
           app_id: string
           date: string
           mau: number
-          storage: number
           bandwidth: number
           get: number
           fail: number
           install: number
+          uninstall: number
         }[]
       }
       get_app_versions: {
-        Args: { appid: string; name_version: string; apikey: string }
+        Args: { appid: string; apikey: string; name_version: string }
         Returns: number
       }
       get_current_plan_max_org: {
         Args: { orgid: string }
         Returns: {
-          mau: number
           bandwidth: number
           storage: number
+          mau: number
         }[]
       }
       get_current_plan_name_org: {
@@ -1477,8 +1480,8 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           yearly: number
-          monthly: number
           total: number
+          monthly: number
         }[]
       }
       get_cycle_info_org: {
@@ -1501,14 +1504,14 @@ export type Database = {
           | { org_id: string }
           | { org_id: string; start_date: string; end_date: string }
         Returns: {
+          storage: number
+          get: number
+          install: number
+          bandwidth: number
+          uninstall: number
           date: string
           mau: number
-          storage: number
-          bandwidth: number
-          get: number
           fail: number
-          install: number
-          uninstall: number
         }[]
       }
       get_identity: {
@@ -1523,8 +1526,8 @@ export type Database = {
       }
       get_identity_org: {
         Args: {
-          org_id: string
           keymode: Database["public"]["Enums"]["key_mode"][]
+          org_id: string
         }
         Returns: string
       }
@@ -1538,8 +1541,8 @@ export type Database = {
       get_identity_org_appid: {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
-          org_id: string
           app_id: string
+          org_id: string
         }
         Returns: string
       }
@@ -1547,8 +1550,8 @@ export type Database = {
         Args: { lookup: string }
         Returns: {
           org_logo: string
-          org_name: string
           role: Database["public"]["Enums"]["user_min_right"]
+          org_name: string
         }[]
       }
       get_metered_usage: {
@@ -1556,26 +1559,26 @@ export type Database = {
         Returns: Database["public"]["CompositeTypes"]["stats_table"]
       }
       get_next_cron_time: {
-        Args: { p_schedule: string; p_timestamp: string }
+        Args: { p_timestamp: string; p_schedule: string }
         Returns: string
       }
       get_next_cron_value: {
-        Args: { current_val: number; pattern: string; max_val: number }
+        Args: { max_val: number; pattern: string; current_val: number }
         Returns: number
       }
       get_org_members: {
-        Args: { guild_id: string } | { user_id: string; guild_id: string }
+        Args: { guild_id: string } | { guild_id: string; user_id: string }
         Returns: {
-          is_tmp: boolean
-          aid: number
           uid: string
           email: string
+          aid: number
           image_url: string
           role: Database["public"]["Enums"]["user_min_right"]
+          is_tmp: boolean
         }[]
       }
       get_org_owner_id: {
-        Args: { apikey: string; app_id: string }
+        Args: { app_id: string; apikey: string }
         Returns: string
       }
       get_org_perm_for_apikey: {
@@ -1583,7 +1586,7 @@ export type Database = {
         Returns: string
       }
       get_organization_cli_warnings: {
-        Args: { cli_version: string; orgid: string }
+        Args: { orgid: string; cli_version: string }
         Returns: Json[]
       }
       get_orgs_v6: {
@@ -1607,13 +1610,13 @@ export type Database = {
       }
       get_plan_usage_percent_detailed: {
         Args:
-          | { cycle_end: string; orgid: string; cycle_start: string }
           | { orgid: string }
+          | { orgid: string; cycle_start: string; cycle_end: string }
         Returns: {
-          total_percent: number
-          mau_percent: number
-          bandwidth_percent: number
           storage_percent: number
+          bandwidth_percent: number
+          mau_percent: number
+          total_percent: number
         }[]
       }
       get_process_cron_stats_job_info: {
@@ -1624,7 +1627,7 @@ export type Database = {
         }[]
       }
       get_total_app_storage_size_orgs: {
-        Args: { org_id: string; app_id: string }
+        Args: { app_id: string; org_id: string }
         Returns: number
       }
       get_total_metrics: {
@@ -1632,10 +1635,10 @@ export type Database = {
           | { org_id: string }
           | { org_id: string; start_date: string; end_date: string }
         Returns: {
+          fail: number
           mau: number
           storage: number
           bandwidth: number
-          fail: number
           get: number
           install: number
           uninstall: number
@@ -1648,12 +1651,12 @@ export type Database = {
       get_update_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
-          get: number
           healthy: boolean
+          install: number
+          get: number
           success_rate: number
           app_id: string
           failed: number
-          install: number
         }[]
       }
       get_user_id: {
@@ -1697,23 +1700,23 @@ export type Database = {
         Args: { app_id: string }
         Returns: {
           failed_updates: number
-          all_updates: number
           open_app: number
+          all_updates: number
         }[]
       }
       has_app_right: {
         Args: {
-          appid: string
           right: Database["public"]["Enums"]["user_min_right"]
+          appid: string
         }
         Returns: boolean
       }
       has_app_right_apikey: {
         Args: {
+          right: Database["public"]["Enums"]["user_min_right"]
           apikey: string
           appid: string
           userid: string
-          right: Database["public"]["Enums"]["user_min_right"]
         }
         Returns: boolean
       }
@@ -1727,8 +1730,8 @@ export type Database = {
       }
       invite_user_to_org: {
         Args: {
-          invite_type: Database["public"]["Enums"]["user_min_right"]
           email: string
+          invite_type: Database["public"]["Enums"]["user_min_right"]
           org_id: string
         }
         Returns: string
@@ -1755,21 +1758,21 @@ export type Database = {
       is_allowed_capgkey: {
         Args:
           | {
-              app_id: string
-              apikey: string
               keymode: Database["public"]["Enums"]["key_mode"][]
+              apikey: string
             }
           | {
               keymode: Database["public"]["Enums"]["key_mode"][]
+              app_id: string
               apikey: string
             }
         Returns: boolean
       }
       is_app_owner: {
         Args:
-          | { apikey: string; appid: string }
           | { appid: string }
-          | { userid: string; appid: string }
+          | { appid: string; apikey: string }
+          | { appid: string; userid: string }
         Returns: boolean
       }
       is_bandwidth_exceeded_by_org: {
@@ -1818,8 +1821,8 @@ export type Database = {
       }
       is_paying_and_good_plan_org_action: {
         Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
           orgid: string
+          actions: Database["public"]["Enums"]["action_type"][]
         }
         Returns: boolean
       }
@@ -1843,9 +1846,9 @@ export type Database = {
       }
       modify_permissions_tmp: {
         Args: {
-          email: string
           org_id: string
           new_role: Database["public"]["Enums"]["user_min_right"]
+          email: string
         }
         Returns: string
       }
@@ -1854,7 +1857,7 @@ export type Database = {
         Returns: string
       }
       parse_cron_field: {
-        Args: { field: string; max_val: number; current_val: number }
+        Args: { field: string; current_val: number; max_val: number }
         Returns: number
       }
       parse_step_pattern: {
@@ -1898,15 +1901,15 @@ export type Database = {
         Returns: undefined
       }
       read_bandwidth_usage: {
-        Args: { p_period_end: string; p_period_start: string; p_app_id: string }
+        Args: { p_period_end: string; p_app_id: string; p_period_start: string }
         Returns: {
-          app_id: string
-          bandwidth: number
           date: string
+          bandwidth: number
+          app_id: string
         }[]
       }
       read_device_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_start: string; p_period_end: string; p_app_id: string }
         Returns: {
           date: string
           mau: number
@@ -1914,7 +1917,7 @@ export type Database = {
         }[]
       }
       read_storage_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_start: string; p_period_end: string; p_app_id: string }
         Returns: {
           app_id: string
           date: string
@@ -1922,14 +1925,14 @@ export type Database = {
         }[]
       }
       read_version_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_start: string; p_period_end: string; p_app_id: string }
         Returns: {
-          install: number
           app_id: string
           version_id: number
           date: string
           get: number
           fail: number
+          install: number
           uninstall: number
         }[]
       }
@@ -1970,7 +1973,7 @@ export type Database = {
         Returns: undefined
       }
       set_mau_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
+        Args: { org_id: string; disabled: boolean }
         Returns: undefined
       }
       set_storage_exceeded_by_org: {
@@ -1978,7 +1981,7 @@ export type Database = {
         Returns: undefined
       }
       transfer_app: {
-        Args: { p_new_org_id: string; p_app_id: string }
+        Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
       }
       transform_role_to_invite: {
@@ -1990,7 +1993,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_min_right"]
       }
       upsert_version_meta: {
-        Args: { p_version_id: number; p_size: number; p_app_id: string }
+        Args: { p_app_id: string; p_version_id: number; p_size: number }
         Returns: boolean
       }
       verify_mfa: {
