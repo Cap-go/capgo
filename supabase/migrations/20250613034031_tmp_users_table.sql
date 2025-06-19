@@ -194,7 +194,9 @@ End;
 $$;
 
 -- Function to rescind an invitation to an organization
-CREATE OR REPLACE FUNCTION "public"."rescind_invitation" ("email" TEXT, "org_id" UUID) RETURNS character varying LANGUAGE "plpgsql" SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION "public"."rescind_invitation" ("email" TEXT, "org_id" UUID) RETURNS character varying LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  search_path = '' AS $$
 DECLARE
   tmp_user record;
   org record;
