@@ -326,6 +326,14 @@ import_map = "./functions/deno.json"
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+[functions.updates_debug]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.updates_lite]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
 [functions.stats]
 verify_jwt = false
 import_map = "./functions/deno.json"
