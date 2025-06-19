@@ -283,7 +283,7 @@ DECLARE
   non_invite_role "public"."user_min_right";
 BEGIN
   -- Convert the role to non-invite format for permission checks
-  non_invite_role := transform_role_to_non_invite(new_role);
+  non_invite_role := public.transform_role_to_non_invite(new_role);
 
   -- Check if org exists
   SELECT * FROM public.orgs
