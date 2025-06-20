@@ -1,6 +1,6 @@
 import { HTTPException } from 'hono/http-exception'
 import { sendDiscordAlert } from './discord.ts'
-import { backgroundTask } from './utils.ts'
+import { backgroundTask, getEnv } from './utils.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: any) => {
@@ -72,7 +72,7 @@ export function onError(functionName: string) {
             },
           ],
           footer: {
-            text: `Function: ${functionName} | Environment: ${Deno.env.get('ENVIRONMENT') || 'unknown'}`,
+            text: `Function: ${functionName} | Environment: ${getEnv(c, 'ENVIRONMENT') || 'unknown'}`,
           },
         },
       ],
