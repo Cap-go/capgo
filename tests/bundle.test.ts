@@ -170,3 +170,144 @@ describe('[DELETE] /bundle operations', () => {
     expect(deleteAllBundlesData.status).toBe('ok')
   })
 })
+
+describe('[PUT] /bundle operations - Set bundle to channel', () => {
+  let versionId: number
+  let channelId: number
+
+  beforeAll(async () => {
+    // Create a test version
+    const version = await createAppVersions('1.0.0-test-channel', APPNAME)
+    versionId = version.id
+
+    // Get the unknown version for this app
+    const supabase = getSupabaseClient()
+    const { data: unknownVersion } = await supabase
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', APPNAME)
+      .eq('name', 'unknown')
+      .single()
+    if (!unknownVersion) {
+      throw new Error('Failed to find unknown version')
+    }
+
+    // Create a test channel using proper seeded values
+    const { data: channel, error } = await supabase
+      .from('channels')
+      .insert({
+        name: 'test-channel',
+        app_id: APPNAME,
+        version: unknownVersion.id, // Use app's unknown version
+        created_by: '6aa76066-55ef-4238-ade6-0b32334a4097', // test@capgo.app user from seed
+        owner_org: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', // Demo org from seed
+      })
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to create test channel: ${error.message}`)
+    }
+    if (!channel) {
+      throw new Error('Failed to create test channel: channel is null')
+    }
+    channelId = channel.id
+  })
+
+  it('should set bundle to channel successfully', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version_id: versionId,
+        channel_id: channelId,
+      }),
+    })
+
+    const data = await response.json() as { status: string, message: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('success')
+    expect(data.message).toContain('Bundle')
+    expect(data.message).toContain('set to channel')
+
+    // Verify the channel was updated in the database
+    const supabase = getSupabaseClient()
+    const { data: channel, error } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('id', channelId)
+      .eq('app_id', APPNAME)
+      .single()
+
+    expect(error).toBeNull()
+    expect(channel).toBeTruthy()
+    if (channel) {
+      expect(channel.version).toBe(versionId)
+    }
+  })
+
+  it('should handle missing required fields', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        // Missing channel_id
+        app_id: APPNAME,
+        version_id: versionId,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string, error: string }
+    expect(data.status).toBe('Missing required fields')
+  })
+
+  it('should handle invalid version_id', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version_id: 999999, // Non-existent version ID
+        channel_id: channelId,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string }
+    expect(data.status).toBe('Cannot find version')
+  })
+
+  it('should handle invalid channel_id', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version_id: versionId,
+        channel_id: 999999, // Non-existent channel ID
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string }
+    expect(data.status).toBe('Cannot find channel')
+  })
+
+  it('should handle invalid app_id', async () => {
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        app_id: 'invalid_app',
+        version_id: versionId,
+        channel_id: channelId,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { status: string }
+    expect(data.status).toBe('You can\'t access this app')
+  })
+})

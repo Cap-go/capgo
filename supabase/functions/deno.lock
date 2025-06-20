@@ -502,6 +502,8 @@
     "https://deno.land/std@0.177.1/testing/_diff.ts": "1a3c044aedf77647d6cac86b798c6417603361b66b54c53331b312caeb447aea",
     "https://deno.land/std@0.177.1/testing/_format.ts": "a69126e8a469009adf4cf2a50af889aca364c349797e63174884a52ff75cf4c7",
     "https://deno.land/std@0.177.1/testing/asserts.ts": "984ab0bfb3faeed92ffaa3a6b06536c66811185328c5dd146257c702c41b01ab",
+    "https://esm.sh/@logsnag/node@1.0.1/deno/node.mjs": "d8fe309765dc8f5a566a257fabdb70e0a33c532cc6ad093d8598660a25eea099",
+    "https://esm.sh/@logsnag/node@1.0.1?target=deno": "6b24b7042038ee56352b193c6c3ca2dcbd54f2aff823ee5fb5f964b751016f79",
     "https://esm.sh/@supabase/auth-js@2.68.0/deno/auth-js.mjs": "2cefeaa6eaf3526b33de4c03afb98e15ec650072af8d1428f1c672e77cf26d33",
     "https://esm.sh/@supabase/functions-js@2.4.4/deno/functions-js.mjs": "b8b8af50d9365a15bb4be01194523fd6998d6d6eba4f22d83c81c3af716f4f0d",
     "https://esm.sh/@supabase/node-fetch@2.6.15/deno/node-fetch.mjs": "8f005fa6811e31fadcf698e96a9377cdc619c1c6da8c09da060517e2cd613c8d",
