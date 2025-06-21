@@ -159,7 +159,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               },
             ],
             footer: {
-              text: `Queue: ${queueName} | Environment: ${getEnv(c, 'ENVIRONMENT') || 'unknown'}`,
+              text: `Queue: ${queueName} | Environment: ${getEnv(c as any, 'ENVIRONMENT') || 'unknown'}`,
             },
           },
         ],

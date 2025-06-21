@@ -72,7 +72,7 @@ export function onError(functionName: string) {
             },
           ],
           footer: {
-            text: `Function: ${functionName} | Environment: ${getEnv(c, 'ENVIRONMENT') || 'unknown'}`,
+            text: `Function: ${functionName} | Environment: ${getEnv(c as any, 'ENVIRONMENT') || 'unknown'}`,
           },
         },
       ],
