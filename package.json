@@ -170,7 +170,7 @@
     "vue-chartjs": "^5.3.2",
     "vue-demi": "0.14.10",
     "vue-router": "4.5.1",
-    "vue-sonner": "^2.0.0",
+    "vue-sonner": "^2.0.1",
     "vue-turnstile": "^1.0.11",
     "zod": "^3.25.64"
   },
