@@ -461,7 +461,7 @@ describe('tests CLI channel commands', () => {
     it.concurrent('should fail to delete non-existent channel', async () => {
       const testInvalidChannel = generateChannelName()
       const output = await runCli(['channel', 'delete', testInvalidChannel, APPNAME], APPNAME, false, undefined, true, true)
-      expect(output).toContain('Cannot delete Channel')
+      expect(output).toContain(`Channel ${testInvalidChannel} not found`)
       expect(output).not.toContain(`Done ✅`)
     })
 
