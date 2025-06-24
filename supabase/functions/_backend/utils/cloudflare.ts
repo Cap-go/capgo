@@ -674,6 +674,22 @@ export async function readLastMonthUpdatesCF(c: Context) {
   return 0
 }
 
+export async function readLastMonthDevicesCF(c: Context): Promise<number> {
+  if (!c.env.DEVICE_USAGE)
+    return 0
+  const query = `SELECT COUNT(DISTINCT blob1) AS total FROM device_usage WHERE timestamp >= toDateTime('${formatDateCF(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))}') AND timestamp < now()`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesCF query', query })
+  try {
+    const res = await runQueryToCFA<{ total: number }>(c, query)
+    return res[0].total
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices', error: e })
+  }
+  return 0
+}
+
 export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 'to_get_info' | 'to_get_similar', limit: number) {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve([] as StoreApp[])

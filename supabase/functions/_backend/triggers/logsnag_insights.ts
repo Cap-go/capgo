@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import ky from 'ky'
-import { readActiveAppsCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -26,6 +26,7 @@ interface GlobalStats {
   customers: PromiseLike<CustomerCount>
   plans: PromiseLike<PlanTotal>
   actives: Promise<Actives>
+  devices_last_month: PromiseLike<number>
 }
 
 async function getGithubStars(): Promise<number> {
@@ -89,6 +90,7 @@ function getStats(c: Context): GlobalStats {
       return { apps: app_ids.length, users: 0 }
     }),
     updates_last_month: readLastMonthUpdatesCF(c),
+    devices_last_month: readLastMonthDevicesCF(c),
   }
 }
 
@@ -110,6 +112,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       plans,
       actives,
       updates_last_month,
+      devices_last_month,
     ] = await Promise.all([
       res.apps,
       res.updates,
@@ -123,6 +126,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       res.plans,
       res.actives,
       res.updates_last_month,
+      res.devices_last_month,
     ])
     const not_paying = users - customers.total - plans.Trial
     cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
@@ -146,6 +150,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       need_upgrade,
       not_paying,
       updates_last_month,
+      devices_last_month,
     }
     cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
     const { error } = await supabaseAdmin(c as any)
@@ -161,7 +166,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         updates_last_month,
       },
       icon: '📲',
-    }).catch((e) => {
+    }).catch((e: any) => {
       cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
     })
     await logsnagInsights(c as any, [

@@ -89,8 +89,8 @@ export type Database = {
           id: number
           link: string | null
           manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version: string | null
           name: string
           native_packages: Json[] | null
@@ -111,8 +111,8 @@ export type Database = {
           id?: number
           link?: string | null
           manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version?: string | null
           name: string
           native_packages?: Json[] | null
@@ -133,8 +133,8 @@ export type Database = {
           id?: number
           link?: string | null
           manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version?: string | null
           name?: string
           native_packages?: Json[] | null
@@ -746,6 +746,7 @@ export type Database = {
           apps_active: number | null
           created_at: string | null
           date_id: string
+          devices_last_month: number | null
           need_upgrade: number | null
           not_paying: number | null
           onboarded: number | null
@@ -765,6 +766,7 @@ export type Database = {
           apps_active?: number | null
           created_at?: string | null
           date_id: string
+          devices_last_month?: number | null
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -784,6 +786,7 @@ export type Database = {
           apps_active?: number | null
           created_at?: string | null
           date_id?: string
+          devices_last_month?: number | null
           need_upgrade?: number | null
           not_paying?: number | null
           onboarded?: number | null
@@ -1339,19 +1342,19 @@ export type Database = {
       }
       check_min_rights: {
         Args:
-          | {
-              min_right: Database["public"]["Enums"]["user_min_right"]
-              org_id: string
-              app_id: string
-              channel_id: number
-            }
-          | {
-              min_right: Database["public"]["Enums"]["user_min_right"]
-              user_id: string
-              org_id: string
-              app_id: string
-              channel_id: number
-            }
+        | {
+          app_id: string
+          channel_id: number
+          min_right: Database["public"]["Enums"]["user_min_right"]
+          org_id: string
+        }
+        | {
+          app_id: string
+          user_id: string
+          min_right: Database["public"]["Enums"]["user_min_right"]
+          org_id: string
+          channel_id: number
+        }
         Returns: boolean
       }
       check_revert_to_builtin_version: {
@@ -1423,12 +1426,12 @@ export type Database = {
       }
       exist_app_versions: {
         Args:
-          | { appid: string; name_version: string }
-          | { appid: string; name_version: string; apikey: string }
+        | { appid: string; apikey: string; name_version: string }
+        | { name_version: string; appid: string }
         Returns: boolean
       }
       find_best_plan_v3: {
-        Args: { mau: number; bandwidth: number; storage: number }
+        Args: { storage: number; bandwidth: number; mau: number }
         Returns: string
       }
       find_fit_plan_v3: {
@@ -1443,13 +1446,13 @@ export type Database = {
       }
       get_app_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; end_date: string; start_date: string }
         Returns: {
+          storage: number
           app_id: string
           date: string
           mau: number
-          storage: number
           bandwidth: number
           get: number
           fail: number
@@ -1458,15 +1461,15 @@ export type Database = {
         }[]
       }
       get_app_versions: {
-        Args: { appid: string; name_version: string; apikey: string }
+        Args: { appid: string; apikey: string; name_version: string }
         Returns: number
       }
       get_current_plan_max_org: {
         Args: { orgid: string }
         Returns: {
-          mau: number
           bandwidth: number
           storage: number
+          mau: number
         }[]
       }
       get_current_plan_name_org: {
@@ -1477,8 +1480,8 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           yearly: number
-          monthly: number
           total: number
+          monthly: number
         }[]
       }
       get_cycle_info_org: {
@@ -1498,23 +1501,23 @@ export type Database = {
       }
       get_global_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; start_date: string; end_date: string }
         Returns: {
+          storage: number
+          get: number
+          install: number
+          bandwidth: number
+          uninstall: number
           date: string
           mau: number
-          storage: number
-          bandwidth: number
-          get: number
           fail: number
-          install: number
-          uninstall: number
         }[]
       }
       get_identity: {
         Args:
-          | Record<PropertyKey, never>
-          | { keymode: Database["public"]["Enums"]["key_mode"][] }
+        | Record<PropertyKey, never>
+        | { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
       get_identity_apikey_only: {
@@ -1546,9 +1549,9 @@ export type Database = {
       get_invite_by_magic_lookup: {
         Args: { lookup: string }
         Returns: {
-          org_name: string
           org_logo: string
           role: Database["public"]["Enums"]["user_min_right"]
+          org_name: string
         }[]
       }
       get_metered_usage: {
@@ -1556,7 +1559,7 @@ export type Database = {
         Returns: Database["public"]["CompositeTypes"]["stats_table"]
       }
       get_next_cron_time: {
-        Args: { p_schedule: string; p_timestamp: string }
+        Args: { p_timestamp: string; p_schedule: string }
         Returns: string
       }
       get_next_cron_value: {
@@ -1564,11 +1567,11 @@ export type Database = {
         Returns: number
       }
       get_org_members: {
-        Args: { guild_id: string } | { user_id: string; guild_id: string }
+        Args: { guild_id: string } | { guild_id: string; user_id: string }
         Returns: {
-          aid: number
           uid: string
           email: string
+          aid: number
           image_url: string
           role: Database["public"]["Enums"]["user_min_right"]
           is_tmp: boolean
@@ -1579,7 +1582,7 @@ export type Database = {
         Returns: string
       }
       get_org_perm_for_apikey: {
-        Args: { apikey: string; app_id: string }
+        Args: { app_id: string; apikey: string }
         Returns: string
       }
       get_organization_cli_warnings: {
@@ -1589,9 +1592,9 @@ export type Database = {
       get_orgs_v6: {
         Args: Record<PropertyKey, never> | { userid: string }
         Returns: {
+          logo: string
           gid: string
           created_by: string
-          logo: string
           name: string
           role: string
           paying: boolean
@@ -1607,20 +1610,20 @@ export type Database = {
       }
       get_plan_usage_percent_detailed: {
         Args:
-          | { orgid: string }
-          | { orgid: string; cycle_start: string; cycle_end: string }
+        | { orgid: string }
+        | { orgid: string; cycle_start: string; cycle_end: string }
         Returns: {
-          total_percent: number
-          mau_percent: number
-          bandwidth_percent: number
           storage_percent: number
+          bandwidth_percent: number
+          mau_percent: number
+          total_percent: number
         }[]
       }
       get_process_cron_stats_job_info: {
         Args: Record<PropertyKey, never>
         Returns: {
-          last_run: string
           next_run: string
+          last_run: string
         }[]
       }
       get_total_app_storage_size_orgs: {
@@ -1629,14 +1632,14 @@ export type Database = {
       }
       get_total_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; start_date: string; end_date: string }
         Returns: {
+          fail: number
           mau: number
           storage: number
           bandwidth: number
           get: number
-          fail: number
           install: number
           uninstall: number
         }[]
@@ -1648,12 +1651,12 @@ export type Database = {
       get_update_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
-          app_id: string
-          failed: number
+          healthy: boolean
           install: number
           get: number
           success_rate: number
-          healthy: boolean
+          app_id: string
+          failed: number
         }[]
       }
       get_user_id: {
@@ -1680,8 +1683,8 @@ export type Database = {
           id: number
           link: string | null
           manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version: string | null
           name: string
           native_packages: Json[] | null
@@ -1696,40 +1699,40 @@ export type Database = {
       get_weekly_stats: {
         Args: { app_id: string }
         Returns: {
-          all_updates: number
           failed_updates: number
           open_app: number
+          all_updates: number
         }[]
       }
       has_app_right: {
         Args: {
-          appid: string
           right: Database["public"]["Enums"]["user_min_right"]
+          appid: string
         }
         Returns: boolean
       }
       has_app_right_apikey: {
         Args: {
-          appid: string
           right: Database["public"]["Enums"]["user_min_right"]
-          userid: string
           apikey: string
+          appid: string
+          userid: string
         }
         Returns: boolean
       }
       has_app_right_userid: {
         Args: {
           appid: string
-          right: Database["public"]["Enums"]["user_min_right"]
           userid: string
+          right: Database["public"]["Enums"]["user_min_right"]
         }
         Returns: boolean
       }
       invite_user_to_org: {
         Args: {
           email: string
-          org_id: string
           invite_type: Database["public"]["Enums"]["user_min_right"]
+          org_id: string
         }
         Returns: string
       }
@@ -1738,7 +1741,7 @@ export type Database = {
         Returns: boolean
       }
       is_allowed_action: {
-        Args: { apikey: string; appid: string }
+        Args: { appid: string; apikey: string }
         Returns: boolean
       }
       is_allowed_action_org: {
@@ -1754,22 +1757,22 @@ export type Database = {
       }
       is_allowed_capgkey: {
         Args:
-          | {
-              apikey: string
-              keymode: Database["public"]["Enums"]["key_mode"][]
-            }
-          | {
-              apikey: string
-              keymode: Database["public"]["Enums"]["key_mode"][]
-              app_id: string
-            }
+        | {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          apikey: string
+        }
+        | {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          app_id: string
+          apikey: string
+        }
         Returns: boolean
       }
       is_app_owner: {
         Args:
-          | { apikey: string; appid: string }
-          | { appid: string }
-          | { userid: string; appid: string }
+        | { appid: string }
+        | { appid: string; apikey: string }
+        | { appid: string; userid: string }
         Returns: boolean
       }
       is_bandwidth_exceeded_by_org: {
@@ -1843,9 +1846,9 @@ export type Database = {
       }
       modify_permissions_tmp: {
         Args: {
-          email: string
           org_id: string
           new_role: Database["public"]["Enums"]["user_min_right"]
+          email: string
         }
         Returns: string
       }
@@ -1898,7 +1901,7 @@ export type Database = {
         Returns: undefined
       }
       read_bandwidth_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_end: string; p_app_id: string; p_period_start: string }
         Returns: {
           date: string
           bandwidth: number
@@ -1906,7 +1909,7 @@ export type Database = {
         }[]
       }
       read_device_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_start: string; p_period_end: string; p_app_id: string }
         Returns: {
           date: string
           mau: number
@@ -1914,7 +1917,7 @@ export type Database = {
         }[]
       }
       read_storage_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_start: string; p_period_end: string; p_app_id: string }
         Returns: {
           app_id: string
           date: string
@@ -1922,7 +1925,7 @@ export type Database = {
         }[]
       }
       read_version_usage: {
-        Args: { p_app_id: string; p_period_start: string; p_period_end: string }
+        Args: { p_period_start: string; p_period_end: string; p_app_id: string }
         Returns: {
           app_id: string
           version_id: number
@@ -1966,7 +1969,7 @@ export type Database = {
         Returns: undefined
       }
       set_bandwidth_exceeded_by_org: {
-        Args: { org_id: string; disabled: boolean }
+        Args: { disabled: boolean; org_id: string }
         Returns: undefined
       }
       set_mau_exceeded_by_org: {
@@ -2004,71 +2007,71 @@ export type Database = {
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
       stats_action:
-        | "delete"
-        | "reset"
-        | "set"
-        | "get"
-        | "set_fail"
-        | "update_fail"
-        | "download_fail"
-        | "windows_path_fail"
-        | "canonical_path_fail"
-        | "directory_path_fail"
-        | "unzip_fail"
-        | "low_mem_fail"
-        | "download_10"
-        | "download_20"
-        | "download_30"
-        | "download_40"
-        | "download_50"
-        | "download_60"
-        | "download_70"
-        | "download_80"
-        | "download_90"
-        | "download_complete"
-        | "decrypt_fail"
-        | "app_moved_to_foreground"
-        | "app_moved_to_background"
-        | "uninstall"
-        | "needPlanUpgrade"
-        | "missingBundle"
-        | "noNew"
-        | "disablePlatformIos"
-        | "disablePlatformAndroid"
-        | "disableAutoUpdateToMajor"
-        | "cannotUpdateViaPrivateChannel"
-        | "disableAutoUpdateToMinor"
-        | "disableAutoUpdateToPatch"
-        | "channelMisconfigured"
-        | "disableAutoUpdateMetadata"
-        | "disableAutoUpdateUnderNative"
-        | "disableDevBuild"
-        | "disableEmulator"
-        | "cannotGetBundle"
-        | "checksum_fail"
-        | "NoChannelOrOverride"
-        | "setChannel"
-        | "getChannel"
-        | "rateLimited"
+      | "delete"
+      | "reset"
+      | "set"
+      | "get"
+      | "set_fail"
+      | "update_fail"
+      | "download_fail"
+      | "windows_path_fail"
+      | "canonical_path_fail"
+      | "directory_path_fail"
+      | "unzip_fail"
+      | "low_mem_fail"
+      | "download_10"
+      | "download_20"
+      | "download_30"
+      | "download_40"
+      | "download_50"
+      | "download_60"
+      | "download_70"
+      | "download_80"
+      | "download_90"
+      | "download_complete"
+      | "decrypt_fail"
+      | "app_moved_to_foreground"
+      | "app_moved_to_background"
+      | "uninstall"
+      | "needPlanUpgrade"
+      | "missingBundle"
+      | "noNew"
+      | "disablePlatformIos"
+      | "disablePlatformAndroid"
+      | "disableAutoUpdateToMajor"
+      | "cannotUpdateViaPrivateChannel"
+      | "disableAutoUpdateToMinor"
+      | "disableAutoUpdateToPatch"
+      | "channelMisconfigured"
+      | "disableAutoUpdateMetadata"
+      | "disableAutoUpdateUnderNative"
+      | "disableDevBuild"
+      | "disableEmulator"
+      | "cannotGetBundle"
+      | "checksum_fail"
+      | "NoChannelOrOverride"
+      | "setChannel"
+      | "getChannel"
+      | "rateLimited"
       stripe_status:
-        | "created"
-        | "succeeded"
-        | "updated"
-        | "failed"
-        | "deleted"
-        | "canceled"
+      | "created"
+      | "succeeded"
+      | "updated"
+      | "failed"
+      | "deleted"
+      | "canceled"
       usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
-        | "invite_read"
-        | "invite_upload"
-        | "invite_write"
-        | "invite_admin"
-        | "invite_super_admin"
-        | "read"
-        | "upload"
-        | "write"
-        | "admin"
-        | "super_admin"
+      | "invite_read"
+      | "invite_upload"
+      | "invite_write"
+      | "invite_admin"
+      | "invite_super_admin"
+      | "read"
+      | "upload"
+      | "write"
+      | "admin"
+      | "super_admin"
       user_role: "read" | "upload" | "write" | "admin"
       version_action: "get" | "fail" | "install" | "uninstall"
     }
@@ -2111,106 +2114,106 @@ type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
+    Update: infer U
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   graphql_public: {

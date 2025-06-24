@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.9.52",
+  "version": "12.11.4",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -22,6 +22,7 @@
     "netlify:dev": "bunx netlify dev --port 8881",
     "test:front": "playwright test",
     "init:playwright": "bunx playwright install",
+    "test:coverage:all": "vitest run --coverage.enabled=true tests/*",
     "test:all": "vitest run tests/*",
     "test:updates": "vitest run tests/updates*",
     "test:all:local": "LOCAL_CLI_PATH=true vitest run tests/*",
@@ -169,7 +170,7 @@
     "vue-chartjs": "^5.3.2",
     "vue-demi": "0.14.10",
     "vue-router": "4.5.1",
-    "vue-sonner": "^2.0.0",
+    "vue-sonner": "^2.0.1",
     "vue-turnstile": "^1.0.11",
     "zod": "^3.25.64"
   },
@@ -192,6 +193,8 @@
     "@types/dompurify": "3.2.0",
     "@vitejs/plugin-vue": "5.2.4",
     "@vitejs/plugin-vue-jsx": "^4.2.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
     "@vue/cli-service": "5.0.8",
     "@vue/compiler-sfc": "3.5.16",
     "@vue/server-renderer": "3.5.16",
@@ -216,7 +219,7 @@
     "vite-plugin-vue-devtools": "^7.7.6",
     "vite-plugin-vue-layouts": "0.11.0",
     "vite-plugin-webfont-dl": "^3.10.5",
-    "vitest": "3.2.3",
+    "vitest": "^3.2.4",
     "vue-tsc": "2.2.10",
     "wrangler": "^4.20.0"
   },

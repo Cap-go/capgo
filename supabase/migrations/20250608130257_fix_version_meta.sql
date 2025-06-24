@@ -152,7 +152,7 @@ CREATE OR REPLACE FUNCTION upsert_version_meta (
   p_size BIGINT
 ) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER -- Run with definer's privileges (postgres/service role)
 SET
-  search_path = 'public' -- Security: fix search path
+  search_path = '' -- Security: fix search path
   AS $$
 DECLARE
   existing_count INTEGER;
