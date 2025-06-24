@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const dialogStore = useDialogV2Store()
 const customInputValue = ref('')
+const { t } = useI18n()
 
 // Demo 1: Basic dialog
 function openBasicDialog() {
@@ -28,7 +30,7 @@ function openBasicDialog() {
 // Demo 2: Dialog with teleported input
 function openInputDialog() {
   dialogStore.openDialog({
-    title: 'Dialog with Custom Input',
+    title: t('dialog-with-custom-input'),
     description: 'This dialog has a custom input field teleported into it.',
     buttons: [
       {
@@ -72,15 +74,15 @@ function openDangerDialog() {
 // Demo 4: Complex form dialog
 function openFormDialog() {
   dialogStore.openDialog({
-    title: 'User Registration',
+    title: t('user-registration'),
     size: 'xl',
     buttons: [
       {
-        text: 'Cancel',
+        text: t('cancel'),
         role: 'cancel',
       },
       {
-        text: 'Register',
+        text: t('register'),
         role: 'primary',
         handler: () => {
           console.log('User registered!')
@@ -165,7 +167,7 @@ function readExternalInput() {
     </div>
 
     <!-- Teleport Content for Input Dialog -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === 'Dialog with Custom Input'" to="#dialog-v2-content">
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('dialog-with-custom-input')" defer to="#dialog-v2-content">
       <div class="space-y-4">
         <div>
           <label for="custom-input" class="block text-sm font-medium mb-2">Custom Input Field</label>
@@ -183,7 +185,7 @@ function readExternalInput() {
     </Teleport>
 
     <!-- Teleport Content for Form Dialog -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === 'User Registration'" to="#dialog-v2-content">
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('user-registration')" to="#dialog-v2-content">
       <div class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

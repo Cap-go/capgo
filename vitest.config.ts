@@ -4,12 +4,12 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
   test: {
-    reporters: ['default', 'html'],
-    coverage: {
-      enabled: false,
-      provider: 'v8',
-      reporter: ['html'],
-    },
+    // reporters: ['default', 'html'],
+    // coverage: {
+    //   enabled: false,
+    //   provider: 'v8',
+    //   reporter: ['html'],
+    // },
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,

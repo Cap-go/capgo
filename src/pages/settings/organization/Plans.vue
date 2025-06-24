@@ -7,18 +7,17 @@ import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
-
-const displayStore = useDisplayStore()
 
 interface PlansOrgData {
   stats: {
@@ -67,6 +66,7 @@ const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
+const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -211,17 +211,16 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
       }
     }
 
-    displayStore.dialogOption = {
-      header: t('cannot-view-plans'),
-      message: `${t('plans-super-only')}`,
+    dialogStore.openDialog({
+      title: t('cannot-view-plans'),
+      description: `${t('plans-super-only')}`,
       buttons: [
         {
           text: t('ok'),
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
     if (!prevOrg)
       router.push('/app')
     else
@@ -298,16 +297,15 @@ const hightLights = computed<Stat[]>(() => ([
       if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
         return
 
-      displayStore.dialogOption = {
-        header: t('detailed-usage-plan'),
-        message: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
+      dialogStore.openDialog({
+        title: t('detailed-usage-plan'),
+        description: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
         buttons: [
           {
             text: t('ok'),
           },
         ],
-      }
-      displayStore.showDialog = true
+      })
     },
   },
   {

@@ -7,19 +7,20 @@ import { toast } from 'vue-sonner'
 import Plus from '~icons/heroicons/plus'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const { t } = useI18n()
 const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
 const hasNewInvitation = ref(false)
+const orgNameInput = ref('')
 
 onClickOutside(dropdown, () => closeDropdown())
 
@@ -34,9 +35,9 @@ onMounted(async () => {
 
 async function handleOrganizationInvitation(org: Organization) {
   const newName = t('alert-accept-inviation').replace('%ORG%', org.name)
-  displayStore.dialogOption = {
-    header: t('alert-confirm-invite'),
-    message: `${newName}`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-invite'),
+    description: `${newName}`,
     buttons: [
       {
         text: t('button-join'),
@@ -94,9 +95,9 @@ async function handleOrganizationInvitation(org: Organization) {
         role: 'cancel',
       },
     ],
-  }
-  displayStore.showDialog = true
+  })
 }
+
 function closeDropdown() {
   if (dropdown.value) {
     dropdown.value.removeAttribute('open')
@@ -117,14 +118,12 @@ function onOrganizationClick(org: Organization) {
 }
 
 async function createNewOrg() {
-  displayStore.dialogOption = {
-    header: t('create-new-org'),
-    message: `${t('type-new-org-name')}`,
-    input: true,
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-lg',
-    buttonCenter: true,
+  orgNameInput.value = ''
+
+  dialogStore.openDialog({
+    title: t('create-new-org'),
+    description: `${t('type-new-org-name')}`,
+    size: 'lg',
     buttons: [
       {
         text: t('button-cancel'),
@@ -134,8 +133,12 @@ async function createNewOrg() {
         text: t('button-confirm'),
         id: 'confirm-button',
         handler: async () => {
-          const orgName = displayStore.dialogInputText
-          // console.log('new org', orgName)
+          const orgName = orgNameInput.value
+          if (!orgName) {
+            toast.error(t('org-name-required'))
+            return false
+          }
+
           const { error } = await supabase.from('orgs')
             .insert({
               name: orgName,
@@ -146,7 +149,7 @@ async function createNewOrg() {
           if (error) {
             console.error('Error when creating org', error)
             toast.error(error.code === '23505' ? t('org-with-this-name-exists') : t('cannot-create-org'))
-            return
+            return false
           }
 
           toast.success(t('org-created-successfully'))
@@ -164,9 +167,8 @@ async function createNewOrg() {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 </script>
 
@@ -202,5 +204,17 @@ async function createNewOrg() {
     <button v-show="!currentOrganization" class="btn btn-outline border-gray-300 dark:border-gray-600 w-full btn-sm text-slate-300 dark:text-white" @click="createNewOrg">
       <Plus class="mx-auto" />
     </button>
+
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('create-new-org')" to="#dialog-v2-content" defer>
+      <div class="w-full">
+        <input
+          v-model="orgNameInput"
+          type="text"
+          :placeholder="t('organization-name')"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          @keydown.enter="$event.preventDefault()"
+        >
+      </div>
+    </Teleport>
   </div>
 </template>

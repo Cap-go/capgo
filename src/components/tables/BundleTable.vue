@@ -13,7 +13,7 @@ import IconTrash from '~icons/heroicons/trash'
 import { appIdToUrl, bytesToMbText } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 
 const props = defineProps<{
   appId: string
@@ -26,7 +26,7 @@ const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
 const showSteps = ref(false)
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
@@ -48,55 +48,68 @@ function onboardingDone() {
   reload()
   showSteps.value = !showSteps.value
 }
+
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
-async function didCancel(name: string, isPlural = false, askForMethod = true): Promise<boolean | 'normal' | 'unsafe'> {
+
+async function showDeletionMethodDialog(): Promise<'normal' | 'unsafe' | null> {
   let method: 'normal' | 'unsafe' | null = null
-  if (askForMethod) {
-    displayStore.dialogOption = {
-      header: t('select-style-of-deletion'),
-      message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">${t('here')}</a>`),
-      buttons: [
-        {
-          text: t('normal'),
-          role: 'normal',
-          handler: () => {
-            method = 'normal'
-          },
+
+  dialogStore.openDialog({
+    title: t('select-style-of-deletion'),
+    description: t('select-style-of-deletion-msg'),
+    buttons: [
+      {
+        text: t('normal'),
+        role: 'secondary',
+        handler: () => {
+          method = 'normal'
         },
-        {
-          text: t('unsafe'),
-          role: 'danger',
-          id: 'unsafe',
-          handler: async () => {
-            if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
-              toast.error(t('no-permission-ask-super-admin'))
-              return
-            }
-            method = 'unsafe'
-          },
+      },
+      {
+        text: t('unsafe'),
+        role: 'danger',
+        handler: async () => {
+          if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(props.appId), ['super_admin'])) {
+            toast.error(t('no-permission-ask-super-admin'))
+            return false
+          }
+          method = 'unsafe'
         },
-      ],
-    }
-    displayStore.showDialog = true
-    if (await displayStore.onDialogDismiss() || !method) {
-      return true
-    }
+      },
+    ],
+  })
+
+  const cancelled = await dialogStore.onDialogDismiss()
+  return cancelled ? null : method
+}
+
+async function showDeleteConfirmationDialog(name: string, isPlural = false, askForMethod = true, _method: 'normal' | 'unsafe' = 'unsafe'): Promise<boolean> {
+  let message: string
+
+  if (isPlural) {
+    message = `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`
+  }
+  else if (askForMethod) {
+    message = `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
   }
   else {
-    method = 'unsafe'
+    const baseMessage = `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`
+    const unsafeWarning = isPlural
+      ? t('you-are-deleting-unsafely-plural')
+      : t('you-are-deleting-unsafely')
+    const formattedWarning = unsafeWarning
+      .replace('$1', '<b><u>')
+      .replace('$2', '</u></b>')
+      .replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">')
+      .replace('$4', '</a>')
+    message = `${baseMessage}\n${formattedWarning}.`
   }
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: isPlural
-      ? `${t('alert-not-reverse-message')} ${t('alert-delete-message-plural')} ${t('bundles').toLowerCase()}?`
-      : askForMethod
-        ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
-        : !isPlural
-            ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\n${t('you-are-deleting-unsafely').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">').replace('$4', '</a>')}.`
-            : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\n${t('you-are-deleting-unsafely-plural').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle">').replace('$4', '</a>')}.`,
 
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: message,
     buttons: [
       {
         text: t('button-cancel'),
@@ -105,17 +118,57 @@ async function didCancel(name: string, isPlural = false, askForMethod = true): P
       {
         text: t('button-delete'),
         role: 'danger',
-        id: 'confirm-button',
       },
     ],
+  })
+
+  return !await dialogStore.onDialogDismiss()
+}
+
+async function didCancel(name: string, isPlural = false, askForMethod = true): Promise<boolean | 'normal' | 'unsafe'> {
+  let method: 'normal' | 'unsafe' | null = null
+
+  if (askForMethod) {
+    method = await showDeletionMethodDialog()
+    if (!method)
+      return true // User cancelled
   }
-  displayStore.showDialog = true
-  if (await displayStore.onDialogDismiss())
-    return true
-  if (method === null)
-    throw new Error('Unreachable, method = null')
+  else {
+    method = 'unsafe'
+  }
+
+  const confirmed = await showDeleteConfirmationDialog(name, isPlural, askForMethod, method)
+  if (!confirmed)
+    return true // User cancelled
+
   return method
 }
+
+async function showUnlinkDialog(message: string): Promise<boolean> {
+  let shouldUnlink = false
+
+  dialogStore.openDialog({
+    title: t('want-to-unlink'),
+    description: message,
+    buttons: [
+      {
+        text: t('no'),
+        role: 'cancel',
+      },
+      {
+        text: t('yes'),
+        role: 'primary',
+        handler: () => {
+          shouldUnlink = true
+        },
+      },
+    ],
+  })
+
+  const cancelled = await dialogStore.onDialogDismiss()
+  return !cancelled && shouldUnlink
+}
+
 async function enhenceVersionElems(dataVersions: Database['public']['Tables']['app_versions']['Row'][]) {
   const { data: dataVersionsMeta } = await supabase
     .from('app_versions_meta')
@@ -127,6 +180,7 @@ async function enhenceVersionElems(dataVersions: Database['public']['Tables']['a
   })
   return newVersions
 }
+
 async function getData() {
   isLoading.value = true
   try {
@@ -187,6 +241,7 @@ async function getData() {
   }
   isLoading.value = false
 }
+
 async function fetchChannelsForVersions(versions: Element[]) {
   const versionIds = versions.map(v => v.id)
   const { data: channelData, error } = await supabase
@@ -203,6 +258,7 @@ async function fetchChannelsForVersions(versions: Element[]) {
     channelCache.value[id] = channel ? { name: channel.name, id: channel.id } : { name: '' }
   })
 }
+
 async function refreshData() {
   try {
     currentPage.value = 1
@@ -215,11 +271,10 @@ async function refreshData() {
     console.error(error)
   }
 }
-async function deleteOne(one: Element) {
-  // console.log('deleteBundle', bundle)
 
+async function deleteOne(one: Element) {
   try {
-    // todo: fix this for AB testing
+    // Check for linked channels
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
       .select('id, name, version(name)')
@@ -228,30 +283,16 @@ async function deleteOne(one: Element) {
 
     let unlink = [] as Database['public']['Tables']['channels']['Row'][]
     if ((channelFound && channelFound.length) || errorChannel) {
-      displayStore.dialogOption = {
-        header: t('want-to-unlink'),
-        message: t('channel-bundle-linked').replace('%', channelFound?.map(ch => `${ch.name} (${ch.version.name})`).join(', ') ?? ''),
-        buttons: [
-          {
-            text: t('yes'),
-            role: 'yes',
-            id: 'yes',
-            handler: () => {
-              if (channelFound)
-                unlink = channelFound as any
-            },
-          },
-          {
-            text: t('no'),
-            id: 'cancel',
-            role: 'cancel',
-          },
-        ],
-      }
-      displayStore.showDialog = true
-      if (await displayStore.onDialogDismiss()) {
+      const message = t('channel-bundle-linked').replace('%', channelFound?.map(ch => `${ch.name} (${ch.version.name})`).join(', ') ?? '')
+      const shouldUnlink = await showUnlinkDialog(message)
+
+      if (!shouldUnlink) {
         toast.error(t('canceled-delete'))
         return
+      }
+
+      if (channelFound) {
+        unlink = channelFound as any
       }
     }
 
@@ -432,36 +473,20 @@ async function massDelete() {
       rawChannel: data,
     }
   })
-  console.log('linkedChannels', linkedChannels)
 
   const linkedChannelsList = linkedChannels.filter(({ channelFound }) => channelFound)
-  console.log('linkedChannelsList', linkedChannelsList)
   let unlink = [] as Database['public']['Tables']['channels']['Row'][]
+
   if (linkedChannelsList.length > 0) {
-    displayStore.dialogOption = {
-      header: t('want-to-unlink'),
-      message: t('channel-bundle-linked').replace('%', linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join(', ') ?? ''),
-      buttons: [
-        {
-          text: t('yes'),
-          role: 'yes',
-          id: 'yes',
-          handler: () => {
-            unlink = linkedChannelsList.map(val => val.rawChannel) as any
-          },
-        },
-        {
-          text: t('no'),
-          id: 'cancel',
-          role: 'cancel',
-        },
-      ],
-    }
-    displayStore.showDialog = true
-    if (await displayStore.onDialogDismiss()) {
+    const message = t('channel-bundle-linked').replace('%', linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join(', ') ?? '')
+    const shouldUnlink = await showUnlinkDialog(message)
+
+    if (!shouldUnlink) {
       toast.error(t('canceled-delete'))
       return
     }
+
+    unlink = linkedChannelsList.map(val => val.rawChannel) as any
   }
 
   if (unlink.length > 0) {
@@ -530,6 +555,7 @@ async function openOne(one: Element) {
     return
   router.push(`/app/p/${appIdToUrl(props.appId)}/bundle/${one.id}`)
 }
+
 watch(props, async () => {
   await refreshData()
   role.value = await organizationStore.getCurrentRoleForApp(props.appId)
@@ -547,12 +573,31 @@ watch(props, async () => {
       filter-text="Filters"
       mass-select
       :is-loading="isLoading"
-      :search-placeholder="t('search-bundle-id')"
-      @add="showSteps = !showSteps"
-      @reload="reload()" @reset="refreshData()"
+      :search-placeholder="t('search-by-name')"
+      @set-selection="selectedElementsFilter"
       @mass-delete="massDelete()"
-      @select-row="selectedElementsFilter"
+      @reload="reload()" @reset="refreshData()"
     />
+
     <StepsBundle v-else :onboarding="!total" :app-id="props.appId" @done="onboardingDone" @close-step="showSteps = !showSteps" />
+
+    <!-- Teleport Content for Deletion Style Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-style-of-deletion')" defer to="#dialog-v2-content">
+      <div class="mt-4 space-y-3">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {{ t('select-style-of-deletion-recommendation') }}
+        </p>
+        <p class="text-sm">
+          {{ t('select-style-of-deletion-link') }}
+          <a
+            href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
+            target="_blank"
+            class="text-blue-500 underline hover:text-blue-600 ml-1"
+          >
+            {{ t('here') }}
+          </a>
+        </p>
+      </div>
+    </Teleport>
   </div>
 </template>

@@ -14,6 +14,7 @@ import iconName from '~icons/ph/user?raw'
 import IconVersion from '~icons/radix-icons/update'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -23,13 +24,17 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const router = useRouter()
 const main = useMainStore()
+const dialogStore = useDialogV2Store()
 const isLoading = ref(false)
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
+const mfaVerificationCode = ref('')
+const mfaQRCode = ref('')
+
 async function deleteAccount() {
-  displayStore.dialogOption = {
-    header: t('are-u-sure'),
+  dialogStore.openDialog({
+    title: t('are-u-sure'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -100,9 +105,8 @@ async function deleteAccount() {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function copyAccountId() {
@@ -114,18 +118,17 @@ async function copyAccountId() {
   catch (err) {
     console.error('Failed to copy: ', err)
     // Display a modal with the copied key
-    displayStore.dialogOption = {
-      header: t('cannot-copy'),
-      message: main!.user!.id,
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: main!.user!.id,
       buttons: [
         {
           text: t('button-cancel'),
           role: 'cancel',
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
 }
 
@@ -141,8 +144,8 @@ const acronym = computed(() => {
 })
 
 async function presentActionSheet() {
-  displayStore.dialogOption = {
-    header: t('change-your-picture'),
+  dialogStore.openDialog({
+    title: t('change-your-picture'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -153,20 +156,21 @@ async function presentActionSheet() {
       },
       {
         text: t('button-camera'),
+        role: 'primary',
         handler: () => {
           takePhoto('update-account', isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
       {
         text: t('button-browse'),
+        role: 'secondary',
         handler: () => {
           pickPhoto('update-account', isLoading, 'user', t('something-went-wrong-try-again-later'))
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
@@ -227,14 +231,14 @@ async function handleMfa() {
       return
     }
 
-    displayStore.dialogOption = {
-      header: t('enable-2FA'),
-      message: `${t('mfa-enable-instruction')}`,
-      image: data.totp.qr_code,
-      headerStyle: 'w-full text-center',
-      textStyle: 'w-full text-center',
-      size: 'max-w-lg',
-      buttonCenter: true,
+    // Store QR code for display
+    mfaQRCode.value = data.totp.qr_code
+
+    // Step 1: Show QR code
+    dialogStore.openDialog({
+      title: t('enable-2FA'),
+      description: `${t('mfa-enable-instruction')}`,
+      size: 'lg',
       preventAccidentalClose: true,
       buttons: [
         {
@@ -242,65 +246,58 @@ async function handleMfa() {
           id: 'verify',
         },
       ],
-    }
-    displayStore.showDialog = true
-    const didCancel = await displayStore.onDialogDismiss()
+    })
+    const didCancel = await dialogStore.onDialogDismiss()
 
     if (didCancel) {
       // User closed the window, go ahead and unregister mfa
       const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
       if (error)
         console.error('Cannot unregister MFA', unregisterError)
+      mfaQRCode.value = ''
     }
     else {
-      // User has scanned the code - verify his claim
+      // Step 2: User has scanned the code - verify his claim
+      mfaVerificationCode.value = ''
+      mfaQRCode.value = ''
 
-      // Open the dialog
-      displayStore.dialogOption = {
-        header: t('verify-2FA'),
-        message: `${t('mfa-enable-instruction-2')}`,
-        input: true,
-        headerStyle: 'w-full text-center',
-        textStyle: 'w-full text-center',
-        size: 'max-w-lg',
-        buttonCenter: true,
+      dialogStore.openDialog({
+        title: t('verify-2FA'),
+        description: `${t('mfa-enable-instruction-2')}`,
+        size: 'lg',
         preventAccidentalClose: true,
         buttons: [
           {
             text: t('verify'),
             id: 'verify',
-            preventClose: true,
             handler: async () => {
               // User has clicked the "verify button - let's check"
-              const verifyCode = displayStore.dialogInputText.replace(' ', '')
+              const verifyCode = mfaVerificationCode.value.replace(' ', '')
 
               const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
 
               if (challengeError) {
                 toast.error(t('mfa-fail'))
                 console.error('Cannot create MFA challange', challengeError)
-                displayStore.showDialog = false
-                return
+                return false
               }
 
               const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
               if (verifyError) {
                 toast.error(t('mfa-invalid-code'))
-                return
+                return false
               }
 
               toast.success(t('mfa-enabled'))
               mfaEnabled.value = true
               mfaFactorId.value = data.id
-              displayStore.showDialog = false
             },
           },
         ],
-      }
-      displayStore.showDialog = true
+      })
 
       // Check the cancel again
-      const didCancel = await displayStore.onDialogDismiss()
+      const didCancel = await dialogStore.onDialogDismiss()
       if (didCancel) {
         // User closed the window, go ahead and unregister mfa
         const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
@@ -311,9 +308,9 @@ async function handleMfa() {
   }
   else {
     // disable mfa
-    displayStore.dialogOption = {
-      header: t('alert-2fa-disable'),
-      message: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
+    dialogStore.openDialog({
+      title: t('alert-2fa-disable'),
+      description: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
       buttons: [
         {
           text: t('button-cancel'),
@@ -325,9 +322,8 @@ async function handleMfa() {
           id: 'confirm-button',
         },
       ],
-    }
-    displayStore.showDialog = true
-    const canceled = await displayStore.onDialogDismiss()
+    })
+    const canceled = await dialogStore.onDialogDismiss()
 
     // User has changed his mind - keepin 2fa
     if (canceled)
@@ -533,6 +529,24 @@ onMounted(async () => {
         </footer>
       </FormKit>
     </div>
+
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('enable-2FA')" to="#dialog-v2-content" defer>
+      <!-- QR Code display for MFA setup -->
+      <div v-if="mfaQRCode" class="w-full text-center">
+        <img :src="mfaQRCode" alt="QR Code for 2FA setup" class="mx-auto mb-4">
+      </div>
+
+      <!-- MFA verification code input -->
+      <div v-if="!mfaQRCode" class="w-full">
+        <input
+          v-model="mfaVerificationCode"
+          type="text"
+          :placeholder="t('verification-code')"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          @keydown.enter="$event.preventDefault()"
+        >
+      </div>
+    </Teleport>
   </div>
 </template>
 

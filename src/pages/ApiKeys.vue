@@ -2,7 +2,7 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import IconArrowPath from '~icons/heroicons/arrow-path'
 import IconClipboard from '~icons/heroicons/clipboard-document'
@@ -10,11 +10,13 @@ import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
+const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const main = useMainStore()
 const currentPage = ref(1)
@@ -23,6 +25,18 @@ const supabase = useSupabase()
 const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
 const organizationStore = useOrganizationStore()
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
+
+// State for change name dialog
+const newApiKeyName = ref('')
+
+// State for tracking app limitation checkbox
+const limitToAppCheckbox = ref(false)
+
+// State for tracking organization limitation checkbox
+const limitToOrgCheckbox = ref(false)
+
+// Available apps for selection (populated when showing app dialog)
+const availableApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
 // Cache for organization and app names
 const orgCache = ref(new Map<string, string>())
@@ -147,6 +161,16 @@ const filteredKeys = computed(() => {
   )
 })
 
+// Computed property to filter apps based on selected organizations
+const filteredAppsForSelectedOrgs = computed(() => {
+  if (!availableApps.value || displayStore.selectedOrganizations.length === 0) {
+    return []
+  }
+  return (availableApps.value as any).filter((app: Database['public']['Tables']['apps']['Row']) =>
+    displayStore.selectedOrganizations.includes(app.owner_org),
+  )
+})
+
 columns.value = [
   {
     key: 'mode',
@@ -241,138 +265,96 @@ async function getKeys(retry = true): Promise<void> {
   isLoading.value = false
 }
 
-async function addNewApiKey() {
-  console.log('displayStore.dialogCheckbox', organizationStore.organizations)
-  if (await showAddNewKeyModal())
-    return
-
-  const keyType = displayStore.lastButtonRole
-
-  let databaseKeyType: 'read' | 'write' | 'all' | 'upload'
-
-  switch (keyType) {
-    case 'cancel':
-    case '':
+async function loadAllApps() {
+  try {
+    const { data: apps, error } = await supabase.from('apps').select('*')
+    if (error) {
+      console.error('Cannot load apps:', error)
       return
-    case 'read-button':
-      databaseKeyType = 'read'
-      break
-    case 'upload-button':
-      databaseKeyType = 'upload'
-      break
-    case 'write-button':
-      databaseKeyType = 'write'
-      break
-    case 'all-button':
-      databaseKeyType = 'all'
-      break
-    default:
-      return
-  }
-
-  let selectedOrganizations = [] as string[]
-  if (displayStore.dialogCheckbox) {
-    displayStore.unsetDialogCheckbox()
-    displayStore.dialogOption = {
-      header: t('alert-confirm-org-limit'),
-      message: t('alert-confirm-org-limit-message'),
-      textStyle: 'mb-5',
-      listOrganizations: true,
-      checkboxText: t('limit-to-app'),
-      checkboxStyle: 'mb-0 mt-10',
-      buttons: [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button-confirm'),
-          id: 'confirm-button',
-        },
-      ],
     }
-    displayStore.showDialog = true
-    if (await displayStore.onDialogDismiss())
-      return
-    selectedOrganizations = displayStore.selectedOrganizations
-    if (selectedOrganizations.length === 0) {
+    availableApps.value = apps || []
+  }
+  catch (err) {
+    console.error('Error loading apps:', err)
+  }
+}
+
+async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
+  // Get selections from the dialog
+  const limitToOrg = limitToOrgCheckbox.value
+  const limitToApp = limitToAppCheckbox.value
+
+  let finalSelectedOrganizations: string[] = []
+  if (limitToOrg) {
+    finalSelectedOrganizations = [...displayStore.selectedOrganizations]
+    if (finalSelectedOrganizations.length === 0) {
       toast.error(t('alert-no-org-selected'))
-      return
+      return false
     }
   }
 
-  let selectedApps = [] as Database['public']['Tables']['apps']['Row'][]
-  // check if the users wants to limit the api key to a specific app
-  if (displayStore.dialogCheckbox) {
-    displayStore.unsetDialogCheckbox()
-    const { data: apps, error } = await supabase.from('apps').select('*').in('owner_org', selectedOrganizations)
-    if (error) {
-      console.error('Cannot get apps for api key', error)
-      return
-    }
-
-    if (error) {
-      toast.error(t('cannot-get-apps'))
-      console.error('Cannot get apps for api key', error)
-      return
-    }
-
-    if (apps.length === 0) {
-      toast.error(selectedOrganizations.length === 1 ? t('no-apps-found') : t('no-apps-found-plural'))
-      return
-    }
-
-    displayStore.dialogOption = {
-      header: t('alert-confirm-appid-limit'),
-      message: t('alert-confirm-appid-limit-message'),
-      listApps: apps,
-      textStyle: 'mb-5',
-      buttons: [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('button-confirm'),
-          id: 'confirm-button',
-        },
-      ],
-    }
-    displayStore.showDialog = true
-    if (await displayStore.onDialogDismiss())
-      return
-    selectedApps = displayStore.selectedApps as any as Database['public']['Tables']['apps']['Row'][]
-    if (selectedApps.length === 0) {
+  let finalSelectedApps: Database['public']['Tables']['apps']['Row'][] = []
+  if (limitToApp) {
+    finalSelectedApps = Array.from(displayStore.selectedApps) as any
+    if (finalSelectedApps.length === 0) {
       toast.error(t('alert-no-app-selected'))
-      return
+      return false
     }
   }
 
-  const newApiKey = crypto.randomUUID()
-  const { data: { user } } = await supabase.auth.getUser()
+  try {
+    const newApiKey = crypto.randomUUID()
+    const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    console.log('Not logged in, cannot regenerate API key')
-    return
+    if (!user) {
+      console.log('Not logged in, cannot create API key')
+      toast.error('Not logged in')
+      return false
+    }
+
+    const { data, error } = await supabase
+      .from('apikeys')
+      .upsert({
+        user_id: user.id,
+        key: newApiKey,
+        mode: keyType,
+        name: '',
+        limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : null,
+        limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : null,
+      })
+      .select()
+
+    if (error) {
+      console.error('Error creating API key:', error)
+      toast.error('Failed to create API key')
+      return false
+    }
+
+    keys.value?.push(data[0])
+    // Fetch org and app names for the new key
+    await fetchOrgAndAppNames()
+    toast.success(t('add-api-key'))
+    return true
   }
+  catch (error) {
+    console.error('Error creating API key:', error)
+    toast.error('Failed to create API key')
+    return false
+  }
+}
 
-  const { data, error } = await supabase
-    .from('apikeys')
-    .upsert({
-      user_id: user.id,
-      key: newApiKey,
-      mode: databaseKeyType as 'read' | 'write' | 'all' | 'upload',
-      name: '',
-      limited_to_orgs: selectedOrganizations.length > 0 ? selectedOrganizations : null,
-      limited_to_apps: selectedApps.length > 0 ? selectedApps.map(app => app.app_id) : null,
-    })
-    .select()
+async function addNewApiKey() {
+  // Clear global state
+  displayStore.selectedOrganizations = []
+  displayStore.selectedApps = []
+  limitToOrgCheckbox.value = false
+  limitToAppCheckbox.value = false
 
-  if (error)
-    throw error
+  // Load all apps for selection
+  await loadAllApps()
 
-  keys.value?.push(data[0])
-  toast.success(t('add-api-key'))
+  // Show API key type selection modal with options
+  await showAddNewKeyModal()
 }
 
 async function regenrateKey(app: Database['public']['Tables']['apikeys']['Row']) {
@@ -418,40 +400,36 @@ async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
 }
 
 async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
-  const currentName = key.name
-  displayStore.dialogInputText = currentName
+  const currentName = key.name || ''
+  newApiKeyName.value = currentName
 
-  displayStore.dialogOption = {
-    header: t('change-api-key-name'),
-    message: `${t('type-new-name')}`,
-    input: true,
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-lg',
-    buttonCenter: true,
+  dialogStore.openDialog({
+    title: t('change-api-key-name'),
+    description: t('type-new-name'),
+    size: 'lg',
     buttons: [
       {
-        text: t('button-cancel'),
+        text: t('cancel'),
         role: 'cancel',
       },
       {
         text: t('button-confirm'),
-        id: 'confirm-button',
+        role: 'primary',
         handler: async () => {
-          const newName = displayStore.dialogInputText
+          const newName = newApiKeyName.value.trim()
           if (currentName === newName) {
             toast.error(t('new-name-not-changed'))
-            return
+            return false
           }
 
           if (newName.length > 32) {
             toast.error(t('new-name-to-long'))
-            return
+            return false
           }
 
           if (newName.length < 4) {
             toast.error(t('new-name-to-short'))
-            return
+            return false
           }
 
           const { error } = await supabase.from('apikeys')
@@ -461,29 +439,27 @@ async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
           if (error) {
             toast.error(t('cannot-change-name'))
             console.error(error)
-            return
+            return false
           }
 
           toast.success(t('changed-name'))
           keys.value = keys.value?.map((k) => {
             if (key.id === k.id)
               k.name = newName
-
             return k
           })
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 // This returns true if user has canceled the action
 async function showRegenerateKeyModal() {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-regenerate'),
-    message: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-regenerate'),
+    description: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -491,18 +467,17 @@ async function showRegenerateKeyModal() {
       },
       {
         text: t('button-regenerate'),
-        id: 'confirm-button',
+        role: 'primary',
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function showDeleteKeyModal() {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -511,18 +486,16 @@ async function showDeleteKeyModal() {
       {
         text: t('button-delete'),
         role: 'danger',
-        id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function showAddNewKeyModal() {
-  displayStore.dialogOption = {
-    header: t('alert-add-new-key'),
-    message: t('alert-generate-new-key'),
+  dialogStore.openDialog({
+    title: t('alert-add-new-key'),
+    description: t('alert-generate-new-key'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -531,50 +504,84 @@ async function showAddNewKeyModal() {
       {
         text: t('key-read'),
         id: 'read-button',
+        role: 'secondary',
+        handler: () => createApiKey('read'),
       },
       {
         text: t('key-upload'),
         id: 'upload-button',
+        role: 'secondary',
+        handler: () => createApiKey('upload'),
       },
       {
         text: t('write-key'),
         id: 'write-button',
+        role: 'secondary',
+        handler: () => createApiKey('write'),
       },
       {
         text: t('key-all'),
         id: 'all-button',
+        role: 'primary',
+        handler: () => createApiKey('all'),
       },
     ],
-    checkboxText: t('limit-to-org'),
-    checkboxStyle: 'mb-0 mt-14',
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+function handleOrgSelection(orgId: string, checked: boolean) {
+  if (checked) {
+    if (!displayStore.selectedOrganizations.includes(orgId)) {
+      displayStore.selectedOrganizations.push(orgId)
+    }
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  else {
+    displayStore.selectedOrganizations = displayStore.selectedOrganizations.filter(id => id !== orgId)
+  }
+}
+
+function handleAppSelection(app: Database['public']['Tables']['apps']['Row'], checked: boolean) {
+  if (checked) {
+    if (!(displayStore.selectedApps as any).find((a: Database['public']['Tables']['apps']['Row']) => a.app_id === app.app_id)) {
+      displayStore.selectedApps.push(app as any)
+    }
+  }
+  else {
+    displayStore.selectedApps = (displayStore.selectedApps as any).filter((a: Database['public']['Tables']['apps']['Row']) => a.app_id !== app.app_id)
+  }
 }
 
 async function copyKey(app: Database['public']['Tables']['apikeys']['Row']) {
   try {
     await navigator.clipboard.writeText(app.key)
-    console.log('displayStore.messageToast', displayStore.messageToast)
     toast.success(t('key-copied'))
   }
   catch (err) {
     console.error('Failed to copy: ', err)
     // Display a modal with the copied key
-    displayStore.dialogOption = {
-      header: t('cannot-copy-key'),
-      message: app.key,
+    dialogStore.openDialog({
+      title: t('cannot-copy-key'),
+      description: app.key,
       buttons: [
         {
-          text: t('button-cancel'),
-          role: 'cancel',
+          text: t('ok'),
+          role: 'primary',
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
 }
+// Watch for organization checkbox changes to reset app limitation
+watch(() => limitToOrgCheckbox.value, (newVal) => {
+  if (!newVal) {
+    // If org limitation is unchecked, reset app limitation
+    limitToAppCheckbox.value = false
+    displayStore.selectedApps = []
+  }
+})
+
 displayStore.NavTitle = t('api-keys')
 displayStore.defaultBack = '/app'
 getKeys()
@@ -613,5 +620,135 @@ getKeys()
         </div>
       </div>
     </div>
+
+    <!-- Teleport Content for Add New Key Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
+      <div class="space-y-4 mt-4">
+        <!-- Limit to Organizations -->
+        <div class="flex items-center gap-2">
+          <input
+            id="limit-to-org"
+            v-model="limitToOrgCheckbox"
+            type="checkbox"
+            class="checkbox"
+          >
+          <label for="limit-to-org" class="text-sm">
+            {{ t('limit-to-org') }}
+          </label>
+        </div>
+        <div v-if="limitToOrgCheckbox" class="pl-6">
+          <div class="space-y-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
+              <input
+                :id="`org-${org.gid}`"
+                :value="org.gid"
+                type="checkbox"
+                class="checkbox"
+                @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
+              >
+              <label :for="`org-${org.gid}`" class="text-sm">
+                {{ org.name }}
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Limit to Apps (only show if orgs are selected) -->
+        <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex items-center gap-2">
+          <input
+            id="limit-to-app"
+            v-model="limitToAppCheckbox"
+            type="checkbox"
+            class="checkbox"
+          >
+          <label for="limit-to-app" class="text-sm">
+            {{ t('limit-to-app') }}
+          </label>
+        </div>
+        <div v-if="limitToAppCheckbox && displayStore.selectedOrganizations.length > 0" class="pl-6">
+          <div class="space-y-2 max-h-32 overflow-y-auto border rounded-lg p-2">
+            <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex items-center gap-2">
+              <input
+                :id="`app-${app.app_id}`"
+                :value="app"
+                type="checkbox"
+                class="checkbox"
+                @change="handleAppSelection(app, ($event.target as HTMLInputElement).checked)"
+              >
+              <label :for="`app-${app.app_id}`" class="text-sm">
+                {{ app.name }}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Change Name Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('change-api-key-name')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div>
+          <label for="api-key-name" class="block text-sm font-medium mb-2">{{ t('name') }}</label>
+          <input
+            v-model="newApiKeyName"
+            type="text"
+            :placeholder="t('type-new-name')"
+            class="input input-bordered w-full"
+            maxlength="32"
+          >
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Organization Selection Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div class="max-h-64 overflow-y-auto border rounded-lg p-2">
+          <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
+            <input
+              :id="`org-select-${org.gid}`"
+              :value="org.gid"
+              type="checkbox"
+              class="checkbox"
+              @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
+            >
+            <label :for="`org-select-${org.gid}`" class="text-sm">
+              {{ org.name }}
+            </label>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mt-4">
+          <input
+            id="limit-to-app-org"
+            v-model="limitToOrgCheckbox"
+            type="checkbox"
+            class="checkbox"
+          >
+          <label for="limit-to-app-org" class="text-sm">
+            {{ t('limit-to-app') }}
+          </label>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for App Selection Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div class="max-h-64 overflow-y-auto border rounded-lg p-2">
+          <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
+            <input
+              :id="`app-${app.app_id}`"
+              :value="app"
+              type="checkbox"
+              class="checkbox"
+              @change="handleAppSelection(app as any, ($event.target as HTMLInputElement).checked)"
+            >
+            <label :for="`app-${app.app_id}`" class="text-sm">
+              {{ app.name }}
+            </label>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

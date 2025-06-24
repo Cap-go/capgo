@@ -2,6 +2,7 @@
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -12,7 +13,7 @@ import IconTrash from '~icons/heroicons/trash'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -37,7 +38,7 @@ type Element = Database['public']['Tables']['channels']['Row'] & Channel
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const offset = 10
 const { t } = useI18n()
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
 const router = useRouter()
@@ -49,15 +50,17 @@ const isLoading = ref(true)
 const currentPage = ref(1)
 const versionId = ref<number>()
 const filters = ref()
+const newChannelName = ref('')
+
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
 const { currentOrganization } = storeToRefs(organizationStore)
 
 async function didCancel(name: string) {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -66,12 +69,10 @@ async function didCancel(name: string) {
       {
         text: t('button-delete'),
         role: 'danger',
-        id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 function findUnknownVersion() {
@@ -202,6 +203,18 @@ async function deleteOne(one: Element) {
   if (await didCancel(t('channel')))
     return
   try {
+    // First delete channel_devices
+    const { error: delDevicesError } = await supabase
+      .from('channel_devices')
+      .delete()
+      .eq('channel_id', one.id)
+
+    if (delDevicesError) {
+      toast.error(t('cannot-delete-channel'))
+      return
+    }
+
+    // Then delete the channel
     const { error: delChanError } = await supabase
       .from('channels')
       .delete()
@@ -284,9 +297,9 @@ async function showAddModal() {
     return
   }
 
-  displayStore.dialogOption = {
-    header: t('channel-create'),
-    input: true,
+  newChannelName.value = ''
+  dialogStore.openDialog({
+    title: t('channel-create'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -294,19 +307,20 @@ async function showAddModal() {
       },
       {
         text: t('button-confirm'),
-        id: 'confirm-button',
+        role: 'primary',
         handler: async () => {
-          const newName = displayStore.dialogInputText
-          console.log('newName', newName)
-          if (!newName)
+          const name = newChannelName.value.trim()
+          console.log('newName', name)
+          if (!name) {
             toast.error(t('missing-name'))
-          await addChannel(newName)
+            return false
+          }
+          await addChannel(name)
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  await displayStore.onDialogDismiss()
+  })
+  await dialogStore.onDialogDismiss()
 }
 
 async function openOneVersion(one: Element) {
@@ -333,5 +347,16 @@ watch(props, async () => {
       @add="showAddModal"
       @reload="reload()" @reset="refreshData()"
     />
+
+    <!-- Teleport Content for Add Channel Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-create')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <FormKit
+          v-model="newChannelName"
+          type="text"
+          :placeholder="t('channel-name-placeholder')"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>

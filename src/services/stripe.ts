@@ -2,16 +2,15 @@ import type { ComposerTranslation } from 'petite-vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useSupabase } from './supabase'
-
-const displayStore = useDisplayStore()
 
 async function presentActionSheetOpen(url: string) {
   const { t } = useI18n()
+  const dialogStore = useDialogV2Store()
 
-  displayStore.dialogOption = {
-    header: t('open-in-new-tab'),
+  dialogStore.openDialog({
+    title: t('open-in-new-tab'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -25,9 +24,8 @@ async function presentActionSheetOpen(url: string) {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 export function openBlank(link: string) {
   console.log('openBlank', link)
@@ -39,6 +37,8 @@ export function openBlank(link: string) {
 export async function openPortal(orgId: string, t: ComposerTranslation) {
   let url = ''
   const supabase = useSupabase()
+  const dialogStore = useDialogV2Store()
+
   const session = await supabase.auth.getSession()
   if (!session)
     return
@@ -51,9 +51,9 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
     }
   })
 
-  displayStore.dialogOption = {
-    header: t('open-your-portal'),
-    message: t('stripe-billing-portal-will-be-opened-in-a-new-tab'),
+  dialogStore.openDialog({
+    title: t('open-your-portal'),
+    description: t('stripe-billing-portal-will-be-opened-in-a-new-tab'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -62,6 +62,7 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
       {
         text: t('button-confirm'),
         id: 'confirm-button',
+        role: 'primary',
         handler: async () => {
           await prem
           if (url)
@@ -71,9 +72,8 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
