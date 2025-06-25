@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { UserResponse } from '@supabase/supabase-js'
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
@@ -9,72 +8,42 @@ import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { getPlans, isAdmin } from './../services/supabase'
 
-async function updateUser(main: ReturnType<typeof useMainStore>, supabase: SupabaseClient, auth: UserResponse['data'], next: NavigationGuardNext, to: RouteLocationNormalized, from: RouteLocationNormalized) {
-  if (!auth.user || !main.user)
-    return
+async function updateUser(main: ReturnType<typeof useMainStore>, supabase: SupabaseClient, next: NavigationGuardNext) {
   const config = getLocalConfig()
-
-  main.auth = auth.user
   // console.log('set auth', auth)
-  if (!main.user) {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select()
-        .eq('id', main.auth?.id)
-        .single()
-      if (!error && data) {
-        // console.log('set user', data)
-        if (main.auth?.email && data.email !== main.auth?.email) {
-          // update email after user updated is uath email
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({ email: main.auth?.email })
-            .eq('id', main.auth?.id)
-          if (updateError)
-            console.error('update error', updateError)
-          data.email = main.auth?.email
-        }
-        main.user = data
-        setUser(main.auth?.id, {
-          email: main.auth?.email,
-          nickname: main.auth?.user_metadata?.nickname,
-          avatar: main.auth?.user_metadata?.avatar_url,
-        }, config.supaHost)
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select()
+      .eq('id', main.auth?.id)
+      .single()
+    if (!error && data) {
+      // console.log('set user', data)
+      if (main.auth?.email && data.email !== main.auth?.email) {
+        // update email after user updated is uath email
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ email: main.auth?.email })
+          .eq('id', main.auth?.id)
+        if (updateError)
+          console.error('update error', updateError)
+        data.email = main.auth?.email
       }
-      else {
-        return next('/onboarding/verify_email')
-      }
+      main.user = data
+      setUser(main.auth?.id ?? '', {
+        email: main.auth?.email,
+        nickname: main.auth?.user_metadata?.nickname,
+        avatar: main.auth?.user_metadata?.avatar_url,
+      }, config.supaHost)
     }
-    catch (error) {
-      console.error('auth', error)
+    else {
       return next('/onboarding/verify_email')
     }
   }
-
-  getPlans().then((pls) => {
-    main.plans = pls
-  })
-
-  // TODO: fix stunning to work with orgs custiner id
-  // initStunning(main.user?.customer_id)
-  isAdmin(main.auth?.id).then((res) => {
-    main.isAdmin = res
-  })
-
-  sendEvent({
-    channel: 'user-login',
-    event: 'User Login',
-    icon: '✅',
-    user_id: main.auth.id,
-    notify: false,
-  }).catch()
-
-  if ((!main.auth?.user_metadata?.activation || !main.auth?.user_metadata?.activation.legal) && !to.path.includes('/onboarding') && !from.path.includes('/onboarding'))
-    next('/onboarding/activation')
-  else
-    next()
-  hideLoader()
+  catch (error) {
+    console.error('auth', error)
+    return next('/onboarding/verify_email')
+  }
 }
 
 async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, from: RouteLocationNormalized) {
@@ -97,7 +66,34 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
     return next(`/login?to=${to.path}`)
 
   if (auth.user && !main.auth) {
-    await updateUser(main, supabase, auth, next, to, from)
+    main.auth = auth.user
+    if (!main.user) {
+      await updateUser(main, supabase, next)
+    }
+
+    getPlans().then((pls) => {
+      main.plans = pls
+    })
+
+    // TODO: fix stunning to work with orgs custiner id
+    // initStunning(main.user?.customer_id)
+    isAdmin(main.auth?.id).then((res) => {
+      main.isAdmin = res
+    })
+
+    sendEvent({
+      channel: 'user-login',
+      event: 'User Login',
+      icon: '✅',
+      user_id: main.auth?.id,
+      notify: false,
+    }).catch()
+
+    if ((!main.auth?.user_metadata?.activation || !main.auth?.user_metadata?.activation.legal) && !to.path.includes('/onboarding') && !from.path.includes('/onboarding'))
+      next('/onboarding/activation')
+    else
+      next()
+    hideLoader()
   }
   else if (from.path !== 'login' && !auth.user) {
     main.auth = undefined
