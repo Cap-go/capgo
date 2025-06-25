@@ -57,7 +57,7 @@ export const inlineAnnotationPlugin = {
         ctx.restore()
 
         ctx.save()
-        ctx.fillStyle = color || '#000'
+        ctx.fillStyle = color ?? '#000'
         ctx.font = `${font.size}px sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'

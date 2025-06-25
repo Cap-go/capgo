@@ -74,7 +74,7 @@ async function getUsage(orgId: string) {
     totalBandwidth = bytesToGb(latestUsage.bandwidth)
   }
 
-  const basePrice = currentPlan?.price_m || 0
+  const basePrice = currentPlan?.price_m ?? 0
 
   const calculatePrice = (total: number, base: number, unit: number) => total <= base ? 0 : (total - base) * unit
 

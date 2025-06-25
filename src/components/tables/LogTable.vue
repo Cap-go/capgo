@@ -113,7 +113,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/stats`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt || ''}`,
+          'authorization': `Bearer ${currentJwt ?? ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,
@@ -158,7 +158,7 @@ columns.value = [
     mobile: true,
     class: 'truncate max-w-8',
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.created_at ?? ''),
   },
   {
     label: t('device-id'),

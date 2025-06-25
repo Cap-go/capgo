@@ -35,7 +35,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   }
   const pluginVersion = parse(plugin_version)
   if (greaterThan(pluginVersion, parse('4.13.0')))
-    res.session_key = version.session_key || ''
+    res.session_key = version.session_key ?? ''
   if (greaterThan(pluginVersion, parse('4.4.0')))
     res.checksum = version.checksum
   if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
@@ -178,12 +178,12 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    const version = channelOverride?.version || channelData.version
-    const manifestEntries = channelOverride?.manifestEntries || channelData.manifestEntries
+    const version = channelOverride?.version ?? channelData.version
+    const manifestEntries = channelOverride?.manifestEntries ?? channelData.manifestEntries
     device.version = versionData ? versionData.id : version.id
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
-    // const xForwardedFor = headers['x-forwarded-for'] || ''
+    // const xForwardedFor = headers['x-forwarded-for'] ?? ''
     // // console.log(c.get('requestId'), 'xForwardedFor', xForwardedFor)
     // const ip = xForwardedFor.split(',')[1]
     // console.log(c.get('requestId'), 'IP', ip)
@@ -367,7 +367,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
     const startBundleUrl = performance.now()
-    let signedURL = version.external_url || ''
+    let signedURL = version.external_url ?? ''
     let manifest: ManifestEntry[] = []
     if (!version.external_url) {
       if (version.r2_path) {

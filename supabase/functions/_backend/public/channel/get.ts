@@ -52,7 +52,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     return c.json(newObject)
   }
   else {
-    const fetchOffset = body.page == null ? 0 : body.page
+    const fetchOffset = body.page ?? 0
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataChannels, error: dbError } = await supabaseAdmin(c)

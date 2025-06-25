@@ -54,7 +54,7 @@ export function shallowCleanObject(obj: Record<string, unknown>) {
 
 // function to fix semver 1.0 to 1.0.0 any verssion missing . should add .0 also should work for 1
 export function fixSemver(version: string) {
-  const nbPoint = (version.match(/\./g) || []).length
+  const nbPoint = (version.match(/\./g) ?? []).length
   if (nbPoint === 0)
     return `${version}.0.0`
   if (nbPoint === 1)

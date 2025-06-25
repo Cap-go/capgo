@@ -1,8 +1,8 @@
 import ky from 'ky'
 
 async function ipapi(ip: string, lang = 'en') {
-  ip = ip || ''
-  lang = lang || 'en'
+  ip = ip ?? ''
+  lang = lang ?? 'en'
 
   const langs = ['en', 'de', 'es', 'pt-BR', 'fr', 'ja', 'zh-CN', 'ru']
 

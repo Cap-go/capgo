@@ -151,7 +151,7 @@ export class UploadHandler {
     const uploadMetadata = parseUploadMetadata(c.req.raw.headers)
     const checksum = parseChecksum(c.req.raw.headers)
 
-    const r2Key = uploadMetadata.filename || ''
+    const r2Key = uploadMetadata.filename ?? ''
     if (r2Key == null) {
       console.log('in DO', 'files create', 'r2Key is null')
       return c.text('bad filename metadata', 400)
@@ -331,7 +331,7 @@ export class UploadHandler {
   // finished, we retrieve the object from R2 and recompute the digest.
   async appendBody(r2Key: string, body: ReadableStream<Uint8Array>, uploadOffset: number, uploadInfo: StoredUploadInfo): Promise<number> {
     const uploadLength = uploadInfo.uploadLength
-    if ((uploadLength || 0) > MAX_UPLOAD_LENGTH_BYTES) {
+    if ((uploadLength ?? 0) > MAX_UPLOAD_LENGTH_BYTES) {
       await this.cleanup(r2Key)
       console.log('files append body', 'Upload-Length exceeds maximum upload size')
       throw new HTTPException(413, { message: 'Upload-Length exceeds maximum upload size' })
@@ -589,7 +589,7 @@ export class UploadHandler {
       if (r2Key != null) {
         await this.hydrateParts(
           r2Key,
-          await this.state.storage.get(UPLOAD_OFFSET_KEY) || 0,
+          await this.state.storage.get(UPLOAD_OFFSET_KEY) ?? 0,
           await this.state.storage.get(UPLOAD_INFO_KEY) || {},
         )
         if (this.multipart != null) {

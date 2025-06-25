@@ -746,14 +746,14 @@ async function deleteBundle() {
             <!-- session_key -->
             <InfoRow
               v-if="version.session_key" :label="t('session_key')" :is-link="true"
-              @click="copyToast(version?.session_key || '')"
+              @click="copyToast(version?.session_key ?? '')"
             >
               {{ hideString(version.session_key) }}
             </InfoRow>
             <!-- version.external_url -->
             <InfoRow
               v-if="version.external_url" :label="t('url')" :is-link="true"
-              @click="copyToast(version?.external_url || '')"
+              @click="copyToast(version?.external_url ?? '')"
             >
               {{ version.external_url }}
             </InfoRow>

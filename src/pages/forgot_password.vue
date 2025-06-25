@@ -46,8 +46,8 @@ async function submit(form: { email: string, password: string, password_confirm:
   else if (step.value === 2 && route.hash) {
     const queryString = route.hash.replace('#', '')
     const urlParams = new URLSearchParams(queryString)
-    const access_token = urlParams.get('access_token') || ''
-    const refresh_token = urlParams.get('refresh_token') || ''
+    const access_token = urlParams.get('access_token') ?? ''
+    const refresh_token = urlParams.get('refresh_token') ?? ''
     // login with access_token
     const { error } = await supabase.auth.setSession({ refresh_token, access_token })
     if (error) {

@@ -53,7 +53,7 @@ onMounted(async () => {
 })
 
 const acronym = computed(() => {
-  const words = appRef.value?.name?.split(' ') || []
+  const words = appRef.value?.name?.split(' ') ?? []
   let res = appRef.value?.name?.slice(0, 2) || 'AP'
   if (words?.length > 2)
     res = words[0][0] + words[1][0]
@@ -469,7 +469,7 @@ async function transferAppOwnership() {
                 type="text"
                 name="app_id"
                 :prefix-icon="iconName"
-                :value="appRef?.app_id || ''"
+                :value="appRef?.app_id ?? ''"
                 :label="t('app-id')"
                 :disabled="true"
               />
@@ -477,7 +477,7 @@ async function transferAppOwnership() {
                 type="text"
                 name="app_name"
                 :prefix-icon="iconName"
-                :value="appRef?.name || ''"
+                :value="appRef?.name ?? ''"
                 :label="t('app-name')"
               />
               <div :key="forceBump" class="flex flex-row">
@@ -509,7 +509,7 @@ async function transferAppOwnership() {
                 number="integer"
                 name="retention"
                 :prefix-icon="gearSix"
-                :value="appRef?.retention || 0"
+                :value="appRef?.retention ?? 0"
                 :label="t('retention')"
               />
               <FormKit

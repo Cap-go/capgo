@@ -324,7 +324,7 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
       .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isGoodPlan error', orgId, error })
@@ -338,7 +338,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
       .rpc('is_onboarded_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isOnboarded error', orgId, error })
@@ -379,7 +379,7 @@ export async function isOnboardingNeeded(c: Context, userId: string): Promise<bo
       .rpc('is_onboarding_needed_org', { orgid: userId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isOnboardingNeeded error', userId, error })
@@ -393,7 +393,7 @@ export async function isCanceledOrg(c: Context, orgId: string): Promise<boolean>
       .rpc('is_canceled_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isCanceled error', orgId, error })
@@ -407,7 +407,7 @@ export async function isPayingOrg(c: Context, orgId: string): Promise<boolean> {
       .rpc('is_paying_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isPayingOrg error', orgId, error })
@@ -421,7 +421,7 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
       .rpc('is_trial_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || 0
+    return data ?? 0
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isTrialOrg error', orgId, error })
@@ -436,7 +436,7 @@ export async function isAdmin(c: Context, userId: string): Promise<boolean> {
   if (error)
     throw new Error(error.message)
 
-  return data || false
+  return data ?? false
 }
 
 export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boolean> {
@@ -445,7 +445,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
       .rpc('is_allowed_action_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg error', orgId, error })
@@ -723,25 +723,25 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
 export async function readDeviceUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readBandwidthUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_bandwidth_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readStatsStorageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_storage_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readStatsSB(c: Context, app_id: string, period_start?: string, period_end?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
@@ -791,7 +791,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
     return []
   }
 
-  return data || []
+  return data ?? []
 }
 
 export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
@@ -838,7 +838,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
     return []
   }
 
-  return data || []
+  return data ?? []
 }
 
 export async function countDevicesSB(c: Context, app_id: string) {
@@ -846,7 +846,7 @@ export async function countDevicesSB(c: Context, app_id: string) {
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
-  return count || 0
+  return count ?? 0
 }
 
 const DEFAUL_PLAN_NAME = 'Solo'
@@ -860,7 +860,7 @@ export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise
   if (error)
     throw new Error(error.message)
 
-  return data || DEFAUL_PLAN_NAME
+  return data  ?? DEFAUL_PLAN_NAME
 }
 
 interface UpdateStats {

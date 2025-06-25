@@ -214,7 +214,7 @@ async function fetchDeployHistory() {
 
     deployHistory.value = filteredData
 
-    total.value = count || 0
+    total.value = count ?? 0
   }
   catch (error) {
     console.error('Error fetching deploy history:', error)

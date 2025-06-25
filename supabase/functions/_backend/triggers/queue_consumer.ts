@@ -141,7 +141,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
                 name: '📈 Status Code Distribution',
                 value: Object.entries(
                   failureDetails.reduce((acc, detail) => {
-                    acc[detail.status] = (acc[detail.status] || 0) + 1
+                    acc[detail.status] = (acc[detail.status] ?? 0) + 1
                     return acc
                   }, {} as Record<number, number>),
                 ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),

@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { fetchLimit } from '../../utils/utils.ts'
 
 export async function get(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {
@@ -41,8 +42,8 @@ export async function get(c: Context, appId: string, apikey: Database['public'][
 export async function getAll(c: Context, apikey: Database['public']['Tables']['apikeys']['Row'], page?: number, limit?: number, orgId?: string): Promise<Response> {
   try {
     // Default limit to 50 if not specified
-    const itemsPerPage = limit || 50
-    const currentPage = page || 0
+    const itemsPerPage = limit ?? fetchLimit
+    const currentPage = page ?? 0
     const offset = currentPage * itemsPerPage
 
     let query = supabaseAdmin(c)

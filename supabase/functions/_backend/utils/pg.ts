@@ -82,7 +82,7 @@ export async function isAllowedActionOrgActionPg(c: Context, drizzleCient: Retur
     const result = await drizzleCient.execute<{ is_allowed: boolean }>(
       sql.join(sqls),
     )
-    return result[0]?.is_allowed || false
+    return result[0]?.is_allowed ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })
@@ -108,7 +108,7 @@ export async function isAllowedActionOrgActionD1(c: Context, drizzleCient: Retur
     )`
     const fullQuery = drizzleCient.select({ is_allowed: subQuery }).from(sql`(SELECT 1)`)
     const result = await fullQuery
-    return result[0]?.is_allowed || false
+    return result[0]?.is_allowed ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrgActionD1', error })
@@ -124,7 +124,7 @@ export async function isAllowedActionOrgPg(c: Context, drizzleCient: ReturnType<
       sql`SELECT is_allowed_action_org(${orgId}) AS is_allowed`,
     )
 
-    return result[0]?.is_allowed || false
+    return result[0]?.is_allowed ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg', error })

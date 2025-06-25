@@ -50,7 +50,7 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 
     cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-    const checkout = await createCheckout(c as any, org.customer_id, body.reccurence || 'month', body.priceId || 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl || `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+    const checkout = await createCheckout(c as any, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return c.json({ url: checkout.url })
   }
   catch (error) {

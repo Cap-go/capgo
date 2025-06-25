@@ -122,7 +122,7 @@ async function customDeviceOverwritePart4(
 ) {
   dialogStore.openDialog({
     title: t('confirm-overwrite'),
-    description: t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name || '').replace('$3', channel.value?.version.name || ''),
+    description: t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name ?? '').replace('$3', channel.value?.version.name ?? ''),
     buttons: [
       {
         text: t('no'),
@@ -164,7 +164,7 @@ async function customDeviceOverwritePart5(
       app_id: route.params.package as string,
       channel_id: Number(route.params.channel),
       device_id: deviceId.toLowerCase(),
-      owner_org: channel.value?.owner_org || '',
+      owner_org: channel.value?.owner_org ?? '',
     })
 
   if (overwriteError) {

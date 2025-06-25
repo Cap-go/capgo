@@ -15,11 +15,11 @@ app.get('/', async (c) => {
     const countTotal = await getTotalAppsByModeCF(c as any, mode)
     const data = await getTopAppsCF(c as any, mode, 100)
 
-    const totalCategory = countTotal || 0
+    const totalCategory = countTotal ?? 0
 
     if (data) {
       return c.json({
-        apps: data || [],
+        apps: data ?? [],
         // calculate percentage usage
         usage: ((totalCategory * 100) / countTotal).toFixed(2),
       })

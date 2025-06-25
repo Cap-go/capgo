@@ -2,9 +2,11 @@ import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { fetchLimit } from '../../utils/utils.ts'
 
 const bodySchema = z.object({
   orgId: z.string().optional(),
+  page: z.number().optional(),
 })
 const orgSchema = z.object({
   id: z.string().uuid(),
@@ -52,9 +54,14 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     return c.json(dataParsed.data)
   }
   else {
+    const fetchOffset = body.page ?? 0
+    const from = fetchOffset * fetchLimit
+    const to = (fetchOffset + 1) * fetchLimit - 1
+
     const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
       .from('orgs')
       .select('*')
+      .range(from, to)
     if (error) {
       console.error('Cannot get organizations', error)
       return c.json({ status: 'Cannot get organizations', error: error.message }, 500)

@@ -122,7 +122,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
-    return (perm && perms.includes(perm)) || false
+    return (perm && perms.includes(perm)) ?? false
   }
 
   const setCurrentOrganizationToMain = () => {

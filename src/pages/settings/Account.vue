@@ -415,7 +415,7 @@ onMounted(async () => {
                   autocomplete="given-name"
                   :prefix-icon="iconName"
                   :disabled="isLoading"
-                  :value="main.user?.first_name || ''"
+                  :value="main.user?.first_name ?? ''"
                   validation="required:trim"
                   enterkeyhint="next"
                   autofocus
@@ -430,7 +430,7 @@ onMounted(async () => {
                   :prefix-icon="iconName"
                   :disabled="isLoading"
                   enterkeyhint="next"
-                  :value="main.user?.last_name || ''"
+                  :value="main.user?.last_name ?? ''"
                   validation="required:trim"
                   :label="t('last-name')"
                 />
@@ -454,7 +454,7 @@ onMounted(async () => {
                   name="country"
                   :prefix-icon="iconFlag"
                   :disabled="isLoading"
-                  :value="main.user?.country || ''"
+                  :value="main.user?.country ?? ''"
                   enterkeyhint="send"
                   validation="required:trim"
                   :label="t('country')"
