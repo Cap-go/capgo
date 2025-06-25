@@ -14,6 +14,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -31,6 +32,7 @@ interface Stat {
   }
 }
 const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const { t } = useI18n()
 const main = useMainStore()
 const router = useRouter()
@@ -227,9 +229,9 @@ async function loadData() {
 }
 
 async function didCancel(name: string) {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -241,9 +243,8 @@ async function didCancel(name: string) {
         id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function upsertDevChannel(device: string, channelId: number) {

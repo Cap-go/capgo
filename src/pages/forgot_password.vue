@@ -9,16 +9,18 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute('/forgot_password')
 const supabase = useSupabase()
+const dialogStore = useDialogV2Store()
 const step = ref(1)
 const turnstileToken = ref('')
+const mfaCode = ref('')
 
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
-const displayStore = useDisplayStore()
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
@@ -75,31 +77,30 @@ async function submit(form: { email: string, password: string, password_confirm:
         return
       }
 
-      displayStore.dialogOption = {
-        header: t('alert-2fa-required'),
-        message: t('alert-2fa-required-message'),
+      mfaCode.value = ''
+      dialogStore.openDialog({
+        title: t('alert-2fa-required'),
+        description: t('alert-2fa-required-message'),
         preventAccidentalClose: true,
-        input: true,
         buttons: [
           {
             text: t('button-confirm'),
-            role: 'confirm',
+            role: 'primary',
             handler: async () => {
               const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
                 factorId: factor.id,
                 challengeId: challenge.id,
-                code: displayStore.dialogInputText.replace(' ', ''),
+                code: mfaCode.value.replace(' ', ''),
               })
               if (errorVerify) {
-                displayStore.showDialog = true
                 toast.error(t('invalid-mfa-code'))
+                return false // Prevent dialog from closing
               }
             },
           },
         ],
-      }
-      displayStore.showDialog = true
-      await displayStore.onDialogDismiss()
+      })
+      await dialogStore.onDialogDismiss()
     }
     const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
     isLoading.value = false
@@ -230,6 +231,26 @@ watchEffect(() => {
         </div>
       </div>
     </section>
+
+    <!-- Teleport Content for 2FA Input -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-2fa-required')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div>
+          <label for="mfa-code" class="block text-sm font-medium mb-2">{{ t('enter-2fa-code') }}</label>
+          <input
+            v-model="mfaCode"
+            type="text"
+            placeholder="123456"
+            class="input input-bordered w-full"
+            maxlength="6"
+            inputmode="numeric"
+          >
+        </div>
+        <div class="text-sm text-gray-500">
+          {{ t('enter-the-6-digit-code-from-your-authenticator-app') }}
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 

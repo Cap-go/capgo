@@ -4,12 +4,13 @@ import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb } from '~/services/conversion'
 import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
@@ -20,8 +21,8 @@ const initialLoad = ref(true)
 const route = useRoute()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
-const displayStore = useDisplayStore()
 const router = useRouter()
+const dialogStore = useDialogV2Store()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -168,17 +169,16 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
     const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
 
-    displayStore.dialogOption = {
-      header: paying ? t('cannot-view-usage') : t('cannot-show'),
-      message: paying ? t('usage-super-only') : t('not-paying-org-usage'),
+    dialogStore.openDialog({
+      title: paying ? t('cannot-view-usage') : t('cannot-show'),
+      description: paying ? t('usage-super-only') : t('not-paying-org-usage'),
       buttons: [
         {
           text: t('ok'),
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
     if (!prevOrg)
       router.push('/app')
     else

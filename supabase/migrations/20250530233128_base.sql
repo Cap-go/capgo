@@ -7082,6 +7082,9 @@ SELECT
 SELECT
   pgmq.create ('on_deploy_history_create');
 
+SELECT
+  pgmq.create ('admin_stats');
+
 -- CREATE ALL CRON JOBS
 SELECT
   cron.schedule (

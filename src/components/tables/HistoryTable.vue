@@ -7,7 +7,7 @@ import { toast } from 'vue-sonner'
 import { appIdToUrl } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 
 // Define custom type for deploy_history since it doesn't exist in Database types
@@ -45,7 +45,7 @@ const { t } = useI18n()
 const router = useRouter()
 const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 
 const deployHistory = ref<DeployHistory[]>([])
 const loading = ref(true)
@@ -237,12 +237,13 @@ async function handleRollback(item: DeployHistory) {
     return
   }
 
-  displayStore.dialogOption = {
-    header: t('rollback-to-version'),
-    message: t('confirm-rollback-desc'),
+  dialogStore.openDialog({
+    title: t('rollback-to-version'),
+    description: t('confirm-rollback-desc'),
     buttons: [
       {
         text: t('confirm'),
+        role: 'primary',
         handler: async () => {
           try {
             const { error } = await supabase
@@ -271,8 +272,8 @@ async function handleRollback(item: DeployHistory) {
         role: 'cancel',
       },
     ],
-  }
-  displayStore.showDialog = true
+  })
+  await dialogStore.onDialogDismiss()
 }
 
 watch([() => props.channelId, () => props.appId], () => {

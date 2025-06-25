@@ -37,7 +37,7 @@ async function guard(next: any, to: string, from: string) {
           .eq('id', main.auth?.id)
           .single()
         if (!error && data) {
-          console.log('set user', data)
+          // console.log('set user', data)
           if (main.auth?.email && data.email !== main.auth?.email) {
             // update email after user updated is uath email
             const { error: updateError } = await supabase

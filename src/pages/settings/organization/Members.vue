@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type VueTurnstile from 'vue-turnstile'
 import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
@@ -7,17 +8,18 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 // Import actual components instead of raw svg
+import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
+
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const supabase = useSupabase()
@@ -26,8 +28,27 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
+const dialogStore = useDialogV2Store()
+const emailInput = ref('')
+
+// Invite new user form state
+const inviteUserEmail = ref('')
+const inviteUserRole = ref('')
+const inviteUserFirstName = ref('')
+const inviteUserLastName = ref('')
+const inviteUserOrgId = ref('')
+const captchaToken = ref('')
+const captchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
+const isSubmittingInvite = ref(false)
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 
 const members = ref([] as ExtendedOrganizationMembers)
+
+const isInviteFormValid = computed(() => {
+  return inviteUserFirstName.value.trim() !== ''
+    && inviteUserLastName.value.trim() !== ''
+    && captchaToken.value !== ''
+})
 
 const filteredMembers = computed(() => {
   if (!search.value)
@@ -116,10 +137,10 @@ function validateEmail(email: string) {
 
 async function showPermModal(invite: boolean): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
   let permision: Database['public']['Enums']['user_min_right'] | undefined
-  displayStore.dialogOption = {
-    header: t('select-user-perms'),
-    message: t('select-user-perms-expanded'),
-    size: 'max-w-fit',
+  dialogStore.openDialog({
+    title: t('select-user-perms'),
+    description: t('select-user-perms-expanded'),
+    size: 'lg',
     buttons: [
       {
         text: t('button-cancel'),
@@ -127,35 +148,34 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
       },
       {
         text: t('key-read'),
-        role: 'read',
+        role: 'secondary',
         handler: () => permision = invite ? 'invite_read' : 'read',
       },
       {
         text: t('key-upload'),
-        role: 'upload',
+        role: 'secondary',
         handler: () => permision = invite ? 'invite_upload' : 'upload',
       },
       {
         text: t('key-write'),
-        role: 'write',
+        role: 'secondary',
         handler: () => permision = invite ? 'invite_write' : 'write',
       },
       {
         text: t('key-admin'),
-        role: 'admin',
+        role: 'secondary',
         handler: () => permision = invite ? 'invite_admin' : 'admin',
       },
       ...(isSuperAdmin()
         ? [{
             text: t('key-super-admin'),
-            role: 'super_admin',
+            role: 'secondary' as const,
             handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
           }]
         : []),
     ],
-  }
-  displayStore.showDialog = true
-  await displayStore.onDialogDismiss()
+  })
+  await dialogStore.onDialogDismiss()
   return permision
 }
 
@@ -168,9 +188,10 @@ async function showInviteModal() {
   let permisionPromise: Promise<Database['public']['Enums']['user_min_right'] | undefined> | undefined
   let email: string | undefined
 
-  displayStore.dialogOption = {
-    header: t('insert-invite-email'),
-    input: true,
+  emailInput.value = ''
+
+  dialogStore.openDialog({
+    title: t('insert-invite-email'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -179,26 +200,26 @@ async function showInviteModal() {
       {
         text: t('button-invite'),
         id: 'confirm-button',
+        role: 'primary',
         handler: async () => {
-          email = displayStore.dialogInputText
+          email = emailInput.value
 
           if (!email) {
             toast.error(t('missing-email'))
-            return
+            return false
           }
 
           if (!validateEmail(email)) {
             toast.error(t('invalid-email'))
-            return
+            return false
           }
 
           permisionPromise = showPermModal(true)
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  await displayStore.onDialogDismiss()
+  })
+  await dialogStore.onDialogDismiss()
   const permision = permisionPromise ? await permisionPromise : undefined
 
   if (!permision || !email)
@@ -230,7 +251,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
       return
     }
 
-    handleSendInvitationOutput(data, email, type)
+    await handleSendInvitationOutput(data, email, type)
     await reloadData()
   }
   catch (error) {
@@ -242,7 +263,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   }
 }
 
-function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']) {
+async function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right']) {
   console.log('Output: ', output)
   if (!output)
     return
@@ -250,27 +271,21 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
     toast.success(t('org-invited-user'))
   }
   else if (output === 'TOO_RECENT_INVITATION_CANCELATION') {
-    displayStore.dialogOption = {
-      header: t('error'),
-      message: t('too-recent-invitation-cancelation'),
+    dialogStore.openDialog({
+      title: t('error'),
+      description: t('too-recent-invitation-cancelation'),
       buttons: [
         {
           text: t('ok'),
-          role: 'ok',
+          role: 'primary',
         },
       ],
-    }
-    displayStore.showDialog = true
+    })
   }
   else if (output === 'NO_EMAIL') {
     const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
-    if (captchaKey) {
-      displayStore.showInviteNewUserWithoutAccountDialog = {
-        email,
-        role: type,
-        orgId: currentOrganization.value?.gid ?? '',
-        refreshFunction: reloadData,
-      }
+    if (captchaKey.value) {
+      await showInviteNewUserDialog(email, type)
     }
     else {
       toast.error(t('cannot_invite_user_without_account'))
@@ -314,9 +329,9 @@ async function rescindInvitation(email: string) {
 }
 
 async function didCancel() {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -328,9 +343,8 @@ async function didCancel() {
         id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  const didCancel = await displayStore.onDialogDismiss()
+  })
+  const didCancel = await dialogStore.onDialogDismiss()
   return didCancel
 }
 
@@ -487,6 +501,100 @@ function canDelete(member: ExtendedOrganizationMember) {
 
   return currentUserIsAdmin
 }
+
+async function showInviteNewUserDialog(email: string, roleType: Database['public']['Enums']['user_min_right']) {
+  // Reset form state
+  inviteUserEmail.value = email
+  inviteUserRole.value = roleType.replace(/_/g, ' ')
+  inviteUserOrgId.value = currentOrganization.value?.gid ?? ''
+  inviteUserFirstName.value = ''
+  inviteUserLastName.value = ''
+  captchaToken.value = ''
+  isSubmittingInvite.value = false
+
+  // Reset captcha if available
+  if (captchaElement.value) {
+    captchaElement.value.reset()
+  }
+
+  dialogStore.openDialog({
+    title: t('invite-new-user-dialog-header', 'Invite New User'),
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('send-invitation', 'Send Invitation'),
+        role: 'primary',
+        handler: handleInviteNewUserSubmit,
+      },
+    ],
+  })
+
+  await dialogStore.onDialogDismiss()
+}
+
+async function handleInviteNewUserSubmit() {
+  if (isSubmittingInvite.value)
+    return false
+
+  if (!inviteUserFirstName.value.trim()) {
+    toast.error(t('first-name-required', 'First name is required'))
+    return false
+  }
+
+  if (!inviteUserLastName.value.trim()) {
+    toast.error(t('last-name-required', 'Last name is required'))
+    return false
+  }
+
+  if (!captchaToken.value) {
+    toast.error(t('captcha-required', 'Captcha verification is required'))
+    return false
+  }
+
+  isSubmittingInvite.value = true
+
+  try {
+    // Extract the actual role without 'invite_' prefix
+    const inviteType = inviteUserRole.value.replace(/\s+/g, '_').replace('invite_', '')
+
+    const { error } = await supabase.functions.invoke('private/invite_new_user_to_org', {
+      body: {
+        email: inviteUserEmail.value,
+        org_id: inviteUserOrgId.value,
+        invite_type: inviteType,
+        captcha_token: captchaToken.value,
+        first_name: inviteUserFirstName.value,
+        last_name: inviteUserLastName.value,
+      },
+    })
+
+    if (error) {
+      console.error('Invitation failed:', error)
+      toast.error(t('invitation-failed', 'Invitation failed'))
+      return false
+    }
+
+    toast.success(t('org-invited-user', 'User has been invited successfully'))
+
+    // Refresh the members list
+    await reloadData()
+
+    return true // Success
+  }
+  catch (error) {
+    console.error('Invitation failed:', error)
+    toast.error(t('invitation-failed', 'Invitation failed'))
+    return false
+  }
+  finally {
+    isSubmittingInvite.value = false
+  }
+}
 </script>
 
 <template>
@@ -513,6 +621,106 @@ function canDelete(member: ExtendedOrganizationMember) {
         @update:columns="columns = $event"
       />
     </div>
+
+    <!-- Teleport for email input dialog -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('insert-invite-email')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <input
+          v-model="emailInput"
+          type="email"
+          :placeholder="t('email')"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          @keydown.enter="$event.preventDefault()"
+        >
+      </div>
+    </Teleport>
+
+    <!-- Teleport for invite new user dialog -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('invite-new-user-dialog-header', 'Invite New User')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <form @submit.prevent="handleInviteNewUserSubmit">
+          <!-- Email (not editable) -->
+          <div class="mb-4">
+            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {{ t('email', 'Email') }}
+            </label>
+            <input
+              v-model="inviteUserEmail"
+              type="email"
+              disabled
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 dark:bg-gray-700 dark:border-gray-600 cursor-not-allowed"
+            >
+          </div>
+
+          <!-- Role (not editable) -->
+          <div class="mb-4">
+            <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {{ t('role', 'Role') }}
+            </label>
+            <input
+              v-model="inviteUserRole"
+              type="text"
+              disabled
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 dark:bg-gray-700 dark:border-gray-600 cursor-not-allowed"
+            >
+          </div>
+
+          <!-- First Name -->
+          <div class="mb-4">
+            <label for="first-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {{ t('first-name', 'First Name') }}
+            </label>
+            <input
+              v-model="inviteUserFirstName"
+              type="text"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
+            >
+          </div>
+
+          <!-- Last Name -->
+          <div class="mb-4">
+            <label for="last-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {{ t('last-name', 'Last Name') }}
+            </label>
+            <input
+              v-model="inviteUserLastName"
+              type="text"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-600"
+            >
+          </div>
+
+          <!-- Captcha -->
+          <div class="mb-4 mt-4">
+            <label for="captcha" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {{ t('captcha', 'Captcha') }}
+            </label>
+            <VueTurnstile v-if="captchaKey" ref="captchaElement" v-model="captchaToken" size="flexible" :site-key="captchaKey" />
+            <div v-else class="text-sm text-gray-600 dark:text-gray-400 text-center py-3 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+              {{ t('captcha-not-available', 'Captcha not available') }}
+            </div>
+          </div>
+
+          <!-- Form Validation Info -->
+          <div class="mt-6 flex flex-col items-center">
+            <p v-if="!isInviteFormValid" class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              {{ t('complete-all-fields', 'Please complete all required fields to continue') }}
+            </p>
+
+            <div class="flex items-center text-xs text-blue-600 dark:text-blue-400 cursor-pointer group relative" :class="{ 'mt-2': isInviteFormValid }">
+              <IconInformation class="w-4 h-4 mr-1" />
+              <span class="font-medium">Why do I need this?</span>
+
+              <!-- Tooltip that appears on hover -->
+              <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg w-60 text-center pointer-events-none">
+                {{ t('captcha-new-user-org-tooltip') }}
+                <!-- Tooltip arrow -->
+                <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800" />
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </Teleport>
   </div>
 </template>
 

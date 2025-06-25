@@ -88,7 +88,7 @@ onMounted(() => {
                 'btn btn-primary': button.role === 'primary',
                 'btn btn-secondary': button.role === 'secondary',
                 'btn btn-error': button.role === 'danger',
-                'btn btn-ghost': button.role === 'cancel',
+                'btn btn-outline': button.role === 'cancel',
                 'btn': !button.role,
               }"
               @click="close(button)"

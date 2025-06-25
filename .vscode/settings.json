@@ -1,7 +1,9 @@
 {
   "i18n-ally.keystyle": "nested",
   "i18n-ally.localesPaths": "messages",
+  "i18n-ally.sourceLanguage": "en",
   "i18n-ally.sortKeys": true,
+  "i18n-ally.enabledFrameworks": ["vue"],
   "i18n-ally.keepFulfilled": true,
   "typescript.tsdk": "node_modules/typescript/lib",
   "editor.codeActionsOnSave": {
