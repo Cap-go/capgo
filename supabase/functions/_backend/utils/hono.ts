@@ -57,7 +57,7 @@ function isUUID(str: string) {
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
   return createMiddleware(async (c, next) => {
     let jwt = c.req.header('authorization')
-    let capgkey_string = c.req.header('capgkey') || c.req.header('x-api-key')
+    let capgkey_string = c.req.header('capgkey') ?? c.req.header('x-api-key')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
 
     // make sure jwt is valid otherwise it means it was an apikey and you need to set it in capgkey_string
