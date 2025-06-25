@@ -22,7 +22,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
       expand: ['items.data.price'], // Correct expand path for retrieve
     })
 
-    console.log({
+    cloudlog({
       requestId: c.get('requestId'),
       context: 'getSubscriptionData',
       // subscriptionsFound: subscriptions.data.length, // Removed - retrieve returns one or throws

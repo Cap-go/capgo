@@ -78,7 +78,7 @@ app.post('/', middlewareAuth, async (c) => {
     return c.body(null, 204) // No content
   }
   catch (e) {
-    console.error(e)
+    cloudlogErr(e)
     return c.json({ status: 'internal_error' }, 500)
   }
 })

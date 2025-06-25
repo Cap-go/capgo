@@ -4,6 +4,8 @@
 import { HTTPException } from 'hono/http-exception'
 import { X_CHECKSUM_SHA256 } from './uploadHandler.ts'
 import { fromBase64 } from './util.ts'
+import { cloudlog } from '../utils/loggin.ts'
+import type { Context } from '@hono/hono'
 
 export interface UploadMetadata {
   filename?: string
@@ -11,9 +13,9 @@ export interface UploadMetadata {
 
 // Parse "Upload-Metadata" header as described in the TUS creation extension
 // https://tus.io/protocols/resumable-upload#upload-metadata
-export function parseUploadMetadata(headers: Headers): UploadMetadata {
+export function parseUploadMetadata(c: Context, headers: Headers): UploadMetadata {
   const uploadMetadata: string | null = headers.get('Upload-Metadata')
-  console.log('parseUploadMetadata', uploadMetadata)
+  cloudlog({ requestId: c.get('requestId'), message: 'parseUploadMetadata', uploadMetadata })
   if (uploadMetadata == null) {
     return {}
   }

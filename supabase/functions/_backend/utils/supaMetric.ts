@@ -98,11 +98,11 @@ export function getCpu(c: Context) {
     .then((lines) => {
       const cpuInfo = getCpuInfo(getOneMetrics('node_cpu_seconds_total', lines))
       const cpuUsage = Math.round(cpuInfo.cpuUsage * 100) / 100
-      // console.log(c.get('requestId'), 'CPU cores info: ', cpuInfo.cores)
-      // console.log(c.get('requestId'), 'CPU cores: ', cpuInfo.numberOfCores)
-      // console.log(c.get('requestId'), 'CPU total: ', cpuInfo.total)
-      // console.log(c.get('requestId'), 'CPU used: ', cpuInfo.used)
-      // console.log(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
+      // cloudlog(c.get('requestId'), 'CPU cores info: ', cpuInfo.cores)
+      // cloudlog(c.get('requestId'), 'CPU cores: ', cpuInfo.numberOfCores)
+      // cloudlog(c.get('requestId'), 'CPU total: ', cpuInfo.total)
+      // cloudlog(c.get('requestId'), 'CPU used: ', cpuInfo.used)
+      // cloudlog(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
       cloudlog({ requestId: c.get('requestId'), message: 'CPU %', cpu: cpuUsage })
       return cpuUsage
     })
@@ -142,8 +142,8 @@ export function getMem(c: Context) {
       const total = getMemTotal(getOneMetrics('node_memory_MemTotal_bytes', lines))
       const percentUsed = 100 - ((available * 100) / total)
       const usedPercentageRound = Math.round(percentUsed * 100) / 100
-      // console.log(c.get('requestId'), 'Memory available: ', available)
-      // console.log(c.get('requestId'), 'Memory free: ', total)
+      // cloudlog(c.get('requestId'), 'Memory available: ', available)
+      // cloudlog(c.get('requestId'), 'Memory free: ', total)
       cloudlog({ requestId: c.get('requestId'), message: 'Memory %', memory: usedPercentageRound })
       return usedPercentageRound
     })

@@ -8,6 +8,7 @@ import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
@@ -30,17 +31,17 @@ app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   try {
     const rawBody = await c.req.json()
-    console.log({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
+    cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
     // Validate the request body using Zod
     const validationResult = inviteUserSchema.safeParse(rawBody)
     if (!validationResult.success) {
-      console.error({ requestId: c.get('requestId'), context: 'validation_error', error: validationResult.error.format() })
+      cloudlogErr({ requestId: c.get('requestId'), context: 'validation_error', error: validationResult.error.format() })
       return c.json({ status: 'Invalid request', errors: validationResult.error.format() }, 400)
     }
 
     const body = validationResult.data
-    console.log({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
+    cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
 
     const authorization = c.get('authorization')
     const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
@@ -147,15 +148,15 @@ app.post('/', middlewareAuth, async (c) => {
       invited_first_name: `${body.first_name}`,
       invited_last_name: `${body.last_name}`,
     }, 'org:invite_new_capgo_user_to_org')
-    console.log({ requestId: c.get('requestId'), context: 'bento_event', bentoEvent })
+    cloudlog({ requestId: c.get('requestId'), context: 'bento_event', bentoEvent })
     if (!bentoEvent) {
-      console.error({ requestId: c.get('requestId'), context: 'bento_event_error', error: 'Failed to track bento event' })
+      cloudlogErr({ requestId: c.get('requestId'), context: 'bento_event_error', error: 'Failed to track bento event' })
       return c.json({ status: 'Failed to invite user', error: 'Failed to track bento event' }, 500)
     }
     return c.json({ status: 'User invited successfully' })
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'error', error })
+    cloudlogErr({ requestId: c.get('requestId'), context: 'error', error })
     if (error instanceof HTTPError) {
       const errorJson = await error.response.json()
       return c.json({ status: 'Failed to invite user', error: JSON.stringify(errorJson) }, 500)
@@ -171,7 +172,7 @@ async function verifyCaptchaToken(c: any, token: string): Promise<boolean> {
   try {
     const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
     if (!captchaSecret) {
-      console.error({ requestId: c.get('requestId'), context: 'captcha_error', error: 'CAPTCHA_SECRET_KEY not set' })
+      cloudlogErr({ requestId: c.get('requestId'), context: 'captcha_error', error: 'CAPTCHA_SECRET_KEY not set' })
       return false
     }
 
@@ -191,14 +192,14 @@ async function verifyCaptchaToken(c: any, token: string): Promise<boolean> {
     const captchaResult = await result.json()
     const captchaResultData = captchaSchema.safeParse(captchaResult)
     if (!captchaResultData.success) {
-      console.error({ requestId: c.get('requestId'), context: 'captcha_error', error: 'Invalid captcha result' })
+      cloudlogErr({ requestId: c.get('requestId'), context: 'captcha_error', error: 'Invalid captcha result' })
       return false
     }
-    console.log({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
+    cloudlog({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
     return captchaResultData.data.success === true
   }
   catch (error) {
-    console.error({ requestId: c.get('requestId'), context: 'captcha_verify_error', error })
+    cloudlogErr({ requestId: c.get('requestId'), context: 'captcha_verify_error', error })
     return false
   }
 }

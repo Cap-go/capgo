@@ -45,7 +45,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean) {
   try {
-    console.log(({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() }))
+    cloudlog(({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() }))
     let {
       version_name,
       version_build,
@@ -140,8 +140,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
     const requestedInto = isV2
-      ? await requestInfosPostgresV2(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
-      : await requestInfosPostgres(platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
+      ? await requestInfosPostgresV2(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClientD1>)
+      : await requestInfosPostgres(c, platform, app_id, device_id, version_name, defaultChannel, drizzleCient as ReturnType<typeof getDrizzleClient>)
     const { versionData, channelOverride } = requestedInto
     let { channelData } = requestedInto
     cloudlog({ requestId: c.get('requestId'), message: `versionData exists ? ${versionData !== undefined}, channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
@@ -182,14 +182,14 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
     // const xForwardedFor = headers['x-forwarded-for'] ?? ''
-    // // console.log(c.get('requestId'), 'xForwardedFor', xForwardedFor)
+    // // cloudlog(c.get('requestId'), 'xForwardedFor', xForwardedFor)
     // const ip = xForwardedFor.split(',')[1]
-    // console.log(c.get('requestId'), 'IP', ip)
+    // cloudlog(c.get('requestId'), 'IP', ip)
     // check if version is created_at more than 4 hours
     // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
 
     // if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
-    //   console.log(c.get('requestId'), 'invalid ip', xForwardedFor, ip)
+    //   cloudlog(c.get('requestId'), 'invalid ip', xForwardedFor, ip)
     //   return c.json({
     //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
     //     error: 'invalid_ip',
@@ -205,7 +205,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       }, 200)
     }
 
-    // console.log(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
+    // cloudlog(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
     if (version_name === version.name) {
       cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
       // TODO: check why this event is send with wrong version_name
@@ -216,7 +216,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
 
     if (channelData) {
-    // console.log(c.get('requestId'), 'check disableAutoUpdateToMajor', device_id)
+    // cloudlog(c.get('requestId'), 'check disableAutoUpdateToMajor', device_id)
       if (!channelData.channels.ios && platform === 'ios') {
         cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, ios is disabled', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disablePlatformIos' }])
@@ -317,7 +317,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         }
       }
 
-      // console.log(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
+      // cloudlog(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
       if (version.name !== 'builtin' && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
         cloudlog({ requestId: c.get('requestId'), message: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative' }])
@@ -393,7 +393,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       // TODO: remove this when all plugin acccept no URL
       signedURL = 'https://404.capgo.app/no.zip'
     }
-    // console.log(c.get('requestId'), 'save stats', device_id)
+    // cloudlog(c.get('requestId'), 'save stats', device_id)
     await backgroundTask(c, Promise.all([
       createStatsVersion(c, version.id, app_id, 'get'),
       sendStatsAndDevice(c, device, [{ action: 'get' }]),

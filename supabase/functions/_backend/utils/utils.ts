@@ -73,7 +73,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       .in('mode', allowed)
       .single()
     if (!data || error) {
-      console.log('Invalid apikey', authorization, allowed, error)
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorization, allowed, error })
       return null
     }
     return data

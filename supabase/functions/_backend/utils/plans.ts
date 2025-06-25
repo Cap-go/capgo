@@ -142,7 +142,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
             cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
           }
 
-          console.log(get_total_stats)
+          cloudlog(get_total_stats)
           if (get_total_stats.mau > (currentPlan?.mau ?? 0)) {
             cloudlog({ requestId: c.get('requestId'), message: 'set_mau_exceeded', orgId, get_total_stats, currentPlan })
             await set_mau_exceeded(c, orgId, true)

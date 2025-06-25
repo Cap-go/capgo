@@ -130,7 +130,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     ])
     const not_paying = users - customers.total - plans.Trial
     cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
-    // console.log(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
+    // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
     const newData: Database['public']['Tables']['global_stats']['Insert'] = {

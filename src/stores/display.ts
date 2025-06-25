@@ -3,7 +3,6 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useDisplayStore = defineStore('display', () => {
-  const toastOption = ref<ActionSheetOption>()
   const NavTitle = ref<string>('')
   const defaultBack = ref<string>('')
   const messageToast = ref<string[]>([])
@@ -13,7 +12,6 @@ export const useDisplayStore = defineStore('display', () => {
   const selectedApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
   return {
-    toastOption,
     messageToast,
     durationToast,
     lastButtonRole,

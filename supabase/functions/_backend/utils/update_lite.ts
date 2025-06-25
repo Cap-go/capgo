@@ -138,7 +138,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
-    const requestedInto = isV2 ? await requestInfosPostgresLiteV2(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
+    const requestedInto = isV2 ? await requestInfosPostgresLiteV2(c, app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(c, app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
 
     const { versionData } = requestedInto
     const { channelData } = requestedInto

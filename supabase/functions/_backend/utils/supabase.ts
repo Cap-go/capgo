@@ -183,7 +183,7 @@ export async function checkAppOwner(c: Context, userId: string | undefined, appI
     return true
   }
   catch (error) {
-    console.error(error)
+    cloudlogErr(error)
     return false
   }
 }

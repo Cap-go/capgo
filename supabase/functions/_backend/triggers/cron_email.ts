@@ -103,8 +103,8 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
 
   const sucessUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
   if (sucessUpdates < 0) {
-    console.error(c.get('requestId'), 'Cannot send email for app, sucessUpdates < 0', weeklyStats, { app_id: appId, email })
-    console.error(c.get('requestId'), 'Invalid stats detected', weeklyStats, { app_id: appId, email })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app, sucessUpdates < 0', error: weeklyStats, metadata: { app_id: appId, email } })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid stats detected', error: weeklyStats, metadata: { app_id: appId, email } })
     return c.json({ status: 'No valid stats available' }, 200)
   }
 

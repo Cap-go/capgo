@@ -49,6 +49,7 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
+import { cloudlog } from '../../supabase/functions/_backend/utils/loggin.ts'
 
 const app = new Hono<MiddlewareKeyVariables>()
 const appTriggers = new Hono<MiddlewareKeyVariables>()
@@ -113,7 +114,7 @@ appTriggers.route('/queue_consumer', queue_consumer)
 app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
 app.all('*', (c) => {
-  console.log('Not found', c.req.url)
+  cloudlog({ requestId: c.get('requestId'), message: 'Not found', url: c.req.url })
   return c.json({ error: 'Not Found' }, 404)
 })
 app.onError(onError('Worker API'))

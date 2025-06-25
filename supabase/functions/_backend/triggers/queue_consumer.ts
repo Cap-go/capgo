@@ -1,4 +1,5 @@
-import type { Context } from 'hono'
+import type { Context } from '@hono/hono'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
@@ -31,10 +32,10 @@ function generateUUID(): string {
 
 async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
   try {
-    const messages = await readQueue(sql, queueName)
+    const messages = await readQueue(c, sql, queueName)
 
     if (!messages) {
-      console.log(`[${queueName}] No messages found in queue or an error occurred.`)
+      cloudlog(`[${queueName}] No messages found in queue or an error occurred.`)
       return
     }
 
@@ -43,12 +44,12 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
       return acc
     }, [[], []] as [typeof messages, typeof messages])
 
-    console.log(`[${queueName}] Processing ${messagesToProcess.length} messages and skipping ${messagesToSkip.length} messages.`)
+    cloudlog(`[${queueName}] Processing ${messagesToProcess.length} messages and skipping ${messagesToSkip.length} messages.`)
 
     // Archive messages that have been read 5 or more times
     if (messagesToSkip.length > 0) {
-      console.log(`[${queueName}] Archiving ${messagesToSkip.length} messages that have been read 5 or more times.`)
-      await archive_queue_messages(sql, queueName, messagesToSkip.map(msg => msg.msg_id))
+      cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that have been read 5 or more times.`)
+      await archive_queue_messages(c, sql, queueName, messagesToSkip.map(msg => msg.msg_id))
     }
 
     // Process messages that have been read less than 5 times
@@ -74,8 +75,8 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
     }))
 
     if (cfIdUpdates.length > 0) {
-      console.log(`[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.`)
-      await mass_edit_queue_messages_cf_ids(sql, cfIdUpdates)
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
+      await mass_edit_queue_messages_cf_ids(c, sql, cfIdUpdates)
     }
 
     // Batch remove all messages that have succeeded
@@ -85,11 +86,11 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
       return acc
     }, [[], []] as [typeof results, typeof results])
     if (successMessages.length > 0) {
-      console.log(`[${queueName}] Deleting ${successMessages.length} successful messages from queue.`)
-      await delete_queue_message_batch(sql, queueName, successMessages.map(msg => msg.msg_id))
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Deleting ${successMessages.length} successful messages from queue.` })
+      await delete_queue_message_batch(c, sql, queueName, successMessages.map(msg => msg.msg_id))
     }
     if (messagesFailed.length > 0) {
-      console.log(`[${queueName}] Failed to process ${messagesFailed.length} messages.`)
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Failed to process ${messagesFailed.length} messages.` })
 
       const timestamp = new Date().toISOString()
       const failureDetails = messagesFailed.map(msg => ({
@@ -168,26 +169,26 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
     }
 
     if (successMessages.length !== messagesToProcess.length) {
-      console.log(`[${queueName}] ${successMessages.length} messages were processed successfully, ${messagesToProcess.length - successMessages.length} messages failed.`)
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] ${successMessages.length} messages were processed successfully, ${messagesToProcess.length - successMessages.length} messages failed.` })
     }
     else {
-      console.log(`[${queueName}] All messages were processed successfully.`)
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] All messages were processed successfully.` })
     }
   }
   catch (error) {
-    console.error(`[${queueName}] Error processing queue:`, error)
+    cloudlogErr({ requestId: c.get('requestId'), message: `[${queueName}] Error processing queue:`, error })
   }
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(sql: ReturnType<typeof getPgClient>, queueName: string) {
+async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
   const queueKey = 'readQueue'
   const startTime = Date.now()
-  console.log(`[${queueKey}] Starting queue read at ${startTime}.`)
+  cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
     const visibilityTimeout = 60
-    console.log(`[${queueKey}] Reading messages from queue: ${queueName}`)
+    cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
     let messages = []
     try {
       messages = await sql`
@@ -196,29 +197,29 @@ async function readQueue(sql: ReturnType<typeof getPgClient>, queueName: string)
       `
     }
     catch (readError) {
-      console.error(`[${queueKey}] Error reading from pgmq queue ${queueName}:`, readError)
+      cloudlogErr({ requestId: c.get('requestId'), message: `[${queueKey}] Error reading from pgmq queue ${queueName}:`, error: readError })
       throw readError
     }
 
     if (!messages || messages.length === 0) {
-      console.log(`[${queueKey}] No new messages found in queue ${queueName}.`)
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] No new messages found in queue ${queueName}.` })
       return
     }
 
-    console.log(`[${queueKey}] Received ${messages.length} messages from queue ${queueName}.`)
+    cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Received ${messages.length} messages from queue ${queueName}.` })
     const parsed = messagesArraySchema.safeParse(messages)
     if (parsed.success) {
       return parsed.data
     }
     else {
-      console.error(`[${queueKey}] Invalid message format:`, parsed.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: `[${queueKey}] Invalid message format:`, error: parsed.error })
     }
   }
   catch (error) {
-    console.error(`[${queueKey}] Error reading queue messages:`, error)
+    cloudlogErr({ requestId: c.get('requestId'), message: `[${queueKey}] Error reading queue messages:`, error })
   }
   finally {
-    console.log(`[${queueKey}] Finished reading queue messages in ${Date.now() - startTime}ms.`)
+    cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Finished reading queue messages in ${Date.now() - startTime}ms.` })
   }
 }
 
@@ -256,7 +257,7 @@ export async function http_post_helper(
   // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
 
   try {
-    console.log(`[${function_name}] Making HTTP POST request to "${url}" with body:`, body)
+    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body })
     const response = await fetch(url, {
       method: 'POST',
       headers,
@@ -266,7 +267,7 @@ export async function http_post_helper(
     return response
   }
   catch (error) {
-    console.error(`[${function_name}] Error making HTTP POST request:`, error)
+    cloudlogErr({ requestId: c.get('requestId'), message: `[${function_name}] Error making HTTP POST request:`, error })
     return new Response('Request Timeout (Internal QUEUE handling error)', { status: 408 })
   }
   finally {
@@ -275,7 +276,7 @@ export async function http_post_helper(
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
-async function delete_queue_message_batch(sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
+async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
@@ -284,13 +285,13 @@ async function delete_queue_message_batch(sql: ReturnType<typeof getPgClient>, q
     `
   }
   catch (error) {
-    console.error(`[Delete Queue Messages] Error deleting messages ${msgIds.join(', ')} from queue ${queueName}:`, error)
+    cloudlogErr({ requestId: c.get('requestId'), message: `[Delete Queue Messages] Error deleting messages ${msgIds.join(', ')} from queue ${queueName}:`, error })
     throw error
   }
 }
 
 // Helper function to archive multiple messages from the queue in a single batch
-async function archive_queue_messages(sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
+async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
@@ -299,13 +300,14 @@ async function archive_queue_messages(sql: ReturnType<typeof getPgClient>, queue
     `
   }
   catch (error) {
-    console.error(`[Archive Queue Messages] Error archiving messages ${msgIds.join(', ')} from queue ${queueName}:`, error)
+    cloudlogErr({ requestId: c.get('requestId'), message: `[Archive Queue Messages] Error archiving messages ${msgIds.join(', ')} from queue ${queueName}:`, error })
     throw error
   }
 }
 
 // Helper function to mass update queue messages with CF IDs
 async function mass_edit_queue_messages_cf_ids(
+  c: Context,
   sql: ReturnType<typeof getPgClient>,
   updates: Array<{ msg_id: number, cf_id: string, queue: string }>,
 ) {
@@ -322,7 +324,7 @@ async function mass_edit_queue_messages_cf_ids(
     `)
   }
   catch (error) {
-    console.error('[Mass Edit CF IDs] Error updating CF IDs:', error)
+    cloudlogErr({ requestId: c.get('requestId'), message: '[Mass Edit CF IDs] Error updating CF IDs:', error })
     throw error
   }
 }
@@ -331,7 +333,7 @@ async function mass_edit_queue_messages_cf_ids(
 export const app = new Hono<MiddlewareKeyVariables>()
 
 // /health endpoint
-app.get('/health', async (c) => {
+app.get('/health', (c) => {
   return c.text('OK', 200)
 })
 
@@ -340,7 +342,7 @@ app.use('/sync', middlewareAPISecret)
 // /sync endpoint
 app.post('/sync', async (c) => {
   const handlerStart = Date.now()
-  console.log(`[Sync Request] Received trigger to process queue.`)
+  cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name
   let body: any
@@ -348,7 +350,7 @@ app.post('/sync', async (c) => {
     body = await c.req.json()
   }
   catch (err) {
-    console.error('[Sync Request] Error parsing JSON body:', err)
+    cloudlogErr({ requestId: c.get('requestId'), message: '[Sync Request] Error parsing JSON body:', error: err })
     return c.text('Invalid or missing JSON body', 400)
   }
   const queueName = body?.queue_name
@@ -358,24 +360,24 @@ app.post('/sync', async (c) => {
 
   try {
     await backgroundTask(c as any, (async () => {
-      console.log(`[Background Queue Sync] Starting background execution for queue: ${queueName}`)
+      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName}` })
       let sql: ReturnType<typeof getPgClient> | null = null
       try {
         sql = getPgClient(c as any)
         await processQueue(c as any, sql, queueName)
-        console.log(`[Background Queue Sync] Background execution finished successfully.`)
+        cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
       }
       finally {
         if (sql)
           await closeClient(c as any, sql)
-        console.log(`[Background Queue Sync] PostgreSQL connection closed.`)
+        cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] PostgreSQL connection closed.` })
       }
     })())
-    console.log(`[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms`)
+    cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
     return c.text('Queue read scheduled', 202)
   }
   catch (error) {
-    console.error('[Sync Request] Error handling sync request trigger:', error)
+    cloudlogErr({ requestId: c.get('requestId'), message: '[Sync Request] Error handling sync request trigger:', error })
     return c.text(error instanceof Error ? error.message : 'Internal server error during sync request trigger', 500)
   }
 })

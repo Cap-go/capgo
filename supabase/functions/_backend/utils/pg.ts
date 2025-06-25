@@ -69,7 +69,7 @@ export function getDrizzleClientD1Session(c: Context) {
 }
 
 export function closeClient(c: Context, client: ReturnType<typeof getPgClient>) {
-  // console.log(c.get('requestId'), 'Closing client', client)
+  // cloudlog(c.get('requestId'), 'Closing client', client)
   return backgroundTask(c, client.end())
 }
 
@@ -146,20 +146,21 @@ function getAliasV2() {
 }
 
 // Helper function to parse manifestEntries
-function parseManifestEntries(data: any, source: string) {
+function parseManifestEntries(c: Context, data: any, source: string) {
   const result = data.at(0)
   if (result && typeof result.manifestEntries === 'string') {
     try {
       result.manifestEntries = JSON.parse(result.manifestEntries)
     }
     catch (e) {
-      console.error(`Error parsing manifestEntries for ${source}:`, e)
+      cloudlogErr({ requestId: c.get('requestId'), message: `Error parsing manifestEntries for ${source}:`, error: e })
     }
   }
   return result
 }
 
 export function requestInfosPostgres(
+  c: Context,
   platform: string,
   app_id: string,
   device_id: string,
@@ -176,7 +177,7 @@ export function requestInfosPostgres(
     .from(versionAlias)
     .where(or(eq(versionAlias.name, version_name), eq(versionAlias.app_id, app_id)))
     .limit(1)
-  console.log('appVersions Query:', appVersionsQuery.toSQL())
+  cloudlog({ requestId: c.get('requestId'), message: 'appVersions Query:', appVersionsQuery: appVersionsQuery.toSQL() })
   const appVersions = appVersionsQuery.then(data => data.at(0))
 
   const channelDeviceQuery = drizzleCient
@@ -222,7 +223,7 @@ export function requestInfosPostgres(
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
-  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDeviceQuery.toSQL() })
   const channelDevice = channelDeviceQuery.then(data => data.at(0))
 
   const channelQuery = drizzleCient
@@ -272,7 +273,7 @@ export function requestInfosPostgres(
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-  console.log('channel Query:', channelQuery.toSQL())
+  cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
 
   return Promise.all([channelDevice, channel, appVersions])
@@ -283,6 +284,7 @@ export function requestInfosPostgres(
 }
 
 export function requestInfosPostgresV2(
+  c: Context,
   platform: string,
   app_id: string,
   device_id: string,
@@ -345,10 +347,10 @@ export function requestInfosPostgresV2(
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
 
-  console.log('channelDevice Query:', channelDeviceQuery.toSQL())
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDeviceQuery.toSQL() })
   const channelDevice = channelDeviceQuery.then((data) => {
-    console.log('channelDevice data:', data)
-    return parseManifestEntries(data, 'channelDevice')
+    cloudlog({ requestId: c.get('requestId'), message: 'channelDevice data:', data })
+    return parseManifestEntries(c, data, 'channelDevice')
   })
 
   const channelQuery = drizzleCient
@@ -399,16 +401,16 @@ export function requestInfosPostgresV2(
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
 
-  console.log('channel Query:', channelQuery.toSQL())
+  cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then((data) => {
-    console.log('channel data:', data)
-    return parseManifestEntries(data, 'channel')
+    cloudlog({ requestId: c.get('requestId'), message: 'channel data:', data })
+    return parseManifestEntries(c, data, 'channel')
   })
 
   return Promise.all([channelDevice, channel, appVersions])
     .then(([channelOverride, channelData, versionData]) => {
       const responseData = { versionData, channelData, channelOverride }
-      console.log('Final response data:', responseData)
+      cloudlog({ requestId: c.get('requestId'), message: 'Final response data:', responseData })
       return responseData
     })
     .catch((e) => {
@@ -422,7 +424,7 @@ export async function getAppOwnerPostgresV2(
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string } } | null> {
   try {
-    console.log('appOwner', appId)
+    cloudlog({ requestId: c.get('requestId'), message: 'appOwner', appId })
     const appOwner = await drizzleCient
       .select({
         owner_org: schemaV2.apps.owner_org,
@@ -436,11 +438,10 @@ export async function getAppOwnerPostgresV2(
       .innerJoin(aliasV2(schemaV2.orgs, 'orgs'), eq(schemaV2.apps.owner_org, schemaV2.orgs.id))
       .limit(1)
       .then(data => data[0])
-    console.log('appOwner result', appOwner)
+    cloudlog({ requestId: c.get('requestId'), message: 'appOwner result', appOwner })
     return appOwner
   }
   catch (e: any) {
-    console.log('appOwner error', e)
     cloudlogErr({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres', error: e })
     return null
   }
@@ -475,6 +476,7 @@ export async function getAppOwnerPostgres(
 }
 
 export function requestInfosPostgresLite(
+  c: Context,
   app_id: string,
   version_name: string,
   drizzleCient: ReturnType<typeof getDrizzleClient>,
@@ -523,7 +525,7 @@ export function requestInfosPostgresLite(
     ))
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => parseManifestEntries(data, 'channel'))
+    .then(data => parseManifestEntries(c, data, 'channel'))
 
   return Promise.all([channel, appVersions])
     .then(([channelData, versionData]) => ({ versionData, channelData }))
@@ -533,6 +535,7 @@ export function requestInfosPostgresLite(
 }
 
 export function requestInfosPostgresLiteV2(
+  c: Context,
   app_id: string,
   version_name: string,
   drizzleCient: ReturnType<typeof getDrizzleClientD1>,
@@ -581,7 +584,7 @@ export function requestInfosPostgresLiteV2(
     ))
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
-    .then(data => parseManifestEntries(data, 'channel'))
+    .then(data => parseManifestEntries(c, data, 'channel'))
 
   return Promise.all([channel, appVersions])
     .then(([channelData, versionData]) => ({ versionData, channelData }))

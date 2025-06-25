@@ -1,10 +1,11 @@
 import { HTTPException } from 'hono/http-exception'
 import { sendDiscordAlert } from './discord.ts'
+import { cloudlog } from './loggin.ts'
 import { backgroundTask, getEnv } from './utils.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: any) => {
-    console.log('app onError', e)
+    cloudlog({ requestId: c.get('requestId'), message: 'app onError', error: e })
     c.get('sentry')?.captureException(e)
 
     const requestId = c.get('requestId') || 'unknown'
@@ -78,7 +79,7 @@ export function onError(functionName: string) {
       ],
     }))
     if (e instanceof HTTPException) {
-      console.log('HTTPException found', e.status)
+      cloudlog({ requestId: c.get('requestId'), message: 'HTTPException found', status: e.status })
       if (e.status === 429) {
         return c.json({ error: 'you are beeing rate limited' }, e.status)
       }

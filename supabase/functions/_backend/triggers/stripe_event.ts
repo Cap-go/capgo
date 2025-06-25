@@ -208,7 +208,7 @@ app.post('/', async (c) => {
     }
     const previousAttributes = stripeEvent.data.previous_attributes ?? {} as any
     if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === true && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === false) {
-      // console.log('USER CANCELLED!!!!!!!!!!!!!!!')
+      // cloudlog('USER CANCELLED!!!!!!!!!!!!!!!')
       const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update({ canceled_at: new Date().toISOString() })
@@ -219,7 +219,7 @@ app.post('/', async (c) => {
       }
     }
     else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
-      // console.log('USER UNCANCELED')
+      // cloudlog('USER UNCANCELED')
       const { error: dbError2 } = await supabaseAdmin(c as any)
         .from('stripe_info')
         .update({ canceled_at: null })

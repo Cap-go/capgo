@@ -22,9 +22,9 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
     await createApiKey(c as any, record.id)
-    console.log({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
+    cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
     if (record.customer_id)
       return c.json(BRES)
     const LogSnag = logsnag(c as any)
