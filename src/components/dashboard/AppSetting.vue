@@ -108,6 +108,7 @@ async function deleteApp() {
     toast.error(t('cannot-delete-app'))
   }
 }
+
 async function submit(form: { app_name: string, retention: number }) {
   isLoading.value = true
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
@@ -115,41 +116,58 @@ async function submit(form: { app_name: string, retention: number }) {
     isLoading.value = false
     return
   }
-  const newName = form.app_name
-  if (newName !== (appRef.value?.name ?? '')) {
-    if (newName.length > 32) {
-      toast.error(t('new-name-to-long'))
-      isLoading.value = false
-      return
-    }
 
-    const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
-    if (error) {
-      toast.error(t('cannot-change-name'))
-      console.error(error)
-      isLoading.value = false
-      return
-    }
-
-    if (appRef.value)
-      appRef.value.name = newName
-
-    toast.success(t('changed-app-name'))
+  try {
+    await updateAppName(form.app_name)
   }
-  if (form.retention !== appRef.value?.retention) {
-    const { error } = await supabase.from('apps').update({ retention: form.retention }).eq('app_id', props.appId)
-    if (error) {
-      toast.error(t('cannot-change-retention'))
-      console.error(error)
-      isLoading.value = false
-    }
-    else {
-      toast.success(t('changed-app-retention'))
-      if (appRef.value)
-        appRef.value.retention = form.retention
-    }
+  catch (error) {
+    toast.error(error as string)
   }
+
+  try {
+    await updateAppRetention(form.retention)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
   isLoading.value = false
+}
+
+async function updateAppName(newName: string) {
+  if (newName === (appRef.value?.name ?? '')) {
+    return Promise.resolve()
+  }
+  if (newName.length > 32) {
+    toast.error(t('new-name-to-long'))
+    return Promise.reject(t('new-name-to-long'))
+  }
+
+  const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
+  if (error) {
+    toast.error(t('cannot-change-name'))
+    console.error(error)
+    return
+  }
+
+  if (appRef.value)
+    appRef.value.name = newName
+
+  toast.success(t('changed-app-name'))
+}
+
+async function updateAppRetention(newRetention: number) {
+  if (newRetention === appRef.value?.retention) {
+    return Promise.resolve()
+  }
+
+  const { error } = await supabase.from('apps').update({ retention: newRetention }).eq('app_id', props.appId)
+  if (error) {
+    return Promise.reject(t('cannot-change-retention'))
+  } 
+  toast.success(t('changed-app-retention'))
+  if (appRef.value)
+    appRef.value.retention = newRetention
 }
 
 async function setDefaultChannel() {
