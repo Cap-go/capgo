@@ -164,7 +164,7 @@ async function updateAppRetention(newRetention: number) {
   const { error } = await supabase.from('apps').update({ retention: newRetention }).eq('app_id', props.appId)
   if (error) {
     return Promise.reject(t('cannot-change-retention'))
-  } 
+  }
   toast.success(t('changed-app-retention'))
   if (appRef.value)
     appRef.value.retention = newRetention

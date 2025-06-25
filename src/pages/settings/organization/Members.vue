@@ -248,7 +248,8 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
     return
   if (output === 'OK') {
     toast.success(t('org-invited-user'))
-  } else if (output === 'TOO_RECENT_INVITATION_CANCELATION') {
+  }
+  else if (output === 'TOO_RECENT_INVITATION_CANCELATION') {
     displayStore.dialogOption = {
       header: t('error'),
       message: t('too-recent-invitation-cancelation'),
@@ -260,7 +261,8 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
       ],
     }
     displayStore.showDialog = true
-  } else if (output === 'NO_EMAIL') {
+  }
+  else if (output === 'NO_EMAIL') {
     const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
     if (captchaKey) {
       displayStore.showInviteNewUserWithoutAccountDialog = {
@@ -269,14 +271,18 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
         orgId: currentOrganization.value?.gid ?? '',
         refreshFunction: reloadData,
       }
-    } else {
+    }
+    else {
       toast.error(t('cannot_invite_user_without_account'))
     }
-  } else if (output === 'ALREADY_INVITED') {
+  }
+  else if (output === 'ALREADY_INVITED') {
     toast.error(t('user-already-invited'))
-  } else if (output === 'CAN_NOT_INVITE_OWNER') {
+  }
+  else if (output === 'CAN_NOT_INVITE_OWNER') {
     toast.error(t('cannot-invite-owner'))
-  } else {
+  }
+  else {
     toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
   }
 }
@@ -298,7 +304,8 @@ async function rescindInvitation(email: string) {
     if (data === 'OK') {
       toast.success(t('invitation-rescinded'))
       await reloadData()
-    } else {
+    }
+    else {
       toast.warning(`${t('unexpected-rescind-response')}: ${data}`)
     }
   }

@@ -427,7 +427,7 @@ export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
   if (error)
     throw new Error(error.message)
 
-  return data  ?? DEFAUL_PLAN_NAME
+  return data ?? DEFAUL_PLAN_NAME
 }
 
 export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {

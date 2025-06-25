@@ -220,29 +220,29 @@ async function unlinkChannels(app_id: string, unlink: Database['public']['Tables
   if (unlink.length === 0) {
     return
   }
-    const { data: unknownVersion, error: unknownError } = await supabase
-      .from('app_versions')
-      .select()
-      .eq('app_id', app_id)
-      .eq('name', 'unknown')
-      .single()
+  const { data: unknownVersion, error: unknownError } = await supabase
+    .from('app_versions')
+    .select()
+    .eq('app_id', app_id)
+    .eq('name', 'unknown')
+    .single()
 
-    if (unknownError) {
-      toast.error(t('cannot-find-unknown-version'))
-      console.error('Cannot find unknown', JSON.stringify(unknownError))
-      return Promise.reject()
-    }
+  if (unknownError) {
+    toast.error(t('cannot-find-unknown-version'))
+    console.error('Cannot find unknown', JSON.stringify(unknownError))
+    return Promise.reject(new Error('Cannot find unknown'))
+  }
 
-    const { error: updateError } = await supabase
-      .from('channels')
-      .update({ version: unknownVersion.id })
-      .in('id', unlink.map(c => c.id))
+  const { error: updateError } = await supabase
+    .from('channels')
+    .update({ version: unknownVersion.id })
+    .in('id', unlink.map(c => c.id))
 
-    if (updateError) {
-      toast.error(t('unlink-error'))
-      console.error('unlink error (updateError)', updateError)
-      return Promise.reject()
-    }
+  if (updateError) {
+    toast.error(t('unlink-error'))
+    console.error('unlink error (updateError)', updateError)
+    return Promise.reject(new Error('Unlink error'))
+  }
 }
 
 async function deleteOne(one: Element) {
@@ -296,7 +296,7 @@ async function deleteOne(one: Element) {
     try {
       await unlinkChannels(one.app_id, unlink)
     }
-    catch (error) {
+    catch {
       return
     }
 
@@ -472,24 +472,24 @@ async function massDelete() {
   }
 
   try {
-      await unlinkChannels(props.appId, unlink)
+    await unlinkChannels(props.appId, unlink)
   }
-  catch (error) {
+  catch {
     return
   }
 
   const { error: delAppError } = await (didCancelRes === 'normal'
-      ? supabase
-          .from('app_versions')
-          .update({ deleted: true })
-          .eq('app_id', props.appId)
-          .in('id', (selectedElements.value as any).map((val: Element) => val.id))
-      : supabase
-          .from('app_versions')
-          .delete()
-          .eq('app_id', props.appId)
-          .in('id', (selectedElements.value as any).map((val: Element) => val.id))
-    )
+    ? supabase
+        .from('app_versions')
+        .update({ deleted: true })
+        .eq('app_id', props.appId)
+        .in('id', (selectedElements.value as any).map((val: Element) => val.id))
+    : supabase
+        .from('app_versions')
+        .delete()
+        .eq('app_id', props.appId)
+        .in('id', (selectedElements.value as any).map((val: Element) => val.id))
+  )
 
   if (delAppError) {
     toast.error(t('cannot-delete-bundles'))
