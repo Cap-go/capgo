@@ -107,7 +107,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
   }
 
   if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.created') {
-    const res = subscriptionUpdated(c,event, data)
+    const res = subscriptionUpdated(c, event, data)
     data = res.data
     isUpgrade = res.isUpgrade
   }
