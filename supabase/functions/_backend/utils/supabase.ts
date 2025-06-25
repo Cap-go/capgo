@@ -860,7 +860,7 @@ export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise
   if (error)
     throw new Error(error.message)
 
-  return data  ?? DEFAUL_PLAN_NAME
+  return data ?? DEFAUL_PLAN_NAME
 }
 
 interface UpdateStats {
