@@ -56,70 +56,79 @@ function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 }
 
+async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
+  const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyString })
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
+  if (!apikey) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
+    throw new HTTPException(401, { message: 'Invalid apikey' })
+  }
+  c.set('auth', {
+    userId: apikey.user_id,
+    authType: 'apikey',
+    apikey,
+  } as AuthInfo)
+  c.set('apikey', apikey)
+  if (subkey_id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
+    const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
+    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
+    if (!subkey && subkey_id) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
+      throw new HTTPException(401, { message: 'Invalid subkey' })
+    }
+    if (subkey && subkey.user_id !== apikey.user_id) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
+      throw new HTTPException(401, { message: 'Invalid subkey' })
+    }
+    if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
+      throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
+    }
+    if (subkey) {
+      c.set('auth', {
+        userId: apikey.user_id,
+        authType: 'apikey',
+        apikey: subkey,
+      } as AuthInfo)
+      c.set('subkey', subkey)
+    }
+  }
+}
+
+async function foundJWT(c: Context, jwt: string) {
+  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
+  const supabaseJWT = supabaseClient(c, jwt)
+  const { data: user, error: userError } = await supabaseJWT.auth.getUser()
+  if (userError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
+    throw new HTTPException(401, { message: 'Invalid JWT' })
+  }
+  c.set('auth', {
+    userId: user.user?.id,
+    authType: 'jwt',
+  } as AuthInfo)
+}
+
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
   return createMiddleware(async (c, next) => {
     let jwt = c.req.header('authorization')
-    let capgkey_string = c.req.header('capgkey') ?? c.req.header('x-api-key')
-    const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
+    let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
 
     // make sure jwt is valid otherwise it means it was an apikey and you need to set it in capgkey_string
     // if jwt is uuid, it means it was an apikey and you need to set it in capgkey_string
     if (jwt && isUUID(jwt)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwt })
-      capgkey_string = jwt
+      capgkey = jwt
       jwt = undefined
     }
     if (jwt) {
-      cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
-      const supabaseJWT = supabaseClient(c as any, jwt)
-      const { data: user, error: userError } = await supabaseJWT.auth.getUser()
-      if (userError) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
-        throw new HTTPException(401, { message: 'Invalid JWT' })
-      }
-      c.set('auth', {
-        userId: user.user?.id,
-        authType: 'jwt',
-      } as AuthInfo)
+      await foundJWT(c, jwt)
     }
-    else if (capgkey_string) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkey_string })
-      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, capgkey_string, supabaseAdmin(c as any), rights)
-      if (!apikey) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkey_string, rights })
-        throw new HTTPException(401, { message: 'Invalid apikey' })
-      }
-      c.set('auth', {
-        userId: apikey.user_id,
-        authType: 'apikey',
-        apikey,
-      } as AuthInfo)
-      c.set('apikey', apikey)
-      if (subkey_id) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
-        const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
-        cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
-        if (!subkey && subkey_id) {
-          cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
-          throw new HTTPException(401, { message: 'Invalid subkey' })
-        }
-        if (subkey && subkey.user_id !== apikey.user_id) {
-          cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
-          throw new HTTPException(401, { message: 'Invalid subkey' })
-        }
-        if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
-          cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
-          throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
-        }
-        if (subkey) {
-          c.set('auth', {
-            userId: apikey.user_id,
-            authType: 'apikey',
-            apikey: subkey,
-          } as AuthInfo)
-          c.set('subkey', subkey)
-        }
-      }
+    else if (capgkey) {
+      await foundAPIKey(c, capgkey, rights)
     }
     else {
       cloudlog('No apikey or subkey provided')
@@ -139,7 +148,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
       cloudlog('No key provided')
       throw new HTTPException(401, { message: 'No key provided' })
     }
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, key, supabaseAdmin(c as any), rights)
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key })
       throw new HTTPException(401, { message: 'Invalid apikey' })
@@ -147,7 +156,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     c.set('apikey', apikey)
     c.set('capgkey', key)
     if (subkey_id) {
-      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
+      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
       if (!subkey && subkey_id) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         throw new HTTPException(401, { message: 'Invalid subkey' })
@@ -170,8 +179,8 @@ export async function getBody<T>(c: Context<MiddlewareKeyVariables, '/' | '/:pat
     body = await c.req.json<T>()
   }
   catch (error) {
-    cloudlogErr(error)
-    body = c.req.query() as any as T
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting body', error })
+    body = c.req.query() as unknown as T
   }
   if (!body) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
@@ -192,7 +201,7 @@ export const middlewareAuth = createMiddleware(async (c, next) => {
 
 export const middlewareAPISecret = createMiddleware(async (c, next) => {
   const authorizationSecret = c.req.header('apisecret')
-  const API_SECRET = getEnv(c as any, 'API_SECRET')
+  const API_SECRET = getEnv(c, 'API_SECRET')
 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
