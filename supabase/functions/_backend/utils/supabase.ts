@@ -294,7 +294,7 @@ export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTot
   return data
 }
 
-interface PlanUsage {
+export interface PlanUsage {
   total_percent: number
   mau_percent: number
   bandwidth_percent: number

@@ -125,10 +125,10 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
       jwt = undefined
     }
     if (jwt) {
-      await foundJWT(c, jwt)
+      await foundJWT(c as any, jwt)
     }
     else if (capgkey) {
-      await foundAPIKey(c, capgkey, rights)
+      await foundAPIKey(c as any, capgkey, rights)
     }
     else {
       cloudlog('No apikey or subkey provided')
@@ -148,7 +148,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
       cloudlog('No key provided')
       throw new HTTPException(401, { message: 'No key provided' })
     }
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, key, supabaseAdmin(c as any), rights)
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key })
       throw new HTTPException(401, { message: 'Invalid apikey' })
@@ -156,7 +156,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     c.set('apikey', apikey)
     c.set('capgkey', key)
     if (subkey_id) {
-      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
+      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
       if (!subkey && subkey_id) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         throw new HTTPException(401, { message: 'Invalid subkey' })
@@ -201,7 +201,7 @@ export const middlewareAuth = createMiddleware(async (c, next) => {
 
 export const middlewareAPISecret = createMiddleware(async (c, next) => {
   const authorizationSecret = c.req.header('apisecret')
-  const API_SECRET = getEnv(c, 'API_SECRET')
+  const API_SECRET = getEnv(c as any, 'API_SECRET')
 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
