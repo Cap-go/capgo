@@ -54,7 +54,7 @@ function closeDropdown() {
 }
 const { t } = useI18n()
 const isDark = useDark()
-const searchVal = ref(props.search || '')
+const searchVal = ref(props.search ?? '')
 const currentSelected = ref<'general' | 'precise'>('general')
 type Minutes = 1 | 3 | 12
 const currentGeneralTime = ref<Minutes>(1)

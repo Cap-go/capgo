@@ -180,7 +180,7 @@ async function getData() {
     const enhancedVersions = await enhenceVersionElems(dataVersions)
     await fetchChannelsForVersions(enhancedVersions)
     elements.value = enhancedVersions as any
-    total.value = count || 0
+    total.value = count ?? 0
   }
   catch (error) {
     console.error(error)
@@ -330,7 +330,7 @@ columns.value = [
     key: 'created_at',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.created_at ?? ''),
   },
   {
     label: t('channel'),
@@ -340,7 +340,7 @@ columns.value = [
     displayFunction: (elem: Element) => {
       if (elem.deleted)
         return t('deleted')
-      return channelCache.value[elem.id]?.name || ''
+      return channelCache.value[elem.id]?.name ?? ''
     },
     onClick: async (elem: Element) => {
       if (elem.deleted || !channelCache.value[elem.id] || !channelCache.value[elem.id].id)

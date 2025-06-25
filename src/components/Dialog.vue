@@ -17,7 +17,7 @@ const organizationStore = useOrganizationStore()
 const route = useRoute()
 
 function calculateAcronym(name: string) {
-  const words = name?.split(' ') || []
+  const words = name?.split(' ') ?? []
   let res = name?.slice(0, 2) || 'AP'
   if (words?.length > 2)
     res = words[0][0] + words[1][0]

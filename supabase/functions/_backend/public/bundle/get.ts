@@ -21,7 +21,7 @@ export async function get(c: Context, body: GetLatest, apikey: Database['public'
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
-    const fetchOffset = body.page == null ? 0 : body.page
+    const fetchOffset = body.page ?? 0
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
     const { data: dataBundles, error: dbError } = await supabaseAdmin(c)

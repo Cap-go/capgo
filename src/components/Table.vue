@@ -51,7 +51,7 @@ const emit = defineEmits([
   'massDelete',
 ])
 const { t } = useI18n()
-const searchVal = ref(props.search || '')
+const searchVal = ref(props.search ?? '')
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 

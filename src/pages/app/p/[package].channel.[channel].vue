@@ -112,7 +112,7 @@ async function customDeviceOverwritePart4(
     textStyle: 'w-full text-center',
     preventAccidentalClose: true,
     header: t('confirm-overwrite'),
-    message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name || '').replace('$3', channel.value?.version.name || '')}`,
+    message: `${t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name ?? '').replace('$3', channel.value?.version.name ?? '')}`,
     size: 'max-w-xl',
     buttons: [
       {
@@ -155,7 +155,7 @@ async function customDeviceOverwritePart5(
       app_id: route.params.package as string,
       channel_id: Number(route.params.channel),
       device_id: deviceId.toLowerCase(),
-      owner_org: channel.value?.owner_org || '',
+      owner_org: channel.value?.owner_org ?? '',
     })
 
   if (overwriteError) {

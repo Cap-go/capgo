@@ -145,10 +145,10 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     const { error: updateError } = await supabaseAdmin(c)
       .from('stripe_info')
       .update({
-        product_id: subscriptionData?.productId || undefined,
-        subscription_id: subscriptionData?.subscriptionId || undefined,
-        subscription_anchor_start: subscriptionData?.cycleStart || undefined,
-        subscription_anchor_end: subscriptionData?.cycleEnd || undefined,
+        product_id: subscriptionData?.productId ?? undefined,
+        subscription_id: subscriptionData?.subscriptionId ?? undefined,
+        subscription_anchor_start: subscriptionData?.cycleStart ?? undefined,
+        subscription_anchor_end: subscriptionData?.cycleEnd ?? undefined,
         status: dbStatus,
       })
       .eq('customer_id', customerId)
@@ -325,7 +325,7 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
   const customer = await getStripe(c).customers.update(customerId, {
-    email: billing_email || email,
+    email: billing_email ?? email,
     name,
     metadata: {
       user_id: userId,

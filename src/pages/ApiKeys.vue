@@ -138,7 +138,7 @@ async function fetchOrgAndAppNames() {
 const searchQuery = ref('')
 const filteredKeys = computed(() => {
   if (!keys.value || !searchQuery.value)
-    return keys.value || []
+    return keys.value ?? []
 
   const query = searchQuery.value.toLowerCase()
   return keys.value.filter(key =>
@@ -228,7 +228,7 @@ async function getKeys(retry = true): Promise<void> {
   const { data } = await supabase
     .from('apikeys')
     .select()
-    .eq('user_id', main.user?.id || '')
+    .eq('user_id', main.user?.id ?? '')
   if (data && data.length) {
     keys.value = data
     // Fetch organization and app names after getting API keys

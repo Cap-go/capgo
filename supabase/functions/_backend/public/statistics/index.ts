@@ -270,9 +270,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   }
 
   for (const key in metricsByApp) {
-    if (!metricsByApp[key]) {
-      metricsByApp[key] = []
-    }
+    metricsByApp[key] ??= []
   }
 
   Object.values(metricsByApp)
@@ -488,7 +486,7 @@ function createDatasets(versions: number[], dates: string[], percentages: { [dat
   return versions.map((version) => {
     const percentageData = dates.map(date => percentages[date][version] || 0)
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
-    const versionName = versionNames.find(v => v.id === version)?.name || version
+    const versionName = versionNames.find(v => v.id === version)?.name ?? version
 
     return {
       label: versionName,

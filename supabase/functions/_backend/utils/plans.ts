@@ -36,7 +36,7 @@ function planToInt(plan: string) {
 export async function findBestPlan(c: Context, stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
   const { data, error } = await supabaseAdmin(c)
     .rpc('find_best_plan_v3', {
-      mau: stats.mau || 0,
+      mau: stats.mau ?? 0,
       bandwidth: stats.bandwidth,
       storage: stats.storage,
     })
@@ -46,7 +46,7 @@ export async function findBestPlan(c: Context, stats: Database['public']['Functi
     throw new Error(error.message)
   }
 
-  return data || 'Team'
+  return data ?? 'Team'
 }
 
 export async function getMeterdUsage(c: Context, orgId: string): Promise<Database['public']['CompositeTypes']['stats_table']> {
@@ -59,9 +59,9 @@ export async function getMeterdUsage(c: Context, orgId: string): Promise<Databas
   }
 
   return {
-    mau: data?.mau || 0,
-    storage: data?.storage || 0,
-    bandwidth: data?.bandwidth || 0,
+    mau: data?.mau ?? 0,
+    storage: data?.storage ?? 0,
+    bandwidth: data?.bandwidth ?? 0,
   }
 }
 interface Prices {
@@ -143,16 +143,16 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
           }
 
           console.log(get_total_stats)
-          if (get_total_stats.mau > (currentPlan?.mau || 0)) {
+          if (get_total_stats.mau > (currentPlan?.mau ?? 0)) {
             cloudlog({ requestId: c.get('requestId'), message: 'set_mau_exceeded', orgId, get_total_stats, currentPlan })
             await set_mau_exceeded(c, orgId, true)
           }
-          if (get_total_stats.storage > (currentPlan?.storage || 0)) {
+          if (get_total_stats.storage > (currentPlan?.storage ?? 0)) {
             cloudlog({ requestId: c.get('requestId'), message: 'set_storage_exceeded', orgId, get_total_stats, currentPlan })
             await set_storage_exceeded(c, orgId, true)
           }
 
-          if (get_total_stats.bandwidth > (currentPlan?.bandwidth || 0)) {
+          if (get_total_stats.bandwidth > (currentPlan?.bandwidth ?? 0)) {
             cloudlog({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded', orgId, get_total_stats, currentPlan })
             await set_bandwidth_exceeded(c, orgId, true)
           }

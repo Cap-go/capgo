@@ -116,9 +116,9 @@ app.post('/', async (c) => {
       return c.json({ status: 'ok' }, 200)
     }
 
-    if (['created', 'succeeded', 'updated'].includes(stripeData.status || '') && stripeData.price_id && stripeData.product_id) {
+    if (['created', 'succeeded', 'updated'].includes(stripeData.status ?? '') && stripeData.price_id && stripeData.product_id) {
       const status = stripeData.status
-      let statusName: string = status || ''
+      let statusName: string = status ?? ''
       stripeData.status = 'succeeded'
       const { data: plan } = await supabaseAdmin(c as any)
         .from('plans')
@@ -139,7 +139,7 @@ app.post('/', async (c) => {
             .single()
           await trackBentoEvent(c as any, org.management_email, {
             plan_name: plan.name,
-            previous_plan_name: previousProduct.data?.name || '',
+            previous_plan_name: previousProduct.data?.name ?? '',
           }, 'user:plan_change')
           await LogSnag.track({
             channel: 'usage',
@@ -149,7 +149,7 @@ app.post('/', async (c) => {
             notify: true,
             tags: {
               plan_name: plan.name,
-              previous_plan_name: previousProduct.data?.name || '',
+              previous_plan_name: previousProduct.data?.name ?? '',
             },
           }).catch()
         }
@@ -183,7 +183,7 @@ app.post('/', async (c) => {
     else if (stripeData.status === 'failed') {
       await trackBentoEvent(c as any, org.management_email, {}, 'org:failed_payment')
     }
-    else if (['canceled', 'deleted'].includes(stripeData.status || '') && customer && customer.subscription_id === stripeData.subscription_id) {
+    else if (['canceled', 'deleted'].includes(stripeData.status ?? '') && customer && customer.subscription_id === stripeData.subscription_id) {
       if (stripeData.status === 'canceled') {
         const segment = await customerToSegmentOrg(c as any, org.id, 'canceled')
         await addTagBento(c as any, org.management_email, segment)

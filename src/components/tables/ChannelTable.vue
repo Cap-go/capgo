@@ -153,7 +153,7 @@ async function getData() {
     elements.value.length = 0
     elements.value.push(...dataVersions as any)
     // console.log('count', count)
-    total.value = count || 0
+    total.value = count ?? 0
     if (count === 0) {
       showAddModal()
     }
@@ -235,7 +235,7 @@ columns.value = [
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.updated_at ?? ''),
   },
   {
     label: t('last-version'),

@@ -196,7 +196,7 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
       .from('apps')
       .select('app_id')
       .eq('owner_org', orgId)
-      .then(res => res.data?.map(app => app.app_id) || [])
+      .then(res => res.data?.map(app => app.app_id) ?? [])
 
     const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}`
 
@@ -258,7 +258,7 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
   if (error)
     return ''
 
-  const nativePackages: NativePackage[] = (data?.native_packages || []) as any as NativePackage[]
+  const nativePackages: NativePackage[] = (data?.native_packages ?? []) as any as NativePackage[]
   for (const pkg of nativePackages) {
     if (pkg && pkg.name === '@capgo/capacitor-updater') {
       return format(parse(pkg.version.replace('^', '').replace('~', '')))
@@ -314,7 +314,7 @@ export async function getTotalAppStorage(orgId?: string, appid?: string): Promis
   if (error)
     throw new Error(error.message)
 
-  return data || 0
+  return data ?? 0
 }
 
 export async function getTotalStorage(orgId?: string): Promise<number> {
@@ -326,7 +326,7 @@ export async function getTotalStorage(orgId?: string): Promise<number> {
   if (error)
     throw new Error(error.message)
 
-  return data || 0
+  return data ?? 0
 }
 
 export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
@@ -338,7 +338,7 @@ export async function isGoodPlanOrg(orgId?: string): Promise<boolean> {
   if (error)
     throw new Error(error.message)
 
-  return data || false
+  return data ?? false
 }
 
 export async function isTrialOrg(orgId: string): Promise<number> {
@@ -348,7 +348,7 @@ export async function isTrialOrg(orgId: string): Promise<number> {
   if (error)
     throw new Error(error.message)
 
-  return data || 0
+  return data ?? 0
 }
 export async function isAdmin(userid?: string): Promise<boolean> {
   if (!userid)
@@ -359,7 +359,7 @@ export async function isAdmin(userid?: string): Promise<boolean> {
   if (error)
     throw new Error(error.message)
 
-  return data || false
+  return data ?? false
 }
 
 export async function isCanceled(orgId?: string): Promise<boolean> {
@@ -371,7 +371,7 @@ export async function isCanceled(orgId?: string): Promise<boolean> {
   if (error)
     throw new Error(error.message)
 
-  return data || false
+  return data ?? false
 }
 
 export async function isPayingOrg(orgId: string): Promise<boolean> {
@@ -381,7 +381,7 @@ export async function isPayingOrg(orgId: string): Promise<boolean> {
   if (error)
     console.error('isPayingOrg error', orgId, error)
 
-  return data || false
+  return data ?? false
 }
 
 export async function getPlans(): Promise<Database['public']['Tables']['plans']['Row'][]> {
@@ -427,7 +427,7 @@ export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
   if (error)
     throw new Error(error.message)
 
-  return data || DEFAUL_PLAN_NAME
+  return data  ?? DEFAUL_PLAN_NAME
 }
 
 export async function findBestPlan(stats: Database['public']['Functions']['find_best_plan_v3']['Args']): Promise<string> {
@@ -436,7 +436,7 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
   // const bandwidth = bytesToGb(stats.bandwidth)
   const { data, error } = await useSupabase()
     .rpc('find_best_plan_v3', {
-      mau: stats.mau || 0,
+      mau: stats.mau ?? 0,
       bandwidth: stats.bandwidth,
       storage: stats.storage,
     })

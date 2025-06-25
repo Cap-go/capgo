@@ -20,7 +20,7 @@ app.get('/', async (c) => {
       plan.bandwidth = bytesToGb(plan.bandwidth)
       return plan
     })
-    return c.json(plansGb || [])
+    return c.json(plansGb ?? [])
   }
   catch (e) {
     return c.json({ status: 'Cannot get plans', error: JSON.stringify(e) }, 500)

@@ -60,13 +60,13 @@ function setFormDataFromStore() {
   console.log('[InviteDialog] Setting form data from:', dialogData)
 
   if (dialogData) {
-    email.value = dialogData.email || ''
+    email.value = dialogData.email ?? ''
 
     // Format role by replacing underscores with spaces
-    const rawRole = dialogData.role || ''
+    const rawRole = dialogData.role ?? ''
     role.value = typeof rawRole === 'string' ? rawRole.replace(/_/g, ' ') : ''
 
-    orgId.value = dialogData.orgId || ''
+    orgId.value = dialogData.orgId ?? ''
 
     // Store the refresh function
     if (dialogData.refreshFunction) {

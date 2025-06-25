@@ -145,7 +145,7 @@ async function getKey(retry = true): Promise<void> {
       await addNewApiKey()
       return getKey(false)
     }
-    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key || '')
+    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key ?? '')
   }
   else if (retry && main?.user?.id) {
     return getKey(false)
@@ -172,7 +172,7 @@ watchEffect(async () => {
         (payload) => {
           console.log('Change received step 1!', payload)
           step.value += 1
-          appId.value = payload.new.id || ''
+          appId.value = payload.new.id ?? ''
           realtimeListener.value = false
           mySubscription.value.unsubscribe()
           setLog()

@@ -121,8 +121,8 @@ async function post(c: Context, body: AppStats) {
       version_build,
       os_version: version_os,
       version: 0,
-      is_emulator: is_emulator == null ? false : is_emulator,
-      is_prod: is_prod == null ? true : is_prod,
+      is_emulator: is_emulator ?? false,
+      is_prod: is_prod ?? true,
       custom_id,
       updated_at: new Date().toISOString(),
     }

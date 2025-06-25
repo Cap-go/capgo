@@ -35,7 +35,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   }
   const pluginVersion = parse(plugin_version)
   if (greaterThan(pluginVersion, parse('4.13.0')))
-    res.session_key = version.session_key || ''
+    res.session_key = version.session_key ?? ''
   if (greaterThan(pluginVersion, parse('4.4.0')))
     res.checksum = version.checksum
   if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
@@ -198,7 +198,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'revert_to_builtin_plugin_version_too_old',
       }, 200)
     }
-    let signedURL = version.external_url || ''
+    let signedURL = version.external_url ?? ''
     let manifest: ManifestEntry[] = []
     if (version.r2_path && !version.external_url) {
       const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
@@ -208,7 +208,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = getManifestUrl(c, version.id, channelData.manifestEntries || [], device_id)
+        manifest = getManifestUrl(c, version.id, channelData.manifestEntries ?? [], device_id)
       }
     }
     //  check signedURL and if it's url

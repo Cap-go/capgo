@@ -42,7 +42,7 @@ app.post('/', async (c) => {
     else if (authorization) {
       const reqOwner = await supabaseClient(c as any, authorization)
         .rpc('has_app_right', { appid: body.appId, right: 'read' })
-        .then(res => res.data || false)
+        .then(res => res.data ?? false)
       if (!reqOwner) {
         cloudlog({ requestId: c.get('requestId'), message: 'error reqOwner', reqOwner })
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
