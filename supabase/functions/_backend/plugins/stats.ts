@@ -102,15 +102,13 @@ async function post(c: Context, body: AppStats) {
       .eq('app_id', app_id)
       .single()
 
-    if (coerce) {
-      version_build = format(coerce)
-    }
-    else {
+    if (!coerce) {
       return c.json({
         message: 'Invalid version build',
         error: 'invalid_version_build',
       }, 400)
     }
+    version_build = format(coerce)
     cloudlog({ requestId: c.get('requestId'), message: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {

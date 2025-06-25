@@ -81,10 +81,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         app_id,
       }, 200)
     }
-    if (coerce) {
-      version_build = format(coerce)
-    }
-    else {
+    if (!coerce) {
       // get app owner with app_id
       await backgroundTask(c, sendNotifOrg(c, 'user:semver_issue', {
         app_id,
@@ -98,6 +95,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'semver_error',
       }, 400)
     }
+    version_build = format(coerce)
     // if plugin_version is < 6 send notif to alert for update
     if (lessThan(parse(plugin_version), parse('6.0.0'))) {
       await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
