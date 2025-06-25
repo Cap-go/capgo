@@ -46,5 +46,6 @@ declare module 'vue-router/auto-routes' {
     '/settings/organization/Members': RouteRecordInfo<'/settings/organization/Members', '/settings/organization/Members', Record<never, never>, Record<never, never>>,
     '/settings/organization/Plans': RouteRecordInfo<'/settings/organization/Plans', '/settings/organization/Plans', Record<never, never>, Record<never, never>>,
     '/settings/organization/Usage': RouteRecordInfo<'/settings/organization/Usage', '/settings/organization/Usage', Record<never, never>, Record<never, never>>,
+    '/Webhooks': RouteRecordInfo<'/Webhooks', '/Webhooks', Record<never, never>, Record<never, never>>,
   }
 }
