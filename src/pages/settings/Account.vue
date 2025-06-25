@@ -176,8 +176,12 @@ async function presentActionSheet() {
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
   if (isLoading.value || !main.user?.id)
     return
-  if (form.first_name === main.user?.first_name && form.last_name === main.user?.last_name && form.email === main.user?.email && form.country === main.user?.country)
+  if (form.first_name === main.user?.first_name
+    && form.last_name === main.user?.last_name
+    && form.email === main.user?.email
+    && form.country === main.user?.country) {
     return
+  }
   isLoading.value = true
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
@@ -219,134 +223,135 @@ async function submit(form: { first_name: string, last_name: string, email: stri
   isLoading.value = false
 }
 
-async function handleMfa() {
-  if (!mfaEnabled.value) {
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-    })
+async function disableMfa() {
+  dialogStore.openDialog({
+    title: t('alert-2fa-disable'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('disable'),
+        role: 'danger',
+        id: 'confirm-button',
+      },
+    ],
+  })
+  const canceled = await dialogStore.onDialogDismiss()
 
-    if (error) {
-      toast.error(t('mfa-fail'))
-      console.error(error)
-      return
-    }
+  // User has changed his mind - keepin 2fa
+  if (canceled)
+    return
 
-    // Store QR code for display
-    mfaQRCode.value = data.totp.qr_code
-
-    // Step 1: Show QR code
-    dialogStore.openDialog({
-      title: t('enable-2FA'),
-      description: `${t('mfa-enable-instruction')}`,
-      size: 'lg',
-      preventAccidentalClose: true,
-      buttons: [
-        {
-          text: t('verify'),
-          id: 'verify',
-        },
-      ],
-    })
-    const didCancel = await dialogStore.onDialogDismiss()
-
-    if (didCancel) {
-      // User closed the window, go ahead and unregister mfa
-      const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-      if (error)
-        console.error('Cannot unregister MFA', unregisterError)
-      mfaQRCode.value = ''
-    }
-    else {
-      // Step 2: User has scanned the code - verify his claim
-      mfaVerificationCode.value = ''
-      mfaQRCode.value = ''
-
-      dialogStore.openDialog({
-        title: t('verify-2FA'),
-        description: `${t('mfa-enable-instruction-2')}`,
-        size: 'lg',
-        preventAccidentalClose: true,
-        buttons: [
-          {
-            text: t('verify'),
-            id: 'verify',
-            handler: async () => {
-              // User has clicked the "verify button - let's check"
-              const verifyCode = mfaVerificationCode.value.replace(' ', '')
-
-              const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
-
-              if (challengeError) {
-                toast.error(t('mfa-fail'))
-                console.error('Cannot create MFA challange', challengeError)
-                return false
-              }
-
-              const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
-              if (verifyError) {
-                toast.error(t('mfa-invalid-code'))
-                return false
-              }
-
-              toast.success(t('mfa-enabled'))
-              mfaEnabled.value = true
-              mfaFactorId.value = data.id
-            },
-          },
-        ],
-      })
-
-      // Check the cancel again
-      const didCancel = await dialogStore.onDialogDismiss()
-      if (didCancel) {
-        // User closed the window, go ahead and unregister mfa
-        const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-        if (error)
-          console.error('Cannot unregister MFA', unregisterError)
-      }
-    }
+  // Remove 2fa
+  const factorId = mfaFactorId.value
+  if (!factorId) {
+    toast.error(t('mfa-fail'))
+    console.error('Factor id = null')
+    return
   }
-  else {
-    // disable mfa
-    dialogStore.openDialog({
-      title: t('alert-2fa-disable'),
-      description: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
-      buttons: [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('disable'),
-          role: 'danger',
-          id: 'confirm-button',
-        },
-      ],
-    })
-    const canceled = await dialogStore.onDialogDismiss()
 
-    // User has changed his mind - keepin 2fa
-    if (canceled)
-      return
+  const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
+  if (unregisterError) {
+    toast.error(t('mfa-fail'))
+    console.error('Cannot unregister MFA', unregisterError)
+    return
+  }
 
-    // Remove 2fa
-    const factorId = mfaFactorId.value
-    if (!factorId) {
-      toast.error(t('mfa-fail'))
-      console.error('Factor id = null')
-      return
-    }
+  mfaFactorId.value = ''
+  mfaEnabled.value = false
+  toast.success(t('2fa-disabled'))
+}
 
-    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
-    if (unregisterError) {
-      toast.error(t('mfa-fail'))
+async function handleMfa() {
+  if (mfaEnabled.value) {
+    await disableMfa()
+    return
+  }
+  const { data, error } = await supabase.auth.mfa.enroll({
+    factorType: 'totp',
+  })
+
+  if (error) {
+    toast.error(t('mfa-fail'))
+    console.error(error)
+    return
+  }
+
+  // Store QR code for display
+  mfaQRCode.value = data.totp.qr_code
+
+  // Step 1: Show QR code
+  dialogStore.openDialog({
+    title: t('enable-2FA'),
+    description: `${t('mfa-enable-instruction')}`,
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('verify'),
+        id: 'verify',
+      },
+    ],
+  })
+  const didCancel = await dialogStore.onDialogDismiss()
+
+  if (didCancel) {
+    // User closed the window, go ahead and unregister mfa
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
+    if (error)
       console.error('Cannot unregister MFA', unregisterError)
-      return
-    }
+    mfaQRCode.value = ''
+    return
+  }
+  // Step 2: User has scanned the code - verify his claim
+  mfaVerificationCode.value = ''
+  mfaQRCode.value = ''
 
-    mfaFactorId.value = ''
-    mfaEnabled.value = false
-    toast.success(t('2fa-disabled'))
+  dialogStore.openDialog({
+    title: t('verify-2FA'),
+    description: `${t('mfa-enable-instruction-2')}`,
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('verify'),
+        id: 'verify',
+        handler: async () => {
+          // User has clicked the "verify button - let's check"
+          const verifyCode = mfaVerificationCode.value.replace(' ', '')
+
+          const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
+
+          if (challengeError) {
+            toast.error(t('mfa-fail'))
+            console.error('Cannot create MFA challange', challengeError)
+            return false
+          }
+
+          const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
+          if (verifyError) {
+            toast.error(t('mfa-invalid-code'))
+            return false
+          }
+
+          toast.success(t('mfa-enabled'))
+          mfaEnabled.value = true
+          mfaFactorId.value = data.id
+        },
+      },
+    ],
+  })
+
+  // Check the cancel again
+  const didCancel2 = await dialogStore.onDialogDismiss()
+  if (didCancel2) {
+    // User closed the window, go ahead and unregister mfa
+    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
+    if (error)
+      console.error('Cannot unregister MFA', unregisterError)
   }
 }
 
