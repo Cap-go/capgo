@@ -4,6 +4,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { cloudlog } from '../utils/loggin.ts'
 import { update as updateLite } from '../utils/update_lite.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,
@@ -66,7 +67,7 @@ const jsonRequestSchema = z.object({
   return val
 })
 
-export const app = new Hono()
+export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
   try {

@@ -53,12 +53,6 @@ export const jsonRequestSchema = z.object({
 
 async function post(c: Context, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
-  const parseResult = jsonRequestSchema.safeParse(body)
-  if (!parseResult.success) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
-    return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
-  }
-
   let {
     version_name,
     version_build,
@@ -199,7 +193,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   // We will just set the channel_devices as the user requested
   let mainChannelName = null as string | null
   if (!dbMainChannelError) {
-    const devicePlatform = parseResult.data.platform
+    const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
     const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
     mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
   }
@@ -473,6 +467,11 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
+    const parseResult = jsonRequestSchema.safeParse(body)
+    if (!parseResult.success) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
+      return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
+    }
     cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
     return post(c as any, body)
   }

@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import dayjs from 'dayjs'
+import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
 import { z } from 'zod'
@@ -28,85 +29,96 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
+async function validateInvite(c: Context, rawBody: any) {
+  // Validate the request body using Zod
+  const validationResult = inviteUserSchema.safeParse(rawBody)
+  if (!validationResult.success) {
+    cloudlogErr({ requestId: c.get('requestId'), context: 'validation_error', error: validationResult.error.format() })
+    return { message: 'Invalid request', errors: validationResult.error.format(), status: 400 }
+  }
+
+  const body = validationResult.data
+  cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
+
+  const authorization = c.get('authorization')
+  const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
+    authorization?.split('Bearer ')[1],
+  )
+
+  if (error || !auth || !auth.user || !auth.user.id)
+    return { message: 'not authorized', status: 401 }
+
+  // Verify the user has permission to invite
+  // inviting super_admin is only allowed for super_admin
+  if (!await hasOrgRight(c as any, body.org_id, auth.user.id, body.invite_type !== 'super_admin' ? 'admin' : 'super_admin'))
+    return { message: 'not authorized (insufficient permissions)', status: 403 }
+
+  // Verify captcha token with Cloudflare Turnstile
+  const captchaVerified = await verifyCaptchaToken(c, body.captcha_token)
+  if (!captchaVerified)
+    return { message: 'Invalid captcha', status: 400 }
+
+  // Check if the user already exists
+  const { data: existingUser, error: userError } = await supabaseAdmin(c as any)
+    .from('users')
+    .select('*')
+    .eq('email', body.email)
+    .single()
+
+  // Create the invitation record in the database
+  if (existingUser || !userError) {
+    return { message: 'Failed to invite user', error: 'User already exists', status: 500 }
+  }
+
+  const { data: org, error: orgError } = await supabaseAdmin(c as any)
+    .from('orgs')
+    .select('*')
+    .eq('id', body.org_id)
+    .single()
+
+  if (orgError || !org) {
+    return { message: 'Failed to invite user', error: orgError.message, status: 500 }
+  }
+
+  const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabaseAdmin(c as any)
+    .from('users')
+    .select('*')
+    .eq('id', auth.user.id)
+    .single()
+
+  if (inviteCreatorUserError) {
+    return { message: 'Failed to invite user', error: inviteCreatorUserError.message, status: 500 }
+  }
+  return { inviteCreatorUser, org, body }
+}
+
 app.post('/', middlewareAuth, async (c) => {
   try {
     const rawBody = await c.req.json()
     cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
-    // Validate the request body using Zod
-    const validationResult = inviteUserSchema.safeParse(rawBody)
-    if (!validationResult.success) {
-      cloudlogErr({ requestId: c.get('requestId'), context: 'validation_error', error: validationResult.error.format() })
-      return c.json({ status: 'Invalid request', errors: validationResult.error.format() }, 400)
+    const res = await validateInvite(c, rawBody)
+    if (!res.inviteCreatorUser || !res.org) {
+      return c.json({ status: res.message ?? 'Failed to invite user', error: res.errors ?? 'Failed to invite user' }, res?.status as any ?? 500)
     }
-
-    const body = validationResult.data
-    cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
-
-    const authorization = c.get('authorization')
-    const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
-      authorization?.split('Bearer ')[1],
-    )
-
-    if (error || !auth || !auth.user || !auth.user.id)
-      return c.json({ status: 'not authorized' }, 401)
-
-    // Verify the user has permission to invite
-    // inviting super_admin is only allowed for super_admin
-    if (!await hasOrgRight(c as any, body.org_id, auth.user.id, body.invite_type !== 'super_admin' ? 'admin' : 'super_admin'))
-      return c.json({ status: 'not authorized (insufficient permissions)' }, 403)
-
-    // Verify captcha token with Cloudflare Turnstile
-    const captchaVerified = await verifyCaptchaToken(c, body.captcha_token)
-    if (!captchaVerified)
-      return c.json({ status: 'Invalid captcha' }, 400)
-
-    // Check if the user already exists
-    const { data: existingUser, error: userError } = await supabaseAdmin(c as any)
-      .from('users')
-      .select('*')
-      .eq('email', body.email)
-      .single()
-
-    // Create the invitation record in the database
-    if (existingUser || !userError) {
-      return c.json({ status: 'Failed to invite user', error: 'User already exists' }, 500)
-    }
-
-    const { data: org, error: orgError } = await supabaseAdmin(c as any)
-      .from('orgs')
-      .select('*')
-      .eq('id', body.org_id)
-      .single()
-
-    if (orgError) {
-      return c.json({ status: 'Failed to invite user', error: orgError.message }, 500)
-    }
-
-    const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabaseAdmin(c as any)
-      .from('users')
-      .select('*')
-      .eq('id', auth.user.id)
-      .single()
-
-    if (inviteCreatorUserError) {
-      return c.json({ status: 'Failed to invite user', error: inviteCreatorUserError.message }, 500)
-    }
+    const body = res.body
+    const inviteCreatorUser = res.inviteCreatorUser
+    const org = res.org
 
     const { data: existingInvitation } = await supabaseAdmin(c as any)
-      .from('tmp_users')
-      .select('*')
-      .eq('email', body.email)
-      .eq('org_id', body.org_id)
-      .single()
-
+    .from('tmp_users')
+    .select('*')
+    .eq('email', body.email)
+    .eq('org_id', body.org_id)
+    .single()
+  
     let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
     if (existingInvitation) {
       const nowMinusThreeHours = dayjs().subtract(3, 'hours')
       if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
         return c.json({ status: 'Failed to invite user', error: 'User already invited and it hasnt been 3 hours since the last invitation was cancelled' }, 400)
       }
-
+  
       const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdmin(c as any)
         .from('tmp_users')
         .update({
@@ -118,11 +130,11 @@ app.post('/', middlewareAuth, async (c) => {
         .eq('org_id', body.org_id)
         .select('*')
         .single()
-
+  
       if (updateInvitationError) {
         return c.json({ status: 'Failed to invite user', error: updateInvitationError.message }, 500)
       }
-
+  
       newInvitation = updatedInvitationData
     }
     else {
@@ -133,11 +145,11 @@ app.post('/', middlewareAuth, async (c) => {
         first_name: body.first_name,
         last_name: body.last_name,
       }).select('*').single()
-
+  
       if (createUserError) {
         return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
       }
-
+  
       newInvitation = newInvitationData
     }
 

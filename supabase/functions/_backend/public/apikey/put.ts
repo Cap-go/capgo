@@ -25,39 +25,32 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
 
   const body = await c.req.json()
   const { name, mode, limited_to_apps, limited_to_orgs } = body
-  const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {}
-
-  if (name !== undefined) {
-    if (typeof name !== 'string') {
-      console.error('Cannot update apikey', 'Name must be a string')
-      return c.json({ error: 'Name must be a string' }, 400)
-    }
-    updateData.name = name
+  const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
+    name,
+    mode,
+    limited_to_apps,
+    limited_to_orgs,
   }
 
-  if (mode !== undefined) {
-    const validModes = Constants.public.Enums.key_mode
-    if (typeof mode !== 'string' || !validModes.includes(mode as any)) {
-      console.error('Cannot update apikey', 'Invalid mode')
-      return c.json({ error: `Invalid mode. Must be one of: ${validModes.join(', ')}` }, 400)
-    }
-    updateData.mode = mode as Database['public']['Enums']['key_mode']
+  if (name !== undefined && typeof name !== 'string') {
+    console.error('Cannot update apikey', 'Name must be a string')
+    return c.json({ error: 'Name must be a string' }, 400)
   }
 
-  if (limited_to_apps !== undefined) {
-    if (!Array.isArray(limited_to_apps) || !limited_to_apps.every(item => typeof item === 'string')) {
-      console.error('Cannot update apikey', 'limited_to_apps must be an array of strings')
-      return c.json({ error: 'limited_to_apps must be an array of strings' }, 400)
-    }
-    updateData.limited_to_apps = limited_to_apps
+  const validModes = Constants.public.Enums.key_mode
+  if (mode !== undefined && typeof mode !== 'string' || !validModes.includes(mode as any)) {
+    console.error('Cannot update apikey', 'Invalid mode')
+    return c.json({ error: `Invalid mode. Must be one of: ${validModes.join(', ')}` }, 400)
   }
 
-  if (limited_to_orgs !== undefined) {
-    if (!Array.isArray(limited_to_orgs) || !limited_to_orgs.every(item => typeof item === 'string')) {
-      console.error('Cannot update apikey', 'limited_to_orgs must be an array of strings')
-      return c.json({ error: 'limited_to_orgs must be an array of strings' }, 400)
-    }
-    updateData.limited_to_orgs = limited_to_orgs
+  if (limited_to_apps !== undefined && (!Array.isArray(limited_to_apps) || !limited_to_apps.every(item => typeof item === 'string'))) {
+    console.error('Cannot update apikey', 'limited_to_apps must be an array of strings')
+    return c.json({ error: 'limited_to_apps must be an array of strings' }, 400)
+  }
+
+  if (limited_to_orgs !== undefined && (!Array.isArray(limited_to_orgs) || !limited_to_orgs.every(item => typeof item === 'string'))) {
+    console.error('Cannot update apikey', 'limited_to_orgs must be an array of strings')
+    return c.json({ error: 'limited_to_orgs must be an array of strings' }, 400)
   }
 
   if (Object.keys(updateData).length === 0) {

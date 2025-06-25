@@ -112,7 +112,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing app_id, name, or created_by' })
-    return Promise.resolve({ error: new Error('missing app_id, name, or created_by'), requestId: c.get('requestId') })
+    return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
 
   const { data: existingChannel } = await supabaseAdmin(c)
@@ -136,6 +136,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   return supabaseAdmin(c)
     .from('channels')
     .upsert(update, { onConflict: 'app_id, name' })
+    .throwOnError()
 }
 
 export async function updateOrCreateChannelDevice(c: Context, update: Database['public']['Tables']['channel_devices']['Insert']) {
