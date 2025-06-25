@@ -162,9 +162,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
         organizationStore.setCurrentOrganization(newOrg.gid)
         return
       }
-      else {
-        router.push('/app')
-      }
+      router.push('/app')
     }
 
     const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
@@ -207,7 +205,7 @@ function nextRunDate() {
         <div class="sm:align-center sm:flex sm:flex-col">
           <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip tooltip-bottom">
             {{ t('usage') }}
-            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
+            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:bg-blue-500 hover:text-white rounded-full" />
             <div class="tooltip-content font-normal bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
               <div class="max-w-xs whitespace-normal">
                 {{ lastRunDate() }}
