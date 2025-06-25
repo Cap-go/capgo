@@ -36,7 +36,7 @@ let config: CapgoConfig = getLocalConfig()
 
 export async function getRemoteConfig() {
   // call host + /api/private/config and parse the result as json using ky
-  const localConfig = await getLocalConfig()
+  const localConfig = getLocalConfig()
   if (import.meta.env.MODE === 'development')
     return localConfig
   const data = await ky
