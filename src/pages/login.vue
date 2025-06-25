@@ -175,6 +175,83 @@ async function submit(form: { email: string, password: string, code: string }) {
   }
 }
 
+async function checkAuthUser() {
+  const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (mfaError) {
+    console.error('Cannot guard auth', mfaError)
+    return
+  }
+
+  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2') {
+    const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+    if (error) {
+      setErrors('login-account', ['See browser console'], {})
+      console.error('Cannot getm MFA factors', error)
+      return
+    }
+
+    const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+
+    const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor!.id })
+    if (errorChallenge) {
+      setErrors('login-account', ['See browser console'], {})
+      console.error('Cannot challange mfa', errorChallenge)
+      return
+    }
+
+    mfaLoginFactor.value = mfaFactor!
+    mfaChallangeId.value = challenge.id
+
+    statusAuth.value = '2fa'
+    isLoading.value = false
+  }
+  else {
+    await nextLogin()
+  }
+}
+
+async function checkMagicLink() {
+  const parsedUrl = new URL(route.fullPath, window.location.origin)
+
+  const hash = parsedUrl.hash
+  const params = new URLSearchParams(hash.slice(1))
+  const error = params.get('error_description')
+  const message = params.get('message')
+  const authType = params.get('type')
+
+  if (message) {
+    isLoading.value = false
+    return setTimeout(() => {
+      toast.success(message, {
+        duration: 7000,
+      })
+    }, 400)
+  }
+  if (error) {
+    isLoading.value = false
+    return toast.error(error)
+  }
+
+  const logSession = await autoAuth(route)
+  if (!logSession)
+    return
+  if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
+    if (authType === 'email_change') {
+      const email = logSession.user.email
+      const id = logSession.user.id
+      await supabase
+        .from('users')
+        .upsert({
+          id,
+          email,
+        }, { onConflict: 'id' })
+        .select()
+        .single()
+    }
+    await nextLogin()
+  }
+}
+
 async function checkLogin() {
   const parsedUrl = new URL(route.fullPath, window.location.origin)
   const params = new URLSearchParams(parsedUrl.search)
@@ -198,83 +275,12 @@ async function checkLogin() {
   const resUser = await supabase.auth.getUser()
   const user = resUser?.data.user
   const resSession = await supabase.auth.getSession()!
-  let session = resSession?.data.session
+  const session = resSession?.data.session
   if (user) {
-    const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (mfaError) {
-      console.error('Cannot guard auth', mfaError)
-      return
-    }
-
-    if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2') {
-      const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
-      if (error) {
-        setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot getm MFA factors', error)
-        return
-      }
-
-      const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
-
-      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor!.id })
-      if (errorChallenge) {
-        setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot challange mfa', errorChallenge)
-        return
-      }
-
-      mfaLoginFactor.value = mfaFactor!
-      mfaChallangeId.value = challenge.id
-
-      statusAuth.value = '2fa'
-      isLoading.value = false
-    }
-    else {
-      await nextLogin()
-    }
+    await checkAuthUser()
   }
   else if (!session && route.hash) {
-    const parsedUrl = new URL(route.fullPath, window.location.origin)
-
-    const hash = parsedUrl.hash
-    const params = new URLSearchParams(hash.slice(1))
-    const error = params.get('error_description')
-    const message = params.get('message')
-    const authType = params.get('type')
-
-    if (message) {
-      isLoading.value = false
-      return setTimeout(() => {
-        toast.success(message, {
-          duration: 7000,
-        })
-      }, 400)
-    }
-    if (error) {
-      isLoading.value = false
-      return toast.error(error)
-    }
-
-    const logSession = await autoAuth(route)
-    if (!logSession)
-      return
-    if (logSession.session)
-      session = logSession.session
-    if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
-      if (authType === 'email_change') {
-        const email = logSession.user.email
-        const id = logSession.user.id
-        await supabase
-          .from('users')
-          .upsert({
-            id,
-            email,
-          }, { onConflict: 'id' })
-          .select()
-          .single()
-      }
-      await nextLogin()
-    }
+    await checkMagicLink()
   }
   else {
     isLoading.value = false
