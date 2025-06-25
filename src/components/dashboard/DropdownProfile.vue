@@ -161,7 +161,7 @@ async function logOut() {
         <router-link v-if="isMobile" to="/app/modules_test" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50">
           {{ t('module-heading') }} {{ t('tests') }}
         </router-link>
-        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="openSupport">
+        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" @click="openSupport">
           {{ t('support') }}
         </div>
         <div v-if="main.isAdmin && !isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': isLoading }" @click="openLogAsDialog">
@@ -171,10 +171,10 @@ async function logOut() {
             {{ t('loading') }}
           </span>
         </div>
-        <div v-if="isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="resetSpoofedUser">
+        <div v-if="isSpoofed()" class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" @click="resetSpoofedUser">
           {{ t('reset-spoofed-user') }}
         </div>
-        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50" @click="logOut">
+        <div class="block px-3 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer" @click="logOut">
           {{ t('sign-out') }}
         </div>
       </div>
