@@ -348,6 +348,48 @@ async function editPhoto() {
   })
 }
 
+function confirmTransferAppOwnership(org: Organization) {
+  // Step 3: Final confirmation with app ID input
+  transferAppIdInput.value = ''
+
+  dialogStore.openDialog({
+    title: t('confirm-transfer'),
+    description: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', props.appId)}`,
+    size: 'xl',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('transfer'),
+        role: 'danger',
+        handler: async () => {
+          if (transferAppIdInput.value !== props.appId) {
+            toast.error(t('incorrect-app-id'))
+            return false
+          }
+          // Transfer logic will go here
+          const { error } = await supabase.rpc('transfer_app', {
+            p_app_id: props.appId,
+            p_new_org_id: org.gid,
+          })
+          if (error) {
+            toast.error(t('cannot-transfer-app'))
+            console.error(error)
+            return false
+          }
+          toast.success(t('app-transferred'))
+          setTimeout(() => {
+            router.push('/app')
+          }, 2500)
+        },
+      },
+    ],
+  })
+}
+
 async function transferAppOwnership() {
   const transferHistory: { transferred_at: string }[] = (appRef.value as any) ?? []
   if (!transferHistory || transferHistory.length === 0)
@@ -398,45 +440,7 @@ async function transferAppOwnership() {
         text: org.name,
         role: 'secondary' as const,
         handler: async () => {
-          // Step 3: Final confirmation with app ID input
-          transferAppIdInput.value = ''
-
-          dialogStore.openDialog({
-            title: t('confirm-transfer'),
-            description: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', props.appId)}`,
-            size: 'xl',
-            preventAccidentalClose: true,
-            buttons: [
-              {
-                text: t('button-cancel'),
-                role: 'cancel',
-              },
-              {
-                text: t('transfer'),
-                role: 'danger',
-                handler: async () => {
-                  if (transferAppIdInput.value !== props.appId) {
-                    toast.error(t('incorrect-app-id'))
-                    return false
-                  }
-                  // Transfer logic will go here
-                  const { error } = await supabase.rpc('transfer_app', {
-                    p_app_id: props.appId,
-                    p_new_org_id: org.gid,
-                  })
-                  if (error) {
-                    toast.error(t('cannot-transfer-app'))
-                    console.error(error)
-                    return false
-                  }
-                  toast.success(t('app-transferred'))
-                  setTimeout(() => {
-                    router.push('/app')
-                  }, 2500)
-                },
-              },
-            ],
-          })
+          confirmTransferAppOwnership(org)
         },
       })),
       {
