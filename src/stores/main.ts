@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js'
-import type { appUsageByApp, appUsageGlobal } from './../services/supabase'
+import type { AppUsageByApp, AppUsageGlobal } from './../services/supabase'
 import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -34,8 +34,8 @@ export const useMainStore = defineStore('main', () => {
     last_run: '',
   })
   const isAdmin = ref<boolean>(false)
-  const dashboard = ref<appUsageGlobal[]>([])
-  const dashboardByapp = ref<appUsageByApp[]>([])
+  const dashboard = ref<AppUsageGlobal[]>([])
+  const dashboardByapp = ref<AppUsageByApp[]>([])
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
   const dashboardFetched = ref<boolean>(false)

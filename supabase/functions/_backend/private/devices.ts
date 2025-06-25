@@ -6,7 +6,7 @@ import { cloudlog } from '../utils/loggin.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
-interface dataDevice {
+interface DataDevice {
   appId: string
   count?: boolean
   versionId?: string
@@ -24,7 +24,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   try {
-    const body = await c.req.json<dataDevice>()
+    const body = await c.req.json<DataDevice>()
     cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
     const devicesIds = body.devicesId ?? body.deviceIds ?? []
     const apikey_string = c.req.header('capgkey')

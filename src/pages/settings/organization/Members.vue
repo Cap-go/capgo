@@ -246,50 +246,38 @@ function handleSendInvitationOutput(output: string, email: string, type: Databas
   console.log('Output: ', output)
   if (!output)
     return
-  switch (output) {
-    case 'OK': {
-      toast.success(t('org-invited-user'))
-      break
+  if (output === 'OK') {
+    toast.success(t('org-invited-user'))
+  } else if (output === 'TOO_RECENT_INVITATION_CANCELATION') {
+    displayStore.dialogOption = {
+      header: t('error'),
+      message: t('too-recent-invitation-cancelation'),
+      buttons: [
+        {
+          text: t('ok'),
+          role: 'ok',
+        },
+      ],
     }
-    case 'TOO_RECENT_INVITATION_CANCELATION': {
-      displayStore.dialogOption = {
-        header: t('error'),
-        message: t('too-recent-invitation-cancelation'),
-        buttons: [
-          {
-            text: t('ok'),
-            role: 'ok',
-          },
-        ],
+    displayStore.showDialog = true
+  } else if (output === 'NO_EMAIL') {
+    const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
+    if (captchaKey) {
+      displayStore.showInviteNewUserWithoutAccountDialog = {
+        email,
+        role: type,
+        orgId: currentOrganization.value?.gid ?? '',
+        refreshFunction: reloadData,
       }
-      displayStore.showDialog = true
-      break
+    } else {
+      toast.error(t('cannot_invite_user_without_account'))
     }
-    case 'NO_EMAIL': {
-      const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
-      if (captchaKey) {
-        displayStore.showInviteNewUserWithoutAccountDialog = {
-          email,
-          role: type,
-          orgId: currentOrganization.value?.gid ?? '',
-          refreshFunction: reloadData,
-        }
-      }
-      else {
-        toast.error(t('cannot_invite_user_without_account'))
-      }
-      break
-    }
-    case 'ALREADY_INVITED': {
-      toast.error(t('user-already-invited'))
-      break
-    }
-    case 'CAN_NOT_INVITE_OWNER': {
-      toast.error(t('cannot-invite-owner'))
-      break
-    }
-    default:
-      toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
+  } else if (output === 'ALREADY_INVITED') {
+    toast.error(t('user-already-invited'))
+  } else if (output === 'CAN_NOT_INVITE_OWNER') {
+    toast.error(t('cannot-invite-owner'))
+  } else {
+    toast.warning(`${t('unexpected-invitation-response')}: ${output}`)
   }
 }
 
@@ -307,14 +295,11 @@ async function rescindInvitation(email: string) {
 
   if (!error && data) {
     // Handle different response codes from the rescind_invitation function
-    switch (data) {
-      case 'OK':
-        // Success is handled in the calling function
-        toast.success(t('invitation-rescinded'))
-        await reloadData()
-        break
-      default:
-        toast.warning(`${t('unexpected-rescind-response')}: ${data}`)
+    if (data === 'OK') {
+      toast.success(t('invitation-rescinded'))
+      await reloadData()
+    } else {
+      toast.warning(`${t('unexpected-rescind-response')}: ${data}`)
     }
   }
 

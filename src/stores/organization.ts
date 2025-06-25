@@ -204,8 +204,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     })
 
     _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
-    if (!currentOrganization.value)
-      currentOrganization.value = organization
+    currentOrganization.value ??= organization
 
     // console.log('done', currentOrganization.value)
     getProcessCronStatsJobInfo()
