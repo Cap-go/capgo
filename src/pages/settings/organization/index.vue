@@ -70,6 +70,43 @@ async function presentActionSheet() {
   return dialogStore.onDialogDismiss()
 }
 
+async function updateEmail(form: { email: string }) {
+  if (!currentOrganization.value)
+    return false
+  const orgCopy = Object.assign({}, currentOrganization.value)
+
+  const { error } = await supabase.functions.invoke('private/set_org_email', {
+    body: {
+      emial: form.email,
+      org_id: orgCopy.gid,
+    },
+  })
+
+  if (error) {
+    if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+      const json = await error.context.json<{ status: string }>()
+      if (json.status && typeof json.status === 'string') {
+        if (json.status === 'email_not_unique')
+          toast.error(t('org-changes-set-email-not-unique'))
+        else
+          toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
+      }
+      else {
+        toast.error(t('org-changes-set-email-other-error'))
+      }
+    }
+    else {
+      toast.error(t('org-changes-set-email-other-error'))
+    }
+
+    // Revert the optimistic update
+    currentOrganization.value.management_email = orgCopy.management_email
+    return true
+  }
+
+  return false
+}
+
 async function saveChanges(form: { orgName: string, email: string }) {
   if (!currentOrganization.value || (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
     toast.error(t('no-permission'))
@@ -108,39 +145,8 @@ async function saveChanges(form: { orgName: string, email: string }) {
 
   let hasErrored = false
   if (orgCopy.management_email !== form.email) {
-    // The management emial has changed, call the edge function
-    console.log('Edge fn')
-
-    const { error } = await supabase.functions.invoke('private/set_org_email', {
-      body: {
-        emial: form.email,
-        org_id: orgCopy.gid,
-      },
-    })
-
-    if (error) {
-      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
-        const json = await error.context.json<{ status: string }>()
-        if (json.status && typeof json.status === 'string') {
-          if (json.status === 'email_not_unique')
-            toast.error(t('org-changes-set-email-not-unique'))
-          else
-            toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
-        }
-        else {
-          toast.error(t('org-changes-set-email-other-error'))
-        }
-      }
-      else {
-        toast.error(t('org-changes-set-email-other-error'))
-      }
-
-      // Revert the optimistic update
-      currentOrganization.value.management_email = orgCopy.management_email
-      hasErrored = true
-    }
-
-    console.log(error)
+    // The management email has changed, call the edge function
+    hasErrored = await updateEmail(form)
   }
 
   isLoading.value = false
