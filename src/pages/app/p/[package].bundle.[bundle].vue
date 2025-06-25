@@ -297,28 +297,52 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
   if (!channel.value)
     return
 
-  switch (action) {
-    case 'set':
-      await ASChannelChooser()
-      break
-    case 'open':
-      await openChannelLink()
-      break
-    case 'unlink':
-      try {
-        const id = await getUnknowBundleId()
-        if (!id)
-          return
-        await setChannel(channel.value, id)
-        await getChannels()
-      }
-      catch (error) {
-        console.error(error)
-        toast.error(t('cannot-test-app-some'))
-      }
-      break
+  if (action === 'set') {
+    await ASChannelChooser()
+  }
+  else if (action === 'open') {
+    await openChannelLink()
+  }
+  else if (action === 'unlink') {
+    try {
+      const id = await getUnknowBundleId()
+      if (!id)
+        return
+      await setChannel(channel.value, id)
+      await getChannels()
+    }
+    catch (error) {
+      console.error(error)
+      toast.error(t('cannot-test-app-some'))
+    }
   }
 }
+
+async function downloadNow() {
+  if (!version.value)
+    return
+  if (version.value.session_key) {
+    const filename = version.value.r2_path?.replace('/', '_')
+    const localPath = `./${filename}`
+    const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
+
+    dialogStore.openDialog({
+      title: t('to-open-encrypted-bu'),
+      buttons: [
+        {
+          text: t('copy-command'),
+          role: 'primary',
+          handler: () => {
+            copyToast(command)
+          },
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+  }
+  openVersion(version.value)
+}
+
 async function openDownload() {
   if (!version.value || !main.auth)
     return
@@ -333,28 +357,7 @@ async function openDownload() {
         text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
         role: 'primary',
         handler: async () => {
-          if (!version.value)
-            return
-          if (version.value.session_key) {
-            const filename = version.value.r2_path?.replace('/', '_')
-            const localPath = `./${filename}`
-            const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
-
-            dialogStore.openDialog({
-              title: t('to-open-encrypted-bu'),
-              buttons: [
-                {
-                  text: t('copy-command'),
-                  role: 'primary',
-                  handler: () => {
-                    copyToast(command)
-                  },
-                },
-              ],
-            })
-            await dialogStore.onDialogDismiss()
-          }
-          openVersion(version.value)
+          await downloadNow()
         },
       },
     ],
@@ -529,6 +532,37 @@ async function didCancel(name: string, askForMethod = true): Promise<boolean | '
   return method
 }
 
+async function unlinkChannels(appId: string, unlink: { id: number, name: string }[]) {
+  // Unlink channels if confirmed
+  if (unlink.length === 0) {
+    return
+  }
+  const { data: unknownVersion, error: unknownError } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appId)
+    .eq('name', 'unknown')
+    .single()
+
+  if (unknownError || !unknownVersion) {
+    toast.error(t('cannot-find-unknown-version'))
+    console.error('Cannot find unknown version:', unknownError)
+    return Promise.reject(new Error('Cannot find unknown version'))
+  }
+
+  const { error: updateError } = await supabase
+    .from('channels')
+    .update({ version: unknownVersion.id })
+    .in('id', unlink.map(c => c.id))
+
+  if (updateError) {
+    toast.error(t('unlink-error'))
+    console.error('Channel unlink error:', updateError)
+    return Promise.reject(new Error('Channel unlink error'))
+  }
+  toast.success(t('channels-unlinked-successfully')) // Add translation key
+}
+
 async function deleteBundle() {
   if (!version.value)
     return
@@ -593,36 +627,7 @@ async function deleteBundle() {
       return
     }
 
-    // Unlink channels if confirmed
-    if (unlink.length > 0) {
-      const { data: unknownVersion, error: unknownError } = await supabase
-        .from('app_versions')
-        .select('id')
-        .eq('app_id', version.value.app_id)
-        .eq('name', 'unknown')
-        .single()
-
-      if (unknownError || !unknownVersion) {
-        toast.error(t('cannot-find-unknown-version'))
-        console.error('Cannot find unknown version:', unknownError)
-        return
-      }
-
-      const { error: updateError } = await supabase
-        .from('channels')
-        .update({ version: unknownVersion.id })
-        .in('id', unlink.map(c => c.id))
-
-      if (updateError) {
-        toast.error(t('unlink-error'))
-        console.error('Channel unlink error:', updateError)
-        // Decide whether to proceed with deletion or stop
-        // return // Optional: stop deletion if unlinking fails
-      }
-      else {
-        toast.success(t('channels-unlinked-successfully')) // Add translation key
-      }
-    }
+    await unlinkChannels(version.value.app_id, unlink)
 
     // Perform deletion (soft or hard)
     const deleteQuery = didCancelRes === 'normal'
