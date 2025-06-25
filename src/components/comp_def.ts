@@ -36,7 +36,7 @@ export interface TableColumn {
   class?: string
   allowHtml?: boolean
   sanitizeHtml?: boolean
-  displayFunction?: (item: any) => string | any
+  displayFunction?: (item: any) => string | number
 }
 
 export interface Tab {
