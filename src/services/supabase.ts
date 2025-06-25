@@ -36,7 +36,7 @@ let config: CapgoConfig = getLocalConfig()
 
 export async function getRemoteConfig() {
   // call host + /api/private/config and parse the result as json using ky
-  const localConfig = await getLocalConfig()
+  const localConfig = getLocalConfig()
   if (import.meta.env.MODE === 'development')
     return localConfig
   const data = await ky
@@ -159,7 +159,7 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   return logSession
 }
 
-export interface appUsageByApp {
+export interface AppUsageByApp {
   app_id: string
   date: string
   mau: number
@@ -168,7 +168,7 @@ export interface appUsageByApp {
   get: number
 }
 
-export interface appUsageByVersion {
+export interface AppUsageByVersion {
   date: string
   app_id: string
   version_id: number
@@ -176,7 +176,7 @@ export interface appUsageByVersion {
   uninstall: number | null
 }
 
-export interface appUsageGlobal {
+export interface AppUsageGlobal {
   date: string
   bandwidth: number
   mau: number
@@ -184,12 +184,12 @@ export interface appUsageGlobal {
   get: number
 }
 
-export interface appUsageGlobalByApp {
-  global: appUsageGlobal[]
-  byApp: appUsageByApp[]
+export interface AppUsageGlobalByApp {
+  global: AppUsageGlobal[]
+  byApp: AppUsageByApp[]
 }
 
-export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<appUsageGlobalByApp> {
+export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageGlobalByApp> {
   try {
     const supabase = useSupabase()
     const resAppIds = await useSupabase()
@@ -286,7 +286,7 @@ export async function getVersionNames(appId: string, versionIds: number[]): Prom
   return data as VersionName[]
 }
 
-export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<appUsageByVersion[]> {
+export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<AppUsageByVersion[]> {
   const { data, error } = await useSupabase()
     .from('daily_version')
     .select('date, app_id, version_id, install, uninstall')
@@ -447,7 +447,7 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
   return data
 }
 
-export async function getAppMetrics(orgId: string, startDate?: string, endDate?: string): Promise<appUsageByApp[]> {
+export async function getAppMetrics(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageByApp[]> {
   const { data, error } = await useSupabase()
     .rpc('get_app_metrics', { org_id: orgId, start_date: startDate, end_date: endDate })
   if (error)

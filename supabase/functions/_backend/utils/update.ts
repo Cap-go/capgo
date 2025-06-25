@@ -378,7 +378,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
           await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
         }
       }
-      manifest = await getManifestUrl(c, version.id, manifestEntries, device_id)
+      manifest = getManifestUrl(c, version.id, manifestEntries, device_id)
     }
     const endBundleUrl = performance.now()
     cloudlog({ requestId: c.get('requestId'), message: 'bundle_url_timing', duration: `${endBundleUrl - startBundleUrl}ms`, date: new Date().toISOString() })

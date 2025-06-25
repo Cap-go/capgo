@@ -6,7 +6,7 @@ import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 
-interface dataUpload {
+interface DataUpload {
   app_id: string
   name: string
 }
@@ -15,7 +15,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   try {
-    const body = await c.req.json<dataUpload>()
+    const body = await c.req.json<DataUpload>()
     cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
     const apikey = c.get('apikey')
     const capgkey = c.get('capgkey') as string

@@ -86,6 +86,27 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
   }
 }
 
+async function getActiveSubscription(c: Context, customerId: string, subscriptionId: string | null) {
+  cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
+  const activeSubscriptions = await getStripe(c).subscriptions.list({
+    customer: customerId,
+    status: 'active', // Look specifically for active subscriptions
+    limit: 1, // We only need one to confirm activity
+  })
+
+  if (activeSubscriptions.data.length > 0) {
+    const activeSub = activeSubscriptions.data[0]
+    cloudlog({ requestId: c.get('requestId'), message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
+    // Fetch data for the newly found active subscription
+    return getSubscriptionData(c, customerId, activeSub.id)
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'No other active subscriptions found for customer.', customerId })
+    // Keep subscriptionData as null or the inactive one, it will be handled below
+  }
+  return null
+}
+
 export async function syncSubscriptionData(c: Context, customerId: string, subscriptionId: string | null): Promise<void> {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return
@@ -95,26 +116,10 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     // If the stored subscription is not active or doesn't exist, check for any other active subscriptions
     if (!subscriptionData || (subscriptionData.status !== 'active')) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Stored subscription not active or not found, checking for others.', customerId, storedSubscriptionId: subscriptionId })
-      const activeSubscriptions = await getStripe(c).subscriptions.list({
-        customer: customerId,
-        status: 'active', // Look specifically for active subscriptions
-        limit: 1, // We only need one to confirm activity
-      })
-
-      if (activeSubscriptions.data.length > 0) {
-        const activeSub = activeSubscriptions.data[0]
-        cloudlog({ requestId: c.get('requestId'), message: 'Found an active subscription, fetching its data.', activeSubscriptionId: activeSub.id })
-        // Fetch data for the newly found active subscription
-        subscriptionData = await getSubscriptionData(c, customerId, activeSub.id)
-      }
-      else {
-        cloudlog({ requestId: c.get('requestId'), message: 'No other active subscriptions found for customer.', customerId })
-        // Keep subscriptionData as null or the inactive one, it will be handled below
-      }
+      subscriptionData = await getActiveSubscription(c, customerId, subscriptionId)
     }
 
-    let dbStatus: 'succeeded' | 'canceled' | undefined
+    let dbStatus: 'succeeded' | 'canceled' | undefined = 'canceled'
 
     if (subscriptionData) {
       // Determine DB status based on the potentially updated subscription data
@@ -123,22 +128,11 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
         if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date()) {
           dbStatus = 'succeeded' // Still active until period end because cycleEnd is future
         }
-        else {
-          dbStatus = 'canceled' // Truly canceled because cycleEnd is past or null
-        }
       }
       else if (subscriptionData.status === 'active') {
         // Active subscriptions are always considered succeeded
         dbStatus = 'succeeded'
       }
-      else {
-        // All other statuses (past_due, unpaid, incomplete, incomplete_expired) are considered canceled immediately
-        dbStatus = 'canceled'
-      }
-    }
-    else {
-      // No active subscription found in Stripe
-      dbStatus = 'canceled'
     }
 
     // Update stripe_info table with latest data, even if no subscription exists

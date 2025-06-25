@@ -21,9 +21,7 @@ const props = defineProps<{
   appId: string
 }>()
 
-const emit = defineEmits<{
-  (event: 'misconfigured', misconfigured: boolean): void
-}>()
+const emit = defineEmits<(event: 'misconfigured', misconfigured: boolean) => void>()
 
 interface Channel {
   version: {
