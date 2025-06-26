@@ -61,7 +61,7 @@ app.get('/app/:app_id', async (c) => {
     }
 
     const supabase = supabaseAdmin(c as any)
-    const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+    const { data: finalStats, error } = await getNormalStats(c as any, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app statistics', error })
@@ -108,7 +108,7 @@ app.get('/org/:org_id', async (c) => {
       return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
-    const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+    const { data: finalStats, error } = await getNormalStats(c as any, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organization statistics', error })
@@ -199,10 +199,10 @@ app.get('/user', async (c) => {
 
   let stats: Array<{ data: any, error: any }> = []
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c as any, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c as any, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)

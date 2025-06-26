@@ -348,7 +348,7 @@ export class UploadHandler {
     // optimization: only bother calculating the stream's checksum if the client provided it, and we're not resuming
     const digester: Digester = checksum != null && uploadOffset === 0 && !isSinglePart ? sha256Digester() : noopDigester()
 
-    for await (const part of generateParts(body, mem)) {
+    for await (const part of generateParts(c, body, mem)) {
       const newLength = uploadOffset + part.bytes.byteLength
       if (uploadLength != null && newLength > uploadLength) {
         await this.cleanup(r2Key)
