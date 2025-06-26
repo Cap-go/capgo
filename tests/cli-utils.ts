@@ -153,13 +153,13 @@ export async function runCli(params: string[], appId: string, logOutput = false,
   // When noFolder is true, always use bunx @capgo/cli@latest
   // When noFolder is false, check for local CLI setup
   let localCliPath = env.LOCAL_CLI_PATH
-  if (!noFolder && localCliPath === 'true') {
-    localCliPath = '../../../CLI/dist/index.js'
+  if (localCliPath === 'true') {
+    localCliPath = '../CLI/dist/index.js'
   }
 
   const command = [
-    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
-    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
+    (noFolder || localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
+    localCliPath ? localCliPath : '@capgo/cli@latest',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
     ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
@@ -228,13 +228,13 @@ export function runCliSync(params: string[], appId: string, logOutput = false, o
   // When noFolder is true, always use bunx @capgo/cli@latest
   // When noFolder is false, check for local CLI setup
   let localCliPath = env.LOCAL_CLI_PATH
-  if (!noFolder && localCliPath === 'true') {
-    localCliPath = '../../../CLI/dist/index.js'
+  if (localCliPath === 'true') {
+    localCliPath = '../CLI/dist/index.js'
   }
 
   const command = [
-    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
-    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
+    (noFolder || localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
+    localCliPath ? localCliPath : '@capgo/cli@latest',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
     ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
