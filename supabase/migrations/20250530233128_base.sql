@@ -4437,7 +4437,7 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow delete for auth (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated",
+CREATE POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated",
 "anon" USING (
   "public"."check_min_rights" (
     'write'::"public"."user_min_right",
@@ -4578,12 +4578,17 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow read for auth (read+)" ON "public"."channel_devices" FOR
+CREATE POLICY "Allow read for auth, api keys (read+)" ON "public"."channel_devices" FOR
 SELECT
-  TO "authenticated" USING (
+  TO "authenticated",
+  "anon" USING (
     "public"."check_min_rights" (
       'read'::"public"."user_min_right",
-      "public"."get_identity" (),
+      "public"."get_identity_org_appid" (
+        '{read,upload,write,all}'::"public"."key_mode" [],
+        "owner_org",
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
