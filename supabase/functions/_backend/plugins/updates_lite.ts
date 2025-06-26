@@ -1,10 +1,10 @@
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { cloudlog } from '../utils/loggin.ts'
 import { update as updateLite } from '../utils/update_lite.ts'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,

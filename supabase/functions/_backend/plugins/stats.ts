@@ -119,10 +119,10 @@ async function post(c: Context, body: AppStats) {
       updated_at: new Date().toISOString(),
     }
     const { data: appOwner } = await supabaseAdmin(c)
-    .from('apps')
-    .select('app_id')
-    .eq('app_id', app_id)
-    .single()
+      .from('apps')
+      .select('app_id')
+      .eq('app_id', app_id)
+      .single()
     if (!appOwner) {
       await opnPremStats(c, app_id, action, device)
       return c.json({

@@ -7,7 +7,6 @@ import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {

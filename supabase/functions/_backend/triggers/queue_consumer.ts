@@ -1,11 +1,11 @@
 import type { Context } from '@hono/hono'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
 import { z } from 'zod'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 

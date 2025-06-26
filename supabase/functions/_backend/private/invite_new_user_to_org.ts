@@ -1,15 +1,15 @@
+import type { Context } from '@hono/hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import dayjs from 'dayjs'
-import type { Context } from '@hono/hono'
 import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
 import { z } from 'zod'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
@@ -106,19 +106,19 @@ app.post('/', middlewareAuth, async (c) => {
     const org = res.org
 
     const { data: existingInvitation } = await supabaseAdmin(c as any)
-    .from('tmp_users')
-    .select('*')
-    .eq('email', body.email)
-    .eq('org_id', body.org_id)
-    .single()
-  
+      .from('tmp_users')
+      .select('*')
+      .eq('email', body.email)
+      .eq('org_id', body.org_id)
+      .single()
+
     let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
     if (existingInvitation) {
       const nowMinusThreeHours = dayjs().subtract(3, 'hours')
       if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
         return c.json({ status: 'Failed to invite user', error: 'User already invited and it hasnt been 3 hours since the last invitation was cancelled' }, 400)
       }
-  
+
       const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdmin(c as any)
         .from('tmp_users')
         .update({
@@ -130,11 +130,11 @@ app.post('/', middlewareAuth, async (c) => {
         .eq('org_id', body.org_id)
         .select('*')
         .single()
-  
+
       if (updateInvitationError) {
         return c.json({ status: 'Failed to invite user', error: updateInvitationError.message }, 500)
       }
-  
+
       newInvitation = updatedInvitationData
     }
     else {
@@ -145,11 +145,11 @@ app.post('/', middlewareAuth, async (c) => {
         first_name: body.first_name,
         last_name: body.last_name,
       }).select('*').single()
-  
+
       if (createUserError) {
         return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
       }
-  
+
       newInvitation = newInvitationData
     }
 

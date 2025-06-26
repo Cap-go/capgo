@@ -6,7 +6,6 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {

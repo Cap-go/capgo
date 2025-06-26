@@ -12,11 +12,11 @@ import {
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
+  type PlanUsage,
   set_bandwidth_exceeded,
   set_mau_exceeded,
   set_storage_exceeded,
   supabaseAdmin,
-  type PlanUsage,
 } from './supabase.ts'
 
 function planToInt(plan: string) {
@@ -100,10 +100,10 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
 }
 
 async function userAbovePlan(c: Context, org: {
-  customer_id: string | null;
+  customer_id: string | null
   stripe_info: {
-      subscription_id: string | null;
-  } | null;
+    subscription_id: string | null
+  } | null
 }, orgId: string, is_good_plan: boolean) {
   cloudlog({ requestId: c.get('requestId'), message: 'is_good_plan_v5_org', orgId, is_good_plan })
   // create dateid var with yyyy-mm with dayjs

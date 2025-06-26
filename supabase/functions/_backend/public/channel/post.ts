@@ -19,14 +19,14 @@ interface ChannelSet {
 
 async function findVersion(c: Context, appID: string, version: string, ownerOrg: string) {
   const { data, error: vError } = await supabaseAdmin(c)
-  .from('app_versions')
-  .select('id')
-  .eq('app_id', appID)
-  .eq('name', version)
-  .eq('owner_org', ownerOrg)
-  .eq('deleted', version === 'unknown' ? true : false)
-  .single()
-if (vError || !data) {
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appID)
+    .eq('name', version)
+    .eq('owner_org', ownerOrg)
+    .eq('deleted', version === 'unknown')
+    .single()
+  if (vError || !data) {
     console.log('Cannot find version', appID, version, ownerOrg, vError)
     return Promise.reject(vError)
   }
