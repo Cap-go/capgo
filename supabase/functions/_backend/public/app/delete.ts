@@ -1,8 +1,8 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
+import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export async function deleteApp(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {

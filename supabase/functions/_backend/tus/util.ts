@@ -1,9 +1,9 @@
 // Copyright 2023 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { Context } from '@hono/hono'
 import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
-import type { Context } from '@hono/hono'
 import { cloudlog } from '../utils/loggin.ts'
 
 export const REQUEST_METHODS = ['POST', 'HEAD', 'PATCH', 'OPTIONS', 'DELETE'] as const

@@ -1,9 +1,9 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
 
 const bodySchema = z.object({
   orgId: z.string().optional(),

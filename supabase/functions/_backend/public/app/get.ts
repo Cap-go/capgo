@@ -1,15 +1,15 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
-import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 
 export async function get(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app Missing app_id' })
     return c.json({ status: 'Missing app_id' }, 400)
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'apikeysubkey', apikey }) 
+  cloudlog({ requestId: c.get('requestId'), message: 'apikeysubkey', apikey })
 
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'read', apikey.key))) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app, You can\'t access this app', app_id: appId })

@@ -1,11 +1,11 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { GetLatest } from './get.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
 import { setChannel } from './set_channel.ts'
 import { app as updateMetadataApp } from './update_metadata.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
 
 export const app = honoFactory.createApp()
 

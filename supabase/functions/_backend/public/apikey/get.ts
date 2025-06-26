@@ -1,7 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()
 

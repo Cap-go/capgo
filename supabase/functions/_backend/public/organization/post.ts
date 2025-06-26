@@ -1,8 +1,8 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { supabaseAdmin } from '../../utils/supabase.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   name: z.string(),

@@ -1,10 +1,10 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
-import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 
 export const app = honoFactory.createApp()
 
