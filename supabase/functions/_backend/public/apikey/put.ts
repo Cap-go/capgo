@@ -38,7 +38,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   }
 
   const validModes = Constants.public.Enums.key_mode
-  if (mode !== undefined && typeof mode !== 'string' || !validModes.includes(mode as any)) {
+  if (mode !== undefined && (typeof mode !== 'string' || !validModes.includes(mode as any))) {
     console.error('Cannot update apikey', 'Invalid mode')
     return c.json({ error: `Invalid mode. Must be one of: ${validModes.join(', ')}` }, 400)
   }
