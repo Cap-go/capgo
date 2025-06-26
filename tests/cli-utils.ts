@@ -1,5 +1,4 @@
-import type { ExecSyncOptions } from 'node:child_process'
-import { exec, execSync, spawn } from 'node:child_process'
+import { exec, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process, { cwd, env } from 'node:process'

@@ -201,7 +201,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppStats>()
-    if (isLimited(c, body.app_id)) {
+    if (isLimited(c as any, body.app_id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Too many requests' })
       return c.json({
         message: 'Too many requests',

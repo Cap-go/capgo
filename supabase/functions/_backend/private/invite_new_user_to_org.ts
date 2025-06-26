@@ -97,7 +97,7 @@ app.post('/', middlewareAuth, async (c) => {
     const rawBody = await c.req.json()
     cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
-    const res = await validateInvite(c, rawBody)
+    const res = await validateInvite(c as any, rawBody)
     if (!res.inviteCreatorUser || !res.org) {
       return c.json({ status: res.message ?? 'Failed to invite user', error: res.errors ?? 'Failed to invite user' }, res?.status as any ?? 500)
     }
