@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { readDevices } from '../../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 
 interface GetDevice {
   app_id: string
@@ -19,7 +20,7 @@ export function filterDeviceKeys(devices: Database['public']['Tables']['devices'
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
-    console.error('Cannot get device', 'You can\'t access this app', body.app_id)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get device', app_id: body.app_id })
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
 
@@ -28,15 +29,15 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   // end is now
   const rangeEnd = (new Date()).toISOString()
 
-  console.log('rangeStart', rangeStart)
-  console.log('rangeEnd', rangeEnd)
+  cloudlog({ requestId: c.get('requestId'), message: 'rangeStart', rangeStart })
+  cloudlog({ requestId: c.get('requestId'), message: 'rangeEnd', rangeEnd })
   // if device_id get one device
   if (body.device_id) {
     const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id.toLowerCase()])
-    console.log('res', res)
+    cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
     if (!res || !res.length) {
-      console.error('Cannot find device', 'Cannot find device', body.device_id)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device', device_id: body.device_id })
       return c.json({ status: 'Cannot find device' }, 400)
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
@@ -47,7 +48,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .eq('id', dataDevice.version)
       .single()
     if (dbErrorVersion || !dataVersion) {
-      console.error('Cannot find version', 'Cannot find version', dataDevice.version)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version: dataDevice.version })
       return c.json({ status: 'Cannot find version', error: dbErrorVersion }, 400)
     }
     dataDevice.version = dataVersion as any
@@ -60,7 +61,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const res = await readDevices(c, body.app_id, from, to, undefined)
 
     if (!res) {
-      console.error('Cannot get devices', 'Cannot get devices')
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get devices' })
       return c.json([])
     }
     const dataDevices = filterDeviceKeys(res as any)
@@ -75,7 +76,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .in('id', versionIds)
     // replace version with object from app_versions table
     if (dbErrorVersions || !dataVersions || !dataVersions.length) {
-      console.error('Cannot get versions', 'Cannot get versions', dbErrorVersions)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get versions', error: dbErrorVersions })
       return c.json([])
     }
     dataDevices.forEach((device) => {

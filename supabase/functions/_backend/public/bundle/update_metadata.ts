@@ -1,5 +1,6 @@
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 
 export const app = honoFactory.createApp()
 
@@ -27,7 +28,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       .single()
 
     if (versionError || !version) {
-      console.error('Cannot find version', versionError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', error: versionError })
       return c.json({ status: 'Cannot find version', error: versionError }, 400)
     }
 

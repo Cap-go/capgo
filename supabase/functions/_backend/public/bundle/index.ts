@@ -5,6 +5,7 @@ import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
 import { setChannel } from './set_channel.ts'
 import { app as updateMetadataApp } from './update_metadata.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 
 export const app = honoFactory.createApp()
 
@@ -18,7 +19,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
     return get(c as any, body, apikey)
   }
   catch (e) {
-    console.error('Cannot get bundle', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get bundle', error: e })
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 })

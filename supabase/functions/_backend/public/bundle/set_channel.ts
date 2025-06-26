@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 
 interface SetChannelBody {
   app_id: string
@@ -27,7 +28,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (orgError || !org) {
-    console.log('Cannot find app', orgError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', error: orgError })
     return c.json({ status: 'Cannot find app', error: JSON.stringify(orgError) }, 400)
   }
 

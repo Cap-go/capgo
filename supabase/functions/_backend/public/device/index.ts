@@ -4,6 +4,7 @@ import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 
 export const app = honoFactory.createApp()
 
@@ -12,12 +13,12 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     const body = await c.req.json<DeviceLink>()
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
 
-    console.log('body', body)
-    console.log('apikey', apikey)
+    cloudlog({ requestId: c.get('requestId'), message: 'body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
     return post(c as any, body, apikey)
   }
   catch (e) {
-    console.log('Cannot post devices', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot post devices', error: e })
     return c.json({ status: 'Cannot post devices', error: JSON.stringify(e) }, 500)
   }
 })

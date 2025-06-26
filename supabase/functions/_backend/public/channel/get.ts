@@ -2,6 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 
 interface GetDevice {
   app_id: string
@@ -11,7 +12,7 @@ interface GetDevice {
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
-    console.log('You can\'t access this app', body.app_id)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this app', app_id: body.app_id })
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
 
@@ -41,7 +42,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .eq('name', body.channel)
       .single()
     if (dbError || !dataChannel) {
-      console.log('Cannot find version', dbError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', error: dbError })
       return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
     }
 
@@ -79,7 +80,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .range(from, to)
       .order('created_at', { ascending: true })
     if (dbError || !dataChannels) {
-      console.log('Cannot find channels', dbError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channels', error: dbError })
       return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
     }
     return c.json(dataChannels.map((o) => {

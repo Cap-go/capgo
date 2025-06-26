@@ -5,6 +5,7 @@ import { deleteApp } from './delete.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 
 export const app = honoFactory.createApp()
 
@@ -24,6 +25,7 @@ app.get('/', middlewareKey(['all', 'read']), async (c) => {
     return getAll(c as any, keyToUse, page, limit, orgId)
   }
   catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get apps', error: e })
     return c.json({ status: 'Cannot get apps', error: JSON.stringify(e) }, 500)
   }
 })
@@ -37,6 +39,7 @@ app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
     return get(c as any, id, keyToUse)
   }
   catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app', error: e })
     return c.json({ status: 'Cannot get app', error: JSON.stringify(e) }, 500)
   }
 })
@@ -48,6 +51,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     return post(c as any, body, apikey)
   }
   catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create app', error: e })
     return c.json({ status: 'Cannot create app', error: JSON.stringify(e) }, 500)
   }
 })
@@ -62,6 +66,7 @@ app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
     return put(c as any, id, body, keyToUse)
   }
   catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app', error: e })
     return c.json({ status: 'Cannot update app', error: JSON.stringify(e) }, 500)
   }
 })
@@ -75,6 +80,7 @@ app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
     return deleteApp(c as any, id, keyToUse)
   }
   catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete app', error: e })
     return c.json({ status: 'Cannot delete app', error: JSON.stringify(e) }, 500)
   }
 })

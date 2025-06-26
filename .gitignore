@@ -14,11 +14,8 @@ android/app/google-services.json
 android/google-play-key.json
 
 # Supabase
-**/supabase/.branches
-**/supabase/.temp
-# Supabase
-**/supabase/.branches
-**/supabase/.temp
+supabase/.branches
+supabase/.temp
 capgo.paw
 keystore.jks.b64
 play_config.json
@@ -30,19 +27,17 @@ fastlane/metadata/review_information/demo_user.txt
 fastlane/metadata/review_information/phone_number.txt
 .capgo_key
 .capgo_key.pub
-.wrangler/*
+.wrangler
 
 scripts/template/netlify/test.gplay.js
 
-/test-results/
-/playwright-report/
-/playwright/.cache/
-/playwright/.auth/
+test-results
+playwright-report
+playwright/.cache
+playwright/.auth
 CHANGELOG.md
 .history
 
-tests_backend/gh_actions/ch_data/*
-tests_backend/gh_actions/ch_logs/*
 .env.dev
 cloudflare_workers_deno/cloudflare/*
 cloudflare_workers_deno/cloudflare_tests/*
@@ -52,13 +47,10 @@ cloudflare_workers_deno/.denoflare
 
 .dev.vars
 .vars
-supabase/functions/_script/import_d1.sh
 src/types/supabase.types.ts
 supabase/functions/_backend/utils/supabase.types.ts
 .env.alpha
 
-vite\.config\.mts\.timestamp-[A-Za-z0-9]+-([A-Za-z0-9]+(\.[A-Za-z0-9]+)+)
-vite.config.mts.timestamp-1712411621093-7395fe6f168c5.mjs
 dist_cf
 .gitsecret/keys/random_seed
 !*.secret
@@ -69,12 +61,12 @@ internal/cloudflare/.prod.env
 internal/cloudflare/.env.preprod
 internal/cloudflare/.env.prod
 scripts/local_cf_backend/spawn
-temp_cli_test*
+temp_cli_test
 internal/netlify/.env.prod
 internal/supabase/.env.prod
 cloudflare_workers/files/.wrangler/*
 cloudflare_workers/plugin/.wrangler/*
-tmp/*
+tmp
 internal/files-api-dev/files_hash_map.json
 internal/files-api-dev/uploads/*
 internal/files-api-dev/main.go
