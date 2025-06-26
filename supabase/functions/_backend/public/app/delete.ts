@@ -125,7 +125,7 @@ export async function deleteApp(c: Context, appId: string, apikey: Database['pub
     return c.json(BRES)
   }
   catch (e) {
-    console.error('Cannot delete app', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete app', error: e })
     return c.json({ status: 'Cannot delete app', error: JSON.stringify(e) }, 500)
   }
 }

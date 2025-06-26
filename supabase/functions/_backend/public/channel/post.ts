@@ -28,7 +28,7 @@ async function findVersion(c: Context, appID: string, version: string, ownerOrg:
     .eq('deleted', version === 'unknown')
     .single()
   if (vError || !data) {
-    console.log('Cannot find version', appID, version, ownerOrg, vError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', data: { appID, version, ownerOrg, vError } })
     return Promise.reject(vError)
   }
   return data.id

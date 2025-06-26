@@ -101,14 +101,14 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
     const { data, error: dbError } = await query
 
     if (dbError) {
-      console.error('Cannot get apps', dbError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get apps', error: dbError })
       return c.json({ status: 'Cannot get apps', error: JSON.stringify(dbError) }, 400)
     }
 
     return c.json(data)
   }
   catch (e) {
-    console.error('Cannot get apps', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get apps', error: e })
     return c.json({ status: 'Cannot get apps', error: JSON.stringify(e) }, 500)
   }
 }

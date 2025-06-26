@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 
 interface DeleteOrganizationParams {
   orgId?: string
@@ -10,14 +11,14 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
   const orgId = c.req.query('orgId') ?? body.orgId
 
   if (!orgId) {
-    console.error('Missing orgId')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing orgId' })
     return c.json({ status: 'Missing orgId' }, 400)
   }
 
   // Check if user has right to delete the organization
   const userId = apikey.user_id
   if (!(await hasOrgRightApikey(c, orgId, userId, 'super_admin', c.get('capgkey') as string))) {
-    console.error('You can\'t delete this organization', orgId)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t delete this organization', org_id: orgId })
     return c.json({ status: 'You don\'t have permission to delete this organization', orgId }, 403)
   }
 
@@ -28,14 +29,14 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
       .eq('id', orgId)
 
     if (error) {
-      console.error('Cannot delete organization', error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete organization', error })
       return c.json({ status: 'Cannot delete organization', error: JSON.stringify(error) }, 400)
     }
 
     return c.json({ status: 'Organization deleted' })
   }
   catch (e) {
-    console.error('Cannot delete organization', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete organization', error: e })
     return c.json({ status: 'Cannot delete organization', error: JSON.stringify(e) }, 500)
   }
 }

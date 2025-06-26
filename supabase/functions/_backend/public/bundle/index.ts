@@ -31,7 +31,7 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
     return deleteBundle(c as any, body, apikey)
   }
   catch (e) {
-    console.error('Cannot delete bundle', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete bundle', error: e })
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })
@@ -43,7 +43,7 @@ app.put('/', middlewareKey(['all', 'write']), async (c) => {
     return setChannel(c as any, body, apikey)
   }
   catch (e) {
-    console.error('Cannot set bundle to channel', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set bundle to channel', error: e })
     return c.json({ status: 'Cannot set bundle to channel', error: JSON.stringify(e) }, 500)
   }
 })

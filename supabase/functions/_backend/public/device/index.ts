@@ -27,12 +27,12 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   try {
     const body = await getBody<DeviceLink>(c as any)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    console.log('body', body)
-    console.log('apikey', apikey)
+    cloudlog({ requestId: c.get('requestId'), message: 'body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
     return get(c as any, body, apikey)
   }
   catch (e) {
-    console.log('Cannot get devices', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get devices', error: e })
     return c.json({ status: 'Cannot get devices', error: JSON.stringify(e) }, 500)
   }
 })
@@ -41,12 +41,12 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   try {
     const body = await getBody<DeviceLink>(c as any)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    console.log('body', body)
-    console.log('apikey', apikey)
+    cloudlog({ requestId: c.get('requestId'), message: 'body', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
     return deleteOverride(c as any, body, apikey)
   }
   catch (e) {
-    console.log('Cannot delete devices', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete devices', error: e })
     return c.json({ status: 'Cannot delete devices', error: JSON.stringify(e) }, 500)
   }
 })

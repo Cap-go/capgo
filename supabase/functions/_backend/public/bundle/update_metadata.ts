@@ -53,14 +53,14 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       .eq('id', body.version_id)
 
     if (updateError) {
-      console.error('Cannot update version metadata', updateError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update version metadata', error: updateError })
       return c.json({ status: 'Cannot update version metadata', error: updateError }, 400)
     }
 
     return c.json({ status: 'success' })
   }
   catch (error) {
-    console.error('Error updating version metadata', error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating version metadata', error })
     return c.json({ status: 'Error updating version metadata', error }, 500)
   }
 })

@@ -2,6 +2,7 @@ import type { Context } from '@hono/hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
+import { cloudlog, cloudlogErr } from '../../../utils/loggin.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -28,13 +29,13 @@ const memberSchema = z.object({
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
-    console.error('Invalid body', bodyParsed.error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
   }
   const body = bodyParsed.data
 
   if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
-    console.error('You can\'t access this organization', body.orgId)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this organization', org_id: body.orgId })
     return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
   }
 
@@ -45,22 +46,22 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
         guild_id: body.orgId,
       })
 
-    console.log('data', data, error)
+    cloudlog({ requestId: c.get('requestId'), message: 'data', data, error })
     if (error) {
-      console.error('Cannot get organization members', error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organization members', error })
       return c.json({ status: 'Cannot get organization members', error: error.message }, 500)
     }
 
     const parsed = memberSchema.safeParse(data)
     if (!parsed.success) {
-      console.error('Cannot parse members', parsed.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot parse members', error: parsed.error })
       return c.json({ status: 'Cannot get organization members', error: parsed.error.message }, 500)
     }
-    console.log('Members', parsed.data)
+    cloudlog({ requestId: c.get('requestId'), message: 'Members', data: parsed.data })
     return c.json(parsed.data)
   }
   catch (error) {
-    console.error('Cannot get members', error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get members', error })
     return c.json({ status: 'Cannot get members', error: error instanceof Error ? error.message : 'Unknown error' }, 500)
   }
 }

@@ -2,7 +2,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 
 const app = honoFactory.createApp()
 
@@ -18,7 +18,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'You cannot do that as a limited API key' }, 401)
   }
   const body = await c.req.json()
-  console.log('body', body)
+  cloudlog({ requestId: c.get('requestId'), message: 'body', data: body })
 
   const orgId = body.org_id
   const appId = body.app_id

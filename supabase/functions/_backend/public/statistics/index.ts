@@ -2,8 +2,10 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { z } from 'zod'
+import type { Context } from '@hono/hono'
 import { honoFactory, middlewareV2, useCors } from '../../utils/hono.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 
 dayjs.extend(utc)
 
@@ -41,7 +43,7 @@ app.get('/app/:app_id', async (c) => {
     const query = c.req.query()
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success) {
-      console.log('Invalid body', bodyParsed.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     }
     const body = bodyParsed.data
@@ -49,27 +51,27 @@ app.get('/app/:app_id', async (c) => {
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
       if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
-        console.log('Invalid apikey', auth)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid apikey', data: auth })
         return c.json({ status: 'You can\'t access this app' }, 400)
       }
     }
     else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
-      console.log('Invalid jwt', auth.userId)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid jwt', data: auth.userId })
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
     const supabase = supabaseAdmin(c as any)
-    const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+    const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error) {
-      console.log('Cannot get app statistics', error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app statistics', error })
       return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
     }
 
     return c.json(finalStats)
   }
   catch (e) {
-    console.error('Error in app statistics', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in app statistics', error: e })
     return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(e) }, 500)
   }
 })
@@ -84,39 +86,39 @@ app.get('/org/:org_id', async (c) => {
 
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success) {
-      console.log('Invalid body', bodyParsed.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     }
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
     if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read'))) {
-      console.log('Invalid jwt', auth.userId)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid jwt', data: auth.userId })
       return c.json({ status: 'You can\'t access this organization' }, 400)
     }
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
       if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
-        console.log('Invalid apikey', auth.apikey!.key)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid apikey', data: auth.apikey!.key })
         return c.json({ status: 'You can\'t access this organization' }, 400)
       }
     }
 
     if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-      console.log('Invalid apikey', auth.apikey!.key)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid apikey', data: auth.apikey!.key })
       return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
-    const { data: finalStats, error } = await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+    const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error) {
-      console.log('Cannot get organization statistics', error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organization statistics', error })
       return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
     }
 
     return c.json(finalStats)
   }
   catch (e) {
-    console.error('Error in organization statistics', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in organization statistics', error: e })
     return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(e) }, 500)
   }
 })
@@ -129,7 +131,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
 
     const bodyParsed = bundleUsageSchema.safeParse(query)
     if (!bodyParsed.success) {
-      console.log('Invalid body', bodyParsed.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
       return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
     }
     const body = bodyParsed.data
@@ -137,12 +139,12 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
       if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
-        console.log('Invalid apikey', auth.apikey!.key)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid apikey', data: auth.apikey!.key })
         return c.json({ status: 'You can\'t access this app' }, 400)
       }
     }
     else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
-      console.log('Invalid jwt', auth.userId)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid jwt', data: auth.userId })
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
@@ -150,14 +152,14 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
     if (error) {
-      console.log('Cannot get app statistics. Cannot get bundle usage', error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app statistics. Cannot get bundle usage', error })
       return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
     }
 
     return c.json(data)
   }
   catch (e) {
-    console.error('Error in app statistics. Cannot get bundle usage', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in app statistics. Cannot get bundle usage', error: e })
     return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(e) }, 500)
   }
 })
@@ -169,7 +171,7 @@ app.get('/user', async (c) => {
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)
   if (!bodyParsed.success) {
-    console.log('Invalid body', bodyParsed.error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
     return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
   }
   const body = bodyParsed.data
@@ -180,32 +182,32 @@ app.get('/user', async (c) => {
   }
   const orgs = await orgsReq
   if (orgs.error) {
-    console.log('Cannot get user statistics', orgs.error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get user statistics', error: orgs.error })
     return c.json({ status: 'User not found', error: JSON.stringify(orgs.error) }, 404)
   }
 
-  console.log('orgs', orgs.data)
+  cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgs.data })
 
   // Deduplicate organizations by org_id using Set for better performance
   const uniqueOrgs = Array.from(
     new Map(orgs.data.map(org => [org.org_id, org])).values(),
   )
   if (uniqueOrgs.length === 0) {
-    console.log('No organizations found', auth.userId)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'No organizations found', data: auth.userId })
     return c.json({ status: 'No organizations found', error: 'No organizations found' }, 401)
   }
 
   let stats: Array<{ data: any, error: any }> = []
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0) {
-    console.log('Cannot get user statistics', errors)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get user statistics', error: errors })
     return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
   }
 
@@ -225,7 +227,7 @@ app.get('/user', async (c) => {
   return c.json(finalStats)
 })
 
-async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
+async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -276,7 +278,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
   Object.values(metricsByApp)
     .forEach((arrItem) => {
       const sortedArrItem = arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      console.log(sortedArrItem)
+      cloudlog({ requestId: c.get('requestId'), message: 'sortedArrItem', data: sortedArrItem })
       arrItem?.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
         if (item.date) {
           const dayNumber = i
