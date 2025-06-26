@@ -48,7 +48,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
         productId = item.price.product
       }
       else {
-        console.warn({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
+        cloudlog({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
       }
     }
 
