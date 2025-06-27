@@ -630,7 +630,7 @@ getKeys()
             id="limit-to-org"
             v-model="limitToOrgCheckbox"
             type="checkbox"
-            class="checkbox"
+            class="checkbox border-gray-500 dark:border-gray-700"
           >
           <label for="limit-to-org" class="text-sm">
             {{ t('limit-to-org') }}
@@ -643,7 +643,7 @@ getKeys()
                 :id="`org-${org.gid}`"
                 :value="org.gid"
                 type="checkbox"
-                class="checkbox"
+                class="checkbox border-gray-500 dark:border-gray-700"
                 @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
               >
               <label :for="`org-${org.gid}`" class="text-sm">
@@ -659,7 +659,7 @@ getKeys()
             id="limit-to-app"
             v-model="limitToAppCheckbox"
             type="checkbox"
-            class="checkbox"
+            class="checkbox border-gray-500 dark:border-gray-700"
           >
           <label for="limit-to-app" class="text-sm">
             {{ t('limit-to-app') }}
@@ -672,7 +672,7 @@ getKeys()
                 :id="`app-${app.app_id}`"
                 :value="app"
                 type="checkbox"
-                class="checkbox"
+                class="checkbox border-gray-500 dark:border-gray-700"
                 @change="handleAppSelection(app, ($event.target as HTMLInputElement).checked)"
               >
               <label :for="`app-${app.app_id}`" class="text-sm">

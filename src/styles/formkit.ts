@@ -104,7 +104,7 @@ export default {
   },
   'datepicker': {
     inner: 'relative',
-    panelWrapper: 'absolute top-[calc(100%_+_0.5em)] drop-shadow-[0_0_1.25em_rgba(0,0,0,.25)] rounded-md p-5 bg-white z-10',
+    panelWrapper: 'absolute top-[calc(100%+0.5em)] drop-shadow-[0_0_1.25em_rgba(0,0,0,.25)] rounded-md p-5 bg-white z-10',
     panelHeader: 'grid grid-cols-[2.5em_1fr_2.5em] justify-center items-center border-b-2 mb-4 pb-4',
     input: 'selection:bg-blue-400',
     monthsHeader: 'flex items-center justify-center col-start-2 col-end-2',
@@ -113,7 +113,7 @@ export default {
     months: 'flex flex-wrap',
     month: `
         flex items-center justify-center
-        w-[calc(33%_-_1em)] m-2 p-2 rounded-md
+        w-[calc(33%-1em)] m-2 p-2 rounded-md
         bg-gray-200
         aria-selected:bg-blue-500 aria-selected:text-white
         focus:outline focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 focus:bg-white focus:text-black
@@ -124,7 +124,7 @@ export default {
     years: 'flex flex-wrap max-w-[35em]',
     year: `
         flex items-center justify-center
-        w-[calc(20%_-_1em)] m-2 p-2 rounded-md
+        w-[calc(20%-1em)] m-2 p-2 rounded-md
         bg-gray-200
         aria-selected:bg-blue-500 aria-selected:text-white
         focus:outline focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 focus:bg-white focus:text-black
@@ -234,9 +234,9 @@ export default {
     transferlistSearchInput: 'border-none p-1 w-full bg-transparent outline-hidden text-sm',
     controlLabel: 'hidden',
     selectedIcon: 'w-3 absolute left-3 select-none',
-    fastForwardIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-[1rem] [&>svg]:max-h-[1rem] rotate-90 sm:rotate-0',
-    moveRightIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-[1rem] [&>svg]:max-h-[1rem] rotate-90 sm:rotate-0',
-    moveLeftIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-[1rem] [&>svg]:max-h-[1rem] rotate-90 sm:rotate-0',
-    rewindIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-[1rem] [&>svg]:max-h-[1rem] rotate-90 sm:rotate-0',
+    fastForwardIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-4 [&>svg]:max-h-4 rotate-90 sm:rotate-0',
+    moveRightIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-4 [&>svg]:max-h-4 rotate-90 sm:rotate-0',
+    moveLeftIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-4 [&>svg]:max-h-4 rotate-90 sm:rotate-0',
+    rewindIcon: 'w-10 flex select-none [&>svg]:m-auto [&>svg]:w-full [&>svg]:max-w-4 [&>svg]:max-h-4 rotate-90 sm:rotate-0',
   },
 }

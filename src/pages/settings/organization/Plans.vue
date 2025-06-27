@@ -575,7 +575,7 @@ const hightLights = computed<Stat[]>(() => ([
     </div>
     <div v-else class="relative w-full overflow-hidden ">
       <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
-        <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+        <img src="/capgo.webp" alt="logo" class="h-16  w-16 ml-auto mr-auto mb-16">
         {{ t('thank-you-for-sub') }}
         <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
         <router-link class="mt-[40vh]" to="/app">

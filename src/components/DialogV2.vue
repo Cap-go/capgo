@@ -52,7 +52,7 @@ onMounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute top-4 right-4 btn btn-sm btn-circle btn-ghost z-10"
+          class="absolute top-4 right-4 btn btn-sm btn-circle btn-ghost z-10 text-black dark:text-white hover:text-white hover:bg-gray-500 dark:hover:bg-gray-500"
           @click="close()"
         >
           ✕
@@ -75,7 +75,7 @@ onMounted(() => {
           </div>
 
           <!-- Teleport target for custom content -->
-          <div id="dialog-v2-content" class="pb-4" />
+          <div id="dialog-v2-content" class="pb-4 text-gray-500 dark:text-gray-400" />
         </div>
 
         <!-- Buttons -->
@@ -88,7 +88,7 @@ onMounted(() => {
                 'btn btn-primary': button.role === 'primary',
                 'btn btn-secondary': button.role === 'secondary',
                 'btn btn-error': button.role === 'danger',
-                'btn btn-outline': button.role === 'cancel',
+                'btn btn-outline text-black dark:text-white hover:text-white': button.role === 'cancel',
                 'btn': !button.role,
               }"
               @click="close(button)"

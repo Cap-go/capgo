@@ -61,6 +61,10 @@ async function showDeletionMethodDialog(): Promise<'normal' | 'unsafe' | null> {
     description: t('select-style-of-deletion-msg'),
     buttons: [
       {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
         text: t('normal'),
         role: 'secondary',
         handler: () => {

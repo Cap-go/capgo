@@ -11,6 +11,7 @@ import { toast } from 'vue-sonner'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
+import { FormKit } from '@formkit/vue'
 
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
@@ -30,6 +31,11 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
+
+// Permission modal state
+const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()
+const selectedPermissionForm = ref('')
+const isInvitePermissionModal = ref(false)
 
 // Invite new user form state
 const inviteUserEmail = ref('')
@@ -59,6 +65,21 @@ const filteredMembers = computed(() => {
     const emailMatch = member.email.toLowerCase().includes(searchLower)
     return emailMatch
   })
+})
+
+const permissionOptions = computed(() => {
+  const options = [
+    { label: t('key-read'), value: 'read' },
+    { label: t('key-upload'), value: 'upload' },
+    { label: t('key-write'), value: 'write' },
+    { label: t('key-admin'), value: 'admin' },
+  ]
+
+  if (isSuperAdmin()) {
+    options.push({ label: t('key-super-admin'), value: 'super_admin' })
+  }
+
+  return options
 })
 
 columns.value = [
@@ -136,7 +157,10 @@ function validateEmail(email: string) {
 }
 
 async function showPermModal(invite: boolean): Promise<Database['public']['Enums']['user_min_right'] | undefined> {
-  let permision: Database['public']['Enums']['user_min_right'] | undefined
+  selectedPermission.value = undefined
+  selectedPermissionForm.value = ''
+  isInvitePermissionModal.value = invite
+
   dialogStore.openDialog({
     title: t('select-user-perms'),
     description: t('select-user-perms-expanded'),
@@ -147,36 +171,20 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
         role: 'cancel',
       },
       {
-        text: t('key-read'),
-        role: 'secondary',
-        handler: () => permision = invite ? 'invite_read' : 'read',
+        text: t('button-confirm'),
+        role: 'primary',
+        handler: () => {
+          if (!selectedPermission.value) {
+            toast.error(t('please-select-permission'))
+            return false
+          }
+          return true
+        },
       },
-      {
-        text: t('key-upload'),
-        role: 'secondary',
-        handler: () => permision = invite ? 'invite_upload' : 'upload',
-      },
-      {
-        text: t('key-write'),
-        role: 'secondary',
-        handler: () => permision = invite ? 'invite_write' : 'write',
-      },
-      {
-        text: t('key-admin'),
-        role: 'secondary',
-        handler: () => permision = invite ? 'invite_admin' : 'admin',
-      },
-      ...(isSuperAdmin()
-        ? [{
-            text: t('key-super-admin'),
-            role: 'secondary' as const,
-            handler: () => permision = invite ? 'invite_super_admin' : 'super_admin',
-          }]
-        : []),
     ],
   })
   await dialogStore.onDialogDismiss()
-  return permision
+  return selectedPermission.value
 }
 
 async function showInviteModal() {
@@ -502,6 +510,37 @@ function canDelete(member: ExtendedOrganizationMember) {
   return currentUserIsAdmin
 }
 
+function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'], invite: boolean) {
+  if (invite) {
+    switch (permission) {
+      case 'read':
+        selectedPermission.value = 'invite_read'
+        break
+      case 'upload':
+        selectedPermission.value = 'invite_upload'
+        break
+      case 'write':
+        selectedPermission.value = 'invite_write'
+        break
+      case 'admin':
+        selectedPermission.value = 'invite_admin'
+        break
+      case 'super_admin':
+        selectedPermission.value = 'invite_super_admin'
+        break
+    }
+  }
+  else {
+    selectedPermission.value = permission
+  }
+}
+
+function handleFormKitPermissionSelection(value: string | undefined) {
+  if (!value) return
+  const permission = value as Database['public']['Enums']['user_min_right']
+  handlePermissionSelection(permission, isInvitePermissionModal.value)
+}
+
 async function showInviteNewUserDialog(email: string, roleType: Database['public']['Enums']['user_min_right']) {
   // Reset form state
   inviteUserEmail.value = email
@@ -719,6 +758,21 @@ async function handleInviteNewUserSubmit() {
             </div>
           </div>
         </form>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for permission selection modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-user-perms')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <div class="border rounded-lg p-4 dark:border-gray-600">
+          <FormKit
+            v-model="selectedPermissionForm"
+            type="radio"
+            name="permission"
+            :options="permissionOptions"
+            @input="handleFormKitPermissionSelection"
+          />
+        </div>
       </div>
     </Teleport>
   </div>

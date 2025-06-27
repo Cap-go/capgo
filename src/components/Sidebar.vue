@@ -92,7 +92,7 @@ const tabs = ref<Tab[]>([
       }"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between px-3 py-4 border-b border-slate-800 lg:px-6 lg:py-6 lg:border-b lg:border-slate-700 flex-shrink-0">
+      <div class="flex justify-between px-3 py-4 border-b border-slate-800 lg:px-6 lg:py-6 lg:border-b lg:border-slate-700 shrink-0">
         <router-link class="flex items-center space-x-2 cursor-pointer lg:space-x-3" to="/app">
           <img src="/capgo.webp" alt="logo" class="w-8 h-8">
           <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 hover:text-white lg:text-slate-200 lg:hover:text-white">Capgo</span>
@@ -100,7 +100,7 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- Organization dropdown -->
-      <div class="px-3 py-4 lg:px-6 lg:py-4 flex-shrink-0">
+      <div class="px-3 py-4 lg:px-6 lg:py-4 shrink-0">
         <dropdown-organization v-if="main.user" />
       </div>
 
@@ -132,7 +132,7 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- User menu -->
-      <div class="pt-4 mt-auto lg:pt-6 lg:border-t lg:border-slate-700 lg:mt-0 flex-shrink-0">
+      <div class="pt-4 mt-auto lg:pt-6 lg:border-t lg:border-slate-700 lg:mt-0 shrink-0">
         <div v-if="main.user" class="flex items-center">
           <DropdownProfile class="w-full" />
         </div>
