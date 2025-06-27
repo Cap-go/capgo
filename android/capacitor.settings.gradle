@@ -110,5 +110,8 @@ project(':capgo-native-market').projectDir = new File('../node_modules/@capgo/na
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
 
+include ':capacitor-camera-view'
+project(':capacitor-camera-view').projectDir = new File('../node_modules/capacitor-camera-view/android')
+
 include ':capacitor-secure-storage-plugin'
 project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/capacitor-secure-storage-plugin/android')

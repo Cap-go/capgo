@@ -39,6 +39,7 @@ declare module 'vue-router/auto-routes' {
     '/onboarding/verify_email': RouteRecordInfo<'/onboarding/verify_email', '/onboarding/verify_email', Record<never, never>, Record<never, never>>,
     '/register': RouteRecordInfo<'/register', '/register', Record<never, never>, Record<never, never>>,
     '/resend_email': RouteRecordInfo<'/resend_email', '/resend_email', Record<never, never>, Record<never, never>>,
+    '/scan': RouteRecordInfo<'/scan', '/scan', Record<never, never>, Record<never, never>>,
     '/settings/Account': RouteRecordInfo<'/settings/Account', '/settings/Account', Record<never, never>, Record<never, never>>,
     '/settings/ChangePassword': RouteRecordInfo<'/settings/ChangePassword', '/settings/ChangePassword', Record<never, never>, Record<never, never>>,
     '/settings/Notifications': RouteRecordInfo<'/settings/Notifications', '/settings/Notifications', Record<never, never>, Record<never, never>>,

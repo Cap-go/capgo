@@ -66,6 +66,7 @@
         "@vueuse/core": "13.3.0",
         "base64-arraybuffer": "1.0.2",
         "bun-types": "^1.2.16",
+        "capacitor-camera-view": "^1.0.1",
         "capacitor-secure-storage-plugin": "^0.11.0",
         "chart.js": "^4.4.9",
         "country-code-to-flag-emoji": "^2.0.0",
@@ -1749,6 +1750,8 @@
     "caniuse-api": ["caniuse-api@3.0.0", "", { "dependencies": { "browserslist": "^4.0.0", "caniuse-lite": "^1.0.0", "lodash.memoize": "^4.1.2", "lodash.uniq": "^4.5.0" } }, "sha512-bsTwuIg/BZZK/vreVTYYbSWoe2F+71P7K5QGEX+pT250DZbfU1MQ5prOKpPR+LL6uWKK3KMwMCAS74QB3Um1uw=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001714", "", {}, "sha512-mtgapdwDLSSBnCI3JokHM7oEQBLxiJKVRtg10AxM1AyeiKcM96f0Mkbqeq+1AbiCtvMcHRulAAEMu693JrSWqg=="],
+
+    "capacitor-camera-view": ["capacitor-camera-view@1.0.1", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-u9hVSOe+ZlD0McNmTRraL4RCLhPfo7UnpgbRaf3Zj9Yl+3B6C42eOvfhg8DFlMooU/IzZBPEG4oCVUia4JLiww=="],
 
     "capacitor-secure-storage-plugin": ["capacitor-secure-storage-plugin@0.11.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-1fs+RifRlKia+7U68Ekm+5FrX5OiWK/MBvtFdfFR2t7enh3rrIHuemA1+0Rkl3IWcQ6XOcL/6lOb5elZq9IMTA=="],
 

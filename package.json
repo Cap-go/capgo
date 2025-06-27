@@ -145,6 +145,7 @@
     "@vueuse/core": "13.3.0",
     "base64-arraybuffer": "1.0.2",
     "bun-types": "^1.2.16",
+    "capacitor-camera-view": "^1.0.1",
     "capacitor-secure-storage-plugin": "^0.11.0",
     "chart.js": "^4.4.9",
     "country-code-to-flag-emoji": "^2.0.0",
