@@ -8,7 +8,7 @@ import { cloudlog } from '../utils/loggin.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from "../utils/utils.ts";
+import { backgroundTask } from '../utils/utils.ts'
 
 // Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
@@ -113,10 +113,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     .from('manifest')
     .select()
     .eq('app_version_id', record.id)
-  
+
   if (fetchError) {
     cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error: fetchError })
-  } else if (manifestEntries && manifestEntries.length > 0) {
+  }
+  else if (manifestEntries && manifestEntries.length > 0) {
     // Delete each file from S3
     const promisesDeleteS3 = []
     for (const entry of manifestEntries) {
@@ -131,21 +132,21 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
             const count = v.count ?? 0
             if (!count) {
               return supabaseAdmin(c)
-              .from('manifest')
-              .delete()
-              .eq('id', entry.id)
+                .from('manifest')
+                .delete()
+                .eq('id', entry.id)
             }
             cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
             return Promise.all([
-              s3.deleteObject(c, entry.s3_path), 
+              s3.deleteObject(c, entry.s3_path),
               supabaseAdmin(c)
-              .from('manifest')
-              .delete()
-              .eq('id', entry.id)
+                .from('manifest')
+                .delete()
+                .eq('id', entry.id),
             ]) as any
-        }))
+          }))
+      }
     }
-  }
     await backgroundTask(c, Promise.all(promisesDeleteS3))
   }
 }
