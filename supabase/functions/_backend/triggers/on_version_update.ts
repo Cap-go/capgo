@@ -143,14 +143,47 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   if (errorUpdate)
     cloudlog({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
 
-  // Delete manifest entries
-  const { error: deleteError } = await supabaseAdmin(c)
+  
+  // Delete manifest entries - first get them to delete from S3
+  const { data: manifestEntries, error: fetchError } = await supabaseAdmin(c)
     .from('manifest')
-    .delete()
+    .select()
     .eq('app_version_id', record.id)
-  if (deleteError)
-    cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest', error: deleteError })
-
+  
+  if (fetchError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error: fetchError })
+  } else if (manifestEntries && manifestEntries.length > 0) {
+    // Delete each file from S3
+    const promises = []
+    for (const entry of manifestEntries) {
+      if (entry.s3_path) {
+        promises.push(supabaseAdmin(c)
+          .from('manifest')
+          .select('*', { count: 'exact', head: true })
+          .eq('file_name', entry.file_name)
+          .eq('file_hash', entry.file_hash)
+          .neq('app_version_id', record.id)
+          .then((v) => {
+            const count = v.count ?? 0
+            if (!count) {
+              return supabaseAdmin(c)
+              .from('manifest')
+              .delete()
+              .eq('id', entry.id)
+            }
+            cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
+            return Promise.all([
+              s3.deleteObject(c, entry.s3_path), 
+              supabaseAdmin(c)
+              .from('manifest')
+              .delete()
+              .eq('id', entry.id)
+            ]) as any
+        }))
+    }
+  }
+    await Promise.all(promises)
+  }
   return c.json(BRES)
 }
 
