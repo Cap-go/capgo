@@ -160,7 +160,7 @@ export async function runCli(params: string[], appId: string, logOutput = false,
   }
 
   const command = [
-    (noFolder || localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
+    localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
     localCliPath ? localCliPath : '@capgo/cli@latest',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
