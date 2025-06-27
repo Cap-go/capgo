@@ -77,7 +77,7 @@ async function handleBarcodeScan(data: any) {
   const scannedValue = data.displayValue || data.value || data.barcode?.displayValue || ''
 
   // Check if the scanned value is a valid URL
-  if (!isValidUrl(scannedValue)) {
+  if (!URL.canParse(scannedValue)) {
     toast.error('Scanned value is not a valid URL')
     return
   }
@@ -85,16 +85,6 @@ async function handleBarcodeScan(data: any) {
   scannedUrl.value = scannedValue
   await stopScanner()
   await downloadUpdate(scannedValue)
-}
-
-function isValidUrl(url: string): boolean {
-  try {
-    new URL(url)
-    return true
-  }
-  catch {
-    return false
-  }
 }
 
 async function downloadUpdate(updateUrl: string) {
