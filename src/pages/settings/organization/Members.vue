@@ -3,6 +3,7 @@ import type VueTurnstile from 'vue-turnstile'
 import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -11,7 +12,6 @@ import { toast } from 'vue-sonner'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
-import { FormKit } from '@formkit/vue'
 
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
@@ -536,7 +536,8 @@ function handlePermissionSelection(permission: Database['public']['Enums']['user
 }
 
 function handleFormKitPermissionSelection(value: string | undefined) {
-  if (!value) return
+  if (!value)
+    return
   const permission = value as Database['public']['Enums']['user_min_right']
   handlePermissionSelection(permission, isInvitePermissionModal.value)
 }

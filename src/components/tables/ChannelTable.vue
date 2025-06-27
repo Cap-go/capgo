@@ -227,7 +227,6 @@ async function deleteOne(one: Element) {
     ],
   })
   return dialogStore.onDialogDismiss()
-
 }
 
 columns.value = [
