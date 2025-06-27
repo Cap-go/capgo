@@ -55,24 +55,6 @@ const currentVersionsNumber = computed(() => {
 })
 const { currentOrganization } = storeToRefs(organizationStore)
 
-async function didCancel(name: string) {
-  dialogStore.openDialog({
-    title: t('alert-confirm-delete'),
-    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-delete'),
-        role: 'danger',
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
-}
-
 function findUnknownVersion() {
   return supabase
     .from('app_versions')
@@ -198,38 +180,54 @@ async function refreshData(keepCurrentPage = false) {
 }
 async function deleteOne(one: Element) {
   // console.log('deleteBundle', bundle)
-  if (await didCancel(t('channel')))
-    return
-  try {
-    // First delete channel_devices
-    const { error: delDevicesError } = await supabase
-      .from('channel_devices')
-      .delete()
-      .eq('channel_id', one.id)
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-delete'),
+        role: 'danger',
+        handler: async () => {
+          try {
+            // First delete channel_devices
+            const { error: delDevicesError } = await supabase
+              .from('channel_devices')
+              .delete()
+              .eq('channel_id', one.id)
 
-    if (delDevicesError) {
-      toast.error(t('cannot-delete-channel'))
-      return
-    }
+            if (delDevicesError) {
+              toast.error(t('cannot-delete-channel'))
+              return
+            }
 
-    // Then delete the channel
-    const { error: delChanError } = await supabase
-      .from('channels')
-      .delete()
-      .eq('app_id', props.appId)
-      .eq('id', one.id)
-    if (delChanError) {
-      toast.error(t('cannot-delete-channel'))
-    }
-    else {
-      await refreshData(true)
-      toast.success(t('channel-deleted'))
-    }
-  }
-  catch (error) {
-    console.error(error)
-    toast.error(t('cannot-delete-channel'))
-  }
+            // Then delete the channel
+            const { error: delChanError } = await supabase
+              .from('channels')
+              .delete()
+              .eq('app_id', props.appId)
+              .eq('id', one.id)
+            if (delChanError) {
+              toast.error(t('cannot-delete-channel'))
+            }
+            else {
+              await refreshData(true)
+              toast.success(t('channel-deleted'))
+            }
+          }
+          catch (error) {
+            console.error(error)
+            toast.error(t('cannot-delete-channel'))
+          }
+        },
+      },
+    ],
+  })
+  return dialogStore.onDialogDismiss()
+
 }
 
 columns.value = [
