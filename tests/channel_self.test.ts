@@ -52,8 +52,8 @@ beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 })
 afterAll(async () => {
-  // await resetAppData(APPNAME)
-  // await resetAppDataStats(APPNAME)
+  await resetAppData(APPNAME)
+  await resetAppDataStats(APPNAME)
 })
 
 describe('invalids /channel_self tests', () => {
@@ -436,21 +436,110 @@ describe('GET /channel_self tests', () => {
     expect(androidChannelNames).toContain('production') // Android only
   })
 
-  it('[GET] should handle emulator and prod flags correctly', async () => {
+  it('[GET] should filter channels based on emulator compatibility', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const response = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'ios',
-      is_emulator: 'true',
-      is_prod: 'false',
-    })
+    // Set beta channel to NOT allow emulators
+    const { error: updateError } = await getSupabaseClient()
+      .from('channels')
+      .update({ allow_emulator: false })
+      .eq('name', 'beta')
+      .eq('app_id', APPNAME)
 
-    expect(response.ok).toBe(true)
-    const json = await response.json() as ChannelsListResponse
-    
-    // Just verify we get an array of channels
-    expect(Array.isArray(json)).toBe(true)
+    expect(updateError).toBeNull()
+
+    try {
+      // Test emulator device - should NOT get beta channel
+      const emulatorResponse = await fetchGetChannels({
+        app_id: APPNAME,
+        platform: 'ios',
+        is_emulator: 'true',
+        is_prod: 'true',
+      })
+
+      expect(emulatorResponse.ok).toBe(true)
+      const emulatorJson = await emulatorResponse.json() as ChannelsListResponse
+      const emulatorChannelNames = emulatorJson.map(ch => ch.name)
+      
+      expect(emulatorChannelNames).toContain('development') // should be included
+      expect(emulatorChannelNames).not.toContain('beta') // should be filtered out
+      
+      // Test production device - should get both channels
+      const prodResponse = await fetchGetChannels({
+        app_id: APPNAME,
+        platform: 'ios',
+        is_emulator: 'false',
+        is_prod: 'true',
+      })
+
+      expect(prodResponse.ok).toBe(true)
+      const prodJson = await prodResponse.json() as ChannelsListResponse
+      const prodChannelNames = prodJson.map(ch => ch.name)
+      
+      expect(prodChannelNames).toContain('development')
+      expect(prodChannelNames).toContain('beta') // production devices can access all channels
+    }
+    finally {
+      // Reset beta channel to allow emulators
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_emulator: true })
+        .eq('name', 'beta')
+        .eq('app_id', APPNAME)
+    }
+  })
+
+  it('[GET] should filter channels based on dev/prod compatibility', async () => {
+    await resetAndSeedAppData(APPNAME)
+
+    // Set development channel to NOT allow dev devices
+    const { error: updateError } = await getSupabaseClient()
+      .from('channels')
+      .update({ allow_dev: false })
+      .eq('name', 'development')
+      .eq('app_id', APPNAME)
+
+    expect(updateError).toBeNull()
+
+    try {
+      // Test dev device - should NOT get development channel
+      const devResponse = await fetchGetChannels({
+        app_id: APPNAME,
+        platform: 'ios',
+        is_emulator: 'false',
+        is_prod: 'false',
+      })
+
+      expect(devResponse.ok).toBe(true)
+      const devJson = await devResponse.json() as ChannelsListResponse
+      const devChannelNames = devJson.map(ch => ch.name)
+      
+      expect(devChannelNames).toContain('beta') // should be included
+      expect(devChannelNames).not.toContain('development') // should be filtered out
+      
+      // Test production device - should get both channels
+      const prodResponse = await fetchGetChannels({
+        app_id: APPNAME,
+        platform: 'ios',
+        is_emulator: 'false',
+        is_prod: 'true',
+      })
+
+      expect(prodResponse.ok).toBe(true)
+      const prodJson = await prodResponse.json() as ChannelsListResponse
+      const prodChannelNames = prodJson.map(ch => ch.name)
+      
+      expect(prodChannelNames).toContain('beta')
+      expect(prodChannelNames).toContain('development') // production devices can access all channels
+    }
+    finally {
+      // Reset development channel to allow dev devices
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_dev: true })
+        .eq('name', 'development')
+        .eq('app_id', APPNAME)
+    }
   })
 
   it('[GET] should default prod to true when not specified', async () => {
@@ -465,8 +554,9 @@ describe('GET /channel_self tests', () => {
     expect(response.ok).toBe(true)
     const json = await response.json() as ChannelsListResponse
     
-    // Just verify we get an array of channels
+    // Should get both iOS channels since prod=true by default
     expect(Array.isArray(json)).toBe(true)
+    expect(json).toHaveLength(2)
   })
 })
 

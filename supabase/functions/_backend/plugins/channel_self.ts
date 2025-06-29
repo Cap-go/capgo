@@ -474,10 +474,10 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   return c.json(BRES)
 }
 
-async function listCompatibleChannels(c: Context, query: { app_id: string, platform: string, is_emulator: boolean, is_prod: boolean }): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
-  
-  const { app_id, platform, is_emulator, is_prod } = query
+async function listCompatibleChannels(c: Context, queryParams: { app_id: string, platform: string, is_emulator: boolean, is_prod: boolean }): Promise<Response> {
+  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query: queryParams })
+
+  const { app_id, platform, is_emulator, is_prod } = queryParams
 
   // Check if app exists and get owner_org for permission check
   const { data: appData } = await supabaseAdmin(c)
@@ -502,12 +502,24 @@ async function listCompatibleChannels(c: Context, query: { app_id: string, platf
   }
 
   // Get channels that allow device self set and are compatible with the platform
-  const { data: channels, error: channelsError } = await supabaseAdmin(c)
+  let dbQuery = supabaseAdmin(c)
     .from('channels')
-    .select('id, name, allow_device_self_set, ios, android, public')
+    .select('id, name, allow_device_self_set, allow_emulator, allow_dev, ios, android, public')
     .eq('app_id', app_id)
     .eq('allow_device_self_set', true)
     .eq(platform as 'ios' | 'android', true)
+
+  // Filter by emulator compatibility
+  if (is_emulator) {
+    dbQuery = dbQuery.eq('allow_emulator', true)
+  }
+
+  // Filter by dev/prod compatibility
+  if (!is_prod) {
+    dbQuery = dbQuery.eq('allow_dev', true)
+  }
+
+  const { data: channels, error: channelsError } = await dbQuery
 
   if (channelsError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot fetch channels', channelsError })
@@ -530,7 +542,7 @@ async function listCompatibleChannels(c: Context, query: { app_id: string, platf
   }))
 
   cloudlog({ requestId: c.get('requestId'), message: 'Found compatible channels', count: compatibleChannels.length })
-  
+
   return c.json(compatibleChannels)
 }
 
@@ -576,10 +588,10 @@ app.delete('/', async (c) => {
   }
 })
 
-app.get('/', async (c) => {
+app.get('/', (c) => {
   try {
     const query = c.req.query()
-    
+
     // If no query parameters, return status
     if (!query.app_id) {
       return c.json({ status: 'ok' })
