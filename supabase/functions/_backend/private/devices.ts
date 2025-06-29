@@ -6,7 +6,7 @@ import { cloudlog } from '../utils/loggin.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
-interface dataDevice {
+interface DataDevice {
   appId: string
   count?: boolean
   versionId?: string
@@ -24,9 +24,9 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   try {
-    const body = await c.req.json<dataDevice>()
+    const body = await c.req.json<DataDevice>()
     cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
-    const devicesIds = body.devicesId || body.deviceIds || []
+    const devicesIds = body.devicesId ?? body.deviceIds ?? []
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')
     if (apikey_string) {
@@ -40,7 +40,7 @@ app.post('/', middlewareAuth, async (c) => {
     else if (authorization) {
       const reqOwner = await supabaseClient(c as any, authorization)
         .rpc('has_app_right', { appid: body.appId, right: 'read' })
-        .then(res => res.data || false)
+        .then(res => res.data ?? false)
       if (!reqOwner)
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }

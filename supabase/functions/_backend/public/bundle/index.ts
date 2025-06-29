@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { GetLatest } from './get.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
 import { setChannel } from './set_channel.ts'
@@ -18,7 +19,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
     return get(c as any, body, apikey)
   }
   catch (e) {
-    console.error('Cannot get bundle', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get bundle', error: e })
     return c.json({ status: 'Cannot get bundle', error: JSON.stringify(e) }, 500)
   }
 })
@@ -30,7 +31,7 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
     return deleteBundle(c as any, body, apikey)
   }
   catch (e) {
-    console.error('Cannot delete bundle', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete bundle', error: e })
     return c.json({ status: 'Cannot delete bundle', error: JSON.stringify(e) }, 500)
   }
 })
@@ -42,7 +43,7 @@ app.put('/', middlewareKey(['all', 'write']), async (c) => {
     return setChannel(c as any, body, apikey)
   }
   catch (e) {
-    console.error('Cannot set bundle to channel', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set bundle to channel', error: e })
     return c.json({ status: 'Cannot set bundle to channel', error: JSON.stringify(e) }, 500)
   }
 })

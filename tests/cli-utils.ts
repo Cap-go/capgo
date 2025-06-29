@@ -1,5 +1,4 @@
-import type { ExecSyncOptions } from 'node:child_process'
-import { exec, execSync, spawn } from 'node:child_process'
+import { exec, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process, { cwd, env } from 'node:process'
@@ -150,16 +149,21 @@ export async function npmInstall(appId: string) {
 export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
   const basePath = noFolder ? cwd() : tempFileFolder(appId)
 
-  // When noFolder is true, always use bunx @capgo/cli@latest
-  // When noFolder is false, check for local CLI setup
   let localCliPath = env.LOCAL_CLI_PATH
-  if (!noFolder && localCliPath === 'true') {
+  if (localCliPath === 'true') {
+    // For easy local testing, we can set the LOCAL_CLI_PATH to true and the CLI folder will be used
     localCliPath = '../../../CLI/dist/index.js'
+  }
+  if (localCliPath) {
+    if (noFolder) {
+      // remove ../../ from the path as the running path is not in subfolder
+      localCliPath = localCliPath.replace('../../', '')
+    }
   }
 
   const command = [
-    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
-    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
+    localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
+    localCliPath ? localCliPath : '@capgo/cli@latest',
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
     ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
@@ -219,49 +223,6 @@ export async function runCli(params: string[], appId: string, logOutput = false,
       }
     })
   })
-}
-
-// Keep sync version for compatibility
-export function runCliSync(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): string {
-  const basePath = noFolder ? cwd() : tempFileFolder(appId)
-
-  // When noFolder is true, always use bunx @capgo/cli@latest
-  // When noFolder is false, check for local CLI setup
-  let localCliPath = env.LOCAL_CLI_PATH
-  if (!noFolder && localCliPath === 'true') {
-    localCliPath = '../../../CLI/dist/index.js'
-  }
-
-  const command = [
-    (!noFolder && localCliPath) ? (env.NODE_PATH ?? 'node') : 'bunx',
-    (!noFolder && localCliPath) ? localCliPath : '@capgo/cli@latest',
-    ...params,
-    ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
-    ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),
-  ].join(' ')
-
-  const options: ExecSyncOptions = {
-    cwd: basePath,
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...env, FORCE_COLOR: '1' },
-    timeout: 30000, // 30 second timeout
-  }
-
-  try {
-    const output = execSync(command, options)
-    if (logOutput) {
-      console.log(output)
-    }
-    return output.toString()
-  }
-  catch (error: any) {
-    if (logOutput) {
-      console.error('CLI execution failed')
-      console.error(error.stdout)
-    }
-    return error.stdout?.toString() ?? error.stderr?.toString() ?? error.message
-  }
 }
 
 // Batch CLI operations to reduce setup overhead

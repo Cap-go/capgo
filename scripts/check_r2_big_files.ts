@@ -559,12 +559,12 @@ async function export_files_folder_to_csv(folderPath: string) {
     const csvRows = folderObjects.map(obj => {
         const size = obj.Size ?? 0
         const sizeGB = (size / (1024 * 1024 * 1024)).toFixed(6)
-        const webLink = `https://web.capgo.app/app/p/${obj.Key?.split('/').pop() || ''}`
+        const webLink = `https://web.capgo.app/app/p/${obj.Key?.split('/').pop() ?? ''}`
 
         return [
-            `"${obj.Key?.split('/').pop() || ''}"`,
-            `"${obj.Key?.split('/').slice(-2).pop() || ''}"`,
-            obj.Key?.split('/').pop() || '',
+            `"${obj.Key?.split('/').pop() ?? ''}"`,
+            `"${obj.Key?.split('/').slice(-2).pop() ?? ''}"`,
+            obj.Key?.split('/').pop() ?? '',
             size.toString(),
             sizeGB,
             `"${webLink}"`
@@ -664,7 +664,7 @@ async function get_app_versions() {
 
         // Execute the query to get all app_versions as JSON
         const result = await sql`SELECT json_agg(app_versions.*) as data FROM app_versions`
-        const appVersions = result[0].data || []
+        const appVersions = result[0].data ?? []
 
         console.log(`✅ Found ${appVersions.length} app versions`)
 
@@ -729,7 +729,7 @@ async function get_big_orgs() {
         if (version.r2_path && version.owner_org) {
             const size = objectSizeMap.get(version.r2_path)
             if (size) {
-                const currentSize = orgSizes.get(version.owner_org) || 0
+                const currentSize = orgSizes.get(version.owner_org)?? 0
                 orgSizes.set(version.owner_org, currentSize + size)
                 foundVersions++
             } else {
@@ -913,7 +913,7 @@ async function export_supabase_csv(orgId: string) {
             }))
             return {
                 version,
-                size: response.ContentLength || 0,
+                size: response.ContentLength?? 0,
                 found: true
             }
         } catch (error: any) {
@@ -967,9 +967,9 @@ async function export_supabase_csv(orgId: string) {
         const webLink = `https://web.capgo.app/app/p/${version.app_id}/bundle/${version.id}`
 
         csvData.push({
-            app_id: version.app_id || '',
-            version_name: version.name || '',
-            version_id: version.id || '',
+            app_id: version.app_id ?? '',
+            version_name: version.name ?? '',
+            version_id: version.id ?? '',
             size_bytes: sizeBytes,
             size_gb: sizeGB,
             link: webLink
@@ -1131,8 +1131,8 @@ async function prepare_cleanup_zip() {
             } else {
                 orphaned++
                 toDelete.push({
-                    key: zipFile.Key || '',
-                    size: zipFile.Size || 0,
+                    key: zipFile.Key ?? '',
+                    size: zipFile.Size?? 0,
                     lastModified: zipFile.LastModified || null,
                     reason: 'No matching app_versions record found',
                     error: null
@@ -1213,7 +1213,7 @@ async function copy_cleanup_candidates_to_backup_bucket() {
 
     // Load cleanup candidates file
     const cleanupData = JSON.parse(readFileSync(cleanupFile, 'utf-8'))
-    const toDelete = cleanupData.toDelete || []
+    const toDelete = cleanupData.toDelete ?? []
 
     if (toDelete.length === 0) {
         console.log('✅ No files to copy - cleanup candidates is empty')
@@ -1227,7 +1227,7 @@ async function copy_cleanup_candidates_to_backup_bucket() {
     const s3 = await initS3()
 
     // Calculate total size
-    const totalSize = toDelete.reduce((sum: number, file: any) => sum + (file.size || 0), 0)
+    const totalSize = toDelete.reduce((sum: number, file: any) => sum + (file.size?? 0), 0)
     const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2)
 
     console.log(`💾 Total size to copy: ${totalSizeGB} GB`)
@@ -1247,7 +1247,7 @@ async function copy_cleanup_candidates_to_backup_bucket() {
     const batches: any[][] = []
 
     for (const file of toDelete) {
-        const fileSize = file.size || 0
+        const fileSize = file.size?? 0
 
         // If adding this file would exceed memory limit, start a new batch
         if (currentBatchSize + fileSize > MAX_MEMORY_BYTES && currentBatch.length > 0) {
@@ -1269,7 +1269,7 @@ async function copy_cleanup_candidates_to_backup_bucket() {
 
     // Process each batch sequentially
     for (const batch of batches) {
-        const batchSizeGB = (batch.reduce((sum, file) => sum + (file.size || 0), 0) / (1024 * 1024 * 1024)).toFixed(2)
+        const batchSizeGB = (batch.reduce((sum, file) => sum + (file.size?? 0), 0) / (1024 * 1024 * 1024)).toFixed(2)
         console.log(`🔄 Processing batch ${batchNumber}/${batches.length}: ${batch.length} files (${batchSizeGB} GB)`)
 
         const copyOperations = batch.map(async (file: any) => {
@@ -1414,7 +1414,7 @@ async function copy_cleanup_candidates_direct() {
 
     // Load cleanup candidates file
     const cleanupData = JSON.parse(readFileSync(cleanupFile, 'utf-8'))
-    const toDelete = cleanupData.toDelete || []
+    const toDelete = cleanupData.toDelete ?? []
 
     if (toDelete.length === 0) {
         console.log('✅ No files to copy - cleanup candidates is empty')
@@ -1428,7 +1428,7 @@ async function copy_cleanup_candidates_direct() {
     const s3 = await initS3()
 
     // Calculate total size
-    const totalSize = toDelete.reduce((sum: number, file: any) => sum + (file.size || 0), 0)
+    const totalSize = toDelete.reduce((sum: number, file: any) => sum + (file.size?? 0), 0)
     const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2)
 
     console.log(`💾 Total size to copy: ${totalSizeGB} GB`)
@@ -1546,7 +1546,7 @@ async function delete_cleanup_candidates() {
 
     // Load cleanup candidates file
     const cleanupData = JSON.parse(readFileSync(cleanupFile, 'utf-8'))
-    const toDelete = cleanupData.toDelete || []
+    const toDelete = cleanupData.toDelete ?? []
 
     if (toDelete.length === 0) {
         console.log('✅ No files to delete - cleanup candidates is empty')
@@ -1556,7 +1556,7 @@ async function delete_cleanup_candidates() {
     console.log(`📦 Found ${toDelete.length} files to delete from main bucket`)
 
     // Calculate total size
-    const totalSize = toDelete.reduce((sum: number, file: any) => sum + (file.size || 0), 0)
+    const totalSize = toDelete.reduce((sum: number, file: any) => sum + (file.size?? 0), 0)
     const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2)
 
     console.log(`💾 Total size to delete: ${totalSizeGB} GB`)

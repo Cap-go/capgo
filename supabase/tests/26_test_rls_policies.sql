@@ -64,9 +64,9 @@ SELECT
     'public',
     'channel_devices',
     ARRAY[
-      'Allow delete for auth (write+)',
+      'Allow delete for auth, api keys (write+)',
       'Allow insert for auth (write+)',
-      'Allow read for auth (read+)',
+      'Allow read for auth, api keys (read+)',
       'Allow update for auth, api keys (write+)',
       'Prevent non 2FA access'
     ],

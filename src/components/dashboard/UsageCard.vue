@@ -43,7 +43,7 @@ const total = computed(() => {
   }
 
   if (!props.accumulated) {
-    return arrWithoutUndefined[arrWithoutUndefined.length - 1] || 0
+    return arrWithoutUndefined[arrWithoutUndefined.length - 1] ?? 0
   }
   return sum(arrWithoutUndefined)
 })
@@ -55,7 +55,7 @@ const lastDayEvolution = computed(() => {
     return 0
   }
 
-  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] || 0
+  const oldTotal = props.accumulated ? sum(arrWithoutUndefined.slice(0, -2)) : arrWithoutUndefined[arrWithoutUndefined.length - 2] ?? 0
   const diff = (total.value as number) - oldTotal
 
   // Prevent division by zero

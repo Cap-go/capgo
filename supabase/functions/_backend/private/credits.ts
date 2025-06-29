@@ -60,7 +60,7 @@ app.get('/', async (c) => {
       .from('capgo_credits_steps')
       .select()
       .order('price_per_unit')
-    return c.json(credits || [])
+    return c.json(credits ?? [])
   }
   catch (e) {
     return c.json({ status: 'Cannot get credits', error: JSON.stringify(e) }, 500)

@@ -42,8 +42,8 @@ app.get('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'pgCounts', pgCounts })
     const diff = await tables.reduce(async (acc: Promise<Record<TableNames, { d1: number, supabase: number, percent: number }>>, table: TableNames, index: number) => {
       const result = await acc
-      const d1Count = (d1Counts[index]?.count as number) || 0
-      const pgCount = pgCounts[index]?.count || 0
+      const d1Count = (d1Counts[index]?.count as number) ?? 0
+      const pgCount = pgCounts[index]?.count ?? 0
       const percent = (pgCount - d1Count) / d1Count
       result[table] = { d1: d1Count, supabase: pgCount, percent }
       return result

@@ -81,13 +81,13 @@ const columns = ref<TableColumn[]>([
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: item => formatDate(item.updated_at || ''),
+    displayFunction: item => formatDate(item.updated_at ?? ''),
   },
   {
     label: t('mau'),
     key: 'mau',
     mobile: false,
-    displayFunction: item => mauNumbers.value[item.app_id] || 0,
+    displayFunction: item => mauNumbers.value[item.app_id] ?? 0,
   },
   {
     label: t('app-perm'),

@@ -17,7 +17,7 @@ import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
 
-const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation']
+const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan']
 
 getRemoteConfig()
 const app = createApp(App)

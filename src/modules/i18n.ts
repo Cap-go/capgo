@@ -14,7 +14,7 @@ export const i18n = createI18n({
 
 const localesMap = Object.fromEntries(
   Object.entries(import.meta.glob('../../messages/*.json'))
-    .map(([path, loadLocale]) => [path.match(/([\w-]*)\.json$/)?.[1], loadLocale]),
+    .map(([path, loadLocale]) => [/([\w-]*)\.json$/.exec(path)?.[1], loadLocale]),
 ) as Record<Locale, () => Promise<{ default: Record<string, string> }>>
 
 export const availableLocales = Object.keys(localesMap)
@@ -63,7 +63,7 @@ export async function loadLanguageAsync(lang: string): Promise<Locale> {
 
 export const install: UserModule = ({ app }) => {
   app.use(i18n)
-  let lang = localStorage.getItem('lang') || window.navigator.language.split('-')[0]
+  let lang = localStorage.getItem('lang') ?? window.navigator.language.split('-')[0]
   if (!(lang in languages))
     lang = 'en'
   loadLanguageAsync(lang)

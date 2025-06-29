@@ -11,8 +11,8 @@ const isLoading = ref(false)
 const enableNotifications = ref(false)
 const optForNewsletters = ref(false)
 
-enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications || false
-optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters || false
+enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications ?? false
+optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters ?? false
 
 async function submitNotif() {
   isLoading.value = true

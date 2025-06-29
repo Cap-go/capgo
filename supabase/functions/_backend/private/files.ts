@@ -24,21 +24,21 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 async function getHandler(c: Context): Promise<Response> {
   const requestId = c.get('fileId')
-  // console.log('fileId', requestId)
+  // cloudlog('fileId', requestId)
   if (getRuntimeKey() !== 'workerd') {
     // serve file from supabase storage using they sdk
     const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(requestId)
 
-    // console.log('publicUrl', data.publicUrl)
+    // cloudlog('publicUrl', data.publicUrl)
     const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
-    // console.log('url', url)
+    // cloudlog('url', url)
     return c.redirect(url)
   }
 
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
 
   if (bucket == null) {
-    console.log('getHandler files', 'bucket is null')
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files bucket is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
 
@@ -51,7 +51,7 @@ async function getHandler(c: Context): Promise<Response> {
   // TODO: move bandwidth tracking here instead of in the updates.ts
   // createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
   if (response != null) {
-    console.log('getHandler files', 'cache hit')
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
     return response
   }
 
@@ -59,7 +59,7 @@ async function getHandler(c: Context): Promise<Response> {
     range: c.req.raw.headers,
   })
   if (object == null) {
-    console.log('getHandler files', 'object is null')
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'Not Found' }, 404)
   }
   const headers = objectHeaders(object)
@@ -109,7 +109,7 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
 }
 
 function optionsHandler(c: Context) {
-  console.log('optionsHandler files', 'optionsHandler')
+  cloudlog({ requestId: c.get('requestId'), message: 'optionsHandler files optionsHandler' })
   return c.newResponse(null, 204, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': ALLOWED_METHODS,
@@ -130,7 +130,7 @@ async function uploadHandler(c: Context) {
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
 
   if (durableObjNs == null) {
-    console.log('files', 'durableObjNs is null')
+    cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
     return c.json({ error: 'Invalid bucket configuration' }, 500)
   }
 
@@ -145,7 +145,7 @@ async function uploadHandler(c: Context) {
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
-  const fileId = parseUploadMetadata(c.req.raw.headers).filename
+  const fileId = parseUploadMetadata(c, c.req.raw.headers).filename
   if (fileId == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
     return c.json({ error: 'Not Found' }, 404)
@@ -156,7 +156,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     decodedFileId = atob(fileId)
   }
   catch {
-    console.log('Debug setKeyFromMetadata - Not base64 encoded:', fileId)
+    cloudlog({ requestId: c.get('requestId'), message: 'Debug setKeyFromMetadata - Not base64 encoded:', fileId })
   }
   const normalizedFileId = decodeURIComponent(decodedFileId)
   c.set('fileId', normalizedFileId)
@@ -183,7 +183,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   if (requestId.split('/').length < 5) {
     throw new HTTPException(400, { message: 'Invalid requestId' })
   }
-  console.log('checkWriteAppAccess', app_id, owner_org)
+  cloudlog({ requestId: c.get('requestId'), message: 'checkWriteAppAccess', app_id, owner_org })
   const capgkey = c.get('capgkey') as string
   cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)

@@ -14,6 +14,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -31,6 +32,7 @@ interface Stat {
   }
 }
 const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const { t } = useI18n()
 const main = useMainStore()
 const router = useRouter()
@@ -80,7 +82,7 @@ async function getVersion() {
       .neq('storage_provider', 'revert_to_builtin')
       .order('created_at', { ascending: false })
       .throwOnError()
-    versions.value = data || []
+    versions.value = data ?? []
   }
   catch (error) {
     console.error(error)
@@ -99,7 +101,7 @@ async function getChannels() {
       `)
       .eq('app_id', packageId.value)
       .throwOnError()
-    channels.value = (data || []) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
+    channels.value = (data ?? []) as (Database['public']['Tables']['channels']['Row'] & Channel)[]
   }
   catch (error) {
     console.error(error)
@@ -151,7 +153,7 @@ async function getDevice() {
       .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt || ''}`,
+          'authorization': `Bearer ${currentJwt ?? ''}`,
         },
         body: JSON.stringify({
           appId: packageId.value,
@@ -227,9 +229,9 @@ async function loadData() {
 }
 
 async function didCancel(name: string) {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-delete-message')} ${name} ${t('from-device')} ?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -241,9 +243,8 @@ async function didCancel(name: string) {
         id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function upsertDevChannel(device: string, channelId: number) {
@@ -357,7 +358,7 @@ function openChannel() {
             <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
-            <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name || ''" @click="openChannel()">
+            <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
               <select :value="channelDevice?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateChannelOverride">
                 <option value="none">
                   {{ t('none') }}

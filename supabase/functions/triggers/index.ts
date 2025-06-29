@@ -27,6 +27,7 @@ import { app as on_version_update } from '../_backend/triggers/on_version_update
 import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
 import { BRES } from '../_backend/utils/hono.ts'
+import { cloudlog } from '../_backend/utils/loggin.ts'
 import { onError } from '../_backend/utils/on_error.ts'
 
 const functionName = 'triggers'
@@ -36,7 +37,7 @@ const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
 if (sentryDsn) {
   appGlobal.use('*', sentry({
     dsn: sentryDsn,
-  }))
+  }) as any)
 }
 
 appGlobal.use('*', logger())
@@ -72,7 +73,7 @@ appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
 
 appGlobal.all('*', (c) => {
-  console.log('all files', c.req.url)
+  cloudlog({ requestId: c.get('requestId'), message: 'all files', url: c.req.url })
   return c.json({ error: 'Not Found' }, 404)
 })
 appGlobal.onError(onError(functionName))

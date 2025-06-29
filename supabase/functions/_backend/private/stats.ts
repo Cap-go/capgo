@@ -6,7 +6,7 @@ import { cloudlog } from '../utils/loggin.ts'
 import { readStats } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
-interface dataStats {
+interface DataStats {
   appId: string
   devicesId?: string[]
   search?: string
@@ -23,7 +23,7 @@ app.use('/', useCors)
 // No middleware applied to this route, as we allow both authorization and capgkey for CLI and webapp access
 app.post('/', async (c) => {
   try {
-    const body = await c.req.json<dataStats>()
+    const body = await c.req.json<DataStats>()
     cloudlog({ requestId: c.get('requestId'), message: 'post private/stats body', body })
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')
@@ -42,7 +42,7 @@ app.post('/', async (c) => {
     else if (authorization) {
       const reqOwner = await supabaseClient(c as any, authorization)
         .rpc('has_app_right', { appid: body.appId, right: 'read' })
-        .then(res => res.data || false)
+        .then(res => res.data ?? false)
       if (!reqOwner) {
         cloudlog({ requestId: c.get('requestId'), message: 'error reqOwner', reqOwner })
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)

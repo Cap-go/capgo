@@ -61,7 +61,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
     }
 
-    currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by, undefined, undefined)
+    currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
   })
 
@@ -122,7 +122,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
-    return (perm && perms.includes(perm)) || false
+    return (perm && perms.includes(perm)) ?? false
   }
 
   const setCurrentOrganizationToMain = () => {
@@ -204,8 +204,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     })
 
     _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
-    if (!currentOrganization.value)
-      currentOrganization.value = organization
+    currentOrganization.value ??= organization
 
     // console.log('done', currentOrganization.value)
     getProcessCronStatsJobInfo()

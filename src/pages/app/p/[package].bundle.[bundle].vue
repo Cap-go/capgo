@@ -3,18 +3,22 @@ import type { Tab } from '~/components/comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
+import { FormKit } from '@formkit/vue'
 import { parse } from '@std/semver'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import Settings from '~icons/heroicons/cog-8-tooth'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
+import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { appIdToUrl, bytesToMbText, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -22,6 +26,7 @@ import { useOrganizationStore } from '~/stores/organization'
 const { t } = useI18n()
 const route = useRoute('/app/p/[package].bundle.[bundle]')
 const router = useRouter()
+const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const main = useMainStore()
@@ -35,6 +40,36 @@ const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const showBundleMetadataInput = ref<boolean>(false)
+
+// Channel chooser state
+const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
+const currentChannelAction = ref<'set' | 'open' | 'unlink' | null>(null)
+const channelSearchVal = ref('')
+const filteredChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+
+// Watch for search changes
+watch(() => channelSearchVal.value, () => {
+  if (channelSearchVal.value.trim()) {
+    filteredChannels.value = channels.value.filter(channel =>
+      channel.name.toLowerCase().includes(channelSearchVal.value.toLowerCase()),
+    )
+  }
+  else {
+    filteredChannels.value = channels.value
+  }
+})
+
+// Update filtered channels when channels change
+watch(() => channels.value, () => {
+  if (channelSearchVal.value.trim()) {
+    filteredChannels.value = channels.value.filter(channel =>
+      channel.name.toLowerCase().includes(channelSearchVal.value.toLowerCase()),
+    )
+  }
+  else {
+    filteredChannels.value = channels.value
+  }
+}, { immediate: true })
 
 const role = ref<OrganizationRole | null>(null)
 watch(version, async (version) => {
@@ -68,18 +103,17 @@ async function copyToast(text: string) {
   catch (err) {
     console.error('Failed to copy: ', err)
     // Display a modal with the copied key
-    displayStore.dialogOption = {
-      header: t('cannot-copy'),
-      message: text,
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: text,
       buttons: [
         {
-          text: t('button-cancel'),
-          role: 'cancel',
+          text: t('ok'),
+          role: 'primary',
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
 }
 
@@ -148,78 +182,81 @@ async function ASChannelChooser() {
     toast.error(t('no-permission'))
     return
   }
-  const buttons = []
 
-  const normalHandler = async (chan: Database['public']['Tables']['channels']['Row']) => {
-    if (!version.value)
-      return
-    try {
-      const {
-        finalCompatibility,
-        localDependencies,
-      } = await checkCompatibilityNativePackages(version.value.app_id, chan.name, (version.value.native_packages as any) ?? [])
+  selectedChannelForLink.value = null
+  currentChannelAction.value = 'set'
+  channelSearchVal.value = ''
+  filteredChannels.value = channels.value
 
-      // Check if any package is incompatible
-      if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
-        toast.error(t('bundle-not-compatible-with-channel', { channel: chan.name }))
-        toast.info(t('channel-not-compatible-with-channel-description').replace('%', 'npx @capgo/cli@latest bundle compatibility'))
-        displayStore.dialogOption = {
-          header: t('confirm-action'),
-          message: t('set-even-not-compatible').replace('%', 'npx @capgo/cli@latest bundle compatibility'),
-          buttons: [
-            {
-              text: t('button-cancel'),
-              role: 'cancel',
-            },
-            {
-              text: t('button-confirm'),
-              role: 'confirm',
-            },
-          ],
-        }
-        displayStore.showDialog = true
-        if (await displayStore.onDialogDismiss())
-          return
-      }
-      else if (localDependencies.length === 0) {
-        toast.info('ignore-compatibility')
-      }
-      else {
-        toast.info(t('bundle-compatible-with-channel').replace('%', chan.name))
-      }
-      await setChannel(chan, version.value.id)
-      await getChannels()
-    }
-    catch (error) {
-      console.error(error)
-      toast.error(t('cannot-test-app-some'))
-    }
-  }
-
-  for (const chan of channels.value) {
-    const v: number = chan.version as any
-    buttons.push({
-      text: chan.name,
-      selected: version.value.id === v,
-      handler: async () => { await normalHandler(chan) },
-    })
-  }
-  buttons.push({
-    text: t('button-cancel'),
-    role: 'cancel',
-    handler: () => {
-      // console.log('Cancel clicked')
-    },
+  dialogStore.openDialog({
+    title: t('channel-linking'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('set-bundle'),
+        role: 'primary',
+        handler: async () => {
+          if (!selectedChannelForLink.value) {
+            toast.error(t('please-select-channel'))
+            return false
+          }
+          await handleChannelLink(selectedChannelForLink.value)
+          return true
+        },
+      },
+    ],
   })
-  displayStore.dialogOption = {
-    header: t('channel-linking'),
-    buttons,
-    buttonVertical: true,
-    headerStyle: 'text-center',
-    size: 'max-w-fit px-12',
+  return dialogStore.onDialogDismiss()
+}
+
+async function handleChannelLink(chan: Database['public']['Tables']['channels']['Row']) {
+  if (!version.value)
+    return
+  try {
+    const {
+      finalCompatibility,
+      localDependencies,
+    } = await checkCompatibilityNativePackages(version.value.app_id, chan.name, (version.value.native_packages as any) ?? [])
+
+    // Check if any package is incompatible
+    if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
+      toast.error(t('bundle-not-compatible-with-channel', { channel: chan.name }))
+      toast.info(t('channel-not-compatible-with-channel-description').replace('%', 'npx @capgo/cli@latest bundle compatibility'))
+
+      dialogStore.openDialog({
+        title: t('confirm-action'),
+        description: t('set-even-not-compatible').replace('%', 'npx @capgo/cli@latest bundle compatibility'),
+        buttons: [
+          {
+            text: t('button-cancel'),
+            role: 'cancel',
+          },
+          {
+            text: t('button-confirm'),
+            role: 'primary',
+          },
+        ],
+      })
+      if (await dialogStore.onDialogDismiss())
+        return
+    }
+    else if (localDependencies.length === 0) {
+      toast.info('ignore-compatibility')
+    }
+    else {
+      toast.info(t('bundle-compatible-with-channel').replace('%', chan.name))
+    }
+    await setChannel(chan, version.value.id)
+    await getChannels()
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  catch (error) {
+    console.error(error)
+    toast.error(t('cannot-test-app-some'))
+  }
 }
 
 async function openChannel(selChannel: Database['public']['Tables']['channels']['Row']) {
@@ -229,120 +266,103 @@ async function openChannel(selChannel: Database['public']['Tables']['channels'][
   if (!channel.value)
     return ASChannelChooser()
 
-  displayStore.dialogOption = {
-    header: t('channel-linking'),
-    buttonVertical: true,
-    headerStyle: 'text-center',
-    size: 'max-w-fit px-12',
+  // Direct navigation to channel
+  await openChannelLink()
+}
+
+async function openChannelSettings(selChannel: Database['public']['Tables']['channels']['Row']) {
+  channel.value = selChannel
+  if (!version.value || !main.auth)
+    return
+  if (!channel.value)
+    return ASChannelChooser()
+
+  selectedChannelForLink.value = selChannel
+  currentChannelAction.value = 'open'
+
+  dialogStore.openDialog({
+    title: t('channel-actions'),
+    size: 'lg',
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
-        handler: () => {
-          // console.log('Cancel clicked')
-        },
       },
     ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
+  if (!channel.value)
+    return
+
+  if (action === 'set') {
+    await ASChannelChooser()
   }
-
-  // Push set-bundle if role > read
-  if (displayStore.dialogOption.buttons && role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
-    displayStore.dialogOption.buttons.splice(0, 0, {
-      text: t('set-bundle'),
-      handler: () => {
-        ASChannelChooser()
-      },
-    })
+  else if (action === 'open') {
+    await openChannelLink()
   }
-
-  const baseIndex = (displayStore.dialogOption?.buttons?.length ?? 0) - 1
-
-  // push in button at index 1 if channel is set
-  if (channel.value && displayStore.dialogOption.buttons) {
-    displayStore.dialogOption.buttons.splice(baseIndex, 0, {
-      text: t('open-channel'),
-      handler: () => {
-        openChannelLink()
-      },
-    })
-    if (role.value && (role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
-      displayStore.dialogOption.buttons.splice(baseIndex + 1, 0, {
-        text: t('unlink-channel'),
-        role: 'danger',
-        handler: async () => {
-          try {
-            if (!channel.value)
-              return
-            const id = await getUnknowBundleId()
-            if (!id)
-              return
-            await setChannel(channel.value, id)
-            await getChannels()
-          }
-          catch (error) {
-            console.error(error)
-            toast.error(t('cannot-test-app-some'))
-          }
-        },
-      })
+  else if (action === 'unlink') {
+    try {
+      const id = await getUnknowBundleId()
+      if (!id)
+        return
+      await setChannel(channel.value, id)
+      await getChannels()
+    }
+    catch (error) {
+      console.error(error)
+      toast.error(t('cannot-test-app-some'))
     }
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
 }
+
+async function downloadNow() {
+  if (!version.value)
+    return
+  if (version.value.session_key) {
+    const filename = version.value.r2_path?.replace('/', '_')
+    const localPath = `./${filename}`
+    const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
+
+    dialogStore.openDialog({
+      title: t('to-open-encrypted-bu'),
+      buttons: [
+        {
+          text: t('copy-command'),
+          role: 'primary',
+          handler: () => {
+            copyToast(command)
+          },
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+  }
+  openVersion(version.value)
+}
+
 async function openDownload() {
   if (!version.value || !main.auth)
     return
-  displayStore.dialogOption = {
-    header: t('are-you-sure-you-want-to-download'),
-    headerStyle: 'w-full text-center',
-    size: 'max-w-fit px-12',
-    buttonCenter: true,
+  dialogStore.openDialog({
+    title: t('are-you-sure-you-want-to-download'),
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
-        handler: () => {
-          // console.log('Cancel clicked')
-        },
       },
       {
         text: Capacitor.isNativePlatform() ? t('launch-bundle') : t('download'),
+        role: 'primary',
         handler: async () => {
-          if (!version.value)
-            return
-          if (version.value.session_key) {
-            const filename = version.value.r2_path?.replace('/', '_')
-            const localPath = `./${filename}`
-            const command = `npx @capgo/cli@latest bundle decrypt ${localPath}  ${version.value.session_key} --key ./.capgo_key`
-            displayStore.dialogOption = {
-              header: '',
-              message: `${t('to-open-encrypted-bu')}<br/><code>${command}</code>`,
-              buttons: [
-                {
-                  text: t('copy-command'),
-                  id: 'confirm-button',
-                },
-              ],
-            }
-            displayStore.showDialog = true
-            await displayStore.onDialogDismiss()
-            copyToast(command)
-          }
-          openVersion(version.value)
-        },
-      },
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-        handler: () => {
-          // console.log('Cancel clicked')
+          await downloadNow()
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function getVersion() {
@@ -454,13 +474,13 @@ function preventInputChangePerm(event: Event) {
 async function didCancel(name: string, askForMethod = true): Promise<boolean | 'normal' | 'unsafe'> {
   let method: 'normal' | 'unsafe' | null = null
   if (askForMethod) {
-    displayStore.dialogOption = {
-      header: t('select-style-of-deletion'),
-      message: t('select-style-of-deletion-msg').replace('$1', `<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle" target="_blank">${t('here')}</a>`),
+    dialogStore.openDialog({
+      title: t('select-style-of-deletion'),
+      description: t('select-style-of-deletion-msg'),
       buttons: [
         {
           text: t('normal'),
-          role: 'normal',
+          role: 'secondary',
           handler: () => {
             method = 'normal'
           },
@@ -468,32 +488,30 @@ async function didCancel(name: string, askForMethod = true): Promise<boolean | '
         {
           text: t('unsafe'),
           role: 'danger',
-          id: 'unsafe',
           handler: async () => {
             if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRoleForApp(packageId.value), ['super_admin'])) {
               toast.error(t('no-permission-ask-super-admin'))
-              return
+              return false
             }
             method = 'unsafe'
           },
         },
       ],
-    }
-    displayStore.showDialog = true
-    if (await displayStore.onDialogDismiss() || !method)
+    })
+    if (await dialogStore.onDialogDismiss() || !method)
       return true
   }
   else {
     method = 'unsafe' // If not asking, assume unsafe (used for already soft-deleted)
   }
 
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message:
-      askForMethod
-        ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
-        : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?\
-${t('you-are-deleting-unsafely').replace('$1', '<b><u>').replace('$2', '</u></b>').replace('$3', '<a href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle" target="_blank">').replace('$4', '</a>')}.`,
+  const description = askForMethod
+    ? `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name} ${t('you-cannot-reuse')}.`
+    : `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`
+
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description,
     buttons: [
       {
         text: t('button-cancel'),
@@ -502,17 +520,47 @@ ${t('you-are-deleting-unsafely').replace('$1', '<b><u>').replace('$2', '</u></b>
       {
         text: t('button-delete'),
         role: 'danger',
-        id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  if (await displayStore.onDialogDismiss())
+  })
+
+  if (await dialogStore.onDialogDismiss())
     return true
   if (method === null)
     throw new Error('Unreachable, method = null')
 
   return method
+}
+
+async function unlinkChannels(appId: string, unlink: { id: number, name: string }[]) {
+  // Unlink channels if confirmed
+  if (unlink.length === 0) {
+    return
+  }
+  const { data: unknownVersion, error: unknownError } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appId)
+    .eq('name', 'unknown')
+    .single()
+
+  if (unknownError || !unknownVersion) {
+    toast.error(t('cannot-find-unknown-version'))
+    console.error('Cannot find unknown version:', unknownError)
+    return Promise.reject(new Error('Cannot find unknown version'))
+  }
+
+  const { error: updateError } = await supabase
+    .from('channels')
+    .update({ version: unknownVersion.id })
+    .in('id', unlink.map(c => c.id))
+
+  if (updateError) {
+    toast.error(t('unlink-error'))
+    console.error('Channel unlink error:', updateError)
+    return Promise.reject(new Error('Channel unlink error'))
+  }
+  toast.success(t('channels-unlinked-successfully')) // Add translation key
 }
 
 async function deleteBundle() {
@@ -534,32 +582,34 @@ async function deleteBundle() {
     let unlink = [] as { id: number, name: string }[] // Store id and name
     if (errorChannel) {
       console.error('Error checking channels:', errorChannel)
-      toast.error(t('error-checking-channels')) // Add translation key
+      toast.error(t('error-checking-channels'))
       return
     }
 
     if (channelFound && channelFound.length > 0) {
-      displayStore.dialogOption = {
-        header: t('want-to-unlink'),
-        message: t('channel-bundle-linked').replace('%s', channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')),
+      let shouldUnlink = false
+
+      dialogStore.openDialog({
+        title: t('want-to-unlink'),
+        description: t('channel-bundle-linked').replace('%s', channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')),
         buttons: [
           {
+            text: t('no'),
+            role: 'cancel',
+          },
+          {
             text: t('yes'),
-            role: 'yes',
-            id: 'yes',
+            role: 'primary',
             handler: () => {
+              shouldUnlink = true
               unlink = channelFound.map((ch: any) => ({ id: ch.id, name: ch.name })) // Map to id and name
             },
           },
-          {
-            text: t('no'),
-            id: 'cancel',
-            role: 'cancel',
-          },
         ],
-      }
-      displayStore.showDialog = true
-      if (await displayStore.onDialogDismiss()) {
+      })
+
+      const cancelled = await dialogStore.onDialogDismiss()
+      if (cancelled || !shouldUnlink) {
         toast.info(t('canceled-delete')) // Use info for cancellation
         return
       }
@@ -577,36 +627,7 @@ async function deleteBundle() {
       return
     }
 
-    // Unlink channels if confirmed
-    if (unlink.length > 0) {
-      const { data: unknownVersion, error: unknownError } = await supabase
-        .from('app_versions')
-        .select('id')
-        .eq('app_id', version.value.app_id)
-        .eq('name', 'unknown')
-        .single()
-
-      if (unknownError || !unknownVersion) {
-        toast.error(t('cannot-find-unknown-version'))
-        console.error('Cannot find unknown version:', unknownError)
-        return
-      }
-
-      const { error: updateError } = await supabase
-        .from('channels')
-        .update({ version: unknownVersion.id })
-        .in('id', unlink.map(c => c.id))
-
-      if (updateError) {
-        toast.error(t('unlink-error'))
-        console.error('Channel unlink error:', updateError)
-        // Decide whether to proceed with deletion or stop
-        // return // Optional: stop deletion if unlinking fails
-      }
-      else {
-        toast.success(t('channels-unlinked-successfully')) // Add translation key
-      }
-    }
+    await unlinkChannels(version.value.app_id, unlink)
 
     // Perform deletion (soft or hard)
     const deleteQuery = didCancelRes === 'normal'
@@ -665,8 +686,11 @@ async function deleteBundle() {
               {{ formatDate(version.updated_at) }}
             </InfoRow>
             <!-- Checksum -->
-            <InfoRow v-if="version.checksum" :label="t('checksum')">
-              {{ version.checksum }}
+            <InfoRow
+              v-if="version.checksum" :label="t('checksum')" :is-link="true"
+              @click="copyToast(version?.checksum ?? '')"
+            >
+              {{ hideString(version.checksum) }}
             </InfoRow>
             <!-- Min update version -->
             <InfoRow
@@ -698,19 +722,22 @@ async function deleteBundle() {
             <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
               <span class="flex justify-end w-full">
-                <span v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id">
+                <span v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center">
                   <span
-                    class="pr-3 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    class="pr-2 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
                     @click="openChannel(chn)"
                   >
                     {{ chn!.name }}
                   </span>
+                  <button class="btn btn-outline btn-sm ml-3" @click="openChannelSettings(chn)">
+                    <Settings class="w-5 h-5 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                  </button>
                 </span>
               </span>
             </InfoRow>
             <InfoRow
               v-else id="open-channel" :label="t('channel')" :is-link="true"
-              @click="openChannel(channel!)"
+              @click="ASChannelChooser()"
             >
               {{ t('set-bundle') }}
             </InfoRow>
@@ -727,14 +754,14 @@ async function deleteBundle() {
             <!-- session_key -->
             <InfoRow
               v-if="version.session_key" :label="t('session_key')" :is-link="true"
-              @click="copyToast(version?.session_key || '')"
+              @click="copyToast(version?.session_key ?? '')"
             >
               {{ hideString(version.session_key) }}
             </InfoRow>
             <!-- version.external_url -->
             <InfoRow
               v-if="version.external_url" :label="t('url')" :is-link="true"
-              @click="copyToast(version?.external_url || '')"
+              @click="copyToast(version?.external_url ?? '')"
             >
               {{ version.external_url }}
             </InfoRow>
@@ -805,5 +832,227 @@ async function deleteBundle() {
         {{ t('back-to-bundles') }}
       </button>
     </div>
+
+    <!-- Teleport Content for Deletion Style Modal -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-style-of-deletion')" defer to="#dialog-v2-content">
+      <div class="mt-4 space-y-3">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {{ t('select-style-of-deletion-recommendation') }}
+        </p>
+        <p class="text-sm">
+          {{ t('select-style-of-deletion-link') }}
+          <a
+            href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
+            target="_blank"
+            class="text-blue-500 underline hover:text-blue-600 ml-1"
+          >
+            {{ t('here') }}
+          </a>
+        </p>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Encrypted Command Display -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('to-open-encrypted-bu')" defer to="#dialog-v2-content">
+      <div class="mt-4">
+        <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+          <code class="text-sm break-all">
+            npx @capgo/cli@latest bundle decrypt ./{{ version?.r2_path?.replace('/', '_') }} {{ version?.session_key }} --key ./.capgo_key
+          </code>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Unsafe Deletion Warning -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-delete') && version?.deleted" defer to="#dialog-v2-content">
+      <div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p class="text-sm text-red-800 dark:text-red-200">
+          <strong class="underline">{{ t('you-are-deleting-unsafely') }}</strong>
+        </p>
+        <p class="text-sm text-red-600 dark:text-red-300 mt-2">
+          {{ t('select-style-of-deletion-link') }}
+          <a
+            href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
+            target="_blank"
+            class="text-blue-500 underline hover:text-blue-600 ml-1"
+          >
+            {{ t('here') }}
+          </a>
+        </p>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Channel Linking (Set Bundle) -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-linking') && currentChannelAction === 'set'" defer to="#dialog-v2-content">
+      <div class="w-full space-y-4">
+        <div class="text-center">
+          <h3 class="text-lg font-medium mb-2">
+            {{ t('select-channel-to-link') }}
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {{ t('choose-which-channel-to-link-this-bundle-to') }}
+          </p>
+        </div>
+
+        <!-- Search Input -->
+        <div class="mb-6">
+          <FormKit
+            v-model="channelSearchVal"
+            :prefix-icon="IconSearch"
+            enterkeyhint="send"
+            :placeholder="t('search-channels')"
+            :classes="{
+              outer: 'mb-0! w-full',
+              inner: 'rounded-full!',
+            }"
+          />
+        </div>
+
+        <div class="space-y-3">
+          <!-- Current Bundle Info -->
+          <div v-if="version" class="p-3 border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium text-blue-800 dark:text-blue-200">
+                  {{ t('current-bundle') }}
+                </div>
+                <div class="text-sm text-blue-600 dark:text-blue-300">
+                  {{ version.name }}
+                </div>
+              </div>
+              <div class="text-blue-600 dark:text-blue-400 text-xl">
+                📦
+              </div>
+            </div>
+          </div>
+
+          <!-- Available Channels -->
+          <div v-if="filteredChannels.length > 0" class="space-y-2">
+            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t('available-channels') }}
+            </h4>
+            <div
+              v-for="chan in filteredChannels"
+              :key="chan.id"
+              class="p-3 border rounded-lg cursor-pointer transition-colors"
+              :class="{
+                'border-blue-500 bg-blue-50 dark:bg-blue-900/20': selectedChannelForLink?.id === chan.id,
+                'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700': selectedChannelForLink?.id !== chan.id,
+                'border-green-500 bg-green-50 dark:bg-green-900/20': version && chan.version === version.id,
+              }"
+              @click="selectedChannelForLink = chan"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-medium flex items-center gap-2">
+                    {{ chan.name }}
+                    <span v-if="version && chan.version === version.id" class="text-xs bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded-full">
+                      {{ t('current') }}
+                    </span>
+                  </div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {{ t('channel-id') }}: {{ chan.id }}
+                    <span v-if="chan.public" class="text-blue-600 dark:text-blue-400 ml-2">• {{ t('public') }}</span>
+                    <span v-else class="text-gray-500 dark:text-gray-400 ml-2">• {{ t('private') }}</span>
+                  </div>
+                  <div v-if="chan.ios || chan.android" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span v-if="chan.ios" class="mr-2">📱 iOS</span>
+                    <span v-if="chan.android">🤖 Android</span>
+                  </div>
+                  <div v-if="chan.created_at" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {{ t('created') }}: {{ new Date(chan.created_at).toLocaleDateString() }}
+                  </div>
+                </div>
+                <div class="text-2xl">
+                  <span v-if="selectedChannelForLink?.id === chan.id" class="text-blue-600 dark:text-blue-400">✓</span>
+                  <span v-else-if="version && chan.version === version.id" class="text-green-600 dark:text-green-400">🔗</span>
+                  <span v-else class="text-gray-300 dark:text-gray-600">○</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty states -->
+          <div v-if="channels.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-8">
+            <div class="text-4xl mb-2">
+              📱
+            </div>
+            <div class="font-medium">
+              {{ t('no-channels-available') }}
+            </div>
+            <div class="text-sm mt-1">
+              {{ t('create-a-channel-first-to-link-bundles') }}
+            </div>
+          </div>
+
+          <div v-else-if="filteredChannels.length === 0 && channelSearchVal.trim()" class="text-center text-gray-500 dark:text-gray-400 py-8">
+            <div class="text-4xl mb-2">
+              🔍
+            </div>
+            <div class="font-medium">
+              {{ t('no-channels-found') }}
+            </div>
+            <div class="text-sm mt-1">
+              {{ t('try-a-different-search-term') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Channel Actions (Settings) -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('channel-actions') && currentChannelAction === 'open'" defer to="#dialog-v2-content">
+      <div class="w-full space-y-4">
+        <div class="text-left">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {{ t('select-action-for-channel', { channel: selectedChannelForLink?.name || '' }) }}
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Set Bundle (if user has permissions) -->
+          <div
+            v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
+            class="p-3 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+            @click="handleChannelAction('set')"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium">
+                  {{ t('set-bundle') }}
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('link-this-bundle-to-another-channel') }}
+                </div>
+              </div>
+              <div class="text-green-600 dark:text-green-400">
+                ⚡
+              </div>
+            </div>
+          </div>
+
+          <!-- Unlink Channel (if user has permissions) -->
+          <div
+            v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
+            class="p-3 border border-red-300 dark:border-red-600 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+            @click="handleChannelAction('unlink')"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium text-red-600 dark:text-red-400">
+                  {{ t('unlink-channel') }}
+                </div>
+                <div class="text-sm text-red-500 dark:text-red-300">
+                  {{ t('remove-bundle-from-channel') }}
+                </div>
+              </div>
+              <div class="text-red-600 dark:text-red-400">
+                🔗⚡
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

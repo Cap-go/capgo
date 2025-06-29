@@ -1,4 +1,5 @@
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = honoFactory.createApp()
@@ -27,7 +28,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       .single()
 
     if (versionError || !version) {
-      console.error('Cannot find version', versionError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', error: versionError })
       return c.json({ status: 'Cannot find version', error: versionError }, 400)
     }
 
@@ -52,14 +53,14 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       .eq('id', body.version_id)
 
     if (updateError) {
-      console.error('Cannot update version metadata', updateError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update version metadata', error: updateError })
       return c.json({ status: 'Cannot update version metadata', error: updateError }, 400)
     }
 
     return c.json({ status: 'success' })
   }
   catch (error) {
-    console.error('Error updating version metadata', error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error updating version metadata', error })
     return c.json({ status: 'Error updating version metadata', error }, 500)
   }
 })

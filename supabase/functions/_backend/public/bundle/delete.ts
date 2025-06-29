@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface GetLatest {
@@ -11,12 +12,12 @@ interface GetLatest {
 
 export async function deleteBundle(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id) {
-    console.error('Cannot delete bundle', 'Missing app_id')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete bundle Missing app_id' })
     return c.json({ status: 'Missing app_id' }, 400)
   }
 
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
-    console.error('Cannot delete bundle', 'You can\'t access this app', body.app_id)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete bundle, You can\'t access this app', app_id: body.app_id })
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
 
@@ -32,7 +33,7 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
         .select()
         .single()
       if (dbError || !data) {
-        console.error('Cannot delete version', dbError)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete version', error: dbError })
         return c.json({ status: 'Cannot delete version', error: JSON.stringify(dbError) }, 400)
       }
     }
@@ -44,13 +45,13 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
         })
         .eq('app_id', body.app_id)
       if (dbError) {
-        console.error('Cannot delete all version', dbError)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete all version', error: dbError })
         return c.json({ status: 'Cannot delete all version', error: JSON.stringify(dbError) }, 400)
       }
     }
   }
   catch (e) {
-    console.error('Cannot delete bundle', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete bundle', error: e })
     return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)
   }
   return c.json(BRES)

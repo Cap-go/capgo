@@ -35,7 +35,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
   }
   const pluginVersion = parse(plugin_version)
   if (greaterThan(pluginVersion, parse('4.13.0')))
-    res.session_key = version.session_key || ''
+    res.session_key = version.session_key ?? ''
   if (greaterThan(pluginVersion, parse('4.4.0')))
     res.checksum = version.checksum
   if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
@@ -80,10 +80,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         app_id,
       }, 200)
     }
-    if (coerce) {
-      version_build = format(coerce)
-    }
-    else {
+    if (!coerce) {
       // get app owner with app_id
       await backgroundTask(c, sendNotifOrg(c, 'user:semver_issue', {
         app_id,
@@ -97,6 +94,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'semver_error',
       }, 400)
     }
+    version_build = format(coerce)
     // if plugin_version is < 6 send notif to alert for update
     if (lessThan(parse(plugin_version), parse('6.0.0'))) {
       await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
@@ -140,7 +138,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 
     cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
-    const requestedInto = isV2 ? await requestInfosPostgresLiteV2(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
+    const requestedInto = isV2 ? await requestInfosPostgresLiteV2(c, app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await requestInfosPostgresLite(c, app_id, version_name, drizzleCient as ReturnType<typeof getDrizzleClient>)
 
     const { versionData } = requestedInto
     const { channelData } = requestedInto
@@ -198,7 +196,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         error: 'revert_to_builtin_plugin_version_too_old',
       }, 200)
     }
-    let signedURL = version.external_url || ''
+    let signedURL = version.external_url ?? ''
     let manifest: ManifestEntry[] = []
     if (version.r2_path && !version.external_url) {
       const res = await getBundleUrl(c, version.id, version.r2_path, device_id)
@@ -208,7 +206,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
         await backgroundTask(c, createStatsBandwidth(c, device_id, app_id, res.size ?? 0))
       }
       if (greaterThan(parse(plugin_version), parse('6.2.0'))) {
-        manifest = getManifestUrl(c, version.id, channelData.manifestEntries || [], device_id)
+        manifest = getManifestUrl(c, version.id, channelData.manifestEntries ?? [], device_id)
       }
     }
     //  check signedURL and if it's url

@@ -3,7 +3,7 @@ import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -104,7 +104,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       const endTime = Date.now()
       const duration = endTime - startTime
 
-      console.log({
+      cloudlog({
         requestId: c.get('requestId'),
         context: 'app deletion completed',
         duration_ms: duration,
@@ -114,7 +114,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
     catch (error) {
-      console.error({
+      cloudlogErr({
         requestId: c.get('requestId'),
         context: 'app deletion process error',
         error: error instanceof Error ? error.message : JSON.stringify(error),
@@ -133,7 +133,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     }
   }
   catch (e) {
-    console.error({
+    cloudlogErr({
       requestId: c.get('requestId'),
       context: 'app deletion error',
       error: e instanceof Error ? e.message : JSON.stringify(e),

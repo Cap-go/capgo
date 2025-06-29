@@ -1,6 +1,7 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export interface ChannelSet {
@@ -19,11 +20,11 @@ export interface ChannelSet {
 
 export async function deleteChannel(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'admin', apikey.key))) {
-    console.log('You can\'t access this app', body.app_id)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this app', app_id: body.app_id })
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
   if (!body.channel) {
-    console.log('You must provide a channel name')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You must provide a channel name' })
     return c.json({ status: 'You must provide a channel name' }, 400)
   }
 
@@ -36,7 +37,7 @@ export async function deleteChannel(c: Context, body: ChannelSet, apikey: Databa
       .eq('name', body.channel)
       .single()
     if (dbError || !dataChannel) {
-      console.log('Cannot find channel', dbError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', error: dbError })
       return c.json({ status: 'Cannot find channel', error: JSON.stringify(dbError) }, 400)
     }
     await supabaseAdmin(c)
@@ -46,7 +47,7 @@ export async function deleteChannel(c: Context, body: ChannelSet, apikey: Databa
       .eq('name', body.channel)
   }
   catch (e) {
-    console.log('Cannot delete channels', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete channels', error: e })
     return c.json({ status: 'Cannot delete channels', error: JSON.stringify(e) }, 500)
   }
   return c.json(BRES)

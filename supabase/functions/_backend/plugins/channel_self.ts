@@ -51,14 +51,20 @@ export const jsonRequestSchema = z.object({
   return val
 })
 
+export const listChannelsQuerySchema = z.object({
+  app_id: z.string({
+    required_error: MISSING_STRING_APP_ID,
+    invalid_type_error: NON_STRING_APP_ID,
+  }).refine(data => reverseDomainRegex.test(data), {
+    message: INVALID_STRING_APP_ID,
+  }),
+  platform: devicePlatformScheme,
+  is_emulator: z.boolean().default(false),
+  is_prod: z.boolean().default(true),
+})
+
 async function post(c: Context, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
-  const parseResult = jsonRequestSchema.safeParse(body)
-  if (!parseResult.success) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
-    return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
-  }
-
   let {
     version_name,
     version_build,
@@ -75,16 +81,14 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     is_prod = true,
   } = body
   const coerce = tryParse(fixSemver(version_build))
-  if (coerce) {
-    version_build = format(coerce)
-  }
-  else {
+  if (!coerce) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
     return c.json({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
   }
+  version_build = format(coerce)
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
 
   const { data: versions } = await supabaseAdmin(c)
@@ -157,111 +161,113 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       error: 'cannot_override',
     }, 400)
   }
+  if (!channel) {
+    await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
+    return c.json(BRES)
+  }
   // if channel set channel_override to it
-  if (channel) {
-    // get channel by name
-    const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
-      .from('channels')
-      .select('*')
-      .eq('app_id', app_id)
-      .eq('name', channel)
-      .single()
-    if (dbError || !dataChannel) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dbError, dataChannel })
-      return c.json({
-        message: `Cannot find channel ${JSON.stringify(dbError)}`,
-        error: 'channel_not_found',
-      }, 400)
-    }
+  // get channel by name
+  const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
+    .from('channels')
+    .select('*')
+    .eq('app_id', app_id)
+    .eq('name', channel)
+    .single()
+  if (dbError || !dataChannel) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dbError, dataChannel })
+    return c.json({
+      message: `Cannot find channel ${JSON.stringify(dbError)}`,
+      error: 'channel_not_found',
+    }, 400)
+  }
 
-    if (!dataChannel.allow_device_self_set) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Channel does not permit self set', dbError, dataChannel })
-      return c.json({
-        message: `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`,
-        error: 'channel_set_from_plugin_not_allowed',
-      }, 400)
-    }
+  if (!dataChannel.allow_device_self_set) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Channel does not permit self set', dbError, dataChannel })
+    return c.json({
+      message: `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`,
+      error: 'channel_set_from_plugin_not_allowed',
+    }, 400)
+  }
 
-    // Get the main channel
-    const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin(c)
-      .from('channels')
-      .select(`
+  // Get the main channel
+  const { data: mainChannel, error: dbMainChannelError } = await supabaseAdmin(c)
+    .from('channels')
+    .select(`
         name, 
         ios, 
         android
       `)
+    .eq('app_id', app_id)
+    .eq('public', true)
+
+  // We DO NOT return if there is no main channel as it's not a critical error
+  // We will just set the channel_devices as the user requested
+  let mainChannelName = null as string | null
+  if (!dbMainChannelError) {
+    const devicePlatform = body.platform as Database['public']['Enums']['platform_os']
+    const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
+    mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
+  }
+
+  // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
+  if (dbMainChannelError || !mainChannel)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find main channel', dbMainChannelError })
+
+  const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
+  if (mainChannelName && mainChannelName === channel) {
+    const { error: dbErrorDev } = await supabaseAdmin(c)
+      .from('channel_devices')
+      .delete()
       .eq('app_id', app_id)
-      .eq('public', true)
-
-    // We DO NOT return if there is no main channel as it's not a critical error
-    // We will just set the channel_devices as the user requested
-    let mainChannelName = null as string | null
-    if (!dbMainChannelError) {
-      const devicePlatform = parseResult.data.platform
-      const finalChannel = mainChannel.find(channel => channel[devicePlatform] === true)
-      mainChannelName = (finalChannel !== undefined) ? finalChannel.name : null
+      .eq('device_id', device_id.toLowerCase())
+    if (dbErrorDev) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
+      return c.json({
+        message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
+        error: 'override_not_allowed',
+      }, 400)
     }
+    cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
+    await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
+    return c.json(BRES)
+  }
+  // if dataChannelOverride is same from dataChannel and exist then do nothing
+  if (channelId && channelId.id === dataChannel.id) {
+    // already set
+    cloudlog({ requestId: c.get('requestId'), message: 'channel already set' })
+    return c.json(BRES)
+  }
 
-    // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
-    if (dbMainChannelError || !mainChannel)
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find main channel', dbMainChannelError })
-
-    const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
-    if (mainChannelName && mainChannelName === channel) {
-      const { error: dbErrorDev } = await supabaseAdmin(c)
-        .from('channel_devices')
-        .delete()
-        .eq('app_id', app_id)
-        .eq('device_id', device_id.toLowerCase())
-      if (dbErrorDev) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-        return c.json({
-          message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
-          error: 'override_not_allowed',
-        }, 400)
-      }
-      cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
+  cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
+  if (dataChannelOverride) {
+    const { error: dbErrorDev } = await supabaseAdmin(c)
+      .from('channel_devices')
+      .delete()
+      .eq('app_id', app_id)
+      .eq('device_id', device_id.toLowerCase())
+    if (dbErrorDev) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
+      return c.json({
+        message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
+        error: 'override_not_allowed',
+      }, 400)
     }
-    else {
-      // if dataChannelOverride is same from dataChannel and exist then do nothing
-      if (channelId && channelId.id === dataChannel.id) {
-        // already set
-        cloudlog({ requestId: c.get('requestId'), message: 'channel already set' })
-        return c.json(BRES)
-      }
-
-      cloudlog({ requestId: c.get('requestId'), message: 'setting channel' })
-      if (dataChannelOverride) {
-        const { error: dbErrorDev } = await supabaseAdmin(c)
-          .from('channel_devices')
-          .delete()
-          .eq('app_id', app_id)
-          .eq('device_id', device_id.toLowerCase())
-        if (dbErrorDev) {
-          cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-          return c.json({
-            message: `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`,
-            error: 'override_not_allowed',
-          }, 400)
-        }
-      }
-      const { error: dbErrorDev } = await supabaseAdmin(c)
-        .from('channel_devices')
-        .upsert({
-          device_id: device_id.toLowerCase(),
-          channel_id: dataChannel.id,
-          app_id,
-          owner_org: dataChannel.owner_org,
-        }, { onConflict: 'device_id, app_id' })
-      if (dbErrorDev) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-        return c.json({
-          message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
-          error: 'override_not_allowed',
-        }, 400)
-      }
-    }
+  }
+  const { error: dbErrorDev } = await supabaseAdmin(c)
+    .from('channel_devices')
+    .upsert({
+      device_id: device_id.toLowerCase(),
+      channel_id: dataChannel.id,
+      app_id,
+      owner_org: dataChannel.owner_org,
+    }, { onConflict: 'device_id, app_id' })
+  if (dbErrorDev) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
+    return c.json({
+      message: `Cannot do channel override ${JSON.stringify(dbErrorDev)}`,
+      error: 'override_not_allowed',
+    }, 400)
   }
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
   return c.json(BRES)
@@ -284,16 +290,14 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     version_os,
   } = body
   const coerce = tryParse(fixSemver(version_build))
-  if (coerce) {
-    version_build = format(coerce)
-  }
-  else {
+  if (!coerce) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
     return c.json({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
   }
+  version_build = format(coerce)
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!device_id || !app_id) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id or appi_id', device_id, app_id, body })
@@ -421,16 +425,14 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     device_id,
   } = body
   const coerce = tryParse(fixSemver(version_build))
-  if (coerce) {
-    version_build = format(coerce)
-  }
-  else {
+  if (!coerce) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
     return c.json({
       message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
       error: 'semver_error',
     }, 400)
   }
+  version_build = format(coerce)
 
   if (!device_id || !app_id) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id or appi_id', device_id, app_id, body })
@@ -472,11 +474,76 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   return c.json(BRES)
 }
 
+async function listCompatibleChannels(c: Context, query: { app_id: string, platform: string, is_emulator: boolean, is_prod: boolean }): Promise<Response> {
+  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
+  
+  const { app_id, platform, is_emulator, is_prod } = query
+
+  // Check if app exists and get owner_org for permission check
+  const { data: appData } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', app_id)
+    .single()
+
+  if (!appData) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', app_id })
+    return c.json({
+      message: `App ${app_id} not found`,
+      error: 'app_not_found',
+    }, 400)
+  }
+
+  if (!(await isAllowedActionOrg(c, appData.owner_org))) {
+    return c.json({
+      message: 'Action not allowed',
+      error: 'action_not_allowed',
+    }, 200)
+  }
+
+  // Get channels that allow device self set and are compatible with the platform
+  const { data: channels, error: channelsError } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id, name, allow_device_self_set, ios, android, public')
+    .eq('app_id', app_id)
+    .eq('allow_device_self_set', true)
+    .eq(platform as 'ios' | 'android', true)
+
+  if (channelsError) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot fetch channels', channelsError })
+    return c.json({
+      message: 'Cannot fetch channels',
+      error: 'database_error',
+    }, 500)
+  }
+
+  if (!channels || channels.length === 0) {
+    return c.json([])
+  }
+
+  // Return the compatible channels
+  const compatibleChannels = channels.map(channel => ({
+    id: channel.id,
+    name: channel.name,
+    public: channel.public,
+    allow_self_set: channel.allow_device_self_set,
+  }))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Found compatible channels', count: compatibleChannels.length })
+  
+  return c.json(compatibleChannels)
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
+    const parseResult = jsonRequestSchema.safeParse(body)
+    if (!parseResult.success) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
+      return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
+    }
     cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
     return post(c as any, body)
   }
@@ -509,6 +576,33 @@ app.delete('/', async (c) => {
   }
 })
 
-app.get('/', (c) => {
-  return c.json({ status: 'ok' })
+app.get('/', async (c) => {
+  try {
+    const query = c.req.query()
+    
+    // If no query parameters, return status
+    if (!query.app_id) {
+      return c.json({ status: 'ok' })
+    }
+
+    // Parse and validate query parameters
+    const parseResult = listChannelsQuerySchema.safeParse({
+      app_id: query.app_id,
+      platform: query.platform,
+      is_emulator: query.is_emulator === 'true',
+      is_prod: query.is_prod !== 'false', // default to true unless explicitly false
+    })
+
+    if (!parseResult.success) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'list channels query validation failed', error: parseResult.error })
+      return c.json({ error: `Invalid query parameters: ${parseResult.error}` }, 400)
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'list channels query', query: parseResult.data })
+    return listCompatibleChannels(c as any, parseResult.data)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'list channels error', error: e })
+    return c.json({ status: 'Cannot list channels', error: JSON.stringify(e) }, 500)
+  }
 })

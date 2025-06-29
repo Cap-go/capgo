@@ -21,9 +21,10 @@ import { registerWebsiteDomain } from '~/utils/Utils'
 const route = useRoute('/login')
 const supabase = useSupabase()
 const isLoading = ref(false)
+const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
-const stauts: Ref<'login' | '2fa'> = ref('login')
+const statusAuth: Ref<'login' | '2fa'> = ref('login')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallangeId: Ref<string> = ref('')
 const router = useRouter()
@@ -44,103 +45,116 @@ async function nextLogin() {
   }, 500)
 }
 
-async function submit(form: { email: string, password: string, code: string }) {
-  isLoading.value = true
-  if (stauts.value === 'login') {
-    const hashedEmail = await hashEmail(form.email)
-    const { data: deleted, error: errorDeleted } = await supabase
-      .rpc('is_not_deleted', { email_check: hashedEmail })
-    if (errorDeleted) {
-      console.error(errorDeleted)
-      isLoading.value = false
-      setErrors('login-account', [errorDeleted.message], {})
-      return
-    }
+async function checkMfa() {
+  const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
+  if (mfaError) {
+    setErrors('login-account', ['See browser console'], {})
+    console.error('Cannot getm MFA factors', mfaError)
+    return
+  }
 
-    if (!deleted) {
-      toast.error(t('used-to-create'))
-      isLoading.value = false
-      setErrors('login-account', [t('used-to-create')], {})
-      return
-    }
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-      options: {
-        captchaToken: turnstileToken.value,
-      },
+  const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
+  if (unverified && unverified.length > 0) {
+    console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
+    const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
+
+    responses.filter(res => !!res.error).forEach((res) => {
+      console.error('Failed to unregister', res.error)
     })
-    if (error) {
+  }
+
+  const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+  const hasMfa = !!mfaFactor
+
+  if (hasMfa) {
+    mfaLoginFactor.value = mfaFactor
+    const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
+    if (errorChallenge) {
       isLoading.value = false
-      console.error('error', error)
-      setErrors('login-account', [error.message], {})
-      if (error.message.includes('Invalid login credentials')) {
-        captchaComponent.value?.reset()
-      }
-      if (error.message.includes('captcha')) {
-        toast.error(t('captcha-fail'))
-      }
-      else {
-        toast.error(t('invalid-auth'))
-      }
-
-      return
-    }
-
-    if (form.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
-      const { data: userPreData, error: userPreError } = await supabase.from('users').select('ban_time').eq('email', form.email).single()
-      if (!userPreData && userPreError) {
-        isLoading.value = false
-        console.error('error', error)
-        setErrors('login-account', [userPreError.message], {})
-        toast.error(t('failed-to-get-user'))
-        return
-      }
-
-      if (!!userPreData.ban_time && dayjs().isBefore(userPreData.ban_time)) {
-        isLoading.value = false
-        console.error('error', error)
-        setErrors('login-account', ['Invalid login credentials'], {})
-        toast.error(t('failed-to-get-user'))
-        return
-      }
-    }
-
-    const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
-    if (mfaError) {
       setErrors('login-account', ['See browser console'], {})
-      console.error('Cannot getm MFA factors', error)
+      console.error('Cannot challange mfa', errorChallenge)
       return
     }
 
-    const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
-    if (unverified && unverified.length > 0) {
-      console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
-      const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
+    mfaChallangeId.value = challenge.id
+    statusAuth.value = '2fa'
+    isLoading.value = false
+  }
+  else {
+    await nextLogin()
+  }
+}
 
-      responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
+async function checkReviewAccount(form: { email: string }) {
+  // this is a review account, we need to check if the user is banned for Apple and Google to check delete feature
+  const { data: userPreData, error: userPreError } = await supabase.from('users').select('ban_time').eq('email', form.email).single()
+  if (!userPreData && userPreError) {
+    isLoading.value = false
+    console.error('error', userPreError)
+    setErrors('login-account', [userPreError.message], {})
+    toast.error(t('failed-to-get-user'))
+    return
+  }
+
+  if (!!userPreData.ban_time && dayjs().isBefore(userPreData.ban_time)) {
+    isLoading.value = false
+    setErrors('login-account', ['Invalid login credentials'], {})
+    toast.error(t('failed-to-get-user'))
+  }
+}
+
+async function login(form: { email: string, password: string }) {
+  const hashedEmail = await hashEmail(form.email)
+  const { data: deleted, error: errorDeleted } = await supabase
+    .rpc('is_not_deleted', { email_check: hashedEmail })
+  if (errorDeleted) {
+    console.error(errorDeleted)
+    isLoading.value = false
+    setErrors('login-account', [errorDeleted.message], {})
+    return
+  }
+
+  if (!deleted) {
+    toast.error(t('used-to-create'))
+    isLoading.value = false
+    setErrors('login-account', [t('used-to-create')], {})
+    return
+  }
+  const { error } = await supabase.auth.signInWithPassword({
+    email: form.email,
+    password: form.password,
+    options: {
+      captchaToken: turnstileToken.value,
+    },
+  })
+  if (error) {
+    isLoading.value = false
+    console.error('error', error)
+    setErrors('login-account', [error.message], {})
+    if (error.message.includes('Invalid login credentials')) {
+      captchaComponent.value?.reset()
     }
-
-    const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
-    const hasMfa = !!mfaFactor
-
-    if (hasMfa) {
-      mfaLoginFactor.value = mfaFactor
-      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor.id })
-      if (errorChallenge) {
-        isLoading.value = false
-        setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot challange mfa', errorChallenge)
-        return
-      }
-
-      mfaChallangeId.value = challenge.id
-      stauts.value = '2fa'
-      isLoading.value = false
+    if (error.message.includes('captcha')) {
+      toast.error(t('captcha-fail'))
     }
     else {
-      await nextLogin()
+      toast.error(t('invalid-auth'))
     }
+
+    return
+  }
+
+  if (form.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
+    await checkReviewAccount(form)
+  }
+
+  await checkMfa()
+}
+
+async function submit(form: { email: string, password: string, code: string }) {
+  isLoading.value = true
+  if (statusAuth.value === 'login') {
+    await login(form)
   }
   else {
     // http://localhost:5173/app
@@ -160,6 +174,87 @@ async function submit(form: { email: string, password: string, code: string }) {
       isLoading.value = false
     }
   }
+}
+
+async function checkAuthUser() {
+  const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (mfaError) {
+    console.error('Cannot guard auth', mfaError)
+    return
+  }
+
+  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2') {
+    const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+    if (error) {
+      setErrors('login-account', ['See browser console'], {})
+      console.error('Cannot getm MFA factors', error)
+      return
+    }
+
+    const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+
+    const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor!.id })
+    if (errorChallenge) {
+      setErrors('login-account', ['See browser console'], {})
+      console.error('Cannot challange mfa', errorChallenge)
+      return
+    }
+
+    mfaLoginFactor.value = mfaFactor!
+    mfaChallangeId.value = challenge.id
+
+    statusAuth.value = '2fa'
+    isLoading.value = false
+  }
+  else {
+    await nextLogin()
+  }
+}
+
+async function checkMagicLink() {
+  const parsedUrl = new URL(route.fullPath, window.location.origin)
+
+  const hash = parsedUrl.hash
+  const params = new URLSearchParams(hash.slice(1))
+  const error = params.get('error_description')
+  const message = params.get('message')
+  const authType = params.get('type')
+
+  if (message) {
+    isLoading.value = false
+    return setTimeout(() => {
+      toast.success(message, {
+        duration: 7000,
+      })
+    }, 400)
+  }
+  if (error) {
+    isLoading.value = false
+    return toast.error(error)
+  }
+
+  const logSession = await autoAuth(route)
+  if (!logSession)
+    return
+  if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
+    if (authType === 'email_change') {
+      const email = logSession.user.email
+      const id = logSession.user.id
+      await supabase
+        .from('users')
+        .upsert({
+          id,
+          email,
+        }, { onConflict: 'id' })
+        .select()
+        .single()
+    }
+    await nextLogin()
+  }
+}
+
+async function openScan() {
+  router.push('/scan')
 }
 
 async function checkLogin() {
@@ -185,83 +280,12 @@ async function checkLogin() {
   const resUser = await supabase.auth.getUser()
   const user = resUser?.data.user
   const resSession = await supabase.auth.getSession()!
-  let session = resSession?.data.session
+  const session = resSession?.data.session
   if (user) {
-    const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (mfaError) {
-      console.error('Cannot guard auth', mfaError)
-      return
-    }
-
-    if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2') {
-      const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
-      if (error) {
-        setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot getm MFA factors', error)
-        return
-      }
-
-      const mfaFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
-
-      const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: mfaFactor!.id })
-      if (errorChallenge) {
-        setErrors('login-account', ['See browser console'], {})
-        console.error('Cannot challange mfa', errorChallenge)
-        return
-      }
-
-      mfaLoginFactor.value = mfaFactor!
-      mfaChallangeId.value = challenge.id
-
-      stauts.value = '2fa'
-      isLoading.value = false
-    }
-    else {
-      await nextLogin()
-    }
+    await checkAuthUser()
   }
   else if (!session && route.hash) {
-    const parsedUrl = new URL(route.fullPath, window.location.origin)
-
-    const hash = parsedUrl.hash
-    const params = new URLSearchParams(hash.slice(1))
-    const error = params.get('error_description')
-    const message = params.get('message')
-    const authType = params.get('type')
-
-    if (message) {
-      isLoading.value = false
-      return setTimeout(() => {
-        toast.success(message, {
-          duration: 7000,
-        })
-      }, 400)
-    }
-    if (error) {
-      isLoading.value = false
-      return toast.error(error)
-    }
-
-    const logSession = await autoAuth(route)
-    if (!logSession)
-      return
-    if (logSession.session)
-      session = logSession.session
-    if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
-      if (authType === 'email_change') {
-        const email = logSession.user.email
-        const id = logSession.user.id
-        await supabase
-          .from('users')
-          .upsert({
-            id,
-            email,
-          }, { onConflict: 'id' })
-          .select()
-          .single()
-      }
-      await nextLogin()
-    }
+    await checkMagicLink()
   }
   else {
     isLoading.value = false
@@ -286,7 +310,7 @@ async function goback() {
 
   mfaChallangeId.value = ''
   mfaLoginFactor.value = null
-  stauts.value = 'login'
+  statusAuth.value = 'login'
 }
 onMounted(checkLogin)
 </script>
@@ -307,7 +331,7 @@ onMounted(checkLogin)
         </p>
       </div>
 
-      <div v-if="stauts === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
+      <div v-if="statusAuth === 'login'" class="relative max-w-md mx-auto mt-8 md:mt-4">
         <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="px-4 py-6 text-gray-500 sm:px-8 sm:py-7">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
@@ -384,6 +408,9 @@ onMounted(checkLogin)
           </div>
           <button class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openSupport">
             {{ t("support") }}
+          </button>
+          <button v-if="isMobile" class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openScan">
+            {{ t("test-bundle") }}
           </button>
         </section>
       </div>

@@ -47,11 +47,11 @@ function getStats(c: Context): GlobalStats {
     users: supabase
       .from('users')
       .select('*', { count: 'exact' })
-      .then(res => res.count || 0),
+      .then(res => res.count ?? 0),
     orgs: supabase
       .from('orgs')
       .select('*', { count: 'exact' })
-      .then(res => res.count || 0),
+      .then(res => res.count ?? 0),
     stars: getGithubStars(),
     customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
       if (res.error || !res.data)
@@ -61,12 +61,12 @@ function getStats(c: Context): GlobalStats {
     onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
-      return res.data || 0
+      return res.data ?? 0
     }),
     need_upgrade: supabase.rpc('count_all_need_upgrade', {}).single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
-      return res.data || 0
+      return res.data ?? 0
     }),
     plans: supabase.rpc('count_all_plans_v2').then((res) => {
       if (res.error || !res.data)
@@ -82,7 +82,7 @@ function getStats(c: Context): GlobalStats {
     actives: readActiveAppsCF(c).then(async (app_ids) => {
       try {
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
-        return { apps: app_ids.length, users: res2.data || 0 }
+        return { apps: app_ids.length, users: res2.data ?? 0 }
       }
       catch (e) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'count_active_users error', error: e })
@@ -130,7 +130,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     ])
     const not_paying = users - customers.total - plans.Trial
     cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
-    // console.log(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
+    // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
     // create var date_id with yearn-month-day
     const date_id = new Date().toISOString().slice(0, 10)
     const newData: Database['public']['Tables']['global_stats']['Insert'] = {

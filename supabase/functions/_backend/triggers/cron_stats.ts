@@ -27,7 +27,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     // get the period of the billing of the organization
     const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
     const cycleInfo = cycleInfoData.data
-    if (!cycleInfo || !cycleInfo.subscription_anchor_start || !cycleInfo.subscription_anchor_end)
+    if (!cycleInfo?.subscription_anchor_start || !cycleInfo?.subscription_anchor_end)
       return c.json({ status: 'Cannot get cycle info' }, 400)
 
     cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })

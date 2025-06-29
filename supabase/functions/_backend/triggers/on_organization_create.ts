@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
-import { cloudlog } from '../utils/loggin.ts'
+import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { createStripeCustomer } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -50,7 +50,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     return c.json(BRES)
   }
   catch (e) {
-    console.error('Error on_organization_create', c.get('requestId'), e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error on_organization_create', error: e })
     return c.json({ status: 'Cannot handle org creation', error: JSON.stringify(e) }, 500)
   }
 })

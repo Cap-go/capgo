@@ -60,23 +60,24 @@ export const jsonRequestSchema = z.object({
   message: INVALID_STRING_DEVICE_ID,
 })
 
+async function opnPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
+  if (app_id) {
+    await createIfNotExistStoreInfo(c, {
+      app_id,
+      onprem: true,
+      capacitor: true,
+      capgo: true,
+    })
+  }
+  if (action === 'get')
+    await updateStoreApp(c, app_id, 1)
+  // save stats of unknow sources in our analytic DB
+  await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
+  cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
+}
+
 async function post(c: Context, body: AppStats) {
   try {
-    if (isLimited(c, body.app_id)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Too many requests' })
-      return c.json({
-        message: 'Too many requests',
-        error: 'too_many_requests',
-      }, 400)
-    }
-    const parseResult: any = jsonRequestSchema.safeParse(body)
-    if (!parseResult.success) {
-      cloudlog({ requestId: c.get('requestId'), message: `Cannot parse json: ${parseResult.error}` })
-      return c.json({
-        error: `Cannot parse json: ${parseResult.error}`,
-      }, 400)
-    }
-
     let {
       version_name,
       version_build,
@@ -95,22 +96,13 @@ async function post(c: Context, body: AppStats) {
     } = body
 
     const coerce = tryParse(fixSemver(version_build))
-
-    const { data: appOwner } = await supabaseAdmin(c)
-      .from('apps')
-      .select('app_id')
-      .eq('app_id', app_id)
-      .single()
-
-    if (coerce) {
-      version_build = format(coerce)
-    }
-    else {
+    if (!coerce) {
       return c.json({
         message: 'Invalid version build',
         error: 'invalid_version_build',
       }, 400)
     }
+    version_build = format(coerce)
     cloudlog({ requestId: c.get('requestId'), message: `VERSION NAME: ${version_name}, VERSION BUILD: ${version_build}` })
     version_name = !version_name ? version_build : version_name
     const device: DeviceWithoutCreatedAt = {
@@ -121,25 +113,18 @@ async function post(c: Context, body: AppStats) {
       version_build,
       os_version: version_os,
       version: 0,
-      is_emulator: is_emulator == null ? false : is_emulator,
-      is_prod: is_prod == null ? true : is_prod,
+      is_emulator: is_emulator ?? false,
+      is_prod: is_prod ?? true,
       custom_id,
       updated_at: new Date().toISOString(),
     }
+    const { data: appOwner } = await supabaseAdmin(c)
+      .from('apps')
+      .select('app_id')
+      .eq('app_id', app_id)
+      .single()
     if (!appOwner) {
-      if (app_id) {
-        await createIfNotExistStoreInfo(c, {
-          app_id,
-          onprem: true,
-          capacitor: true,
-          capgo: true,
-        })
-      }
-      if (action === 'get')
-        await updateStoreApp(c, app_id, 1)
-      // save stats of unknow sources in our analytic DB
-      await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
-      cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
+      await opnPremStats(c, app_id, action, device)
       return c.json({
         message: 'App not found',
         error: 'app_not_found',
@@ -216,6 +201,20 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppStats>()
+    if (isLimited(c as any, body.app_id)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Too many requests' })
+      return c.json({
+        message: 'Too many requests',
+        error: 'too_many_requests',
+      }, 400)
+    }
+    const parseResult: any = jsonRequestSchema.safeParse(body)
+    if (!parseResult.success) {
+      cloudlog({ requestId: c.get('requestId'), message: `Cannot parse json: ${parseResult.error}` })
+      return c.json({
+        error: `Cannot parse json: ${parseResult.error}`,
+      }, 400)
+    }
     cloudlog({ requestId: c.get('requestId'), message: 'post plugin/stats body', body })
     return post(c as any, body)
   }

@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface SetChannelBody {
@@ -11,7 +12,7 @@ interface SetChannelBody {
 export async function setChannel(c: Context, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   // Check API key permissions
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
-    console.log('You can\'t access this app', body.app_id)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this app', data: body.app_id })
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
 
@@ -27,7 +28,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (orgError || !org) {
-    console.log('Cannot find app', orgError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', error: orgError })
     return c.json({ status: 'Cannot find app', error: JSON.stringify(orgError) }, 400)
   }
 
@@ -42,7 +43,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (versionError || !version) {
-    console.error('Cannot find version', versionError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', error: versionError })
     return c.json({ status: 'Cannot find version', error: JSON.stringify(versionError) }, 400)
   }
 
@@ -56,7 +57,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (channelError || !channel) {
-    console.error('Cannot find channel', channelError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', error: channelError })
     return c.json({ status: 'Cannot find channel', error: JSON.stringify(channelError) }, 400)
   }
 
@@ -68,7 +69,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .eq('app_id', body.app_id)
 
   if (updateError) {
-    console.error('Cannot set bundle to channel', updateError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set bundle to channel', error: updateError })
     return c.json({ status: 'Cannot set bundle to channel', error: JSON.stringify(updateError) }, 500)
   }
 

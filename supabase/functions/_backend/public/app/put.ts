@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface UpdateApp {
@@ -10,12 +11,12 @@ interface UpdateApp {
 
 export async function put(c: Context, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {
-    console.error('Cannot update app', 'Missing app_id')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app Missing app_id' })
     return c.json({ status: 'Missing app_id' }, 400)
   }
 
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
-    console.error('Cannot update app', 'You can\'t access this app', appId)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app, You can\'t access this app', app_id: appId })
     return c.json({ status: 'You can\'t access this app', app_id: appId }, 400)
   }
 
@@ -32,14 +33,14 @@ export async function put(c: Context, appId: string, body: UpdateApp, apikey: Da
       .single()
 
     if (dbError || !data) {
-      console.error('Cannot update app', dbError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app', error: dbError })
       return c.json({ status: 'Cannot update app', error: JSON.stringify(dbError) }, 400)
     }
 
     return c.json(data)
   }
   catch (e) {
-    console.error('Cannot update app', e)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app', error: e })
     return c.json({ status: 'Cannot update app', error: JSON.stringify(e) }, 500)
   }
 }

@@ -1,24 +1,25 @@
-import type { Context } from 'node_modules/@hono/hono/_dist/src/context'
+import type { Context } from '@hono/hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { BRES } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
 export async function post(c: Context<MiddlewareKeyVariables, any, object>, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (!body.device_id || !body.app_id) {
-    console.log('Missing device_id or app_id')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing device_id or app_id' })
     return c.json({ status: 'Missing device_id or app_id' }, 400)
   }
   body.device_id = body.device_id.toLowerCase()
 
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
-    console.log('You can\'t access this app', body.app_id)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this app', app_id: body.app_id })
     return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
   }
 
   if ((body as any).version_id) {
-    console.log('Cannot set version to device, use channel instead')
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set version to device, use channel instead' })
     return c.json({ status: 'Cannot set version to device, use channel instead' }, 400)
   }
 
@@ -32,12 +33,12 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
       .eq('name', body.channel)
       .single()
     if (dbError || !dataChannel) {
-      console.log('Cannot find channel', dbError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', error: dbError })
       return c.json({ status: 'Cannot find channel', error: dbError }, 400)
     }
 
     if (dataChannel.public) {
-      console.log('Cannot set channel override for public channel')
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set channel override for public channel' })
       // if channel is public, we don't set channel_override
       return c.json({ status: 'Cannot set channel override for public channel' }, 400)
     }
@@ -50,7 +51,7 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
       })
     }
     catch (error) {
-      console.log('Cannot save channel override', error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot save channel override', error })
       return c.json({ status: 'Cannot save channel override', error }, 400)
     }
   }

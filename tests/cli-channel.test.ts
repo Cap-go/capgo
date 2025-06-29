@@ -458,6 +458,65 @@ describe('tests CLI channel commands', () => {
       expect(data).toBeNull()
     })
 
+    it.concurrent('should delete channel and associated channel_devices', async () => {
+      const channelName = generateChannelName()
+      await createChannel(channelName, APPNAME)
+
+      // Get the channel ID
+      const { data: channelData } = await getSupabaseClient()
+        .from('channels')
+        .select('id')
+        .eq('name', channelName)
+        .eq('app_id', APPNAME)
+        .single()
+        .throwOnError()
+
+      const channelId = channelData!.id
+
+      // Create some channel_devices
+      const deviceIds = [randomUUID(), randomUUID(), randomUUID()]
+      for (const deviceId of deviceIds) {
+        await getSupabaseClient()
+          .from('channel_devices')
+          .insert({
+            channel_id: channelId,
+            device_id: deviceId,
+            app_id: APPNAME,
+            owner_org: ORG_ID,
+          })
+          .throwOnError()
+      }
+
+      // Verify channel_devices were created
+      const { data: devicesBefore } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('channel_id', channelId)
+      expect(devicesBefore).toHaveLength(3)
+
+      // Delete the channel
+      const output = await runCli(['channel', 'delete', channelName, APPNAME], APPNAME, false, undefined, true, true)
+      expect(output).toContain(`Deleting channel ${APPNAME}#${channelName} from Capgo`)
+      expect(output).toContain(`Done ✅`)
+
+      // Verify channel is deleted
+      const { data: channelAfter, error: channelError } = await getSupabaseClient()
+        .from('channels')
+        .select('*')
+        .eq('name', channelName)
+        .eq('app_id', APPNAME)
+        .single()
+      expect(channelError).toBeDefined()
+      expect(channelAfter).toBeNull()
+
+      // Verify channel_devices are also deleted
+      const { data: devicesAfter } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('channel_id', channelId)
+      expect(devicesAfter).toHaveLength(0)
+    })
+
     it.concurrent('should fail to delete non-existent channel', async () => {
       const testInvalidChannel = generateChannelName()
       const output = await runCli(['channel', 'delete', testInvalidChannel, APPNAME], APPNAME, false, undefined, true, true)

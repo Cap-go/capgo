@@ -10,7 +10,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 function errorOut(c: Context, error: string) {
-  console.error(error)
+  cloudlogErr(error)
   return c.json({ status: error }, 500)
 }
 

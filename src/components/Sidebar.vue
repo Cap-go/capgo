@@ -72,7 +72,7 @@ const tabs = ref<Tab[]>([
   <div>
     <!-- Sidebar backdrop (mobile only) -->
     <div
-      class="fixed inset-0 z-40 transition-opacity duration-200 lg:hidden"
+      class="fixed inset-0 z-60 transition-opacity duration-200 lg:hidden"
       :class="{
         'bg-slate-900/50': props.sidebarOpen,
         'bg-slate-900/0 pointer-events-none': !props.sidebarOpen,
@@ -85,14 +85,14 @@ const tabs = ref<Tab[]>([
     <div
       id="sidebar"
       ref="sidebar"
-      class="fixed z-40 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:w-64 lg:h-full lg:bg-slate-800 lg:rounded-none lg:shadow-none lg:translate-x-0"
+      class="fixed z-60 left-4 top-16 h-[calc(100%-4rem)] w-64 flex shrink-0 flex-col bg-slate-800 transition-all duration-200 ease-in-out rounded-xl shadow-lg lg:static lg:left-0 lg:top-0 lg:w-64 lg:h-full lg:bg-slate-800 lg:rounded-none lg:shadow-none lg:translate-x-0"
       :class="{
         'translate-x-0': props.sidebarOpen,
         '-translate-x-[120%]': !props.sidebarOpen,
       }"
     >
       <!-- Sidebar header -->
-      <div class="flex justify-between px-3 py-4 border-b border-slate-800 lg:px-6 lg:py-6 lg:border-b lg:border-slate-700 flex-shrink-0">
+      <div class="flex justify-between px-3 py-4 border-b border-slate-800 lg:px-6 lg:py-6 lg:border-b lg:border-slate-700 shrink-0">
         <router-link class="flex items-center space-x-2 cursor-pointer lg:space-x-3" to="/app">
           <img src="/capgo.webp" alt="logo" class="w-8 h-8">
           <span class="text-xl font-semibold truncate transition duration-150 font-prompt text-slate-200 hover:text-white lg:text-slate-200 lg:hover:text-white">Capgo</span>
@@ -100,7 +100,7 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- Organization dropdown -->
-      <div class="px-3 py-4 lg:px-6 lg:py-4 flex-shrink-0">
+      <div class="px-3 py-4 lg:px-6 lg:py-4 shrink-0">
         <dropdown-organization v-if="main.user" />
       </div>
 
@@ -132,7 +132,7 @@ const tabs = ref<Tab[]>([
       </div>
 
       <!-- User menu -->
-      <div class="pt-4 mt-auto lg:pt-6 lg:border-t lg:border-slate-700 lg:mt-0 flex-shrink-0">
+      <div class="pt-4 mt-auto lg:pt-6 lg:border-t lg:border-slate-700 lg:mt-0 shrink-0">
         <div v-if="main.user" class="flex items-center">
           <DropdownProfile class="w-full" />
         </div>

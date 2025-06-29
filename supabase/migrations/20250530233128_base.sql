@@ -1185,16 +1185,6 @@ $$;
 
 ALTER FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") RETURNS "uuid" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-Begin
-  RAISE EXCEPTION 'get_identity_org is deprecated';
-End;
-$$;
-
-ALTER FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
@@ -4447,10 +4437,15 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow delete for auth (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated" USING (
+CREATE POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_devices" FOR DELETE TO "authenticated",
+"anon" USING (
   "public"."check_min_rights" (
     'write'::"public"."user_min_right",
-    "public"."get_identity" (),
+    "public"."get_identity_org_appid" (
+      '{write,all}'::"public"."key_mode" [],
+      "owner_org",
+      "app_id"
+    ),
     "owner_org",
     "app_id",
     NULL::bigint
@@ -4583,12 +4578,17 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow read for auth (read+)" ON "public"."channel_devices" FOR
+CREATE POLICY "Allow read for auth, api keys (read+)" ON "public"."channel_devices" FOR
 SELECT
-  TO "authenticated" USING (
+  TO "authenticated",
+  "anon" USING (
     "public"."check_min_rights" (
       'read'::"public"."user_min_right",
-      "public"."get_identity" (),
+      "public"."get_identity_org_appid" (
+        '{read,upload,write,all}'::"public"."key_mode" [],
+        "owner_org",
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
@@ -5733,12 +5733,6 @@ GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."k
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_identity_org" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") TO "anon";
 
@@ -7081,6 +7075,9 @@ SELECT
 
 SELECT
   pgmq.create ('on_deploy_history_create');
+
+SELECT
+  pgmq.create ('admin_stats');
 
 -- CREATE ALL CRON JOBS
 SELECT

@@ -31,7 +31,7 @@ async function listFolderSizes() {
 
   try {
     for await (const obj of s3client.listObjects({ prefix: folderToList })) {
-      const size = obj.size || 0
+      const size = obj.size ?? 0
       totalSize += size
       fileCount++
       console.log(`${obj.key}: ${formatBytes(size)}`)

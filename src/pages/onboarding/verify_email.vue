@@ -48,7 +48,7 @@ async function updateDb() {
         id: user.value?.id,
         first_name: user.value?.user_metadata.first_name,
         last_name: user.value?.user_metadata.last_name,
-        email: user.value?.email || '',
+        email: user.value?.email ?? '',
         image_url: '',
       },
     )

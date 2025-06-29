@@ -13,6 +13,8 @@ PODS:
     - Capacitor
   - CapacitorCamera (7.0.1):
     - Capacitor
+  - CapacitorCameraView (1.0.1):
+    - Capacitor
   - CapacitorClipboard (7.0.1):
     - Capacitor
   - CapacitorCommunityInAppReview (7.0.1):
@@ -72,7 +74,7 @@ PODS:
     - Capacitor
   - CapgoCapacitorScreenRecorder (7.1.9):
     - Capacitor
-  - CapgoCapacitorUpdater (7.2.6):
+  - CapgoCapacitorUpdater (7.4.0):
     - Alamofire (= 5.10.2)
     - BigInt (= 5.2.0)
     - Capacitor
@@ -106,6 +108,7 @@ DEPENDENCIES:
   - "CapacitorAppLauncher (from `../../node_modules/@capacitor/app-launcher`)"
   - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
+  - CapacitorCameraView (from `../../node_modules/capacitor-camera-view`)
   - "CapacitorClipboard (from `../../node_modules/@capacitor/clipboard`)"
   - "CapacitorCommunityInAppReview (from `../../node_modules/@capacitor-community/in-app-review`)"
   - "CapacitorCommunityKeepAwake (from `../../node_modules/@capacitor-community/keep-awake`)"
@@ -166,6 +169,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/browser"
   CapacitorCamera:
     :path: "../../node_modules/@capacitor/camera"
+  CapacitorCameraView:
+    :path: "../../node_modules/capacitor-camera-view"
   CapacitorClipboard:
     :path: "../../node_modules/@capacitor/clipboard"
   CapacitorCommunityInAppReview:
@@ -242,6 +247,7 @@ SPEC CHECKSUMS:
   CapacitorAppLauncher: 551876cb6b3f5939206ed7dc35d97b42256940c1
   CapacitorBrowser: 081852cf532acf77b9d2953f3a88fe5b9711fb06
   CapacitorCamera: eb8687d8687fed853598ec9460d94bcd5e16babe
+  CapacitorCameraView: df31b78e5f025c81e517ad920cdb05a533699150
   CapacitorClipboard: b98aead5dc7ec595547fc2c5d75bacd2ae3338bc
   CapacitorCommunityInAppReview: f2faacccf485005d6f2f113522467337db88a06b
   CapacitorCommunityKeepAwake: 00dfd8fa3cca0df003c9a3e2cd7bee678aeec68b
@@ -270,7 +276,7 @@ SPEC CHECKSUMS:
   CapgoCapacitorMute: 7eaaf948bf463e7db0ca7c588fec0680fb7d7704
   CapgoCapacitorNativeBiometric: ef4244ffac92fb918ec8aaf19dc0aaef54e24a99
   CapgoCapacitorScreenRecorder: 45286f49ac71a5c2eef874b6211a0995247d9500
-  CapgoCapacitorUpdater: a91acd03fa23e119317704319deb3932e11cf197
+  CapgoCapacitorUpdater: 5944c4a0fb53b48934774cd3d3081eb278fd0ba1
   CapgoInappbrowser: 8e0b4b6bd8238b1abe1eba34791a4da117325eb7
   CapgoNativeAudio: b1d207d8279259c9feac83cbfadb7f346cd104f2
   CapgoNativeMarket: 5f74fd7e2b40ba85c5fcf3fd6f5196e5eb619fb9
@@ -284,6 +290,6 @@ SPEC CHECKSUMS:
   SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
   Version: de5907f2c5d0f3cf21708db7801d1d5401139486
 
-PODFILE CHECKSUM: aa1fcc1f941ae0ff469efe9ffa00b4856f06710b
+PODFILE CHECKSUM: 3c2fb74a743a3f663c0da45b1f38bf96e73364ca
 
 COCOAPODS: 1.16.2

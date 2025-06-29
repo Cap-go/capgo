@@ -12,6 +12,7 @@ import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&heig
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import { useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 
 const props = defineProps<{ appId: string }>()
 const isLoading = ref(false)
@@ -20,10 +21,13 @@ const router = useRouter()
 const supabase = useSupabase()
 const appRef = ref<Database['public']['Tables']['apps']['Row'] & { owner_org: Database['public']['Tables']['orgs']['Row'] } | null>(null)
 const { t } = useI18n()
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const role = ref<OrganizationRole | null>(null)
 const forceBump = ref(0)
 const organizationStore = useOrganizationStore()
+const transferAppIdInput = ref('')
+const selectedChannel = ref('')
+const availableChannels = ref<{ name: string }[]>([])
 
 onMounted(async () => {
   isLoading.value = true
@@ -49,7 +53,7 @@ onMounted(async () => {
 })
 
 const acronym = computed(() => {
-  const words = appRef.value?.name?.split(' ') || []
+  const words = appRef.value?.name?.split(' ') ?? []
   let res = appRef.value?.name?.slice(0, 2) || 'AP'
   if (words?.length > 2)
     res = words[0][0] + words[1][0]
@@ -59,9 +63,9 @@ const acronym = computed(() => {
 })
 
 async function didCancel(name: string) {
-  displayStore.dialogOption = {
-    header: t('alert-confirm-delete'),
-    message: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
+  dialogStore.openDialog({
+    title: t('alert-confirm-delete'),
+    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')} ${name}?`,
     buttons: [
       {
         text: t('button-cancel'),
@@ -73,9 +77,8 @@ async function didCancel(name: string) {
         id: 'confirm-button',
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function deleteApp() {
@@ -108,6 +111,7 @@ async function deleteApp() {
     toast.error(t('cannot-delete-app'))
   }
 }
+
 async function submit(form: { app_name: string, retention: number }) {
   isLoading.value = true
   if (role.value && !organizationStore.hasPermisisonsInRole(role.value, ['super_admin'])) {
@@ -115,41 +119,58 @@ async function submit(form: { app_name: string, retention: number }) {
     isLoading.value = false
     return
   }
-  const newName = form.app_name
-  if (newName !== (appRef.value?.name ?? '')) {
-    if (newName.length > 32) {
-      toast.error(t('new-name-to-long'))
-      isLoading.value = false
-      return
-    }
 
-    const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
-    if (error) {
-      toast.error(t('cannot-change-name'))
-      console.error(error)
-      isLoading.value = false
-      return
-    }
-
-    if (appRef.value)
-      appRef.value.name = newName
-
-    toast.success(t('changed-app-name'))
+  try {
+    await updateAppName(form.app_name)
   }
-  if (form.retention !== appRef.value?.retention) {
-    const { error } = await supabase.from('apps').update({ retention: form.retention }).eq('app_id', props.appId)
-    if (error) {
-      toast.error(t('cannot-change-retention'))
-      console.error(error)
-      isLoading.value = false
-    }
-    else {
-      toast.success(t('changed-app-retention'))
-      if (appRef.value)
-        appRef.value.retention = form.retention
-    }
+  catch (error) {
+    toast.error(error as string)
   }
+
+  try {
+    await updateAppRetention(form.retention)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
   isLoading.value = false
+}
+
+async function updateAppName(newName: string) {
+  if (newName === (appRef.value?.name ?? '')) {
+    return Promise.resolve()
+  }
+  if (newName.length > 32) {
+    toast.error(t('new-name-to-long'))
+    return Promise.reject(t('new-name-to-long'))
+  }
+
+  const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
+  if (error) {
+    toast.error(t('cannot-change-name'))
+    console.error(error)
+    return
+  }
+
+  if (appRef.value)
+    appRef.value.name = newName
+
+  toast.success(t('changed-app-name'))
+}
+
+async function updateAppRetention(newRetention: number) {
+  if (newRetention === appRef.value?.retention) {
+    return Promise.resolve()
+  }
+
+  const { error } = await supabase.from('apps').update({ retention: newRetention }).eq('app_id', props.appId)
+  if (error) {
+    return Promise.reject(t('cannot-change-retention'))
+  }
+  toast.success(t('changed-app-retention'))
+  if (appRef.value)
+    appRef.value.retention = newRetention
 }
 
 async function setDefaultChannel() {
@@ -163,47 +184,48 @@ async function setDefaultChannel() {
     return
   }
 
-  const buttons = channels.map((chann) => {
-    return {
-      text: chann.name,
-      handler: async () => {
-        const { error: appError } = await supabase.from('apps')
-          .update({ default_upload_channel: chann.name })
-          .eq('app_id', appRef.value?.app_id ?? '')
+  availableChannels.value = channels || []
+  selectedChannel.value = appRef.value?.default_upload_channel || ''
 
-        if (appError) {
-          toast.error(t('cannot-change-default-upload-channel'))
-          console.error(error)
-          return
-        }
-        if (appRef.value) {
-          appRef.value.default_upload_channel = chann.name
-          forceBump.value += 1
-        }
-        toast.success(t('updated-default-upload-channel'))
-      },
-    }
-  })
-
-  displayStore.dialogOption = {
-    header: t('select-default-upload-channel-header'),
-    message: `${t('select-default-upload-channel')}`,
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
+  dialogStore.openDialog({
+    title: t('select-default-upload-channel-header'),
+    description: t('select-default-upload-channel'),
+    size: 'lg',
     preventAccidentalClose: true,
-    buttonVertical: true,
-    size: 'max-w-xl',
-    buttons: Array.prototype.concat(
-      buttons,
-      [
-        {
-          text: t('button-cancel'),
-          role: 'cancel',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        role: 'primary',
+        handler: async () => {
+          if (!selectedChannel.value) {
+            toast.error(t('please-select-channel'))
+            return false
+          }
+
+          const { error: appError } = await supabase.from('apps')
+            .update({ default_upload_channel: selectedChannel.value })
+            .eq('app_id', appRef.value?.app_id ?? '')
+
+          if (appError) {
+            toast.error(t('cannot-change-default-upload-channel'))
+            console.error(appError)
+            return false
+          }
+
+          if (appRef.value) {
+            appRef.value.default_upload_channel = selectedChannel.value
+            forceBump.value += 1
+          }
+          toast.success(t('updated-default-upload-channel'))
+          return true
         },
-      ],
-    ),
-  }
-  displayStore.showDialog = true
+      },
+    ],
+  })
 }
 
 const isSuperAdmin = computed(() => {
@@ -219,13 +241,10 @@ async function editPhoto() {
     return
   }
 
-  displayStore.dialogOption = {
-    header: t('what-to-do-with-photo'),
-    message: `${t('what-to-do-with-photo-dec')}`,
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-sm',
-    buttonCenter: true,
+  dialogStore.openDialog({
+    title: t('what-to-do-with-photo'),
+    description: `${t('what-to-do-with-photo-dec')}`,
+    size: 'sm',
     preventAccidentalClose: true,
     buttons: [
       {
@@ -235,7 +254,6 @@ async function editPhoto() {
       {
         text: t('change'),
         id: 'verify',
-        preventClose: true,
         handler: async () => {
           const rawPhotos = await Camera.pickImages({
             limit: 1,
@@ -244,7 +262,7 @@ async function editPhoto() {
 
           if (!rawPhotos || rawPhotos.photos.length === 0) {
             toast.error(t('canceled-photo-selection'))
-            return
+            return false
           }
 
           const photos = rawPhotos.photos
@@ -255,7 +273,7 @@ async function editPhoto() {
           if (!mimeType) {
             toast.error(t('unknown-mime'))
             console.error(`Unknown mime type for ${photos[0].format}`)
-            return
+            return false
           }
 
           const { error } = await supabase.storage
@@ -267,7 +285,7 @@ async function editPhoto() {
           if (error) {
             toast.error(t('upload-img-error'))
             console.error(`Cannot upload picture: ${JSON.stringify(error)}`)
-            return
+            return false
           }
 
           const { data: signedURLData } = await supabase
@@ -282,25 +300,23 @@ async function editPhoto() {
           if (appUpdateErr) {
             toast.error(t('upload-img-error'))
             console.error(`Cannot upload picture (appUpdateErr): ${appUpdateErr}`)
-            return
+            return false
           }
 
           if (appRef.value)
             appRef.value.icon_url = signedURLData.publicUrl
 
           toast.success(t('picture-uploaded'))
-          displayStore.showDialog = false
         },
       },
       {
         text: t('delete'),
         id: 'verify',
         role: 'danger',
-        preventClose: true,
         handler: async () => {
           if (!appRef.value?.icon_url) {
             toast.error(t('no-app-icon'))
-            return
+            return false
           }
 
           const { error } = await supabase
@@ -311,7 +327,7 @@ async function editPhoto() {
           if (error) {
             console.error('Cannot remove app logo', error)
             toast.error(t('picture-delete-fail'))
-            return
+            return false
           }
 
           const { error: setAppError } = await supabase.from('apps')
@@ -321,19 +337,57 @@ async function editPhoto() {
           if (setAppError) {
             console.error('Cannot remove app logo (set app)', error)
             toast.error(t('picture-delete-fail'))
-            return
+            return false
           }
 
           toast.success(t('app-logo-deleted'))
           appRef.value.icon_url = ''
-          displayStore.showDialog = false
         },
       },
     ],
-  }
+  })
+}
 
-  displayStore.dialogInputText = appRef?.value?.name ?? ''
-  displayStore.showDialog = true
+function confirmTransferAppOwnership(org: Organization) {
+  // Step 3: Final confirmation with app ID input
+  transferAppIdInput.value = ''
+
+  dialogStore.openDialog({
+    title: t('confirm-transfer'),
+    description: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', props.appId)}`,
+    size: 'xl',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('transfer'),
+        role: 'danger',
+        handler: async () => {
+          if (transferAppIdInput.value !== props.appId) {
+            toast.error(t('incorrect-app-id'))
+            return false
+          }
+          // Transfer logic will go here
+          const { error } = await supabase.rpc('transfer_app', {
+            p_app_id: props.appId,
+            p_new_org_id: org.gid,
+          })
+          if (error) {
+            toast.error(t('cannot-transfer-app'))
+            console.error(error)
+            return false
+          }
+          toast.success(t('app-transferred'))
+          setTimeout(() => {
+            router.push('/app')
+          }, 2500)
+        },
+      },
+    ],
+  })
 }
 
 async function transferAppOwnership() {
@@ -350,13 +404,11 @@ async function transferAppOwnership() {
     return
   }
 
-  displayStore.dialogOption = {
-    header: t('transfer-app-ownership'),
-    message: t('transfer-app-ownership-requirements'),
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-xl',
-    buttonCenter: true,
+  // Step 1: Initial confirmation
+  dialogStore.openDialog({
+    title: t('transfer-app-ownership'),
+    description: t('transfer-app-ownership-requirements'),
+    size: 'xl',
     buttons: [
       {
         text: t('button-cancel'),
@@ -367,71 +419,28 @@ async function transferAppOwnership() {
         role: 'danger',
       },
     ],
-  }
-  displayStore.showDialog = true
-  if (await displayStore.onDialogDismiss())
+  })
+  if (await dialogStore.onDialogDismiss())
     return
 
-  // Continue with transfer logic here
+  // Step 2: Organization selection
   const superAdminOrganizations = organizationStore.organizations.filter(org => org.role === 'super_admin' && org.gid !== appRef.value?.owner_org.id)
   if (superAdminOrganizations.length === 0) {
     toast.error(t('no-super-admin-organizations'))
     return
   }
 
-  displayStore.dialogOption = {
-    header: t('select-destination-organization'),
-    message: t('select-organization-to-transfer'),
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-xl',
-    buttonVertical: true,
+  dialogStore.openDialog({
+    title: t('select-destination-organization'),
+    description: t('select-organization-to-transfer'),
+    size: 'xl',
     preventAccidentalClose: true,
     buttons: [
       ...superAdminOrganizations.map(org => ({
         text: org.name,
+        role: 'secondary' as const,
         handler: async () => {
-          displayStore.dialogOption = {
-            header: t('confirm-transfer'),
-            message: `${t('app-will-be-transferred').replace('$ORG_ID', org.name).replace('$APP_ID', props.appId)}`,
-            headerStyle: 'w-full text-center',
-            textStyle: 'w-full text-center mb-4',
-            size: 'max-w-xl',
-            input: true,
-            preventAccidentalClose: true,
-            buttonCenter: true,
-            buttons: [
-              {
-                text: t('button-cancel'),
-                role: 'cancel',
-              },
-              {
-                text: t('transfer'),
-                role: 'danger',
-                handler: async () => {
-                  if (displayStore.dialogInputText !== props.appId) {
-                    toast.error(t('incorrect-app-id'))
-                    return
-                  }
-                  // Transfer logic will go here
-                  const { error } = await supabase.rpc('transfer_app', {
-                    p_app_id: props.appId,
-                    p_new_org_id: org.gid,
-                  })
-                  if (error) {
-                    toast.error(t('cannot-transfer-app'))
-                    console.error(error)
-                    return
-                  }
-                  toast.success(t('app-transferred'))
-                  setTimeout(() => {
-                    router.push('/app')
-                  }, 2500)
-                },
-              },
-            ],
-          }
-          displayStore.showDialog = true
+          confirmTransferAppOwnership(org)
         },
       })),
       {
@@ -439,8 +448,7 @@ async function transferAppOwnership() {
         role: 'cancel',
       },
     ],
-  }
-  displayStore.showDialog = true
+  })
 }
 </script>
 
@@ -483,7 +491,7 @@ async function transferAppOwnership() {
                 type="text"
                 name="app_id"
                 :prefix-icon="iconName"
-                :value="appRef?.app_id || ''"
+                :value="appRef?.app_id ?? ''"
                 :label="t('app-id')"
                 :disabled="true"
               />
@@ -491,7 +499,7 @@ async function transferAppOwnership() {
                 type="text"
                 name="app_name"
                 :prefix-icon="iconName"
-                :value="appRef?.name || ''"
+                :value="appRef?.name ?? ''"
                 :label="t('app-name')"
               />
               <div :key="forceBump" class="flex flex-row">
@@ -523,7 +531,7 @@ async function transferAppOwnership() {
                 number="integer"
                 name="retention"
                 :prefix-icon="gearSix"
-                :value="appRef?.retention || 0"
+                :value="appRef?.retention ?? 0"
                 :label="t('retention')"
               />
               <FormKit
@@ -583,5 +591,41 @@ async function transferAppOwnership() {
         </div>
       </footer>
     </FormKit>
+
+    <!-- Teleport for Transfer App ID Input -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-transfer')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <input
+          v-model="transferAppIdInput"
+          type="text"
+          :placeholder="t('type-app-id-to-confirm')"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          @keydown.enter="$event.preventDefault()"
+        >
+      </div>
+    </Teleport>
+
+    <!-- Teleport for Default Channel Selection -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-default-upload-channel-header')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <div class="space-y-3">
+          <div v-for="channel in availableChannels" :key="channel.name" class="flex items-center gap-3">
+            <input
+              :id="`channel-${channel.name}`"
+              v-model="selectedChannel"
+              type="radio"
+              :value="channel.name"
+              class="radio radio-primary"
+            >
+            <label :for="`channel-${channel.name}`" class="text-sm font-medium cursor-pointer flex-1">
+              {{ channel.name }}
+            </label>
+          </div>
+          <div v-if="availableChannels.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-4">
+            {{ t('no-channels-available') }}
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

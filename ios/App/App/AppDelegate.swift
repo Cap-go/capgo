@@ -28,7 +28,7 @@ extension UIWindow {
             let okButtonTitle = "Go Home"
             let reloadButtonTitle = "Reload app"
             let cancelButtonTitle = "Close menu"
-            let updater = CapacitorUpdater()
+            let updater = CapgoUpdater()
             if let vc = (rootViewController as? CAPBridgeViewController) {
                 if UIApplication.topViewController()!.isKind(of: UIAlertController.self) { 
                     print("UIAlertController is already presented")

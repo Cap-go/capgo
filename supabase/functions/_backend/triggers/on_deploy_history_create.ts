@@ -4,6 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -15,18 +16,18 @@ app.post('/', middlewareAPISecret, async (c) => {
     const table: keyof Database['public']['Tables'] = 'deploy_history'
     const body = await c.req.json<InsertPayload<typeof table>>()
     if (body.table !== table) {
-      console.log({ requestId: c.get('requestId'), message: `Not ${table}` })
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
       return c.json({ status: `Not ${table}` }, 200)
     }
     if (body.type !== 'INSERT') {
-      console.log({ requestId: c.get('requestId'), message: 'Not INSERT' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Not INSERT' })
       return c.json({ status: 'Not INSERT' }, 200)
     }
     const record = body.record
-    console.log({ requestId: c.get('requestId'), message: 'record', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.id) {
-      console.log({ requestId: c.get('requestId'), message: 'No id' })
+      cloudlog({ requestId: c.get('requestId'), message: 'No id' })
       return c.json(BRES)
     }
 
@@ -38,7 +39,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       .single()
 
     if (channelError) {
-      console.log({ requestId: c.get('requestId'), message: 'Error fetching channel', channelError })
+      cloudlog({ requestId: c.get('requestId'), message: 'Error fetching channel', channelError })
       return c.json(BRES)
     }
 
@@ -52,7 +53,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .single()
 
       if (versionError || !version) {
-        console.log({ requestId: c.get('requestId'), message: 'Error fetching version', versionError })
+        cloudlog({ requestId: c.get('requestId'), message: 'Error fetching version', versionError })
         return c.json(BRES)
       }
 
@@ -77,7 +78,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .single()
         .then(({ data, error }) => {
           if (error || !data) {
-            console.log({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
+            cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
             return c.json({ status: 'Error fetching organization' }, 500)
           }
           return trackBentoEvent(c as any, data.management_email, {

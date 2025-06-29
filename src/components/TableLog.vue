@@ -54,7 +54,7 @@ function closeDropdown() {
 }
 const { t } = useI18n()
 const isDark = useDark()
-const searchVal = ref(props.search || '')
+const searchVal = ref(props.search ?? '')
 const currentSelected = ref<'general' | 'precise'>('general')
 type Minutes = 1 | 3 | 12
 const currentGeneralTime = ref<Minutes>(1)
@@ -291,7 +291,7 @@ onMounted(async () => {
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 12 }" @click="setTime(12)">{{ t('last-12-hours') }}</a></li>
           </ul>
         </div>
-        <div class="flex-auto flex items-center justify-center mx-0 w-[1px] bg-gray-200 dark:bg-gray-600" />
+        <div class="flex-auto flex items-center justify-center mx-0 w-px bg-gray-200 dark:bg-gray-600" />
         <div class="flex items-center justify-center flex-auto rounded-r-md cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700" :class="{ 'bg-gray-100 text-gray-600 dark:text-gray-300 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900': currentSelected === 'precise' }" @click="clickRight">
           <div class="relative">
             <VueDatePicker
@@ -310,7 +310,7 @@ onMounted(async () => {
               @update:model-value="clickRight"
             >
               <template #trigger>
-                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-1 md:px-6">
+                <div class="flex flex-row items-center justify-center h-10 px-3 md:px-6">
                   <IconCalendar class="mr-1" />
                   <p class="hidden md:block">
                     {{ t('custom') }}
@@ -318,7 +318,7 @@ onMounted(async () => {
                 </div>
               </template>
               <template #top-extra="{ value }">
-                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 mb-2 rounded-full" @click="openTimePicker">
+                <div class="flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 md:mb-2 rounded-full" @click="openTimePicker">
                   <div class="flex items-center space-x-2 text-neutral-700 dark:text-neutral-200 bg-gray-300 dark:bg-gray-700 px-3 py-2 rounded-full">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -575,6 +575,32 @@ onMounted(async () => {
   width: 320px !important;
   min-width: 320px !important;
   max-width: 320px !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  border: 1px solid rgb(229 231 235) !important;
+}
+
+/* Mobile responsive calendar */
+@media (max-width: 768px) {
+  .dp__menu {
+    width: calc(100vw - 2rem) !important;
+    min-width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    transform: none !important;
+  }
+}
+
+/* Dark mode menu styling */
+.dark .dp__menu {
+  border-color: rgb(55 65 81) !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3) !important;
+}
+
+/* Arrow styling to match menu border */
+.dp__arrow_top {
+  border-top-color: rgb(229 231 235) !important;
+  border-right-color: rgb(229 231 235) !important;
 }
 
 /* Prevent calendar from resizing during range selection */

@@ -7,18 +7,17 @@ import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
 import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
-
-const displayStore = useDisplayStore()
 
 interface PlansOrgData {
   stats: {
@@ -67,6 +66,7 @@ const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
+const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
 const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
 const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
@@ -211,17 +211,16 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
       }
     }
 
-    displayStore.dialogOption = {
-      header: t('cannot-view-plans'),
-      message: `${t('plans-super-only')}`,
+    dialogStore.openDialog({
+      title: t('cannot-view-plans'),
+      description: `${t('plans-super-only')}`,
       buttons: [
         {
           text: t('ok'),
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
     if (!prevOrg)
       router.push('/app')
     else
@@ -298,16 +297,15 @@ const hightLights = computed<Stat[]>(() => ([
       if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
         return
 
-      displayStore.dialogOption = {
-        header: t('detailed-usage-plan'),
-        message: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
+      dialogStore.openDialog({
+        title: t('detailed-usage-plan'),
+        description: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
         buttons: [
           {
             text: t('ok'),
           },
         ],
-      }
-      displayStore.showDialog = true
+      })
     },
   },
   {
@@ -332,7 +330,7 @@ const hightLights = computed<Stat[]>(() => ([
         <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
           {{ t('plan-failed') }}
         </div>
-        <section class="px-8 pt-4 sm:px-0">
+        <section class="px-4 md:px-8 pt-4 sm:px-0">
           <BlurBg :mini="true">
             <template #default>
               <StatsBar :mini="true" :stats="hightLights" />
@@ -442,37 +440,37 @@ const hightLights = computed<Stat[]>(() => ([
             <br>
           </p>
         </div>
-        <section v-if="!isMobile" class="py-12 lg:py-20 sm:py-16">
+        <section class="py-8 lg:py-20 sm:py-12">
           <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
             <div class="max-w-2xl mx-auto text-center">
-              <h2 class="text-3xl font-bold text-white-900 font-pj sm:text-4xl xl:text-5xl dark:text-white">
+              <h2 class="text-2xl font-bold text-white-900 font-pj sm:text-3xl xl:text-4xl dark:text-white">
                 {{ t('need-more-contact-us') }}
               </h2>
             </div>
 
             <BlurBg background="">
               <template #default>
-                <div class="w-full px-16 py-8 lg:px-16 lg:py-14 sm:px-8 bg-blue-50">
+                <div class="w-full px-4 py-6 lg:px-16 lg:py-14 sm:px-8 bg-blue-50">
                   <div class="w-full md:flex md:items-center lg:space-x-6 md:space-x-4">
-                    <div class="grid grid-cols-1 gap-x-12 gap-y-3 sm:grid-cols-2 xl:gap-x-24">
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:gap-x-12">
                       <div>
-                        <ul class="space-y-3 text-base font-medium text-black font-pj">
+                        <ul class="space-y-3 text-sm sm:text-base font-medium text-black font-pj">
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('unlimited-updates') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('bigger-app-size') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('more-version-storage') }}
@@ -481,23 +479,23 @@ const hightLights = computed<Stat[]>(() => ([
                       </div>
 
                       <div>
-                        <ul class="space-y-3 text-base font-medium text-black font-pj">
+                        <ul class="space-y-3 text-sm sm:text-base font-medium text-black font-pj">
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('custom-domain') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('special-api-access') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('bulk-upload') }}
@@ -506,62 +504,31 @@ const hightLights = computed<Stat[]>(() => ([
                       </div>
                     </div>
 
-                    <div class="block lg:block md:hidden">
-                      <div class="hidden lg:block">
-                        <svg class="w-4 h-auto dark:text-gray-600" viewBox="0 0 16 123" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 11)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 46)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 81)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 116)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 18)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 53)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 88)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 123)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 25)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 60)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 95)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 32)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 67)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 102)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 39)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 74)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 109)" />
-                        </svg>
-                      </div>
-
-                      <div class="block mt-10 md:hidden">
-                        <svg class="w-auto h-4 dark:text-gray-600" viewBox="0 0 172 16" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 11 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 46 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 81 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 116 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 151 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 18 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 53 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 88 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 123 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 158 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 25 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 60 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 95 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 130 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 165 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 32 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 67 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 102 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 137 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 172 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 39 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 74 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 109 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 144 1)" />
-                        </svg>
-                      </div>
+                    <div class="hidden lg:block">
+                      <svg class="w-4 h-auto dark:text-gray-600" viewBox="0 0 16 123" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 11)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 46)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 81)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 116)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 18)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 53)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 88)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 123)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 25)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 60)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 95)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 32)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 67)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 102)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 39)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 74)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 109)" />
+                      </svg>
                     </div>
 
-                    <div class="mx-auto! mt-10 md:mt-0">
+                    <div class="w-full sm:w-auto mt-6 md:mt-0 text-center">
                       <button
-                        class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black"
+                        class="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black w-full sm:w-auto"
                         @click="openSupport()"
                       >
                         Get quote now
@@ -577,7 +544,7 @@ const hightLights = computed<Stat[]>(() => ([
     </div>
     <div v-else class="relative w-full overflow-hidden ">
       <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
-        <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+        <img src="/capgo.webp" alt="logo" class="h-16  w-16 ml-auto mr-auto mb-16">
         {{ t('thank-you-for-sub') }}
         <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
         <router-link class="mt-[40vh]" to="/app">

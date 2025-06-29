@@ -51,7 +51,7 @@ const emit = defineEmits([
   'massDelete',
 ])
 const { t } = useI18n()
-const searchVal = ref(props.search || '')
+const searchVal = ref(props.search ?? '')
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -259,7 +259,6 @@ watch(props.elementList, () => {
 })
 async function handleCheckboxClick(i: number, e: MouseEvent) {
   if (e.shiftKey && previousSelectedRow.value !== null) {
-    console.log((e as MouseEvent).shiftKey && true, i, previousSelectedRow)
     for (let y = Math.min(previousSelectedRow.value, i); y <= Math.max(previousSelectedRow.value, i); y++) {
       if (i > previousSelectedRow.value && y === previousSelectedRow.value)
         continue

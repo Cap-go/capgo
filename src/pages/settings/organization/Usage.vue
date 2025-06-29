@@ -4,12 +4,13 @@ import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb } from '~/services/conversion'
 import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
@@ -20,8 +21,8 @@ const initialLoad = ref(true)
 const route = useRoute()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
-const displayStore = useDisplayStore()
 const router = useRouter()
+const dialogStore = useDialogV2Store()
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -73,7 +74,7 @@ async function getUsage(orgId: string) {
     totalBandwidth = bytesToGb(latestUsage.bandwidth)
   }
 
-  const basePrice = currentPlan?.price_m || 0
+  const basePrice = currentPlan?.price_m ?? 0
 
   const calculatePrice = (total: number, base: number, unit: number) => total <= base ? 0 : (total - base) * unit
 
@@ -161,24 +162,21 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
         organizationStore.setCurrentOrganization(newOrg.gid)
         return
       }
-      else {
-        router.push('/app')
-      }
+      router.push('/app')
     }
 
     const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
 
-    displayStore.dialogOption = {
-      header: paying ? t('cannot-view-usage') : t('cannot-show'),
-      message: paying ? t('usage-super-only') : t('not-paying-org-usage'),
+    dialogStore.openDialog({
+      title: paying ? t('cannot-view-usage') : t('cannot-show'),
+      description: paying ? t('usage-super-only') : t('not-paying-org-usage'),
       buttons: [
         {
           text: t('ok'),
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
     if (!prevOrg)
       router.push('/app')
     else
@@ -207,7 +205,7 @@ function nextRunDate() {
         <div class="sm:align-center sm:flex sm:flex-col">
           <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip tooltip-bottom">
             {{ t('usage') }}
-            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
+            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:bg-blue-500 hover:text-white rounded-full" />
             <div class="tooltip-content font-normal bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
               <div class="max-w-xs whitespace-normal">
                 {{ lastRunDate() }}
