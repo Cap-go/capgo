@@ -21,7 +21,7 @@ import { registerWebsiteDomain } from '~/utils/Utils'
 const route = useRoute('/login')
 const supabase = useSupabase()
 const isLoading = ref(false)
-// const isMobile = ref(Capacitor.isNativePlatform())
+const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const statusAuth: Ref<'login' | '2fa'> = ref('login')
@@ -253,9 +253,9 @@ async function checkMagicLink() {
   }
 }
 
-// async function openScan() {
-//   router.push('/scan')
-// }
+async function openScan() {
+  router.push('/scan')
+}
 
 async function checkLogin() {
   const parsedUrl = new URL(route.fullPath, window.location.origin)
@@ -409,9 +409,9 @@ onMounted(checkLogin)
           <button class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openSupport">
             {{ t("support") }}
           </button>
-          <!-- <button class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openScan">
+          <button v-if="isMobile" class="p-2 mt-3 text-gray-500 rounded-md hover:bg-gray-300" @click="openScan">
             {{ t("test-bundle") }}
-          </button> -->
+          </button>
         </section>
       </div>
       <div v-else class="relative max-w-md mx-auto mt-8 md:mt-4">

@@ -74,7 +74,7 @@ PODS:
     - Capacitor
   - CapgoCapacitorScreenRecorder (7.1.9):
     - Capacitor
-  - CapgoCapacitorUpdater (7.2.6):
+  - CapgoCapacitorUpdater (7.4.0):
     - Alamofire (= 5.10.2)
     - BigInt (= 5.2.0)
     - Capacitor
@@ -276,7 +276,7 @@ SPEC CHECKSUMS:
   CapgoCapacitorMute: 7eaaf948bf463e7db0ca7c588fec0680fb7d7704
   CapgoCapacitorNativeBiometric: ef4244ffac92fb918ec8aaf19dc0aaef54e24a99
   CapgoCapacitorScreenRecorder: 45286f49ac71a5c2eef874b6211a0995247d9500
-  CapgoCapacitorUpdater: a91acd03fa23e119317704319deb3932e11cf197
+  CapgoCapacitorUpdater: 5944c4a0fb53b48934774cd3d3081eb278fd0ba1
   CapgoInappbrowser: 8e0b4b6bd8238b1abe1eba34791a4da117325eb7
   CapgoNativeAudio: b1d207d8279259c9feac83cbfadb7f346cd104f2
   CapgoNativeMarket: 5f74fd7e2b40ba85c5fcf3fd6f5196e5eb619fb9
