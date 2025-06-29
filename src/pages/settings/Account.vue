@@ -513,7 +513,7 @@ onMounted(async () => {
         </div>
         <!-- Panel footer -->
         <footer>
-          <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+          <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
             <div class="flex self-end">
               <button type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white" @click="deleteAccount()">
                 {{ t('delete-account') }}

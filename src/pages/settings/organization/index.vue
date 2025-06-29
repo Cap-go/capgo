@@ -306,7 +306,7 @@ async function copyOrganizationId() {
               <p class="text-slate-800 dark:text-white">
                 {{ t('organization-id') }}
               </p>
-              <div class="md:ml-6">
+              <div class="pt-2 md:pt-0 md:ml-6">
                 <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
@@ -314,7 +314,7 @@ async function copyOrganizationId() {
             </div>
           </div>
           <footer style="margin-top: auto">
-            <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+            <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
               <div class="flex self-end">
                 <button
                   class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
@@ -326,7 +326,7 @@ async function copyOrganizationId() {
                   }"
                   @click="() => deleteOrganization()"
                 >
-                  <span v-if="!isLoading" class="rounded-4xl">
+                  <span v-if="!isLoading" class="rounded-4xl truncate">
                     {{ t('delete-org') }}
                   </span>
                   <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
@@ -339,7 +339,7 @@ async function copyOrganizationId() {
                   shape="round"
                 >
                   <span v-if="!isLoading" class="rounded-4xl">
-                    {{ t('save-changes') }}
+                    {{ t('update') }}
                   </span>
                   <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
                 </button>

@@ -686,8 +686,11 @@ async function deleteBundle() {
               {{ formatDate(version.updated_at) }}
             </InfoRow>
             <!-- Checksum -->
-            <InfoRow v-if="version.checksum" :label="t('checksum')">
-              {{ version.checksum }}
+            <InfoRow
+              v-if="version.checksum" :label="t('checksum')" :is-link="true"
+              @click="copyToast(version?.checksum ?? '')"
+            >
+              {{ hideString(version.checksum) }}
             </InfoRow>
             <!-- Min update version -->
             <InfoRow
