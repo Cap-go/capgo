@@ -151,11 +151,13 @@ export async function runCli(params: string[], appId: string, logOutput = false,
 
   let localCliPath = env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
+    // For easy local testing, we can set the LOCAL_CLI_PATH to true and the CLI folder will be used
+    localCliPath = '../../../CLI/dist/index.js'
+  }
+  if (localCliPath) {
     if (noFolder) {
-      localCliPath = '../CLI/dist/index.js'
-    }
-    else {
-      localCliPath = '../../../CLI/dist/index.js'
+      // remove ../../ from the path as the running path is not in subfolder
+      localCliPath = localCliPath.replace('../../', '')
     }
   }
 
