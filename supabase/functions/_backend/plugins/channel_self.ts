@@ -51,6 +51,18 @@ export const jsonRequestSchema = z.object({
   return val
 })
 
+export const listChannelsQuerySchema = z.object({
+  app_id: z.string({
+    required_error: MISSING_STRING_APP_ID,
+    invalid_type_error: NON_STRING_APP_ID,
+  }).refine(data => reverseDomainRegex.test(data), {
+    message: INVALID_STRING_APP_ID,
+  }),
+  platform: devicePlatformScheme,
+  is_emulator: z.boolean().default(false),
+  is_prod: z.boolean().default(true),
+})
+
 async function post(c: Context, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
   let {
@@ -462,6 +474,66 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   return c.json(BRES)
 }
 
+async function listCompatibleChannels(c: Context, query: { app_id: string, platform: string, is_emulator: boolean, is_prod: boolean }): Promise<Response> {
+  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
+  
+  const { app_id, platform, is_emulator, is_prod } = query
+
+  // Check if app exists and get owner_org for permission check
+  const { data: appData } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', app_id)
+    .single()
+
+  if (!appData) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', app_id })
+    return c.json({
+      message: `App ${app_id} not found`,
+      error: 'app_not_found',
+    }, 400)
+  }
+
+  if (!(await isAllowedActionOrg(c, appData.owner_org))) {
+    return c.json({
+      message: 'Action not allowed',
+      error: 'action_not_allowed',
+    }, 200)
+  }
+
+  // Get channels that allow device self set and are compatible with the platform
+  const { data: channels, error: channelsError } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id, name, allow_device_self_set, ios, android, public')
+    .eq('app_id', app_id)
+    .eq('allow_device_self_set', true)
+    .eq(platform as 'ios' | 'android', true)
+
+  if (channelsError) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot fetch channels', channelsError })
+    return c.json({
+      message: 'Cannot fetch channels',
+      error: 'database_error',
+    }, 500)
+  }
+
+  if (!channels || channels.length === 0) {
+    return c.json([])
+  }
+
+  // Return the compatible channels
+  const compatibleChannels = channels.map(channel => ({
+    id: channel.id,
+    name: channel.name,
+    public: channel.public,
+    allow_self_set: channel.allow_device_self_set,
+  }))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Found compatible channels', count: compatibleChannels.length })
+  
+  return c.json(compatibleChannels)
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
@@ -504,6 +576,33 @@ app.delete('/', async (c) => {
   }
 })
 
-app.get('/', (c) => {
-  return c.json({ status: 'ok' })
+app.get('/', async (c) => {
+  try {
+    const query = c.req.query()
+    
+    // If no query parameters, return status
+    if (!query.app_id) {
+      return c.json({ status: 'ok' })
+    }
+
+    // Parse and validate query parameters
+    const parseResult = listChannelsQuerySchema.safeParse({
+      app_id: query.app_id,
+      platform: query.platform,
+      is_emulator: query.is_emulator === 'true',
+      is_prod: query.is_prod !== 'false', // default to true unless explicitly false
+    })
+
+    if (!parseResult.success) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'list channels query validation failed', error: parseResult.error })
+      return c.json({ error: `Invalid query parameters: ${parseResult.error}` }, 400)
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'list channels query', query: parseResult.data })
+    return listCompatibleChannels(c as any, parseResult.data)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'list channels error', error: e })
+    return c.json({ status: 'Cannot list channels', error: JSON.stringify(e) }, 500)
+  }
 })
