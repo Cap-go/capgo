@@ -29,7 +29,7 @@ async function findVersion(c: Context, appID: string, version: string, ownerOrg:
     .single()
   if (vError || !data) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', data: { appID, version, ownerOrg, vError } })
-    return Promise.reject(vError)
+    return Promise.reject(new Error(vError?.message ?? 'Cannot find version'))
   }
   return data.id
 }
