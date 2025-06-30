@@ -30,8 +30,25 @@ jobs:
       - name: Create bump and changelog
         if: github.ref != 'refs/heads/main'
         run: bun x standard-version --prerelease alpha
-      - name: Add version.ts to commit
-        run: git add supabase/functions/_backend/utils/version.ts
+      - name: Check and truncate CHANGELOG.md if too large
+        run: |
+          if [ -f "CHANGELOG.md" ]; then
+            size=$(stat -f%z CHANGELOG.md 2>/dev/null || stat -c%s CHANGELOG.md 2>/dev/null)
+            max_size=$((10 * 1024 * 1024))  # 10MB
+            if [ $size -gt $max_size ]; then
+              echo "CHANGELOG.md is $(echo "scale=2; $size/1024/1024" | bc)MB, truncating..."
+              head -n 1000 CHANGELOG.md > CHANGELOG.tmp
+              echo "" >> CHANGELOG.tmp
+              echo "---" >> CHANGELOG.tmp
+              echo "*Older entries truncated to keep file size manageable*" >> CHANGELOG.tmp
+              mv CHANGELOG.tmp CHANGELOG.md
+              echo "CHANGELOG.md truncated successfully"
+            fi
+          fi
+      - name: Add version.ts and CHANGELOG.md to commit
+        run: |
+          git add supabase/functions/_backend/utils/version.ts
+          git add CHANGELOG.md
       - name: Push to origin
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
