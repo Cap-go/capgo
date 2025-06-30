@@ -14,6 +14,8 @@ import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 
 import Table from '~/components/Table.vue'
+import DeleteOrgDialog from './DeleteOrgDialog.vue'
+import IconSearch from '~icons/ic/round-search?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -22,6 +24,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import { hasExactlyOneMatch } from '~/utils/arrayUtils.ts'
 
 const { t } = useI18n()
+const router = useRouter()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const supabase = useSupabase()
@@ -32,6 +35,7 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
+
 
 // Permission modal state
 const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()
@@ -48,6 +52,11 @@ const captchaToken = ref('')
 const captchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const isSubmittingInvite = ref(false)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const dialogRef = ref()
+
+// Super Admin Delegation modal
+const selectedUserToDelegateAdmin = ref()
+const searchUserForAdminDelegation = ref('')
 
 const members = ref([] as ExtendedOrganizationMembers)
 
@@ -79,6 +88,22 @@ const permissionOptions = computed(() => {
   if (isSuperAdmin()) {
     options.push({ label: t('key-super-admin'), value: 'super_admin' })
   }
+
+  return options
+})
+
+const membersOptions = computed(() => {
+  if (!searchUserForAdminDelegation) {
+    return
+  }
+
+  const searchLower = searchUserForAdminDelegation.value.toLowerCase()
+  const options = members.value
+    .filter(m => m.role !== 'super_admin')
+    .filter(m => m.email.toLowerCase().includes(searchLower))
+    .map((m) => {
+      return { label: m.email, value: m.id }
+    })
 
   return options
 })
@@ -358,39 +383,71 @@ async function didCancel() {
 }
 
 async function cannotDeleteOwner() {
-  displayStore.dialogOption = {
-    header: t('alert-cannot-delete-owner-title'),
-    message: `${t('alert-cannot-delete-owner-body')}`,
+  dialogStore.openDialog({
+    title: t('alert-cannot-delete-owner-title'),
+    description: `${t('alert-cannot-delete-owner-body')}`,
+    size: 'xl',
     buttons: [
       {
-        text: t('ok'),
-        role: 'ok',
-        id: 'confirm-button',
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('delete-org'),
+        role: 'danger',
+        handler: () => {
+          dialogRef.value?.open()
+        },
+      },
+      {
+        text: t('delegate-super-admin-title'),
+        role: 'secondary',
+        handler: () => {
+          dialogStore.openDialog({
+            title: t('delegate-super-admin-title'),
+            description: t('select-user-delegate-admin'),
+            size: 'xl',
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('delegate'),
+                role: 'primary',
+                id: 'confirm-button',
+                handler: () => {
+                  if (!selectedUserToDelegateAdmin.value) {
+                    toast.error(t('please-select-user'))
+                    return false
+                  }
+
+                  // get member from id
+                  const selectedUser = members.value.filter(m => m.id === selectedUserToDelegateAdmin.value)[0]
+                  // set user to super admin
+                  _changeMemberPermission(selectedUser, 'super_admin')
+                  selectedUserToDelegateAdmin.value = null
+                  // get current member
+                  const currentMember = members.value.filter(m => m.uid === main.user?.id )[0]
+                  // delete current member from org
+                  _deleteMember(currentMember)
+                  // redirect to /app
+                  router.push('/app')
+
+                  return true
+                }
+              },
+            ],
+          })
+        },
       },
     ],
-  }
-  displayStore.showDialog = true
-  const didCancel = await displayStore.onDialogDismiss()
-  return didCancel
+  })
 }
 
-async function deleteMember(member: ExtendedOrganizationMember) {
-  if (hasExactlyOneMatch(members.value, 'role', m => m.role === 'super_admin' && m.uid === member.uid)) {
-    await cannotDeleteOwner()
-    return
-  }
-
-  else if (await didCancel()) {
-    console.log('Member deletion cancelled.')
-    return
-  }
-
-  else if (member.aid === 0) {
-    toast.error(t('cannot-delete-owner'))
-    return
-  }
-
+async function _deleteMember(member: ExtendedOrganizationMember) {
   isLoading.value = true
+
   try {
     if (member.is_tmp) {
       // Handle invitation rescinding for temporary users
@@ -409,7 +466,11 @@ async function deleteMember(member: ExtendedOrganizationMember) {
       if (member.uid === main.user?.id) {
         console.log('Current user deleted themselves from the org.')
         await organizationStore.fetchOrganizations()
-        organizationStore.setCurrentOrganizationToMain()
+        try {
+          organizationStore.setCurrentOrganizationToMain()
+        } catch {
+          organizationStore.setCurrentOrganizationToFirst()
+        }
       }
       else {
         await reloadData()
@@ -425,14 +486,26 @@ async function deleteMember(member: ExtendedOrganizationMember) {
   }
 }
 
-async function changeMemberPermission(member: ExtendedOrganizationMember) {
-  const perm = await showPermModal(member.role.includes('invite'))
-
-  if (!perm) {
-    console.log('Permission change cancelled.')
+async function deleteMember(member: ExtendedOrganizationMember) {
+  if (hasExactlyOneMatch(members.value, 'role', m => m.role === 'super_admin' && m.uid === member.uid)) {
+    await cannotDeleteOwner()
     return
   }
 
+  else if (await didCancel()) {
+    console.log('Member deletion cancelled.')
+    return
+  }
+
+  else if (member.aid === 0) {
+    toast.error(t('cannot-delete-owner'))
+    return
+  }
+
+  _deleteMember(member)
+}
+
+async function _changeMemberPermission(member: ExtendedOrganizationMember, perm: Database['public']['Enums']['user_min_right']) {
   isLoading.value = true
   try {
     if (member.is_tmp) {
@@ -480,6 +553,17 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
   finally {
     isLoading.value = false
   }
+}
+
+async function changeMemberPermission(member: ExtendedOrganizationMember) {
+  const perm = await showPermModal(member.role.includes('invite'))
+
+  if (!perm) {
+    console.log('Permission change cancelled.')
+    return
+  }
+
+  _changeMemberPermission(member, perm)
 }
 
 function acronym(email: string) {
@@ -563,6 +647,12 @@ function handleFormKitPermissionSelection(value: string | undefined) {
     return
   const permission = value as Database['public']['Enums']['user_min_right']
   handlePermissionSelection(permission, isInvitePermissionModal.value)
+}
+
+function delegateSuperAdmin(value: string | undefined) {
+  if (!value)
+    return
+  selectedUserToDelegateAdmin.value = value
 }
 
 async function showInviteNewUserDialog(email: string, roleType: Database['public']['Enums']['user_min_right']) {
@@ -799,6 +889,44 @@ async function handleInviteNewUserSubmit() {
         </div>
       </div>
     </Teleport>
+
+    <!-- Teleport for super admin delegation -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('delegate-super-admin-title')" defer to="#dialog-v2-content">
+      <div class="w-full">
+        <div class="flex md:w-auto overflow-hidden mb-5">
+          <FormKit
+            v-model="searchUserForAdminDelegation"
+            :placeholder="t('search-by-name-or-email')"
+            :prefix-icon="IconSearch"
+            :disabled="isLoading"
+            enterkeyhint="send"
+            :classes="{
+              outer: 'mb-0! md:w-90',
+              inner: 'rounded-full! py-1.5!',
+            }"
+          />
+        </div>
+        <div class="border rounded-lg p-4 dark:border-gray-600">
+          <FormKit
+            v-show="membersOptions?.length > 0"
+            v-model="selectedUserToDelegateAdmin"
+            type="radio"
+            name="admin-delegation"
+            :options="membersOptions"
+            @input="delegateSuperAdmin"
+          />
+          <div v-show="membersOptions?.length === 0">
+            {{ t('no-results')  }}
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- offer possibility to directly delete organization when the last super admin want to delete himself -->
+    <DeleteOrgDialog
+      ref="dialogRef"
+      :org="currentOrganization"
+    />
   </div>
 </template>
 
