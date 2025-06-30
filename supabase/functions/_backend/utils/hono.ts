@@ -1,21 +1,21 @@
 import type { Context, Next } from '@hono/hono'
 import type { Bindings } from './cloudflare.ts'
+import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
+import { sentry } from '@hono/sentry'
+import { getRuntimeKey } from 'hono/adapter'
 import { cors } from 'hono/cors'
 import { createFactory, createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
+import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
 import { cloudlog } from './loggin.ts'
 import { cloudlogErr } from './loggin.ts'
+import { onError } from './on_error.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
 import { checkKey, checkKeyById, getEnv } from './utils.ts'
-import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
-import { Hono } from 'hono/tiny'
-import { logger } from 'hono/logger'
-import { requestId } from 'hono/request-id'
-import { sentry } from '@hono/sentry'
-import { onError } from './on_error.ts'
-import { getRuntimeKey } from 'hono/adapter'
 
 export const useCors = cors({
   origin: '*',
@@ -148,10 +148,9 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
 
 export function triggerValidator(
   table: keyof Database['public']['Tables'],
-  type: 'DELETE' | 'INSERT' | 'UPDATE'
+  type: 'DELETE' | 'INSERT' | 'UPDATE',
 ) {
   return async (c: Context, next: Next) => {
-    
     try {
       const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
 
@@ -168,26 +167,30 @@ export function triggerValidator(
       // Store the validated body in context for next middleware
       if (body.type === 'DELETE' && body.old_record) {
         c.set('webhookBody', body.old_record)
-      } else if (body.type === 'INSERT' && body.record) {
+      }
+      else if (body.type === 'INSERT' && body.record) {
         c.set('webhookBody', body.record)
-      } else if (body.type === 'UPDATE' && body.record) {
+      }
+      else if (body.type === 'UPDATE' && body.record) {
         c.set('webhookBody', body.record)
-      } else {
+      }
+      else {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid webhook payload' })
         return c.json({ status: 'Invalid payload' }, 400)
       }
-      
+
       await next()
-    } catch (error) {
-      cloudlog({ 
-        requestId: c.get('requestId'), 
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
         message: 'Invalid webhook payload',
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       })
       return c.json({ status: 'Invalid payload' }, 400)
     }
   }
-} 
+}
 
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
   const subMiddlewareKey = createMiddleware(async (c, next) => {
@@ -269,12 +272,13 @@ export const middlewareAPISecret = createMiddleware(async (c, next) => {
 
 export const BRES = { status: 'ok' }
 
-export const createHono = (functionName: string, version: string, sentryDsn?: string) => {
+export function createHono(functionName: string, version: string, sentryDsn?: string) {
   let appGlobal
   console.log('getRuntimeKey()', getRuntimeKey())
   if (getRuntimeKey() === 'deno') {
     appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
-  } else {
+  }
+  else {
     appGlobal = new Hono<MiddlewareKeyVariables>()
   }
 
@@ -284,10 +288,10 @@ export const createHono = (functionName: string, version: string, sentryDsn?: st
       release: version,
     }) as any)
   }
-  
+
   appGlobal.use('*', logger())
   appGlobal.use('*', requestId())
-  
+
   appGlobal.post('/ok', (c) => {
     return c.json(BRES)
   })
@@ -298,7 +302,7 @@ export const createHono = (functionName: string, version: string, sentryDsn?: st
   return appGlobal
 }
 
-export const createAllCatch = (appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) => {
+export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) {
   appGlobal.all('*', (c) => {
     cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
     return c.json({ error: 'Not Found' }, 404)

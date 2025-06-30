@@ -1,5 +1,5 @@
 import { app as files } from '../_backend/private/files.ts'
-import { createHono, createAllCatch } from '../_backend/utils/hono.ts'
+import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'files'

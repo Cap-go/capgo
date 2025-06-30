@@ -1,5 +1,5 @@
 import { app } from '../_backend/plugins/updates_lite.ts'
-import { createHono, createAllCatch } from '../_backend/utils/hono.ts'
+import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'updates_lite'

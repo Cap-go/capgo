@@ -20,7 +20,7 @@ import { app as on_version_delete } from '../_backend/triggers/on_version_delete
 import { app as on_version_update } from '../_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../_backend/triggers/stripe_event.ts'
-import { createHono, createAllCatch } from '../_backend/utils/hono.ts'
+import { createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'triggers'

@@ -11,7 +11,6 @@ import { backgroundTask } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c) => {
-
   const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
