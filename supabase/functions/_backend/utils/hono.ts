@@ -1,4 +1,4 @@
-import type { Context, Next } from '@hono/hono'
+import type { Context } from '@hono/hono'
 import type { Bindings } from './cloudflare.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
@@ -150,7 +150,7 @@ export function triggerValidator(
   table: keyof Database['public']['Tables'],
   type: 'DELETE' | 'INSERT' | 'UPDATE',
 ) {
-  return async (c: Context, next: Next) => {
+  return createMiddleware(async (c, next) => {
     try {
       const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
 
@@ -189,7 +189,7 @@ export function triggerValidator(
       })
       return c.json({ status: 'Invalid payload' }, 400)
     }
-  }
+  })
 }
 
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
