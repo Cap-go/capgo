@@ -43,7 +43,6 @@ const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Dat
 const filters = ref()
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
 
-
 function findVersion(id: number, versions: { name: string, id: number }[]) {
   return versions.find(elem => elem.id === id)
 }

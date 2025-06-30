@@ -152,7 +152,7 @@ function validateEmail(email: string) {
   return String(email)
     .toLowerCase()
     .match(
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/i,
+      /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/,
     )
 }
 
