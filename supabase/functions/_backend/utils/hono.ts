@@ -274,7 +274,6 @@ export const BRES = { status: 'ok' }
 
 export function createHono(functionName: string, version: string, sentryDsn?: string) {
   let appGlobal
-  console.log('getRuntimeKey()', getRuntimeKey())
   if (getRuntimeKey() === 'deno') {
     appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
   }
