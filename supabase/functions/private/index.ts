@@ -1,9 +1,4 @@
-import type { MiddlewareKeyVariables } from '../_backend/utils/hono.ts'
-import { sentry } from '@hono/sentry'
-import { logger } from 'hono/logger'
-import { requestId } from 'hono/request-id'
-
-import { Hono } from 'hono/tiny'
+import { version } from '../_backend/utils/version.ts'
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
@@ -26,21 +21,11 @@ import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
-import { cloudlog } from '../_backend/utils/loggin.ts'
-import { onError } from '../_backend/utils/on_error.ts'
+import { createHono, createAllCatch } from '../_backend/utils/hono.ts'
 
 const functionName = 'private'
-const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
+const appGlobal = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
 
-const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
-if (sentryDsn) {
-  appGlobal.use('*', sentry({
-    dsn: sentryDsn,
-  }) as any)
-}
-
-appGlobal.use('*', logger())
-appGlobal.use('*', requestId())
 
 // Webapps API
 
@@ -65,9 +50,6 @@ appGlobal.route('/latency_postres', latency_postres)
 appGlobal.route('/events', events)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
-appGlobal.all('*', (c) => {
-  cloudlog({ requestId: c.get('requestId'), message: 'Not found', url: c.req.url })
-  return c.json({ error: 'Not Found' }, 404)
-})
-appGlobal.onError(onError(functionName))
+
+createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

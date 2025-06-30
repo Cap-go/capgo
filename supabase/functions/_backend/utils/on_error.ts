@@ -5,7 +5,7 @@ import { backgroundTask, getEnv } from './utils.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: any) => {
-    cloudlog({ requestId: c.get('requestId'), message: 'app onError', error: e })
+    cloudlog({ requestId: c.get('requestId'), functionName, message: 'app onError', error: e })
     c.get('sentry')?.captureException(e)
 
     const requestId = c.get('requestId') || 'unknown'
@@ -79,7 +79,7 @@ export function onError(functionName: string) {
       ],
     }))
     if (e instanceof HTTPException) {
-      cloudlog({ requestId: c.get('requestId'), message: 'HTTPException found', status: e.status })
+      cloudlog({ requestId: c.get('requestId'), functionName, message: 'HTTPException found', status: e.status })
       if (e.status === 429) {
         return c.json({ error: 'you are beeing rate limited' }, e.status)
       }

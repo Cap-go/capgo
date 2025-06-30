@@ -1,29 +1,10 @@
-import type { MiddlewareKeyVariables } from '../_backend/utils/hono.ts'
-import { sentry } from '@hono/sentry'
-import { logger } from 'hono/logger'
-import { requestId } from 'hono/request-id'
-import { Hono } from 'hono/tiny'
 import { app } from '../_backend/public/ok.ts'
-import { cloudlog } from '../_backend/utils/loggin.ts'
-import { onError } from '../_backend/utils/on_error.ts'
+import { createHono, createAllCatch } from '../_backend/utils/hono.ts'
+import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'ok'
-const appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
+const appGlobal = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
 
-const sentryDsn = Deno.env.get('SENTRY_DSN_SUPABASE')
-if (sentryDsn) {
-  appGlobal.use('*', sentry({
-    dsn: Deno.env.get('SENTRY_DSN_SUPABASE'),
-  }) as any)
-}
-
-appGlobal.use('*', logger())
-appGlobal.use('*', requestId())
 appGlobal.route('/', app)
-
-appGlobal.all('*', (c) => {
-  cloudlog({ requestId: c.get('requestId'), message: 'Not found', url: c.req.url })
-  return c.json({ error: 'Not Found' }, 404)
-})
-appGlobal.onError(onError(functionName))
+createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

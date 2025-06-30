@@ -10,6 +10,12 @@ import { cloudlogErr } from './loggin.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
 import { checkKey, checkKeyById, getEnv } from './utils.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
+import { Hono } from 'hono/tiny'
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
+import { sentry } from '@hono/sentry'
+import { onError } from './on_error.ts'
+import { getRuntimeKey } from 'hono/adapter'
 
 export const useCors = cors({
   origin: '*',
@@ -140,7 +146,6 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   })
 }
 
-
 export function triggerValidator(
   table: keyof Database['public']['Tables'],
   type: 'DELETE' | 'INSERT' | 'UPDATE'
@@ -263,3 +268,40 @@ export const middlewareAPISecret = createMiddleware(async (c, next) => {
 })
 
 export const BRES = { status: 'ok' }
+
+export const createHono = (functionName: string, version: string, sentryDsn?: string) => {
+  let appGlobal
+  console.log('getRuntimeKey()', getRuntimeKey())
+  if (getRuntimeKey() === 'deno') {
+    appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
+  } else {
+    appGlobal = new Hono<MiddlewareKeyVariables>()
+  }
+
+  if (sentryDsn) {
+    appGlobal.use('*', sentry({
+      dsn: sentryDsn,
+      release: version,
+    }) as any)
+  }
+  
+  appGlobal.use('*', logger())
+  appGlobal.use('*', requestId())
+  
+  appGlobal.post('/ok', (c) => {
+    return c.json(BRES)
+  })
+  appGlobal.post('/ko', (c) => {
+    return c.json({ status: 'KO' }, 500)
+  })
+
+  return appGlobal
+}
+
+export const createAllCatch = (appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) => {
+  appGlobal.all('*', (c) => {
+    cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
+    return c.json({ error: 'Not Found' }, 404)
+  })
+  appGlobal.onError(onError(functionName))
+}
