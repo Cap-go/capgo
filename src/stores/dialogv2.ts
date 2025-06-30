@@ -52,8 +52,7 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
     return new Promise((resolve) => {
       const unwatch = watch(showDialog, (val) => {
         if (!val) {
-          resolve(dialogCanceled.value)
-          dialogCanceled.value = false
+          closeDialog()
           unwatch()
         }
       })

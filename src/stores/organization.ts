@@ -224,6 +224,19 @@ export const useOrganizationStore = defineStore('organization', () => {
     return _organizations.value
   }
 
+  const deleteOrganization = async (orgId: string) => {
+    const { data, error } = await supabase.from('orgs')
+      .delete()
+      .eq('id', orgId)
+
+    if (error) {
+      console.error('org del err', error)
+      return { data: null, error }
+    }
+
+    return { data, error: null }
+  }
+
   return {
     organizations,
     currentOrganization,
@@ -241,5 +254,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     dedupFetchOrganizations,
     getOrgByAppId,
     awaitInitialLoad,
+    deleteOrganization,
   }
 })

@@ -268,7 +268,7 @@ async function copyOrganizationId() {
                 {{ t('organization-id') }}
               </p>
               <div class="pt-2 md:pt-0 md:ml-6">
-                <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+                <button type="button" class="btn px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
@@ -278,7 +278,7 @@ async function copyOrganizationId() {
             <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
+                  class="btn text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
                   color="secondary"
                   shape="round"
                   type="button"
