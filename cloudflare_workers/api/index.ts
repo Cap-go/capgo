@@ -47,7 +47,7 @@ import { createAllCatch, createHono } from '../../supabase/functions/_backend/ut
 
 // Public API
 const functionName = 'api'
-const app = createHono(functionName, version)
+const app = createHono(functionName, version, process.env.SENTRY_DSN)
 app.route('/ok', ok)
 app.route('/apikey', apikey)
 app.route('/bundle', bundle)

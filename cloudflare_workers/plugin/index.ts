@@ -10,7 +10,7 @@ import { createAllCatch, createHono } from '../../supabase/functions/_backend/ut
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
 const functionName = 'plugin'
-const app = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
+const app = createHono(functionName, version, process.env.SENTRY_DSN)
 
 // Plugin API
 app.route('/plugin/ok', ok)
