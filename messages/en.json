@@ -689,5 +689,11 @@
   "your-ussage": "Your usage:",
   "zip-bundle": "Zip app bundle",
   "alert-cannot-delete-owner-title": "Cannot delete the last super admin user",
-  "alert-cannot-delete-owner-body": "You cannot delete this user because they are the last super admin of this organization. You can either assign the super admin role to another user or delete the organization from the ‘General Information’ section of the organization."
+  "alert-cannot-delete-owner-body": "You cannot delete this user because they are the last super admin of this organization. You can either assign the super admin role to another user or delete the organization from the ‘General Information’ section of the organization.",
+  "delegate-super-admin-title": "Delegate super admin",
+  "select-user-delegate-admin": "Select a user to give the super admin role to:",
+  "delegate": "Delegate",
+  "please-select-user": "Please select a user",
+  "no-results": "No results found",
+  "please-select-permission": "Please select a permission"
 }

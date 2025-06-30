@@ -687,5 +687,13 @@
   "your-role-in-org": "組織におけるあなたの役割",
   "your-settings": "あなたの設定",
   "your-ussage": "あなたの使用法：",
-  "zip-bundle": "Zipアプリバンドル"
+  "zip-bundle": "Zipアプリバンドル",
+  "alert-cannot-delete-owner-body": "このユーザーはこの組織の最後のスーパー管理者であるため、このユーザーを削除することはできません。\nスーパー管理者の役割を別のユーザーに割り当てるか、組織の「一般情報」セクションから組織を削除することができます。",
+  "alert-cannot-delete-owner-title": "最後のスーパー管理者ユーザーを削除できません",
+  "delegate": "委任",
+  "delegate-super-admin-title": "委任スーパー管理者",
+  "no-results": "結果は見つかりませんでした",
+  "please-select-user": "ユーザーを選択してください",
+  "select-user-delegate-admin": "ユーザーを選択して、スーパー管理者の役割を次のようにします。",
+  "please-select-permission": "許可を選択してください"
 }

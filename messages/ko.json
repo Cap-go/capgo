@@ -687,5 +687,13 @@
   "your-role-in-org": "조직에서의 당신의 역할",
   "your-settings": "당신의 설정",
   "your-ussage": "당신의 사용량:",
-  "zip-bundle": "지프 앱 번들"
+  "zip-bundle": "지프 앱 번들",
+  "alert-cannot-delete-owner-body": "이 사용자는이 조직의 마지막 슈퍼 관리자 이므로이 사용자를 삭제할 수 없습니다. \n슈퍼 관리자 역할을 다른 사용자에게 할당하거나 조직의 '일반 정보'섹션에서 조직을 삭제할 수 있습니다.",
+  "alert-cannot-delete-owner-title": "마지막 슈퍼 관리자 사용자를 삭제할 수 없습니다",
+  "delegate": "대리자",
+  "delegate-super-admin-title": "슈퍼 슈퍼 관리자",
+  "no-results": "결과가 없습니다",
+  "please-select-user": "사용자를 선택하십시오",
+  "select-user-delegate-admin": "슈퍼 관리자 역할을 할 사용자를 선택하십시오.",
+  "please-select-permission": "허가를 선택하십시오"
 }

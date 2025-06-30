@@ -689,5 +689,11 @@
   "your-ussage": "您的使用情况：",
   "zip-bundle": "ZIP应用程序包",
   "alert-cannot-delete-owner-title": "无法删除最后一个超级管理员用户",
-  "alert-cannot-delete-owner-body": "您无法删除此用户，因为他们是该组织的最后一个超级管理员。\n您可以将超级管理员角色分配给另一个用户，也可以从组织的“一般信息”部分中删除组织。"
+  "alert-cannot-delete-owner-body": "您无法删除此用户，因为他们是该组织的最后一个超级管理员。\n您可以将超级管理员角色分配给另一个用户，也可以从组织的“一般信息”部分中删除组织。",
+  "delegate": "代表",
+  "delegate-super-admin-title": "委托超级管理员",
+  "no-results": "找不到结果",
+  "please-select-user": "请选择用户",
+  "select-user-delegate-admin": "选择用户将超级管理员角色赋予：",
+  "please-select-permission": "请选择许可"
 }
