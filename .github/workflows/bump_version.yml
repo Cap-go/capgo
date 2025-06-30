@@ -30,6 +30,8 @@ jobs:
       - name: Create bump and changelog
         if: github.ref != 'refs/heads/main'
         run: bun x standard-version --prerelease alpha
+      - name: Add version.ts to commit
+        run: git add supabase/functions/_backend/utils/version.ts
       - name: Push to origin
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
