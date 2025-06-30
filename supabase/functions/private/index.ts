@@ -15,7 +15,7 @@ import { app as events } from '../_backend/private/events.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as latency_drizzle } from '../_backend/private/latency_drizzle.ts'
-import { app as latency_postres } from '../_backend/private/latency_postres.ts'
+import { app as latency_postres } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'

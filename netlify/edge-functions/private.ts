@@ -12,7 +12,7 @@ import { app as download_link } from '../../supabase/functions/_backend/private/
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
-import { app as latency_postres } from '../../supabase/functions/_backend/private/latency_postres.ts'
+import { app as latency_postres } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
