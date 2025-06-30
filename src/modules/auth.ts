@@ -89,7 +89,7 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
       notify: false,
     }).catch()
 
-    if ((!main.auth?.user_metadata?.activation || !main.auth?.user_metadata?.activation.legal) && !to.path.includes('/onboarding') && !from.path.includes('/onboarding'))
+    if ((!main.auth?.user_metadata?.activation?.legal) && !to.path.includes('/onboarding') && !from.path.includes('/onboarding'))
       next('/onboarding/activation')
     else
       next()

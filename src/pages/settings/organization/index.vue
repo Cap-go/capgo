@@ -73,7 +73,7 @@ async function presentActionSheet() {
 async function updateEmail(form: { email: string }) {
   if (!currentOrganization.value)
     return false
-  const orgCopy = Object.assign({}, currentOrganization.value)
+  const orgCopy = { ...currentOrganization.value }
 
   const { error } = await supabase.functions.invoke('private/set_org_email', {
     body: {
@@ -120,7 +120,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
     return
   }
 
-  const orgCopy = Object.assign({}, currentOrganization.value)
+  const orgCopy = { ...currentOrganization.value }
 
   // Optimistic update
   currentOrganization.value.name = form.orgName
@@ -159,15 +159,15 @@ const hasOrgPerm = computed(() => {
 })
 
 const acronym = computed(() => {
-  const res = 'N/A'
+  let res = 'N/A'
   // use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
-  // if (currentOrganization.value?.name) {
-  //   const words = currentOrganization.value.name.split(' ')
-  //   if (words.length > 1)
-  //     res = words[0][0] + words[1][0]
-  //   else
-  //     res = words[0].slice(0, 2)
-  // }
+  if (currentOrganization.value?.name) {
+    const words = currentOrganization.value.name.split(' ')
+    if (words.length > 1)
+      res = words[0][0] + words[1][0]
+    else
+      res = words[0].slice(0, 2)
+  }
   return res.toUpperCase()
 })
 

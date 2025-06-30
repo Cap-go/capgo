@@ -36,11 +36,11 @@ interface Step {
 }
 
 const config = getLocalConfig()
-
+const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
 const steps = ref<Step[]>([
   {
     title: t('add-another-bundle'),
-    command: `npx @capgo/cli@latest bundle upload -a [APIKEY]${isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``}`,
+    command: `npx @capgo/cli@latest bundle upload -a [APIKEY]${localCommand}`,
     subtitle: '',
   },
   {
