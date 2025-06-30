@@ -1,30 +1,16 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { DeletePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c) => {
+app.post('/', middlewareAPISecret, triggerValidator('users', 'DELETE'), async (c) => {
   try {
-    const table: keyof Database['public']['Tables'] = 'users'
-    const body = await c.req.json<DeletePayload<typeof table>>()
-
-    if (body.table !== table) {
-      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
-      return c.json({ status: `Not ${table}` }, 200)
-    }
-
-    if (body.type !== 'DELETE') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Not DELETE' })
-      return c.json({ status: 'Not DELETE' }, 200)
-    }
-
-    const record = body.old_record
+    const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
     cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record || !record.id) {

@@ -1,9 +1,8 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -11,26 +10,17 @@ import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c) => {
+app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c) => {
+
+  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row']
+  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+
+  if (!record.id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No id' })
+    return c.json(BRES)
+  }
+
   try {
-    const table: keyof Database['public']['Tables'] = 'apps'
-    const body = await c.req.json<InsertPayload<typeof table>>()
-    if (body.table !== table) {
-      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
-      return c.json({ status: `Not ${table}` }, 200)
-    }
-    if (body.type !== 'INSERT') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Not INSERT' })
-      return c.json({ status: 'Not INSERT' }, 200)
-    }
-    const record = body.record
-    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
-
-    if (!record.id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-      return c.json(BRES)
-    }
-
     const LogSnag = logsnag(c as any)
     await backgroundTask(c as any, LogSnag.track({
       channel: 'app-created',

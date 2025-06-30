@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context, Next } from '@hono/hono'
 import type { Bindings } from './cloudflare.ts'
 import type { Database } from './supabase.types.ts'
 import { cors } from 'hono/cors'
@@ -9,6 +9,7 @@ import { cloudlog } from './loggin.ts'
 import { cloudlogErr } from './loggin.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
 import { checkKey, checkKeyById, getEnv } from './utils.ts'
+import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 
 export const useCors = cors({
   origin: '*',
@@ -33,6 +34,7 @@ export interface MiddlewareKeyVariables {
     APISecret?: string
     auth?: AuthInfo
     subkey?: Database['public']['Tables']['apikeys']['Row']
+    webhookBody?: any
   }
 }
 
@@ -137,6 +139,50 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
     await next()
   })
 }
+
+
+export function triggerValidator(
+  table: keyof Database['public']['Tables'],
+  type: 'DELETE' | 'INSERT' | 'UPDATE'
+) {
+  return async (c: Context, next: Next) => {
+    
+    try {
+      const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
+
+      if (body.table !== String(table)) {
+        cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
+        return c.json({ status: `Not ${String(table)}` }, 200)
+      }
+
+      if (body.type !== type) {
+        cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
+        return c.json({ status: `Not ${type}` }, 200)
+      }
+
+      // Store the validated body in context for next middleware
+      if (body.type === 'DELETE' && body.old_record) {
+        c.set('webhookBody', body.old_record)
+      } else if (body.type === 'INSERT' && body.record) {
+        c.set('webhookBody', body.record)
+      } else if (body.type === 'UPDATE' && body.record) {
+        c.set('webhookBody', body.record)
+      } else {
+        cloudlog({ requestId: c.get('requestId'), message: 'Invalid webhook payload' })
+        return c.json({ status: 'Invalid payload' }, 400)
+      }
+      
+      await next()
+    } catch (error) {
+      cloudlog({ 
+        requestId: c.get('requestId'), 
+        message: 'Invalid webhook payload',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return c.json({ status: 'Invalid payload' }, 400)
+    }
+  }
+} 
 
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
   const subMiddlewareKey = createMiddleware(async (c, next) => {

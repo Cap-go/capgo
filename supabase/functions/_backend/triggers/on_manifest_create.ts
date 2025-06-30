@@ -1,9 +1,8 @@
 import type { Context } from '@hono/hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { InsertPayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -34,19 +33,9 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c) => {
+app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), async (c) => {
   try {
-    const table: keyof Database['public']['Tables'] = 'manifest'
-    const body = await c.req.json<InsertPayload<typeof table>>()
-    if (body.table !== table) {
-      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
-      return c.json({ status: `Not ${table}` }, 200)
-    }
-    if (body.type !== 'INSERT') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Not INSERT' })
-      return c.json({ status: 'Not INSERT' }, 200)
-    }
-    const record = body.record
+    const record = c.get('webhookBody') as Database['public']['Tables']['manifest']['Row']
     cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
     if (!record.app_version_id || !record.s3_path) {
@@ -54,7 +43,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
-    return updateManifestSize(c as any, body.record as any)
+    return updateManifestSize(c as any, record)
   }
   catch (e) {
     return c.json({ status: 'Cannot update manifest size', error: JSON.stringify(e) }, 500)
