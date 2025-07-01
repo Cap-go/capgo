@@ -1,4 +1,5 @@
 import type { Context } from '@hono/hono'
+import type { ContentfulStatusCode } from '@hono/http-status'
 import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
 import type { StripeData } from './stripe.ts'
@@ -7,7 +8,7 @@ import type { Database } from './supabase.types.ts'
 import { sentry } from '@hono/sentry'
 import { getRuntimeKey } from 'hono/adapter'
 import { cors } from 'hono/cors'
-import { createFactory, createMiddleware } from 'hono/factory'
+import { createFactory } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
@@ -126,7 +127,7 @@ async function foundJWT(c: Context, jwt: string) {
 }
 
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
-  return createMiddleware(async (c, next) => {
+  return honoFactory.createMiddleware(async (c, next) => {
     let jwt = c.req.header('authorization')
     let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
 
@@ -155,7 +156,7 @@ export function triggerValidator(
   table: keyof Database['public']['Tables'],
   type: 'DELETE' | 'INSERT' | 'UPDATE',
 ) {
-  return createMiddleware(async (c, next) => {
+  return honoFactory.createMiddleware(async (c, next) => {
     try {
       const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
 
@@ -198,7 +199,7 @@ export function triggerValidator(
 }
 
 export function middlewareStripeWebhook() {
-  return createMiddleware(async (c, next) => {
+  return honoFactory.createMiddleware(async (c, next) => {
     if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       throw new HTTPException(400, { message: 'Webhook Error: no secret found' })
@@ -224,7 +225,7 @@ export function middlewareStripeWebhook() {
 }
 
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
-  const subMiddlewareKey = createMiddleware(async (c, next) => {
+  const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
@@ -274,7 +275,7 @@ export async function getBody<T>(c: Context<MiddlewareKeyVariables, '/' | '/:pat
   return body
 }
 
-export const middlewareAuth = createMiddleware(async (c, next) => {
+export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
@@ -284,7 +285,7 @@ export const middlewareAuth = createMiddleware(async (c, next) => {
   await next()
 })
 
-export const middlewareAPISecret = createMiddleware(async (c, next) => {
+export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) => {
   const authorizationSecret = c.req.header('apisecret')
   const API_SECRET = getEnv(c as any, 'API_SECRET')
 
@@ -338,4 +339,23 @@ export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, function
     return c.json({ error: 'Not Found' }, 404)
   })
   appGlobal.onError(onError(functionName))
+}
+
+export interface SimpleErrorResponse {
+  errorCode: string
+  message: string
+  cause?: any
+  moreInfo?: any
+}
+
+export function simpleError(status: ContentfulStatusCode, errorCode: string, message: string, moreInfo: any, cause?: any) {
+  // const safeCause = cause ? JSON.stringify(cause, Object.getOwnPropertyNames(cause)) : undefined
+  const res: SimpleErrorResponse = {
+    errorCode,
+    message,
+    moreInfo,
+    // cause: safeCause,
+  }
+  console.log('res of simpleError', res)
+  return new HTTPException(status, { res: new Response(JSON.stringify(res), { status }) })
 }

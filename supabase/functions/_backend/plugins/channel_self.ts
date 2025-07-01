@@ -5,10 +5,12 @@ import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
+import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { BRES, getBody } from '../utils/hono.ts'
+import { BRES, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, fixSemver, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
@@ -65,11 +67,9 @@ export const listChannelsQuerySchema = z.object({
 
 async function post(c: Context, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
-  let {
+  const {
     version_name,
     version_build,
-  } = body
-  const {
     platform,
     app_id,
     channel,
@@ -79,17 +79,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     custom_id,
     is_emulator = false,
     is_prod = true,
-  } = body
-  const coerce = tryParse(fixSemver(version_build))
-  if (!coerce) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
-    return c.json({
-      message: `Native version: ${version_build} doesn't follow semver convention, please follow https://semver.org to allow Capgo compare version number`,
-      error: 'semver_error',
-    }, 400)
-  }
-  version_build = format(coerce)
-  version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
+  } = parsePluginBody(c, body)
 
   const { data: versions } = await supabaseAdmin(c)
     .from('app_versions')
@@ -488,10 +478,7 @@ async function listCompatibleChannels(c: Context, queryParams: { app_id: string,
 
   if (!appData) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', app_id })
-    return c.json({
-      message: `App ${app_id} not found`,
-      error: 'app_not_found',
-    }, 400)
+    throw new HTTPException(400, { message: `App ${app_id} not found`, res: new Response(JSON.stringify({ error: 'app_not_found' }), { status: 400 }) })
   }
 
   if (!(await isAllowedActionOrg(c, appData.owner_org))) {
@@ -523,10 +510,7 @@ async function listCompatibleChannels(c: Context, queryParams: { app_id: string,
 
   if (channelsError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot fetch channels', channelsError })
-    return c.json({
-      message: 'Cannot fetch channels',
-      error: 'database_error',
-    }, 500)
+    throw simpleError(500, 'database_error', 'Cannot fetch channels', {}, channelsError)
   }
 
   if (!channels || channels.length === 0) {
@@ -549,72 +533,62 @@ async function listCompatibleChannels(c: Context, queryParams: { app_id: string,
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  try {
-    const body = await c.req.json<DeviceLink>()
-    const parseResult = jsonRequestSchema.safeParse(body)
-    if (!parseResult.success) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
-      return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
-    }
-    cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
-    return post(c as any, body)
+  const body = await c.req.json<DeviceLink>()
+    .catch((e) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: e })
+      throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
+    })
+  const parseResult = jsonRequestSchema.safeParse(body)
+  if (!parseResult.success) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'post channel self', error: parseResult.error })
+    throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, parseResult.error)
   }
-  catch (e) {
-    return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
-  }
+  cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
+  return post(c as any, body)
 })
 
 app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
-  try {
-    const body = await c.req.json<DeviceLink>()
-    cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
-    return put(c as any, body)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot self get channel', error: JSON.stringify(e) }, 500)
-  }
+  const body = await c.req.json<DeviceLink>()
+    .catch((e) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'put channel self', error: e })
+      throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
+    })
+  cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
+  return put(c as any, body)
 })
 
 app.delete('/', async (c) => {
-  try {
-    const body = await getBody<DeviceLink>(c as any)
-    // const body = await c.req.json<DeviceLink>()
-    cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
-    return deleteOverride(c as any, body)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
-  }
+  const body = await c.req.json<DeviceLink>()
+    .catch((e) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'delete channel self', error: e })
+      throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
+    })
+  cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
+  return deleteOverride(c as any, body)
 })
 
 app.get('/', (c) => {
-  try {
-    const query = c.req.query()
+  const query = c.req.query()
 
-    // If no query parameters, return status
-    if (!query.app_id) {
-      return c.json({ status: 'ok' })
-    }
-
-    // Parse and validate query parameters
-    const parseResult = listChannelsQuerySchema.safeParse({
-      app_id: query.app_id,
-      platform: query.platform,
-      is_emulator: query.is_emulator === 'true',
-      is_prod: query.is_prod !== 'false', // default to true unless explicitly false
-    })
-
-    if (!parseResult.success) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'list channels query validation failed', error: parseResult.error })
-      return c.json({ error: `Invalid query parameters: ${parseResult.error}` }, 400)
-    }
-
-    cloudlog({ requestId: c.get('requestId'), message: 'list channels query', query: parseResult.data })
-    return listCompatibleChannels(c as any, parseResult.data)
+  // If no query parameters, return status
+  if (!query.app_id) {
+    return c.json({ status: 'ok' })
   }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'list channels error', error: e })
-    return c.json({ status: 'Cannot list channels', error: JSON.stringify(e) }, 500)
+
+  // Parse and validate query parameters
+  const parseResult = listChannelsQuerySchema.safeParse({
+    app_id: query.app_id,
+    platform: query.platform,
+    is_emulator: query.is_emulator === 'true',
+    is_prod: query.is_prod !== 'false', // default to true unless explicitly false
+  })
+
+  if (!parseResult.success) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'list channels query validation failed', error: parseResult.error })
+    throw simpleError(400, 'invalid_query_parameters', 'Invalid query parameters', { error: parseResult.error })
   }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'list channels query', query: parseResult.data })
+  return listCompatibleChannels(c as any, parseResult.data)
 })

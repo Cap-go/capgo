@@ -1,11 +1,12 @@
 import { HTTPException } from 'hono/http-exception'
 import { sendDiscordAlert } from './discord.ts'
-import { cloudlog } from './loggin.ts'
+import { cloudlogErr } from './loggin.ts'
 import { backgroundTask, getEnv } from './utils.ts'
+import { SimpleErrorResponse } from './hono.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: any) => {
-    cloudlog({ requestId: c.get('requestId'), functionName, message: 'app onError', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'app onError', error: e })
     c.get('sentry')?.captureException(e)
 
     const requestId = c.get('requestId') ?? 'unknown'
@@ -19,7 +20,7 @@ export function onError(functionName: string) {
     let body = 'N/A'
     try {
       const clonedReq = c.req.raw.clone()
-      body = await clonedReq.text()
+      body = await clonedReq.text().catch(() => 'Failed to read body')
       if (body.length > 1000) {
         body = `${body.substring(0, 1000)}... (truncated)`
       }
@@ -31,6 +32,13 @@ export function onError(functionName: string) {
     const errorMessage = e?.message ?? 'Unknown error'
     const errorStack = e?.stack ?? 'No stack trace'
     const errorName = e?.name ?? 'Error'
+    // const safeCause = e ? JSON.stringify(e, Object.getOwnPropertyNames(e)) : undefined
+    const defaultResponse: SimpleErrorResponse = {
+      errorCode: 'unknown_error',
+      message: 'Unknown error',
+      // cause: safeCause,
+      moreInfo: {},
+    }
 
     await backgroundTask(c, sendDiscordAlert(c, {
       content: `🚨 **${functionName}** Error Alert`,
@@ -77,14 +85,19 @@ export function onError(functionName: string) {
           },
         },
       ],
-    }))
+    })).catch((e: any) => {
+      cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'sendDiscordAlert failed', error: e })
+      return
+    })
     if (e instanceof HTTPException) {
-      cloudlog({ requestId: c.get('requestId'), functionName, message: 'HTTPException found', status: e.status })
+      cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'HTTPException found', status: e.status })
       if (e.status === 429) {
         return c.json({ error: 'you are beeing rate limited' }, e.status)
       }
-      return c.json({ status: 'Internal Server Error', response: e.getResponse(), error: JSON.stringify(e), message: e.message }, e.status)
+      const res: SimpleErrorResponse = await e.getResponse().json<SimpleErrorResponse>().catch(() => (defaultResponse))
+      console.log('res of ERROR', res)
+      return c.json(res, e.status)
     }
-    return c.json({ status: 'Internal Server Error', error: JSON.stringify(e), message: e.message }, 500)
+    return c.json(defaultResponse, 500)
   }
 }
