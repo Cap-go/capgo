@@ -102,7 +102,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
   let previousProductId: string | undefined
 
   cloudlog({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
-  if (!event || !event.data || !event.data.object) {
+  if (!event?.data?.object) {
     return { data, isUpgrade, previousProductId }
   }
 

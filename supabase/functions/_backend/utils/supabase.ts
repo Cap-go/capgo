@@ -179,7 +179,7 @@ export async function checkAppOwner(c: Context, userId: string | undefined, appI
       .select()
       .eq('user_id', userId)
       .eq('app_id', appId)
-    if (!data || !data.length || error)
+    if (!data?.length || error)
       return false
     return true
   }
@@ -464,7 +464,7 @@ export async function createApiKey(c: Context, userId: string) {
     .from('apikeys')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .then(res => res.count || null)
+    .then(res => res.count ?? null)
   if (total === null) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is null' })
     return
@@ -760,7 +760,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   if (period_end)
     query = query.lt('created_at', new Date(period_end).toISOString())
 
-  if (deviceIds && deviceIds.length) {
+  if (deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1)
       query = query.eq('device_id', deviceIds[0])
@@ -770,7 +770,7 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
 
   if (search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds && deviceIds.length)
+    if (deviceIds?.length)
       query = query.ilike('version_build', `${search}%`)
     else
       query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
@@ -806,7 +806,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
     .range(range_start, range_end)
     .limit(limit)
 
-  if (deviceIds && deviceIds.length) {
+  if (deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1)
       query = query.eq('device_id', deviceIds[0])
@@ -816,7 +816,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
 
   if (search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds && deviceIds.length)
+    if (deviceIds?.length)
       query = query.ilike('custom_id', `${search}%`)
     else
       query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)

@@ -83,7 +83,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
-    if (!subkey && subkey_id) {
+    if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       throw new HTTPException(401, { message: 'Invalid subkey' })
     }
@@ -91,7 +91,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
       cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
       throw new HTTPException(401, { message: 'Invalid subkey' })
     }
-    if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
+    if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
       throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
     }
@@ -197,7 +197,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
-    const key = capgkey_string || apikey_string
+    const key = capgkey_string ?? apikey_string
     if (!key) {
       cloudlog('No key provided')
       throw new HTTPException(401, { message: 'No key provided' })
@@ -211,11 +211,11 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     c.set('capgkey', key)
     if (subkey_id) {
       const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
-      if (!subkey && subkey_id) {
+      if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         throw new HTTPException(401, { message: 'Invalid subkey' })
       }
-      if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
+      if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
         throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
       }

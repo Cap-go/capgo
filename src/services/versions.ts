@@ -16,38 +16,33 @@ export async function openVersion(app: Database['public']['Tables']['app_version
   else
     signedURL = app.external_url
 
-  if (signedURL && Capacitor.isNativePlatform()) {
-    showLoader()
-    try {
-      // const newBundle = await CapacitorUpdater.download({
-      //   url: signedURL
-      // })
-      // await CapacitorUpdater.set(newBundle)
-      // comment temporary
-      const newBundle = await CapacitorUpdater.download({
-        url: signedURL,
-        version: app.name,
-      })
-      const current = await CapacitorUpdater.current()
-      // console.log('current', current)
-      await CapacitorUpdater.next({ id: current.bundle.id })
-      // // iso date in one hour with dayjs
-      const expires = dayjs().add(1, 'hour').toISOString()
-      await CapacitorUpdater.setMultiDelay({ delayConditions: [{ kind: 'date', value: expires }] })
-      await CapacitorUpdater.set(newBundle)
-    }
-    catch (error) {
-      console.error('Error', error)
-      toast.error(t('cannot-set-this-vers'))
-    }
-    hideLoader()
+  if (!signedURL) {
+    toast.error(t('cannot-get-the-test-'))
+    return
   }
-  else {
-    if (!signedURL) {
-      toast.error(t('cannot-get-the-test-'))
-    }
-    else {
-      window.location.assign(signedURL)
-    }
+  if (!Capacitor.isNativePlatform()) {
+    window.location.assign(signedURL)
+    return
   }
+  // native platform test the budnle in the app
+  showLoader()
+  try {
+    const newBundle = await CapacitorUpdater.download({
+      url: signedURL,
+      version: app.name,
+    })
+    const current = await CapacitorUpdater.current()
+    // Make the old bundle auto revert to it after 1 hour
+    await CapacitorUpdater.next({ id: current.bundle.id })
+    // iso date in one hour with dayjs
+    const expires = dayjs().add(1, 'hour').toISOString()
+    await CapacitorUpdater.setMultiDelay({ delayConditions: [{ kind: 'date', value: expires }] })
+    // set the new bundle
+    await CapacitorUpdater.set(newBundle)
+  }
+  catch (error) {
+    console.error('Error', error)
+    toast.error(t('cannot-set-this-vers'))
+  }
+  hideLoader()
 }

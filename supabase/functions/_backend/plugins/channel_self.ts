@@ -370,7 +370,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id.toLowerCase())
     .single()
-  if (dataChannelOverride && dataChannelOverride.channel_id) {
+  if (dataChannelOverride?.channel_id) {
     const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
     await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
     return c.json({
@@ -433,7 +433,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     }, 400)
   }
   version_build = format(coerce)
-
+  cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
   if (!device_id || !app_id) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id or appi_id', device_id, app_id, body })
     return c.json({ message: 'Cannot find device_id or appi_id', error: 'missing_info' }, 400)
@@ -452,7 +452,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id.toLowerCase())
     .single()
-  if (!dataChannelOverride || !dataChannelOverride.channel_id || !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
+  if (!(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot change device override current channel don\t allow it', dataChannelOverride })
     return c.json({
       message: 'Cannot change device override current channel don\t allow it',

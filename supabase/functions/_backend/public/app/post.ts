@@ -25,7 +25,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
   const dataInsert = {
     owner_org: body.owner_org,
     app_id: body.name,
-    icon_url: body.icon || '',
+    icon_url: body.icon ?? '',
     name: body.name,
     retention: 2592000,
     default_upload_channel: 'dev',

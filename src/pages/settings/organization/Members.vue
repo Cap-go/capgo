@@ -427,12 +427,11 @@ async function changeMemberPermission(member: ExtendedOrganizationMember) {
       }
 
       // Handle response codes
-      switch (data) {
-        case 'OK':
-          toast.success(t('permission-changed'))
-          break
-        default:
-          toast.warning(`${t('unexpected-response')}: ${data}`)
+      if (data === 'OK') {
+        toast.success(t('permission-changed'))
+      }
+      else {
+        toast.warning(`${t('unexpected-response')}: ${data}`)
       }
 
       await reloadData()

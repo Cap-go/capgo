@@ -30,12 +30,6 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
       subscriptionStatus: subscription.status,
     })
 
-    // // If no subscriptions found - Removed: retrieve throws error if not found
-    // if (!subscriptions.data.length) {
-    //   cloudlog({ requestId: c.get('requestId'), message: 'getSubscriptionData', message: 'No active subscriptions found for customer'  })
-    //   return null
-    // }
-
     // // Get the subscription - Removed: already have the subscription object
     // const subscription = subscriptions.data[0]
 

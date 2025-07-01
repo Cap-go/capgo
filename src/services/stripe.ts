@@ -92,7 +92,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         orgId,
       }),
     })
-    if (!resp.error && resp.data && resp.data.url)
+    if (!resp.error && resp.data?.url)
       openBlank(resp.data.url)
   }
   catch (error) {

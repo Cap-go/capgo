@@ -32,7 +32,7 @@ app.post('/', async (c) => {
       const { data: auth, error } = await supabase.auth.getUser(
         authorization?.split('Bearer ')[1],
       )
-      if (error || !auth || !auth.user) {
+      if (error || !auth?.user?.id) {
         cloudlog({ requestId: c.get('requestId'), message: 'error no auth', auth: authorization })
         return c.json({ status: 'You can\'t access this, auth not found' }, 400)
       }

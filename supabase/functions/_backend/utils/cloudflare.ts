@@ -431,7 +431,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   let deviceFilter = ''
   let rangeStart = range_start
   let rangeEnd = range_end
-  if (deviceIds && deviceIds.length) {
+  if (deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
@@ -448,7 +448,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
   let searchFilter = ''
   if (search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds && deviceIds.length)
+    if (deviceIds?.length)
       searchFilter = `AND custom_id LIKE '%${search}%')`
     else
       searchFilter = `AND (device_id LIKE '%${search}%' OR custom_id LIKE '%${search}%')`
@@ -458,7 +458,7 @@ export async function readDevicesCF(c: Context, app_id: string, range_start: num
     versionFilter = `AND version_id = ${version_id}`
 
   const orderFilters: string[] = []
-  if (order && order.length) {
+  if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
@@ -517,7 +517,7 @@ export async function readStatsCF(c: Context, app_id: string, period_start?: str
 
   let deviceFilter = ''
 
-  if (deviceIds && deviceIds.length) {
+  if (deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
     if (deviceIds.length === 1) {
       deviceFilter = `AND device_id = '${deviceIds[0]}'`
@@ -530,13 +530,13 @@ export async function readStatsCF(c: Context, app_id: string, period_start?: str
   let searchFilter = ''
   if (search) {
     const searchLower = search.toLowerCase()
-    if (deviceIds && deviceIds.length)
+    if (deviceIds?.length)
       searchFilter = `AND position('${searchLower}' IN toLower(action)) > 0`
     else
       searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0)`
   }
   const orderFilters: string[] = []
-  if (order && order.length) {
+  if (order?.length) {
     order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })

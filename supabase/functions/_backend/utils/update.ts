@@ -181,20 +181,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     device.version = versionData ? versionData.id : version.id
 
     // TODO: find better solution to check if device is from apple or google, currently not qworking in netlify-egde
-    // const xForwardedFor = headers['x-forwarded-for'] ?? ''
-    // // cloudlog(c.get('requestId'), 'xForwardedFor', xForwardedFor)
-    // const ip = xForwardedFor.split(',')[1]
-    // cloudlog(c.get('requestId'), 'IP', ip)
-    // check if version is created_at more than 4 hours
-    // const isOlderEnought = (new Date(version.created_at || Date.now()).getTime() + 4 * 60 * 60 * 1000) < Date.now()
-
-    // if (xForwardedFor && device_id !== defaultDeviceID && !isOlderEnought && await invalidIp(ip)) {
-    //   cloudlog(c.get('requestId'), 'invalid ip', xForwardedFor, ip)
-    //   return c.json({
-    //     message: `invalid ip ${xForwardedFor} ${JSON.stringify(headers)}`,
-    //     error: 'invalid_ip',
-    //   }, 400)
-    // }
 
     if (!version.external_url && !version.r2_path && version.name !== 'builtin' && (!manifestEntries || manifestEntries.length === 0)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })

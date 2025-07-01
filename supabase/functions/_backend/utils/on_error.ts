@@ -8,10 +8,10 @@ export function onError(functionName: string) {
     cloudlog({ requestId: c.get('requestId'), functionName, message: 'app onError', error: e })
     c.get('sentry')?.captureException(e)
 
-    const requestId = c.get('requestId') || 'unknown'
+    const requestId = c.get('requestId') ?? 'unknown'
     const timestamp = new Date().toISOString()
-    const userAgent = c.req.header('user-agent') || 'unknown'
-    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
+    const userAgent = c.req.header('user-agent') ?? 'unknown'
+    const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
     const method = c.req.method
     const url = c.req.url
     const headers = Object.fromEntries(c.req.raw.headers.entries())
@@ -28,9 +28,9 @@ export function onError(functionName: string) {
       body = 'Failed to read body'
     }
 
-    const errorMessage = e?.message || 'Unknown error'
-    const errorStack = e?.stack || 'No stack trace'
-    const errorName = e?.name || 'Error'
+    const errorMessage = e?.message ?? 'Unknown error'
+    const errorStack = e?.stack ?? 'No stack trace'
+    const errorName = e?.name ?? 'Error'
 
     await backgroundTask(c, sendDiscordAlert(c, {
       content: `🚨 **${functionName}** Error Alert`,

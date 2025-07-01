@@ -28,7 +28,7 @@ app.post('/', middlewareAuth, async (c) => {
     const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
       authorization?.split('Bearer ')[1],
     )
-    if (error || !auth || !auth.user)
+    if (error || !auth?.user?.id)
       return c.json({ status: 'not authorize' }, 400)
 
     const userId = auth.user.id

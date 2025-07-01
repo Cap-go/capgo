@@ -38,7 +38,7 @@ app.post('/', middlewareAuth, async (c) => {
     const supabaseClient = useSupabaseClient(c as any, authToken)
 
     const clientData = await supabaseClient.auth.getUser()
-    if (!clientData || !clientData.data || clientData.error) {
+    if (!clientData?.data?.user || clientData?.error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get supabase user', error: clientData.error })
       return c.json({ status: 'Cannot get supabase user' }, 500)
     }

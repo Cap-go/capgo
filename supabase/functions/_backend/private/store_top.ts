@@ -10,7 +10,7 @@ app.use('/', useCors)
 app.get('/', async (c) => {
   try {
     // count allapps
-    const mode = c.req.query('mode') || 'capacitor'
+    const mode = c.req.query('mode') ?? 'capacitor'
 
     const countTotal = await getTotalAppsByModeCF(c as any, mode)
     const data = await getTopAppsCF(c as any, mode, 100)
