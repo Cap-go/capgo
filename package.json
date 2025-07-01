@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.11.44",
+  "version": "12.11.70",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -119,7 +119,7 @@
     "@capgo/capacitor-mute": "^7.1.39",
     "@capgo/capacitor-native-biometric": "^7.1.7",
     "@capgo/capacitor-screen-recorder": "7.1.9",
-    "@capgo/capacitor-updater": "^7.4.0",
+    "@capgo/capacitor-updater": "^7.6.0",
     "@capgo/inappbrowser": "^7.10.0",
     "@capgo/native-audio": "^7.3.33",
     "@capgo/native-market": "^7.1.5",

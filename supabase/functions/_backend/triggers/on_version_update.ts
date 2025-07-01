@@ -10,40 +10,82 @@ import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
-// Generate a v4 UUID. For this we use the browser standard `crypto.randomUUID`
+async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string) {
+  // pdate size and checksum
+  cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
+  // set checksum in s3
+  const size = await s3.getSize(c, v2Path)
+  if (!size) {
+    cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
+    return
+  }
+  // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
+  const { error: errorUpdate } = await supabaseAdmin(c)
+    .from('app_versions_meta')
+    .upsert({
+      id: record.id,
+      app_id: record.app_id,
+      owner_org: record.owner_org,
+      size,
+      checksum: record.checksum ?? '',
+    }, {
+      onConflict: 'id',
+    })
+    .eq('id', record.id)
+  if (errorUpdate)
+    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+  const { error } = await createStatsMeta(c, record.app_id, record.id, size)
+  if (error)
+    cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
+}
+
+async function handleManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
+  cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
+  const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
+
+  // Check if entries exist
+  const { data: existingEntries } = await supabaseAdmin(c)
+    .from('manifest')
+    .select('id')
+    .eq('app_version_id', record.id)
+    .limit(1)
+
+  // Only create entries if none exist
+  if (!existingEntries?.length && manifestEntries.length > 0) {
+    const validEntries = manifestEntries
+      .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
+      .map(entry => ({
+        app_version_id: record.id,
+        file_name: entry.file_name!,
+        file_hash: entry.file_hash!,
+        s3_path: entry.s3_path!,
+        file_size: 0,
+      }))
+
+    if (validEntries.length > 0) {
+      const { error: insertError } = await supabaseAdmin(c)
+        .from('manifest')
+        .insert(validEntries)
+      if (insertError)
+        cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
+    }
+  }
+  // delete manifest in app_versions
+  const { error: deleteError } = await supabaseAdmin(c)
+    .from('app_versions')
+    .update({ manifest: null })
+    .eq('id', record.id)
+  if (deleteError)
+    cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
+}
+
 async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
   const record = body.record as Database['public']['Tables']['app_versions']['Row']
 
   const v2Path = await getPath(c, record)
 
   if (v2Path && record.storage_provider === 'r2') {
-    // pdate size and checksum
-    cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
-    // set checksum in s3
-    const size = await s3.getSize(c, v2Path)
-    if (size) {
-      // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
-      const { error: errorUpdate } = await supabaseAdmin(c)
-        .from('app_versions_meta')
-        .upsert({
-          id: record.id,
-          app_id: record.app_id,
-          owner_org: record.owner_org,
-          size,
-          checksum: record.checksum ?? '',
-        }, {
-          onConflict: 'id',
-        })
-        .eq('id', record.id)
-      if (errorUpdate)
-        cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
-      const { error } = await createStatsMeta(c, record.app_id, record.id, size)
-      if (error)
-        cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
-    }
-    else {
-      cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
-    }
+    await v2PathSize(c, record, v2Path)
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
@@ -65,43 +107,7 @@ async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
 
   // Handle manifest entries
   if (record.manifest) {
-    cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
-    const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
-
-    // Check if entries exist
-    const { data: existingEntries } = await supabaseAdmin(c)
-      .from('manifest')
-      .select('id')
-      .eq('app_version_id', record.id)
-      .limit(1)
-
-    // Only create entries if none exist
-    if (!existingEntries?.length && manifestEntries.length > 0) {
-      const validEntries = manifestEntries
-        .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
-        .map(entry => ({
-          app_version_id: record.id,
-          file_name: entry.file_name!,
-          file_hash: entry.file_hash!,
-          s3_path: entry.s3_path!,
-          file_size: 0,
-        }))
-
-      if (validEntries.length > 0) {
-        const { error: insertError } = await supabaseAdmin(c)
-          .from('manifest')
-          .insert(validEntries)
-        if (insertError)
-          cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
-      }
-    }
-    // delete manifest in app_versions
-    const { error: deleteError } = await supabaseAdmin(c)
-      .from('app_versions')
-      .update({ manifest: null })
-      .eq('id', record.id)
-    if (deleteError)
-      cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
+    await handleManifest(c, record)
   }
 
   return c.json(BRES)

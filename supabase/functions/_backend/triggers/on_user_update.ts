@@ -1,26 +1,15 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { createApiKey } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c) => {
+app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c) => {
   try {
-    const table: keyof Database['public']['Tables'] = 'users'
-    const body = await c.req.json<UpdatePayload<typeof table>>()
-    if (body.table !== table) {
-      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
-      return c.json({ status: `Not ${table}` }, 200)
-    }
-    if (body.type !== 'UPDATE') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Not UPDATE' })
-      return c.json({ status: 'Not UPDATE' }, 200)
-    }
-    const record = body.record
+    const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
     cloudlog({ requestId: c.get('requestId'), message: 'record', record })
     if (!record.email) {
       cloudlog({ requestId: c.get('requestId'), message: 'No email' })

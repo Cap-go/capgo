@@ -45,7 +45,7 @@ async function validateInvite(c: Context, rawBody: any) {
     authorization?.split('Bearer ')[1],
   )
 
-  if (error || !auth || !auth.user || !auth.user.id)
+  if (error || !auth?.user?.id)
     return { message: 'not authorized', status: 401 }
 
   // Verify the user has permission to invite

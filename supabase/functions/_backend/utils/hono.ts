@@ -1,12 +1,22 @@
 import type { Context } from '@hono/hono'
+import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
+import type { StripeData } from './stripe.ts'
+import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
+import { sentry } from '@hono/sentry'
+import { getRuntimeKey } from 'hono/adapter'
 import { cors } from 'hono/cors'
 import { createFactory, createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
+import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
 import { cloudlog } from './loggin.ts'
 import { cloudlogErr } from './loggin.ts'
+import { onError } from './on_error.ts'
+import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
 import { checkKey, checkKeyById, getEnv } from './utils.ts'
 
@@ -33,6 +43,9 @@ export interface MiddlewareKeyVariables {
     APISecret?: string
     auth?: AuthInfo
     subkey?: Database['public']['Tables']['apikeys']['Row']
+    webhookBody?: any
+    stripeEvent?: Stripe.Event
+    stripeData?: StripeData
   }
 }
 
@@ -75,7 +88,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
-    if (!subkey && subkey_id) {
+    if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       throw new HTTPException(401, { message: 'Invalid subkey' })
     }
@@ -83,7 +96,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
       cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
       throw new HTTPException(401, { message: 'Invalid subkey' })
     }
-    if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
+    if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
       throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
     }
@@ -138,12 +151,84 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   })
 }
 
+export function triggerValidator(
+  table: keyof Database['public']['Tables'],
+  type: 'DELETE' | 'INSERT' | 'UPDATE',
+) {
+  return createMiddleware(async (c, next) => {
+    try {
+      const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
+
+      if (body.table !== String(table)) {
+        cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
+        return c.json({ status: `Not ${String(table)}` }, 200)
+      }
+
+      if (body.type !== type) {
+        cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
+        return c.json({ status: `Not ${type}` }, 200)
+      }
+
+      // Store the validated body in context for next middleware
+      if (body.type === 'DELETE' && body.old_record) {
+        c.set('webhookBody', body.old_record)
+      }
+      else if (body.type === 'INSERT' && body.record) {
+        c.set('webhookBody', body.record)
+      }
+      else if (body.type === 'UPDATE' && body.record) {
+        c.set('webhookBody', body.record)
+      }
+      else {
+        cloudlog({ requestId: c.get('requestId'), message: 'Invalid webhook payload' })
+        return c.json({ status: 'Invalid payload' }, 400)
+      }
+
+      await next()
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Invalid webhook payload',
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return c.json({ status: 'Invalid payload' }, 400)
+    }
+  })
+}
+
+export function middlewareStripeWebhook() {
+  return createMiddleware(async (c, next) => {
+    if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
+      throw new HTTPException(400, { message: 'Webhook Error: no secret found' })
+    }
+
+    const signature = c.req.raw.headers.get('stripe-signature')
+    if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
+      throw new HTTPException(400, { message: 'Webhook Error: no signature' })
+    }
+    const body = await c.req.text()
+    const stripeEvent = await parseStripeEvent(c as any, body, signature!)
+    const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
+    const stripeData = stripeDataEvent.data
+    if (stripeData.customer_id === '') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
+      throw new HTTPException(400, { message: 'Webhook Error: no customer found' })
+    }
+    c.set('stripeEvent', stripeEvent)
+    c.set('stripeData', stripeDataEvent)
+    await next()
+  })
+}
+
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
   const subMiddlewareKey = createMiddleware(async (c, next) => {
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
-    const key = capgkey_string || apikey_string
+    const key = capgkey_string ?? apikey_string
     if (!key) {
       cloudlog('No key provided')
       throw new HTTPException(401, { message: 'No key provided' })
@@ -157,11 +242,11 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     c.set('capgkey', key)
     if (subkey_id) {
       const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
-      if (!subkey && subkey_id) {
+      if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         throw new HTTPException(401, { message: 'Invalid subkey' })
       }
-      if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
+      if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
         throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
       }
@@ -217,3 +302,40 @@ export const middlewareAPISecret = createMiddleware(async (c, next) => {
 })
 
 export const BRES = { status: 'ok' }
+
+export function createHono(functionName: string, version: string, sentryDsn?: string) {
+  let appGlobal
+  if (getRuntimeKey() === 'deno') {
+    appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
+  }
+  else {
+    appGlobal = new Hono<MiddlewareKeyVariables>()
+  }
+
+  if (sentryDsn) {
+    appGlobal.use('*', sentry({
+      dsn: sentryDsn,
+      release: version,
+    }) as any)
+  }
+
+  appGlobal.use('*', logger())
+  appGlobal.use('*', requestId())
+
+  appGlobal.post('/ok', (c) => {
+    return c.json(BRES)
+  })
+  appGlobal.post('/ko', (c) => {
+    return c.json({ status: 'KO' }, 500)
+  })
+
+  return appGlobal
+}
+
+export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) {
+  appGlobal.all('*', (c) => {
+    cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
+    return c.json({ error: 'Not Found' }, 404)
+  })
+  appGlobal.onError(onError(functionName))
+}

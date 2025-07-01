@@ -43,9 +43,7 @@ function openPackage(appId: string) {
 const acronym = computed(() => {
   const words = props.app.name?.split(' ') ?? []
   let res = props.app.name?.slice(0, 2) || 'AP'
-  if (words?.length > 2)
-    res = words[0][0] + words[1][0]
-  else if (words?.length > 1)
+  if (words?.length > 1)
     res = words[0][0] + words[1][0]
   return res.toUpperCase()
 })

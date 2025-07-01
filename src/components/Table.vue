@@ -118,7 +118,8 @@ function updateUrlParams() {
     else
       params.delete(`sort_${col.key}`)
   })
-  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
 
 function loadFromUrlParams() {
@@ -168,7 +169,8 @@ onUnmounted(() => {
   props.columns.forEach((col) => {
     params.delete(`sort_${col.key}`)
   })
-  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 })
 
 onMounted(() => {

@@ -15,7 +15,6 @@ const mfaCode = ref('')
 
 const { t } = useI18n()
 
-// https://xvwzpoazmxkqosrdewyv.supabase.co/auth/v1/verify?token=69af7abb6508b17c05fec3ac963d335eafee0e5802a7977fc9b7aa35&type=recovery&redirect_to=http%3A%2F%2Flocalhost:5173%2Fforgot_password%3Fstep%3D2
 async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)
   if (isLoading.value)
@@ -85,9 +84,6 @@ async function submit(form: { password: string, password_confirm: string }) {
 <template>
   <div>
     <div class="h-full pb-8 max-h-fit grow md:pb-0">
-      <!-- <form
-      @submit.prevent="submit"
-    > -->
       <FormKit id="change-pass" type="form" :actions="false" @submit="submit">
         <!-- Panel body -->
         <div class="p-6 space-y-6">
@@ -140,7 +136,6 @@ async function submit(form: { password: string, password_confirm: string }) {
             </div>
           </div>
         </footer>
-        <!-- </form> -->
       </FormKit>
     </div>
 

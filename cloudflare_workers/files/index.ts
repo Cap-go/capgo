@@ -1,24 +1,14 @@
-import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
-import { requestId } from '@hono/hono/request-id'
-import { sentry } from '@hono/sentry'
-import { logger } from 'hono/logger'
-import { Hono } from 'hono/tiny'
-import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
-import { version } from '../../package.json'
+import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
 import { app as files } from '../../supabase/functions/_backend/private/files.ts'
 import { app as upload_link } from '../../supabase/functions/_backend/private/upload_link.ts'
-import { cloudlog } from '../../supabase/functions/_backend/utils/loggin.ts'
+import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = new Hono<MiddlewareKeyVariables>()
+const functionName = 'files'
+const app = createHono(functionName, version, process.env.SENTRY_DSN)
 
-app.use('*', sentry({
-  release: version,
-}))
-app.use('*', logger())
-app.use('*', (requestId as any)())
 
 // Files API
 app.route('/files', files)
@@ -27,11 +17,7 @@ app.route('/files', files)
 app.route('/private/download_link', download_link)
 app.route('/private/upload_link', upload_link)
 app.route('/private/files', files)
-app.all('*', (c) => {
-  cloudlog({ requestId: c.get('requestId'), message: 'Not found', url: c.req.url })
-  return c.json({ error: 'Not Found' }, 404)
-})
-app.onError(onError('Worker Files'))
+createAllCatch(app, functionName)
 
 export default {
   fetch: app.fetch,

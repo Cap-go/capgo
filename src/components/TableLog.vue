@@ -185,7 +185,8 @@ function updateUrlParams() {
     if (col.sortable && col.sortable !== true)
       params.set(`sort_${col.key}`, col.sortable)
   })
-  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
 
 function openTimePicker() {
@@ -233,7 +234,8 @@ onUnmounted(() => {
   props.columns.forEach((col) => {
     params.delete(`sort_${col.key}`)
   })
-  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 })
 
 // Add watches
@@ -557,9 +559,7 @@ onMounted(async () => {
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons {
   display: contents !important;
 }
-.dp__calendar_item {
-  display: contents !important;
-}
+
 .dp--tp-wrap > .dp__btn.dp__button {
   display: none !important;
 }

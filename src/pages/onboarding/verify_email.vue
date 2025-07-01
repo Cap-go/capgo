@@ -24,14 +24,14 @@ const user = ref<User | null>(null)
 async function updateDb() {
   // console.log('update db')
   const resSession = await supabase.auth.getSession()!
-  let session = resSession.data.session
+  const session = resSession.data.session
   if (!session) {
     const logSession = await autoAuth(route)
     if (!logSession)
       return
-    if (logSession.session)
-      session = logSession.session
-    if (logSession.user)
+    if (logSession.session?.user)
+      user.value = logSession.session.user
+    else if (logSession.user)
       user.value = logSession.user
   }
   else {

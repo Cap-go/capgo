@@ -1,5 +1,5 @@
 import type { Context } from '@hono/hono'
-import type { MeteredData } from './stripe.ts'
+import type { MeteredData, StripeData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
 import { cloudlog, cloudlogErr } from './loggin.ts'
@@ -83,7 +83,7 @@ function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: Database['pub
   return data
 }
 
-export function extractDataEvent(c: Context, event: Stripe.Event): { data: Database['public']['Tables']['stripe_info']['Insert'], isUpgrade: boolean, previousProductId: string | undefined } {
+export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   let data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: 'free',
     price_id: '',
@@ -102,7 +102,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): { data: Datab
   let previousProductId: string | undefined
 
   cloudlog({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
-  if (!event || !event.data || !event.data.object) {
+  if (!event?.data?.object) {
     return { data, isUpgrade, previousProductId }
   }
 

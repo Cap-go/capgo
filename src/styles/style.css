@@ -243,11 +243,6 @@ layer(base);
   src: url('/fonts/AirbnbCerealBold.woff');
 }
 
-/* html {
-  height: 100vh;
-  width: 100vw;
-  overscroll-behavior: none;
-} */
 html {
   height: 100%;
   overflow: hidden;

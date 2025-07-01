@@ -362,7 +362,7 @@ describe('test platform - /stats', () => {
 })
 
 function getJSON(): RequestJSON {
-  return Object.assign({}, requestJSON)
+  return { ...requestJSON }
 }
 
 function parseJSON(body: RequestJSON, jsonRequestSchema: z.ZodSchema) {

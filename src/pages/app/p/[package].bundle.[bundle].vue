@@ -719,7 +719,6 @@ async function deleteBundle() {
             <InfoRow v-if="version_meta?.fails" :label="t('fail')">
               {{ version_meta.fails.toLocaleString() }}
             </InfoRow>
-            <!-- <InfoRow v-if="version_meta?.installs && version_meta?.fails" :label="t('percent-fail')" :value="failPercent" /> -->
             <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
               <span class="flex justify-end w-full">
                 <span v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center">

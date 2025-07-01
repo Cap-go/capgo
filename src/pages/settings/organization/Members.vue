@@ -178,7 +178,7 @@ function validateEmail(email: string) {
   return String(email)
     .toLowerCase()
     .match(
-      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\])|(([a-z\-0-9]+\.)+[a-z]{2,}))$/i,
+      /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/,
     )
 }
 
@@ -523,12 +523,11 @@ async function _changeMemberPermission(member: ExtendedOrganizationMember, perm:
       }
 
       // Handle response codes
-      switch (data) {
-        case 'OK':
-          toast.success(t('permission-changed'))
-          break
-        default:
-          toast.warning(`${t('unexpected-response')}: ${data}`)
+      if (data === 'OK') {
+        toast.success(t('permission-changed'))
+      }
+      else {
+        toast.warning(`${t('unexpected-response')}: ${data}`)
       }
 
       await reloadData()

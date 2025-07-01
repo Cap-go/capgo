@@ -81,7 +81,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     .select()
     .eq('customer_id', customer_id)
     .single()
-  if (data && data.subscription_metered) {
+  if (data?.subscription_metered) {
     try {
       await setThreshold(c, customer_id)
     }
@@ -214,7 +214,7 @@ export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
 
     // Sync subscription data with Stripe
     if (org.customer_id)
-      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id || null)
+      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id ?? null)
 
     if (await isTrialOrg(c, orgId)) {
       const { error } = await supabaseAdmin(c)

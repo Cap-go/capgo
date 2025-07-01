@@ -138,10 +138,6 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
   return t === 'y'
 }
 
-// function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
-//   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
-// }
-
 function lastRunDate() {
   const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
   const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')

@@ -341,11 +341,11 @@ async function makeDefault(val = true) {
     toast.error(t('no-permission'))
     return
   }
-  const buttonMessage = channel.value?.ios && !channel.value.android
-    ? t('make-default-ios')
-    : channel.value?.android && !channel.value.ios
-      ? t('make-default-android')
-      : t('channel-make-now')
+  let buttonMessage = t('channel-make-now')
+  if (channel.value?.ios && !channel.value.android)
+    buttonMessage = t('make-default-ios')
+  else if (channel.value?.android && !channel.value.ios)
+    buttonMessage = t('make-default-android')
 
   dialogStore.openDialog({
     title: t('are-u-sure'),

@@ -46,9 +46,12 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
     }
 
-    const newObject = dataChannel as any
-    delete Object.assign(newObject, { disableAutoUpdateUnderNative: dataChannel.disable_auto_update_under_native }).disable_auto_update_under_native
-    delete Object.assign(newObject, { disableAutoUpdate: dataChannel.disable_auto_update }).disable_auto_update
+    const { disable_auto_update_under_native, disable_auto_update, ...rest } = dataChannel
+    const newObject = {
+      ...rest,
+      disableAutoUpdateUnderNative: disable_auto_update_under_native,
+      disableAutoUpdate: disable_auto_update,
+    }
 
     return c.json(newObject)
   }
@@ -84,10 +87,12 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       return c.json({ status: 'Cannot find channels', error: JSON.stringify(dbError) }, 400)
     }
     return c.json(dataChannels.map((o) => {
-      const newObject = o as any
-      delete Object.assign(newObject, { disableAutoUpdateUnderNative: o.disable_auto_update_under_native }).disable_auto_update_under_native
-      delete Object.assign(newObject, { disableAutoUpdate: o.disable_auto_update }).disable_auto_update
-      return newObject
+      const { disable_auto_update_under_native, disable_auto_update, ...rest } = o
+      return {
+        ...rest,
+        disableAutoUpdateUnderNative: disable_auto_update_under_native,
+        disableAutoUpdate: disable_auto_update,
+      }
     }))
   }
 }

@@ -24,7 +24,7 @@ app.post('/', middlewareAuth, async (c) => {
       authorization?.split('Bearer ')[1],
     )
 
-    if (error || !auth || !auth.user || !auth.user.id)
+    if (error || !auth?.user?.id)
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
     cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })

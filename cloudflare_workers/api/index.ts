@@ -1,10 +1,4 @@
-import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
-import { requestId } from '@hono/hono/request-id'
-import { sentry } from '@hono/sentry'
-import { logger } from 'hono/logger'
-import { Hono } from 'hono/tiny'
-import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
-import { version } from '../../package.json'
+import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
@@ -12,7 +6,7 @@ import { app as deleted_failed_version } from '../../supabase/functions/_backend
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
-import { app as latency_postres } from '../../supabase/functions/_backend/private/latency_postres.ts'
+import { app as latency_postres } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
@@ -49,19 +43,11 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
-import { cloudlog } from '../../supabase/functions/_backend/utils/loggin.ts'
-
-const app = new Hono<MiddlewareKeyVariables>()
-const appTriggers = new Hono<MiddlewareKeyVariables>()
-const appPrivate = new Hono<MiddlewareKeyVariables>()
-
-app.use('*', sentry({
-  release: version,
-}))
-app.use('*', logger())
-app.use('*', (requestId as any)())
+import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 
 // Public API
+const functionName = 'api'
+const app = createHono(functionName, version, process.env.SENTRY_DSN)
 app.route('/ok', ok)
 app.route('/apikey', apikey)
 app.route('/bundle', bundle)
@@ -72,6 +58,8 @@ app.route('/statistics', statistics)
 app.route('/app', appEndpoint)
 
 // Private API
+const functionNamePrivate = 'private'
+const appPrivate = createHono(functionNamePrivate, version)
 appPrivate.route('/plans', plans)
 appPrivate.route('/credits', credits)
 appPrivate.route('/store_top', storeTop)
@@ -90,6 +78,8 @@ appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)
 
 // Triggers
+const functionNameTriggers = 'triggers'
+const appTriggers = createHono(functionNameTriggers, version)
 appTriggers.route('/clear_app_cache', clear_app_cache)
 appTriggers.route('/clear_device_cache', clear_device_cache)
 appTriggers.route('/cron_email', cron_email)
@@ -113,11 +103,10 @@ appTriggers.route('/queue_consumer', queue_consumer)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
-app.all('*', (c) => {
-  cloudlog({ requestId: c.get('requestId'), message: 'Not found', url: c.req.url })
-  return c.json({ error: 'Not Found' }, 404)
-})
-app.onError(onError('Worker API'))
+
+createAllCatch(app, functionName)
+createAllCatch(appPrivate, functionNamePrivate)
+createAllCatch(appTriggers, functionNameTriggers)
 
 export default {
   fetch: app.fetch,

@@ -53,8 +53,10 @@ const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
 })
 
-async function showDeletionMethodDialog(): Promise<'normal' | 'unsafe' | null> {
-  let method: 'normal' | 'unsafe' | null = null
+type DeletionMethod = 'normal' | 'unsafe' | null
+
+async function showDeletionMethodDialog(): Promise<DeletionMethod> {
+  let method: DeletionMethod = null
 
   dialogStore.openDialog({
     title: t('select-style-of-deletion'),

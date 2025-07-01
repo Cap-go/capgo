@@ -52,21 +52,19 @@ async function handleOrganizationInvitation(org: Organization) {
             return
           }
 
-          switch (data) {
-            case 'OK':
-              organizationStore.setCurrentOrganization(org.gid)
-              organizationStore.fetchOrganizations()
-              toast.success(t('invite-accepted'))
-              break
-            case 'NO_INVITE':
-              toast.error(t('alert-no-invite'))
-              break
-            case 'INVALID_ROLE':
-              toast.error(t('alert-not-invited'))
-              break
-            default:
-              toast.error(t('alert-unknown-error'))
-              break
+          if (data === 'OK') {
+            organizationStore.setCurrentOrganization(org.gid)
+            organizationStore.fetchOrganizations()
+            toast.success(t('invite-accepted'))
+          }
+          else if (data === 'NO_INVITE') {
+            toast.error(t('alert-no-invite'))
+          }
+          else if (data === 'INVALID_ROLE') {
+            toast.error(t('alert-not-invited'))
+          }
+          else {
+            toast.error(t('alert-unknown-error'))
           }
         },
       },

@@ -1,27 +1,16 @@
-import type { MiddlewareKeyVariables } from 'supabase/functions/_backend/utils/hono.ts'
-import { requestId } from '@hono/hono/request-id'
-import { sentry } from '@hono/sentry'
-import { logger } from 'hono/logger'
-import { Hono } from 'hono/tiny'
-import { onError } from 'supabase/functions/_backend/utils/on_error.ts'
-import { version } from '../../package.json'
+import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
 import { app as updates_lite } from '../../supabase/functions/_backend/plugins/updates_lite.ts'
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
-import { cloudlog } from '../../supabase/functions/_backend/utils/loggin.ts'
+import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
-const app = new Hono<MiddlewareKeyVariables>()
-
-app.use('*', sentry({
-  release: version,
-}))
-app.use('*', logger())
-app.use('*', (requestId as any)())
+const functionName = 'plugin'
+const app = createHono(functionName, version, process.env.SENTRY_DSN)
 
 // Plugin API
 app.route('/plugin/ok', ok)
@@ -38,11 +27,7 @@ app.route('/updates_v2', updates)
 app.route('/updates_lite', updates_lite)
 app.route('/updates_lite_v2', updates_lite)
 app.route('/stats', stats)
-app.all('*', (c) => {
-  cloudlog({ requestId: c.get('requestId'), message: 'Not found', url: c.req.url })
-  return c.json({ error: 'Not Found' }, 404)
-})
-app.onError(onError('Worker Plugin'))
+createAllCatch(app, functionName)
 
 export default {
   fetch: app.fetch,
