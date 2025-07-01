@@ -211,12 +211,8 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
 app.post('/', middlewareStripeWebhook(), async (c) => {
   try {
     const LogSnag = logsnag(c as any)
-    const stripeData = c.get('stripeData')
-    const stripeEvent = c.get('stripeEvent')
-    if (!stripeData || !stripeEvent) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no stripe data or event' })
-      return c.json({ status: 'Webhook Error: no stripe data or event' }, 400)
-    }
+    const stripeData = c.get('stripeData')!
+    const stripeEvent = c.get('stripeEvent')!
 
     // find email from user with customer_id
     const org = await getOrg(c, stripeData)
@@ -235,8 +231,6 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: 'no customer found' })
       return c.json({ status: 'ok' }, 200)
     }
-    if (!customer.subscription_id)
-      stripeData.data.status = 'succeeded'
     cloudlog({ requestId: c.get('requestId'), message: 'stripeData', stripeData })
 
     if (stripeEvent.type === 'customer.source.expiring') {

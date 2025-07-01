@@ -96,7 +96,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     mau_exceeded: false,
     storage_exceeded: false,
     bandwidth_exceeded: false,
-    status: undefined,
+    status: 'succeeded',
   }
   let isUpgrade = false
   let previousProductId: string | undefined

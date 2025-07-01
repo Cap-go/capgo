@@ -1,4 +1,3 @@
-import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
@@ -6,13 +5,8 @@ import { supabaseAdmin } from '../../utils/supabase.ts'
 const app = honoFactory.createApp()
 
 app.delete('/:id', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  if (!key) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete apikey Unauthorized' })
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
+  const key = c.get('apikey')!
+  if (key.limited_to_orgs?.length) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete apikey You cannot do that as a limited API key' })
     return c.json({ error: 'You cannot do that as a limited API key' }, 401)
   }

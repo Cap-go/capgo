@@ -7,13 +7,9 @@ import { Constants } from '../../utils/supabase.types.ts'
 const app = honoFactory.createApp()
 
 app.put('/:id', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  if (!key) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update apikey Unauthorized' })
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
+  const key = c.get('apikey')!
 
-  if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
+  if (key.limited_to_orgs?.length) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update apikey You cannot do that as a limited API key' })
     return c.json({ error: 'You cannot do that as a limited API key' }, 401)
   }
