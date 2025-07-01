@@ -500,7 +500,7 @@ export async function createApiKey(c: Context, userId: string) {
 export async function customerToSegmentOrg(
   c: Context,
   orgId: string,
-  price_id: string,
+  price_id?: string | null,
   plan?: Database['public']['Tables']['plans']['Row'] | null,
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
   const segmentsObj = {

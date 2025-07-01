@@ -1,5 +1,7 @@
 import type { Context } from '@hono/hono'
+import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
+import type { StripeData } from './stripe.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { sentry } from '@hono/sentry'
@@ -14,6 +16,7 @@ import { timingSafeEqual } from 'hono/utils/buffer'
 import { cloudlog } from './loggin.ts'
 import { cloudlogErr } from './loggin.ts'
 import { onError } from './on_error.ts'
+import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
 import { checkKey, checkKeyById, getEnv } from './utils.ts'
 
@@ -41,6 +44,8 @@ export interface MiddlewareKeyVariables {
     auth?: AuthInfo
     subkey?: Database['public']['Tables']['apikeys']['Row']
     webhookBody?: any
+    stripeEvent?: Stripe.Event
+    stripeData?: StripeData
   }
 }
 
@@ -189,6 +194,32 @@ export function triggerValidator(
       })
       return c.json({ status: 'Invalid payload' }, 400)
     }
+  })
+}
+
+export function middlewareStripeWebhook() {
+  return createMiddleware(async (c, next) => {
+    if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
+      throw new HTTPException(400, { message: 'Webhook Error: no secret found' })
+    }
+
+    const signature = c.req.raw.headers.get('stripe-signature')
+    if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
+      throw new HTTPException(400, { message: 'Webhook Error: no signature' })
+    }
+    const body = await c.req.text()
+    const stripeEvent = await parseStripeEvent(c as any, body, signature!)
+    const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
+    const stripeData = stripeDataEvent.data
+    if (stripeData.customer_id === '') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
+      throw new HTTPException(400, { message: 'Webhook Error: no customer found' })
+    }
+    c.set('stripeEvent', stripeEvent)
+    c.set('stripeData', stripeDataEvent)
+    await next()
   })
 }
 

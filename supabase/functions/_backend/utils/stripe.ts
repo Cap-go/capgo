@@ -1,4 +1,5 @@
 import type { Context } from '@hono/hono'
+import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -205,6 +206,12 @@ async function getPriceIds(c: Context, planId: string, reccurence: string): Prom
 
 export interface MeteredData {
   [key: string]: string
+}
+
+export interface StripeData {
+  data: Database['public']['Tables']['stripe_info']['Insert']
+  isUpgrade: boolean
+  previousProductId: string | undefined
 }
 
 export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null, meteredData: MeteredData } {
