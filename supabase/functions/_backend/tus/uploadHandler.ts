@@ -3,9 +3,11 @@ import type { Context } from '@hono/hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Digester } from './digest.ts'
+import type { UploadMetadata } from './parse.ts'
 import type {
   RetryMultipartUpload,
 } from './retry.ts'
+import type { Part } from './util.ts'
 import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
@@ -146,47 +148,56 @@ export class UploadHandler {
     return await this.cleanup()
   }
 
-  // create a new TUS upload
-  async create(c: Context): Promise<Response> {
-    cloudlog({ requestId: c.get('requestId'), message: 'in DO create' })
-    const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
-    const checksum = parseChecksum(c.req.raw.headers)
-
+  async initCreate(c: Context, uploadMetadata: UploadMetadata) {
     const r2Key = uploadMetadata.filename ?? ''
     if (r2Key == null) {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files create r2Key is null' })
-      return c.text('bad filename metadata', 400)
+      throw new HTTPException(400, { message: 'bad filename metadata' })
     }
 
     const existingUploadOffset: number | undefined = await this.state.storage.get(UPLOAD_OFFSET_KEY)
     if (existingUploadOffset != null && existingUploadOffset > 0) {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files create duplicate object creation' })
       await this.cleanup(r2Key)
-      return c.text('object already exists', 409)
+      throw new HTTPException(409, { message: 'object already exists' })
     }
 
     const contentType = c.req.header('Content-Type')
     if (contentType != null && contentType !== 'application/offset+octet-stream') {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files create create only supports application/offset+octet-stream content-type' })
-      return c.text('create only supports application/offset+octet-stream content-type', 415)
+      throw new HTTPException(415, { message: 'create only supports application/offset+octet-stream content-type' })
     }
     const contentLength = readIntFromHeader(c.req.raw.headers, 'Content-Length')
     if (!Number.isNaN(contentLength) && contentLength > 0 && contentType == null) {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files create body requires application/offset+octet-stream content-type' })
-      return c.text('body requires application/offset+octet-stream content-type', 415)
+      throw new HTTPException(415, { message: 'body requires application/offset+octet-stream content-type' })
     }
     const hasContent = c.req.raw.body != null && contentType != null
     const uploadLength = readIntFromHeader(c.req.raw.headers, 'Upload-Length')
     const uploadDeferLength = readIntFromHeader(c.req.raw.headers, 'Upload-Defer-Length')
     if (Number.isNaN(uploadLength) && Number.isNaN(uploadDeferLength)) {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files create must contain Upload-Length or Upload-Defer-Length header' })
-      return c.text('must contain Upload-Length or Upload-Defer-Length header', 400)
+      throw new HTTPException(400, { message: 'must contain Upload-Length or Upload-Defer-Length header' })
     }
 
     if (!Number.isNaN(uploadDeferLength) && uploadDeferLength !== 1) {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files create bad Upload-Defer-Length' })
-      return c.text('bad Upload-Defer-Length', 400)
+      throw new HTTPException(400, { message: 'bad Upload-Defer-Length' })
     }
+    return {
+      r2Key,
+      uploadLength,
+      hasContent,
+    }
+  }
+
+  // create a new TUS upload
+  async create(c: Context): Promise<Response> {
+    cloudlog({ requestId: c.get('requestId'), message: 'in DO create' })
+    const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
+    const checksum = parseChecksum(c.req.raw.headers)
+
+    const { r2Key, uploadLength, hasContent } = await this.initCreate(c, uploadMetadata)
 
     const uploadInfo: StoredUploadInfo = {}
 
@@ -311,6 +322,52 @@ export class UploadHandler {
     })
   }
 
+  async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadLength: number | undefined, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
+    switch (part.kind) {
+      case 'intermediate': {
+        if (this.multipart == null) {
+          this.multipart = await this.r2CreateMultipartUpload(r2Key, uploadInfo)
+        }
+        this.parts.push({
+          part: await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes),
+          length: part.bytes.byteLength,
+        })
+        uploadOffset += part.bytes.byteLength
+        const writePart = this.state.storage.put(this.parts.length.toString(), this.parts.at(-1))
+        const writeOffset = this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
+        await Promise.all([writePart, writeOffset])
+        break
+      }
+      case 'final':
+      case 'error': {
+        const finished = uploadLength != null && uploadOffset + part.bytes.byteLength === uploadLength
+        if (!finished) {
+          // write the partial part to a temporary object so we can rehydrate it
+          // later, and then we're done
+          await this.r2Put(c, this.tempkey(), part.bytes)
+          uploadOffset += part.bytes.byteLength
+          await this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
+        }
+        else if (!this.multipart) {
+          // all the bytes fit into a single in memory buffer, so we can just upload
+          // it directly without using multipart
+          await this.r2Put(c, r2Key, part.bytes, checksum)
+          uploadOffset += part.bytes.byteLength
+          await this.cleanup()
+        }
+        else {
+          // upload the last part (can be less than the 5mb min part size), then complete the upload
+          const uploadedPart = await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes)
+          this.parts.push({ part: uploadedPart, length: part.bytes.byteLength })
+          await this.r2CompleteMultipartUpload(c, r2Key, await digester.digest(), checksum)
+          uploadOffset += part.bytes.byteLength
+          await this.cleanup()
+        }
+        break
+      }
+    }
+  }
+
   // Append body to the upload starting at uploadOffset. Returns the new uploadOffset
   //
   // The body is streamed into a fixed length buffer. If the object fits into a single
@@ -362,50 +419,7 @@ export class UploadHandler {
       }
 
       await digester.update(part.bytes)
-
-      switch (part.kind) {
-        case 'intermediate': {
-          if (this.multipart == null) {
-            this.multipart = await this.r2CreateMultipartUpload(r2Key, uploadInfo)
-          }
-          this.parts.push({
-            part: await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes),
-            length: part.bytes.byteLength,
-          })
-          uploadOffset += part.bytes.byteLength
-          const writePart = this.state.storage.put(this.parts.length.toString(), this.parts.at(-1))
-          const writeOffset = this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
-          await Promise.all([writePart, writeOffset])
-          break
-        }
-        case 'final':
-        case 'error': {
-          const finished = uploadLength != null && uploadOffset + part.bytes.byteLength === uploadLength
-          if (!finished) {
-            // write the partial part to a temporary object so we can rehydrate it
-            // later, and then we're done
-            await this.r2Put(c, this.tempkey(), part.bytes)
-            uploadOffset += part.bytes.byteLength
-            await this.state.storage.put(UPLOAD_OFFSET_KEY, uploadOffset)
-          }
-          else if (!this.multipart) {
-            // all the bytes fit into a single in memory buffer, so we can just upload
-            // it directly without using multipart
-            await this.r2Put(c, r2Key, part.bytes, checksum)
-            uploadOffset += part.bytes.byteLength
-            await this.cleanup()
-          }
-          else {
-            // upload the last part (can be less than the 5mb min part size), then complete the upload
-            const uploadedPart = await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes)
-            this.parts.push({ part: uploadedPart, length: part.bytes.byteLength })
-            await this.r2CompleteMultipartUpload(c, r2Key, await digester.digest(), checksum)
-            uploadOffset += part.bytes.byteLength
-            await this.cleanup()
-          }
-          break
-        }
-      }
+      await this.switchOnPartKind(c, r2Key, uploadOffset, uploadLength, uploadInfo, part, digester, checksum)
     }
     return uploadOffset
   }
