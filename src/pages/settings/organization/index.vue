@@ -70,6 +70,24 @@ async function presentActionSheet() {
   return dialogStore.onDialogDismiss()
 }
 
+async function toastError(error: any) {
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    const json = await error.context.json<{ status: string }>()
+    if (json.status && typeof json.status === 'string') {
+      if (json.status === 'email_not_unique')
+        toast.error(t('org-changes-set-email-not-unique'))
+      else
+        toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
+    }
+    else {
+      toast.error(t('org-changes-set-email-other-error'))
+    }
+  }
+  else {
+    toast.error(t('org-changes-set-email-other-error'))
+  }
+}
+
 async function updateEmail(form: { email: string }) {
   if (!currentOrganization.value)
     return false
@@ -83,22 +101,7 @@ async function updateEmail(form: { email: string }) {
   })
 
   if (error) {
-    if (error instanceof FunctionsHttpError && error.context instanceof Response) {
-      const json = await error.context.json<{ status: string }>()
-      if (json.status && typeof json.status === 'string') {
-        if (json.status === 'email_not_unique')
-          toast.error(t('org-changes-set-email-not-unique'))
-        else
-          toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
-      }
-      else {
-        toast.error(t('org-changes-set-email-other-error'))
-      }
-    }
-    else {
-      toast.error(t('org-changes-set-email-other-error'))
-    }
-
+    await toastError(error)
     // Revert the optimistic update
     currentOrganization.value.management_email = orgCopy.management_email
     return true
