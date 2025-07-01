@@ -93,7 +93,7 @@ const permissionOptions = computed(() => {
 })
 
 const membersOptions = computed(() => {
-  if (!searchUserForAdminDelegation) {
+  if (!searchUserForAdminDelegation.value) {
     return
   }
 

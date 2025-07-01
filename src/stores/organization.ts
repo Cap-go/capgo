@@ -225,12 +225,29 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const deleteOrganization = async (orgId: string) => {
+    // Validate input
+    if (!orgId || typeof orgId !== 'string' || orgId.trim() === '') {
+      return { data: null, error: new Error('Invalid organization ID') }
+    }
+
+    // Check if current user has permission to delete this organization
+    const currentUserId = main.user?.id
+    if (!currentUserId) {
+      return { data: null, error: new Error('User not authenticated') }
+    }
+
+    // Verify user has super_admin role for this organization
+    const currentOrg = _organizations.value.get(orgId)
+    if (!currentOrg || currentOrg.role !== 'super_admin') {
+      return { data: null, error: new Error('Insufficient permissions') }
+    }
+
     const { data, error } = await supabase.from('orgs')
       .delete()
       .eq('id', orgId)
 
     if (error) {
-      console.error('org del err', error)
+      console.error('Organization deletion failed:', error.message)
       return { data: null, error }
     }
 

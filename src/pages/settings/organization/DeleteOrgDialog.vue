@@ -4,7 +4,6 @@ import { ref, defineProps, defineExpose } from 'vue'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { Organization, useOrganizationStore } from '~/stores/organization'
-import { _deleteOrganization } from './utils'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
