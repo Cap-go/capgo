@@ -325,9 +325,7 @@ export class UploadHandler {
   async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadLength: number | undefined, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
     switch (part.kind) {
       case 'intermediate': {
-        if (this.multipart == null) {
-          this.multipart = await this.r2CreateMultipartUpload(r2Key, uploadInfo)
-        }
+        this.multipart ??= await this.r2CreateMultipartUpload(r2Key, uploadInfo)
         this.parts.push({
           part: await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes),
           length: part.bytes.byteLength,
@@ -605,7 +603,7 @@ export class UploadHandler {
         await this.hydrateParts(
           r2Key,
           await this.state.storage.get(UPLOAD_OFFSET_KEY) ?? 0,
-          await this.state.storage.get(UPLOAD_INFO_KEY) || {},
+          await this.state.storage.get(UPLOAD_INFO_KEY) ?? {},
         )
         if (this.multipart != null) {
           await this.multipart.abort()

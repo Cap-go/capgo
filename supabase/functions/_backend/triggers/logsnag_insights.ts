@@ -56,7 +56,7 @@ function getStats(c: Context): GlobalStats {
     customers: supabase.rpc('get_customer_counts', {}).single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
-      return res.data || { total: 0, yearly: 0, monthly: 0 }
+      return res.data ?? { total: 0, yearly: 0, monthly: 0 }
     }),
     onboarded: supabase.rpc('count_all_onboarded', {}).single().then((res) => {
       if (res.error || !res.data)
@@ -71,7 +71,7 @@ function getStats(c: Context): GlobalStats {
     plans: supabase.rpc('count_all_plans_v2').then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_plans_v2', error: res.error })
-      return res.data || {}
+      return res.data ?? {}
     }).then((data: any) => {
       const total: PlanTotal = {}
       for (const plan of data)

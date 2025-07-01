@@ -39,7 +39,8 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
 
     // Count super admins per org
     const orgCounts = superAdminCounts.reduce((acc, item) => {
-      acc[item.org_id] = (acc[item.org_id] || 0) + 1
+      acc[item.org_id] ??= 0
+      acc[item.org_id] += 1
       return acc
     }, {} as Record<string, number>)
 

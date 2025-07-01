@@ -29,7 +29,7 @@ interface VersionName {
   created_at: string | null
 }
 
-interface appUsageByVersion {
+interface AppUsageByVersion {
   date: string
   app_id: string
   version_id: number
@@ -313,7 +313,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     if (storageError)
       return { data: null, error: storageError }
 
-    const storageVariance = storage.reduce((p, c) => (p + (c || 0)), 0)
+    const storageVariance = storage.reduce((p, c) => (p + (c ?? 0)), 0)
     const currentStorage = currentStorageBytes
     const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
     storage[0] = initValue
@@ -408,7 +408,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
 }
 
 // Calculate cumulative installs for each version over time
-function calculateAccumulatedData(usage: appUsageByVersion[], dates: string[], versions: number[]) {
+function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], versions: number[]) {
   const accumulated: { [date: string]: { [version: number]: number } } = {}
 
   // Initialize with zeros
@@ -420,12 +420,12 @@ function calculateAccumulatedData(usage: appUsageByVersion[], dates: string[], v
   // Process data day by day
   dates.forEach((date, index) => {
     const dailyUsage = usage.filter(u => u.date === date)
-    const totalNewInstalls = dailyUsage.reduce((sum, u) => sum + (u.install || 0), 0)
+    const totalNewInstalls = dailyUsage.reduce((sum, u) => sum + (u.install ?? 0), 0)
 
     if (index === 0) {
       // First day: just add installs
       dailyUsage.forEach(({ version_id, install }) => {
-        accumulated[date][version_id] = install || 0
+        accumulated[date][version_id] = install ?? 0
       })
     }
     else {
@@ -479,14 +479,14 @@ function convertToPercentages(accumulated: { [date: string]: { [version: number]
 // Filter out versions with no usage
 function getActiveVersions(versions: number[], percentages: { [date: string]: { [version: number]: number } }) {
   return versions.filter(version =>
-    Object.values(percentages).some(dayData => (dayData[version] || 0) > 0),
+    Object.values(percentages).some(dayData => (dayData[version] ?? 0) > 0),
   )
 }
 
 // Create datasets for Chart.js
 function createDatasets(versions: number[], dates: string[], percentages: { [date: string]: { [version: number]: number } }, versionNames: VersionName[]) {
   return versions.map((version) => {
-    const percentageData = dates.map(date => percentages[date][version] || 0)
+    const percentageData = dates.map(date => percentages[date][version] ?? 0)
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
     const versionName = versionNames.find(v => v.id === version)?.name ?? version
 

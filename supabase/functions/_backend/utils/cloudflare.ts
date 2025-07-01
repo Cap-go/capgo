@@ -709,7 +709,7 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
   return [] as StoreApp[]
 }
 
-interface topApp {
+interface TopApp {
   url: string
   title: string
   icon: string
@@ -717,7 +717,7 @@ interface topApp {
   installs: number
   category: string
 }
-export async function getTopAppsCF(c: Context, mode: string, limit: number): Promise<topApp[]> {
+export async function getTopAppsCF(c: Context, mode: string, limit: number): Promise<TopApp[]> {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve([] as StoreApp[])
   let modeQuery = ''

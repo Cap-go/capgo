@@ -95,7 +95,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
       const timestamp = new Date().toISOString()
       const failureDetails = messagesFailed.map(msg => ({
         function_name: msg.message.function_name,
-        function_type: msg.message.function_type || 'supabase',
+        function_type: msg.message.function_type ?? 'supabase',
         msg_id: msg.msg_id,
         read_count: msg.read_ct,
         status: msg.httpResponse.status,
@@ -106,8 +106,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 
       const groupedByFunction = failureDetails.reduce((acc, detail) => {
         const key = detail.function_name
-        if (!acc[key])
-          acc[key] = []
+        acc[key] ??= []
         acc[key].push(detail)
         return acc
       }, {} as Record<string, typeof failureDetails>)
@@ -160,7 +159,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               },
             ],
             footer: {
-              text: `Queue: ${queueName} | Environment: ${getEnv(c as any, 'ENVIRONMENT') || 'unknown'}`,
+              text: `Queue: ${queueName} | Environment: ${getEnv(c as any, 'ENVIRONMENT') ?? 'unknown'}`,
             },
           },
         ],

@@ -5,7 +5,7 @@ import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-interface dataToGet {
+interface DataToGet {
   appId?: string
   orgId?: string
   todayOnly?: boolean
@@ -17,7 +17,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAPISecret, async (c) => {
   try {
-    const body = await c.req.json<dataToGet>()
+    const body = await c.req.json<DataToGet>()
     cloudlog({ requestId: c.get('requestId'), message: 'postcron stats body', body })
     if (!body.appId || !body.orgId)
       return c.json({ status: 'No appId' }, 400)
