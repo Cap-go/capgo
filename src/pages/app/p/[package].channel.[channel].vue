@@ -383,7 +383,7 @@ async function makeDefault(val = true) {
               .eq('android', false)
               .eq('ios', false)
             if (iosError || hiddenError)
-              console.log('error', iosError || hiddenError)
+              console.log('error', iosError ?? hiddenError)
           }
 
           if (val && channel.value.android) {
@@ -400,7 +400,7 @@ async function makeDefault(val = true) {
               .eq('android', false)
               .eq('ios', false)
             if (androidError || hiddenError)
-              console.log('error', androidError || hiddenError)
+              console.log('error', androidError ?? hiddenError)
           }
 
           if (error) {

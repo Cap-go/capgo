@@ -51,7 +51,7 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
     const thresholdGreaterThenStat = threshold >= stat
     const lastIndexAndStatGreaterOrEqualThreshold = index === 2 && stat >= threshold
 
-    return thresholdGreaterThenStat || lastIndexAndStatGreaterOrEqualThreshold
+    return thresholdGreaterThenStat ?? lastIndexAndStatGreaterOrEqualThreshold
   })
 
   if (index === -1 || index >= 3)
@@ -151,9 +151,9 @@ async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
     .gte('deployed_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
     .lte('deployed_at', new Date().toISOString())
 
-  const bundleCount = appVersions && appVersions.length ? appVersions.length : 0
-  const channelCount = channels && channels.length ? channels.length : 0
-  const publishCount = deployHistory && deployHistory.length ? deployHistory.length : 0
+  const bundleCount = appVersions?.length ?? 0
+  const channelCount = channels?.length ?? 0
+  const publishCount = deployHistory?.length ?? 0
 
   const metadata = {
     app_id: appId,

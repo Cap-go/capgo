@@ -32,7 +32,7 @@ export async function get(c: Context, body: GetLatest, apikey: Database['public'
       .eq('deleted', false)
       .range(from, to)
       .order('created_at', { ascending: false })
-    if (dbError || !dataBundles || !dataBundles.length) {
+    if (dbError || !dataBundles?.length) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get bundle', error: dbError })
       return c.json({ status: 'Cannot get bundle', error: dbError }, 400)
     }

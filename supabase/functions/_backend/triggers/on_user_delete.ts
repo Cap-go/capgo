@@ -21,7 +21,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
       .eq('user_id', record.id)
       .eq('user_right', 'super_admin')
 
-    if (!userSuperAdminOrgs || userSuperAdminOrgs.length === 0) {
+    if (!userSuperAdminOrgs?.length) {
       return c.json(BRES)
     }
 
@@ -102,7 +102,7 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'DELETE'), async (c
     const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
     cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
-    if (!record || !record.id) {
+    if (!record?.id) {
       cloudlog({ requestId: c.get('requestId'), message: 'no user id' })
       return c.json(BRES)
     }

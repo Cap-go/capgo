@@ -447,7 +447,7 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
         }
 
         // Subtract uninstalls if any
-        if (change && change.uninstall) {
+        if (change?.uninstall) {
           accumulated[date][version] = Math.max(0, accumulated[date][version] - change.uninstall)
         }
       })

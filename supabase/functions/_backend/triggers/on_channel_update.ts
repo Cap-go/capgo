@@ -37,7 +37,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
         .eq('android', false)
         .eq('ios', false)
       if (iosError || hiddenError)
-        cloudlog({ requestId: c.get('requestId'), message: 'error', error: iosError || hiddenError })
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error: iosError ?? hiddenError })
     }
 
     if (record.public && record.android) {

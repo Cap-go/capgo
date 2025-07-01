@@ -36,7 +36,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id.toLowerCase()])
     cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
-    if (!res || !res.length) {
+    if (!res?.length) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device', device_id: body.device_id })
       return c.json({ status: 'Cannot find device' }, 400)
     }
@@ -58,7 +58,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const fetchOffset = body.page ?? 0
     const from = fetchOffset * fetchLimit
     const to = (fetchOffset + 1) * fetchLimit - 1
-    const res = await readDevices(c, body.app_id, from, to, undefined)
+    const res = await readDevices(c, body.app_id, from, to)
 
     if (!res) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get devices' })
@@ -75,7 +75,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       `)
       .in('id', versionIds)
     // replace version with object from app_versions table
-    if (dbErrorVersions || !dataVersions || !dataVersions.length) {
+    if (dbErrorVersions || !dataVersions?.length) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get versions', error: dbErrorVersions })
       return c.json([])
     }

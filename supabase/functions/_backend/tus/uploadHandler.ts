@@ -364,6 +364,7 @@ export class UploadHandler {
         break
       }
     }
+    return uploadOffset
   }
 
   // Append body to the upload starting at uploadOffset. Returns the new uploadOffset
@@ -417,7 +418,7 @@ export class UploadHandler {
       }
 
       await digester.update(part.bytes)
-      await this.switchOnPartKind(c, r2Key, uploadOffset, uploadLength, uploadInfo, part, digester, checksum)
+      uploadOffset = await this.switchOnPartKind(c, r2Key, uploadOffset, uploadLength, uploadInfo, part, digester, checksum)
     }
     return uploadOffset
   }
@@ -635,12 +636,6 @@ export class AttachmentUploadHandler extends UploadHandler {
     super(state, env)
   }
 }
-
-// export class BackupUploadHandler extends UploadHandler {
-//   constructor(state: DurableObjectState, env: Env) {
-//     super(state, env, env.BACKUP_BUCKET)
-//   }
-// }
 
 class UnrecoverableError extends Error {
   r2Key: string
