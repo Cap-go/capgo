@@ -144,6 +144,7 @@ export function requestInfosPostgres(
   cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDeviceQuery.toSQL() })
   const channelDevice = channelDeviceQuery.then(data => data.at(0))
 
+  const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const channelQuery = drizzleCient
     .select({
       version: {
@@ -182,7 +183,7 @@ export function requestInfosPostgres(
       ? and(
           eq(channelAlias.public, true),
           eq(channelAlias.app_id, app_id),
-          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+          eq(platformQuery, true),
         )
       : and (
           eq(channelAlias.app_id, app_id),

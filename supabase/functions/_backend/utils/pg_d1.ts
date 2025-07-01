@@ -138,6 +138,7 @@ export function requestInfosPostgresV2(
     return parseManifestEntries(c, data, 'channelDevice')
   })
 
+  const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const channelQuery = drizzleCient
     .select({
       version: {
@@ -176,7 +177,7 @@ export function requestInfosPostgresV2(
       ? and(
           eq(channelAlias.public, true),
           eq(channelAlias.app_id, app_id),
-          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+          eq(platformQuery, true),
         )
       : and (
           eq(channelAlias.app_id, app_id),
