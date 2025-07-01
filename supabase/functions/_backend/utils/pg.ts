@@ -228,4 +228,3 @@ export async function getAppOwnerPostgres(
     return null
   }
 }
-

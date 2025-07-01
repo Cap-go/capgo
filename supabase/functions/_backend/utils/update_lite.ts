@@ -1,5 +1,6 @@
 import type { Context } from '@hono/hono'
 import type { ManifestEntry } from './downloadUrl.ts'
+import type { getDrizzleClientD1 } from './pg_d1.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos } from './types.ts'
@@ -19,9 +20,9 @@ import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from './pg.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
-import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, getDrizzleClientD1 } from './pg_d1.ts'
+import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1 } from './pg_d1.ts'
 import { requestInfosPostgresLite, requestInfosPostgresLiteV2 } from './pg_lite.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 
 function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
