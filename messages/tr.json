@@ -688,12 +688,12 @@
   "your-settings": "Ayarlarınız",
   "your-ussage": "Kullanımınız:",
   "zip-bundle": "Zip uygulama paketi",
-  "alert-cannot-delete-owner-body": "Bu kullanıcıyı silemezsiniz çünkü bu kuruluşun son süper yöneticisidir. \nSüper yönetici rolünü başka bir kullanıcıya atayabilir veya kuruluşun kuruluşun \"Genel Bilgi\" bölümünden silebilirsiniz.",
   "alert-cannot-delete-owner-title": "Son Süper Yönetici Kullanıcısını Silmemiyor",
   "delegate": "Temsilci",
   "delegate-super-admin-title": "Süper Yönetici Delege",
   "no-results": "Sonuç bulunamadı",
   "please-select-user": "Lütfen bir kullanıcı seçin",
   "select-user-delegate-admin": "Süper Yönetici rolünü vermek için bir kullanıcı seçin:",
-  "please-select-permission": "Lütfen bir izin seçin"
+  "please-select-permission": "Lütfen bir izin seçin",
+  "alert-cannot-delete-owner-body": "Bu kullanıcı bu organizasyonun son süper yöneticisidir, silemezsiniz. \nSüper yönetici rolünü başka bir kullanıcıya atayabilir veya kuruluşu silebilirsiniz."
 }

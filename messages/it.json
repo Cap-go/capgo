@@ -688,12 +688,12 @@
   "your-settings": "Le tue impostazioni",
   "your-ussage": "Il tuo utilizzo:",
   "zip-bundle": "Pacchetto app Zip",
-  "alert-cannot-delete-owner-body": "Non è possibile eliminare questo utente perché sono l'ultimo super admin di questa organizzazione. \nÈ possibile assegnare il ruolo di Super Admin a un altro utente o eliminare l'organizzazione dalla sezione \"Informazioni generali\" dell'organizzazione.",
   "alert-cannot-delete-owner-title": "Impossibile eliminare l'ultimo utente super admin",
   "delegate": "Delegare",
   "delegate-super-admin-title": "Delegare super admin",
   "no-results": "Nessun risultato trovato",
   "please-select-user": "Seleziona un utente",
   "select-user-delegate-admin": "Seleziona un utente per dare il ruolo di Super Admin a:",
-  "please-select-permission": "Seleziona un'autorizzazione"
+  "please-select-permission": "Seleziona un'autorizzazione",
+  "alert-cannot-delete-owner-body": "Questo utente è l'ultimo super admin di questa organizzazione, non è possibile eliminarlo. \nÈ possibile assegnare il ruolo di Super Admin a un altro utente o eliminare l'organizzazione."
 }
