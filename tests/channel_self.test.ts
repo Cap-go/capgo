@@ -10,6 +10,13 @@ interface ChannelInfo {
   allow_self_set: boolean
 }
 
+interface SimpleErrorResponse {
+  errorCode: string
+  message: string
+  moreInfo?: any
+  cause?: any
+}
+
 type ChannelsListResponse = ChannelInfo[]
 
 const id = randomUUID()
@@ -43,9 +50,10 @@ async function fetchGetChannels(queryParams: Record<string, string>) {
   return response
 }
 
-async function getResponseError(response: Response) {
-  const json = await response.json<{ error: string }>()
-  return json.error
+async function getResponseErrorCode(response: Response) {
+  const json = await response.json<SimpleErrorResponse>()
+  console.log('json', json)
+  return json.errorCode
 }
 
 beforeAll(async () => {
@@ -73,9 +81,9 @@ describe('invalids /channel_self tests', () => {
   it('[POST] empty json', async () => {
     const response = await fetchEndpoint('POST', {})
 
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
 
-    expect(error).toContain('Cannot parse json')
+    expect(error).toBe('cannot_parse_json')
   })
 
   it('[POST] invalid semver', async () => {
@@ -83,7 +91,7 @@ describe('invalids /channel_self tests', () => {
     data.version_build = 'invalid semver'
 
     const response = await fetchEndpoint('POST', data)
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
 
     expect(error).toBe('semver_error')
   })
@@ -95,8 +103,8 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('POST', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
-    expect(error).toMatch(/Cannot parse json|missing_info/)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('cannot_parse_json')
   })
 
   it('[POST] without field (app_id)', async () => {
@@ -106,8 +114,8 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('POST', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
-    expect(error).toMatch(/Cannot parse json|missing_info/)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('cannot_parse_json')
   })
 
   it('[POST] without channel', async () => {
@@ -117,7 +125,7 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('POST', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
     expect(error).toBe('cannot_override')
   })
 
@@ -128,7 +136,7 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('POST', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
     expect(error).toBe('channel_not_found')
   })
 
@@ -145,7 +153,7 @@ describe('invalids /channel_self tests', () => {
       const response = await fetchEndpoint('POST', data)
       expect(response.status).toBe(400)
 
-      const responseError = await getResponseError(response)
+      const responseError = await getResponseErrorCode(response)
       expect(responseError).toBe('channel_set_from_plugin_not_allowed')
     }
     finally {
@@ -160,7 +168,7 @@ describe('invalids /channel_self tests', () => {
     data.version_build = 'invalid semver'
 
     const response = await fetchEndpoint('PUT', data)
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
 
     expect(error).toBe('semver_error')
   })
@@ -172,8 +180,8 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('PUT', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
-    expect(error).toMatch(/Cannot parse json|missing_info/)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('missing_device_id_or_app_id')
   })
 
   it('[PUT] post without field (app_id)', async () => {
@@ -183,8 +191,8 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('PUT', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
-    expect(error).toMatch(/Cannot parse json|missing_info/)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('missing_device_id_or_app_id')
   })
 
   it('[PUT] with a version that does not exist', async () => {
@@ -199,7 +207,7 @@ describe('invalids /channel_self tests', () => {
       const response = await fetchEndpoint('PUT', data)
       expect(response.status).toBe(400)
 
-      const responseError = await getResponseError(response)
+      const responseError = await getResponseErrorCode(response)
       expect(responseError).toBe('version_error')
     }
     finally {
@@ -214,7 +222,7 @@ describe('invalids /channel_self tests', () => {
     data.version_build = 'invalid semver'
 
     const response = await fetchEndpoint('DELETE', data)
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
 
     expect(error).toBe('semver_error')
   })
@@ -226,8 +234,8 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('DELETE', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
-    expect(error).toMatch(/Cannot parse json|missing_info/)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('missing_device_id_or_app_id')
   })
 
   it('[DELETE] post without field (app_id)', async () => {
@@ -237,8 +245,8 @@ describe('invalids /channel_self tests', () => {
     const response = await fetchEndpoint('DELETE', data)
     expect(response.status).toBe(400)
 
-    const error = await getResponseError(response)
-    expect(error).toMatch(/Cannot parse json|missing_info/)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('missing_device_id_or_app_id')
   })
 })
 
@@ -262,7 +270,7 @@ describe('GET /channel_self tests', () => {
     })
 
     expect(response.status).toBe(400)
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
     expect(error).toContain('Invalid query parameters')
   })
 
@@ -287,7 +295,7 @@ describe('GET /channel_self tests', () => {
     })
 
     expect(response.status).toBe(400)
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
     expect(error).toContain('Invalid query parameters')
   })
 
@@ -300,7 +308,7 @@ describe('GET /channel_self tests', () => {
     })
 
     expect(response.status).toBe(400)
-    const error = await getResponseError(response)
+    const error = await getResponseErrorCode(response)
     expect(error).toBe('app_not_found')
   })
 
@@ -567,7 +575,7 @@ it('[POST] with a version that does not exist', async () => {
   const response = await fetchEndpoint('POST', data)
   expect(response.status).toBe(200)
 
-  const responseError = await getResponseError(response)
+  const responseError = await getResponseErrorCode(response)
   expect(responseError).toBeUndefined()
 })
 
@@ -710,7 +718,7 @@ it('[PUT] /channel_self with non-existent defaultChannel', async () => {
   const response = await fetchEndpoint('PUT', data)
   expect(response.ok).toBe(false)
 
-  const error = await getResponseError(response)
+  const error = await getResponseErrorCode(response)
   expect(error).toBe('channel_not_found')
 })
 
@@ -758,7 +766,7 @@ it('[DELETE] /channel_self (no overwrite)', async () => {
   const response = await fetchEndpoint('DELETE', data)
   expect(response.status).toBe(400)
 
-  const error = await getResponseError(response)
+  const error = await getResponseErrorCode(response)
   expect(error).toBe('cannot_override')
 })
 

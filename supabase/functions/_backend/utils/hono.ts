@@ -1,4 +1,3 @@
-import type { ContentfulStatusCode } from '@hono/http-status'
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
@@ -348,7 +347,7 @@ export interface SimpleErrorResponse {
   moreInfo?: any
 }
 
-export function simpleError(status: ContentfulStatusCode, errorCode: string, message: string, moreInfo: any, cause?: any) {
+export function simpleError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
   // const safeCause = cause ? JSON.stringify(cause, Object.getOwnPropertyNames(cause)) : undefined
   const res: SimpleErrorResponse = {
     errorCode,
@@ -357,5 +356,5 @@ export function simpleError(status: ContentfulStatusCode, errorCode: string, mes
     // cause: safeCause,
   }
   console.log('res of simpleError', res)
-  return new HTTPException(status, { res: new Response(JSON.stringify(res), { status }) })
+  return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }) })
 }
