@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'DELETE'), (
       cloudlog({ requestId: c.get('requestId'), message: 'no app_id or user_id' })
       return c.json(BRES)
     }
-    return deleteIt(c as any, record)
+    return deleteIt(c, record)
   }
   catch (e) {
     return c.json({ status: 'Cannot delete version', error: JSON.stringify(e) }, 500)

@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { getDrizzleClient } from './pg.ts'
 import type { getDrizzleClientD1 } from './pg_d1.ts'
 import { and, eq, or, sql } from 'drizzle-orm'

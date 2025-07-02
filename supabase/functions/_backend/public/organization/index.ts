@@ -12,9 +12,9 @@ export const app = honoFactory.createApp()
 
 app.get('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return get(c as any, body, apikey)
+    return get(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot get organization', error: JSON.stringify(e) }, 500)
@@ -23,9 +23,9 @@ app.get('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
 
 app.put('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return put(c as any, body, apikey)
+    return put(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot create organization', error: JSON.stringify(e) }, 500)
@@ -34,9 +34,9 @@ app.put('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
 
 app.post('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return post(c as any, body, apikey)
+    return post(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot create organization', error: JSON.stringify(e) }, 500)
@@ -45,9 +45,9 @@ app.post('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
 
 app.delete('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteOrg(c as any, body, apikey)
+    return deleteOrg(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot delete organization', error: JSON.stringify(e) }, 500)
@@ -56,9 +56,9 @@ app.delete('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => 
 
 app.get('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return getMembers(c as any, body, apikey)
+    return getMembers(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot get organization', error: JSON.stringify(e) }, 500)
@@ -67,9 +67,9 @@ app.get('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c)
 
 app.post('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return inviteUser(c as any, body, apikey)
+    return inviteUser(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot invite user to organization', error: JSON.stringify(e) }, 500)
@@ -78,9 +78,9 @@ app.post('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c
 
 app.delete('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteMember(c as any, body, apikey)
+    return deleteMember(c, body, apikey)
   }
   catch (e) {
     return c.json({ status: 'Cannot delete user from organization', error: JSON.stringify(e) }, 500)

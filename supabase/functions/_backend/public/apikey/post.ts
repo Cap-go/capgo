@@ -37,7 +37,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'Invalid mode' }, 400)
   }
 
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
     user_id: key.user_id,
     key: crypto.randomUUID(),

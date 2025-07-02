@@ -28,8 +28,8 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'invalid_json_body' }, 400)
     }
 
-    const supabaseAdmin = await useSupabaseAdmin(c as any)
-    const supabaseClient = useSupabaseClient(c as any, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c)
+    const supabaseClient = useSupabaseClient(c, authToken)
 
     const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
     if (adminError) {
@@ -61,7 +61,7 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ error: 'generate_magic_link_error' }, 500)
     }
 
-    const tmpSupabaseClient = emptySupabase(c as any)
+    const tmpSupabaseClient = emptySupabase(c)
     const { data: authData, error: authError } = await tmpSupabaseClient.auth.verifyOtp({ token_hash: magicLink.properties.hashed_token, type: 'email' })
 
     if (authError) {

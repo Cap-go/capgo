@@ -21,7 +21,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
     }
 
     // Check if the channel is public
-    const { data: channel, error: channelError } = await supabaseAdmin(c as any)
+    const { data: channel, error: channelError } = await supabaseAdmin(c)
       .from('channels')
       .select('public')
       .eq('id', record.channel_id)
@@ -35,7 +35,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
     // If channel is public, send events
     if (channel?.public) {
       // Get version details for the event
-      const { data: version, error: versionError } = await supabaseAdmin(c as any)
+      const { data: version, error: versionError } = await supabaseAdmin(c)
         .from('app_versions')
         .select('name, owner_org')
         .eq('id', record.version_id)
@@ -46,8 +46,8 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
         return c.json(BRES)
       }
 
-      const LogSnag = logsnag(c as any)
-      await backgroundTask(c as any, LogSnag.track({
+      const LogSnag = logsnag(c)
+      await backgroundTask(c, LogSnag.track({
         channel: 'bundle-deployed',
         event: 'Bundle Deployed',
         icon: '🚀',
@@ -60,7 +60,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
         notify: false,
       }))
 
-      await backgroundTask(c as any, supabaseAdmin(c as any)
+      await backgroundTask(c, supabaseAdmin(c)
         .from('orgs')
         .select('*')
         .eq('id', version.owner_org)
@@ -70,7 +70,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
             cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
             return c.json({ status: 'Error fetching organization' }, 500)
           }
-          return trackBentoEvent(c as any, data.management_email, {
+          return trackBentoEvent(c, data.management_email, {
             org_id: version.owner_org,
             app_id: record.app_id,
             bundle_name: version.name,

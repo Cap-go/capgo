@@ -11,8 +11,8 @@ app.use('/', useCors)
 
 app.get('/', async (c) => {
   try {
-    const updateStats = await getUpdateStats(c as any)
-    const LogSnag = logsnag(c as any)
+    const updateStats = await getUpdateStats(c)
+    const LogSnag = logsnag(c)
     await LogSnag.track({
       channel: 'updates-stats',
       event: 'Updates Stats',

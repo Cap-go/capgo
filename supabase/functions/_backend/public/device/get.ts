@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { readDevices } from '../../utils/stats.ts'

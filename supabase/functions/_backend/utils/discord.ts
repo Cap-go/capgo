@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type {
   RESTPostAPIWebhookWithTokenJSONBody,
 } from 'discord-api-types/v10'

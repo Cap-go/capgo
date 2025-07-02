@@ -1,5 +1,5 @@
 import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Digester } from './digest.ts'

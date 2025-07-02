@@ -35,7 +35,7 @@ app.post('/', async (c) => {
     // For now, we're just doing validation without additional logic
     // This will be expanded with the actual invitation acceptance logic
 
-    const supabaseAdmin = useSupabaseAdmin(c as any)
+    const supabaseAdmin = useSupabaseAdmin(c)
     const { data: invitation, error: invitationError } = await supabaseAdmin.from('tmp_users')
       .select('*')
       .eq('invite_magic_string', body.magic_invite_string)
@@ -91,7 +91,7 @@ app.post('/', async (c) => {
 
     // let's now login the user in. The rough idea is that we will create a session and then return the session to the client
     // then the client will use the session to redirect to login page.
-    const userSupabase = emptySupabase(c as any)
+    const userSupabase = emptySupabase(c)
     const { data: session, error: sessionError } = await userSupabase.auth.signInWithPassword({
       email: invitation.email,
       password: body.password,

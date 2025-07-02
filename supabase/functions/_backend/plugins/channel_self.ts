@@ -1,11 +1,10 @@
 // channel self old function
-import type { Context } from '@hono/hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Context } from 'hono'
 import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { format, tryParse } from '@std/semver'
-import { Hono } from 'hono/tiny'
+import { honoFactory } from '../utils/hono.ts'
 import { z } from 'zod'
 import { BRES, getBody } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
@@ -546,7 +545,7 @@ async function listCompatibleChannels(c: Context, queryParams: { app_id: string,
   return c.json(compatibleChannels)
 }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = honoFactory.createApp()
 
 app.post('/', async (c) => {
   try {
@@ -557,7 +556,7 @@ app.post('/', async (c) => {
       return c.json({ error: `Cannot parse json: ${parseResult.error}` }, 400)
     }
     cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
-    return post(c as any, body)
+    return post(c, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self set channel', error: JSON.stringify(e) }, 500)
@@ -569,7 +568,7 @@ app.put('/', async (c) => {
   try {
     const body = await c.req.json<DeviceLink>()
     cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
-    return put(c as any, body)
+    return put(c, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self get channel', error: JSON.stringify(e) }, 500)
@@ -578,10 +577,10 @@ app.put('/', async (c) => {
 
 app.delete('/', async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c as any)
+    const body = await getBody<DeviceLink>(c)
     // const body = await c.req.json<DeviceLink>()
     cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
-    return deleteOverride(c as any, body)
+    return deleteOverride(c, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot self delete channel', error: JSON.stringify(e) }, 500)
@@ -611,7 +610,7 @@ app.get('/', (c) => {
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'list channels query', query: parseResult.data })
-    return listCompatibleChannels(c as any, parseResult.data)
+    return listCompatibleChannels(c, parseResult.data)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'list channels error', error: e })

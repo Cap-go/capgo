@@ -13,14 +13,14 @@ interface UpdateMetadataBody {
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
   try {
-    const body = await getBody<UpdateMetadataBody>(c as any)
+    const body = await getBody<UpdateMetadataBody>(c)
     // We don't need apikey for this endpoint as middleware handles permission checks
 
     if (!body.app_id || !body.version_id) {
       return c.json({ status: 'Missing required fields', error: 'app_id and version_id are required' }, 400)
     }
 
-    const { data: version, error: versionError } = await supabaseAdmin(c as any)
+    const { data: version, error: versionError } = await supabaseAdmin(c)
       .from('app_versions')
       .select('*')
       .eq('app_id', body.app_id)
@@ -46,7 +46,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
       return c.json({ status: 'No fields to update' }, 400)
     }
 
-    const { error: updateError } = await supabaseAdmin(c as any)
+    const { error: updateError } = await supabaseAdmin(c)
       .from('app_versions')
       .update(updateData)
       .eq('app_id', body.app_id)

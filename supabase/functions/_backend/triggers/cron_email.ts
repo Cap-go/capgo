@@ -86,7 +86,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 })
 
 async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
-  const supabase = await supabaseAdmin(c as any)
+  const supabase = await supabaseAdmin(c)
 
   const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
     app_id: appId,
@@ -122,13 +122,13 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
     fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
   }
 
-  await trackBentoEvent(c as any, email, metadata, 'user:weekly_stats')
+  await trackBentoEvent(c, email, metadata, 'user:weekly_stats')
 
   return c.json(BRES)
 }
 
 async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
-  const supabase = await supabaseAdmin(c as any)
+  const supabase = await supabaseAdmin(c)
   // Fetch additional stats for bundle creation, channel creation, and publishing
   const { data: appVersions, error: _appVersionsError } = await supabase
     .from('app_versions')
@@ -162,7 +162,7 @@ async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
     monthly_publishes: publishCount.toString(),
   }
 
-  await trackBentoEvent(c as any, email, metadata, 'org:monthly_create_stats')
+  await trackBentoEvent(c, email, metadata, 'org:monthly_create_stats')
 
   return c.json(BRES)
 }

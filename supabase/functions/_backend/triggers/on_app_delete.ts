@@ -21,7 +21,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'DELETE'), async (c)
     const startTime = Date.now()
 
     // Track deleted app for billing
-    await supabaseAdmin(c as any)
+    await supabaseAdmin(c)
       .from('deleted_apps')
       .insert({
         app_id: record.app_id,
@@ -31,56 +31,56 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'DELETE'), async (c)
     // Run most deletions in parallel
     await Promise.all([
       // Delete version related data
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('app_versions_meta')
         .delete()
         .eq('app_id', record.app_id),
 
       // Delete daily version stats
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('daily_version')
         .delete()
         .eq('app_id', record.app_id),
 
       // Delete version usage
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('version_usage')
         .delete()
         .eq('app_id', record.app_id),
 
       // Delete app related data
       // Delete channel devices
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('channel_devices')
         .delete()
         .eq('app_id', record.app_id),
 
       // Delete channels
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('channels')
         .delete()
         .eq('app_id', record.app_id),
 
       // Delete devices
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('devices')
         .delete()
         .eq('app_id', record.app_id),
 
       // Delete org_users with this app_id
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('org_users')
         .delete()
         .eq('app_id', record.app_id),
 
-      supabaseAdmin(c as any)
+      supabaseAdmin(c)
         .from('deploy_history')
         .delete()
         .eq('app_id', record.app_id),
     ])
 
     // Delete versions (last)
-    await supabaseAdmin(c as any)
+    await supabaseAdmin(c)
       .from('app_versions')
       .delete()
       .eq('app_id', record.app_id)

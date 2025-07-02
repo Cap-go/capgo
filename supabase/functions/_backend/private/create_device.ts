@@ -34,8 +34,8 @@ app.post('/', middlewareAuth, async (c) => {
 
     const safeBody = parsedBodyResult.data
 
-    const supabaseAdmin = await useSupabaseAdmin(c as any)
-    const supabaseClient = useSupabaseClient(c as any, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c)
+    const supabaseClient = useSupabaseClient(c, authToken)
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData?.data?.user || clientData?.error) {
@@ -73,7 +73,7 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'not_authorized' }, 403)
     }
 
-    await createStatsDevices(c as any, safeBody.app_id, safeBody.device_id, safeBody.version, safeBody.platform, '0.0.0', '0.0.0', '0.0.0', '', true, false)
+    await createStatsDevices(c, safeBody.app_id, safeBody.device_id, safeBody.version, safeBody.platform, '0.0.0', '0.0.0', '0.0.0', '', true, false)
 
     return c.body(null, 204) // No content
   }

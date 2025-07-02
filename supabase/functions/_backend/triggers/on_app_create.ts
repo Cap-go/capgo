@@ -20,8 +20,8 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   }
 
   try {
-    const LogSnag = logsnag(c as any)
-    await backgroundTask(c as any, LogSnag.track({
+    const LogSnag = logsnag(c)
+    await backgroundTask(c, LogSnag.track({
       channel: 'app-created',
       event: 'App Created',
       icon: '🎉',
@@ -31,8 +31,8 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
       },
       notify: false,
     }))
-    const supabase = supabaseAdmin(c as any)
-    await backgroundTask(c as any, supabase
+    const supabase = supabaseAdmin(c)
+    await backgroundTask(c, supabase
       .from('orgs')
       .select('*')
       .eq('id', record.owner_org)
@@ -42,7 +42,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
           cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
           return c.json({ status: 'Error fetching organization' }, 500)
         }
-        return trackBentoEvent(c as any, data.management_email, {
+        return trackBentoEvent(c, data.management_email, {
           org_id: record.owner_org,
           org_name: data.name,
           app_name: record.name,

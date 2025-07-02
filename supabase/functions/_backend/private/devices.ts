@@ -30,15 +30,15 @@ app.post('/', middlewareAuth, async (c) => {
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')
     if (apikey_string) {
-      const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
+      const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
         .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
       if (_errorUserId || !userId)
         return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
-      if (!(await hasAppRightApikey(c as any, body.appId, userId, 'read', apikey_string)))
+      if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string)))
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
     }
     else if (authorization) {
-      const reqOwner = await supabaseClient(c as any, authorization)
+      const reqOwner = await supabaseClient(c, authorization)
         .rpc('has_app_right', { appid: body.appId, right: 'read' })
         .then(res => res.data ?? false)
       if (!reqOwner)
@@ -48,8 +48,8 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'You can\'t access this app auth not found', app_id: body.appId }, 400)
     }
     if (body.count)
-      return c.json({ count: await countDevices(c as any, body.appId) })
-    return c.json(await readDevices(c as any, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search, body.order))
+      return c.json({ count: await countDevices(c, body.appId) })
+    return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search, body.order))
   }
   catch (e) {
     return c.json({ status: 'Cannot get devices', error: JSON.stringify(e) }, 500)

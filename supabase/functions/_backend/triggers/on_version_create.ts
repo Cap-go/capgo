@@ -20,7 +20,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
       return c.json(BRES)
     }
 
-    const { error: errorUpdate } = await supabaseAdmin(c as any)
+    const { error: errorUpdate } = await supabaseAdmin(c)
       .from('apps')
       .update({
         last_version: record.name,
@@ -30,8 +30,8 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     if (errorUpdate)
       cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
 
-    const LogSnag = logsnag(c as any)
-    await backgroundTask(c as any, LogSnag.track({
+    const LogSnag = logsnag(c)
+    await backgroundTask(c, LogSnag.track({
       channel: 'bundle-created',
       event: 'Bundle Created',
       icon: '🎉',
@@ -42,7 +42,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
       },
       notify: false,
     }))
-    await backgroundTask(c as any, supabaseAdmin(c as any)
+    await backgroundTask(c, supabaseAdmin(c)
       .from('orgs')
       .select('*')
       .eq('id', record.owner_org)
@@ -52,7 +52,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
           cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
           return c.json({ status: 'Error fetching organization' }, 500)
         }
-        return trackBentoEvent(c as any, data.management_email, {
+        return trackBentoEvent(c, data.management_email, {
           org_id: record.owner_org,
           app_id: record.app_id,
           bundle_name: record.name,

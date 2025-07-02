@@ -15,7 +15,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
     cloudlog({ requestId: c.get('requestId'), message: 'body', body })
     cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
-    return post(c as any, body, apikey)
+    return post(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot post devices', error: e })
@@ -25,11 +25,11 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c as any)
+    const body = await getBody<DeviceLink>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
     cloudlog({ requestId: c.get('requestId'), message: 'body', body })
     cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
-    return get(c as any, body, apikey)
+    return get(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get devices', error: e })
@@ -39,11 +39,11 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   try {
-    const body = await getBody<DeviceLink>(c as any)
+    const body = await getBody<DeviceLink>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
     cloudlog({ requestId: c.get('requestId'), message: 'body', body })
     cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
-    return deleteOverride(c as any, body, apikey)
+    return deleteOverride(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete devices', error: e })

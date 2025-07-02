@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -226,10 +226,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     }
     // // check if not deleted it's present in s3 storage
     if (record.deleted && record.deleted !== body.old_record.deleted)
-      return deleteIt(c as any, body.record as any)
+      return deleteIt(c, body.record as any)
 
     cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
-    return updateIt(c as any, body)
+    return updateIt(c, body)
   }
   catch (e) {
     return c.json({ status: 'Cannot update version', error: JSON.stringify(e) }, 500)

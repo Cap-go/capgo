@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import { LogSnag } from '@logsnag/node'
 
 import ky from 'ky'

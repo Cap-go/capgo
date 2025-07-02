@@ -1,5 +1,5 @@
 import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import dayjs from 'dayjs'

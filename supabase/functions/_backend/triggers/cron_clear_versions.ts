@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -21,26 +21,26 @@ app.post('/', middlewareAPISecret, async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'post body cron_clear_versions', body })
 
     // Let's start with the metadata
-    const supabase = supabaseAdmin(c as any)
+    const supabase = supabaseAdmin(c)
 
     const version = body.version
     if (version.user_id === null) {
       // find the user_id from the app_id
-      const { data: app, error: errorApp } = await supabaseAdmin(c as any)
+      const { data: app, error: errorApp } = await supabaseAdmin(c)
         .from('apps')
         .select('user_id')
         .eq('app_id', version.app_id)
         .single()
       if (errorApp)
-        return errorOut(c as any, `Cannot find user_id for app_id ${version.app_id} because of error: ${errorApp}`)
+        return errorOut(c, `Cannot find user_id for app_id ${version.app_id} because of error: ${errorApp}`)
       if (!app)
-        return errorOut(c as any, `Cannot find user_id for app_id ${version.app_id} because of no app found`)
+        return errorOut(c, `Cannot find user_id for app_id ${version.app_id} because of no app found`)
       version.user_id = app.user_id
     }
 
     let notFound = false
     try {
-      const v2Path = await getPath(c as any, version)
+      const v2Path = await getPath(c, version)
         .catch((e) => {
           cloudlog({ requestId: c.get('requestId'), message: 'error getPath', error: e })
           // if error is rate limit this terminate the function
@@ -54,7 +54,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         notFound = true
         throw new Error(`no_path ${version.id}`)
       }
-      const size = await s3.getSize(c as any, v2Path).catch((e) => {
+      const size = await s3.getSize(c, v2Path).catch((e) => {
         cloudlog({ requestId: c.get('requestId'), message: 'error getSize', error: e })
         // if error is rate limit this terminate the function
         if (e.message.includes('Rate limit exceeded')) {
@@ -69,15 +69,15 @@ app.post('/', middlewareAPISecret, async (c) => {
         throw new Error(`no_size ${version.id} ${v2Path}`)
       }
       // get checksum from table app_versions
-      const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c as any)
+      const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c)
         .from('app_versions')
         .select('checksum')
         .eq('id', version.id)
         .single()
       if (errorAppVersion)
-        return errorOut(c as any, `Cannot find checksum for app_versions id ${version.id} because of error: ${errorAppVersion}`)
+        return errorOut(c, `Cannot find checksum for app_versions id ${version.id} because of error: ${errorAppVersion}`)
       if (!appVersion)
-        return errorOut(c as any, `Cannot find checksum for app_versions id ${version.id} because of no app_versions found`)
+        return errorOut(c, `Cannot find checksum for app_versions id ${version.id} because of no app_versions found`)
       const checksum = appVersion.checksum
       if (!checksum) {
         cloudlog({ requestId: c.get('requestId'), message: `No checksum for ${v2Path}, ${checksum}` })
@@ -106,7 +106,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('version', version.id)
 
       if (error)
-        return errorOut(c as any, `Cannot check channel count for ${version.id} because of error: ${error}`)
+        return errorOut(c, `Cannot check channel count for ${version.id} because of error: ${error}`)
 
       if ((count ?? 0) > 0) {
         if (notFound) {
@@ -118,15 +118,15 @@ app.post('/', middlewareAPISecret, async (c) => {
             .eq('name', 'unknown')
             .single()
           if (errorUnknowVersion)
-            return errorOut(c as any, `Cannot find unknow version for app_id ${version.app_id} because of error: ${errorUnknowVersion}`)
+            return errorOut(c, `Cannot find unknow version for app_id ${version.app_id} because of error: ${errorUnknowVersion}`)
           if (!unknowVersion)
-            return errorOut(c as any, `Cannot find unknow version for app_id ${version.app_id} because of no unknow version found`)
+            return errorOut(c, `Cannot find unknow version for app_id ${version.app_id} because of no unknow version found`)
           await supabase.from('channels')
             .update({ version: unknowVersion.id })
             .eq('version', version.id)
         }
         else {
-          return errorOut(c as any, `cannot delete failed version ${version.id}, linked in some channels (${data.map(d => d.id).join(', ')})`)
+          return errorOut(c, `cannot delete failed version ${version.id}, linked in some channels (${data.map(d => d.id).join(', ')})`)
         }
       }
 
@@ -135,7 +135,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .eq('id', version.id)
 
       if (error1)
-        errorOut(c as any, `Cannot delete version ${version.id} because of the error: ${error1}`)
+        errorOut(c, `Cannot delete version ${version.id} because of the error: ${error1}`)
     }
     return c.json(BRES)
   }

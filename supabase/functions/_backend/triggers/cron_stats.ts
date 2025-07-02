@@ -22,7 +22,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (!body.appId || !body.orgId)
       return c.json({ status: 'No appId' }, 400)
 
-    const supabase = supabaseAdmin(c as any)
+    const supabase = supabaseAdmin(c)
 
     // get the period of the billing of the organization
     const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
@@ -35,12 +35,12 @@ app.post('/', middlewareAPISecret, async (c) => {
     const endDate = cycleInfo.subscription_anchor_end
 
     // get mau
-    let mau = await readStatsMau(c as any, body.appId, startDate, endDate)
+    let mau = await readStatsMau(c, body.appId, startDate, endDate)
     // get bandwidth
-    let bandwidth = await readStatsBandwidth(c as any, body.appId, startDate, endDate)
+    let bandwidth = await readStatsBandwidth(c, body.appId, startDate, endDate)
     // get storage
-    let storage = await readStatsStorage(c as any, body.appId, startDate, endDate)
-    let versionUsage = await readStatsVersion(c as any, body.appId, startDate, endDate)
+    let storage = await readStatsStorage(c, body.appId, startDate, endDate)
+    let versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
 
     if (body.todayOnly) {
       // take only the last day

@@ -10,7 +10,7 @@ app.get('/', middlewareKey(['all']), async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey You cannot do that as a limited API key' })
     return c.json({ error: 'You cannot do that as a limited API key' }, 401)
   }
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
 
   const { data: apikeys, error } = await supabase
     .from('apikeys')
@@ -36,7 +36,7 @@ app.get('/:id', middlewareKey(['all']), async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update apikey API key ID is required' })
     return c.json({ error: 'API key ID is required' }, 400)
   }
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
   const { data: apikey, error } = await supabase
     .from('apikeys')
     .select('*')

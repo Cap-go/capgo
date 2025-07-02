@@ -14,9 +14,9 @@ app.route('/metadata', updateMetadataApp)
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   try {
-    const body = await getBody<GetLatest>(c as any)
+    const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return get(c as any, body, apikey)
+    return get(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get bundle', error: e })
@@ -26,9 +26,9 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   try {
-    const body = await getBody<GetLatest>(c as any)
+    const body = await getBody<GetLatest>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteBundle(c as any, body, apikey)
+    return deleteBundle(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete bundle', error: e })
@@ -38,9 +38,9 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
 
 app.put('/', middlewareKey(['all', 'write']), async (c) => {
   try {
-    const body = await getBody<any>(c as any)
+    const body = await getBody<any>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return setChannel(c as any, body, apikey)
+    return setChannel(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set bundle to channel', error: e })

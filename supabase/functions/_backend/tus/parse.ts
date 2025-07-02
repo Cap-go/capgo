@@ -1,7 +1,7 @@
 // Copyright 2023 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { cloudlog } from '../utils/loggin.ts'
 import { X_CHECKSUM_SHA256 } from './uploadHandler.ts'

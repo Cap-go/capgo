@@ -21,17 +21,17 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     }
 
     if (!record.customer_id)
-      await createStripeCustomer(c as any, record as any)
+      await createStripeCustomer(c, record as any)
 
-    const LogSnag = logsnag(c as any)
-    await backgroundTask(c as any, LogSnag.track({
+    const LogSnag = logsnag(c)
+    await backgroundTask(c, LogSnag.track({
       channel: 'org-created',
       event: 'Org Created',
       icon: '🎉',
       user_id: record.id,
       notify: false,
     }))
-    await backgroundTask(c as any, trackBentoEvent(c as any, record.management_email, {
+    await backgroundTask(c, trackBentoEvent(c, record.management_email, {
       org_id: record.id,
       org_name: record.name,
     }, 'org:created'))

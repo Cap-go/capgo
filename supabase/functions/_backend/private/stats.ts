@@ -28,19 +28,19 @@ app.post('/', async (c) => {
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')
     if (apikey_string) {
-      const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
+      const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
         .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
       if (_errorUserId || !userId) {
         cloudlog({ requestId: c.get('requestId'), message: 'error', error: _errorUserId, userId })
         return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
       }
-      if (!(await hasAppRightApikey(c as any, body.appId, userId, 'read', apikey_string))) {
+      if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string))) {
         cloudlog({ requestId: c.get('requestId'), message: 'error hasAppRight not found', userId })
         return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
       }
     }
     else if (authorization) {
-      const reqOwner = await supabaseClient(c as any, authorization)
+      const reqOwner = await supabaseClient(c, authorization)
         .rpc('has_app_right', { appid: body.appId, right: 'read' })
         .then(res => res.data ?? false)
       if (!reqOwner) {
@@ -53,7 +53,7 @@ app.post('/', async (c) => {
       return c.json({ status: 'You can\'t access this app auth not found', app_id: body.appId }, 400)
     }
 
-    return c.json(await readStats(c as any, body.appId, body.rangeStart, body.rangeEnd, body.devicesId, body.search, body.order, body.limit))
+    return c.json(await readStats(c, body.appId, body.rangeStart, body.rangeEnd, body.devicesId, body.search, body.order, body.limit))
   }
   catch (e) {
     return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)

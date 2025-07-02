@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
 import type { getDrizzleClientD1 } from './pg_d1.ts'
 import type { DeviceWithoutCreatedAt } from './stats.ts'

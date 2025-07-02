@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type Stripe from 'stripe'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { StripeData } from '../utils/stripe.ts'
@@ -20,7 +20,7 @@ interface Org {
 async function customerSourceCreated(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org, stripeEvent: Stripe.CustomerSourceCreatedEvent) {
   const card = stripeEvent.data.object as any
   const expirationDate = card.exp_month && card.exp_year ? `${card.exp_month}/${card.exp_year}` : 'unknown'
-  await trackBentoEvent(c as any, org.management_email, { expiration_date: expirationDate }, 'org:card_added')
+  await trackBentoEvent(c, org.management_email, { expiration_date: expirationDate }, 'org:card_added')
   await LogSnag.track({
     channel: 'usage',
     event: 'Credit Card Added',
@@ -32,7 +32,7 @@ async function customerSourceCreated(c: Context, LogSnag: ReturnType<typeof logs
 }
 
 async function customerSourceExpiring(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org) {
-  await trackBentoEvent(c as any, org.management_email, {}, 'org:card_expiring')
+  await trackBentoEvent(c, org.management_email, {}, 'org:card_expiring')
   await LogSnag.track({
     channel: 'usage',
     event: 'Credit Card Expiring',
@@ -48,7 +48,7 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
   let planName = null
   let planType = 'monthly'
   if (stripeData.data.product_id) {
-    const { data: plan } = await supabaseAdmin(c as any)
+    const { data: plan } = await supabaseAdmin(c)
       .from('plans')
       .select('name, price_y_id')
       .eq('stripe_id', stripeData.data.product_id)
@@ -63,7 +63,7 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
     }
   }
   const price = invoice.total ? invoice.total / 100 : 0
-  await trackBentoEvent(c as any, org.management_email, { plan_name: planName, price, plan_type: planType }, 'org:invoice_upcoming')
+  await trackBentoEvent(c, org.management_email, { plan_name: planName, price, plan_type: planType }, 'org:invoice_upcoming')
   await LogSnag.track({
     channel: 'usage',
     event: 'Invoice Upcoming',
@@ -77,24 +77,24 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
 async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>) {
   const status = stripeData.data.status
   let statusName: string = status ?? ''
-  const { data: plan } = await supabaseAdmin(c as any)
+  const { data: plan } = await supabaseAdmin(c)
     .from('plans')
     .select()
     .eq('stripe_id', stripeData.data.product_id)
     .single()
   if (plan) {
-    const { error: dbError2 } = await supabaseAdmin(c as any)
+    const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update(stripeData.data)
       .eq('customer_id', stripeData.data.customer_id)
     if (stripeData.isUpgrade && stripeData.previousProductId) {
       statusName = 'upgraded'
-      const previousProduct = await supabaseAdmin(c as any)
+      const previousProduct = await supabaseAdmin(c)
         .from('plans')
         .select()
         .eq('stripe_id', stripeData.previousProductId)
         .single()
-      await trackBentoEvent(c as any, org.management_email, {
+      await trackBentoEvent(c, org.management_email, {
         plan_name: plan.name,
         previous_plan_name: previousProduct.data?.name ?? '',
       }, 'user:plan_change')
@@ -116,11 +116,11 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
       return c.json({ error: `succeeded: customer_id not found: ${stripeData.data.customer_id}`, dbError2, stripeData }, 500)
     }
 
-    const segment = await customerToSegmentOrg(c as any, org.id, stripeData.data.price_id, plan)
+    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
     const eventName = `user:subcribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
-    await trackBentoEvent(c as any, org.management_email, { plan_name: plan.name }, eventName)
-    await addTagBento(c as any, org.management_email, segment)
+    await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
+    await addTagBento(c, org.management_email, segment)
     await LogSnag.track({
       channel: 'usage',
       event: status === 'succeeded' ? 'User subscribe' : 'User update subscribe',
@@ -133,14 +133,14 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     }).catch()
   }
   else {
-    const segment = await customerToSegmentOrg(c as any, org.id, stripeData.data.price_id)
-    await addTagBento(c as any, org.management_email, segment)
+    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
+    await addTagBento(c, org.management_email, segment)
   }
   return false
 }
 
 async function updateStripeInfo(c: Context, stripeData: StripeData) {
-  const { error: dbError2 } = await supabaseAdmin(c as any)
+  const { error: dbError2 } = await supabaseAdmin(c)
     .from('stripe_info')
     .update(stripeData.data)
     .eq('customer_id', stripeData.data.customer_id)
@@ -152,9 +152,9 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
 }
 
 async function didCancel(c: Context, org: Org, LogSnag: ReturnType<typeof logsnag>) {
-  const segment = await customerToSegmentOrg(c as any, org.id, 'canceled')
-  await addTagBento(c as any, org.management_email, segment)
-  await trackBentoEvent(c as any, org.management_email, {}, 'user:cancel')
+  const segment = await customerToSegmentOrg(c, org.id, 'canceled')
+  await addTagBento(c, org.management_email, segment)
+  await trackBentoEvent(c, org.management_email, {}, 'user:cancel')
   await LogSnag.track({
     channel: 'usage',
     event: 'User cancel',
@@ -165,7 +165,7 @@ async function didCancel(c: Context, org: Org, LogSnag: ReturnType<typeof logsna
 }
 
 async function getOrg(c: Context, stripeData: StripeData) {
-  const { error: dbError, data: org } = await supabaseAdmin(c as any)
+  const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
     .select('id, management_email')
     .eq('customer_id', stripeData.data.customer_id)
@@ -185,7 +185,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
   const previousAttributes = stripeEvent.data.previous_attributes ?? {} as any
   if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === true && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === false) {
     // cloudlog('USER CANCELLED!!!!!!!!!!!!!!!')
-    const { error: dbError2 } = await supabaseAdmin(c as any)
+    const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update({ canceled_at: new Date().toISOString() })
       .eq('customer_id', stripeData.customer_id)
@@ -196,7 +196,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
   }
   else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
     // cloudlog('USER UNCANCELED')
-    const { error: dbError2 } = await supabaseAdmin(c as any)
+    const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update({ canceled_at: null })
       .eq('customer_id', stripeData.customer_id)
@@ -210,7 +210,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
 
 app.post('/', middlewareStripeWebhook(), async (c) => {
   try {
-    const LogSnag = logsnag(c as any)
+    const LogSnag = logsnag(c)
     const stripeData = c.get('stripeData')!
     const stripeEvent = c.get('stripeEvent')!
 
@@ -221,7 +221,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       return c.json({ status: 'Webhook Error: no org found' }, 400)
     }
 
-    const { data: customer } = await supabaseAdmin(c as any)
+    const { data: customer } = await supabaseAdmin(c)
       .from('stripe_info')
       .select()
       .eq('customer_id', stripeData.data.customer_id)
@@ -251,7 +251,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       }
     }
     else if (stripeData.data.status === 'failed') {
-      await trackBentoEvent(c as any, org.management_email, {}, 'org:failed_payment')
+      await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
     }
     else if (['canceled', 'deleted'].includes(stripeData.data.status ?? '') && customer && customer.subscription_id === stripeData.data.subscription_id) {
       await didCancel(c, org, LogSnag)

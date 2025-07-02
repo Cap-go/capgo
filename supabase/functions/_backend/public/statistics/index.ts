@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -50,18 +50,18 @@ app.get('/app/:app_id', async (c) => {
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
+      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid apikey', data: auth })
         return c.json({ status: 'You can\'t access this app' }, 400)
       }
     }
-    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
+    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid jwt', data: auth.userId })
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c as any)
-    const { data: finalStats, error } = await getNormalStats(c as any, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+    const supabase = supabaseAdmin(c)
+    const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app statistics', error })
@@ -82,7 +82,7 @@ app.get('/org/:org_id', async (c) => {
     const query = c.req.query()
 
     // Check if user has access to this organization
-    const supabase = supabaseAdmin(c as any)
+    const supabase = supabaseAdmin(c)
 
     const bodyParsed = normalStatsSchema.safeParse(query)
     if (!bodyParsed.success) {
@@ -92,7 +92,7 @@ app.get('/org/:org_id', async (c) => {
     const body = bodyParsed.data
 
     const auth = c.get('auth') as AuthInfo
-    if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read'))) {
+    if (!(await hasOrgRight(c, orgId, auth.userId, 'read'))) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid jwt', data: auth.userId })
       return c.json({ status: 'You can\'t access this organization' }, 400)
     }
@@ -108,7 +108,7 @@ app.get('/org/:org_id', async (c) => {
       return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
     }
 
-    const { data: finalStats, error } = await getNormalStats(c as any, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+    const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organization statistics', error })
@@ -138,17 +138,17 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
 
     const auth = c.get('auth') as AuthInfo
     if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
+      if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid apikey', data: auth.apikey!.key })
         return c.json({ status: 'You can\'t access this app' }, 400)
       }
     }
-    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
+    else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid jwt', data: auth.userId })
       return c.json({ status: 'You can\'t access this app' }, 400)
     }
 
-    const supabase = supabaseAdmin(c as any)
+    const supabase = supabaseAdmin(c)
     const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
     if (error) {
@@ -166,7 +166,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
 
 app.get('/user', async (c) => {
   const auth = c.get('auth') as AuthInfo
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
 
   const query = c.req.query()
   const bodyParsed = normalStatsSchema.safeParse(query)
@@ -199,10 +199,10 @@ app.get('/user', async (c) => {
 
   let stats: Array<{ data: any, error: any }> = []
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c as any, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c as any, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)

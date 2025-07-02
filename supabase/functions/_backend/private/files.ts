@@ -1,4 +1,4 @@
-import type { Context, Next } from '@hono/hono'
+import type { Context, Next } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { HTTPException } from 'hono/http-exception'
@@ -186,19 +186,19 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   cloudlog({ requestId: c.get('requestId'), message: 'checkWriteAppAccess', app_id, owner_org })
   const capgkey = c.get('capgkey') as string
   cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
-  const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
+  const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
     .rpc('get_user_id', { apikey: capgkey, app_id })
   if (_errorUserId) {
     cloudlog({ requestId: c.get('requestId'), message: '_errorUserId', error: _errorUserId })
     throw new HTTPException(400, { message: 'Error User not found' })
   }
 
-  if (!(await hasAppRightApikey(c as any, app_id, userId, 'read', capgkey))) {
+  if (!(await hasAppRightApikey(c, app_id, userId, 'read', capgkey))) {
     cloudlog({ requestId: c.get('requestId'), message: 'no read' })
     throw new HTTPException(400, { message: 'You can\'t access this app' })
   }
 
-  const { data: app, error: errorApp } = await supabaseAdmin(c as any)
+  const { data: app, error: errorApp } = await supabaseAdmin(c)
     .from('apps')
     .select('app_id, owner_org')
     .eq('app_id', app_id)

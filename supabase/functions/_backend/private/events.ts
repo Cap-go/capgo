@@ -20,9 +20,9 @@ app.post('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'post private/stats body', body })
     const apikey_string = c.req.header('capgkey')
     const authorization = c.req.header('authorization')
-    const supabase = supabaseAdmin(c as any)
+    const supabase = supabaseAdmin(c)
     if (apikey_string) {
-      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, apikey_string, supabase, ['read', 'write', 'all', 'upload'])
+      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, apikey_string, supabase, ['read', 'write', 'all', 'upload'])
       if (!apikey) {
         cloudlog({ requestId: c.get('requestId'), message: 'error invalid apikey', apikey_string })
         return c.json({ status: 'Invalid apikey' }, 401)
@@ -41,11 +41,11 @@ app.post('/', async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: 'error no auth', auth: authorization })
       return c.json({ status: 'You can\'t access this, auth not found' }, 400)
     }
-    await backgroundTask(c as any, logsnag(c as any).track(body))
+    await backgroundTask(c, logsnag(c).track(body))
     if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-10') {
       const orgId = body.user_id
       const appId = body.tags['app-id']
-      await backgroundTask(c as any, Promise.all([
+      await backgroundTask(c, Promise.all([
         supabase
           .from('orgs')
           .select('*')
@@ -62,7 +62,7 @@ app.post('/', async (c) => {
             cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization or app', org: orgResult.error, app: appResult.error })
             return c.json({ status: 'Error fetching organization or app' }, 500)
           }
-          return trackBentoEvent(c as any, orgResult.data.management_email, {
+          return trackBentoEvent(c, orgResult.data.management_email, {
             org_id: orgResult.data.id,
             org_name: orgResult.data.name,
             app_name: appResult.data.name,

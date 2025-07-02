@@ -1,5 +1,4 @@
-import type { Context } from '@hono/hono'
-
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'

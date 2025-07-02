@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -98,7 +98,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   try {
-    const res = getStats(c as any)
+    const res = getStats(c)
     const [
       apps,
       updates,
@@ -153,12 +153,12 @@ app.post('/', middlewareAPISecret, async (c) => {
       devices_last_month,
     }
     cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
-    const { error } = await supabaseAdmin(c as any)
+    const { error } = await supabaseAdmin(c)
       .from('global_stats')
       .upsert(newData)
     if (error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
-    await logsnag(c as any).track({
+    await logsnag(c).track({
       channel: 'updates-stats',
       event: 'Updates last month',
       user_id: 'admin',
@@ -169,7 +169,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     }).catch((e: any) => {
       cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
     })
-    await logsnagInsights(c as any, [
+    await logsnagInsights(c, [
       {
         title: 'Apps',
         value: apps,
