@@ -1,9 +1,9 @@
 // channel self old function
 import type { Context } from 'hono'
-import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
-import type { Database } from '../utils/supabase.types.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
+import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { BRES, simpleError } from '../utils/hono.ts'
@@ -339,7 +339,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   } = body
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
-  const { data: dataChannelOverride } = await supabaseAdmin(c)
+  const { data: dataChannelOverride, error: channelOverrideError } = await supabaseAdmin(c)
     .from('channel_devices')
     .select(`
     app_id,
@@ -352,8 +352,15 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
   `)
     .eq('app_id', app_id)
     .eq('device_id', device_id.toLowerCase())
-    .single()
-  if (!(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set) {
+    .maybeSingle()
+
+  if (channelOverrideError || !dataChannelOverride?.channel_id) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'No channel override found to delete', dataChannelOverride, error: channelOverrideError })
+    throw simpleError(400, 'cannot_override', 'Cannot change device override current channel don\t allow it')
+  }
+
+  const channelOverride = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
+  if (!channelOverride.allow_device_self_set) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot change device override current channel don\t allow it', dataChannelOverride })
     throw simpleError(400, 'cannot_override', 'Cannot change device override current channel don\t allow it')
   }
@@ -370,7 +377,6 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
 }
 
 async function listCompatibleChannels(c: Context, body: DeviceLink): Promise<Response> {
-
   const { app_id, platform, is_emulator, is_prod } = body
 
   // Check if app exists and get owner_org for permission check
