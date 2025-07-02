@@ -89,8 +89,8 @@ export type Database = {
           id: number
           link: string | null
           manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version: string | null
           name: string
           native_packages: Json[] | null
@@ -111,8 +111,8 @@ export type Database = {
           id?: number
           link?: string | null
           manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version?: string | null
           name: string
           native_packages?: Json[] | null
@@ -133,8 +133,8 @@ export type Database = {
           id?: number
           link?: string | null
           manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version?: string | null
           name?: string
           native_packages?: Json[] | null
@@ -1342,19 +1342,19 @@ export type Database = {
       }
       check_min_rights: {
         Args:
-          | {
-              app_id: string
-              channel_id: number
-              min_right: Database["public"]["Enums"]["user_min_right"]
-              org_id: string
-            }
-          | {
-              app_id: string
-              user_id: string
-              min_right: Database["public"]["Enums"]["user_min_right"]
-              org_id: string
-              channel_id: number
-            }
+        | {
+          app_id: string
+          channel_id: number
+          min_right: Database["public"]["Enums"]["user_min_right"]
+          org_id: string
+        }
+        | {
+          app_id: string
+          user_id: string
+          min_right: Database["public"]["Enums"]["user_min_right"]
+          org_id: string
+          channel_id: number
+        }
         Returns: boolean
       }
       check_revert_to_builtin_version: {
@@ -1404,8 +1404,8 @@ export type Database = {
       count_all_plans_v2: {
         Args: Record<PropertyKey, never>
         Returns: {
-          count: number
           plan_name: string
+          count: number
         }[]
       }
       delete_http_response: {
@@ -1426,8 +1426,8 @@ export type Database = {
       }
       exist_app_versions: {
         Args:
-          | { appid: string; apikey: string; name_version: string }
-          | { name_version: string; appid: string }
+        | { appid: string; apikey: string; name_version: string }
+        | { name_version: string; appid: string }
         Returns: boolean
       }
       find_best_plan_v3: {
@@ -1435,7 +1435,7 @@ export type Database = {
         Returns: string
       }
       find_fit_plan_v3: {
-        Args: { storage: number; bandwidth: number; mau: number }
+        Args: { mau: number; bandwidth: number; storage: number }
         Returns: {
           name: string
         }[]
@@ -1446,8 +1446,8 @@ export type Database = {
       }
       get_app_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; end_date: string; start_date: string }
+        | { org_id: string }
+        | { org_id: string; end_date: string; start_date: string }
         Returns: {
           storage: number
           app_id: string
@@ -1501,8 +1501,8 @@ export type Database = {
       }
       get_global_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; start_date: string; end_date: string }
         Returns: {
           storage: number
           get: number
@@ -1516,8 +1516,8 @@ export type Database = {
       }
       get_identity: {
         Args:
-          | Record<PropertyKey, never>
-          | { keymode: Database["public"]["Enums"]["key_mode"][] }
+        | Record<PropertyKey, never>
+        | { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
       get_identity_apikey_only: {
@@ -1541,8 +1541,8 @@ export type Database = {
       get_identity_org_appid: {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
-          app_id: string
           org_id: string
+          app_id: string
         }
         Returns: string
       }
@@ -1563,7 +1563,7 @@ export type Database = {
         Returns: string
       }
       get_next_cron_value: {
-        Args: { max_val: number; pattern: string; current_val: number }
+        Args: { pattern: string; current_val: number; max_val: number }
         Returns: number
       }
       get_org_members: {
@@ -1578,7 +1578,7 @@ export type Database = {
         }[]
       }
       get_org_owner_id: {
-        Args: { app_id: string; apikey: string }
+        Args: { apikey: string; app_id: string }
         Returns: string
       }
       get_org_perm_for_apikey: {
@@ -1610,8 +1610,8 @@ export type Database = {
       }
       get_plan_usage_percent_detailed: {
         Args:
-          | { orgid: string }
-          | { orgid: string; cycle_start: string; cycle_end: string }
+        | { orgid: string }
+        | { orgid: string; cycle_start: string; cycle_end: string }
         Returns: {
           storage_percent: number
           bandwidth_percent: number
@@ -1627,13 +1627,13 @@ export type Database = {
         }[]
       }
       get_total_app_storage_size_orgs: {
-        Args: { app_id: string; org_id: string }
+        Args: { org_id: string; app_id: string }
         Returns: number
       }
       get_total_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; start_date: string; end_date: string }
         Returns: {
           fail: number
           mau: number
@@ -1683,8 +1683,8 @@ export type Database = {
           id: number
           link: string | null
           manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version: string | null
           name: string
           native_packages: Json[] | null
@@ -1750,29 +1750,29 @@ export type Database = {
       }
       is_allowed_action_org_action: {
         Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
           orgid: string
+          actions: Database["public"]["Enums"]["action_type"][]
         }
         Returns: boolean
       }
       is_allowed_capgkey: {
         Args:
-          | {
-              keymode: Database["public"]["Enums"]["key_mode"][]
-              apikey: string
-            }
-          | {
-              keymode: Database["public"]["Enums"]["key_mode"][]
-              app_id: string
-              apikey: string
-            }
+        | {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          apikey: string
+        }
+        | {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          app_id: string
+          apikey: string
+        }
         Returns: boolean
       }
       is_app_owner: {
         Args:
-          | { appid: string }
-          | { appid: string; apikey: string }
-          | { appid: string; userid: string }
+        | { appid: string }
+        | { appid: string; apikey: string }
+        | { appid: string; userid: string }
         Returns: boolean
       }
       is_bandwidth_exceeded_by_org: {
@@ -2007,71 +2007,71 @@ export type Database = {
       key_mode: "read" | "write" | "all" | "upload"
       platform_os: "ios" | "android"
       stats_action:
-        | "delete"
-        | "reset"
-        | "set"
-        | "get"
-        | "set_fail"
-        | "update_fail"
-        | "download_fail"
-        | "windows_path_fail"
-        | "canonical_path_fail"
-        | "directory_path_fail"
-        | "unzip_fail"
-        | "low_mem_fail"
-        | "download_10"
-        | "download_20"
-        | "download_30"
-        | "download_40"
-        | "download_50"
-        | "download_60"
-        | "download_70"
-        | "download_80"
-        | "download_90"
-        | "download_complete"
-        | "decrypt_fail"
-        | "app_moved_to_foreground"
-        | "app_moved_to_background"
-        | "uninstall"
-        | "needPlanUpgrade"
-        | "missingBundle"
-        | "noNew"
-        | "disablePlatformIos"
-        | "disablePlatformAndroid"
-        | "disableAutoUpdateToMajor"
-        | "cannotUpdateViaPrivateChannel"
-        | "disableAutoUpdateToMinor"
-        | "disableAutoUpdateToPatch"
-        | "channelMisconfigured"
-        | "disableAutoUpdateMetadata"
-        | "disableAutoUpdateUnderNative"
-        | "disableDevBuild"
-        | "disableEmulator"
-        | "cannotGetBundle"
-        | "checksum_fail"
-        | "NoChannelOrOverride"
-        | "setChannel"
-        | "getChannel"
-        | "rateLimited"
+      | "delete"
+      | "reset"
+      | "set"
+      | "get"
+      | "set_fail"
+      | "update_fail"
+      | "download_fail"
+      | "windows_path_fail"
+      | "canonical_path_fail"
+      | "directory_path_fail"
+      | "unzip_fail"
+      | "low_mem_fail"
+      | "download_10"
+      | "download_20"
+      | "download_30"
+      | "download_40"
+      | "download_50"
+      | "download_60"
+      | "download_70"
+      | "download_80"
+      | "download_90"
+      | "download_complete"
+      | "decrypt_fail"
+      | "app_moved_to_foreground"
+      | "app_moved_to_background"
+      | "uninstall"
+      | "needPlanUpgrade"
+      | "missingBundle"
+      | "noNew"
+      | "disablePlatformIos"
+      | "disablePlatformAndroid"
+      | "disableAutoUpdateToMajor"
+      | "cannotUpdateViaPrivateChannel"
+      | "disableAutoUpdateToMinor"
+      | "disableAutoUpdateToPatch"
+      | "channelMisconfigured"
+      | "disableAutoUpdateMetadata"
+      | "disableAutoUpdateUnderNative"
+      | "disableDevBuild"
+      | "disableEmulator"
+      | "cannotGetBundle"
+      | "checksum_fail"
+      | "NoChannelOrOverride"
+      | "setChannel"
+      | "getChannel"
+      | "rateLimited"
       stripe_status:
-        | "created"
-        | "succeeded"
-        | "updated"
-        | "failed"
-        | "deleted"
-        | "canceled"
+      | "created"
+      | "succeeded"
+      | "updated"
+      | "failed"
+      | "deleted"
+      | "canceled"
       usage_mode: "last_saved" | "5min" | "day" | "cycle"
       user_min_right:
-        | "invite_read"
-        | "invite_upload"
-        | "invite_write"
-        | "invite_admin"
-        | "invite_super_admin"
-        | "read"
-        | "upload"
-        | "write"
-        | "admin"
-        | "super_admin"
+      | "invite_read"
+      | "invite_upload"
+      | "invite_write"
+      | "invite_admin"
+      | "invite_super_admin"
+      | "read"
+      | "upload"
+      | "write"
+      | "admin"
+      | "super_admin"
       user_role: "read" | "upload" | "write" | "admin"
       version_action: "get" | "fail" | "install" | "uninstall"
     }
@@ -2114,106 +2114,106 @@ type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
+    Update: infer U
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   graphql_public: {

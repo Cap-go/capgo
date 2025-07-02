@@ -15,6 +15,7 @@ declare module 'vue' {
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
+    DeleteOrgDialog: typeof import('./pages/settings/organization/DeleteOrgDialog.vue')['default']
     DeviceTable: typeof import('./components/tables/DeviceTable.vue')['default']
     DialogV2: typeof import('./components/DialogV2.vue')['default']
     DropdownOrganization: typeof import('./components/dashboard/DropdownOrganization.vue')['default']

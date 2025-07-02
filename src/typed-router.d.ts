@@ -44,6 +44,7 @@ declare module 'vue-router/auto-routes' {
     '/settings/ChangePassword': RouteRecordInfo<'/settings/ChangePassword', '/settings/ChangePassword', Record<never, never>, Record<never, never>>,
     '/settings/Notifications': RouteRecordInfo<'/settings/Notifications', '/settings/Notifications', Record<never, never>, Record<never, never>>,
     '/settings/organization/': RouteRecordInfo<'/settings/organization/', '/settings/organization', Record<never, never>, Record<never, never>>,
+    '/settings/organization/DeleteOrgDialog': RouteRecordInfo<'/settings/organization/DeleteOrgDialog', '/settings/organization/DeleteOrgDialog', Record<never, never>, Record<never, never>>,
     '/settings/organization/Members': RouteRecordInfo<'/settings/organization/Members', '/settings/organization/Members', Record<never, never>, Record<never, never>>,
     '/settings/organization/Plans': RouteRecordInfo<'/settings/organization/Plans', '/settings/organization/Plans', Record<never, never>, Record<never, never>>,
     '/settings/organization/Usage': RouteRecordInfo<'/settings/organization/Usage', '/settings/organization/Usage', Record<never, never>, Record<never, never>>,
