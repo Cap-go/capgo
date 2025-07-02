@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './supabase.types.ts'
 import { env, getRuntimeKey } from 'hono/adapter'
@@ -154,11 +154,11 @@ export function backgroundTask(c: Context, p: any) {
 }
 
 export function existInEnv(c: Context, key: string): boolean {
-  return key in env(c as any)
+  return key in env(c)
 }
 
 export function getEnv(c: Context, key: string): string {
-  if (key in env(c as any))
-    return env(c as any)[key] ?? ''
+  if (key in env(c))
+    return env(c)[key] ?? ''
   return ''
 }

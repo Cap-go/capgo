@@ -23,19 +23,19 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     const capgkey = c.get('capgkey') as string
     cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
     cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
-    const { data: userId, error: _errorUserId } = await supabaseAdmin(c as any)
+    const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
       .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
     if (_errorUserId) {
       cloudlog({ requestId: c.get('requestId'), message: '_errorUserId', error: _errorUserId })
       return c.json({ status: 'Error User not found' }, 500)
     }
 
-    if (!(await hasAppRightApikey(c as any, body.app_id, userId, 'read', capgkey))) {
+    if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
       cloudlog({ requestId: c.get('requestId'), message: 'no read' })
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
     }
 
-    const { data: app, error: errorApp } = await supabaseAdmin(c as any)
+    const { data: app, error: errorApp } = await supabaseAdmin(c)
       .from('apps')
       .select('app_id, owner_org')
       .eq('app_id', body.app_id)
@@ -46,7 +46,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
       return c.json({ status: 'Error App not found' }, 500)
     }
 
-    const { data: version, error: errorVersion } = await supabaseAdmin(c as any)
+    const { data: version, error: errorVersion } = await supabaseAdmin(c)
       .from('app_versions')
       .select('id, name')
       .eq('name', body.name)
@@ -67,21 +67,21 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 's3.checkIfExist', filePath })
 
     // check if object exist in r2
-    const exist = await s3.checkIfExist(c as any, filePath)
+    const exist = await s3.checkIfExist(c, filePath)
     if (exist) {
       cloudlog({ requestId: c.get('requestId'), message: 'exist', exist })
       return c.json({ status: 'Error already exist' }, 500)
     }
     cloudlog({ requestId: c.get('requestId'), message: 's3.getUploadUrl', filePath })
 
-    const url = await s3.getUploadUrl(c as any, filePath)
+    const url = await s3.getUploadUrl(c, filePath)
     cloudlog({ requestId: c.get('requestId'), message: 'url', url })
     if (!url) {
       cloudlog({ requestId: c.get('requestId'), message: 'no url found' })
       return c.json({ status: 'Error unknow' }, 500)
     }
 
-    const LogSnag = logsnag(c as any)
+    const LogSnag = logsnag(c)
     await LogSnag.track({
       channel: 'upload-get-link',
       event: 'Upload via single file',
@@ -93,7 +93,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'url', filePath, url })
     const response = { url }
 
-    const { error: changeError } = await supabaseAdmin(c as any)
+    const { error: changeError } = await supabaseAdmin(c)
       .from('app_versions')
       .update({ r2_path: filePath })
       .eq('id', version.id)

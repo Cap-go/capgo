@@ -1,5 +1,5 @@
-import type { Context } from '@hono/hono'
 import type { ContentfulStatusCode } from '@hono/http-status'
+import type { Context } from 'hono'
 import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
 import type { StripeData } from './stripe.ts'
@@ -139,10 +139,10 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
       jwt = undefined
     }
     if (jwt) {
-      await foundJWT(c as any, jwt)
+      await foundJWT(c, jwt)
     }
     else if (capgkey) {
-      await foundAPIKey(c as any, capgkey, rights)
+      await foundAPIKey(c, capgkey, rights)
     }
     else {
       cloudlog('No apikey or subkey provided')
@@ -200,19 +200,19 @@ export function triggerValidator(
 
 export function middlewareStripeWebhook() {
   return honoFactory.createMiddleware(async (c, next) => {
-    if (!getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       throw new HTTPException(400, { message: 'Webhook Error: no secret found' })
     }
 
     const signature = c.req.raw.headers.get('stripe-signature')
-    if (!signature || !getEnv(c as any, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c as any, 'STRIPE_SECRET_KEY')) {
+    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
       throw new HTTPException(400, { message: 'Webhook Error: no signature' })
     }
     const body = await c.req.text()
-    const stripeEvent = await parseStripeEvent(c as any, body, signature!)
-    const stripeDataEvent = extractDataEvent(c as any, stripeEvent)
+    const stripeEvent = await parseStripeEvent(c, body, signature!)
+    const stripeDataEvent = extractDataEvent(c, stripeEvent)
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '') {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
@@ -234,7 +234,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
       cloudlog('No key provided')
       throw new HTTPException(401, { message: 'No key provided' })
     }
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, key, supabaseAdmin(c as any), rights)
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key })
       throw new HTTPException(401, { message: 'Invalid apikey' })
@@ -242,7 +242,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
     c.set('apikey', apikey)
     c.set('capgkey', key)
     if (subkey_id) {
-      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
+      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         throw new HTTPException(401, { message: 'Invalid subkey' })
@@ -259,7 +259,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
   return subMiddlewareKey
 }
 
-export async function getBody<T>(c: Context<MiddlewareKeyVariables, '/' | '/:path*'>) {
+export async function getBody<T>(c: Context<MiddlewareKeyVariables, any, any>) {
   let body: T
   try {
     body = await c.req.json<T>()
@@ -287,7 +287,7 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
 
 export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) => {
   const authorizationSecret = c.req.header('apisecret')
-  const API_SECRET = getEnv(c as any, 'API_SECRET')
+  const API_SECRET = getEnv(c, 'API_SECRET')
 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {

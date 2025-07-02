@@ -73,7 +73,7 @@ app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppInfos>()
     cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
-    if (isLimited(c as any, body.app_id)) {
+    if (isLimited(c, body.app_id)) {
       return c.json({
         status: 'Too many requests',
         error: 'too_many_requests',
@@ -88,7 +88,7 @@ app.post('/', async (c) => {
       }, 400)
     }
 
-    return updateLite(c as any, body)
+    return updateLite(c, body)
   }
   catch (e) {
     cloudlog({ requestId: c.get('requestId'), message: 'error', error: JSON.stringify(e) })

@@ -55,7 +55,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'No valid fields provided for update. Provide name, mode, limited_to_apps, or limited_to_orgs.' }, 400)
   }
 
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
 
   // Check if the apikey to update exists (RLS handles ownership)
   const { data: existingApikey, error: fetchError } = await supabase

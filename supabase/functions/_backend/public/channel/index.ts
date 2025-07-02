@@ -12,7 +12,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   try {
     const body = await c.req.json<ChannelSet>()
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return post(c as any, body, apikey)
+    return post(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create channel', error: e })
@@ -22,9 +22,9 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   try {
-    const body = await getBody<ChannelSet>(c as any)
+    const body = await getBody<ChannelSet>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return get(c as any, body, apikey)
+    return get(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get channel', error: e })
@@ -34,9 +34,9 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   try {
-    const body = await getBody<ChannelSet>(c as any)
+    const body = await getBody<ChannelSet>(c)
     const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return deleteChannel(c as any, body, apikey)
+    return deleteChannel(c, body, apikey)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete channel', error: e })

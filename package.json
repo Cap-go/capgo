@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.11.74",
+  "version": "12.11.76",
   "private": true,
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
@@ -128,8 +128,8 @@
     "@formkit/i18n": "^1.6.9",
     "@formkit/themes": "1.6.9",
     "@formkit/vue": "1.6.9",
-    "@hono/hono": "npm:@jsr/hono__hono@4.7.11",
-    "@hono/sentry": "^1.2.2",
+    "hono": "4.7.11",
+    "@hono/sentry": "1.2.2",
     "@iconify-json/simple-icons": "^1.2.38",
     "@intlify/unplugin-vue-i18n": "^6.0.8",
     "@logsnag/node": "1.0.1",

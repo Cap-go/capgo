@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceWithoutCreatedAt, StatsActions } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -201,7 +201,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<AppStats>()
-    if (isLimited(c as any, body.app_id)) {
+    if (isLimited(c, body.app_id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Too many requests' })
       return c.json({
         message: 'Too many requests',
@@ -216,7 +216,7 @@ app.post('/', async (c) => {
       }, 400)
     }
     cloudlog({ requestId: c.get('requestId'), message: 'post plugin/stats body', body })
-    return post(c as any, body)
+    return post(c, body)
   }
   catch (e) {
     cloudlog({ requestId: c.get('requestId'), message: `Error unknow: ${e}` })

@@ -32,8 +32,8 @@ app.post('/', middlewareAuth, async (c) => {
 
     const safeBody = parsedBodyResult.data
 
-    const supabaseAdmin = await useSupabaseAdmin(c as any)
-    const supabaseClient = useSupabaseClient(c as any, authToken)
+    const supabaseAdmin = await useSupabaseAdmin(c)
+    const supabaseClient = useSupabaseClient(c, authToken)
 
     const clientData = await supabaseClient.auth.getUser()
     if (!clientData?.data?.user || clientData?.error) {
@@ -76,7 +76,7 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'not_authorized' }, 403)
     }
 
-    await updateCustomerEmail(c as any, organization.customer_id, safeBody.emial)
+    await updateCustomerEmail(c, organization.customer_id, safeBody.emial)
 
     // Update supabase
     const { error: updateOrgErr } = await supabaseAdmin.from('orgs')
@@ -86,7 +86,7 @@ app.post('/', middlewareAuth, async (c) => {
     if (updateOrgErr) {
       // revert stripe
       cloudlogErr({ requestId: c.get('requestId'), message: 'CRITICAL!!! Cannot update supabase, reverting stripe', error: updateOrgErr })
-      await updateCustomerEmail(c as any, organization.customer_id, organization.management_email)
+      await updateCustomerEmail(c, organization.customer_id, organization.management_email)
       return c.json({ status: 'critical_error' }, 500)
     }
 

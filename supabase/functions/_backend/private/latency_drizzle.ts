@@ -7,10 +7,10 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
   try {
-    const pgClient = getPgClient(c as any)
+    const pgClient = getPgClient(c)
     const res = await pgClient`select 1`
 
-    closeClient(c as any, pgClient)
+    closeClient(c, pgClient)
     if (!res)
       return c.json({ status: 'Cannot post ok', error: 'Cannot get apps' }, 400)
     return c.json(BRES)

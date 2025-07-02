@@ -24,13 +24,13 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
     }
 
     if (record.public && record.ios) {
-      const { error: iosError } = await supabaseAdmin(c as any)
+      const { error: iosError } = await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
         .eq('ios', true)
         .neq('id', record.id)
-      const { error: hiddenError } = await supabaseAdmin(c as any)
+      const { error: hiddenError } = await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
@@ -41,13 +41,13 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
     }
 
     if (record.public && record.android) {
-      const { error: androidError } = await supabaseAdmin(c as any)
+      const { error: androidError } = await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
         .eq('android', true)
         .neq('id', record.id)
-      const { error: hiddenError } = await supabaseAdmin(c as any)
+      const { error: hiddenError } = await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
@@ -58,7 +58,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
     }
 
     if (record.public && (record.ios === record.android)) {
-      const { error } = await supabaseAdmin(c as any)
+      const { error } = await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)

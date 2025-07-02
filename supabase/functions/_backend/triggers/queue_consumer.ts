@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
@@ -58,7 +58,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
       const function_type = message.message.function_type
       const body = message.message.payload
       const cfId = generateUUID()
-      const httpResponse = await http_post_helper(c as any, function_name, function_type, body, cfId)
+      const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
 
       return {
         httpResponse,
@@ -111,7 +111,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
         return acc
       }, {} as Record<string, typeof failureDetails>)
 
-      await sendDiscordAlert(c as any, {
+      await sendDiscordAlert(c, {
         content: `🚨 **Queue Processing Failures** - ${queueName}`,
         embeds: [
           {
@@ -132,7 +132,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               {
                 name: '🔍 Detailed Failures',
                 value: failureDetails.slice(0, 10).map((detail) => {
-                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c as any, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
+                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
                   return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
                 }).join('\n'),
                 inline: false,
@@ -159,7 +159,7 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
               },
             ],
             footer: {
-              text: `Queue: ${queueName} | Environment: ${getEnv(c as any, 'ENVIRONMENT') ?? 'unknown'}`,
+              text: `Queue: ${queueName} | Environment: ${getEnv(c, 'ENVIRONMENT') ?? 'unknown'}`,
             },
           },
         ],
@@ -232,22 +232,22 @@ export async function http_post_helper(
 ): Promise<Response> {
   const headers = {
     'Content-Type': 'application/json',
-    'apisecret': getEnv(c as any, 'API_SECRET'),
+    'apisecret': getEnv(c, 'API_SECRET'),
     'x-capgo-cf-id': cfId,
   }
 
   let url: string
-  if (function_type === 'cloudflare_pp' && getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')) {
-    url = `${getEnv(c as any, 'CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
+  if (function_type === 'cloudflare_pp' && getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')) {
+    url = `${getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
   }
-  else if (function_type === 'cloudflare' && getEnv(c as any, 'CLOUDFLARE_FUNCTION_URL')) {
-    url = `${getEnv(c as any, 'CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
+  else if (function_type === 'cloudflare' && getEnv(c, 'CLOUDFLARE_FUNCTION_URL')) {
+    url = `${getEnv(c, 'CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
   }
-  else if (function_type === 'netlify' && getEnv(c as any, 'NETLIFY_FUNCTION_URL')) {
-    url = `${getEnv(c as any, 'NETLIFY_FUNCTION_URL')}/triggers/${function_name}`
+  else if (function_type === 'netlify' && getEnv(c, 'NETLIFY_FUNCTION_URL')) {
+    url = `${getEnv(c, 'NETLIFY_FUNCTION_URL')}/triggers/${function_name}`
   }
   else {
-    url = `${getEnv(c as any, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
+    url = `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
   }
 
   // Create an AbortController for timeout
@@ -358,17 +358,17 @@ app.post('/sync', async (c) => {
   }
 
   try {
-    await backgroundTask(c as any, (async () => {
+    await backgroundTask(c, (async () => {
       cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName}` })
       let sql: ReturnType<typeof getPgClient> | null = null
       try {
-        sql = getPgClient(c as any)
-        await processQueue(c as any, sql, queueName)
+        sql = getPgClient(c)
+        await processQueue(c, sql, queueName)
         cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
       }
       finally {
         if (sql)
-          await closeClient(c as any, sql)
+          await closeClient(c, sql)
         cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] PostgreSQL connection closed.` })
       }
     })())

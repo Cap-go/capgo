@@ -25,7 +25,7 @@ app.post('/', middlewareAuth, async (c) => {
     const body = await c.req.json<PortalData>()
     cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout body', body })
     const authorization = c.get('authorization')
-    const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
+    const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
       authorization?.split('Bearer ')[1],
     )
 
@@ -36,7 +36,7 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ status: 'not authorize' }, 400)
     // get user from users
     cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
-    const { data: org, error: dbError } = await supabaseAdmin(c as any)
+    const { data: org, error: dbError } = await supabaseAdmin(c)
       .from('orgs')
       .select('customer_id')
       .eq('id', body.orgId)
@@ -46,11 +46,11 @@ app.post('/', middlewareAuth, async (c) => {
     if (!org.customer_id)
       return c.json({ status: 'no customer' }, 400)
 
-    if (!await hasOrgRight(c as any, body.orgId, auth.user.id, 'super_admin'))
+    if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
       return c.json({ status: 'not authorize (orgs right)' }, 400)
 
     cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-    const checkout = await createCheckout(c as any, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c as any, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+    const checkout = await createCheckout(c, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
     return c.json({ url: checkout.url })
   }
   catch (error) {

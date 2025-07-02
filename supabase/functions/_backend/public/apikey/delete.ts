@@ -17,7 +17,7 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
     return c.json({ error: 'API key ID is required' }, 400)
   }
 
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
 
   const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', key.user_id).single()
   if (!apikey || apikeyError) {

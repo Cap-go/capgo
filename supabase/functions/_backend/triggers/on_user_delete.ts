@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -15,7 +15,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
     const startTime = Date.now()
 
     // 1. Find organizations where this user is the only super admin
-    const { data: userSuperAdminOrgs } = await supabaseAdmin(c as any)
+    const { data: userSuperAdminOrgs } = await supabaseAdmin(c)
       .from('org_users')
       .select('org_id')
       .eq('user_id', record.id)
@@ -27,7 +27,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
 
     // For each org where user is super admin, check if they are the only one
     const orgIds = userSuperAdminOrgs.map(org => org.org_id)
-    const { data: superAdminCounts } = await supabaseAdmin(c as any)
+    const { data: superAdminCounts } = await supabaseAdmin(c)
       .from('org_users')
       .select('org_id')
       .in('org_id', orgIds)
@@ -51,7 +51,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
       return c.json(BRES)
     }
 
-    const { data: orgs } = await supabaseAdmin(c as any)
+    const { data: orgs } = await supabaseAdmin(c)
       .from('orgs')
       .select('id, customer_id')
       .in('id', singleSuperAdminOrgs)
@@ -62,7 +62,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
       for (const org of orgs) {
         // Cancel org subscriptions if they exist
         if (org.customer_id) {
-          await cancelSubscription(c as any, org.customer_id)
+          await cancelSubscription(c, org.customer_id)
         }
       }
     }

@@ -25,7 +25,7 @@ app.post('/', middlewareAuth, async (c) => {
     if (!authorization)
       return c.json({ status: 'Cannot find authorization' }, 400)
 
-    const { data: auth, error } = await supabaseAdmin(c as any).auth.getUser(
+    const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
       authorization?.split('Bearer ')[1],
     )
     if (error || !auth?.user?.id)
@@ -33,10 +33,10 @@ app.post('/', middlewareAuth, async (c) => {
 
     const userId = auth.user.id
 
-    if (!(await hasAppRight(c as any, body.app_id, userId, 'read')))
+    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
       return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
 
-    const { data: bundle, error: getBundleError } = await supabaseAdmin(c as any)
+    const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
       .from('app_versions')
       .select('*, owner_org ( created_by )')
       .eq('app_id', body.app_id)
@@ -56,7 +56,7 @@ app.post('/', middlewareAuth, async (c) => {
     }
 
     if (body.isManifest) {
-      const { data: manifest, error: getManifestError } = await supabaseAdmin(c as any)
+      const { data: manifest, error: getManifestError } = await supabaseAdmin(c)
         .from('manifest')
         .select('*')
         .eq('app_id', body.app_id)
@@ -66,11 +66,11 @@ app.post('/', middlewareAuth, async (c) => {
         cloudlogErr({ requestId: c.get('requestId'), message: 'getManifestError', error: getManifestError })
         return c.json({ status: 'Error unknown' }, 500)
       }
-      const manifestEntries = getManifestUrl(c as any, bundle.id, manifest, userId)
+      const manifestEntries = getManifestUrl(c, bundle.id, manifest, userId)
       return c.json({ manifest: manifestEntries })
     }
     else {
-      const data = await getBundleUrl(c as any, bundle.id, bundle.r2_path, userId)
+      const data = await getBundleUrl(c, bundle.id, bundle.r2_path, userId)
       if (!data)
         return c.json({ status: 'Error unknown' }, 500)
 

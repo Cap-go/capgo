@@ -56,7 +56,7 @@ app.use('/', useCors)
 
 app.get('/', async (c) => {
   try {
-    const { data: credits } = await supabaseAdmin(c as any)
+    const { data: credits } = await supabaseAdmin(c)
       .from('capgo_credits_steps')
       .select()
       .order('price_per_unit')
@@ -78,7 +78,7 @@ app.post('/', async (c) => {
     }
 
     // Get pricing steps from database
-    const { data: credits, error } = await supabaseAdmin(c as any)
+    const { data: credits, error } = await supabaseAdmin(c)
       .from('capgo_credits_steps')
       .select()
       .order('type, step_min')

@@ -10,7 +10,7 @@ app.use('/', useCors)
 
 app.get('/', async (c) => {
   try {
-    const { data: plans } = await supabaseAdmin(c as any)
+    const { data: plans } = await supabaseAdmin(c)
       .from('plans')
       .select()
       .order('price_m')

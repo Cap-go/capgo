@@ -19,7 +19,7 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c
       cloudlog({ requestId: c.get('requestId'), message: 'No id' })
       return c.json(BRES)
     }
-    await createApiKey(c as any, record.id)
+    await createApiKey(c, record.id)
     return c.json(BRES)
   }
   catch (e) {

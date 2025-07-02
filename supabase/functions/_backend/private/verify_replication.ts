@@ -30,7 +30,7 @@ app.get('/', async (c) => {
     // Count from update.ts (PostgreSQL database)
     const pgCounts = await Promise.all(
       tables.map(table =>
-        supabaseAdmin(c as any)
+        supabaseAdmin(c)
           .from(table)
           .select('*', { count: 'exact', head: true })
           .then((v) => {

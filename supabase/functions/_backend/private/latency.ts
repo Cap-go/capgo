@@ -7,7 +7,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.get('/', async (c) => {
   try {
-    const { data, error: dbError } = await supabaseAdmin(c as any)
+    const { data, error: dbError } = await supabaseAdmin(c)
       .from('apps')
       .select('id')
       .limit(1)

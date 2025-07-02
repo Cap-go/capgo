@@ -17,7 +17,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (!body.orgId)
       return c.json({ status: 'No orgId' }, 400)
 
-    await checkPlanOrg(c as any, body.orgId)
+    await checkPlanOrg(c, body.orgId)
     return c.json(BRES)
   }
   catch (e) {

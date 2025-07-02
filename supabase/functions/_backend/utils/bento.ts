@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import ky from 'ky'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'

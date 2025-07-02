@@ -11,7 +11,7 @@ app.use('/', useCors)
 app.get('/', async (c) => {
   try {
     const date_id = new Date().toISOString().slice(0, 10)
-    const { data, error } = await supabaseAdmin(c as any)
+    const { data, error } = await supabaseAdmin(c)
       .from('global_stats')
       .select()
       .eq('date_id', date_id)

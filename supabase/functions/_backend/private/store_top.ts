@@ -12,8 +12,8 @@ app.get('/', async (c) => {
     // count allapps
     const mode = c.req.query('mode') ?? 'capacitor'
 
-    const countTotal = await getTotalAppsByModeCF(c as any, mode)
-    const data = await getTopAppsCF(c as any, mode, 100)
+    const countTotal = await getTotalAppsByModeCF(c, mode)
+    const data = await getTopAppsCF(c, mode, 100)
 
     const totalCategory = countTotal ?? 0
 

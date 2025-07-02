@@ -18,7 +18,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'DELETE'), async (c)
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'org delete', record })
-    cancelSubscription(c as any, record.customer_id)
+    cancelSubscription(c, record.customer_id)
     return c.json(BRES)
   }
   catch (e) {

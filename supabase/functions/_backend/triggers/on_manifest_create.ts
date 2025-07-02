@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -43,7 +43,7 @@ app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), async
       return c.json(BRES)
     }
 
-    return updateManifestSize(c as any, record)
+    return updateManifestSize(c, record)
   }
   catch (e) {
     return c.json({ status: 'Cannot update manifest size', error: JSON.stringify(e) }, 500)
