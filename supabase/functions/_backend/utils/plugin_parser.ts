@@ -1,10 +1,10 @@
 import type { Context } from 'hono'
 import type { ZodSchema } from 'zod'
+import type { AppInfos } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { cloudlogErr } from '../utils/loggin.ts'
 import { fixSemver } from '../utils/utils.ts'
-import { simpleError } from "./hono.ts";
-import { AppInfos } from './types.ts'
+import { simpleError } from './hono.ts'
 
 export interface DeviceLink extends AppInfos {
   channel?: string
@@ -80,14 +80,13 @@ export function parsePluginBody(c: Context, body: DeviceLink, schema: ZodSchema)
   }
 }
 
-
 export function convertQueryToBody(query: Record<string, string>): DeviceLink {
   if (!Object.keys(query).length) {
     return {} as DeviceLink
   }
   // Ensure the values are set for old plugins
   query.is_emulator ??= 'false'
-  query.is_prod ??=  'true'
+  query.is_prod ??= 'true'
   const body = {
     version_name: query.version_name,
     version_build: query.version_build,
@@ -98,7 +97,7 @@ export function convertQueryToBody(query: Record<string, string>): DeviceLink {
     defaultChannel: query.defaultChannel,
     channel: query.channel,
     custom_id: query.custom_id,
-    is_emulator: query.is_emulator === 'true' ,
+    is_emulator: query.is_emulator === 'true',
     is_prod: query.is_prod === 'true',
     version_os: query.version_os,
   }
