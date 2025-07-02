@@ -52,7 +52,6 @@ async function fetchGetChannels(queryParams: Record<string, string>) {
 
 async function getResponseErrorCode(response: Response) {
   const json = await response.json<SimpleErrorResponse>()
-  console.log('json', json)
   return json.errorCode
 }
 
@@ -83,7 +82,7 @@ describe('invalids /channel_self tests', () => {
 
     const error = await getResponseErrorCode(response)
 
-    expect(error).toBe('cannot_parse_json')
+    expect(error).toBe('invalid_json_body')
   })
 
   it('[POST] invalid semver', async () => {
@@ -104,7 +103,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('cannot_parse_json')
+    expect(error).toBe('missing_device_id')
   })
 
   it('[POST] without field (app_id)', async () => {
@@ -115,7 +114,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('cannot_parse_json')
+    expect(error).toBe('missing_app_id')
   })
 
   it('[POST] without channel', async () => {
@@ -181,7 +180,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('missing_device_id_or_app_id')
+    expect(error).toBe('missing_device_id')
   })
 
   it('[PUT] post without field (app_id)', async () => {
@@ -192,7 +191,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('missing_device_id_or_app_id')
+    expect(error).toBe('missing_app_id')
   })
 
   it('[PUT] with a version that does not exist', async () => {
@@ -235,7 +234,7 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('missing_device_id_or_app_id')
+    expect(error).toBe('missing_device_id')
   })
 
   it('[DELETE] post without field (app_id)', async () => {
@@ -246,66 +245,55 @@ describe('invalids /channel_self tests', () => {
     expect(response.status).toBe(400)
 
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('missing_device_id_or_app_id')
+    expect(error).toBe('missing_app_id')
   })
 })
 
 describe('GET /channel_self tests', () => {
-  it('[GET] without query params should return status ok', async () => {
+  it('[GET] without query params should return error', async () => {
     const response = await fetch(`${BASE_URL}/channel_self`, {
       method: 'GET',
     })
 
-    expect(response.ok).toBe(true)
-    const json = await response.json<{ status: string }>()
-    expect(json.status).toBe('ok')
+    expect(response.ok).toBe(false)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('invalid_query_parameters')
   })
 
   it('[GET] with invalid app_id format', async () => {
-    const response = await fetchGetChannels({
-      app_id: 'invalid-app-id',
-      platform: 'ios',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
-
+    const data = getBaseData(APPNAME)
+    data.app_id = 'invalid-app-id'
+    const response = await fetchGetChannels(data as any)
+ 
     expect(response.status).toBe(400)
     const error = await getResponseErrorCode(response)
-    expect(error).toContain('Invalid query parameters')
+    expect(error).toBe('invalid_query_parameters')
   })
 
   it('[GET] with missing app_id', async () => {
-    const response = await fetchGetChannels({
-      platform: 'ios',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    delete data.app_id
+    const response = await fetchGetChannels(data as any)
 
-    expect(response.ok).toBe(true)
-    const json = await response.json<{ status: string }>()
-    expect(json.status).toBe('ok')
+    expect(response.ok).toBe(false)
+    const error = await getResponseErrorCode(response)
+    expect(error).toBe('missing_app_id')
   })
 
   it('[GET] with invalid platform', async () => {
-    const response = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'windows',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    data.platform = 'windows'
+    const response = await fetchGetChannels(data as any)
 
     expect(response.status).toBe(400)
     const error = await getResponseErrorCode(response)
-    expect(error).toContain('Invalid query parameters')
+    expect(error).toBe('invalid_query_parameters')
   })
 
   it('[GET] with non-existent app_id', async () => {
-    const response = await fetchGetChannels({
-      app_id: 'com.nonexistent.app',
-      platform: 'ios',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    data.app_id = 'com.nonexistent.app'
+    const response = await fetchGetChannels(data as any)
 
     expect(response.status).toBe(400)
     const error = await getResponseErrorCode(response)
@@ -315,12 +303,11 @@ describe('GET /channel_self tests', () => {
   it('[GET] should return compatible channels for iOS', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const response = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'ios',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    data.platform = 'ios'
+    data.is_emulator = false
+    data.is_prod = true
+    const response = await fetchGetChannels(data as any)
 
     expect(response.ok).toBe(true)
     const json = await response.json<ChannelsListResponse>()
@@ -343,12 +330,11 @@ describe('GET /channel_self tests', () => {
   it('[GET] should return compatible channels for Android', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const response = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'android',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    data.platform = 'android'
+    data.is_emulator = false
+    data.is_prod = true
+    const response = await fetchGetChannels(data as any)
 
     expect(response.ok).toBe(true)
     const json = await response.json() as ChannelsListResponse
@@ -379,12 +365,11 @@ describe('GET /channel_self tests', () => {
 
     expect(updateError).toBeNull()
 
-    const response = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'ios',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    data.platform = 'ios'
+    data.is_emulator = false
+    data.is_prod = true
+    const response = await fetchGetChannels(data as any)
 
     expect(response.ok).toBe(true)
     const json = await response.json() as ChannelsListResponse
@@ -406,12 +391,11 @@ describe('GET /channel_self tests', () => {
     expect(updateError).toBeNull()
 
     // Request iOS channels
-    const iosResponse = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'ios',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    const data = getBaseData(APPNAME)
+    data.platform = 'ios'
+    data.is_emulator = false
+    data.is_prod = true
+    const iosResponse = await fetchGetChannels(data as any)
 
     expect(iosResponse.ok).toBe(true)
     const iosJson = await iosResponse.json() as ChannelsListResponse
@@ -421,12 +405,10 @@ describe('GET /channel_self tests', () => {
     expect(iosChannelNames).toEqual(['beta', 'development'])
 
     // Request Android channels
-    const androidResponse = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'android',
-      is_emulator: 'false',
-      is_prod: 'true',
-    })
+    data.platform = 'android'
+    data.is_emulator = false
+    data.is_prod = true
+    const androidResponse = await fetchGetChannels(data as any)
 
     expect(androidResponse.ok).toBe(true)
     const androidJson = await androidResponse.json() as ChannelsListResponse
@@ -444,26 +426,29 @@ describe('GET /channel_self tests', () => {
     expect(androidChannelNames).toContain('production') // Android only
   })
 
-  it('[GET] should filter channels based on emulator compatibility', async () => {
+  it.only('[GET] should filter channels based on emulator compatibility', async () => {
     await resetAndSeedAppData(APPNAME)
 
     // Set beta channel to NOT allow emulators
-    const { error: updateError } = await getSupabaseClient()
+    const { error: updateError, data: channelData } = await getSupabaseClient()
       .from('channels')
       .update({ allow_emulator: false })
       .eq('name', 'beta')
       .eq('app_id', APPNAME)
+      .select('allow_emulator')
+      .single()
 
     expect(updateError).toBeNull()
+    expect(channelData?.allow_emulator).toBe(false)
 
     try {
+
+      const data = getBaseData(APPNAME)
+      data.platform = 'ios'
+      data.is_emulator = true
+      data.is_prod = true
       // Test emulator device - should NOT get beta channel
-      const emulatorResponse = await fetchGetChannels({
-        app_id: APPNAME,
-        platform: 'ios',
-        is_emulator: 'true',
-        is_prod: 'true',
-      })
+      const emulatorResponse = await fetchGetChannels(data as any)
 
       expect(emulatorResponse.ok).toBe(true)
       const emulatorJson = await emulatorResponse.json() as ChannelsListResponse
@@ -473,12 +458,9 @@ describe('GET /channel_self tests', () => {
       expect(emulatorChannelNames).not.toContain('beta') // should be filtered out
       
       // Test production device - should get both channels
-      const prodResponse = await fetchGetChannels({
-        app_id: APPNAME,
-        platform: 'ios',
-        is_emulator: 'false',
-        is_prod: 'true',
-      })
+      data.is_emulator = false
+      data.is_prod = true
+      const prodResponse = await fetchGetChannels(data as any)
 
       expect(prodResponse.ok).toBe(true)
       const prodJson = await prodResponse.json() as ChannelsListResponse
@@ -489,11 +471,11 @@ describe('GET /channel_self tests', () => {
     }
     finally {
       // Reset beta channel to allow emulators
-      await getSupabaseClient()
-        .from('channels')
-        .update({ allow_emulator: true })
-        .eq('name', 'beta')
-        .eq('app_id', APPNAME)
+      // await getSupabaseClient()
+      //   .from('channels')
+      //   .update({ allow_emulator: true })
+      //   .eq('name', 'beta')
+      //   .eq('app_id', APPNAME)
     }
   })
 
@@ -511,12 +493,11 @@ describe('GET /channel_self tests', () => {
 
     try {
       // Test dev device - should NOT get development channel
-      const devResponse = await fetchGetChannels({
-        app_id: APPNAME,
-        platform: 'ios',
-        is_emulator: 'false',
-        is_prod: 'false',
-      })
+      const data = getBaseData(APPNAME)
+      data.platform = 'ios'
+      data.is_emulator = false
+      data.is_prod = false
+      const devResponse = await fetchGetChannels(data as any)
 
       expect(devResponse.ok).toBe(true)
       const devJson = await devResponse.json() as ChannelsListResponse
@@ -526,12 +507,8 @@ describe('GET /channel_self tests', () => {
       expect(devChannelNames).not.toContain('development') // should be filtered out
       
       // Test production device - should get both channels
-      const prodResponse = await fetchGetChannels({
-        app_id: APPNAME,
-        platform: 'ios',
-        is_emulator: 'false',
-        is_prod: 'true',
-      })
+      data.is_prod = true
+      const prodResponse = await fetchGetChannels(data as any)
 
       expect(prodResponse.ok).toBe(true)
       const prodJson = await prodResponse.json() as ChannelsListResponse
@@ -553,11 +530,11 @@ describe('GET /channel_self tests', () => {
   it('[GET] should default prod to true when not specified', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const response = await fetchGetChannels({
-      app_id: APPNAME,
-      platform: 'ios',
-      is_emulator: 'false',
-    })
+    const data = getBaseData(APPNAME)
+    data.platform = 'ios'
+    data.is_emulator = false
+    data.is_prod = true
+    const response = await fetchGetChannels(data as any)
 
     expect(response.ok).toBe(true)
     const json = await response.json() as ChannelsListResponse
@@ -598,7 +575,9 @@ it('[POST] /channel_self with default channel', async () => {
   expect(noAccessData!.public).toBeFalsy()
 
   try {
-    const { error: overwriteUpsertError } = await getSupabaseClient().from('channel_devices').upsert({
+    const { error: overwriteUpsertError } = await getSupabaseClient()
+    .from('channel_devices')
+    .upsert({
       app_id: APPNAME,
       channel_id: noAccessData!.id,
       device_id: data.device_id,

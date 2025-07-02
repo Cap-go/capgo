@@ -16,6 +16,7 @@ export interface AppInfos {
   device_id: string
   defaultChannel: string
 }
+
 export interface AppStats extends AppInfos {
   action: string
   old_version_name?: string

@@ -43,18 +43,9 @@ export const MISSING_STRING_PLUGIN_VERSION = 'plugin_version is required'
 // Constants for validation messages
 export const INVALID_STRING_PLATFORM = 'Platform is not supported or invalid'
 
-export function shallowCleanObject(obj: Record<string, unknown>) {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
-    if (value ?? false)
-      acc[key] = value
-
-    return acc
-  }, {} as Record<string, unknown>)
-}
-
 // function to fix semver 1.0 to 1.0.0 any verssion missing . should add .0 also should work for 1
 export function fixSemver(version: string) {
-  const nbPoint = (version.match(/\./g) ?? []).length
+  const nbPoint = (version?.match(/\./g) ?? []).length
   if (nbPoint === 0)
     return `${version}.0.0`
   if (nbPoint === 1)
