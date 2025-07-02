@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { ZodSchema } from 'zod'
-import type { AppInfos } from './types.ts'
+import type { AppInfos, AppStats } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { cloudlogErr } from '../utils/loggin.ts'
 import { fixSemver } from '../utils/utils.ts'
@@ -10,74 +10,33 @@ export interface DeviceLink extends AppInfos {
   channel?: string
 }
 
-export function parsePluginBody(c: Context, body: DeviceLink, schema: ZodSchema) {
+export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodSchema) {
   const invalidCode = c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
   if (Object.keys(body ?? {}).length === 0) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot parse body', body })
     throw simpleError(400, invalidCode, 'Cannot parse body')
   }
-  let {
-    version_name,
-    version_build,
-  } = body
-  const {
-    platform,
-    app_id,
-    device_id,
-    plugin_version,
-    channel,
-    defaultChannel,
-    custom_id,
-    is_emulator = false,
-    is_prod = true,
-    version_os,
-  } = body
-  if (!device_id) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id', device_id, app_id, body })
+  if (!body.device_id) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device_id', body })
     throw simpleError(400, 'missing_device_id', 'Cannot find device_id')
   }
-  if (!app_id) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app_id', device_id, app_id, body })
+  if (!body.app_id) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app_id', body })
     throw simpleError(400, 'missing_app_id', 'Cannot find app_id')
   }
-  const coerce = tryParse(fixSemver(version_build))
+  const coerce = tryParse(fixSemver(body.version_build))
   if (!coerce) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build })
-    throw simpleError(400, 'semver_error', `Native version: ${version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_build: body.version_build })
+    throw simpleError(400, 'semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
   }
-  version_build = format(coerce)
-  version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
-  const parseResult = schema.safeParse({
-    version_name,
-    version_build,
-    platform,
-    app_id,
-    device_id,
-    plugin_version,
-    channel,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_os,
-  })
+  body.version_build = format(coerce)
+  body.version_name = (body.version_name === 'builtin' || !body.version_name) ? body.version_build : body.version_name
+  const parseResult = schema.safeParse(body)
   if (!parseResult.success) {
     cloudlogErr({ requestId: c.get('requestId'), message: `${c.req.method} ${c.req.path}`, error: parseResult.error })
     throw simpleError(400, invalidCode, 'Cannot parse body')
   }
-  return {
-    version_name,
-    version_build,
-    platform,
-    app_id,
-    device_id,
-    plugin_version,
-    defaultChannel,
-    channel,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_os,
-  }
+  return body
 }
 
 export function convertQueryToBody(query: Record<string, string>): DeviceLink {

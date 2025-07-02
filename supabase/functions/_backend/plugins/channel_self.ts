@@ -436,7 +436,7 @@ app.post('/', async (c) => {
       throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
     })
   cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
-  return post(c, parsePluginBody(c, body, jsonRequestSchema))
+  return post(c, parsePluginBody<DeviceLink>(c, body, jsonRequestSchema))
 })
 
 app.put('/', async (c) => {
@@ -447,17 +447,17 @@ app.put('/', async (c) => {
       throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
     })
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
-  return put(c, parsePluginBody(c, body, jsonRequestSchema))
+  return put(c, parsePluginBody<DeviceLink>(c, body, jsonRequestSchema))
 })
 
-app.delete('/', async (c) => {
+app.delete('/', (c) => {
   const query = convertQueryToBody(c.req.query())
   cloudlog({ requestId: c.get('requestId'), message: 'delete body', query })
-  return deleteOverride(c, parsePluginBody(c, query, jsonRequestSchema))
+  return deleteOverride(c, parsePluginBody<DeviceLink>(c, query, jsonRequestSchema))
 })
 
 app.get('/', (c) => {
   const query = convertQueryToBody(c.req.query())
   cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
-  return listCompatibleChannels(c, parsePluginBody(c, query, jsonRequestSchema))
+  return listCompatibleChannels(c, parsePluginBody<DeviceLink>(c, query, jsonRequestSchema))
 })
