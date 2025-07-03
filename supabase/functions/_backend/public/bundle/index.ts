@@ -1,7 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { GetLatest } from './get.ts'
-import { getBody, honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
+import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
 import { setChannel } from './set_channel.ts'

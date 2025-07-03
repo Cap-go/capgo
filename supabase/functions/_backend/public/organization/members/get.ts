@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
 import { simpleError } from '../../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../../utils/loggin.ts'
+import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({

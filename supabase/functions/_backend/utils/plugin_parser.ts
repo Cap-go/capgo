@@ -2,7 +2,6 @@ import type { Context } from 'hono'
 import type { ZodSchema } from 'zod'
 import type { AppInfos, AppStats } from './types.ts'
 import { format, tryParse } from '@std/semver'
-import { cloudlogErr } from '../utils/loggin.ts'
 import { fixSemver } from '../utils/utils.ts'
 import { simpleError } from './hono.ts'
 

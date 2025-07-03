@@ -7,7 +7,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { BRES, simpleError, simpleError200 } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
@@ -161,7 +161,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
 
   // const mainChannelName = (!dbMainChannelError && mainChannel) ? mainChannel.name : null
   if (dbMainChannelError || !mainChannel)
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find main channel', dbMainChannelError })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find main channel', dbMainChannelError })
 
   const channelId = dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']
   if (mainChannelName && mainChannelName === channel) {

@@ -1,5 +1,5 @@
-import type { Context } from 'hono'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { env, getRuntimeKey } from 'hono/adapter'
 import { cloudlog } from './loggin.ts'

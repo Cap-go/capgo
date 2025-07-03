@@ -1,6 +1,5 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
@@ -40,7 +39,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     throw simpleError('limited_to_apps_must_be_an_array_of_strings', 'limited_to_apps must be an array of strings')
   }
 
-  if (limited_to_orgs !== undefined && (!Array.isArray(limited_to_orgs) || !limited_to_orgs.every(item => typeof item === 'string'))) { 
+  if (limited_to_orgs !== undefined && (!Array.isArray(limited_to_orgs) || !limited_to_orgs.every(item => typeof item === 'string'))) {
     throw simpleError('limited_to_orgs_must_be_an_array_of_strings', 'limited_to_orgs must be an array of strings')
   }
 

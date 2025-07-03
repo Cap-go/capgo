@@ -1,7 +1,7 @@
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { type MiddlewareKeyVariables, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 // Define the schema for the accept invitation request
