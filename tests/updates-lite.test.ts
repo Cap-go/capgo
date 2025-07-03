@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
 import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
