@@ -112,7 +112,7 @@ async function post(c: Context, body: AppStats) {
     .single()
   if (!appOwner) {
     await opnPremStats(c, app_id, action, device)
-    throw simpleError(400, 'app_not_found', 'App not found')
+    throw simpleError('app_not_found', 'App not found')
   }
   const statsActions: StatsActions[] = []
 
@@ -127,13 +127,11 @@ async function post(c: Context, body: AppStats) {
     .or(`name.eq.${version_name}`)
     .eq('deleted', allowedDeleted)
     .single()
-  cloudlog({ requestId: c.get('requestId'), message: `appVersion ${JSON.stringify(appVersion)}` })
   if (!appVersion) {
-    cloudlog({ requestId: c.get('requestId'), message: 'switch to onprem', app_id })
-    throw simpleError(400, 'version_not_found', 'Version not found')
+    throw simpleError('version_not_found', 'Version not found', { app_id, version_name })
   }
   if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
-    throw simpleError(400, 'action_not_allowed', 'Action not allowed')
+    throw simpleError('action_not_allowed', 'Action not allowed', { appVersion, app_id, owner_org: appVersion.owner_org })
   }
   device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
@@ -171,13 +169,11 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   const body = await c.req.json<AppStats>()
   if (isLimited(c, body.app_id)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Too many requests' })
-    throw simpleError(400, 'too_many_requests', 'Too many requests')
+    throw simpleError('too_many_requests', 'Too many requests')
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'post plugin/stats body', body })
   return post(c, parsePluginBody<AppStats>(c, body, jsonRequestSchema))
 })
 
 app.get('/', (c) => {
-  return c.json({ status: 'ok' })
+  return c.json(BRES)
 })

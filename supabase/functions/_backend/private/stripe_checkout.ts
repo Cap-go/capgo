@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { createCheckout } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -21,46 +21,34 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  try {
-    const body = await c.req.json<PortalData>()
-    cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout body', body })
-    const authorization = c.get('authorization')
-    const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-      authorization?.split('Bearer ')[1],
-    )
+  const body = await c.req.json<PortalData>()
+  cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout body', body })
+  const authorization = c.get('authorization')
+  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
+    authorization?.split('Bearer ')[1],
+  )
 
-    if (!body.orgId)
-      return c.json({ status: 'No org_id provided' }, 400)
+  if (!body.orgId)
+    throw simpleError('no_org_id_provided', 'No org_id provided')
 
-    if (error || !auth?.user?.id)
-      return c.json({ status: 'not authorize' }, 400)
+  if (error || !auth?.user?.id)
+    throw simpleError('not_authorize', 'Not authorize')
     // get user from users
-    cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
-    const { data: org, error: dbError } = await supabaseAdmin(c)
-      .from('orgs')
-      .select('customer_id')
-      .eq('id', body.orgId)
-      .single()
-    if (dbError || !org)
-      return c.json({ status: 'not authorize' }, 400)
-    if (!org.customer_id)
-      return c.json({ status: 'no customer' }, 400)
+  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
+  const { data: org, error: dbError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', body.orgId)
+    .single()
+  if (dbError || !org)
+    throw simpleError('not_authorize', 'Not authorize')
+  if (!org.customer_id)
+    throw simpleError('no_customer', 'No customer')
 
-    if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
-      return c.json({ status: 'not authorize (orgs right)' }, 400)
+  if (!await hasOrgRight(c, body.orgId, auth.user.id, 'super_admin'))
+    throw simpleError('not_authorize', 'Not authorize')
 
-    cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-    const checkout = await createCheckout(c, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
-    return c.json({ url: checkout.url })
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'error', error })
-    if (error instanceof HTTPError) {
-      const errorJson = await error.response.json()
-      return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(errorJson) }, 500)
-    }
-    else {
-      return c.json({ status: 'Cannot get checkout url', error: JSON.stringify(error) }, 500)
-    }
-  }
+  cloudlog({ requestId: c.get('requestId'), message: 'user', org })
+  const checkout = await createCheckout(c, org.customer_id, body.reccurence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId)
+  return c.json({ url: checkout.url })
 })

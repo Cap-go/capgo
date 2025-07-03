@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
+import { simpleError } from '../../utils/hono.ts'
+import { cloudlog } from '../../utils/loggin.ts'
 import { readDevices } from '../../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
@@ -20,8 +21,7 @@ export function filterDeviceKeys(devices: Database['public']['Tables']['devices'
 
 export async function get(c: Context, body: GetDevice, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id || !(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get device', app_id: body.app_id })
-    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   // start is 30 days ago
@@ -37,8 +37,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
     if (!res?.length) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find device', device_id: body.device_id })
-      return c.json({ status: 'Cannot find device' }, 400)
+      throw simpleError('device_not_found', 'Cannot find device', { device_id: body.device_id })
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
     // get version from device
@@ -48,8 +47,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .eq('id', dataDevice.version)
       .single()
     if (dbErrorVersion || !dataVersion) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version: dataDevice.version })
-      return c.json({ status: 'Cannot find version', error: dbErrorVersion }, 400)
+      throw simpleError('version_not_found', 'Cannot find version', { version: dataDevice.version })
     }
     dataDevice.version = dataVersion as any
     return c.json(dataDevice)
@@ -61,8 +59,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const res = await readDevices(c, body.app_id, from, to)
 
     if (!res) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get devices' })
-      return c.json([])
+      throw simpleError('devices_not_found', 'Cannot get devices')
     }
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
@@ -76,8 +73,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .in('id', versionIds)
     // replace version with object from app_versions table
     if (dbErrorVersions || !dataVersions?.length) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get versions', error: dbErrorVersions })
-      return c.json([])
+      throw simpleError('versions_not_found', 'Cannot get versions', { dbErrorVersions, dataVersions })
     }
     dataDevices.forEach((device) => {
       const version = dataVersions.find((v: any) => v.id === device.version)

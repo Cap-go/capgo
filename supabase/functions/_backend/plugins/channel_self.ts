@@ -6,7 +6,7 @@ import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { BRES, simpleError } from '../utils/hono.ts'
+import { BRES, simpleError, simpleError200 } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -72,8 +72,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .limit(2)
 
   if (!versions || versions.length === 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_name, body })
-    throw simpleError(400, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
   const owner_org = versions[0].owner_org
 
@@ -81,15 +80,11 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     ? versions.find(v => v.name !== 'builtin')
     : versions[0]
   if (!version) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', versions })
-    throw simpleError(400, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
   if (!(await isAllowedActionOrg(c, owner_org))) {
-    return c.json({
-      message: 'Action not allowed',
-      error: 'action_not_allowed',
-    }, 200)
+    throw simpleError200(c, 'action_not_allowed', 'Action not allowed')
   }
   // find device
 
@@ -122,8 +117,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .eq('device_id', device_id.toLowerCase())
     .single()
   if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot change device override current channel don\t allow it', channel, dataChannelOverride })
-    throw simpleError(400, 'cannot_override', 'Cannot change device override current channel don\t allow it')
+    throw simpleError('cannot_override', 'Cannot change device override current channel don\'t allow it', { channel, dataChannelOverride })
   }
   if (!channel) {
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -138,14 +132,11 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .eq('name', channel)
     .single()
   if (dbError || !dataChannel) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find channel', channel, app_id })
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dbError, dataChannel })
-    throw simpleError(400, 'channel_not_found', `Cannot find channel ${JSON.stringify(dbError)}`)
+    throw simpleError('channel_not_found', `Cannot find channel`, { channel, app_id, dbError, dataChannel })
   }
 
   if (!dataChannel.allow_device_self_set) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Channel does not permit self set', dbError, dataChannel })
-    throw simpleError(400, 'channel_set_from_plugin_not_allowed', `This channel does not allow devices to self associate ${JSON.stringify(dbError)}`)
+    throw simpleError('channel_set_from_plugin_not_allowed', `This channel does not allow devices to self associate`, { channel, app_id, dbError, dataChannel })
   }
 
   // Get the main channel
@@ -180,8 +171,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .eq('app_id', app_id)
       .eq('device_id', device_id.toLowerCase())
     if (dbErrorDev) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-      throw simpleError(400, 'override_not_allowed', `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`)
+      throw simpleError('override_not_allowed', `Cannot remove channel override`, { dbErrorDev })
     }
     cloudlog({ requestId: c.get('requestId'), message: 'main channel set, removing override' })
     await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
@@ -202,8 +192,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .eq('app_id', app_id)
       .eq('device_id', device_id.toLowerCase())
     if (dbErrorDev) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-      throw simpleError(400, 'override_not_allowed', `Cannot remove channel override ${JSON.stringify(dbErrorDev)}`)
+      throw simpleError('override_not_allowed', `Cannot remove channel override`, { dbErrorDev })
     }
   }
   const { error: dbErrorDev } = await supabaseAdmin(c)
@@ -215,8 +204,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       owner_org: dataChannel.owner_org,
     }, { onConflict: 'device_id, app_id' })
   if (dbErrorDev) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot do channel override', dbErrorDev })
-    throw simpleError(400, 'override_not_allowed', `Cannot do channel override ${JSON.stringify(dbErrorDev)}`)
+    throw simpleError('override_not_allowed', `Cannot do channel override`, { dbErrorDev })
   }
   await sendStatsAndDevice(c, device, [{ action: 'setChannel' }])
   return c.json(BRES)
@@ -245,8 +233,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     .limit(2)
 
   if (!versions || versions.length === 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', version_name, body })
-    throw simpleError(400, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { version_name, body })
   }
   const owner_org = versions[0].owner_org
 
@@ -254,12 +241,11 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     ? versions.find(v => v.name !== 'builtin')
     : versions[0]
   if (!version) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', versions })
-    throw simpleError(400, 'version_error', `Version ${version_name} doesn't exist, and no builtin version`)
+    throw simpleError('version_error', `Version ${version_name} doesn't exist, and no builtin version`, { versions })
   }
 
   if (!(await isAllowedActionOrg(c, owner_org))) {
-    throw simpleError(400, 'action_not_allowed', 'Action not allowed')
+    throw simpleError('action_not_allowed', 'Action not allowed')
   }
   const device: DeviceWithoutCreatedAt = {
     app_id,
@@ -303,16 +289,13 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
       allowSet: channelId.allow_device_self_set,
     })
   }
-  if (errorChannel)
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel default', errorChannel })
   if (!dataChannel) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dataChannel, errorChannel })
-    throw simpleError(400, 'channel_not_found', 'Cannot find channel')
+    throw simpleError('channel_not_found', 'Cannot find channel', { dataChannel, errorChannel })
   }
 
   const devicePlatform = devicePlatformScheme.safeParse(platform)
   if (!devicePlatform.success) {
-    throw simpleError(400, 'invalid_platform', 'Invalid device platform')
+    throw simpleError('invalid_platform', 'Invalid device platform', { platform, devicePlatform })
   }
 
   const finalChannel = body.defaultChannel
@@ -320,8 +303,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     : dataChannel.find(channel => channel[devicePlatform.data] === true)
 
   if (!finalChannel) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', dataChannel, errorChannel })
-    throw simpleError(400, 'channel_not_found', 'Cannot find channel')
+    throw simpleError('channel_not_found', 'Cannot find channel', { dataChannel, errorChannel })
   }
   await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
   return c.json({
@@ -355,14 +337,12 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .maybeSingle()
 
   if (channelOverrideError || !dataChannelOverride?.channel_id) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'No channel override found to delete', dataChannelOverride, error: channelOverrideError })
-    throw simpleError(400, 'cannot_override', 'Cannot change device override current channel don\t allow it')
+    throw simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { dataChannelOverride, error: channelOverrideError })
   }
 
   const channelOverride = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
   if (!channelOverride.allow_device_self_set) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot change device override current channel don\t allow it', dataChannelOverride })
-    throw simpleError(400, 'cannot_override', 'Cannot change device override current channel don\t allow it')
+    throw simpleError('cannot_override', 'Cannot change device override current channel don\t allow it', { channelOverride })
   }
   const { error } = await supabaseAdmin(c)
     .from('channel_devices')
@@ -370,8 +350,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .eq('app_id', app_id)
     .eq('device_id', device_id.toLowerCase())
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete channel override', error })
-    throw simpleError(400, 'override_not_allowed', `Cannot delete channel override ${JSON.stringify(error)}`)
+    throw simpleError('override_not_allowed', `Cannot delete channel override`, { error })
   }
   return c.json(BRES)
 }
@@ -387,12 +366,11 @@ async function listCompatibleChannels(c: Context, body: DeviceLink): Promise<Res
     .single()
 
   if (!appData) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', app_id })
-    throw simpleError(400, 'app_not_found', `App ${app_id} not found`)
+    throw simpleError('app_not_found', `App ${app_id} not found`, { app_id })
   }
 
   if (!(await isAllowedActionOrg(c, appData.owner_org))) {
-    throw simpleError(400, 'action_not_allowed', 'Action not allowed')
+    throw simpleError('action_not_allowed', 'Action not allowed')
   }
 
   // Get channels that allow device self set and are compatible with the platform
@@ -406,8 +384,7 @@ async function listCompatibleChannels(c: Context, body: DeviceLink): Promise<Res
     .eq(platform as 'ios' | 'android', true)
 
   if (channelsError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot fetch channels', channelsError })
-    throw simpleError(500, 'database_error', 'Cannot fetch channels', {}, channelsError)
+    throw simpleError('database_error', 'Cannot fetch channels', {}, channelsError)
   }
 
   if (!channels || channels.length === 0) {
@@ -432,8 +409,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', async (c) => {
   const body = await c.req.json<DeviceLink>()
     .catch((e) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: `${c.req.method} ${c.req.path}`, error: e })
-      throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
+      throw simpleError('cannot_parse_json', 'Cannot parse json', { method: c.req.method, path: c.req.path }, e)
     })
   cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
   return post(c, parsePluginBody<DeviceLink>(c, body, jsonRequestSchema))
@@ -443,8 +419,7 @@ app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
   const body = await c.req.json<DeviceLink>()
     .catch((e) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: `${c.req.method} ${c.req.path}`, error: e })
-      throw simpleError(400, 'cannot_parse_json', 'Cannot parse json', {}, e)
+      throw simpleError('cannot_parse_json', 'Cannot parse json', { method: c.req.method, path: c.req.path }, e)
     })
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
   return put(c, parsePluginBody<DeviceLink>(c, body, jsonRequestSchema))

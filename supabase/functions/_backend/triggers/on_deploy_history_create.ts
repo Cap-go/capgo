@@ -11,77 +11,71 @@ import { backgroundTask } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'), async (c) => {
-  try {
-    const record = c.get('webhookBody') as Database['public']['Tables']['deploy_history']['Row']
-    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  const record = c.get('webhookBody') as Database['public']['Tables']['deploy_history']['Row']
+  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
-    if (!record.id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-      return c.json(BRES)
-    }
+  if (!record.id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No id' })
+    return c.json(BRES)
+  }
 
-    // Check if the channel is public
-    const { data: channel, error: channelError } = await supabaseAdmin(c)
-      .from('channels')
-      .select('public')
-      .eq('id', record.channel_id)
+  // Check if the channel is public
+  const { data: channel, error: channelError } = await supabaseAdmin(c)
+    .from('channels')
+    .select('public')
+    .eq('id', record.channel_id)
+    .single()
+
+  if (channelError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error fetching channel', channelError })
+    return c.json(BRES)
+  }
+
+  // If channel is public, send events
+  if (channel?.public) {
+    // Get version details for the event
+    const { data: version, error: versionError } = await supabaseAdmin(c)
+      .from('app_versions')
+      .select('name, owner_org')
+      .eq('id', record.version_id)
       .single()
 
-    if (channelError) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Error fetching channel', channelError })
+    if (versionError || !version) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Error fetching version', versionError })
       return c.json(BRES)
     }
 
-    // If channel is public, send events
-    if (channel?.public) {
-      // Get version details for the event
-      const { data: version, error: versionError } = await supabaseAdmin(c)
-        .from('app_versions')
-        .select('name, owner_org')
-        .eq('id', record.version_id)
-        .single()
+    const LogSnag = logsnag(c)
+    await backgroundTask(c, LogSnag.track({
+      channel: 'bundle-deployed',
+      event: 'Bundle Deployed',
+      icon: '🚀',
+      user_id: version.owner_org,
+      tags: {
+        app_id: record.app_id,
+        bundle_name: version.name,
+        channel_id: record.channel_id,
+      },
+      notify: false,
+    }))
 
-      if (versionError || !version) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Error fetching version', versionError })
-        return c.json(BRES)
-      }
-
-      const LogSnag = logsnag(c)
-      await backgroundTask(c, LogSnag.track({
-        channel: 'bundle-deployed',
-        event: 'Bundle Deployed',
-        icon: '🚀',
-        user_id: version.owner_org,
-        tags: {
+    await backgroundTask(c, supabaseAdmin(c)
+      .from('orgs')
+      .select('*')
+      .eq('id', version.owner_org)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
+        }
+        return trackBentoEvent(c, data.management_email, {
+          org_id: version.owner_org,
           app_id: record.app_id,
           bundle_name: version.name,
           channel_id: record.channel_id,
-        },
-        notify: false,
+        }, 'bundle:deployed') as any
       }))
-
-      await backgroundTask(c, supabaseAdmin(c)
-        .from('orgs')
-        .select('*')
-        .eq('id', version.owner_org)
-        .single()
-        .then(({ data, error }) => {
-          if (error || !data) {
-            cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
-            return c.json({ status: 'Error fetching organization' }, 500)
-          }
-          return trackBentoEvent(c, data.management_email, {
-            org_id: version.owner_org,
-            app_id: record.app_id,
-            bundle_name: version.name,
-            channel_id: record.channel_id,
-          }, 'bundle:deployed') as any
-        }))
-    }
-
-    return c.json(BRES)
   }
-  catch (e) {
-    return c.json({ status: 'Cannot create deploy history', error: JSON.stringify(e) }, 500)
-  }
+
+  return c.json(BRES)
 })

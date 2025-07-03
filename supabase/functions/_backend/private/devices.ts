@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
@@ -23,35 +23,30 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  try {
-    const body = await c.req.json<DataDevice>()
-    cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
-    const devicesIds = body.devicesId ?? body.deviceIds ?? []
-    const apikey_string = c.req.header('capgkey')
-    const authorization = c.req.header('authorization')
-    if (apikey_string) {
-      const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
-        .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
-      if (_errorUserId || !userId)
-        return c.json({ status: 'You can\'t access this app user not found', app_id: body.appId }, 400)
-      if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string)))
-        return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
-    }
-    else if (authorization) {
-      const reqOwner = await supabaseClient(c, authorization)
-        .rpc('has_app_right', { appid: body.appId, right: 'read' })
-        .then(res => res.data ?? false)
-      if (!reqOwner)
-        return c.json({ status: 'You can\'t access this app', app_id: body.appId }, 400)
-    }
-    else {
-      return c.json({ status: 'You can\'t access this app auth not found', app_id: body.appId }, 400)
-    }
-    if (body.count)
-      return c.json({ count: await countDevices(c, body.appId) })
-    return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search, body.order))
+  const body = await c.req.json<DataDevice>()
+  cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
+  const devicesIds = body.devicesId ?? body.deviceIds ?? []
+  const apikey_string = c.req.header('capgkey')
+  const authorization = c.req.header('authorization')
+  if (apikey_string) {
+    const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
+      .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
+    if (_errorUserId || !userId)
+      throw simpleError('user_not_found', 'You can\'t access this app user not found', { app_id: body.appId })
+    if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string)))
+      throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot get devices', error: JSON.stringify(e) }, 500)
+  else if (authorization) {
+    const reqOwner = await supabaseClient(c, authorization)
+      .rpc('has_app_right', { appid: body.appId, right: 'read' })
+      .then(res => res.data ?? false)
+    if (!reqOwner)
+      throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
+  else {
+    throw simpleError('auth_not_found', 'You can\'t access this app auth not found', { app_id: body.appId })
+  }
+  if (body.count)
+    return c.json({ count: await countDevices(c, body.appId) })
+  return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search, body.order))
 })

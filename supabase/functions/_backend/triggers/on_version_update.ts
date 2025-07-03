@@ -1,9 +1,8 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { UpdatePayload } from '../utils/supabase.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
@@ -79,9 +78,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
 }
 
-async function updateIt(c: Context, body: UpdatePayload<'app_versions'>) {
-  const record = body.record as Database['public']['Tables']['app_versions']['Row']
-
+async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   const v2Path = await getPath(c, record)
 
   if (v2Path && record.storage_provider === 'r2') {
@@ -201,37 +198,23 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, async (c) => {
-  try {
-    const table: keyof Database['public']['Tables'] = 'app_versions'
-    const body = await c.req.json<UpdatePayload<typeof table>>()
-    if (body.table !== table) {
-      cloudlog({ requestId: c.get('requestId'), message: `Not ${table}` })
-      return c.json({ status: `Not ${table}` }, 200)
-    }
-    if (body.type !== 'UPDATE') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Not UPDATE' })
-      return c.json({ status: 'Not UPDATE' }, 200)
-    }
-    const record = body.record
-    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (c) => {
+  const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
+  const oldRecord = c.get('oldRecord') as Database['public']['Tables']['app_versions']['Row']
+  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
-    if (!record.app_id) {
-      cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
-      return c.json(BRES)
-    }
-    if (!record.r2_path && !record.manifest) {
-      cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
-      return c.json(BRES)
-    }
-    // // check if not deleted it's present in s3 storage
-    if (record.deleted && record.deleted !== body.old_record.deleted)
-      return deleteIt(c, body.record as any)
+  if (!record.app_id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
+    return c.json(BRES)
+  }
+  if (!record.r2_path && !record.manifest) {
+    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
+    return c.json(BRES)
+  }
+  // // check if not deleted it's present in s3 storage
+  if (record.deleted && record.deleted !== oldRecord.deleted)
+    return deleteIt(c, record)
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
-    return updateIt(c, body)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot update version', error: JSON.stringify(e) }, 500)
-  }
+  cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
+  return updateIt(c, record)
 })

@@ -13,19 +13,14 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
     return c.json(BRES)
   }
 
-  try {
-    const size = await s3.getSize(c, record.s3_path)
-    if (size) {
-      const { error: updateError } = await supabaseAdmin(c)
-        .from('manifest')
-        .update({ file_size: size })
-        .eq('id', record.id)
-      if (updateError)
-        cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
-    }
-  }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot get s3 size', error })
+  const size = await s3.getSize(c, record.s3_path)
+  if (size) {
+    const { error: updateError } = await supabaseAdmin(c)
+      .from('manifest')
+      .update({ file_size: size })
+      .eq('id', record.id)
+    if (updateError)
+      cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
   }
 
   return c.json(BRES)
@@ -33,19 +28,14 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), async (c) => {
-  try {
-    const record = c.get('webhookBody') as Database['public']['Tables']['manifest']['Row']
-    cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), (c) => {
+  const record = c.get('webhookBody') as Database['public']['Tables']['manifest']['Row']
+  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
-    if (!record.app_version_id || !record.s3_path) {
-      cloudlog({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })
-      return c.json(BRES)
-    }
+  if (!record.app_version_id || !record.s3_path) {
+    cloudlog({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })
+    return c.json(BRES)
+  }
 
-    return updateManifestSize(c, record)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot update manifest size', error: JSON.stringify(e) }, 500)
-  }
+  return updateManifestSize(c, record)
 })

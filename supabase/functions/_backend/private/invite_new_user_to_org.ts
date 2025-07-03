@@ -6,7 +6,7 @@ import { Hono } from 'hono/tiny'
 import { HTTPError } from 'ky'
 import { z } from 'zod'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -98,8 +98,11 @@ app.post('/', middlewareAuth, async (c) => {
     cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
     const res = await validateInvite(c, rawBody)
-    if (!res.inviteCreatorUser || !res.org) {
-      return c.json({ status: res.message ?? 'Failed to invite user', error: res.errors ?? 'Failed to invite user' }, res?.status as any ?? 500)
+    if (!res.inviteCreatorUser) {
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
+    }
+    if (!res.org) {
+      throw simpleError('organization_not_found', 'Organization not found')
     }
     const body = res.body
     const inviteCreatorUser = res.inviteCreatorUser
@@ -116,7 +119,7 @@ app.post('/', middlewareAuth, async (c) => {
     if (existingInvitation) {
       const nowMinusThreeHours = dayjs().subtract(3, 'hours')
       if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-        return c.json({ status: 'Failed to invite user', error: 'User already invited and it hasnt been 3 hours since the last invitation was cancelled' }, 400)
+        throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
       }
 
       const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdmin(c)
@@ -132,7 +135,7 @@ app.post('/', middlewareAuth, async (c) => {
         .single()
 
       if (updateInvitationError) {
-        return c.json({ status: 'Failed to invite user', error: updateInvitationError.message }, 500)
+        throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
       }
 
       newInvitation = updatedInvitationData
@@ -147,7 +150,7 @@ app.post('/', middlewareAuth, async (c) => {
       }).select('*').single()
 
       if (createUserError) {
-        return c.json({ status: 'Failed to invite user', error: createUserError.message }, 500)
+        throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
       }
 
       newInvitation = newInvitationData
@@ -160,10 +163,8 @@ app.post('/', middlewareAuth, async (c) => {
       invited_first_name: `${body.first_name}`,
       invited_last_name: `${body.last_name}`,
     }, 'org:invite_new_capgo_user_to_org')
-    cloudlog({ requestId: c.get('requestId'), context: 'bento_event', bentoEvent })
     if (!bentoEvent) {
-      cloudlogErr({ requestId: c.get('requestId'), context: 'bento_event_error', error: 'Failed to track bento event' })
-      return c.json({ status: 'Failed to invite user', error: 'Failed to track bento event' }, 500)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
     }
     return c.json({ status: 'User invited successfully' })
   }
@@ -171,10 +172,10 @@ app.post('/', middlewareAuth, async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), context: 'error', error })
     if (error instanceof HTTPError) {
       const errorJson = await error.response.json()
-      return c.json({ status: 'Failed to invite user', error: JSON.stringify(errorJson) }, 500)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, JSON.stringify(errorJson))
     }
     else {
-      return c.json({ status: 'Failed to invite user', error: JSON.stringify(error) }, 500)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, JSON.stringify(error))
     }
   }
 })

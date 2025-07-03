@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -18,66 +18,58 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  try {
-    const body = await c.req.json<DataDownload>()
-    cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
-    const authorization = c.req.header('authorization')
-    if (!authorization)
-      return c.json({ status: 'Cannot find authorization' }, 400)
+  const body = await c.req.json<DataDownload>()
+  cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
+  const authorization = c.req.header('authorization')
+  if (!authorization)
+    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
 
-    const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
-      authorization?.split('Bearer ')[1],
-    )
-    if (error || !auth?.user?.id)
-      return c.json({ status: 'not authorize' }, 400)
+  const { data: auth, error } = await supabaseAdmin(c).auth.getUser(
+    authorization?.split('Bearer ')[1],
+  )
+  if (error || !auth?.user?.id)
+    throw simpleError('not_authorize', 'Not authorize')
 
-    const userId = auth.user.id
+  const userId = auth.user.id
 
-    if (!(await hasAppRight(c, body.app_id, userId, 'read')))
-      return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+  if (!(await hasAppRight(c, body.app_id, userId, 'read')))
+    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
 
-    const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
-      .from('app_versions')
-      .select('*, owner_org ( created_by )')
+  const { data: bundle, error: getBundleError } = await supabaseAdmin(c)
+    .from('app_versions')
+    .select('*, owner_org ( created_by )')
+    .eq('app_id', body.app_id)
+    .eq('id', body.id)
+    .single()
+
+  const ownerOrg = (bundle?.owner_org as any).created_by
+
+  if (getBundleError) {
+    throw simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })
+  }
+
+  if (!ownerOrg) {
+    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
+  }
+
+  if (body.isManifest) {
+    const { data: manifest, error: getManifestError } = await supabaseAdmin(c)
+      .from('manifest')
+      .select('*')
       .eq('app_id', body.app_id)
       .eq('id', body.id)
-      .single()
 
-    const ownerOrg = (bundle?.owner_org as any).created_by
-
-    if (getBundleError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBundleError', error: getBundleError })
-      return c.json({ status: 'Error unknown' }, 500)
+    if (getManifestError) {
+      throw simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
     }
-
-    if (!ownerOrg) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'cannotGetOwnerOrg', bundle })
-      return c.json({ status: 'Error unknown' }, 500)
-    }
-
-    if (body.isManifest) {
-      const { data: manifest, error: getManifestError } = await supabaseAdmin(c)
-        .from('manifest')
-        .select('*')
-        .eq('app_id', body.app_id)
-        .eq('id', body.id)
-
-      if (getManifestError) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'getManifestError', error: getManifestError })
-        return c.json({ status: 'Error unknown' }, 500)
-      }
-      const manifestEntries = getManifestUrl(c, bundle.id, manifest, userId)
-      return c.json({ manifest: manifestEntries })
-    }
-    else {
-      const data = await getBundleUrl(c, bundle.id, bundle.r2_path, userId)
-      if (!data)
-        return c.json({ status: 'Error unknown' }, 500)
-
-      return c.json({ url: data.url })
-    }
+    const manifestEntries = getManifestUrl(c, bundle.id, manifest, userId)
+    return c.json({ manifest: manifestEntries })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot get download link', error: JSON.stringify(e) }, 500)
+  else {
+    const data = await getBundleUrl(c, bundle.id, bundle.r2_path, userId)
+    if (!data)
+      throw simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
+
+    return c.json({ url: data.url })
   }
 })

@@ -8,7 +8,7 @@ import { parseUploadMetadata } from '../tus/parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from '../tus/retry.ts'
 import { MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION, X_CHECKSUM_SHA256 } from '../tus/uploadHandler.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, toBase64 } from '../tus/util.ts'
-import { middlewareKey } from '../utils/hono.ts'
+import { middlewareKey, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -131,7 +131,7 @@ async function uploadHandler(c: Context) {
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
-    return c.json({ error: 'Invalid bucket configuration' }, 500)
+    throw simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))

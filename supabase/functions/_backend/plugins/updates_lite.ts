@@ -3,7 +3,9 @@ import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
+import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
+import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update as updateLite } from '../utils/update_lite.ts'
 import {
   deviceIdRegex,
@@ -70,32 +72,14 @@ const jsonRequestSchema = z.object({
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  try {
-    const body = await c.req.json<AppInfos>()
-    cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
-    if (isLimited(c, body.app_id)) {
-      return c.json({
-        status: 'Too many requests',
-        error: 'too_many_requests',
-      }, 200)
-    }
-    const parseResult = jsonRequestSchema.safeParse(body)
-    if (!parseResult.success) {
-      const error = parseResult.error.errors[0]
-      cloudlog({ requestId: c.get('requestId'), message: 'parseResult', error: error.message })
-      return c.json({
-        error: `Cannot parse json: ${error.message}`,
-      }, 400)
-    }
-
-    return updateLite(c, body)
+  const body = await c.req.json<AppInfos>()
+  cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
+  if (isLimited(c, body.app_id)) {
+    throw simpleError('too_many_requests', 'Too many requests')
   }
-  catch (e) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error', error: JSON.stringify(e) })
-    return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 400)
-  }
+  return updateLite(c, parsePluginBody<AppInfos>(c, body, jsonRequestSchema))
 })
 
 app.get('/', (c) => {
-  return c.json({ status: 'ok' })
+  return c.json(BRES)
 })

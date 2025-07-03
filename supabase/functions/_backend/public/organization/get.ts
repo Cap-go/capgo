@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
+import { simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
@@ -23,20 +24,17 @@ const orgSchema = z.object({
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
-    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
   if (body.orgId && !(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this organization', org_id: body.orgId })
-    return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
+    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
   if (body.orgId) {
     if (!apikeyHasOrgRight(apikey, body.orgId)) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this organization', org_id: body.orgId })
-      return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
+      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
     }
     const { data, error } = await supabaseApikey(c, c.get('capgkey') as string)
       .from('orgs')
@@ -44,13 +42,11 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
       .eq('id', body.orgId)
       .single()
     if (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organization', error })
-      return c.json({ status: 'Cannot get organization', error: error.message }, 500)
+      throw simpleError('cannot_get_organization', 'Cannot get organization', { error })
     }
     const dataParsed = orgSchema.safeParse(data)
     if (!dataParsed.success) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot parse organization', error: dataParsed.error })
-      return c.json({ status: 'Cannot get organization', error: dataParsed.error.message }, 500)
+      throw simpleError('cannot_parse_organization', 'Cannot parse organization', { error: dataParsed.error })
     }
     return c.json(dataParsed.data)
   }
@@ -64,13 +60,11 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
       .select('*')
       .range(from, to)
     if (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organizations', error })
-      return c.json({ status: 'Cannot get organizations', error: error.message }, 500)
+      throw simpleError('cannot_get_organizations', 'Cannot get organizations', { error })
     }
     const dataParsed = orgSchema.array().safeParse(data)
     if (!dataParsed.success) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot parse organization', error: dataParsed.error })
-      return c.json({ status: 'Cannot get organization', error: dataParsed.error.message }, 500)
+      throw simpleError('cannot_parse_organizations', 'Cannot parse organizations', { error: dataParsed.error })
     }
     return c.json(dataParsed.data)
   }

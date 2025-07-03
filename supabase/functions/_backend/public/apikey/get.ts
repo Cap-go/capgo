@@ -1,4 +1,4 @@
-import { honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
@@ -7,8 +7,7 @@ const app = honoFactory.createApp()
 app.get('/', middlewareKey(['all']), async (c) => {
   const key = c.get('apikey')!
   if (key.limited_to_orgs?.length) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey You cannot do that as a limited API key' })
-    return c.json({ error: 'You cannot do that as a limited API key' }, 401)
+    throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
   const supabase = supabaseAdmin(c)
 
@@ -18,8 +17,7 @@ app.get('/', middlewareKey(['all']), async (c) => {
     .eq('user_id', key.user_id)
 
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot list apikeys Failed to list API keys', error })
-    return c.json({ error: 'Failed to list API keys', supabaseError: error }, 500)
+    throw simpleError('failed_to_list_apikeys', 'Failed to list API keys', { supabaseError: error })
   }
 
   return c.json(apikeys)
@@ -28,13 +26,11 @@ app.get('/', middlewareKey(['all']), async (c) => {
 app.get('/:id', middlewareKey(['all']), async (c) => {
   const key = c.get('apikey')!
   if (key.limited_to_orgs?.length) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey You cannot do that as a limited API key' })
-    return c.json({ error: 'You cannot do that as a limited API key' }, 401)
+    throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
   const id = c.req.param('id')
   if (!id) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update apikey API key ID is required' })
-    return c.json({ error: 'API key ID is required' }, 400)
+    throw simpleError('api_key_id_required', 'API key ID is required', { id })
   }
   const supabase = supabaseAdmin(c)
   const { data: apikey, error } = await supabase
@@ -44,8 +40,7 @@ app.get('/:id', middlewareKey(['all']), async (c) => {
     .eq('user_id', key.user_id)
     .single()
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get apikey Failed to get API key', error })
-    return c.json({ error: 'Failed to get API key', supabaseError: error }, 404)
+    throw simpleError('failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
   return c.json(apikey)
 })

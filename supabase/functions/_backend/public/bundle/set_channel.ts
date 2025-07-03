@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
@@ -12,12 +13,11 @@ interface SetChannelBody {
 export async function setChannel(c: Context, body: SetChannelBody, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   // Check API key permissions
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this app', data: body.app_id })
-    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   if (!body.app_id || !body.version_id || !body.channel_id) {
-    return c.json({ status: 'Missing required fields', error: 'app_id, version_id, and channel_id are required' }, 400)
+    throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id, channel_id: body.channel_id })
   }
 
   // Get organization info
@@ -28,8 +28,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (orgError || !org) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find app', error: orgError })
-    return c.json({ status: 'Cannot find app', error: JSON.stringify(orgError) }, 400)
+    throw simpleError('cannot_find_app', 'Cannot find app', { supabaseError: orgError })
   }
 
   // Verify the bundle exists and belongs to the app
@@ -43,8 +42,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (versionError || !version) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', error: versionError })
-    return c.json({ status: 'Cannot find version', error: JSON.stringify(versionError) }, 400)
+    throw simpleError('cannot_find_version', 'Cannot find version', { supabaseError: versionError })
   }
 
   // Verify the channel exists and belongs to the app
@@ -57,8 +55,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (channelError || !channel) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find channel', error: channelError })
-    return c.json({ status: 'Cannot find channel', error: JSON.stringify(channelError) }, 400)
+    throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: channelError })
   }
 
   // Update the channel to set the new version
@@ -69,8 +66,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .eq('app_id', body.app_id)
 
   if (updateError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot set bundle to channel', error: updateError })
-    return c.json({ status: 'Cannot set bundle to channel', error: JSON.stringify(updateError) }, 500)
+    throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { supabaseError: updateError })
   }
 
   return c.json({

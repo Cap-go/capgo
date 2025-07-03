@@ -97,182 +97,176 @@ function getStats(c: Context): GlobalStats {
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  try {
-    const res = getStats(c)
-    const [
-      apps,
-      updates,
-      updates_external,
-      users,
-      orgs,
-      stars,
-      customers,
-      onboarded,
-      need_upgrade,
-      plans,
-      actives,
+  const res = getStats(c)
+  const [
+    apps,
+    updates,
+    updates_external,
+    users,
+    orgs,
+    stars,
+    customers,
+    onboarded,
+    need_upgrade,
+    plans,
+    actives,
+    updates_last_month,
+    devices_last_month,
+  ] = await Promise.all([
+    res.apps,
+    res.updates,
+    res.updates_external,
+    res.users,
+    res.orgs,
+    res.stars,
+    res.customers,
+    res.onboarded,
+    res.need_upgrade,
+    res.plans,
+    res.actives,
+    res.updates_last_month,
+    res.devices_last_month,
+  ])
+  const not_paying = users - customers.total - plans.Trial
+  cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
+  // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
+  // create var date_id with yearn-month-day
+  const date_id = new Date().toISOString().slice(0, 10)
+  const newData: Database['public']['Tables']['global_stats']['Insert'] = {
+    date_id,
+    apps,
+    trial: plans.Trial,
+    users,
+    updates,
+    updates_external,
+    apps_active: actives.apps,
+    users_active: actives.users,
+    stars,
+    paying: customers.total,
+    paying_yearly: customers.yearly,
+    paying_monthly: customers.monthly,
+    onboarded,
+    need_upgrade,
+    not_paying,
+    updates_last_month,
+    devices_last_month,
+  }
+  cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
+  const { error } = await supabaseAdmin(c)
+    .from('global_stats')
+    .upsert(newData)
+  if (error)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
+  await logsnag(c).track({
+    channel: 'updates-stats',
+    event: 'Updates last month',
+    user_id: 'admin',
+    tags: {
       updates_last_month,
-      devices_last_month,
-    ] = await Promise.all([
-      res.apps,
-      res.updates,
-      res.updates_external,
-      res.users,
-      res.orgs,
-      res.stars,
-      res.customers,
-      res.onboarded,
-      res.need_upgrade,
-      res.plans,
-      res.actives,
-      res.updates_last_month,
-      res.devices_last_month,
-    ])
-    const not_paying = users - customers.total - plans.Trial
-    cloudlog({ requestId: c.get('requestId'), message: 'All Promises', apps, updates, updates_external, users, stars, customers, onboarded, need_upgrade, plans })
-    // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
-    // create var date_id with yearn-month-day
-    const date_id = new Date().toISOString().slice(0, 10)
-    const newData: Database['public']['Tables']['global_stats']['Insert'] = {
-      date_id,
-      apps,
-      trial: plans.Trial,
-      users,
-      updates,
-      updates_external,
-      apps_active: actives.apps,
-      users_active: actives.users,
-      stars,
-      paying: customers.total,
-      paying_yearly: customers.yearly,
-      paying_monthly: customers.monthly,
-      onboarded,
-      need_upgrade,
-      not_paying,
-      updates_last_month,
-      devices_last_month,
-    }
-    cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
-    const { error } = await supabaseAdmin(c)
-      .from('global_stats')
-      .upsert(newData)
-    if (error)
-      cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
-    await logsnag(c).track({
-      channel: 'updates-stats',
-      event: 'Updates last month',
-      user_id: 'admin',
-      tags: {
-        updates_last_month,
-      },
+    },
+    icon: '📲',
+  }).catch((e: any) => {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
+  })
+  await logsnagInsights(c, [
+    {
+      title: 'Apps',
+      value: apps,
+      icon: '📱',
+    },
+    {
+      title: 'Active Apps',
+      value: actives.apps,
+      icon: '💃',
+    },
+    {
+      title: 'Updates',
+      value: updates,
       icon: '📲',
-    }).catch((e: any) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
-    })
-    await logsnagInsights(c, [
-      {
-        title: 'Apps',
-        value: apps,
-        icon: '📱',
-      },
-      {
-        title: 'Active Apps',
-        value: actives.apps,
-        icon: '💃',
-      },
-      {
-        title: 'Updates',
-        value: updates,
-        icon: '📲',
-      },
-      {
-        title: 'Updates on premises',
-        value: updates_external,
-        icon: '📲',
-      },
-      {
-        title: 'Updates last month',
-        value: updates_last_month,
-        icon: '📲',
-      },
-      {
-        title: 'Total Users',
-        value: users,
-        icon: '👨',
-      },
-      {
-        title: 'Active Users',
-        value: actives.users,
-        icon: '🎉',
-      },
-      {
-        title: 'User onboarded',
-        value: onboarded,
-        icon: '✅',
-      },
-      {
-        title: 'Orgs',
-        value: orgs,
-        icon: '🏢',
-      },
-      {
-        title: 'Orgs with trial',
-        value: plans.Trial,
-        icon: '👶',
-      },
-      {
-        title: 'Orgs paying',
-        value: customers.total,
-        icon: '💰',
-      },
-      {
-        title: 'Orgs yearly',
-        value: `${(customers.yearly * 100 / customers.total).toFixed(0)}% - ${customers.yearly}`,
-        icon: '🧧',
-      },
-      {
-        title: 'Orgs monthly',
-        value: `${(customers.monthly * 100 / customers.total).toFixed(0)}% - ${customers.monthly}`,
-        icon: '🗓️',
-      },
-      {
-        title: 'Orgs not paying',
-        value: not_paying,
-        icon: '🥲',
-      },
-      {
-        title: 'Orgs need upgrade',
-        value: need_upgrade,
-        icon: '🤒',
-      },
-      {
-        title: 'Orgs Solo Plan',
-        value: `${(plans.Solo * 100 / customers.total).toFixed(0)}% - ${plans.Solo}`,
-        icon: '🎸',
-      },
-      {
-        title: 'Orgs Maker Plan',
-        value: `${(plans.Maker * 100 / customers.total).toFixed(0)}% - ${plans.Maker}`,
-        icon: '🤝',
-      },
-      {
-        title: 'Orgs Team Plan',
-        value: `${(plans.Team * 100 / customers.total).toFixed(0)}% - ${plans.Team}`,
-        icon: '👏',
-      },
-      {
-        title: 'Orgs Pay as you go Plan',
-        value: `${(plans['Pay as you go'] * 100 / customers.total).toFixed(0)}% - ${plans['Pay as you go']}`,
-        icon: '📈',
-      },
-    ]).catch((e) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
-    })
-    cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
-    return c.json(BRES)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'general insights error', e })
-    return c.json({ status: 'Cannot process insights', error: JSON.stringify(e) }, 500)
-  }
+    },
+    {
+      title: 'Updates on premises',
+      value: updates_external,
+      icon: '📲',
+    },
+    {
+      title: 'Updates last month',
+      value: updates_last_month,
+      icon: '📲',
+    },
+    {
+      title: 'Total Users',
+      value: users,
+      icon: '👨',
+    },
+    {
+      title: 'Active Users',
+      value: actives.users,
+      icon: '🎉',
+    },
+    {
+      title: 'User onboarded',
+      value: onboarded,
+      icon: '✅',
+    },
+    {
+      title: 'Orgs',
+      value: orgs,
+      icon: '🏢',
+    },
+    {
+      title: 'Orgs with trial',
+      value: plans.Trial,
+      icon: '👶',
+    },
+    {
+      title: 'Orgs paying',
+      value: customers.total,
+      icon: '💰',
+    },
+    {
+      title: 'Orgs yearly',
+      value: `${(customers.yearly * 100 / customers.total).toFixed(0)}% - ${customers.yearly}`,
+      icon: '🧧',
+    },
+    {
+      title: 'Orgs monthly',
+      value: `${(customers.monthly * 100 / customers.total).toFixed(0)}% - ${customers.monthly}`,
+      icon: '🗓️',
+    },
+    {
+      title: 'Orgs not paying',
+      value: not_paying,
+      icon: '🥲',
+    },
+    {
+      title: 'Orgs need upgrade',
+      value: need_upgrade,
+      icon: '🤒',
+    },
+    {
+      title: 'Orgs Solo Plan',
+      value: `${(plans.Solo * 100 / customers.total).toFixed(0)}% - ${plans.Solo}`,
+      icon: '🎸',
+    },
+    {
+      title: 'Orgs Maker Plan',
+      value: `${(plans.Maker * 100 / customers.total).toFixed(0)}% - ${plans.Maker}`,
+      icon: '🤝',
+    },
+    {
+      title: 'Orgs Team Plan',
+      value: `${(plans.Team * 100 / customers.total).toFixed(0)}% - ${plans.Team}`,
+      icon: '👏',
+    },
+    {
+      title: 'Orgs Pay as you go Plan',
+      value: `${(plans['Pay as you go'] * 100 / customers.total).toFixed(0)}% - ${plans['Pay as you go']}`,
+      icon: '📈',
+    },
+  ]).catch((e) => {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
+  })
+  cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
+  return c.json(BRES)
 })

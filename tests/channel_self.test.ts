@@ -1,3 +1,4 @@
+import type { SimpleErrorResponse } from '../supabase/functions/_backend/utils/hono.ts'
 import type { DeviceLink, HttpMethod } from './test-utils.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -8,13 +9,6 @@ interface ChannelInfo {
   name: string
   public: boolean
   allow_self_set: boolean
-}
-
-interface SimpleErrorResponse {
-  errorCode: string
-  message: string
-  moreInfo?: any
-  cause?: any
 }
 
 type ChannelsListResponse = ChannelInfo[]
@@ -52,7 +46,7 @@ async function fetchGetChannels(queryParams: Record<string, string>) {
 
 async function getResponseErrorCode(response: Response) {
   const json = await response.json<SimpleErrorResponse>()
-  return json.errorCode
+  return json.error
 }
 
 beforeAll(async () => {

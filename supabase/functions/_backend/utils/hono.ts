@@ -44,6 +44,7 @@ export interface MiddlewareKeyVariables {
     auth?: AuthInfo
     subkey?: Database['public']['Tables']['apikeys']['Row']
     webhookBody?: any
+    oldRecord?: any
     stripeEvent?: Stripe.Event
     stripeData?: StripeData
   }
@@ -156,44 +157,34 @@ export function triggerValidator(
   type: 'DELETE' | 'INSERT' | 'UPDATE',
 ) {
   return honoFactory.createMiddleware(async (c, next) => {
-    try {
-      const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
+    const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
 
-      if (body.table !== String(table)) {
-        cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
-        return c.json({ status: `Not ${String(table)}` }, 200)
-      }
-
-      if (body.type !== type) {
-        cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
-        return c.json({ status: `Not ${type}` }, 200)
-      }
-
-      // Store the validated body in context for next middleware
-      if (body.type === 'DELETE' && body.old_record) {
-        c.set('webhookBody', body.old_record)
-      }
-      else if (body.type === 'INSERT' && body.record) {
-        c.set('webhookBody', body.record)
-      }
-      else if (body.type === 'UPDATE' && body.record) {
-        c.set('webhookBody', body.record)
-      }
-      else {
-        cloudlog({ requestId: c.get('requestId'), message: 'Invalid webhook payload' })
-        return c.json({ status: 'Invalid payload' }, 400)
-      }
-
-      await next()
+    if (body.table !== String(table)) {
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
+      return c.json({ status: `Not ${String(table)}` }, 200)
     }
-    catch (error) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Invalid webhook payload',
-        error: error instanceof Error ? error.message : String(error),
-      })
-      return c.json({ status: 'Invalid payload' }, 400)
+
+    if (body.type !== type) {
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
+      return c.json({ status: `Not ${type}` }, 200)
     }
+
+    // Store the validated body in context for next middleware
+    if (body.type === 'DELETE' && body.old_record) {
+      c.set('webhookBody', body.old_record)
+    }
+    else if (body.type === 'INSERT' && body.record) {
+      c.set('webhookBody', body.record)
+    }
+    else if (body.type === 'UPDATE' && body.record) {
+      c.set('webhookBody', body.record)
+      c.set('oldRecord', body.old_record)
+    }
+    else {
+      throw simpleError('invalid_payload', 'Invalid payload', { body })
+    }
+
+    await next()
   })
 }
 
@@ -326,7 +317,12 @@ export function createHono(functionName: string, version: string, sentryDsn?: st
     return c.json(BRES)
   })
   appGlobal.post('/ko', (c) => {
-    return c.json({ status: 'KO' }, 500)
+    const defaultResponse: SimpleErrorResponse = {
+      error: 'unknown_error',
+      message: 'KO',
+      moreInfo: {},
+    }
+    return c.json(defaultResponse, 500)
   })
 
   return appGlobal
@@ -341,20 +337,35 @@ export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, function
 }
 
 export interface SimpleErrorResponse {
-  errorCode: string
+  error: string
   message: string
   cause?: any
   moreInfo?: any
 }
 
-export function simpleError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
+export function simpleError200(c: Context, errorCode: string, message: string, moreInfo: any = {}) {
+  const status = 200
+  const res: SimpleErrorResponse = {
+    error: errorCode,
+    message,
+    ...moreInfo,
+  }
+  cloudlogErr({ requestId: c.get('requestId'), message, errorCode, moreInfo })
+  return c.json(res, status)
+}
+
+export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
   // const safeCause = cause ? JSON.stringify(cause, Object.getOwnPropertyNames(cause)) : undefined
   const res: SimpleErrorResponse = {
-    errorCode,
+    error: errorCode,
     message,
     moreInfo,
     // cause: safeCause,
   }
   console.log('res of simpleError', res)
   return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }) })
+}
+
+export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
+  return quickError(400, errorCode, message, moreInfo, cause)
 }

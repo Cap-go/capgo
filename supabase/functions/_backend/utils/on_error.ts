@@ -1,13 +1,13 @@
+import type { SimpleErrorResponse } from './hono.ts'
 import { HTTPException } from 'hono/http-exception'
 import { sendDiscordAlert } from './discord.ts'
 import { cloudlogErr } from './loggin.ts'
 import { backgroundTask, getEnv } from './utils.ts'
-import { SimpleErrorResponse } from './hono.ts'
 
 export function onError(functionName: string) {
   return async (e: any, c: any) => {
-    cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'app onError', error: e })
     c.get('sentry')?.captureException(e)
+    cloudlogErr({ requestId: c.get('requestId'), functionName, message: e?.message ?? 'app onError', error: e })
 
     const requestId = c.get('requestId') ?? 'unknown'
     const timestamp = new Date().toISOString()
@@ -34,7 +34,7 @@ export function onError(functionName: string) {
     const errorName = e?.name ?? 'Error'
     // const safeCause = e ? JSON.stringify(e, Object.getOwnPropertyNames(e)) : undefined
     const defaultResponse: SimpleErrorResponse = {
-      errorCode: 'unknown_error',
+      error: 'unknown_error',
       message: 'Unknown error',
       // cause: safeCause,
       moreInfo: {},
@@ -87,7 +87,6 @@ export function onError(functionName: string) {
       ],
     })).catch((e: any) => {
       cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'sendDiscordAlert failed', error: e })
-      return
     })
     if (e instanceof HTTPException) {
       cloudlogErr({ requestId: c.get('requestId'), functionName, message: 'HTTPException found', status: e.status })

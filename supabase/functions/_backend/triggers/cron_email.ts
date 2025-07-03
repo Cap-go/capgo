@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, simpleError } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -63,25 +63,20 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  try {
-    const { email, appId, type } = await c.req.json()
+  const { email, appId, type } = await c.req.json()
 
-    if (!email || !appId || !type) {
-      return c.json({ status: 'Missing email, appId, or type' }, 400)
-    }
-
-    if (type === 'weekly_install_stats') {
-      return await handleWeeklyInstallStats(c, email, appId)
-    }
-    else if (type === 'monthly_create_stats') {
-      return await handleMonthlyCreateStats(c, email, appId)
-    }
-    else {
-      return c.json({ status: 'Invalid email type' }, 400)
-    }
+  if (!email || !appId || !type) {
+    throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot process email', error: JSON.stringify(e) }, 500)
+
+  if (type === 'weekly_install_stats') {
+    return await handleWeeklyInstallStats(c, email, appId)
+  }
+  else if (type === 'monthly_create_stats') {
+    return await handleMonthlyCreateStats(c, email, appId)
+  }
+  else {
+    throw simpleError('invalid_email_type', 'Invalid email type', { email, appId, type })
   }
 })
 
@@ -93,8 +88,7 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app', appId, error: generateStatsError, email })
-    return c.json({ status: 'Cannot generate stats' }, 500)
+    throw simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
   }
 
   if (weeklyStats.all_updates === 0) {
