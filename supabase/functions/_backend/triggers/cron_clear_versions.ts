@@ -10,6 +10,9 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   // unsafe parse the body
   const body = await c.req.json<{ version: Database['public']['Tables']['app_versions']['Row'] }>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   cloudlog({ requestId: c.get('requestId'), message: 'post body cron_clear_versions', body })
 
   // Let's start with the metadata

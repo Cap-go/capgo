@@ -16,6 +16,9 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await c.req.json<PortalData>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
   const authorization = c.get('authorization')
   const { data: auth, error } = await supabaseAdmin(c).auth.getUser(

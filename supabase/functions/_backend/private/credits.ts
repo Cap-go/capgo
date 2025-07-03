@@ -69,6 +69,9 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   const body = await c.req.json<CostCalculationRequest>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   const { mau, bandwidth, storage } = body
 
   // Validate inputs

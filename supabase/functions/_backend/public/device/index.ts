@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/loggin.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
@@ -10,6 +11,9 @@ export const app = honoFactory.createApp()
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await c.req.json<DeviceLink>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
 
   cloudlog({ requestId: c.get('requestId'), message: 'body', body })

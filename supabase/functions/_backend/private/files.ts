@@ -39,7 +39,7 @@ async function getHandler(c: Context): Promise<Response> {
 
   if (bucket == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files bucket is null' })
-    return c.json({ error: 'Not Found' }, 404)
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
 
   // let response = null
@@ -60,7 +60,7 @@ async function getHandler(c: Context): Promise<Response> {
   })
   if (object == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
-    return c.json({ error: 'Not Found' }, 404)
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
   const headers = objectHeaders(object)
   if (object.range != null && c.req.header('range')) {
@@ -148,7 +148,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
   const fileId = parseUploadMetadata(c, c.req.raw.headers).filename
   if (fileId == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
-    return c.json({ error: 'Not Found' }, 404)
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
   // Decode base64 if necessary
   let decodedFileId = fileId
@@ -167,7 +167,7 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   const fileId = c.req.param('id')
   if (fileId == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'fileId is null' })
-    return c.json({ error: 'Not Found' }, 404)
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
   const normalizedFileId = decodeURIComponent(fileId)
   c.set('fileId', normalizedFileId)

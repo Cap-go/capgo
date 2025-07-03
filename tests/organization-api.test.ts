@@ -46,6 +46,17 @@ describe('[GET] /organization', () => {
     expect(safe.success).toBe(true)
     expect(safe.data).toEqual({ id: ORG_ID, name })
   })
+
+  it('get organization with invalid orgId', async () => {
+    const invalidOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/organization?orgId=${invalidOrgId}`, {
+      headers,
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string, orgId: string }
+    expect(responseData.status).toBe('You can\'t access this organization')
+    expect(responseData.orgId).toBe(invalidOrgId)
+  })
 })
 
 describe('[GET] /organization/members', () => {
@@ -66,6 +77,26 @@ describe('[GET] /organization/members', () => {
     expect(safe.data?.[0].uid).toBe(USER_ID)
     expect(safe.data?.[0].email).toBe(USER_EMAIL)
     expect(safe.data?.[0].role).toBe('super_admin')
+  })
+
+  it('get organization members with missing orgId', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
+  })
+
+  it('get organization members with invalid orgId', async () => {
+    const invalidOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${invalidOrgId}`, {
+      headers,
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string, orgId: string }
+    expect(responseData.status).toBe('You can\'t access this organization')
+    expect(responseData.orgId).toBe(invalidOrgId)
   })
 })
 
@@ -101,6 +132,48 @@ describe('[POST] /organization/members', () => {
     expect(data?.org_id).toBe(ORG_ID)
     expect(data?.user_right).toBe('invite_read')
   })
+
+  it('add organization member with invalid body', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({}), // Missing required fields
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
+  })
+
+  it('add organization member with invalid orgId', async () => {
+    const invalidOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: invalidOrgId,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string, orgId: string }
+    expect(responseData.status).toBe('You can\'t access this organization')
+    expect(responseData.orgId).toBe(invalidOrgId)
+  })
+
+  it('add organization member with missing email', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        invite_type: 'read',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
+  })
 })
 
 describe('[DELETE] /organization/members', () => {
@@ -133,6 +206,39 @@ describe('[DELETE] /organization/members', () => {
     expect(orgUserError).toBeTruthy()
     expect(data).toBeNull()
   })
+
+  it('delete organization member with invalid body', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
+  })
+
+  it('delete organization member with invalid orgId', async () => {
+    const invalidOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${invalidOrgId}&email=${USER_ADMIN_EMAIL}`, {
+      headers,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string, orgId: string }
+    expect(responseData.status).toBe('You can\'t access this organization')
+    expect(responseData.orgId).toBe(invalidOrgId)
+  })
+
+  it('delete organization member with non-existent email', async () => {
+    const nonExistentEmail = `nonexistent-${randomUUID()}@example.com`
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${nonExistentEmail}`, {
+      headers,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('User not found')
+  })
 })
 
 describe('[POST] /organization', () => {
@@ -158,6 +264,38 @@ describe('[POST] /organization', () => {
     expect(data).toBeTruthy()
     expect(data?.name).toBe(name)
   })
+
+  it('create organization with missing name', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({}), // Missing name
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string, error: string }
+    expect(responseData.status).toBe('Invalid body')
+    expect(responseData.error).toContain('Required')
+  })
+
+  it('create organization with invalid body format', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: 'invalid json', // Invalid JSON
+    })
+    expect(response.status).toBeGreaterThanOrEqual(400)
+  })
+
+  it('create organization with empty name', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({ name: '' }), // Empty name
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
+  })
 })
 
 describe('[PUT] /organization', () => {
@@ -180,6 +318,41 @@ describe('[PUT] /organization', () => {
     expect(error).toBeNull()
     expect(data).toBeTruthy()
     expect(data?.name).toBe(name)
+  })
+
+  it('update organization with invalid body', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({}), // Missing required fields
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
+  })
+
+  it('update organization with invalid orgId', async () => {
+    const invalidOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({ orgId: invalidOrgId, name: 'New Name' }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string, orgId: string }
+    expect(responseData.status).toBe('You can\'t access this organization')
+    expect(responseData.orgId).toBe(invalidOrgId)
+  })
+
+  it('update organization with missing orgId', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({ name: 'New Name' }), // Missing orgId
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Invalid body')
   })
 })
 
@@ -209,6 +382,16 @@ describe('[DELETE] /organization', () => {
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
     expect(errorOrg2).toBeTruthy()
     expect(dataOrg2).toBeNull()
+  })
+
+  it('delete organization with missing orgId', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('Missing orgId')
   })
 
   it('fail to delete non-existent organization', async () => {

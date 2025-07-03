@@ -57,6 +57,16 @@ describe('[GET] /apikey operations', () => {
     expect(data).toHaveProperty('error', 'failed_to_get_apikey')
     expect(response.status).toBe(404) // Assuming 404 for not found
   })
+
+  it('get api key with missing id', async () => {
+    const response = await fetch(`${BASE_URL}/apikey/`, {
+      method: 'GET',
+      headers,
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'API key ID is required')
+  })
 })
 
 describe('[POST] /apikey operations', () => {
@@ -89,8 +99,73 @@ describe('[POST] /apikey operations', () => {
       headers,
       body: JSON.stringify({}), // Missing name
     })
-    await response.arrayBuffer()
     expect(response.status).toBe(400) // Assuming 400 for bad request
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'Name is required')
+  })
+
+  it('create api key with empty name', async () => {
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: '' }), // Empty name
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'Name is required')
+  })
+
+  it('create api key with invalid mode', async () => {
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'test-key',
+        mode: 'invalid_mode',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'Invalid mode')
+  })
+
+  it('create api key with non-existent org_id', async () => {
+    const nonExistentOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'test-key',
+        org_id: nonExistentOrgId,
+      }),
+    })
+    expect(response.status).toBe(404)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'Org not found')
+  })
+
+  it('create api key with non-existent app_id', async () => {
+    const nonExistentAppId = randomUUID()
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'test-key',
+        app_id: nonExistentAppId,
+      }),
+    })
+    expect(response.status).toBe(404)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'App not found')
+  })
+
+  it('create api key with invalid JSON body', async () => {
+    const response = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: 'invalid json',
+    })
+    expect(response.status).toBeGreaterThanOrEqual(400)
   })
 })
 
@@ -125,8 +200,86 @@ describe('[PUT] /apikey/:id operations', () => {
       headers,
       body: JSON.stringify({ name: 'wont-work' }),
     })
-    await response.arrayBuffer()
     expect(response.status).toBe(404) // Assuming 404 for not found
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error')
+  })
+
+  it('update api key with missing id', async () => {
+    const response = await fetch(`${BASE_URL}/apikey/`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ name: 'test' }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'API key ID is required')
+  })
+
+  it('update api key with invalid mode', async () => {
+    if (!createdApiKeyId) {
+      console.warn('Skipping PUT API key test as no key ID is available.')
+      return
+    }
+    const response = await fetch(`${BASE_URL}/apikey/${createdApiKeyId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        mode: 'invalid_mode',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toContain('Invalid mode')
+  })
+
+  it('update api key with invalid limited_to_apps format', async () => {
+    if (!createdApiKeyId) {
+      console.warn('Skipping PUT API key test as no key ID is available.')
+      return
+    }
+    const response = await fetch(`${BASE_URL}/apikey/${createdApiKeyId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        limited_to_apps: 'not_an_array',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'limited_to_apps must be an array of strings')
+  })
+
+  it('update api key with invalid limited_to_orgs format', async () => {
+    if (!createdApiKeyId) {
+      console.warn('Skipping PUT API key test as no key ID is available.')
+      return
+    }
+    const response = await fetch(`${BASE_URL}/apikey/${createdApiKeyId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        limited_to_orgs: 'not_an_array',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'limited_to_orgs must be an array of strings')
+  })
+
+  it('update api key with no valid fields', async () => {
+    if (!createdApiKeyId) {
+      console.warn('Skipping PUT API key test as no key ID is available.')
+      return
+    }
+    const response = await fetch(`${BASE_URL}/apikey/${createdApiKeyId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({}), // No valid update fields
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toContain('No valid fields provided for update')
   })
 
   // Add more PUT tests for different scenarios (e.g., updating permissions)
@@ -144,7 +297,7 @@ describe('[DELETE] /apikey/:id operations', () => {
       // DELETE body is usually ignored, but check delete.ts if it expects one
     })
 
-    const data = await response.json()
+    const data = await response.json() as { success: boolean }
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('success', true) // Assuming success indicator
 
@@ -160,8 +313,19 @@ describe('[DELETE] /apikey/:id operations', () => {
       method: 'DELETE',
       headers,
     })
-    await response.arrayBuffer()
     expect(response.status).toBe(404) // Assuming 404 for not found
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error')
+  })
+
+  it('delete api key with missing id', async () => {
+    const response = await fetch(`${BASE_URL}/apikey/`, {
+      method: 'DELETE',
+      headers,
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error', 'API key ID is required')
   })
 
   it('delete already deleted api key', async () => {
@@ -180,7 +344,8 @@ describe('[DELETE] /apikey/:id operations', () => {
       method: 'DELETE',
       headers,
     })
-    await response.arrayBuffer()
     expect(response.status).toBe(404) // Should still be 404 if it doesn't exist
+    const data = await response.json() as { error: string }
+    expect(data).toHaveProperty('error')
   })
 })

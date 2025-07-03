@@ -12,6 +12,9 @@ app.post('/', middlewareKey(['all']), async (c) => {
     throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
   const body = await c.req.json()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
 
   const orgId = body.org_id
   const appId = body.app_id

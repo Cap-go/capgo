@@ -23,6 +23,9 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorized', 'Not authorized')
 
   const body = await c.req.json<any>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })

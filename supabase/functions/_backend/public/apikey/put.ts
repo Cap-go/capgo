@@ -18,6 +18,9 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   }
 
   const body = await c.req.json()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   const { name, mode, limited_to_apps, limited_to_orgs } = body
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,

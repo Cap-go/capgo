@@ -334,13 +334,10 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name
-  let body: any
-  try {
-    body = await c.req.json()
-  }
-  catch (err) {
-    throw simpleError('invalid_or_missing_json_body', 'Invalid or missing JSON body', { err })
-  }
+  const body = await c.req.json()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   const queueName = body?.queue_name
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body')

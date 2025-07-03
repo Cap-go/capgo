@@ -17,6 +17,9 @@ app.use('/', useCors)
 
 app.post('/', middlewareAPISecret, async (c) => {
   const body = await c.req.json<DataToGet>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   cloudlog({ requestId: c.get('requestId'), message: 'postcron stats body', body })
   if (!body.appId || !body.orgId)
     throw simpleError('no_appId_orgId', 'No appId or orgId', { body })

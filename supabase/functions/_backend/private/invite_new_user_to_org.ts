@@ -90,6 +90,9 @@ async function validateInvite(c: Context, rawBody: any) {
 
 app.post('/', middlewareAuth, async (c) => {
   const rawBody = await c.req.json()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
   const res = await validateInvite(c, rawBody)

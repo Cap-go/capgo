@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareKey, simpleError } from '../utils/hono.ts'
+import { middlewareKey, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
@@ -15,6 +15,9 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await c.req.json<DataUpload>()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
   const apikey = c.get('apikey')
   const capgkey = c.get('capgkey') as string
@@ -23,11 +26,11 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
-    throw simpleError('error_user_not_found', 'Error User not found', { _errorUserId })
+    throw quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
   }
 
   if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
-    throw simpleError('not_authorized', 'You can\'t access this app', { app_id: body.app_id })
+    throw quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   const { error: errorApp } = await supabaseAdmin(c)
@@ -36,11 +39,14 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('app_id', body.app_id)
     .single()
   if (errorApp) {
-    throw simpleError('error_app_not_found', 'Error App not found', { errorApp })
+    throw quickError(404, 'app_not_found', 'Error App not found', { errorApp })
   }
 
-  if (!body.app_id || !body.name) {
-    throw simpleError('error_app_id_or_bundle_name_missing', 'Error app_id or bundle name missing', { body })
+  if (!body.app_id) {
+    throw quickError(400, 'error_app_id_missing', 'Error bundle name missing', { body })
+  }
+  if (!body.name) {
+    throw quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { body })
   }
 
   const { data: version, error: errorVersion } = await supabaseAdmin(c)

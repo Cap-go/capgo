@@ -17,6 +17,9 @@ app.use('/', useCors)
 
 app.post('/', async (c) => {
   const rawBody = await c.req.json()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody })
 
   // Validate the request body using Zod

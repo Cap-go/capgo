@@ -64,6 +64,9 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   const { email, appId, type } = await c.req.json()
+    .catch((e) => {
+      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+    })
 
   if (!email || !appId || !type) {
     throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
