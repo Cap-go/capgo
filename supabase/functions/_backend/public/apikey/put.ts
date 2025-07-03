@@ -1,5 +1,5 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
@@ -9,7 +9,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   const key = c.get('apikey')!
 
   if (key.limited_to_orgs?.length) {
-    throw simpleError('cannot_update_apikey', 'You cannot do that as a limited API key', { key })
+    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { key })
   }
 
   const id = c.req.param('id')
@@ -59,10 +59,10 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
 
   if (fetchError) {
     // RLS might return an error or just no data if not found/accessible
-    throw simpleError('api_key_not_found_or_access_denied', 'API key not found or access denied', { supabaseError: fetchError })
+    throw quickError(fetchError.code === 'PGRST116' ? 404 : 500, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { supabaseError: fetchError })
   }
   if (!existingApikey) {
-    throw simpleError('api_key_not_found_or_access_denied', 'API key not found or access denied')
+    throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied')
   }
 
   const { data: updatedApikey, error: updateError } = await supabase
@@ -74,7 +74,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     .single()
 
   if (updateError) {
-    throw simpleError('failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
+    throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
   }
 
   return c.json(updatedApikey)

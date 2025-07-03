@@ -18,7 +18,7 @@ app.delete('/:id', middlewareKey(['all']), async (c) => {
 
   const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', key.user_id).single()
   if (!apikey || apikeyError) {
-    throw quickError(401, 'api_key_not_found', 'API key not found', { supabaseError: apikeyError })
+    throw quickError(404, 'api_key_not_found', 'API key not found', { supabaseError: apikeyError })
   }
 
   const { error } = await supabase

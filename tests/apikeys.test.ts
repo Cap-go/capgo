@@ -55,7 +55,7 @@ describe('[GET] /apikey operations', () => {
     })
     const data = await response.json() as { error: string }
     expect(data).toHaveProperty('error', 'failed_to_get_apikey')
-    expect(response.status).toBe(400) // Assuming 404 for not found
+    expect(response.status).toBe(404) // Assuming 404 for not found
   })
 })
 
