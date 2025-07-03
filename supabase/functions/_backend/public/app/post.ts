@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export interface CreateApp {
@@ -17,7 +17,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
   // Check if the user is allowed to create an app in this organization
   const userId = apikey.user_id
   if (body.owner_org && !(await hasOrgRightApikey(c, body.owner_org, userId, 'write', c.get('capgkey') as string))) {
-    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
+    throw quickError(403, 'cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 
   const dataInsert = {

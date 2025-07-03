@@ -147,9 +147,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
       method: 'GET',
       headers: { ...headers, ...subkeyHeaders },
     })
-    expect(getStats.status).toBe(400)
+    expect(getStats.status).toBe(401)
     const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('status', 'You can\'t access this app')
+    expect(statsData).toHaveProperty('error', 'invalid_apikey')
   })
 
   it('should fail to get organization statistics with subkey for org not belonging to user', async () => {
@@ -161,9 +161,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
       method: 'GET',
       headers: { ...headers, ...subkeyHeaders },
     })
-    expect(getOrgStats.status).toBe(400)
-    const orgStatsData = await getOrgStats.json()
-    expect(orgStatsData).toHaveProperty('status', 'You can\'t access this organization')
+    expect(getOrgStats.status).toBe(401)
+    const orgStatsData = await getOrgStats.json<{ error: string }>()
+    expect(orgStatsData.error).toBe('no_access_to_organization')
   })
 
   it('should create subkey with non-accessible org and fail to get org statistics', async () => {
@@ -188,9 +188,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
       method: 'GET',
       headers: { ...headers, ...subkeyHeaders },
     })
-    expect(getOrgStats.status).toBe(400)
-    const orgStatsData = await getOrgStats.json()
-    expect(orgStatsData).toHaveProperty('status', 'You can\'t access this organization')
+    expect(getOrgStats.status).toBe(401)
+    const orgStatsData = await getOrgStats.json<{ error: string }>()
+    expect(orgStatsData.error).toBe('no_access_to_organization')
 
     // Clean up
     const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleOrgSubkeyId}`, {
@@ -222,9 +222,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
       method: 'GET',
       headers: { ...headers, ...subkeyHeaders },
     })
-    expect(getStats.status).toBe(400)
-    const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('status', 'You can\'t access this app')
+    expect(getStats.status).toBe(401)
+    const statsData = await getStats.json<{ error: string }>()
+    expect(statsData.error).toBe('invalid_apikey')
 
     // Clean up
     const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleAppSubkeyId}`, {

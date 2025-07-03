@@ -135,7 +135,7 @@ describe('[GET] /app operations with subkey', () => {
       headers: { ...headers, ...subkeyHeaders },
     })
     const data = await getOtherAppWithSubkey.json()
-    expect(data).toHaveProperty('error', 'cannot_access_app')
+    expect(data).toHaveProperty('error', 'cannot_get_app')
     expect(getOtherAppWithSubkey.status).toBe(400)
 
     // Clean up the other app
@@ -231,7 +231,7 @@ describe('[POST] /app operations with non-owner user', () => {
     })
     expect(createApp.status).toBe(403)
     const responseData = await createApp.json()
-    expect(responseData).toHaveProperty('status', 'You can\'t access this organization')
+    expect(responseData).toHaveProperty('error', 'cannot_access_organization')
   })
 
   it('should allow app creation in an organization where user is not owner but has write access', async () => {
