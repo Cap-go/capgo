@@ -202,7 +202,7 @@
     "@vue/server-renderer": "3.5.16",
     "adm-zip": "^0.5.16",
     "cross-env": "^7.0.3",
-    "discord-api-types": "^0.38.11",
+    "discord-api-types": "^0.38.15",
     "eslint": "9.29.0",
     "husky": "^9.1.7",
     "sass": "1.89.2",

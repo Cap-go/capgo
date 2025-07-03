@@ -30,6 +30,8 @@
     "postgres": "https://deno.land/x/postgresjs@v3.4.5/mod.js",
     "adm-zip": "https://esm.sh/adm-zip@0.5.16?target=deno",
     "@std/semver": "jsr:@std/semver@1.0.4",
-    "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.1"
+    "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.1",
+    "discord-api-types": "npm:discord-api-types@0.38.15",
+    "discord-api-types/v10": "npm:discord-api-types@0.38.15/v10"
   }
 }

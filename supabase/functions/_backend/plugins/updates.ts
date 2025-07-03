@@ -3,10 +3,11 @@ import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { simpleError } from '../utils/hono.ts'
+import { BRES, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update } from '../utils/update.ts'
+
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,
