@@ -3,7 +3,7 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { z } from 'zod'
-import { honoFactory, middlewareV2, simpleError, useCors } from '../../utils/hono.ts'
+import { honoFactory, middlewareV2, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
@@ -60,7 +60,7 @@ app.get('/app/:app_id', async (c) => {
   const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
   if (error) {
-    throw simpleError('cannot_get_app_statistics', 'Cannot get app statistics', { error })
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
   }
 
   return c.json(finalStats)
@@ -96,7 +96,7 @@ app.get('/org/:org_id', async (c) => {
   const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
   if (error) {
-    throw simpleError('cannot_get_organization_statistics', 'Cannot get organization statistics', { error })
+    throw quickError(500, 'cannot_get_organization_statistics', 'Cannot get organization statistics', { error })
   }
 
   return c.json(finalStats)
@@ -127,7 +127,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
   if (error) {
-    throw simpleError('cannot_get_app_statistics', 'Cannot get app statistics', { error })
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
   }
 
   return c.json(data)
@@ -150,7 +150,7 @@ app.get('/user', async (c) => {
   }
   const orgs = await orgsReq
   if (orgs.error) {
-    throw simpleError('user_not_found', 'User not found', { error: orgs.error })
+    throw quickError(404, 'user_not_found', 'User not found', { error: orgs.error })
   }
 
   cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgs.data })
@@ -160,7 +160,7 @@ app.get('/user', async (c) => {
     new Map(orgs.data.map(org => [org.org_id, org])).values(),
   )
   if (uniqueOrgs.length === 0) {
-    throw simpleError('no_organizations_found', 'No organizations found', { data: auth.userId })
+    throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
   }
 
   let stats: Array<{ data: any, error: any }> = []
@@ -173,7 +173,7 @@ app.get('/user', async (c) => {
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0) {
-    throw simpleError('cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
+    throw quickError(500, 'cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
   }
 
   const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
