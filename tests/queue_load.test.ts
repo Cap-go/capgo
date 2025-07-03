@@ -40,7 +40,7 @@ describe('queue Load Test', () => {
     })
 
     expect(validResponse.status).toBe(202)
-    expect(await validResponse.text()).toBe('Queue read scheduled')
+    expect(await validResponse.json()).toEqual({ status: 'ok' })
   })
 
   it('should reject invalid queue sync requests', async () => {
@@ -52,7 +52,8 @@ describe('queue Load Test', () => {
     })
 
     expect(invalidResponse1.status).toBe(400)
-    expect(await invalidResponse1.text()).toBe('Missing or invalid queue_name in body')
+    const json = await invalidResponse1.json<{ error: string }>()
+    expect(json.error).toEqual('missing_or_invalid_queue_name')
 
     // Test invalid JSON
     const invalidResponse2 = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
@@ -62,7 +63,8 @@ describe('queue Load Test', () => {
     })
 
     expect(invalidResponse2.status).toBe(400)
-    expect(await invalidResponse2.text()).toBe('Invalid or missing JSON body')
+    const json2 = await invalidResponse2.json<{ error: string }>()
+    expect(json2.error).toEqual('invalid_or_missing_json_body')
 
     // Test invalid queue_name type
     const invalidResponse3 = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
@@ -72,7 +74,8 @@ describe('queue Load Test', () => {
     })
 
     expect(invalidResponse3.status).toBe(400)
-    expect(await invalidResponse3.text()).toBe('Missing or invalid queue_name in body')
+    const json3 = await invalidResponse3.json<{ error: string }>()
+    expect(json3.error).toEqual('missing_or_invalid_queue_name')
   })
 
   it('should handle multiple queue messages simultaneously', async () => {
@@ -104,7 +107,7 @@ describe('queue Load Test', () => {
       body: JSON.stringify({ queue_name: queueName }),
     })
     expect(response.status).toBe(202)
-    expect(await response.text()).toBe('Queue read scheduled')
+    expect(await response.json()).toEqual({ status: 'ok' })
 
     // Wait for processing to complete
     await new Promise(resolve => setTimeout(resolve, 1000))

@@ -36,7 +36,8 @@ describe('[POST] /updates-lite', () => {
     const response = await postUpdate(baseData)
 
     expect(response.status).toBe(200)
-    expect(await response.json<UpdateRes>()).toEqual({ message: 'No new version available' })
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toEqual('no_new_version_available')
   })
 
   it('new version available', async () => {

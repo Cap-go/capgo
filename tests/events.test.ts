@@ -125,7 +125,7 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.json()
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
   })
 
   it('track event with invalid authorization', async () => {

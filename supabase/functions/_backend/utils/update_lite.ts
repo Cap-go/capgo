@@ -157,7 +157,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   if (version_name === version.name) {
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
     await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
-    return simpleError200(c, 'no_new_version', 'No new version available')
+    return simpleError200(c, 'no_new_version_available', 'No new version available')
   }
 
   if (version.name === 'builtin' && greaterOrEqual(parse(plugin_version), parse('6.2.0'))) {

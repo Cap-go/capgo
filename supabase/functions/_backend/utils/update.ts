@@ -164,7 +164,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
     // TODO: check why this event is send with wrong version_name
     await sendStatsAndDevice(c, device, [{ action: 'noNew' }])
-    return simpleError200(c, 'no_new_version', 'No new version available')
+    return simpleError200(c, 'no_new_version_available', 'No new version available')
   }
 
   if (channelData) {

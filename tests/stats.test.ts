@@ -147,7 +147,7 @@ describe('test valid and invalid cases of version_build', () => {
     response = await postStats(baseData)
     expect(response.status).toBe(400)
     responseData = await response.json<StatsRes>()
-    expect(responseData.error).toBe('invalid_version_build')
+    expect(responseData.error).toBe('semver_error')
     const deviceCountData2 = await getSupabaseClient()
       .from('devices')
       .select('*', { count: 'exact' })
