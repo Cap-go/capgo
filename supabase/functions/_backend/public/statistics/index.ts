@@ -438,7 +438,7 @@ app.get('/user', async (c) => {
   }
   const orgs = await orgsReq
   if (orgs.error) {
-    throw quickError(401, 'user_not_found', 'User not found', { error: orgs.error })
+    throw quickError(404, 'user_not_found', 'User not found', { error: orgs.error })
   }
 
   cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgs.data })

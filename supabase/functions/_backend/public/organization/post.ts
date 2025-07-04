@@ -5,7 +5,7 @@ import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
-  name: z.string(),
+  name: z.string().min(3),
 })
 
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {

@@ -38,7 +38,7 @@ describe('[DELETE] /app operations', () => {
       method: 'GET',
       headers,
     })
-    expect(checkApp.status).toBe(400)
+    expect(checkApp.status).toBe(401)
 
     // Verify version is deleted
     const checkVersion = await fetch(`${BASE_URL}/bundle/${APPNAME}/1.0.0`, {

@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { simpleError } from '../../../utils/hono.ts'
+import { quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
 
@@ -28,7 +28,7 @@ export async function deleteMember(c: Context, bodyRaw: any, apikey: Database['p
     .single()
 
   if (userError || !userData) {
-    throw simpleError('user_not_found', 'User not found', { error: userError })
+    throw quickError(404, 'user_not_found', 'User not found', { error: userError })
   }
 
   const supabase = supabaseApikey(c, c.get('capgkey') as string)

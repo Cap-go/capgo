@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareKey, simpleError } from '../utils/hono.ts'
+import { middlewareKey, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
@@ -28,7 +28,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
-    throw simpleError('error_user_not_found', 'Error User not found', { _errorUserId })
+    throw quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
   }
 
   if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {

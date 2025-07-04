@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { simpleError, useCors } from '../utils/hono.ts'
+import { quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { readStats } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
@@ -33,7 +33,7 @@ app.post('/', async (c) => {
     const { data: userId, error: _errorUserId } = await supabaseAdmin(c)
       .rpc('get_user_id', { apikey: apikey_string, app_id: body.appId })
     if (_errorUserId || !userId) {
-      throw simpleError('user_not_found', 'You can\'t access this app user not found', { app_id: body.appId })
+      throw quickError(404, 'user_not_found', 'You can\'t access this app user not found', { app_id: body.appId })
     }
     if (!(await hasAppRightApikey(c, body.appId, userId, 'read', apikey_string))) {
       throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })

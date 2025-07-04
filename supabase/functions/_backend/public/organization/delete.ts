@@ -8,7 +8,7 @@ interface DeleteOrganizationParams {
 }
 
 export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const orgId = c.req.query('orgId') ?? body.orgId
+  const orgId = body.orgId
 
   if (!orgId) {
     throw simpleError('missing_org_id', 'Missing orgId')

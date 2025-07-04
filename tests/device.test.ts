@@ -79,7 +79,7 @@ describe('[POST] /device operations', () => {
 
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
-    expect(data.error).toBe('ok')
+    expect(data.status).toBe('ok')
   })
 
   it.concurrent('invalid app_id', async () => {
@@ -123,7 +123,7 @@ describe('[DELETE] /device operations', () => {
 
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
-    expect(data.error).toBe('ok')
+    expect(data.status).toBe('ok')
   })
 
   it.concurrent('invalid device_id', async () => {
@@ -137,6 +137,6 @@ describe('[DELETE] /device operations', () => {
     })
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
-    expect(data.error).toBe('ok')
+    expect(data.status).toBe('ok')
   })
 })
