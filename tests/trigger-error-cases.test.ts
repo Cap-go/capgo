@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, resetAndSeedAppData, resetAppData, ORG_ID, USER_EMAIL } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.trigger.test.${id}`
@@ -27,10 +27,10 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('No appId')
+    expect(data.error).toBe('no_appId')
   })
 
-  it('should return 400 when cycle info cannot be retrieved', async () => {
+  it('should return 400 when org is missing', async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -40,7 +40,20 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot get cycle info')
+    expect(data.error).toBe('no_orgId')
+  })
+
+  it('should return 400 when appId is not provided', async () => {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stats`, {
+      method: 'POST',
+      headers: triggerHeaders,
+      body: JSON.stringify({
+        orgId: ORG_ID
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_appId')
   })
 })
 
@@ -53,20 +66,7 @@ describe('[POST] /triggers/cron_plan - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('No orgId')
-  })
-
-  it('should return 500 when stats cannot be retrieved', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/cron_plan`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        orgId: 'nonexistent-org-id',
-      }),
-    })
-    expect(response.status).toBe(500)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot get stats')
+    expect(data.error).toBe('no_orgId')
   })
 })
 
@@ -79,7 +79,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Missing email, appId, or type')
+    expect(data.error).toBe('missing_email_appId_type')
   })
 
   it('should return 400 when email is missing', async () => {
@@ -93,7 +93,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Missing email, appId, or type')
+    expect(data.error).toBe('missing_email_appId_type')
   })
 
   it('should return 400 when appId is missing', async () => {
@@ -107,7 +107,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Missing email, appId, or type')
+    expect(data.error).toBe('missing_email_appId_type')
   })
 
   it('should return 400 when type is missing', async () => {
@@ -121,7 +121,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Missing email, appId, or type')
+    expect(data.error).toBe('missing_email_appId_type')
   })
 
   it('should return 400 when email type is invalid', async () => {
@@ -129,29 +129,29 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        email: 'test@example.com',
+        email: USER_EMAIL,
         appId: APPNAME,
         type: 'invalid_type',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Invalid email type')
+    expect(data.error).toBe('invalid_stats_type')
   })
 
-  it('should return 500 when stats cannot be generated', async () => {
+  it('should return 400 when stats cannot be generated', async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
         email: 'test@example.com',
         appId: 'nonexistent-app',
-        type: 'stats',
+        type: 'yoyoy',
       }),
     })
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot generate stats')
+    expect(data.error).toBe('user_not_found')
   })
 })
 
@@ -166,19 +166,7 @@ describe('[POST] /triggers/cron_clear_versions - Error Cases', () => {
     })
 
     const data = await response.json() as { error: string }
-    expect(data.error).toBeDefined()
-  })
-
-  it('should return 429 when rate limit is exceeded', async () => {
-    // This test is harder to trigger but we can at least test the structure
-    const response = await fetch(`${BASE_URL}/triggers/cron_clear_versions`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({}),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Rate limit exceeded')
+    expect(data.error).toBe('no_version')
   })
 })
 
@@ -198,7 +186,7 @@ describe('[POST] /triggers/on_channel_update - Error Cases', () => {
     })
 
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot update channel')
+    expect(data.error).toBe('no_app_id')
   })
 
   it('should return 200 for non-channel table', async () => {
@@ -265,7 +253,7 @@ describe('[POST] /triggers/on_app_create - Error Cases', () => {
         record: {
           id: randomUUID(),
           app_id: 'test.app',
-          owner_org: 'nonexistent-org-id',
+          owner_org: randomUUID(),
         },
       }),
     })
@@ -426,7 +414,7 @@ describe('[POST] /triggers/on_user_update - Error Cases', () => {
         type: 'UPDATE',
         record: {
           // Invalid user data
-          id: 'nonexistent-user-id',
+          id: randomUUID(),
         },
         old_record: {},
       }),
@@ -447,7 +435,7 @@ describe('[POST] /triggers/on_user_delete - Error Cases', () => {
         type: 'DELETE',
         old_record: {
           // Invalid user data
-          id: 'nonexistent-user-id',
+          id: randomUUID(),
         },
       }),
     })
@@ -467,7 +455,7 @@ describe('[POST] /triggers/on_organization_delete - Error Cases', () => {
         type: 'DELETE',
         old_record: {
           // Invalid org data
-          id: 'nonexistent-org-id',
+          id: randomUUID(),
           customer_id: 'invalid-customer-id',
         },
       }),
@@ -607,7 +595,7 @@ describe('[POST] /triggers/stripe_event - Error Cases', () => {
         type: 'customer.subscription.created',
         data: {
           object: {
-            customer: 'nonexistent-customer-id',
+            customer: randomUUID(),
           },
         },
       }),

@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAPISecret, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAPISecret, simpleError, quickError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -20,13 +20,22 @@ app.post('/', middlewareAPISecret, async (c) => {
     .catch((e) => {
       throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
-  cloudlog({ requestId: c.get('requestId'), message: 'postcron stats body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post cron_stats body', body })
   if (!body.appId)
     throw simpleError('no_appId', 'No appId', { body })
   if (!body.orgId)
     throw simpleError('no_orgId', 'No orgId', { body })
 
   const supabase = supabaseAdmin(c)
+
+  const app = await supabase.from('apps')
+  .select('*')
+  .eq('id', body.appId)
+  .single()
+  if (!app.data)
+    throw quickError(404, 'app_not_found', 'App not found', { body })
+  if (app.data.owner_org !== body.orgId)
+    throw quickError(401, 'app_not_found', 'This app is not owned by the organization', { body })
 
   // get the period of the billing of the organization
   const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()

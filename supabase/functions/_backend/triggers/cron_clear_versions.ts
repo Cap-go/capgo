@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, simpleError } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, simpleError, quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -19,6 +19,8 @@ app.post('/', middlewareAPISecret, async (c) => {
   const supabase = supabaseAdmin(c)
 
   const version = body.version
+  if (!version)
+    throw simpleError('no_version', 'No version', { body })
   if (version.user_id === null) {
     // find the user_id from the app_id
     const { data: app, error: errorApp } = await supabaseAdmin(c)
@@ -40,20 +42,20 @@ app.post('/', middlewareAPISecret, async (c) => {
         cloudlog({ requestId: c.get('requestId'), message: 'error getPath', error: e })
         // if error is rate limit this terminate the function
         if (e.message.includes('Rate limit exceeded')) {
-          throw new Error('Rate limit exceeded')
+          throw quickError(429, 'rate_limit_exceeded', 'Rate limit exceeded')
         }
         return null
       })
     cloudlog({ requestId: c.get('requestId'), message: 'v2Path', v2Path })
     if (!v2Path) {
       notFound = true
-      throw new Error(`no_path ${version.id}`)
+      throw quickError(404, 'no_path', 'No path', { versionId: version.id })
     }
     const size = await s3.getSize(c, v2Path).catch((e) => {
       cloudlog({ requestId: c.get('requestId'), message: 'error getSize', error: e })
       // if error is rate limit this terminate the function
       if (e.message.includes('Rate limit exceeded')) {
-        throw new Error('Rate limit exceeded')
+        throw quickError(429, 'rate_limit_exceeded', 'Rate limit exceeded')
       }
       return null
     })
@@ -61,7 +63,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: `No size for ${v2Path}, ${size}` })
       // throw error to trigger the deletion
       notFound = true
-      throw new Error(`no_size ${version.id} ${v2Path}`)
+      throw simpleError('no_size', 'No size', { versionId: version.id, v2Path })
     }
     // get checksum from table app_versions
     const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c)

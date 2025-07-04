@@ -71,6 +71,14 @@ app.post('/', middlewareAPISecret, async (c) => {
   if (!email || !appId || !type) {
     throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
   }
+  // cherck if email exists
+  const { data: user, error: userError } = await supabaseAdmin(c)
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .single()
+  if (userError || !user)
+    throw simpleError('user_not_found', 'User not found', { email, userError })
 
   if (type === 'weekly_install_stats') {
     return await handleWeeklyInstallStats(c, email, appId)
@@ -79,7 +87,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     return await handleMonthlyCreateStats(c, email, appId)
   }
   else {
-    throw simpleError('invalid_email_type', 'Invalid email type', { email, appId, type })
+    throw simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
   }
 })
 
