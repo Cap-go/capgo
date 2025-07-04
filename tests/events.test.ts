@@ -104,7 +104,7 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.json()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
   })
 
   it('track event with invalid apikey', async () => {
@@ -146,7 +146,7 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.json()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
   })
 
   it('track event with malformed body', async () => {

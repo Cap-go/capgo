@@ -135,8 +135,8 @@ describe('[GET] /app operations with subkey', () => {
       headers: { ...headers, ...subkeyHeaders },
     })
     const data = await getOtherAppWithSubkey.json()
-    expect(data).toHaveProperty('error', 'cannot_get_app')
-    expect(getOtherAppWithSubkey.status).toBe(400)
+    expect(data).toHaveProperty('error', 'cannot_access_app')
+    expect(getOtherAppWithSubkey.status).toBe(401)
 
     // Clean up the other app
     await resetAppData(OTHER_APPNAME)

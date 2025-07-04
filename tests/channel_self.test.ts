@@ -127,7 +127,7 @@ describe('invalids /channel_self tests', () => {
     data.channel = 'unexisting_channel'
 
     const response = await fetchEndpoint('POST', data)
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
 
     const error = await getResponseErrorCode(response)
     expect(error).toBe('channel_not_found')
@@ -289,7 +289,7 @@ describe('[GET] /channel_self tests', () => {
     data.app_id = 'com.nonexistent.app'
     const response = await fetchGetChannels(data as any)
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
     const error = await getResponseErrorCode(response)
     expect(error).toBe('app_not_found')
   })

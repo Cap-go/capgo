@@ -69,7 +69,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
         version: 1,
       }),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('app_not_found')
   })
@@ -132,7 +132,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('error_app_or_version_not_found')
   })
@@ -147,7 +147,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('error_app_or_version_not_found')
   })
