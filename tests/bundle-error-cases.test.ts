@@ -162,7 +162,6 @@ describe('[POST] /bundle/metadata - Extended Error Cases', () => {
       .insert({
         app_id: APPNAME,
         name: '1.0.0-test-metadata',
-        bucket_id: 'test-bucket',
         owner_org: testOrgId,
       })
       .select()
@@ -181,8 +180,8 @@ describe('[POST] /bundle/metadata - Extended Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No fields to update')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_fields_to_update')
   })
 
   it('should return 400 when update fails', async () => {
@@ -196,8 +195,8 @@ describe('[POST] /bundle/metadata - Extended Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot update version metadata')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_version')
   })
 
   it('should handle invalid JSON body', async () => {
@@ -222,8 +221,8 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_app')
   })
 
   it('should return 400 when app cannot be found', async () => {
@@ -237,8 +236,8 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_version')
   })
 
   it('should return 500 when bundle cannot be set to channel', async () => {
@@ -250,7 +249,6 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
       .insert({
         app_id: APPNAME,
         name: '1.0.0-test-channel',
-        bucket_id: 'test-bucket',
         owner_org: testOrgId,
       })
       .select()
