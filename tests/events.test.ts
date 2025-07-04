@@ -33,9 +33,9 @@ describe('[POST] /private/events operations', () => {
       }),
     })
 
-    const data = await response.json() as { error: string }
+    const data = await response.json() as { status: string }
     expect(response.status).toBe(200)
-    expect(data.error).toBe('ok')
+    expect(data.status).toBe('ok')
   })
 
   // it('track event with authorization jwt', async () => {

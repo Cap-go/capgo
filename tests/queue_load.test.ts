@@ -64,7 +64,7 @@ describe('queue Load Test', () => {
 
     expect(invalidResponse2.status).toBe(400)
     const json2 = await invalidResponse2.json<{ error: string }>()
-    expect(json2.error).toEqual('invalid_or_missing_json_body')
+    expect(json2.error).toEqual('invalid_json_parse_body')
 
     // Test invalid queue_name type
     const invalidResponse3 = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
