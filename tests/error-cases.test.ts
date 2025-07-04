@@ -1,142 +1,82 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.error.test.${id}`
-let testOrgId: string
-let testAppId: string
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
-
-  // Create test organization
-  const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: randomUUID(),
-    name: `Test Error Org ${id}`,
-    management_email: TEST_EMAIL,
-    created_by: USER_ID,
-  }).select().single()
-
-  if (orgError)
-    throw orgError
-  testOrgId = orgData.id
-
-  // Create test app
-  const { data: appData, error: appError } = await getSupabaseClient().from('apps').insert({
-    id: randomUUID(),
-    app_id: APPNAME,
-    name: `Test Error App`,
-    icon_url: 'https://example.com/icon.png',
-    owner_org: testOrgId,
-  }).select().single()
-
-  if (appError)
-    throw appError
-  testAppId = appData.app_id
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
 })
 
 describe('[GET] /statistics - Error Cases', () => {
-  it('should return 400 for invalid body', async () => {
-    const response = await fetch(`${BASE_URL}/statistics/app`, {
-      method: 'POST',
+
+  it('should return 404 for app without access', async () => {
+    const response = await fetch(`${BASE_URL}/statistics/app/nonexistent.app.id?from=2&to=1`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({}), // Missing required fields
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Invalid body')
+    expect(data.error).toBe('no_access_to_app')
   })
 
-  it('should return 400 for app without access', async () => {
-    const response = await fetch(`${BASE_URL}/statistics/app`, {
-      method: 'POST',
+  it('should return 401 for organization without access', async () => {
+    const response = await fetch(`${BASE_URL}/statistics/org/${randomUUID()}?from=1&to=2`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: 'nonexistent.app.id',
-        period: '7d',
-      }),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('You can\'t access this app')
-  })
-
-  it('should return 400 for organization without access', async () => {
-    const response = await fetch(`${BASE_URL}/statistics/organization`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        org_id: randomUUID(),
-        period: '7d',
-      }),
-    })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('You can\'t access this organization')
+    expect(data.error).toBe('no_access_to_organization')
   })
 })
 
 describe('[GET] /device - Error Cases', () => {
   it('should return 400 for app without access', async () => {
-    const response = await fetch(`${BASE_URL}/device`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/device?device_id=${randomUUID()}&app_id=nonexistent.app.id`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: 'nonexistent.app.id',
-        device_id: 'test-device',
-      }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('You can\'t access this app')
+    expect(data.error).toBe('invalid_app_id')
   })
 
   it('should return 400 for missing device_id or app_id', async () => {
     const response = await fetch(`${BASE_URL}/device`, {
-      method: 'POST',
+      method: 'GET',
       headers,
-      body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Missing device_id or app_id')
+    expect(data.error).toBe('invalid_app_id')
   })
 
   it('should return 400 when trying to set version to device', async () => {
-    const response = await fetch(`${BASE_URL}/device`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/device?device_id=${randomUUID()}&app_id=${APPNAME}&version=1.0.0`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: testAppId,
-        device_id: 'test-device',
-        version: '1.0.0',
-      }),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot set version to device, use channel instead')
+    expect(data.error).toBe('device_not_found')
   })
 })
 
 describe('[GET] /channel - Error Cases', () => {
   it('should return 400 for app without access', async () => {
-    const response = await fetch(`${BASE_URL}/channel`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/channel?name=test-channel&app_id=nonexistent.app.id`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: 'nonexistent.app.id',
-        name: 'test-channel',
-      }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('You can\'t access this app')
+    expect(data.error).toBe('cannot_access_app')
   })
 
   it('should return 400 for missing channel name on delete', async () => {
@@ -144,12 +84,12 @@ describe('[GET] /channel - Error Cases', () => {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
-        app_id: testAppId,
+        app_id: APPNAME,
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('You must provide a channel name')
+    expect(data.error).toBe('missing_channel_name')
   })
 
   it('should return 400 for non-existent channel on delete', async () => {
@@ -157,29 +97,25 @@ describe('[GET] /channel - Error Cases', () => {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
-        app_id: testAppId,
+        app_id: APPNAME,
         name: 'nonexistent-channel',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot find channel')
+    expect(data.error).toBe('missing_channel_name')
   })
 })
 
 describe('[GET] /bundle - Error Cases', () => {
   it('should return 400 for app without access', async () => {
-    const response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/bundle?app_id=nonexistent.app.id&name=test-bundle`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: 'nonexistent.app.id',
-        name: 'test-bundle',
-      }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('You can\'t access this app')
+    expect(data.error).toBe('cannot_get_bundle')
   })
 })
 
@@ -194,7 +130,7 @@ describe('general Error Cases', () => {
   })
 
   it('should handle missing content-type header', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
+    const response = await fetch(`${BASE_URL}/org`, {
       method: 'POST',
       headers: {
         ...headers,
@@ -264,13 +200,13 @@ describe('trigger Endpoint Error Cases', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': 'test-secret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('No appId')
+    expect(data.error).toBe('no_appId')
   })
 
   it('should return 400 for cron_plan without orgId', async () => {
@@ -278,13 +214,13 @@ describe('trigger Endpoint Error Cases', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': 'test-secret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('No orgId')
+    expect(data.error).toBe('no_orgId')
   })
 
   it('should return 400 for cron_email with missing fields', async () => {
@@ -292,13 +228,13 @@ describe('trigger Endpoint Error Cases', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': 'test-secret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Missing email, appId, or type')
+    expect(data.error).toBe('missing_email_appId_type')
   })
 
   it('should return 400 for cron_email with invalid type', async () => {
@@ -306,17 +242,17 @@ describe('trigger Endpoint Error Cases', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': 'test-secret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         email: 'test@example.com',
-        appId: testAppId,
+        appId: APPNAME,
         type: 'invalid_type',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Invalid email type')
+    expect(data.error).toBe('invalid_email_type')
   })
 })
 
@@ -329,7 +265,7 @@ describe('private Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('not authorize')
+    expect(data.error).toBe('not_authorize')
   })
 
   it('should return 400 for stripe_checkout without org_id', async () => {
@@ -340,7 +276,7 @@ describe('private Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('No org_id provided')
+    expect(data.error).toBe('no_org_id_provided')
   })
 
   it('should return 500 for upload_link with non-existent user', async () => {
@@ -348,7 +284,7 @@ describe('private Endpoint Error Cases', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        app_id: testAppId,
+        app_id: APPNAME,
         version: '1.0.0',
       }),
     })

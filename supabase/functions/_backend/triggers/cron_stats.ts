@@ -21,8 +21,10 @@ app.post('/', middlewareAPISecret, async (c) => {
       throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   cloudlog({ requestId: c.get('requestId'), message: 'postcron stats body', body })
-  if (!body.appId || !body.orgId)
-    throw simpleError('no_appId_orgId', 'No appId or orgId', { body })
+  if (!body.appId)
+    throw simpleError('no_appId', 'No appId', { body })
+  if (!body.orgId)
+    throw simpleError('no_orgId', 'No orgId', { body })
 
   const supabase = supabaseAdmin(c)
 

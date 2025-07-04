@@ -1,49 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.trigger.test.${id}`
-let testOrgId: string
-let testAppId: string
 
 const triggerHeaders = {
   'Content-Type': 'application/json',
-  'x-api-key': 'test-secret-key', // This would need to match your actual test secret
+  'apisecret': 'testsecret', // This would need to match your actual test secret
 }
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
-
-  // Create test organization
-  const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: randomUUID(),
-    name: `Test Trigger Org ${id}`,
-    management_email: TEST_EMAIL,
-    created_by: USER_ID,
-  }).select().single()
-
-  if (orgError)
-    throw orgError
-  testOrgId = orgData.id
-
-  // Create test app
-  const { data: appData, error: appError } = await getSupabaseClient().from('apps').insert({
-    id: randomUUID(),
-    app_id: APPNAME,
-    name: `Test Trigger App`,
-    icon_url: 'https://example.com/icon.png',
-    owner_org: testOrgId,
-  }).select().single()
-
-  if (appError)
-    throw appError
-  testAppId = appData.app_id
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
 })
 
 describe('[POST] /triggers/cron_stats - Error Cases', () => {
@@ -115,7 +87,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        appId: testAppId,
+        appId: APPNAME,
         type: 'stats',
       }),
     })
@@ -144,7 +116,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       headers: triggerHeaders,
       body: JSON.stringify({
         email: 'test@example.com',
-        appId: testAppId,
+        appId: APPNAME,
       }),
     })
     expect(response.status).toBe(400)
@@ -158,7 +130,7 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       headers: triggerHeaders,
       body: JSON.stringify({
         email: 'test@example.com',
-        appId: testAppId,
+        appId: APPNAME,
         type: 'invalid_type',
       }),
     })

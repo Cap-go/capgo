@@ -337,7 +337,7 @@ app.get('/app/:app_id', async (c) => {
   const auth = c.get('auth') as AuthInfo
   if (auth.authType === 'apikey') {
     if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth })
+      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth })
     }
   }
   else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
@@ -404,7 +404,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   const auth = c.get('auth') as AuthInfo
   if (auth.authType === 'apikey') {
     if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
+      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth.apikey!.key })
     }
   }
   else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
