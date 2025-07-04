@@ -47,9 +47,9 @@ describe('[POST] /bundle/metadata operations', () => {
       }),
     })
 
-    const data = await response.json() as { error: string }
+    const data = await response.json() as { status: string }
     expect(response.status).toBe(200)
-    expect(data.error).toBe('success')
+    expect(data.status).toBe('success')
 
     // Verify the data was updated in the database
     const supabase = getSupabaseClient()
@@ -151,7 +151,7 @@ describe('[DELETE] /bundle operations', () => {
         version: '1.0.1',
       }),
     })
-    const deleteBundleData = await deleteBundle.json() as { error: string }
+    const deleteBundleData = await deleteBundle.json() as { status: string }
     expect(deleteBundle.status).toBe(200)
     expect(deleteBundleData.status).toBe('ok')
   })
@@ -165,7 +165,7 @@ describe('[DELETE] /bundle operations', () => {
       }),
     })
 
-    const deleteAllBundlesData = await deleteAllBundles.json() as { error: string }
+    const deleteAllBundlesData = await deleteAllBundles.json() as { status: string }
     expect(deleteAllBundles.status).toBe(200)
     expect(deleteAllBundlesData.status).toBe('ok')
   })
@@ -227,7 +227,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
 
     const data = await response.json() as { status: string, message: string }
     expect(response.status).toBe(200)
-    expect(data.error).toBe('success')
+    expect(data.status).toBe('success')
     expect(data.message).toContain('Bundle')
     expect(data.message).toContain('set to channel')
 
