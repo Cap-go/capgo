@@ -279,19 +279,21 @@ describe('private Endpoint Error Cases', () => {
     expect(data.error).toBe('no_org_id_provided')
   })
 
-  it('should return 500 for upload_link with non-existent user', async () => {
+  it('should return 401 for upload_link with invalid API key', async () => {
     const response = await fetch(`${BASE_URL}/private/upload_link`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'invalid-api-key',
+      },
       body: JSON.stringify({
         app_id: APPNAME,
-        version: '1.0.0',
+        name: '1.0.0',
       }),
     })
-    // This might return different status codes depending on the actual error
-    expect([400, 500]).toContain(response.status)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toContain('Error')
+    expect(data.error).toBe('invalid_apikey')
   })
 })
 
@@ -312,7 +314,7 @@ describe('plugin Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot get updates')
+    expect(data.error).toBe('invalid_json_body')
   })
 
   it('should return 400 for updates_lite with invalid request', async () => {
@@ -331,7 +333,7 @@ describe('plugin Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot get updates')
+    expect(data.error).toBe('invalid_json_body')
   })
 })
 
@@ -343,17 +345,18 @@ describe('files Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Not Found')
+    expect(data.error).toBe('not_found')
   })
 
-  it('should return 500 for invalid bucket configuration', async () => {
+  it('should return 404 for invalid file name', async () => {
     // This test may be environment-specific
-    const response = await fetch(`${BASE_URL}/files/invalid-bucket-config`, {
+    const response = await fetch(`${BASE_URL}/files/invalid-file-name`, {
       method: 'GET',
       headers,
     })
 
+    expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Invalid bucket configuration')
+    expect(data.error).toBe('not_found')
   })
 })
