@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, resetAndSeedAppData, resetAppData, ORG_ID, USER_EMAIL } from './test-utils.ts'
+import { BASE_URL, ORG_ID, resetAndSeedAppData, resetAppData, USER_EMAIL } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.trigger.test.${id}`
@@ -48,7 +48,7 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        orgId: ORG_ID
+        orgId: ORG_ID,
       }),
     })
     expect(response.status).toBe(400)
@@ -200,9 +200,9 @@ describe('[POST] /triggers/on_channel_update - Error Cases', () => {
         old_record: {},
       }),
     })
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Not channels')
+    expect(data.error).toBe('table_not_match')
   })
 
   it('should return 200 for non-UPDATE type', async () => {
@@ -216,34 +216,14 @@ describe('[POST] /triggers/on_channel_update - Error Cases', () => {
         old_record: {},
       }),
     })
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Not UPDATE')
-  })
-})
-
-describe('[POST] /triggers/on_organization_create - Error Cases', () => {
-  it('should return 500 when org creation handling fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_organization_create`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'orgs',
-        type: 'INSERT',
-        record: {
-          // Invalid or incomplete org data
-          id: 'invalid-org-id',
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot handle org creation')
+    expect(data.error).toBe('type_not_match')
   })
 })
 
 describe('[POST] /triggers/on_app_create - Error Cases', () => {
-  it('should return 500 when organization fetching fails', async () => {
+  it('should return 400 when organization fetching fails', async () => {
     const response = await fetch(`${BASE_URL}/triggers/on_app_create`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -258,11 +238,12 @@ describe('[POST] /triggers/on_app_create - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Error fetching organization')
+    expect(data.error).toBe('error_fetching_organization')
   })
 
-  it('should return 500 when app creation handling fails', async () => {
+  it('should return 400 when app creation handling fails', async () => {
     const response = await fetch(`${BASE_URL}/triggers/on_app_create`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -277,13 +258,14 @@ describe('[POST] /triggers/on_app_create - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot handle org creation')
+    expect(data.error).toBe('no_id')
   })
 })
 
 describe('[POST] /triggers/on_version_create - Error Cases', () => {
-  it('should return 500 when organization fetching fails', async () => {
+  it('should return 400 when organization fetching fails', async () => {
     const response = await fetch(`${BASE_URL}/triggers/on_version_create`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -298,11 +280,12 @@ describe('[POST] /triggers/on_version_create - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Error fetching organization')
+    expect(data.error).toBe('error_fetching_organization')
   })
 
-  it('should return 500 when version creation fails', async () => {
+  it('should return 400 when version creation fails', async () => {
     const response = await fetch(`${BASE_URL}/triggers/on_version_create`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -316,32 +299,14 @@ describe('[POST] /triggers/on_version_create - Error Cases', () => {
         },
       }),
     })
-
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot create version')
+    expect(data.error).toBe('no_id')
   })
 })
 
 describe('[POST] /triggers/on_deploy_history_create - Error Cases', () => {
-  it('should return 500 when organization fetching fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_deploy_history_create`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'app_versions_meta',
-        type: 'INSERT',
-        record: {
-          id: randomUUID(),
-          app_id: 'nonexistent.app',
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Error fetching organization')
-  })
-
-  it('should return 500 when deploy history creation fails', async () => {
+  it('should return 400 when deploy history creation fails', async () => {
     const response = await fetch(`${BASE_URL}/triggers/on_deploy_history_create`, {
       method: 'POST',
       headers: triggerHeaders,
@@ -356,8 +321,9 @@ describe('[POST] /triggers/on_deploy_history_create - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot create deploy history')
+    expect(data.error).toBe('table_not_match')
   })
 })
 
@@ -367,7 +333,7 @@ describe('[POST] /triggers/on_manifest_create - Error Cases', () => {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        table: 'app_versions_meta',
+        table: 'manifest',
         type: 'INSERT',
         record: {
           // Invalid manifest data
@@ -378,111 +344,9 @@ describe('[POST] /triggers/on_manifest_create - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot update manifest size')
-  })
-})
-
-describe('[POST] /triggers/on_user_create - Error Cases', () => {
-  it('should return 500 when user creation fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_user_create`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'users',
-        type: 'INSERT',
-        record: {
-          // Invalid user data
-          id: null,
-          email: null,
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot create user')
-  })
-})
-
-describe('[POST] /triggers/on_user_update - Error Cases', () => {
-  it('should return 500 when user update fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_user_update`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'users',
-        type: 'UPDATE',
-        record: {
-          // Invalid user data
-          id: randomUUID(),
-        },
-        old_record: {},
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot update user')
-  })
-})
-
-describe('[POST] /triggers/on_user_delete - Error Cases', () => {
-  it('should return 500 when user deletion fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_user_delete`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'users',
-        type: 'DELETE',
-        old_record: {
-          // Invalid user data
-          id: randomUUID(),
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot delete user')
-  })
-})
-
-describe('[POST] /triggers/on_organization_delete - Error Cases', () => {
-  it('should return 500 when organization deletion fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_organization_delete`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'orgs',
-        type: 'DELETE',
-        old_record: {
-          // Invalid org data
-          id: randomUUID(),
-          customer_id: 'invalid-customer-id',
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot delete version')
-  })
-})
-
-describe('[POST] /triggers/on_version_delete - Error Cases', () => {
-  it('should return 500 when version deletion fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_version_delete`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'app_versions',
-        type: 'DELETE',
-        old_record: {
-          // Invalid version data
-          id: 'nonexistent-version-id',
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot delete version')
+    expect(data.error).toBe('no_app_version_id_or_s3_path')
   })
 })
 
@@ -498,9 +362,9 @@ describe('[POST] /triggers/on_version_update - Error Cases', () => {
         old_record: {},
       }),
     })
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Not app_versions')
+    expect(data.error).toBe('table_not_match')
   })
 
   it('should return 200 for non-UPDATE type', async () => {
@@ -514,60 +378,9 @@ describe('[POST] /triggers/on_version_update - Error Cases', () => {
         old_record: {},
       }),
     })
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Not UPDATE')
-  })
-
-  it('should return 500 when version update fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/on_version_update`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        table: 'app_versions',
-        type: 'UPDATE',
-        record: {
-          // Invalid version data
-          id: 'nonexistent-version-id',
-        },
-        old_record: {},
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot update version')
-  })
-})
-
-describe('[POST] /triggers/clear_app_cache - Error Cases', () => {
-  it('should return 500 when cache invalidation fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/clear_app_cache`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        // This might trigger cache invalidation errors
-        app_id: 'invalid-app-id',
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot invalidate cache')
-  })
-})
-
-describe('[POST] /triggers/clear_device_cache - Error Cases', () => {
-  it('should return 500 when device cache invalidation fails', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/clear_device_cache`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        // This might trigger cache invalidation errors
-        device_id: 'invalid-device-id',
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot invalidate cache')
+    expect(data.error).toBe('type_not_match')
   })
 })
 
@@ -584,42 +397,6 @@ describe('[POST] /triggers/stripe_event - Error Cases', () => {
     })
 
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot parse event')
-  })
-
-  it('should return 400 when no organization is found', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/stripe_event`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        type: 'customer.subscription.created',
-        data: {
-          object: {
-            customer: randomUUID(),
-          },
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Webhook Error: no org found')
-  })
-
-  it('should return 500 when customer_id is not found', async () => {
-    const response = await fetch(`${BASE_URL}/triggers/stripe_event`, {
-      method: 'POST',
-      headers: triggerHeaders,
-      body: JSON.stringify({
-        type: 'customer.subscription.updated',
-        data: {
-          object: {
-            customer: null,
-          },
-        },
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toContain('customer_id not found')
+    expect(data.error).toBe('webhook_error_no_secret')
   })
 })

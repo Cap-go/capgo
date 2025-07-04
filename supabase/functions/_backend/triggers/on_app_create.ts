@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return c.json(BRES)
+    throw simpleError('no_id', 'No id', { record })
   }
 
   const LogSnag = logsnag(c)

@@ -163,12 +163,12 @@ export function triggerValidator(
 
     if (body.table !== String(table)) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
-      return c.json({ status: `Not ${String(table)}` }, 200)
+      throw simpleError('table_not_match', 'Not table', { body })
     }
 
     if (body.type !== type) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
-      return c.json({ status: `Not ${type}` }, 200)
+      throw simpleError('type_not_match', 'Not type', { body })
     }
 
     // Store the validated body in context for next middleware

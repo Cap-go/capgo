@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return c.json(BRES)
+    throw simpleError('no_id', 'No id', { record })
   }
 
   const { error: errorUpdate } = await supabaseAdmin(c)

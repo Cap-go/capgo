@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, triggerValidator, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { createStripeCustomer } from '../utils/supabase.ts'
@@ -16,7 +16,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return c.json(BRES)
+    throw simpleError('no_id', 'No id', { record })
   }
 
   if (!record.customer_id)
