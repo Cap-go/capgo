@@ -68,10 +68,8 @@ describe('[GET] /bundle - Error Cases', () => {
       }),
     })
 
-    if (response.status === 400) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot get bundle')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot get bundle')
   })
 
   it('should handle invalid JSON body', async () => {
@@ -137,10 +135,8 @@ describe('[DELETE] /bundle - Error Cases', () => {
       }),
     })
 
-    if (response.status === 400) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot delete all version')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot delete all version')
   })
 
   it('should handle invalid JSON body', async () => {
@@ -283,10 +279,8 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot set bundle to channel')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot set bundle to channel')
   })
 
   it('should handle invalid JSON body', async () => {

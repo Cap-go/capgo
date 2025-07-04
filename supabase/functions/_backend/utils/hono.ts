@@ -256,13 +256,15 @@ export async function getBody<T>(c: Context<MiddlewareKeyVariables, any, any>) {
   try {
     body = await c.req.json<T>()
   }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting body', error })
+  catch {
     body = c.req.query() as unknown as T
+    if (c.req.method === 'GET') {
+      return body
+    }
   }
-  if (!body) {
+  if (!body || Object.keys(body).length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
-    throw simpleError('cannot_find_body', 'Cannot find body')
+    throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
   }
   return body
 }

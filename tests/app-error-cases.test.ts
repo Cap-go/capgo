@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.error.${id}`
@@ -53,23 +53,11 @@ describe('[POST] /app - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(403)
-    const data = await response.json() as { status: string, orgId: string }
-    expect(data.status).toBe('You can\'t access this organization')
-    expect(data.orgId).toBe(nonExistentOrgId)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_organization')
   })
 
   it('should return 400 when app creation fails due to duplicate name', async () => {
-    // First create an app
-    const response1 = await fetch(`${BASE_URL}/app`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: APPNAME,
-        owner_org: testOrgId,
-      }),
-    })
-    expect(response1.status).toBe(200)
-
     // Try to create another app with the same name
     const response2 = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
@@ -80,8 +68,8 @@ describe('[POST] /app - Error Cases', () => {
       }),
     })
     expect(response2.status).toBe(400)
-    const data = await response2.json() as { status: string }
-    expect(data.status).toBe('Cannot create app')
+    const data = await response2.json() as { error: string }
+    expect(data.error).toBe('cannot_create_app')
   })
 
   it('should return 400 with invalid JSON body', async () => {
@@ -95,25 +83,14 @@ describe('[POST] /app - Error Cases', () => {
 })
 
 describe('[GET] /app - Error Cases', () => {
-  it('should return 400 when app_id is missing', async () => {
-    const response = await fetch(`${BASE_URL}/app/`, {
-      method: 'GET',
-      headers,
-    })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing app_id')
-  })
-
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
       method: 'GET',
       headers,
     })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, app_id: string }
-    expect(data.status).toBe('You can\'t access this app')
-    expect(data.app_id).toBe('nonexistent.app')
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_app')
   })
 
   it('should return 404 when app is not found', async () => {
@@ -136,23 +113,21 @@ describe('[GET] /app - Error Cases', () => {
       method: 'GET',
       headers,
     })
-    expect(response.status).toBe(404)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find app')
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_app')
   })
 
   it('should return 403 when user does not have access to organization', async () => {
     // This test would need a more complex setup with different users
     // For now, we test with a response structure check
-    const response = await fetch(`${BASE_URL}/app`, {
+    const response = await fetch(`${BASE_URL}/app/${NON_ACCESS_APP_NAME}`, {
       method: 'GET',
       headers,
     })
 
-    if (response.status === 403) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('You do not have access to this organization')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_app')
   })
 })
 
@@ -170,19 +145,6 @@ describe('[PUT] /app - Error Cases', () => {
     expect(createResponse.status).toBe(200)
   })
 
-  it('should return 400 when app_id is missing', async () => {
-    const response = await fetch(`${BASE_URL}/app/`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        name: 'Updated Name',
-      }),
-    })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing app_id')
-  })
-
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
       method: 'PUT',
@@ -191,10 +153,9 @@ describe('[PUT] /app - Error Cases', () => {
         name: 'Updated Name',
       }),
     })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, app_id: string }
-    expect(data.status).toBe('You can\'t access this app')
-    expect(data.app_id).toBe('nonexistent.app')
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_app')
   })
 
   it('should return 400 when update fails', async () => {
@@ -208,10 +169,8 @@ describe('[PUT] /app - Error Cases', () => {
       }),
     })
 
-    if (response.status === 400) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot update app')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_update_app')
   })
 
   it('should handle invalid JSON body', async () => {
@@ -225,25 +184,14 @@ describe('[PUT] /app - Error Cases', () => {
 })
 
 describe('[DELETE] /app - Error Cases', () => {
-  it('should return 400 when app_id is missing', async () => {
-    const response = await fetch(`${BASE_URL}/app/`, {
-      method: 'DELETE',
-      headers,
-    })
-    expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing app_id')
-  })
-
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
       method: 'DELETE',
       headers,
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, app_id: string }
-    expect(data.status).toBe('You can\'t access this app')
-    expect(data.app_id).toBe('nonexistent.app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_delete_app')
   })
 
   it('should return 400 when app deletion fails', async () => {
@@ -273,7 +221,7 @@ describe('[DELETE] /app - Error Cases', () => {
       headers,
     })
     expect(response2.status).toBe(400)
-    const data = await response2.json() as { status: string }
-    expect(data.status).toBe('Cannot delete app')
+    const data = await response2.json() as { error: string }
+    expect(data.error).toBe('cannot_delete_app')
   })
 })

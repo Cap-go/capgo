@@ -4,16 +4,12 @@ import { BRES, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface GetLatest {
-  app_id?: string
+  app_id: string
   version?: string
   page?: number
 }
 
 export async function deleteBundle(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id) {
-    throw simpleError('missing_app_id', 'Missing app_id', { body })
-  }
-
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('cannot_delete_bundle', 'You can\'t access this app', { app_id: body.app_id })
   }

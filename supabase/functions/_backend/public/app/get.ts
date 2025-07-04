@@ -1,19 +1,15 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 export async function get(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!appId) {
-    throw simpleError('missing_app_id', 'Missing app_id', { appId })
-  }
-
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'read', apikey.key))) {
-    throw simpleError('cannot_get_app', 'You can\'t access this app', { app_id: appId })
+    throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
   if (apikey.limited_to_apps && apikey.limited_to_apps.length > 0 && !apikey.limited_to_apps.includes(appId)) {
-    throw simpleError('cannot_get_app', 'You can\'t access this app', { app_id: appId })
+    throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
 
   const { data, error: dbError } = await supabaseAdmin(c)
@@ -23,7 +19,7 @@ export async function get(c: Context, appId: string, apikey: Database['public'][
     .single()
 
   if (dbError || !data) {
-    throw simpleError('cannot_find_app', 'Cannot find app', { supabaseError: dbError })
+    throw quickError(404, 'cannot_find_app', 'Cannot find app', { supabaseError: dbError })
   }
 
   return c.json(data)

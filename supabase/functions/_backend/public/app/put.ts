@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface UpdateApp {
@@ -10,12 +10,8 @@ interface UpdateApp {
 }
 
 export async function put(c: Context, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!appId) {
-    throw simpleError('missing_app_id', 'Missing app_id', { appId })
-  }
-
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
-    throw simpleError('cannot_update_app', 'You can\'t access this app', { app_id: appId })
+    throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
 
   const { data, error: dbError } = await supabaseAdmin(c)

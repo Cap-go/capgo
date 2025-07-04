@@ -53,9 +53,8 @@ describe('[GET] /organization', () => {
       headers,
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string, orgId: string }
-    expect(responseData.status).toBe('You can\'t access this organization')
-    expect(responseData.orgId).toBe(invalidOrgId)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_org_id')
   })
 })
 
@@ -84,8 +83,8 @@ describe('[GET] /organization/members', () => {
       headers,
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
-    expect(responseData.status).toBe('Invalid body')
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_json_body')
   })
 
   it('get organization members with invalid orgId', async () => {
@@ -140,7 +139,7 @@ describe('[POST] /organization/members', () => {
       body: JSON.stringify({}), // Missing required fields
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Invalid body')
   })
 
@@ -171,7 +170,7 @@ describe('[POST] /organization/members', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Invalid body')
   })
 })
@@ -213,7 +212,7 @@ describe('[DELETE] /organization/members', () => {
       method: 'DELETE',
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Invalid body')
   })
 
@@ -236,7 +235,7 @@ describe('[DELETE] /organization/members', () => {
       method: 'DELETE',
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('User not found')
   })
 })
@@ -293,7 +292,7 @@ describe('[POST] /organization', () => {
       body: JSON.stringify({ name: '' }), // Empty name
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Invalid body')
   })
 })
@@ -327,7 +326,7 @@ describe('[PUT] /organization', () => {
       body: JSON.stringify({}), // Missing required fields
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Invalid body')
   })
 
@@ -351,7 +350,7 @@ describe('[PUT] /organization', () => {
       body: JSON.stringify({ name: 'New Name' }), // Missing orgId
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Invalid body')
   })
 })
@@ -376,7 +375,7 @@ describe('[DELETE] /organization', () => {
       method: 'DELETE',
     })
     expect(response.status).toBe(200)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Organization deleted')
 
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
@@ -390,7 +389,7 @@ describe('[DELETE] /organization', () => {
       method: 'DELETE',
     })
     expect(response.status).toBe(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).toBe('Missing orgId')
   })
 
@@ -404,7 +403,7 @@ describe('[DELETE] /organization', () => {
 
     // Should return error as the organization doesn't exist
     expect(response.status).toBeGreaterThanOrEqual(400)
-    const responseData = await response.json() as { status: string }
+    const responseData = await response.json() as { error: string }
     expect(responseData.status).not.toBe('Organization deleted')
   })
 

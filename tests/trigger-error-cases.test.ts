@@ -54,8 +54,8 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No appId')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('No appId')
   })
 
   it('should return 400 when cycle info cannot be retrieved', async () => {
@@ -67,8 +67,8 @@ describe('[POST] /triggers/cron_stats - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot get cycle info')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot get cycle info')
   })
 })
 
@@ -80,8 +80,8 @@ describe('[POST] /triggers/cron_plan - Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No orgId')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('No orgId')
   })
 
   it('should return 500 when stats cannot be retrieved', async () => {
@@ -93,8 +93,8 @@ describe('[POST] /triggers/cron_plan - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(500)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot get stats')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot get stats')
   })
 })
 
@@ -106,8 +106,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing email, appId, or type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Missing email, appId, or type')
   })
 
   it('should return 400 when email is missing', async () => {
@@ -120,8 +120,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing email, appId, or type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Missing email, appId, or type')
   })
 
   it('should return 400 when appId is missing', async () => {
@@ -134,8 +134,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing email, appId, or type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Missing email, appId, or type')
   })
 
   it('should return 400 when type is missing', async () => {
@@ -148,8 +148,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing email, appId, or type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Missing email, appId, or type')
   })
 
   it('should return 400 when email type is invalid', async () => {
@@ -163,8 +163,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Invalid email type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Invalid email type')
   })
 
   it('should return 500 when stats cannot be generated', async () => {
@@ -178,8 +178,8 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(500)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot generate stats')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot generate stats')
   })
 })
 
@@ -193,10 +193,8 @@ describe('[POST] /triggers/cron_clear_versions - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBeDefined()
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBeDefined()
   })
 
   it('should return 429 when rate limit is exceeded', async () => {
@@ -207,10 +205,8 @@ describe('[POST] /triggers/cron_clear_versions - Error Cases', () => {
       body: JSON.stringify({}),
     })
 
-    if (response.status === 429) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Rate limit exceeded')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Rate limit exceeded')
   })
 })
 
@@ -229,10 +225,8 @@ describe('[POST] /triggers/on_channel_update - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot update channel')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot update channel')
   })
 
   it('should return 200 for non-channel table', async () => {
@@ -247,8 +241,8 @@ describe('[POST] /triggers/on_channel_update - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(200)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Not channels')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Not channels')
   })
 
   it('should return 200 for non-UPDATE type', async () => {
@@ -263,8 +257,8 @@ describe('[POST] /triggers/on_channel_update - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(200)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Not UPDATE')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Not UPDATE')
   })
 })
 
@@ -283,10 +277,8 @@ describe('[POST] /triggers/on_organization_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot handle org creation')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot handle org creation')
   })
 })
 
@@ -306,10 +298,8 @@ describe('[POST] /triggers/on_app_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Error fetching organization')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Error fetching organization')
   })
 
   it('should return 500 when app creation handling fails', async () => {
@@ -327,10 +317,8 @@ describe('[POST] /triggers/on_app_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot handle org creation')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot handle org creation')
   })
 })
 
@@ -350,10 +338,8 @@ describe('[POST] /triggers/on_version_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Error fetching organization')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Error fetching organization')
   })
 
   it('should return 500 when version creation fails', async () => {
@@ -371,10 +357,8 @@ describe('[POST] /triggers/on_version_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot create version')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot create version')
   })
 })
 
@@ -393,10 +377,8 @@ describe('[POST] /triggers/on_deploy_history_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Error fetching organization')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Error fetching organization')
   })
 
   it('should return 500 when deploy history creation fails', async () => {
@@ -414,10 +396,8 @@ describe('[POST] /triggers/on_deploy_history_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot create deploy history')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot create deploy history')
   })
 })
 
@@ -438,10 +418,8 @@ describe('[POST] /triggers/on_manifest_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot update manifest size')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot update manifest size')
   })
 })
 
@@ -461,10 +439,8 @@ describe('[POST] /triggers/on_user_create - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot create user')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot create user')
   })
 })
 
@@ -484,10 +460,8 @@ describe('[POST] /triggers/on_user_update - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot update user')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot update user')
   })
 })
 
@@ -506,10 +480,8 @@ describe('[POST] /triggers/on_user_delete - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot delete user')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot delete user')
   })
 })
 
@@ -529,10 +501,8 @@ describe('[POST] /triggers/on_organization_delete - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot delete version')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot delete version')
   })
 })
 
@@ -551,10 +521,8 @@ describe('[POST] /triggers/on_version_delete - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot delete version')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot delete version')
   })
 })
 
@@ -571,8 +539,8 @@ describe('[POST] /triggers/on_version_update - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(200)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Not app_versions')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Not app_versions')
   })
 
   it('should return 200 for non-UPDATE type', async () => {
@@ -587,8 +555,8 @@ describe('[POST] /triggers/on_version_update - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(200)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Not UPDATE')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Not UPDATE')
   })
 
   it('should return 500 when version update fails', async () => {
@@ -606,10 +574,8 @@ describe('[POST] /triggers/on_version_update - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot update version')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot update version')
   })
 })
 
@@ -624,10 +590,8 @@ describe('[POST] /triggers/clear_app_cache - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot invalidate cache')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot invalidate cache')
   })
 })
 
@@ -642,10 +606,8 @@ describe('[POST] /triggers/clear_device_cache - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot invalidate cache')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot invalidate cache')
   })
 })
 
@@ -661,10 +623,8 @@ describe('[POST] /triggers/stripe_event - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Cannot parse event')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot parse event')
   })
 
   it('should return 400 when no organization is found', async () => {
@@ -681,10 +641,8 @@ describe('[POST] /triggers/stripe_event - Error Cases', () => {
       }),
     })
 
-    if (response.status === 400) {
-      const data = await response.json() as { status: string }
-      expect(data.status).toBe('Webhook Error: no org found')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Webhook Error: no org found')
   })
 
   it('should return 500 when customer_id is not found', async () => {
@@ -701,9 +659,7 @@ describe('[POST] /triggers/stripe_event - Error Cases', () => {
       }),
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { error: string }
-      expect(data.error).toContain('customer_id not found')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toContain('customer_id not found')
   })
 })

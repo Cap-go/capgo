@@ -49,8 +49,8 @@ describe('[GET] /statistics - Error Cases', () => {
       body: JSON.stringify({}), // Missing required fields
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Invalid body')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Invalid body')
   })
 
   it('should return 400 for app without access', async () => {
@@ -63,8 +63,8 @@ describe('[GET] /statistics - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('You can\'t access this app')
   })
 
   it('should return 400 for organization without access', async () => {
@@ -77,8 +77,8 @@ describe('[GET] /statistics - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this organization')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('You can\'t access this organization')
   })
 })
 
@@ -93,8 +93,8 @@ describe('[GET] /device - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('You can\'t access this app')
   })
 
   it('should return 400 for missing device_id or app_id', async () => {
@@ -104,8 +104,8 @@ describe('[GET] /device - Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing device_id or app_id')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Missing device_id or app_id')
   })
 
   it('should return 400 when trying to set version to device', async () => {
@@ -119,8 +119,8 @@ describe('[GET] /device - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot set version to device, use channel instead')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot set version to device, use channel instead')
   })
 })
 
@@ -135,8 +135,8 @@ describe('[GET] /channel - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('You can\'t access this app')
   })
 
   it('should return 400 for missing channel name on delete', async () => {
@@ -148,8 +148,8 @@ describe('[GET] /channel - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You must provide a channel name')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('You must provide a channel name')
   })
 
   it('should return 400 for non-existent channel on delete', async () => {
@@ -162,8 +162,8 @@ describe('[GET] /channel - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find channel')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot find channel')
   })
 })
 
@@ -178,8 +178,8 @@ describe('[GET] /bundle - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('You can\'t access this app')
   })
 })
 
@@ -269,8 +269,8 @@ describe('trigger Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No appId')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('No appId')
   })
 
   it('should return 400 for cron_plan without orgId', async () => {
@@ -283,8 +283,8 @@ describe('trigger Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No orgId')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('No orgId')
   })
 
   it('should return 400 for cron_email with missing fields', async () => {
@@ -297,8 +297,8 @@ describe('trigger Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing email, appId, or type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Missing email, appId, or type')
   })
 
   it('should return 400 for cron_email with invalid type', async () => {
@@ -315,8 +315,8 @@ describe('trigger Endpoint Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Invalid email type')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Invalid email type')
   })
 })
 
@@ -328,8 +328,8 @@ describe('private Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('not authorize')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('not authorize')
   })
 
   it('should return 400 for stripe_checkout without org_id', async () => {
@@ -339,8 +339,8 @@ describe('private Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No org_id provided')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('No org_id provided')
   })
 
   it('should return 500 for upload_link with non-existent user', async () => {
@@ -354,8 +354,8 @@ describe('private Endpoint Error Cases', () => {
     })
     // This might return different status codes depending on the actual error
     expect([400, 500]).toContain(response.status)
-    const data = await response.json() as { status: string }
-    expect(data.status).toContain('Error')
+    const data = await response.json() as { error: string }
+    expect(data.error).toContain('Error')
   })
 })
 
@@ -375,8 +375,8 @@ describe('plugin Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot get updates')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot get updates')
   })
 
   it('should return 400 for updates_lite with invalid request', async () => {
@@ -394,8 +394,8 @@ describe('plugin Endpoint Error Cases', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot get updates')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Cannot get updates')
   })
 })
 
@@ -417,9 +417,7 @@ describe('files Endpoint Error Cases', () => {
       headers,
     })
 
-    if (response.status === 500) {
-      const data = await response.json() as { error: string }
-      expect(data.error).toBe('Invalid bucket configuration')
-    }
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('Invalid bucket configuration')
   })
 })

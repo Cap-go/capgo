@@ -62,7 +62,7 @@ describe('[POST] /channel operations', () => {
     })
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
-    expect(data.status).toBe('ok')
+    expect(data.error).toBe('ok')
   })
 
   it('update channel', async () => {
@@ -78,7 +78,7 @@ describe('[POST] /channel operations', () => {
 
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
-    expect(data.status).toBe('ok')
+    expect(data.error).toBe('ok')
   })
 
   it('invalid app_id', async () => {
@@ -121,6 +121,6 @@ describe('[DELETE] /channel operations', () => {
 
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
-    expect(data.status).toBe('ok')
+    expect(data.error).toBe('ok')
   })
 })

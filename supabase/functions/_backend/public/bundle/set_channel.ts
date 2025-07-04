@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface SetChannelBody {
@@ -27,7 +27,7 @@ export async function setChannel(c: Context, body: SetChannelBody, apikey: Datab
     .single()
 
   if (orgError || !org) {
-    throw simpleError('cannot_find_app', 'Cannot find app', { supabaseError: orgError })
+    throw quickError(404, 'cannot_find_app', 'Cannot find app', { supabaseError: orgError })
   }
 
   // Verify the bundle exists and belongs to the app

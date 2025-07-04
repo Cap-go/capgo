@@ -5,16 +5,12 @@ import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 export interface GetLatest {
-  app_id?: string
+  app_id: string
   version?: string
   page?: number
 }
 
 export async function get(c: Context, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!body.app_id) {
-    throw simpleError('missing_app_id', 'Missing app_id', { body })
-  }
-
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'read', apikey.key))) {
     throw simpleError('cannot_get_bundle', 'You can\'t access this app', { app_id: body.app_id })
   }
