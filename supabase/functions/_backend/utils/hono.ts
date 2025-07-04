@@ -367,7 +367,7 @@ export function quickError(status: number, errorCode: string, message: string, m
     // cause: safeCause,
   }
   console.log('res of simpleError', res)
-  return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }) })
+  return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }) }, cause)
 }
 
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {

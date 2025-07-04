@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAPISecret, simpleError, quickError, useCors } from '../utils/hono.ts'
+import { middlewareAPISecret, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -29,9 +29,9 @@ app.post('/', middlewareAPISecret, async (c) => {
   const supabase = supabaseAdmin(c)
 
   const app = await supabase.from('apps')
-  .select('*')
-  .eq('id', body.appId)
-  .single()
+    .select('*')
+    .eq('id', body.appId)
+    .single()
   if (!app.data)
     throw quickError(404, 'app_not_found', 'App not found', { body })
   if (app.data.owner_org !== body.orgId)
