@@ -157,6 +157,6 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.arrayBuffer()
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
   })
 })
