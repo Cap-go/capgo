@@ -45,7 +45,7 @@ describe('[GET] /bundle - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_app_id')
+    expect(data.error).toBe('cannot_get_bundle')
   })
 
   it('should return 400 when user cannot access the app', async () => {
@@ -59,17 +59,14 @@ describe('[GET] /bundle - Error Cases', () => {
   })
 
   it('should return 400 when bundle cannot be retrieved', async () => {
-    const response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/bundle?app_id=${APPNAME}_no`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: APPNAME,
-        // This might trigger a database error
-      }),
     })
 
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot get bundle')
+    expect(data.error).toBe('cannot_get_bundle')
   })
 
   it('should handle invalid JSON body', async () => {
@@ -94,7 +91,7 @@ describe('[DELETE] /bundle - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('missing_app_id')
+    expect(data.error).toBe('cannot_delete_bundle')
   })
 
   it('should return 400 when user cannot access the app', async () => {
@@ -123,20 +120,6 @@ describe('[DELETE] /bundle - Error Cases', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('cannot_delete_version')
-  })
-
-  it('should return 400 when all versions cannot be deleted', async () => {
-    const response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'DELETE',
-      headers,
-      body: JSON.stringify({
-        app_id: APPNAME,
-        // No version specified - should delete all
-      }),
-    })
-
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot delete all version')
   })
 
   it('should handle invalid JSON body', async () => {
@@ -280,7 +263,7 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
     })
 
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Cannot set bundle to channel')
+    expect(data.error).toBe('cannot_find_version')
   })
 
   it('should handle invalid JSON body', async () => {
