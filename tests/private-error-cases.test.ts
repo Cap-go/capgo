@@ -42,9 +42,9 @@ describe('[POST] /private/create_device - Error Cases', () => {
         version: 1,
       }),
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_find_authorization')
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 
   it('should return 400 for invalid JSON body', async () => {

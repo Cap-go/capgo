@@ -30,6 +30,7 @@ export interface AuthInfo {
   userId: string
   authType: 'apikey' | 'jwt'
   apikey: Database['public']['Tables']['apikeys']['Row'] | null
+  jwt: string | null
 }
 
 export interface MiddlewareKeyVariables {
@@ -123,6 +124,7 @@ async function foundJWT(c: Context, jwt: string) {
   c.set('auth', {
     userId: user.user?.id,
     authType: 'jwt',
+    jwt,
   } as AuthInfo)
 }
 
@@ -146,7 +148,7 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
     }
     else {
       cloudlog('No apikey or subkey provided')
-      throw quickError(401, 'no_apikey_or_subkey', 'No apikey or subkey provided')
+      throw quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
     }
     await next()
   })

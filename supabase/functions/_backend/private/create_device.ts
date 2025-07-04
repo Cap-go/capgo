@@ -1,9 +1,9 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2, simpleError, useCors } from '../utils/hono.ts'
 import { createStatsDevices } from '../utils/stats.ts'
-import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
+import { supabaseWithAuth, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
   device_id: z.string().uuid(),
@@ -16,11 +16,8 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c) => {
-  const authToken = c.req.header('authorization')
-
-  if (!authToken)
-    throw simpleError('not_authorized', 'Not authorized')
+app.post('/', middlewareV2(['all', 'write']), async (c) => {
+  const auth = c.get('auth')!
 
   const body = await c.req.json<any>()
     .catch((e) => {
@@ -33,13 +30,8 @@ app.post('/', middlewareAuth, async (c) => {
 
   const safeBody = parsedBodyResult.data
 
-  const supabaseAdmin = await useSupabaseAdmin(c)
-  const supabaseClient = useSupabaseClient(c, authToken)
-
-  const clientData = await supabaseClient.auth.getUser()
-  if (!clientData?.data?.user || clientData?.error) {
-    throw simpleError('internal_error', 'Cannot get supabase user', { clientData })
-  }
+  const supabaseAdmin = useSupabaseAdmin(c)
+  const supabaseClient = supabaseWithAuth(c, auth)
 
   const { data: appData, error: appError } = await supabaseClient.from('apps')
     .select('owner_org')
@@ -50,7 +42,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('app_not_found', 'App not found', { app_id: safeBody.app_id })
   }
 
-  const userId = clientData.data.user.id
+  const userId = auth.userId
 
   const userRight = await supabaseAdmin.rpc('check_min_rights', {
     min_right: 'write',

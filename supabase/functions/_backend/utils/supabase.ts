@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from './hono.ts'
+import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { type MiddlewareKeyVariables, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
@@ -32,16 +33,28 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   old_record: Database['public']['Tables'][T]['Row']
 }
 
-export function supabaseClient(c: Context, auth: string) {
+export function supabaseClient(c: Context, jwt: string) {
   const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
-    global: { headers: { Authorization: auth } },
+    global: { headers: { Authorization: jwt } },
   }
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
+}
+
+export function supabaseWithAuth(c: Context, auth: AuthInfo) {
+  if (auth.authType === 'jwt' && auth.jwt) {
+    return supabaseClient(c, auth.jwt)
+  }
+  else if (auth.authType === 'apikey' && auth.apikey) {
+    return supabaseApikey(c, auth.apikey.key)
+  }
+  else {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
 }
 
 export function emptySupabase(c: Context) {
