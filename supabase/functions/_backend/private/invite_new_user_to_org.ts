@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -100,7 +100,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
   }
   if (!res.org) {
-    throw simpleError('organization_not_found', 'Organization not found')
+    throw quickError(404, 'organization_not_found', 'Organization not found')
   }
   const body = res.body
   const inviteCreatorUser = res.inviteCreatorUser

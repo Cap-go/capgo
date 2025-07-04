@@ -6,7 +6,7 @@ import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { BRES, simpleError, simpleError200 } from '../utils/hono.ts'
+import { BRES, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -132,7 +132,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     .eq('name', channel)
     .single()
   if (dbError || !dataChannel) {
-    throw simpleError('channel_not_found', `Cannot find channel`, { channel, app_id, dbError, dataChannel })
+    throw quickError(404, 'channel_not_found', `Cannot find channel`, { channel, app_id, dbError, dataChannel })
   }
 
   if (!dataChannel.allow_device_self_set) {
@@ -290,7 +290,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     })
   }
   if (!dataChannel) {
-    throw simpleError('channel_not_found', 'Cannot find channel', { dataChannel, errorChannel })
+    throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel, errorChannel })
   }
 
   const devicePlatform = devicePlatformScheme.safeParse(platform)
@@ -303,7 +303,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
     : dataChannel.find(channel => channel[devicePlatform.data] === true)
 
   if (!finalChannel) {
-    throw simpleError('channel_not_found', 'Cannot find channel', { dataChannel, errorChannel })
+    throw quickError(404, 'channel_not_found', 'Cannot find channel', { dataChannel, errorChannel })
   }
   await sendStatsAndDevice(c, device, [{ action: 'getChannel' }])
   return c.json({
@@ -366,7 +366,7 @@ async function listCompatibleChannels(c: Context, body: DeviceLink): Promise<Res
     .single()
 
   if (!appData) {
-    throw simpleError('app_not_found', `App ${app_id} not found`, { app_id })
+    throw quickError(404, 'app_not_found', `App ${app_id} not found`, { app_id })
   }
 
   if (!(await isAllowedActionOrg(c, appData.owner_org))) {

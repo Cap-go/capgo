@@ -47,7 +47,7 @@ app.post('/', middlewareAuth, async (c) => {
       throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
   else {
-    throw simpleError('auth_not_found', 'You can\'t access this app auth not found', { app_id: body.appId })
+    throw quickError(401, 'auth_not_found', 'You can\'t access this app auth not found', { app_id: body.appId })
   }
   if (body.count)
     return c.json({ count: await countDevices(c, body.appId) })

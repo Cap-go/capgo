@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
-import { BRES, simpleError } from '../../utils/hono.ts'
+import { BRES, quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
 
 export async function post(c: Context<MiddlewareKeyVariables, any, object>, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']) {
@@ -29,7 +29,7 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
       .eq('name', body.channel)
       .single()
     if (dbError || !dataChannel) {
-      throw simpleError('channel_not_found', 'Cannot find channel', { dbError })
+      throw quickError(404, 'channel_not_found', 'Cannot find channel', { dbError })
     }
 
     if (dataChannel.public) {

@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/loggin.ts'
 import { readDevices } from '../../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
@@ -37,7 +37,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
     if (!res?.length) {
-      throw simpleError('device_not_found', 'Cannot find device', { device_id: body.device_id })
+      throw quickError(404, 'device_not_found', 'Cannot find device', { device_id: body.device_id })
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
     // get version from device
@@ -47,7 +47,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .eq('id', dataDevice.version)
       .single()
     if (dbErrorVersion || !dataVersion) {
-      throw simpleError('version_not_found', 'Cannot find version', { version: dataDevice.version })
+      throw quickError(404, 'version_not_found', 'Cannot find version', { version: dataDevice.version })
     }
     dataDevice.version = dataVersion as any
     return c.json(dataDevice)
@@ -59,7 +59,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const res = await readDevices(c, body.app_id, from, to)
 
     if (!res) {
-      throw simpleError('devices_not_found', 'Cannot get devices')
+      throw quickError(404, 'devices_not_found', 'Cannot get devices')
     }
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
@@ -73,7 +73,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       .in('id', versionIds)
     // replace version with object from app_versions table
     if (dbErrorVersions || !dataVersions?.length) {
-      throw simpleError('versions_not_found', 'Cannot get versions', { dbErrorVersions, dataVersions })
+      throw quickError(404, 'versions_not_found', 'Cannot get versions', { dbErrorVersions, dataVersions })
     }
     dataDevices.forEach((device) => {
       const version = dataVersions.find((v: any) => v.id === device.version)

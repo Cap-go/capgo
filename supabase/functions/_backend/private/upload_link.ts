@@ -42,7 +42,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   // .eq('user_id', userId)
     .single()
   if (errorApp) {
-    throw simpleError('error_app_not_found', 'Error App not found', { errorApp })
+    throw quickError(404, 'error_app_not_found', 'Error App not found', { errorApp })
   }
 
   const { data: version, error: errorVersion } = await supabaseAdmin(c)
@@ -54,7 +54,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('user_id', apikey.user_id)
     .single()
   if (errorVersion) {
-    throw simpleError('error_app_or_version_not_found', 'Error App or Version not found', { errorVersion })
+    throw quickError(404, 'error_app_or_version_not_found', 'Error App or Version not found', { errorVersion })
   }
 
   // orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/ee.forgr.capacitor_go/11.zip

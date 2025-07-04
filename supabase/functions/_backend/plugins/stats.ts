@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES, simpleError } from '../utils/hono.ts'
+import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
@@ -112,7 +112,7 @@ async function post(c: Context, body: AppStats) {
     .single()
   if (!appOwner) {
     await opnPremStats(c, app_id, action, device)
-    throw simpleError('app_not_found', 'App not found')
+    throw quickError(404, 'app_not_found', 'App not found')
   }
   const statsActions: StatsActions[] = []
 
@@ -128,7 +128,7 @@ async function post(c: Context, body: AppStats) {
     .eq('deleted', allowedDeleted)
     .single()
   if (!appVersion) {
-    throw simpleError('version_not_found', 'Version not found', { app_id, version_name })
+    throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
   }
   if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
     throw simpleError('action_not_allowed', 'Action not allowed', { appVersion, app_id, owner_org: appVersion.owner_org })

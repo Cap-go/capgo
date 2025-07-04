@@ -48,7 +48,7 @@ app.post('/', async (c) => {
     }
   }
   else {
-    throw simpleError('auth_not_found', 'You can\'t access this app auth not found', { app_id: body.appId })
+    throw quickError(401, 'auth_not_found', 'You can\'t access this app auth not found', { app_id: body.appId })
   }
 
   return c.json(await readStats(c, body.appId, body.rangeStart, body.rangeEnd, body.devicesId, body.search, body.order, body.limit))

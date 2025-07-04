@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -34,11 +34,11 @@ app.post('/', async (c) => {
       authorization?.split('Bearer ')[1],
     )
     if (error || !auth?.user?.id) {
-      throw simpleError('auth_not_found', 'You can\'t access this, auth not found', { auth: authorization })
+      throw quickError(401, 'auth_not_found', 'You can\'t access this, auth not found', { auth: authorization })
     }
   }
   else {
-    throw simpleError('auth_not_found', 'You can\'t access this, auth not found', { auth: authorization })
+    throw quickError(401, 'auth_not_found', 'You can\'t access this, auth not found', { auth: authorization })
   }
   await backgroundTask(c, logsnag(c).track(body))
   if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-10') {

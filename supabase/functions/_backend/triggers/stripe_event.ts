@@ -6,7 +6,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareStripeWebhook } from '../utils/hono.ts'
-import { simpleError } from '../utils/hono.ts'
+import { quickError, simpleError } from '../utils/hono.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -111,7 +111,7 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     }
 
     if (dbError2) {
-      throw simpleError('succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
+      throw quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
@@ -142,7 +142,7 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
     .update(stripeData.data)
     .eq('customer_id', stripeData.data.customer_id)
   if (dbError2) {
-    throw simpleError('canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
+    throw quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
   }
   return false
 }
@@ -184,7 +184,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
       .update({ canceled_at: new Date().toISOString() })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
-      throw simpleError('user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
+      throw quickError(404, 'user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
     }
   }
   else if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === false && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === true) {
@@ -194,7 +194,7 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
       .update({ canceled_at: null })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
-      throw simpleError('user_uncancelled_customer_id_not_found', `USER UNCANCELED, customer_id not found`, { dbError2, stripeData })
+      throw quickError(404, 'user_uncancelled_customer_id_not_found', `USER UNCANCELED, customer_id not found`, { dbError2, stripeData })
     }
   }
   return c.json(BRES)

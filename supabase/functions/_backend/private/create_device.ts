@@ -38,7 +38,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     .single()
 
   if (appError) {
-    throw simpleError('app_not_found', 'App not found', { app_id: safeBody.app_id })
+    throw quickError(404, 'app_not_found', 'App not found', { app_id: safeBody.app_id })
   }
 
   const userId = auth.userId

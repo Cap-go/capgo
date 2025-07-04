@@ -1,5 +1,5 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
@@ -46,14 +46,14 @@ app.post('/', middlewareKey(['all']), async (c) => {
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
     if (!org || error) {
-      throw simpleError('org_not_found', 'Org not found', { supabaseError: error })
+      throw quickError(404, 'org_not_found', 'Org not found', { supabaseError: error })
     }
     newData.limited_to_orgs = [org.id]
   }
   if (appId) {
     const { data: app, error } = await supabase.from('apps').select('*').eq('id', appId).single()
     if (!app || error) {
-      throw simpleError('app_not_found', 'App not found', { supabaseError: error })
+      throw quickError(404, 'app_not_found', 'App not found', { supabaseError: error })
     }
     newData.limited_to_apps = [app.app_id]
   }
