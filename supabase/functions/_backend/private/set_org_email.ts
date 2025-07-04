@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -14,11 +14,8 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c) => {
-  const authToken = c.req.header('authorization')
-
-  if (!authToken)
-    throw simpleError('not_authorize', 'Not authorize')
+app.post('/', middlewareV2(['all', 'write']), async (c) => {
+  const auth = c.get('auth')!
 
   const body = await c.req.json<any>()
     .catch((e) => {
@@ -32,12 +29,6 @@ app.post('/', middlewareAuth, async (c) => {
   const safeBody = parsedBodyResult.data
 
   const supabaseAdmin = await useSupabaseAdmin(c)
-  const supabaseClient = useSupabaseClient(c, authToken)
-
-  const clientData = await supabaseClient.auth.getUser()
-  if (!clientData?.data?.user || clientData?.error) {
-    throw simpleError('cannot_get_supabase_user', 'Cannot get supabase user', { clientData })
-  }
 
   const { data: organization, error: organizationError } = await supabaseAdmin.from('orgs')
     .select('customer_id, management_email')
@@ -52,12 +43,10 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: safeBody.org_id })
   }
 
-  const userId = clientData.data.user.id
-
   const userRight = await supabaseAdmin.rpc('check_min_rights', {
     min_right: 'super_admin',
     org_id: safeBody.org_id,
-    user_id: userId,
+    user_id: auth.userId,
     channel_id: null as any,
     app_id: null as any,
   })
@@ -67,7 +56,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (!userRight.data) {
-    throw simpleError('not_authorized', 'Not authorized', { userId, orgId: safeBody.org_id })
+    throw quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, orgId: safeBody.org_id })
   }
 
   await updateCustomerEmail(c, organization.customer_id, safeBody.emial)

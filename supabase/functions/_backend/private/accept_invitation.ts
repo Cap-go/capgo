@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { type MiddlewareKeyVariables, simpleError, useCors } from '../utils/hono.ts'
+import { type MiddlewareKeyVariables, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
@@ -25,7 +25,7 @@ app.post('/', async (c) => {
   // Validate the request body using Zod
   const validationResult = acceptInvitationSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    throw simpleError('validation_error', 'Invalid request', { errors: validationResult.error.format() })
+    throw simpleError('invalid_json_body', 'Invalid request', { errors: validationResult.error.format() })
   }
 
   const body = validationResult.data
@@ -41,11 +41,11 @@ app.post('/', async (c) => {
     .single()
 
   if (invitationError) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: invitationError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: invitationError.message })
   }
 
   if (!invitation) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: 'Invitation not found' })
+    throw quickError(404, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: 'Invitation not found' })
   }
 
   // here the real magic happens
@@ -65,7 +65,7 @@ app.post('/', async (c) => {
   })
 
   if (userError || !user) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: userError?.message ?? 'Unknown error' })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: userError?.message ?? 'Unknown error' })
   }
 
   // TODO: improve error handling
@@ -81,7 +81,7 @@ app.post('/', async (c) => {
   })
 
   if (userNormalTableError) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: userNormalTableError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: userNormalTableError.message })
   }
 
   // let's now login the user in. The rough idea is that we will create a session and then return the session to the client
@@ -93,13 +93,13 @@ app.post('/', async (c) => {
   })
 
   if (sessionError) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: sessionError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: sessionError.message })
   }
 
   // We are still not finished. We need to remove from tmp_users and accept the invitation
   const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
   if (tmpUserDeleteError) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: tmpUserDeleteError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: tmpUserDeleteError.message })
   }
 
   const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
@@ -109,7 +109,7 @@ app.post('/', async (c) => {
   })
 
   if (insertIntoMainTableError) {
-    throw simpleError('failed_to_accept_invitation', 'Failed to accept invitation', { error: insertIntoMainTableError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: insertIntoMainTableError.message })
   }
 
   return c.json({

@@ -1,9 +1,9 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { middlewareV2, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { createStatsDevices } from '../utils/stats.ts'
-import { supabaseWithAuth, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
   device_id: z.string().uuid(),
@@ -56,7 +56,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   }
 
   if (!userRight.data) {
-    throw simpleError('not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
+    throw quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
   }
 
   await createStatsDevices(c, safeBody.app_id, safeBody.device_id, safeBody.version, safeBody.platform, '0.0.0', '0.0.0', '0.0.0', '', true, false)
