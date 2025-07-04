@@ -38,8 +38,8 @@ describe('[POST] /app - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing name')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('missing_name')
   })
 
   it('should return 403 when organization access is denied', async () => {

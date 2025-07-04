@@ -39,27 +39,23 @@ afterAll(async () => {
 describe('[GET] /bundle - Error Cases', () => {
   it('should return 400 when app_id is missing', async () => {
     const response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'POST',
+      method: 'GET',
       headers,
-      body: JSON.stringify({}), // Missing app_id
+      // Missing app_id
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing app_id')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('missing_app_id')
   })
 
   it('should return 400 when user cannot access the app', async () => {
-    const response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/bundle?app_id=nonexistent.app`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({
-        app_id: 'nonexistent.app',
-      }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, app_id: string }
-    expect(data.status).toBe('You can\'t access this app')
-    expect(data.app_id).toBe('nonexistent.app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_get_bundle')
   })
 
   it('should return 400 when bundle cannot be retrieved', async () => {
@@ -99,8 +95,8 @@ describe('[DELETE] /bundle - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Missing app_id')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('missing_app_id')
   })
 
   it('should return 400 when user cannot access the app', async () => {
@@ -113,9 +109,8 @@ describe('[DELETE] /bundle - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, app_id: string }
-    expect(data.status).toBe('You can\'t access this app')
-    expect(data.app_id).toBe('nonexistent.app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_delete_bundle')
   })
 
   it('should return 400 when version cannot be deleted', async () => {
@@ -128,8 +123,8 @@ describe('[DELETE] /bundle - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot delete version')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_delete_version')
   })
 
   it('should return 400 when all versions cannot be deleted', async () => {
