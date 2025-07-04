@@ -13,7 +13,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
   }
   const body = await c.req.json()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
 
   const orgId = body.org_id

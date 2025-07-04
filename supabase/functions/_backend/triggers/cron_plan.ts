@@ -13,7 +13,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   const body = await c.req.json<OrgToGet>()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   cloudlog({ requestId: c.get('requestId'), message: 'post cron plan body', body })
   if (!body.orgId)

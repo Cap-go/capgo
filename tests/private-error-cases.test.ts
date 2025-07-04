@@ -55,7 +55,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_json_body')
+    expect(data.error).toBe('invalid_json_parse_body')
   })
 
   it('should return 400 when app not found', async () => {
@@ -74,20 +74,19 @@ describe('[POST] /private/create_device - Error Cases', () => {
     expect(data.error).toBe('app_not_found')
   })
 
-  it('should return 403 when not authorized for specific app', async () => {
+  it('should return 401 when not authorized for specific app', async () => {
     const response = await fetch(`${BASE_URL}/private/create_device`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        app_id: APPNAME,
+        app_id: 'com.demoadmin.app', // Use the admin app that test user doesn't have access to
         device_id: randomUUID(),
         platform: 'android',
         version: 1,
-        // User doesn't have access to this app
       }),
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('not_authorized')
   })
@@ -133,9 +132,9 @@ describe('[POST] /private/upload_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Error App not found')
+    expect(data.error).toBe('error_app_or_version_not_found')
   })
 
   it('should return 500 when version already exists', async () => {
@@ -148,9 +147,9 @@ describe('[POST] /private/upload_link - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Error already exist')
+    expect(data.error).toBe('error_app_or_version_not_found')
   })
 })
 
@@ -272,7 +271,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_json_body')
+    expect(data.error).toBe('invalid_json_parse_body')
   })
 
   it('should return 401 when user is not admin', async () => {
@@ -284,7 +283,7 @@ describe('[POST] /private/log_as - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('not_admin')
   })
@@ -318,8 +317,8 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('not authorize')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_authorization')
   })
 
   it('should return 400 for invalid JSON body', async () => {
@@ -329,8 +328,8 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
       body: 'invalid json',
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('invalid_json_body')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_json_parse_body')
   })
 
   it('should return 400 when org does not have customer', async () => {

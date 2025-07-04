@@ -336,7 +336,7 @@ app.post('/sync', async (c) => {
   // Require JSON body with queue_name
   const body = await c.req.json()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   const queueName = body?.queue_name
   if (!queueName || typeof queueName !== 'string') {

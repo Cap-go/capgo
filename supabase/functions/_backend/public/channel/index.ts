@@ -10,7 +10,7 @@ export const app = honoFactory.createApp()
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await c.req.json<ChannelSet>()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return post(c, body, apikey)

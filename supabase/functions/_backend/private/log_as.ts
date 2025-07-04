@@ -5,7 +5,7 @@ import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
-  user_id: z.string(),
+  user_id: z.string().uuid(),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -20,7 +20,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const body = await c.req.json<any>()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {

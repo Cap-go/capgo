@@ -17,7 +17,7 @@ app.use('/', useCors)
 app.post('/', async (c) => {
   const body = await c.req.json<TrackOptions>()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   cloudlog({ requestId: c.get('requestId'), message: 'post private/stats body', body })
   const apikey_string = c.req.header('capgkey')

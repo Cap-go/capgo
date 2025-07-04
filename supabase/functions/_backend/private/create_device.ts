@@ -21,7 +21,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
   const body = await c.req.json<any>()
     .catch((e) => {
-      throw simpleError('invalid_json_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
@@ -31,9 +31,8 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const safeBody = parsedBodyResult.data
 
   const supabaseAdmin = useSupabaseAdmin(c)
-  const supabaseClient = supabaseWithAuth(c, auth)
 
-  const { data: appData, error: appError } = await supabaseClient.from('apps')
+  const { data: appData, error: appError } = await supabaseAdmin.from('apps')
     .select('owner_org')
     .eq('app_id', safeBody.app_id)
     .single()
@@ -49,7 +48,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     org_id: appData.owner_org,
     user_id: userId,
     channel_id: null as any,
-    app_id: null as any,
+    app_id: safeBody.app_id,
   })
 
   if (userRight.error) {
