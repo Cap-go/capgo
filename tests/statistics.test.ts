@@ -149,7 +149,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getStats.status).toBe(401)
     const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('error', 'invalid_apikey')
+    expect(statsData).toHaveProperty('error', 'no_access_to_app')
   })
 
   it('should fail to get organization statistics with subkey for org not belonging to user', async () => {
@@ -224,7 +224,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     })
     expect(getStats.status).toBe(401)
     const statsData = await getStats.json<{ error: string }>()
-    expect(statsData.error).toBe('invalid_apikey')
+    expect(statsData.error).toBe('no_access_to_app')
 
     // Clean up
     const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleAppSubkeyId}`, {

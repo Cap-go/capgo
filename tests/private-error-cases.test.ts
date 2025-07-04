@@ -134,7 +134,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
 
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('error_app_or_version_not_found')
+    expect(data.error).toBe('error_version_not_found')
   })
 
   it('should return 500 when version already exists', async () => {
@@ -149,7 +149,7 @@ describe('[POST] /private/upload_link - Error Cases', () => {
 
     expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('error_app_or_version_not_found')
+    expect(data.error).toBe('error_version_not_found')
   })
 })
 

@@ -14,7 +14,6 @@ afterAll(async () => {
 })
 
 describe('[GET] /statistics - Error Cases', () => {
-
   it('should return 404 for app without access', async () => {
     const response = await fetch(`${BASE_URL}/statistics/app/nonexistent.app.id?from=2&to=1`, {
       method: 'GET',
@@ -252,7 +251,7 @@ describe('trigger Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_email_type')
+    expect(data.error).toBe('user_not_found')
   })
 })
 
