@@ -31,6 +31,8 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
+const displayStore = useDisplayStore()
+displayStore.NavTitle = t('members')
 
 // Permission modal state
 const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()

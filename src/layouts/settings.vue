@@ -125,7 +125,6 @@ function gotoMainSettings() {
   type.value = 'user'
 }
 
-displayStore.NavTitle = t('settings')
 </script>
 
 <template>

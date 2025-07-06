@@ -31,6 +31,7 @@ const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
 const mfaVerificationCode = ref('')
 const mfaQRCode = ref('')
+displayStore.NavTitle = t('account')
 
 async function deleteAccount() {
   dialogStore.openDialog({

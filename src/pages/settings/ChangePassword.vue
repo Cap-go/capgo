@@ -10,10 +10,11 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 
 const isLoading = ref(false)
 const dialogStore = useDialogV2Store()
+const displayStore = useDisplayStore()
 const supabase = useSupabase()
 const mfaCode = ref('')
-
 const { t } = useI18n()
+displayStore.NavTitle = t('password')
 
 async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)

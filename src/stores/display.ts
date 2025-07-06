@@ -2,8 +2,14 @@ import type { Database } from '~/types/supabase.types'
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 
+export interface BreadcrumbItem {
+  path: string
+  name: string
+}
+
 export const useDisplayStore = defineStore('display', () => {
   const NavTitle = ref<string>('')
+  const pathTitle = ref<BreadcrumbItem[]>([])
   const defaultBack = ref<string>('')
   const messageToast = ref<string[]>([])
   const durationToast = ref<number>(2000)
@@ -16,6 +22,7 @@ export const useDisplayStore = defineStore('display', () => {
     durationToast,
     lastButtonRole,
     NavTitle,
+    pathTitle,
     defaultBack,
     selectedApps,
     selectedOrganizations,

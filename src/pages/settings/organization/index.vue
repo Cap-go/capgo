@@ -13,6 +13,7 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
+const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
@@ -20,6 +21,7 @@ const router = useRouter()
 const isLoading = ref(true)
 const deleteInput = ref('')
 
+displayStore.NavTitle = t('organization')
 onMounted(async () => {
   await organizationStore.dedupFetchOrganizations()
   isLoading.value = false

@@ -18,6 +18,8 @@ import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
+const displayStore = useDisplayStore()
+displayStore.NavTitle = t('plans')
 
 interface PlansOrgData {
   stats: {
