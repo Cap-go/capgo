@@ -1,6 +1,5 @@
 import type { BreadcrumbItem } from '~/stores/display'
 import type { UserModule } from '~/types'
-import { useI18n } from 'petite-vue-i18n'
 import { useDisplayStore } from '~/stores/display'
 
 function getPrettyName(segment: string, index: number, allSegments: string[]): string {

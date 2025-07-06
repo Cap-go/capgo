@@ -1,7 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
-import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { getBody, honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/loggin.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
