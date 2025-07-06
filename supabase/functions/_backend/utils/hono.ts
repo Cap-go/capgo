@@ -359,12 +359,10 @@ export function simpleError200(c: Context, errorCode: string, message: string, m
 }
 
 export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
-  // const safeCause = cause ? JSON.stringify(cause, Object.getOwnPropertyNames(cause)) : undefined
   const res: SimpleErrorResponse = {
     error: errorCode,
     message,
     moreInfo,
-    // cause: safeCause,
   }
   console.log('res of simpleError', res)
   return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }), cause })
