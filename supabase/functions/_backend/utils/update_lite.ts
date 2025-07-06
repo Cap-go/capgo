@@ -102,7 +102,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   version_name = (version_name === 'builtin' || !version_name) ? version_build : version_name
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing_info', app_id, device_id, version_build, version_name, platform })
-    return simpleError200(c, 'missing_info', 'Cannot find device_id or appi_id')
+    return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')
   }
   const device: DeviceWithoutCreatedAt = {
     app_id,
@@ -185,7 +185,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }
   }
   //  check signedURL and if it's url
-  if (!signedURL && (!signedURL.startsWith('http://') || !signedURL.startsWith('https://'))) {
+  if (!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
     await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle' }])
     return simpleError200(c, 'no_bundle_url', 'Cannot get bundle url')

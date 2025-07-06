@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { CreateApp } from './post.ts'
-import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteApp } from './delete.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
@@ -32,14 +32,14 @@ app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
 })
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBody<CreateApp>(c)
+  const body = await getBodyOrQuery<CreateApp>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return post(c, body, apikey)
 })
 
 app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
   const id = c.req.param('id')
-  const body = await getBody<{ name?: string, icon?: string, retention?: number }>(c)
+  const body = await getBodyOrQuery<{ name?: string, icon?: string, retention?: number }>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
   const keyToUse = subkey || apikey

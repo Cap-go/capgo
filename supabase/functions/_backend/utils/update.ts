@@ -45,7 +45,7 @@ function resToVersion(plugin_version: string, signedURL: string, version: Databa
 }
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean) {
-  cloudlog(({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() }))
+  cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
   const {
     version_name,
     version_build,
@@ -94,7 +94,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     }, appOwner.owner_org, app_id, '0 0 * * 1'))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
-    throw simpleError('missing_info', 'Cannot find device_id or appi_id', { body })
+    throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
   const device: DeviceWithoutCreatedAt = {
     app_id,

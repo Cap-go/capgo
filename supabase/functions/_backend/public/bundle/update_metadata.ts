@@ -1,4 +1,4 @@
-import { getBody, honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, middlewareKey, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 export const app = honoFactory.createApp()
@@ -11,7 +11,7 @@ interface UpdateMetadataBody {
 }
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBody<UpdateMetadataBody>(c)
+  const body = await getBodyOrQuery<UpdateMetadataBody>(c)
   // We don't need apikey for this endpoint as middleware handles permission checks
 
   if (!body.app_id || !body.version_id) {

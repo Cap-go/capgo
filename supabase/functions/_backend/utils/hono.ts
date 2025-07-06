@@ -251,7 +251,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
   return subMiddlewareKey
 }
 
-export async function getBody<T>(c: Context<MiddlewareKeyVariables, any, any>) {
+export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, any>) {
   let body: T
   try {
     body = await c.req.json<T>()

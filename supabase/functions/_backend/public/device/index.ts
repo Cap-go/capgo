@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
-import { getBody, honoFactory, middlewareKey, parseBody } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, middlewareKey, parseBody } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/loggin.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
@@ -18,7 +18,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 })
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
-  const body = await getBody<DeviceLink>(c)
+  const body = await getBodyOrQuery<DeviceLink>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'body', body })
   cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
@@ -26,7 +26,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 })
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBody<DeviceLink>(c)
+  const body = await getBodyOrQuery<DeviceLink>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'body', body })
   cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })

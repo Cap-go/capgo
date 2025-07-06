@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { ChannelSet } from './delete.ts'
-import { getBody, honoFactory, middlewareKey, parseBody } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, middlewareKey, parseBody } from '../../utils/hono.ts'
 import { deleteChannel } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
@@ -14,13 +14,13 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 })
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
-  const body = await getBody<ChannelSet>(c)
+  const body = await getBodyOrQuery<ChannelSet>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return get(c, body, apikey)
 })
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBody<ChannelSet>(c)
+  const body = await getBodyOrQuery<ChannelSet>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteChannel(c, body, apikey)
 })
