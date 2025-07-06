@@ -14,7 +14,6 @@ import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 function getCurrentTab() {
@@ -124,7 +123,6 @@ async function gotoOrgSettings() {
 function gotoMainSettings() {
   type.value = 'user'
 }
-
 </script>
 
 <template>
