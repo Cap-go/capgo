@@ -224,7 +224,7 @@ export async function update(c: Context, body: AppInfos) {
     res = await updateWithPG(c, body, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2)
   }
   catch (e) {
-    throw simpleError('unknow_error', `Error unknow ${JSON.stringify(e)}`, { e })
+    throw simpleError('unknow_error', `Error unknow`, { body }, e)
   }
   if (isV2 && pgClient)
     await closeClient(c, pgClient)
