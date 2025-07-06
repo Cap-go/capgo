@@ -336,7 +336,7 @@ const hightLights = computed<Stat[]>(() => ([
           </BlurBg>
         </section>
         <div class="flex items-center justify-center mt-8 space-x-6 sm:mt-12">
-          <div class="flex items-center" @click="segmentVal = 'm'">
+          <div class="flex items-center cursor-pointer" @click="segmentVal = 'm'">
             <input
               id="monthly" type="radio" name="pricing-plans"
               class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
@@ -347,7 +347,7 @@ const hightLights = computed<Stat[]>(() => ([
             </label>
           </div>
 
-          <div class="flex items-center" @click="segmentVal = 'y'">
+          <div class="flex items-center cursor-pointer" @click="segmentVal = 'y'">
             <input
               id="yearly" type="radio" name="pricing-plans"
               class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
@@ -396,7 +396,7 @@ const hightLights = computed<Stat[]>(() => ([
               </p>
               <button
                 :class="buttonStyle(p)"
-                class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
+                class="cursor-pointer block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
                 :disabled="isDisabled(p)" @click="openChangePlan(p, index)"
               >
                 <svg v-if="isSubscribeLoading[index]" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle dark:text-gray-900 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -526,7 +526,7 @@ const hightLights = computed<Stat[]>(() => ([
 
                     <div class="w-full sm:w-auto mt-6 md:mt-0 text-center">
                       <button
-                        class="inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black w-full sm:w-auto"
+                        class="cursor-pointer inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black w-full sm:w-auto"
                         @click="openSupport()"
                       >
                         Get quote now

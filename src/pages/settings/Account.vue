@@ -405,7 +405,7 @@ onMounted(async () => {
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="cursor-pointer px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -473,7 +473,7 @@ onMounted(async () => {
             {{ t('settings') }}
           </h3>
           <!-- Language Info -->
-          <section class="flex flex-col text-slate-800 dark:text-white md:flex-row md:items-center items-left">
+          <section class="flex flex-col md:flex-row md:items-center items-left">
             <p class="">
               {{ t('language') }}:
             </p>
@@ -490,7 +490,7 @@ onMounted(async () => {
               <button
                 type="button"
                 data-test="setup-mfa"
-                class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800"
+                class="px-3 py-2 text-xs cursor-pointer font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800"
                 :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
                 @click="handleMfa"
               >
@@ -503,7 +503,7 @@ onMounted(async () => {
               {{ t('account-id') }}:
             </p>
             <div class="md:ml-6">
-              <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
+              <button type="button" class="px-3 cursor-pointer py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyAccountId()">
                 {{ t('copy-account-id') }}
               </button>
             </div>
