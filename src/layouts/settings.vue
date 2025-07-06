@@ -10,7 +10,6 @@ import IconPassword from '~icons/mdi/password'
 import IconAcount from '~icons/mdi/user'
 import IconBilling from '~icons/mingcute/bill-fill'
 import { openPortal } from '~/services/stripe'
-import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
