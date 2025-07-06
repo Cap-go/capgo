@@ -94,7 +94,6 @@ export function onError(functionName: string) {
         return c.json({ error: 'you are beeing rate limited' }, e.status)
       }
       const res: SimpleErrorResponse = await e.getResponse().json<SimpleErrorResponse>().catch(() => (defaultResponse))
-      console.log('res of ERROR', res)
       return c.json(res, e.status)
     }
     return c.json(defaultResponse, 500)
