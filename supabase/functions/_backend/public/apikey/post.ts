@@ -1,5 +1,5 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
@@ -11,10 +11,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
   if (key.limited_to_orgs?.length) {
     throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
-  const body = await c.req.json()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<any>(c)
 
   const orgId = body.org_id
   const appId = body.app_id

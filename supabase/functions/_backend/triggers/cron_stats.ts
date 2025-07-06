@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAPISecret, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAPISecret, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -16,10 +16,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const body = await c.req.json<DataToGet>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<DataToGet>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post cron_stats body', body })
   if (!body.appId)
     throw simpleError('no_appId', 'No appId', { body })

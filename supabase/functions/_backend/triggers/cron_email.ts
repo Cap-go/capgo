@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret, simpleError } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -63,10 +63,7 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const { email, appId, type } = await c.req.json()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const { email, appId, type } = await parseBody<{ email: string, appId: string, type: string }>(c)
 
   if (!email || !appId || !type) {
     throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })

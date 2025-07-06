@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { middlewareV2, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareV2, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
@@ -17,10 +17,7 @@ app.use('/', useCors)
 app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const auth = c.get('auth')!
 
-  const body = await c.req.json<any>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<any>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })

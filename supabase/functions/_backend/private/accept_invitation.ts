@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { type MiddlewareKeyVariables, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { type MiddlewareKeyVariables, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
@@ -16,10 +16,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', async (c) => {
-  const rawBody = await c.req.json()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const rawBody = await parseBody<AcceptInvitation>(c)
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody })
 
   // Validate the request body using Zod

@@ -4,7 +4,7 @@ import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
 import { z } from 'zod'
 import { sendDiscordAlert } from '../utils/discord.ts'
-import { BRES, middlewareAPISecret, simpleError } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
@@ -334,10 +334,7 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name
-  const body = await c.req.json()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { }, e)
-    })
+  const body = await parseBody<{ queue_name: string }>(c)
   const queueName = body?.queue_name
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })

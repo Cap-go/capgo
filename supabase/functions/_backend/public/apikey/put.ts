@@ -1,5 +1,5 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
@@ -17,10 +17,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     throw simpleError('api_key_id_required', 'API key ID is required', { id })
   }
 
-  const body = await c.req.json()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<{ name: string, mode: string, limited_to_apps: string[], limited_to_orgs: string[] }>(c)
   const { name, mode, limited_to_apps, limited_to_orgs } = body
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,

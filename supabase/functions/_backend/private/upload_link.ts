@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareKey, quickError, simpleError } from '../utils/hono.ts'
+import { middlewareKey, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { s3 } from '../utils/s3.ts'
@@ -16,10 +16,7 @@ interface DataUpload {
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
-  const body = await c.req.json<DataUpload>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<DataUpload>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post upload link body', body })
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const capgkey = c.get('capgkey') as string

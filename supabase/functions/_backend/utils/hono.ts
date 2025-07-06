@@ -371,3 +371,10 @@ export function quickError(status: number, errorCode: string, message: string, m
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
   return quickError(400, errorCode, message, moreInfo, cause)
 }
+
+export function parseBody<T>(c: Context) {
+  return c.req.json<T>()
+    .catch((e) => {
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+    })
+}

@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { simpleError, useCors } from '../utils/hono.ts'
+import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 interface CreditStep {
@@ -68,10 +68,7 @@ app.get('/', async (c) => {
 })
 
 app.post('/', async (c) => {
-  const body = await c.req.json<CostCalculationRequest>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<CostCalculationRequest>(c)
   const { mau, bandwidth, storage } = body
 
   // Validate inputs

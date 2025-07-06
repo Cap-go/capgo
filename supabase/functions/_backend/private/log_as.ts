@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -18,10 +18,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!authToken)
     throw simpleError('not_authorize', 'Not authorize')
 
-  const body = await c.req.json<any>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<any>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })

@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -15,10 +15,7 @@ app.use('/', useCors)
 
 // No middleware applied to this route, as we allow both authorization and capgkey for CLI and webapp access
 app.post('/', async (c) => {
-  const body = await c.req.json<TrackOptions>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<TrackOptions>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post private/stats body', body })
   const apikey_string = c.req.header('capgkey')
   const authorization = c.req.header('authorization')

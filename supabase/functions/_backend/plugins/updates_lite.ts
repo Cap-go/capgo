@@ -3,7 +3,7 @@ import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { BRES, simpleError } from '../utils/hono.ts'
+import { BRES, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update as updateLite } from '../utils/update_lite.ts'
@@ -72,10 +72,7 @@ const jsonRequestSchema = z.object({
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  const body = await c.req.json<AppInfos>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<AppInfos>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
   if (isLimited(c, body.app_id)) {
     throw simpleError('too_many_requests', 'Too many requests')

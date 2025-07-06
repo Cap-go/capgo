@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { hasAppRight, supabaseAdmin } from '../utils/supabase.ts'
 
@@ -18,10 +18,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const body = await c.req.json<DataDownload>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<DataDownload>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
   const authorization = c.req.header('authorization')
   if (!authorization)

@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAuth, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 import { hasAppRightApikey, supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
@@ -23,10 +23,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const body = await c.req.json<DataDevice>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<DataDevice>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
   const apikey_string = c.req.header('capgkey')

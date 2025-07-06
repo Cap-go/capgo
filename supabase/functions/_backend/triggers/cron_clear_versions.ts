@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -9,10 +9,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   // unsafe parse the body
-  const body = await c.req.json<{ version: Database['public']['Tables']['app_versions']['Row'] }>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<{ version: Database['public']['Tables']['app_versions']['Row'] }>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post body cron_clear_versions', body })
 
   // Let's start with the metadata

@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { middlewareAuth, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -89,10 +89,7 @@ async function validateInvite(c: Context, rawBody: any) {
 }
 
 app.post('/', middlewareAuth, async (c) => {
-  const rawBody = await c.req.json()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const rawBody = await parseBody<any>(c)
   cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
   const res = await validateInvite(c, rawBody)

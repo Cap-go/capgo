@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAuth, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { createPortal } from '../utils/stripe.ts'
 import { hasOrgRight, supabaseAdmin } from '../utils/supabase.ts'
@@ -15,10 +15,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const body = await c.req.json<PortalData>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<PortalData>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
   const authorization = c.get('authorization')
   const { data: auth, error } = await supabaseAdmin(c).auth.getUser(

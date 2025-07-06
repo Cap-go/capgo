@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
@@ -167,10 +167,7 @@ async function post(c: Context, body: AppStats) {
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  const body = await c.req.json<AppStats>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
+  const body = await parseBody<AppStats>(c)
   if (isLimited(c, body.app_id)) {
     throw simpleError('too_many_requests', 'Too many requests')
   }
