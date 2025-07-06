@@ -191,7 +191,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
       `
     }
     catch (readError) {
-      throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName, readError })
+      throw simpleError('error_reading_from_pgmq_queue', 'Error reading from pgmq queue', { queueName }, readError)
     }
 
     if (!messages || messages.length === 0) {
@@ -260,7 +260,7 @@ export async function http_post_helper(
     return response
   }
   catch (error) {
-    throw simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name, error })
+    throw simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
   }
   finally {
     clearTimeout(timeoutId)
@@ -277,7 +277,7 @@ async function delete_queue_message_batch(c: Context, sql: ReturnType<typeof get
     `
   }
   catch (error) {
-    throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName, error })
+    throw simpleError('error_deleting_queue_messages', 'Error deleting queue messages', { msgIds, queueName }, error)
   }
 }
 
@@ -291,7 +291,7 @@ async function archive_queue_messages(c: Context, sql: ReturnType<typeof getPgCl
     `
   }
   catch (error) {
-    throw simpleError('error_archiving_queue_messages', 'Error archiving queue messages', { msgIds, queueName, error })
+    throw simpleError('error_archiving_queue_messages', 'Error archiving queue messages', { msgIds, queueName }, error)
   }
 }
 
@@ -314,7 +314,7 @@ async function mass_edit_queue_messages_cf_ids(
     `)
   }
   catch (error) {
-    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', { error })
+    throw simpleError('error_updating_cf_ids', 'Error updating CF IDs', { }, error)
   }
 }
 
@@ -336,11 +336,11 @@ app.post('/sync', async (c) => {
   // Require JSON body with queue_name
   const body = await c.req.json()
     .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { }, e)
     })
   const queueName = body?.queue_name
   if (!queueName || typeof queueName !== 'string') {
-    throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body')
+    throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
   }
 
   await backgroundTask(c, (async () => {
