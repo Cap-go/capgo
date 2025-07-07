@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.11.80 (2025-07-07)
+
+
+### Bug Fixes
+
+* remove useless functions ([b871fca](https://github.com/Cap-go/capgo/commit/b871fca7b2be2ba63bd73575ab64314307b10693))
+
 ### 12.11.79 (2025-07-07)
 
 
