@@ -101,6 +101,7 @@
         "@antfu/eslint-config": "4.14.1",
         "@capacitor/cli": "^7.3.0",
         "@capacitor/core": "^7.3.0",
+        "@capgo/cli": "latest",
         "@cloudflare/workers-types": "4.20250614.0",
         "@iconify-json/carbon": "1.2.9",
         "@iconify-json/heroicons": "^1.2.2",
@@ -510,6 +511,8 @@
     "@capgo/capacitor-screen-recorder": ["@capgo/capacitor-screen-recorder@7.1.9", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-extcX94S0u1W1LzCKcnUrM/yXEQ6YdJDjpqRHTTd7PurcCFHrvH4/kADm5qLe6RseInTn+/OX8kJZCRWPt0jfA=="],
 
     "@capgo/capacitor-updater": ["@capgo/capacitor-updater@7.6.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-EwWQKviM/85O/ttczvKobY5mFXc6l4yoq7dYeLhsgfA2GF3rB0NLrnt/AOLTN0OK07UDX2ozex2sOLDdujQ7uw=="],
+
+    "@capgo/cli": ["@capgo/cli@7.11.4", "", { "bin": { "capgo": "dist/index.js" } }, "sha512-dedHRZyD35RxsBIYGd0BjnXhEyCFOYZ05/NQaXeMqQ0246HDREo4LhS1HZIyrsigtqSmfIUAocxlDv7jJpLjxw=="],
 
     "@capgo/inappbrowser": ["@capgo/inappbrowser@7.10.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-ynhM0tHkfk2tsHKZC8QuVvnNJ/n34YJ3qrFSddv8pE4LGYhxxo7p85Jd368CwpM4VL0QwaDydg0PEV1yGP/Iuw=="],
 
