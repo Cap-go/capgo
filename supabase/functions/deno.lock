@@ -4,10 +4,11 @@
     "jsr:@bradenmacdonald/s3-lite-client@0.9.1": "0.9.1",
     "jsr:@std/semver@1.0.4": "1.0.4",
     "npm:@cloudflare/workers-types@4.20250303.0": "4.20250303.0",
-    "npm:@hono/sentry@1.2.0": "1.2.0_hono@4.7.11",
+    "npm:@hono/sentry@1.2.0": "1.2.0_hono@4.8.4",
     "npm:@types/node@*": "22.15.15",
     "npm:discord-api-types@0.38.15": "0.38.15",
-    "npm:hono@^4.7.11": "4.7.11",
+    "npm:hono@^4.7.11": "4.8.4",
+    "npm:hono@^4.8.4": "4.8.4",
     "npm:stripe@18.0.0": "18.0.0",
     "npm:stripe@18.2.1": "18.2.1_@types+node@22.15.15"
   },
@@ -23,7 +24,7 @@
     "@cloudflare/workers-types@4.20250303.0": {
       "integrity": "sha512-O7F7nRT4bbmwHf3gkRBLfJ7R6vHIJ/oZzWdby6obOiw2yavUfp/AIwS7aO2POu5Cv8+h3TXS3oHs3kKCZLraUA=="
     },
-    "@hono/sentry@1.2.0_hono@4.7.11": {
+    "@hono/sentry@1.2.0_hono@4.8.4": {
       "integrity": "sha512-9mS8GrkGtR4YxM1CViL4Ft8LFQ9YhCoXeqKnUA1AUmrvA5PhUU/V+xoo8Autw0nVriin3liX5/lPrwWz3muwiw==",
       "dependencies": [
         "hono",
@@ -126,8 +127,8 @@
         "function-bind"
       ]
     },
-    "hono@4.7.11": {
-      "integrity": "sha512-rv0JMwC0KALbbmwJDEnxvQCeJh+xbS3KEWW5PC9cMJ08Ur9xgatI0HmtgYZfOdOSOeYsp5LO2cOhdI8cLEbDEQ=="
+    "hono@4.8.4": {
+      "integrity": "sha512-KOIBp1+iUs0HrKztM4EHiB2UtzZDTBihDtOF5K6+WaJjCPeaW4Q92R8j63jOhvJI5+tZSMuKD9REVEXXY9illg=="
     },
     "math-intrinsics@1.1.0": {
       "integrity": "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="
@@ -542,7 +543,7 @@
       "npm:@cloudflare/workers-types@4.20250303.0",
       "npm:@hono/sentry@1.2.0",
       "npm:discord-api-types@0.38.15",
-      "npm:hono@^4.7.11",
+      "npm:hono@^4.8.4",
       "npm:stripe@18.2.1"
     ]
   }

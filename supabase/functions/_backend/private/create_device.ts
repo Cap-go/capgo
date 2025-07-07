@@ -16,10 +16,17 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
+interface CreateDeviceBody {
+  device_id: string
+  app_id: string
+  platform: string
+  version: number
+}
+
 app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const auth = c.get('auth')!
 
-  const body = await parseBody<any>(c)
+  const body = await parseBody<CreateDeviceBody>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
@@ -56,7 +63,19 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     throw quickError(401, 'not_authorized', 'Not authorized', { userId, appId: safeBody.app_id })
   }
 
-  await createStatsDevices(c, safeBody.app_id, safeBody.device_id, safeBody.version, safeBody.platform, '0.0.0', '0.0.0', '0.0.0', '', true, false)
+  await createStatsDevices(c, {
+    app_id: safeBody.app_id,
+    device_id: safeBody.device_id,
+    version: safeBody.version,
+    platform: safeBody.platform,
+    plugin_version: '0.0.0',
+    os_version: '0.0.0',
+    version_build: '0.0.0',
+    custom_id: '',
+    is_prod: true,
+    is_emulator: false,
+    updated_at: new Date().toISOString(),
+  })
 
   return c.body(null, 204) // No content
 })

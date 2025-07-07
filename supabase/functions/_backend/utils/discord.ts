@@ -45,7 +45,7 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
   const method = c.req.method
   const url = c.req.url
-  const headers = Object.fromEntries(c.req.raw.headers.entries())
+  const headers = Object.fromEntries((c.req.raw.headers as any).entries())
   const errorMessage = e?.message ?? 'Unknown error'
   const errorStack = e?.stack ?? 'No stack trace'
   const errorName = e?.name ?? 'Error'
