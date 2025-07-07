@@ -211,9 +211,9 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
     }
 
     cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Received ${messages.length} messages from queue ${queueName}.` })
-    const parsed = messagesArraySchema.safeParse<Message[]>(messages)
+    const parsed = messagesArraySchema.safeParse(messages)
     if (parsed.success) {
-      return parsed.data
+      return parsed.data as Message[]
     }
     else {
       throw simpleError('invalid_message_format', 'Invalid message format', { parsed: parsed.error })

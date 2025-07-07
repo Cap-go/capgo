@@ -13,24 +13,21 @@ import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
+z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
 
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
   }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
   }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   }),
   version_build: z.string({
-    required_error: MISSING_STRING_VERSION_BUILD,
-    invalid_type_error: NON_STRING_VERSION_BUILD,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
   }),
   is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),

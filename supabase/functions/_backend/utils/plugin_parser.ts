@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { ZodSchema } from 'zod/v4-mini'
+import type { ZodMiniObject } from 'zod/v4-mini'
 import type { AppInfos, AppStats } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { fixSemver } from '../utils/utils.ts'
@@ -9,7 +9,7 @@ export interface DeviceLink extends AppInfos {
   channel?: string
 }
 
-export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodSchema) {
+export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject) {
   const invalidCode = c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
   if (Object.keys(body ?? {}).length === 0) {
     throw simpleError(invalidCode, 'Cannot parse body', { body })

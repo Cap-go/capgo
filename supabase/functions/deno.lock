@@ -10,7 +10,8 @@
     "npm:hono@^4.7.11": "4.8.4",
     "npm:hono@^4.8.4": "4.8.4",
     "npm:stripe@18.0.0": "18.0.0",
-    "npm:stripe@18.2.1": "18.2.1_@types+node@22.15.15"
+    "npm:stripe@18.2.1": "18.2.1_@types+node@22.15.15",
+    "npm:zod@3.25.75": "3.25.75"
   },
   "jsr": {
     "@bradenmacdonald/s3-lite-client@0.9.1": {
@@ -205,6 +206,9 @@
     },
     "undici-types@6.21.0": {
       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="
+    },
+    "zod@3.25.75": {
+      "integrity": "sha512-OhpzAmVzabPOL6C3A3gpAifqr9MqihV/Msx3gor2b2kviCgcb+HM9SEOpMWwwNp9MRunWnhtAKUoo0AHhjyPPg=="
     }
   },
   "redirects": {
@@ -534,7 +538,12 @@
     "https://esm.sh/ws@8.18.0/deno/ws.mjs": "e4d1c51cfb776a271718dddf0c080524a4096a2de59c12900399dd4827f0c927",
     "https://esm.sh/ws@8.18.0?target=deno": "d884771dc453f8846d2fa2045f6c5c0272a1504f9b959248e85d2da2f9853e19",
     "https://esm.sh/zod@3.24.3/deno/zod.mjs": "46c4acb1f87caf349962b648f519cbf3999a8746fb40df0331ad2d3b62a197c0",
-    "https://esm.sh/zod@3.24.3?target=deno": "9fca222e4d84f20fa2eadb5b08378cee9ba79f135c6fbdbead2158aafc98fde7"
+    "https://esm.sh/zod@3.24.3?target=deno": "9fca222e4d84f20fa2eadb5b08378cee9ba79f135c6fbdbead2158aafc98fde7",
+    "https://esm.sh/zod@3.25.75/deno/v4-mini.mjs": "80b80c85005008202c2d6666d36e24f0b2197a12f3d5a1a6166f451e417a7453",
+    "https://esm.sh/zod@3.25.75/deno/v4/core.mjs": "dc194f03d75e74a195ec1e1a8bbbda457c39f7c8a4ae7c657cee45411abeb32d",
+    "https://esm.sh/zod@3.25.75/deno/v4/locales.mjs": "fad4870f1ecab0562d1b2b4b290ccb552d24bfe8069fdb26d8adb803755aada8",
+    "https://esm.sh/zod@3.25.75/deno/v4/mini.mjs": "95ac5e50fd9af837362db90334bd8c893822ff08eeec2d6b05307e4f0b808a1f",
+    "https://esm.sh/zod@3.25.75/v4-mini?target=deno": "26cdbfe517926db0d4dcd0b8e3840f282e80f81d4ef841d316f72b86efde9977"
   },
   "workspace": {
     "dependencies": [
@@ -544,7 +553,8 @@
       "npm:@hono/sentry@1.2.0",
       "npm:discord-api-types@0.38.15",
       "npm:hono@^4.8.4",
-      "npm:stripe@18.2.1"
+      "npm:stripe@18.2.1",
+      "npm:zod@3.25.75"
     ]
   }
 }

@@ -30,31 +30,25 @@ import {
 
 const jsonRequestSchema = z.object({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
   }).check(z.minLength(1, MISSING_STRING_APP_ID), z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
   }).check(z.maxLength(36), z.minLength(1, MISSING_STRING_DEVICE_ID), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   }).check(z.minLength(1, MISSING_STRING_VERSION_NAME)),
   version_build: z.string({
-    required_error: MISSING_STRING_VERSION_BUILD,
-    invalid_type_error: NON_STRING_VERSION_BUILD,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
   }).check(z.minLength(1, MISSING_STRING_VERSION_BUILD)),
   is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),
   is_prod: z.boolean(),
   platform: z.literal(['android', 'ios'], {
-    required_error: MISSING_STRING_PLATFORM,
-    invalid_type_error: INVALID_STRING_PLATFORM,
+    error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : INVALID_STRING_PLATFORM,
   }),
   plugin_version: z.string({
-    required_error: MISSING_STRING_PLUGIN_VERSION,
-    invalid_type_error: INVALID_STRING_PLUGIN_VERSION,
+    error: issue => issue.input === undefined ? MISSING_STRING_PLUGIN_VERSION : INVALID_STRING_PLUGIN_VERSION,
   }).check(z.refine((version: string) => canParse(version), {
     message: INVALID_STRING_PLUGIN_VERSION,
   })),

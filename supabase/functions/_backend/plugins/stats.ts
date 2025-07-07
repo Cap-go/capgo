@@ -18,30 +18,25 @@ const failActions = [
   'update_fail',
   'download_fail',
 ]
+z.config(z.locales.en())
 export const jsonRequestSchema = z.object({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
   }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
   }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   platform: z.string({
-    required_error: MISSING_STRING_PLATFORM,
-    invalid_type_error: NON_STRING_PLATFORM,
+    error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : NON_STRING_PLATFORM,
   }),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   }),
   old_version_name: z.optional(z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   })),
   version_os: z.string({
-    required_error: MISSING_STRING_VERSION_OS,
-    invalid_type_error: NON_STRING_VERSION_OS,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_OS : NON_STRING_VERSION_OS,
   }),
   version_code: z.optional(z.string()),
   version_build: z.optional(z.string()),
