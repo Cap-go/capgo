@@ -5,15 +5,15 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { createIfNotExistStoreInfo, updateStoreApp } from '../utils/cloudflare.ts'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
-import { createStatsLogsExternal, createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
+import { opnPremStats } from '../utils/stats.ts'
+import { createStatsVersion, sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 
 const failActions = [
   'set_fail',
@@ -60,22 +60,6 @@ export const jsonRequestSchema = z.object({
   message: INVALID_STRING_DEVICE_ID,
 })
 
-async function opnPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
-  if (app_id) {
-    await createIfNotExistStoreInfo(c, {
-      app_id,
-      onprem: true,
-      capacitor: true,
-      capgo: true,
-    })
-  }
-  if (action === 'get')
-    await updateStoreApp(c, app_id, 1)
-  // save stats of unknow sources in our analytic DB
-  await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
-  cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
-}
-
 async function post(c: Context, body: AppStats) {
   const {
     version_name,
@@ -111,8 +95,7 @@ async function post(c: Context, body: AppStats) {
     .eq('app_id', app_id)
     .single()
   if (!appOwner) {
-    await opnPremStats(c, app_id, action, device)
-    throw quickError(404, 'app_not_found', 'App not found')
+    return opnPremStats(c, app_id, action, device)
   }
   const statsActions: StatsActions[] = []
 

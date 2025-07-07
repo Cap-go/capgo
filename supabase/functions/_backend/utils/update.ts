@@ -12,7 +12,6 @@ import {
   tryParse,
 } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
-import { createIfNotExistStoreInfo } from './cloudflare.ts'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
 import { simpleError, simpleError200 } from './hono.ts'
@@ -20,10 +19,11 @@ import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, requestInfosPostgresV2 } from './pg_d1.ts'
+import { opnPremStats } from './stats.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver, getEnv } from './utils.ts'
 
-function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
+export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
     version: string
     url: string
@@ -61,17 +61,21 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   } = body
   // if version_build is not semver, then make it semver
   const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
+  const device: DeviceWithoutCreatedAt = {
+    app_id,
+    device_id,
+    plugin_version,
+    version: 0,
+    custom_id,
+    is_emulator,
+    is_prod,
+    version_build,
+    os_version: version_os,
+    platform: platform as Database['public']['Enums']['platform_os'],
+    updated_at: new Date().toISOString(),
+  }
   if (!appOwner) {
-    if (app_id) {
-      await backgroundTask(c, createIfNotExistStoreInfo(c, {
-        app_id,
-        onprem: true,
-        capacitor: true,
-        capgo: true,
-      }))
-    }
-    cloudlog({ requestId: c.get('requestId'), message: 'App not found', id: app_id, date: new Date().toISOString() })
-    return simpleError200(c, 'app_not_found', 'App not found')
+    return opnPremStats(c, app_id, 'get', device)
   }
   const coerce = tryParse(fixSemver(body.version_build))
   if (!coerce) {
@@ -96,19 +100,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
     throw simpleError('missing_info', 'Cannot find device_id or app_id', { body })
   }
-  const device: DeviceWithoutCreatedAt = {
-    app_id,
-    device_id,
-    plugin_version,
-    version: 0,
-    custom_id,
-    is_emulator,
-    is_prod,
-    version_build,
-    os_version: version_os,
-    platform: platform as Database['public']['Enums']['platform_os'],
-    updated_at: new Date().toISOString(),
-  }
+
   const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
   if (!planValid) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })

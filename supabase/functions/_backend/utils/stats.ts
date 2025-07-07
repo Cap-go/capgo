@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { Order } from './types.ts'
 import { backgroundTask } from '../utils/utils.ts'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF } from './cloudflare.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 
@@ -17,6 +18,23 @@ export function createStatsMau(c: Context, device_id: string, app_id: string) {
   if (!c.env.DEVICE_USAGE)
     return trackDeviceUsageSB(c, lowerDeviceId, app_id)
   return trackDeviceUsageCF(c, lowerDeviceId, app_id)
+}
+
+export async function opnPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
+  if (app_id) {
+    await createIfNotExistStoreInfo(c, {
+      app_id,
+      onprem: true,
+      capacitor: true,
+      capgo: true,
+    })
+  }
+  if (action === 'get')
+    await updateStoreApp(c, app_id, 1)
+  // save stats of unknow sources in our analytic DB
+  await backgroundTask(c, createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version))
+  cloudlog({ requestId: c.get('requestId'), message: 'App is external', app_id: device.app_id, country: (c.req.raw as any)?.cf?.country })
+  return simpleError200(c, 'app_not_found', 'App not found')
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {
