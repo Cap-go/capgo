@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.11.79 (2025-07-07)
+
+
+### Bug Fixes
+
+* stats return 200 even when fail ([e6d6140](https://github.com/Cap-go/capgo/commit/e6d6140dcfbe4825a173442a24a39e69cd77fda0))
+
 ### 12.11.78 (2025-07-07)
 
 
