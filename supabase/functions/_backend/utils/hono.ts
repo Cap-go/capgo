@@ -265,6 +265,9 @@ export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, 
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
     throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
   }
+  if ((body as any).device_id) {
+    (body as any).device_id = (body as any).device_id.toLowerCase()
+  }
   return body
 }
 
@@ -374,5 +377,11 @@ export function parseBody<T>(c: Context) {
   return c.req.json<T>()
     .catch((e) => {
       throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+    })
+    .then((body) => {
+      if ((body as any).device_id) {
+        (body as any).device_id = (body as any).device_id.toLowerCase()
+      }
+      return body
     })
 }

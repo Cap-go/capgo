@@ -18,7 +18,7 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
     .from('channel_devices')
     .delete()
     .eq('app_id', body.app_id)
-    .eq('device_id', body.device_id.toLowerCase())
+    .eq('device_id', body.device_id)
   if (errorChannel) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }

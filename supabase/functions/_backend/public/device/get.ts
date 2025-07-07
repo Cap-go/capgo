@@ -33,7 +33,12 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   cloudlog({ requestId: c.get('requestId'), message: 'rangeEnd', rangeEnd })
   // if device_id get one device
   if (body.device_id) {
-    const res = await readDevices(c, body.app_id, 0, 1, undefined, [body.device_id.toLowerCase()])
+    const res = await readDevices(c, {
+      app_id: body.app_id,
+      rangeStart: 0,
+      rangeEnd: 1,
+      deviceIds: [body.device_id.toLowerCase()],
+    })
     cloudlog({ requestId: c.get('requestId'), message: 'res', res })
 
     if (!res?.length) {
@@ -54,9 +59,13 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
   }
   else {
     const fetchOffset = body.page ?? 0
-    const from = fetchOffset * fetchLimit
-    const to = (fetchOffset + 1) * fetchLimit - 1
-    const res = await readDevices(c, body.app_id, from, to)
+    const rangeStart = fetchOffset * fetchLimit
+    const rangeEnd = (fetchOffset + 1) * fetchLimit - 1
+    const res = await readDevices(c, {
+      app_id: body.app_id,
+      rangeStart,
+      rangeEnd,
+    })
 
     if (!res) {
       throw quickError(404, 'devices_not_found', 'Cannot get devices')

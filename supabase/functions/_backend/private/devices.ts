@@ -48,5 +48,13 @@ app.post('/', middlewareAuth, async (c) => {
   }
   if (body.count)
     return c.json({ count: await countDevices(c, body.appId) })
-  return c.json(await readDevices(c, body.appId, body.rangeStart as any, body.rangeEnd as any, body.versionId as any, devicesIds, body.search, body.order))
+  return c.json(await readDevices(c, {
+    app_id: body.appId,
+    rangeStart: body.rangeStart,
+    rangeEnd: body.rangeEnd,
+    version_id: body.versionId,
+    deviceIds: devicesIds,
+    search: body.search,
+    order: body.order,
+  }))
 })

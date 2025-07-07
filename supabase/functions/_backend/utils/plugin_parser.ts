@@ -17,6 +17,7 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   if (!body.device_id) {
     throw simpleError('missing_device_id', 'Cannot find device_id', { body })
   }
+  body.device_id = body.device_id.toLowerCase()
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Cannot find app_id', { body })
   }

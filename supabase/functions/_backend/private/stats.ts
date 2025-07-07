@@ -48,5 +48,13 @@ app.post('/', async (c) => {
     throw quickError(401, 'auth_not_found', 'You can\'t access this app auth not found', { app_id: body.appId })
   }
 
-  return c.json(await readStats(c, body.appId, body.rangeStart, body.rangeEnd, body.devicesId, body.search, body.order, body.limit))
+  return c.json(await readStats(c, {
+    app_id: body.appId,
+    start_date: body.rangeStart,
+    end_date: body.rangeEnd,
+    deviceIds: body.devicesId,
+    search: body.search,
+    order: body.order,
+    limit: body.limit,
+  }))
 })

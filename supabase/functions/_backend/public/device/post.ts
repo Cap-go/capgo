@@ -9,7 +9,6 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
   if (!body.device_id || !body.app_id) {
     throw simpleError('missing_device_id_or_app_id', 'Missing device_id or app_id', { body })
   }
-  body.device_id = body.device_id.toLowerCase()
 
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })

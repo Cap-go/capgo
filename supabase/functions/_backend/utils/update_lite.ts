@@ -40,7 +40,6 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
     is_emulator = false,
     is_prod = true,
   } = body
-  device_id = device_id.toLowerCase()
   // if version_build is not semver, then make it semver
   const coerce = tryParse(fixSemver(version_build))
   const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)

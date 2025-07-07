@@ -2,11 +2,11 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
-import type { DeviceWithoutCreatedAt } from '../utils/stats.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { BRES, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -114,7 +114,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
     )
   `)
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
+    .eq('device_id', device_id)
     .single()
   if (!channel || (dataChannelOverride && !(dataChannelOverride?.channel_id as any as Database['public']['Tables']['channels']['Row']).allow_device_self_set)) {
     throw simpleError('cannot_override', 'Cannot change device override current channel don\'t allow it', { channel, dataChannelOverride })
@@ -169,7 +169,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .from('channel_devices')
       .delete()
       .eq('app_id', app_id)
-      .eq('device_id', device_id.toLowerCase())
+      .eq('device_id', device_id)
     if (dbErrorDev) {
       throw simpleError('override_not_allowed', `Cannot remove channel override`, { dbErrorDev })
     }
@@ -190,7 +190,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
       .from('channel_devices')
       .delete()
       .eq('app_id', app_id)
-      .eq('device_id', device_id.toLowerCase())
+      .eq('device_id', device_id)
     if (dbErrorDev) {
       throw simpleError('override_not_allowed', `Cannot remove channel override`, { dbErrorDev })
     }
@@ -198,7 +198,7 @@ async function post(c: Context, body: DeviceLink): Promise<Response> {
   const { error: dbErrorDev } = await supabaseAdmin(c)
     .from('channel_devices')
     .upsert({
-      device_id: device_id.toLowerCase(),
+      device_id,
       channel_id: dataChannel.id,
       app_id,
       owner_org: dataChannel.owner_org,
@@ -278,7 +278,7 @@ async function put(c: Context, body: DeviceLink): Promise<Response> {
       )
     `)
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
+    .eq('device_id', device_id)
     .single()
   if (dataChannelOverride?.channel_id) {
     const channelId = dataChannelOverride.channel_id as any as Database['public']['Tables']['channels']['Row']
@@ -333,7 +333,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     )
   `)
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
+    .eq('device_id', device_id)
     .maybeSingle()
 
   if (channelOverrideError || !dataChannelOverride?.channel_id) {
@@ -348,7 +348,7 @@ async function deleteOverride(c: Context, body: DeviceLink): Promise<Response> {
     .from('channel_devices')
     .delete()
     .eq('app_id', app_id)
-    .eq('device_id', device_id.toLowerCase())
+    .eq('device_id', device_id)
   if (error) {
     throw simpleError('override_not_allowed', `Cannot delete channel override`, { error })
   }
@@ -407,20 +407,14 @@ async function listCompatibleChannels(c: Context, body: DeviceLink): Promise<Res
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  const body = await c.req.json<DeviceLink>()
-    .catch((e) => {
-      throw simpleError('cannot_parse_json', 'Cannot parse json', { method: c.req.method, path: c.req.path }, e)
-    })
+  const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
   return post(c, parsePluginBody<DeviceLink>(c, body, jsonRequestSchema))
 })
 
 app.put('/', async (c) => {
   // Used as get, should be refactor with query param instead
-  const body = await c.req.json<DeviceLink>()
-    .catch((e) => {
-      throw simpleError('cannot_parse_json', 'Cannot parse json', { method: c.req.method, path: c.req.path }, e)
-    })
+  const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
   return put(c, parsePluginBody<DeviceLink>(c, body, jsonRequestSchema))
 })
