@@ -17,6 +17,7 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   if (!body.device_id) {
     throw simpleError('missing_device_id', 'Cannot find device_id', { body })
   }
+  // Ensure the device_id is lowercase for compatibility with old plugins below 7.0.0
   body.device_id = body.device_id.toLowerCase()
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Cannot find app_id', { body })
@@ -26,6 +27,9 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
     throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
   }
   body.version_build = format(coerce)
+  // For plugin below 5.0.0, we need to set the default values of is_emulator and is_prod
+  body.is_emulator ??= false
+  body.is_prod ??= true
   body.version_name = (body.version_name === 'builtin' || !body.version_name) ? body.version_build : body.version_name
   const parseResult = schema.safeParse(body)
   if (!parseResult.success) {
@@ -38,9 +42,10 @@ export function convertQueryToBody(query: Record<string, string>): DeviceLink {
   if (!Object.keys(query).length) {
     return {} as DeviceLink
   }
-  // Ensure the values are set for old plugins
+  // For plugin below 5.0.0, we need to set the default values of is_emulator and is_prod
   query.is_emulator ??= 'false'
   query.is_prod ??= 'true'
+  // Ensure the device_id is lowercase for compatibility with old plugins below 7.0.0
   query.device_id = query.device_id?.toLowerCase()
   const body = {
     version_name: query.version_name,
