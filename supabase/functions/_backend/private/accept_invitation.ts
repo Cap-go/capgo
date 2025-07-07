@@ -4,6 +4,12 @@ import { type MiddlewareKeyVariables, parseBody, quickError, simpleError, useCor
 import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
+interface AcceptInvitation {
+  password: string
+  magic_invite_string: string
+  optForNewsletters: boolean
+}
+
 // Define the schema for the accept invitation request
 const acceptInvitationSchema = z.object({
   password: z.string().min(12, 'Password must be at least 12 characters').regex(/[A-Z]/, 'Password must contain at least one uppercase letter').regex(/\d/, 'Password must contain at least one number').regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?].*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least two special characters'),

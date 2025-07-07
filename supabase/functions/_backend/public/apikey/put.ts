@@ -5,6 +5,13 @@ import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
 
+interface ApiKeyPut {
+  name: string
+  mode: 'read' | 'write' | 'all' | 'upload'
+  limited_to_apps: string[]
+  limited_to_orgs: string[]
+}
+
 app.put('/:id', middlewareKey(['all']), async (c) => {
   const key = c.get('apikey')!
 
@@ -17,7 +24,7 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
     throw simpleError('api_key_id_required', 'API key ID is required', { id })
   }
 
-  const body = await parseBody<{ name: string, mode: string, limited_to_apps: string[], limited_to_orgs: string[] }>(c)
+  const body = await parseBody<ApiKeyPut>(c)
   const { name, mode, limited_to_apps, limited_to_orgs } = body
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,
