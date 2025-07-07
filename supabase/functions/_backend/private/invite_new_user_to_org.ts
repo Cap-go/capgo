@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
@@ -12,12 +12,12 @@ import { getEnv } from '../utils/utils.ts'
 
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
-  email: z.string().email(),
-  org_id: z.string().min(1),
+  email: z.email(),
+  org_id: z.string().check(z.minLength(1)),
   invite_type: z.enum(['read', 'upload', 'write', 'admin', 'super_admin']),
-  captcha_token: z.string().min(1),
-  first_name: z.string().min(1),
-  last_name: z.string().min(1),
+  captcha_token: z.string().check(z.minLength(1)),
+  first_name: z.string().check(z.minLength(1)),
+  last_name: z.string().check(z.minLength(1)),
 })
 
 const captchaSchema = z.object({
@@ -32,7 +32,7 @@ async function validateInvite(c: Context, rawBody: any) {
   // Validate the request body using Zod
   const validationResult = inviteUserSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_request', 'Invalid request', { errors: validationResult.error.format() })
+    throw simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data

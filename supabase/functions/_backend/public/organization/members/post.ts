@@ -1,13 +1,13 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
 const inviteBodySchema = z.object({
   orgId: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   invite_type: z.enum([
     'read',
     'upload',

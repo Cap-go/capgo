@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
@@ -22,11 +22,11 @@ export const jsonRequestSchema = z.object({
   app_id: z.string({
     required_error: MISSING_STRING_APP_ID,
     invalid_type_error: NON_STRING_APP_ID,
-  }),
+  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
     required_error: MISSING_STRING_DEVICE_ID,
     invalid_type_error: NON_STRING_DEVICE_ID,
-  }).max(36),
+  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   platform: z.string({
     required_error: MISSING_STRING_PLATFORM,
     invalid_type_error: NON_STRING_PLATFORM,
@@ -50,12 +50,8 @@ export const jsonRequestSchema = z.object({
   channel: z.optional(z.string()),
   defaultChannel: z.optional(z.string()),
   plugin_version: z.optional(z.string()),
-  is_emulator: z.boolean().default(false),
-  is_prod: z.boolean().default(true),
-}).refine(data => reverseDomainRegex.test(data.app_id), {
-  message: INVALID_STRING_APP_ID,
-}).refine(data => deviceIdRegex.test(data.device_id), {
-  message: INVALID_STRING_DEVICE_ID,
+  is_emulator: z.boolean(),
+  is_prod: z.boolean(),
 })
 
 async function post(c: Context, body: AppStats) {

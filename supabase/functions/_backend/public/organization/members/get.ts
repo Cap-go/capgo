@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
@@ -9,9 +9,9 @@ const bodySchema = z.object({
   orgId: z.string(),
 })
 
-const memberSchema = z.object({
-  uid: z.string().uuid(),
-  email: z.string().email(),
+const memberSchema = z.array(z.object({
+  uid: z.uuid(),
+  email: z.email(),
   image_url: z.string(),
   role: z.enum([
     'invite_read',
@@ -25,7 +25,7 @@ const memberSchema = z.object({
     'admin',
     'super_admin',
   ]),
-}).array()
+}))
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)

@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
@@ -19,9 +19,19 @@ export const messageSchema = z.object({
   message: z.object({
     payload: z.unknown(),
     function_name: z.string(),
-    function_type: z.enum(['netlify', 'cloudflare', 'cloudflare_pp', '']).nullable().optional(),
+    function_type: z.nullable(z.optional(z.enum(['netlify', 'cloudflare', 'cloudflare_pp', '']))),
   }),
 })
+
+interface Message {
+  msg_id: number
+  read_ct: number
+  message: {
+    payload: any
+    function_name: string
+    function_type: 'netlify' | 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
+  }
+}
 
 export const messagesArraySchema = z.array(messageSchema)
 
@@ -175,15 +185,16 @@ async function processQueue(c: Context, sql: ReturnType<typeof getPgClient>, que
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string) {
+async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueName: string): Promise<Message[]> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
+  let messages: Message[] = []
+
   cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Starting queue read at ${startTime}.` })
 
   try {
     const visibilityTimeout = 60
     cloudlog(`[${queueKey}] Reading messages from queue: ${queueName}`)
-    let messages = []
     try {
       messages = await sql`
         SELECT msg_id, message, read_ct
@@ -196,11 +207,11 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
 
     if (!messages || messages.length === 0) {
       cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] No new messages found in queue ${queueName}.` })
-      return
+      return messages
     }
 
     cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Received ${messages.length} messages from queue ${queueName}.` })
-    const parsed = messagesArraySchema.safeParse(messages)
+    const parsed = messagesArraySchema.safeParse<Message[]>(messages)
     if (parsed.success) {
       return parsed.data
     }
@@ -214,6 +225,7 @@ async function readQueue(c: Context, sql: ReturnType<typeof getPgClient>, queueN
   finally {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Finished reading queue messages in ${Date.now() - startTime}ms.` })
   }
+  return messages
 }
 
 // The main HTTP POST helper function

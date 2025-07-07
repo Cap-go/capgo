@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { type MiddlewareKeyVariables, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
@@ -9,11 +9,15 @@ interface AcceptInvitation {
   magic_invite_string: string
   optForNewsletters: boolean
 }
+const MIN_PASSWORD_LENGTH = 'Password must be at least 12 characters'
+const MIN_PASSWORD_UPPERCASE = 'Password must contain at least one uppercase letter'
+const MIN_PASSWORD_NUMBER = 'Password must contain at least one number'
+const MIN_PASSWORD_SPECIAL = 'Password must contain at least two special characters'
 
 // Define the schema for the accept invitation request
 const acceptInvitationSchema = z.object({
-  password: z.string().min(12, 'Password must be at least 12 characters').regex(/[A-Z]/, 'Password must contain at least one uppercase letter').regex(/\d/, 'Password must contain at least one number').regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?].*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least two special characters'),
-  magic_invite_string: z.string().min(1, 'Magic invite string is required'),
+  password: z.string().check(z.minLength(12, MIN_PASSWORD_LENGTH), z.regex(/[A-Z]/, MIN_PASSWORD_UPPERCASE), z.regex(/\d/, MIN_PASSWORD_NUMBER), z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?].*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, MIN_PASSWORD_SPECIAL)),
+  magic_invite_string: z.string().check(z.minLength(1)),
   optForNewsletters: z.boolean(),
 })
 
@@ -28,7 +32,7 @@ app.post('/', async (c) => {
   // Validate the request body using Zod
   const validationResult = acceptInvitationSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid request', { errors: validationResult.error.format() })
+    throw simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data

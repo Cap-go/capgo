@@ -15,6 +15,7 @@
     "hono/factory": "npm:hono@^4.8.4/factory",
     "stripe": "npm:stripe@18.2.1",
     "zod": "https://esm.sh/zod@3.25.75?target=deno",
+    "zod/v4-mini": "https://esm.sh/zod@3.25.75/v4-mini?target=deno",
     "dayjs": "https://esm.sh/dayjs@1.11.13?target=deno",
     "dayjs/plugin/utc": "https://esm.sh/dayjs@1.11.13/plugin/utc?target=deno",
     "ky": "https://esm.sh/ky@1.7.5",

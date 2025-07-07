@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
-  name: z.string().min(3),
+  name: z.string().check(z.minLength(3)),
 })
 
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {

@@ -1,12 +1,12 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { middlewareV2, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { createStatsDevices } from '../utils/stats.ts'
 import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
-  device_id: z.string().uuid(),
+  device_id: z.uuid(),
   app_id: z.string(),
   platform: z.enum(['ios', 'android']),
   version: z.number(),

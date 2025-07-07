@@ -5,7 +5,7 @@ import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { BRES, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
@@ -13,17 +13,17 @@ import { sendStatsAndDevice } from '../utils/stats.ts'
 import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
-const devicePlatformScheme = z.union([z.literal('ios'), z.literal('android')])
+const devicePlatformScheme = z.literal(['ios', 'android'])
 
-export const jsonRequestSchema = z.object({
+export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
     required_error: MISSING_STRING_APP_ID,
     invalid_type_error: NON_STRING_APP_ID,
-  }),
+  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
     required_error: MISSING_STRING_DEVICE_ID,
     invalid_type_error: NON_STRING_DEVICE_ID,
-  }).max(36),
+  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   version_name: z.string({
     required_error: MISSING_STRING_VERSION_NAME,
     invalid_type_error: NON_STRING_VERSION_NAME,
@@ -32,20 +32,11 @@ export const jsonRequestSchema = z.object({
     required_error: MISSING_STRING_VERSION_BUILD,
     invalid_type_error: NON_STRING_VERSION_BUILD,
   }),
-  is_emulator: z.boolean().default(false),
+  is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),
   channel: z.optional(z.string()),
-  is_prod: z.boolean().default(true),
+  is_prod: z.boolean(),
   platform: devicePlatformScheme,
-}).passthrough().refine(data => reverseDomainRegex.test(data.app_id), {
-  message: INVALID_STRING_APP_ID,
-}).refine(data => deviceIdRegex.test(data.device_id), {
-  message: INVALID_STRING_DEVICE_ID,
-}).transform((val) => {
-  if (val.version_name === 'builtin')
-    val.version_name = val.version_build
-
-  return val
 })
 
 async function post(c: Context, body: DeviceLink): Promise<Response> {

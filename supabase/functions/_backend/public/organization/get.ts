@@ -1,23 +1,23 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { simpleError } from '../../utils/hono.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 const bodySchema = z.object({
-  orgId: z.string().optional(),
-  page: z.number().optional(),
+  orgId: z.optional(z.string()),
+  page: z.optional(z.number()),
 })
 const orgSchema = z.object({
-  id: z.string().uuid(),
-  created_by: z.string().uuid(),
+  id: z.uuid(),
+  created_by: z.uuid(),
   created_at: z.coerce.date(),
   updated_at: z.coerce.date(),
-  logo: z.string().nullable(),
+  logo: z.nullable(z.string()),
   name: z.string(),
-  management_email: z.string().email(),
-  customer_id: z.string().nullable(),
+  management_email: z.email(),
+  customer_id: z.nullable(z.string()),
 })
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -61,7 +61,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     if (error) {
       throw simpleError('cannot_get_organizations', 'Cannot get organizations', { error })
     }
-    const dataParsed = orgSchema.array().safeParse(data)
+    const dataParsed = z.array(orgSchema).safeParse(data)
     if (!dataParsed.success) {
       throw simpleError('cannot_parse_organizations', 'Cannot parse organizations', { error: dataParsed.error })
     }

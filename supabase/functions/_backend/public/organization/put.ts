@@ -1,15 +1,14 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { simpleError } from '../../utils/hono.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
-  logo: z.string().optional(),
-  name: z.string().optional(),
-  management_email: z.string().email().optional(),
-
+  logo: z.optional(z.string()),
+  name: z.optional(z.string()),
+  management_email: z.optional(z.email()),
 })
 export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)

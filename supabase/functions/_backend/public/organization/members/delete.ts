@@ -1,13 +1,13 @@
 import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
 
 const deleteBodySchema = z.object({
   orgId: z.string(),
-  email: z.string().email(),
+  email: z.email(),
 })
 
 export async function deleteMember(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']) {
