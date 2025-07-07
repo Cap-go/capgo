@@ -246,7 +246,7 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
         const change = dailyUsage.find(u => u.version_id === version)
         const prevValue = accumulated[prevDate][version]
 
-        if (change && change.install) {
+        if (change?.install) {
           // Version has new installs: add them
           accumulated[date][version] = prevValue + change.install
         }

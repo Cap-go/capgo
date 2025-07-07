@@ -21,8 +21,7 @@ import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1 } from './pg_d1.ts'
 import { requestInfosPostgresLite, requestInfosPostgresLiteV2 } from './pg_lite.ts'
-import { opnPremStats } from './stats.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
 import { resToVersion } from './update.ts'
 
 export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1>, isV2: boolean = false) {

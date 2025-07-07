@@ -19,8 +19,7 @@ import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, requestInfosPostgresV2 } from './pg_d1.ts'
-import { opnPremStats } from './stats.ts'
-import { createStatsBandwidth, createStatsMau, createStatsVersion, sendStatsAndDevice } from './stats.ts'
+import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
 import { backgroundTask, fixSemver, getEnv } from './utils.ts'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {

@@ -13,8 +13,7 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
-import { cloudlog } from './loggin.ts'
-import { cloudlogErr } from './loggin.ts'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { onError } from './on_error.ts'
 import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
@@ -203,7 +202,7 @@ export function middlewareStripeWebhook() {
       throw simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
     }
     const body = await c.req.text()
-    const stripeEvent = await parseStripeEvent(c, body, signature!)
+    const stripeEvent = await parseStripeEvent(c, body, signature)
     const stripeDataEvent = extractDataEvent(c, stripeEvent)
     const stripeData = stripeDataEvent.data
     if (stripeData.customer_id === '') {
