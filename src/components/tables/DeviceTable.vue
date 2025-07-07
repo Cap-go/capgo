@@ -188,6 +188,7 @@ async function getData() {
 async function reload() {
   try {
     elements.value.length = 0
+    total.value = await countDevices()
     await getData()
   }
   catch (error) {

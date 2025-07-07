@@ -311,6 +311,9 @@ declare global {
   export type { DialogV2Button, DialogV2Options } from './stores/dialogv2'
   import('./stores/dialogv2')
   // @ts-ignore
+  export type { BreadcrumbItem } from './stores/display'
+  import('./stores/display')
+  // @ts-ignore
   export type { Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
   import('./stores/organization')
 }

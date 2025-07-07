@@ -23,6 +23,8 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const dialogStore = useDialogV2Store()
+const displayStore = useDisplayStore()
+displayStore.NavTitle = t('usage')
 
 const { currentOrganization } = storeToRefs(organizationStore)
 

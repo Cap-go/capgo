@@ -1,7 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { CreateApp } from './post.ts'
-import { getBody, honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
+import { getBodyOrQuery, honoFactory, middlewareKey } from '../../utils/hono.ts'
 import { deleteApp } from './delete.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
@@ -10,77 +9,47 @@ import { put } from './put.ts'
 export const app = honoFactory.createApp()
 
 app.get('/', middlewareKey(['all', 'read']), async (c) => {
-  try {
-    const pageQuery = c.req.query('page')
-    const limitQuery = c.req.query('limit')
-    const orgId = c.req.query('org_id')
+  const pageQuery = c.req.query('page')
+  const limitQuery = c.req.query('limit')
+  const orgId = c.req.query('org_id')
 
-    const page = pageQuery ? Number.parseInt(pageQuery) : undefined
-    const limit = limitQuery ? Number.parseInt(limitQuery) : undefined
+  const page = pageQuery ? Number.parseInt(pageQuery) : undefined
+  const limit = limitQuery ? Number.parseInt(limitQuery) : undefined
 
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    const keyToUse = subkey || apikey
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const keyToUse = subkey || apikey
 
-    return getAll(c, keyToUse, page, limit, orgId)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get apps', error: e })
-    return c.json({ status: 'Cannot get apps', error: JSON.stringify(e) }, 500)
-  }
+  return getAll(c, keyToUse, page, limit, orgId)
 })
 
 app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
-  try {
-    const id = c.req.param('id')
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    const keyToUse = subkey || apikey
-    return get(c, id, keyToUse)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get app', error: e })
-    return c.json({ status: 'Cannot get app', error: JSON.stringify(e) }, 500)
-  }
+  const id = c.req.param('id')
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const keyToUse = subkey || apikey
+  return get(c, id, keyToUse)
 })
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
-  try {
-    const body = await getBody<CreateApp>(c)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return post(c, body, apikey)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create app', error: e })
-    return c.json({ status: 'Cannot create app', error: JSON.stringify(e) }, 500)
-  }
+  const body = await getBodyOrQuery<CreateApp>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return post(c, body, apikey)
 })
 
 app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
-  try {
-    const id = c.req.param('id')
-    const body = await getBody<{ name?: string, icon?: string, retention?: number }>(c)
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    const keyToUse = subkey || apikey
-    return put(c, id, body, keyToUse)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app', error: e })
-    return c.json({ status: 'Cannot update app', error: JSON.stringify(e) }, 500)
-  }
+  const id = c.req.param('id')
+  const body = await getBodyOrQuery<{ name?: string, icon?: string, retention?: number }>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const keyToUse = subkey || apikey
+  return put(c, id, body, keyToUse)
 })
 
 app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
-  try {
-    const id = c.req.param('id')
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    const keyToUse = subkey || apikey
-    return deleteApp(c, id, keyToUse)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot delete app', error: e })
-    return c.json({ status: 'Cannot delete app', error: JSON.stringify(e) }, 500)
-  }
+  const id = c.req.param('id')
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const keyToUse = subkey || apikey
+  return deleteApp(c, id, keyToUse)
 })

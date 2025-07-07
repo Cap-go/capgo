@@ -114,8 +114,8 @@ describe('[POST] /triggers/cron_plan', () => {
       body: JSON.stringify({}),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('No orgId')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_orgId')
   })
 
   it('should handle too big MAU correctly', async () => {

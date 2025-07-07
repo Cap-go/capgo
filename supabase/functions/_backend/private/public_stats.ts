@@ -9,28 +9,23 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.get('/', async (c) => {
-  try {
-    const date_id = new Date().toISOString().slice(0, 10)
-    const { data, error } = await supabaseAdmin(c)
-      .from('global_stats')
-      .select()
-      .eq('date_id', date_id)
-      .single()
-    if (data && !error) {
-      return c.json({
-        apps: data.apps,
-        updates: (data.updates ?? 0) + (data.updates_external ?? 0),
-        stars: data.stars,
-      })
-    }
-    cloudlog({ requestId: c.get('requestId'), message: 'Supabase error:', error })
+  const date_id = new Date().toISOString().slice(0, 10)
+  const { data, error } = await supabaseAdmin(c)
+    .from('global_stats')
+    .select()
+    .eq('date_id', date_id)
+    .single()
+  if (data && !error) {
     return c.json({
-      apps: 1688,
-      updates: 1862788600,
-      stars: 595,
+      apps: data.apps,
+      updates: (data.updates ?? 0) + (data.updates_external ?? 0),
+      stars: data.stars,
     })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot get public stats', error: JSON.stringify(e) }, 500)
-  }
+  cloudlog({ requestId: c.get('requestId'), message: 'Supabase error:', error })
+  return c.json({
+    apps: 1688,
+    updates: 1862788600,
+    stars: 595,
+  })
 })

@@ -1,7 +1,7 @@
-import type { Context } from 'hono'
 import type {
   RESTPostAPIWebhookWithTokenJSONBody,
 } from 'discord-api-types/v10'
+import type { Context } from 'hono'
 import { cloudlog } from './loggin.ts'
 import { cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
@@ -10,7 +10,7 @@ export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWi
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
 
   if (!webhookUrl) {
-    cloudlog({ requestId: c.get('requestId'), message: payload })
+    cloudlog({ requestId: c.get('requestId'), message: 'Discord not set' })
     return true
   }
 

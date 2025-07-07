@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
+import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifOrg } from './notifications.ts'
@@ -203,63 +204,57 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
 }
 
 export async function checkPlanOrg(c: Context, orgId: string): Promise<void> {
-  try {
-    const { data: org, error: userError } = await supabaseAdmin(c)
-      .from('orgs')
-      .select('customer_id, stripe_info(subscription_id)')
-      .eq('id', orgId)
-      .single()
-    if (userError || !org)
-      throw userError
+  const { data: org, error: userError } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id, stripe_info(subscription_id)')
+    .eq('id', orgId)
+    .single()
+  if (userError || !org)
+    throw quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
 
-    // Sync subscription data with Stripe
-    if (org.customer_id)
-      await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id ?? null)
+  // Sync subscription data with Stripe
+  if (org.customer_id)
+    await syncSubscriptionData(c, org.customer_id, org?.stripe_info?.subscription_id ?? null)
 
-    if (await isTrialOrg(c, orgId)) {
-      const { error } = await supabaseAdmin(c)
-        .from('stripe_info')
-        .update({ is_good_plan: true })
-        .eq('customer_id', org.customer_id!)
-        .then()
-      if (error)
-        cloudlogErr({ requestId: c.get('requestId'), message: 'update stripe info', error })
-      return Promise.resolve()
-    }
-
-    const is_good_plan = await isGoodPlanOrg(c, orgId)
-    const is_onboarded = await isOnboardedOrg(c, orgId)
-    const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
-    const percentUsage = await getPlanUsagePercent(c, orgId)
-    if (!is_good_plan && is_onboarded) {
-      await userAbovePlan(c, org, orgId, is_good_plan)
-    }
-    else if (!is_onboarded && is_onboarding_needed) {
-      const sent = await sendNotifOrg(c, 'user:need_onboarding', { }, orgId, orgId, '0 0 1 * *')
-      if (sent) {
-        await logsnag(c).track({
-          channel: 'usage',
-          event: 'User need onboarding',
-          icon: '🥲',
-          user_id: orgId,
-          notify: false,
-        }).catch()
-      }
-    }
-    else if (is_good_plan && is_onboarded) {
-      await userIsAtPlanUsage(c, orgId, percentUsage)
-    }
-    return supabaseAdmin(c)
+  if (await isTrialOrg(c, orgId)) {
+    const { error } = await supabaseAdmin(c)
       .from('stripe_info')
-      .update({
-        is_good_plan,
-        plan_usage: Math.round(percentUsage.total_percent),
-      })
+      .update({ is_good_plan: true })
       .eq('customer_id', org.customer_id!)
       .then()
-  }
-  catch (e) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Error checkPlan', error: e })
+    if (error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'update stripe info', error })
     return Promise.resolve()
   }
+
+  const is_good_plan = await isGoodPlanOrg(c, orgId)
+  const is_onboarded = await isOnboardedOrg(c, orgId)
+  const is_onboarding_needed = await isOnboardingNeeded(c, orgId)
+  const percentUsage = await getPlanUsagePercent(c, orgId)
+  if (!is_good_plan && is_onboarded) {
+    await userAbovePlan(c, org, orgId, is_good_plan)
+  }
+  else if (!is_onboarded && is_onboarding_needed) {
+    const sent = await sendNotifOrg(c, 'user:need_onboarding', { }, orgId, orgId, '0 0 1 * *')
+    if (sent) {
+      await logsnag(c).track({
+        channel: 'usage',
+        event: 'User need onboarding',
+        icon: '🥲',
+        user_id: orgId,
+        notify: false,
+      }).catch()
+    }
+  }
+  else if (is_good_plan && is_onboarded) {
+    await userIsAtPlanUsage(c, orgId, percentUsage)
+  }
+  return supabaseAdmin(c)
+    .from('stripe_info')
+    .update({
+      is_good_plan,
+      plan_usage: Math.round(percentUsage.total_percent),
+    })
+    .eq('customer_id', org.customer_id!)
+    .then()
 }

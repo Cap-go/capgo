@@ -37,6 +37,17 @@ const preparedApps = new Set<string>()
 // Track active processes for cleanup
 const activeProcesses = new Set<ReturnType<typeof spawn>>()
 
+// Check if CLI is available locally
+function hasLocalCli(): boolean {
+  try {
+    require.resolve('@capgo/cli')
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
 export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
 function generateDefaultJsonCliConfig(appId: string) {
@@ -161,9 +172,25 @@ export async function runCli(params: string[], appId: string, logOutput = false,
     }
   }
 
+  // Determine the command to use
+  let executable: string
+  let cliPath: string
+
+  if (localCliPath) {
+    executable = env.NODE_PATH ?? 'node'
+    cliPath = localCliPath
+  }
+  else if (hasLocalCli()) {
+    executable = 'bunx'
+    cliPath = '@capgo/cli'
+  }
+  else {
+    throw new Error('CLI not available. Install @capgo/cli as devDependency or set LOCAL_CLI_PATH')
+  }
+
   const command = [
-    localCliPath ? (env.NODE_PATH ?? 'node') : 'bunx',
-    localCliPath ? localCliPath : '@capgo/cli@latest',
+    executable,
+    cliPath,
     ...params,
     ...((overwriteApiKey === undefined || overwriteApiKey.length > 0) ? ['--apikey', overwriteApiKey ?? APIKEY_TEST_ALL] : []),
     ...(overwriteSupaHost ? ['--supa-host', env.SUPABASE_URL ?? '', '--supa-anon', env.SUPABASE_ANON_KEY ?? ''] : []),

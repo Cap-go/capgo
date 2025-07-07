@@ -1,26 +1,24 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { cloudlogErr } from '../../utils/loggin.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
-  name: z.string(),
+  name: z.string().min(3),
 })
 
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
-    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
   const userId = apikey.user_id
   const { data, error } = await supabaseAdmin(c).from('users').select('*').eq('id', userId).single()
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get user', error })
-    return c.json({ status: 'Cannot get user', error: error.message }, 500)
+    throw simpleError('cannot_get_user', 'Cannot get user', { error: error.message })
   }
 
   const { data: dataOrg, error: errorOrg } = await supabaseAdmin(c)
@@ -34,8 +32,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     .single()
 
   if (errorOrg) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error when creating org', error: errorOrg })
-    return c.json({ status: 'Cannot create org', error: errorOrg.message }, 500)
+    throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg.message })
   }
   return c.json({ status: 'Organization created', id: dataOrg.id }, 200)
 }

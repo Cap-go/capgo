@@ -12,6 +12,7 @@ import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
+import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { onError } from '../utils/on_error.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
@@ -243,7 +244,7 @@ export class UploadHandler {
       const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
         cloudlog({ requestId: c.get('requestId'), message: 'in DO files head headResponse is null' })
-        return c.text('Not Found', 404)
+        throw quickError(404, 'not_found', 'Not Found')
       }
       offset = headResponse.size
       uploadLength = headResponse.size

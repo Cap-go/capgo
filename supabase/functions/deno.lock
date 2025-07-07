@@ -2,20 +2,18 @@
   "version": "5",
   "specifiers": {
     "jsr:@bradenmacdonald/s3-lite-client@0.9.1": "0.9.1",
-    "jsr:@hono/hono@^4.7.11": "4.7.11",
     "jsr:@std/semver@1.0.4": "1.0.4",
     "npm:@cloudflare/workers-types@4.20250303.0": "4.20250303.0",
     "npm:@hono/sentry@1.2.0": "1.2.0_hono@4.7.11",
     "npm:@types/node@*": "22.15.15",
+    "npm:discord-api-types@0.38.15": "0.38.15",
+    "npm:hono@^4.7.11": "4.7.11",
     "npm:stripe@18.0.0": "18.0.0",
     "npm:stripe@18.2.1": "18.2.1_@types+node@22.15.15"
   },
   "jsr": {
     "@bradenmacdonald/s3-lite-client@0.9.1": {
       "integrity": "158f9da4346bb679fcf4ce0c8895806764880c945b3ef9134cf5d957e3c9c045"
-    },
-    "@hono/hono@4.7.11": {
-      "integrity": "52b9395e4f2448fbaf82a6bd7925d15e59f4055037e74d6c2f657f3618b11193"
     },
     "@std/semver@1.0.4": {
       "integrity": "a62af791917d8fd6c48d6ebbb872f83fad3fc6671ffadbbd39ea229c2d34d175"
@@ -67,6 +65,9 @@
         "call-bind-apply-helpers",
         "get-intrinsic"
       ]
+    },
+    "discord-api-types@0.38.15": {
+      "integrity": "sha512-RX3skyRH7p6BlHOW62ztdnIc87+wv4TEJEURMir5k5BbRJ10wK1MCqFEO6USHTol3gkiHLE6wWoHhNQ2pqB4AA=="
     },
     "dunder-proto@1.0.1": {
       "integrity": "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==",
@@ -537,10 +538,11 @@
   "workspace": {
     "dependencies": [
       "jsr:@bradenmacdonald/s3-lite-client@0.9.1",
-      "jsr:@hono/hono@^4.7.11",
       "jsr:@std/semver@1.0.4",
       "npm:@cloudflare/workers-types@4.20250303.0",
       "npm:@hono/sentry@1.2.0",
+      "npm:discord-api-types@0.38.15",
+      "npm:hono@^4.7.11",
       "npm:stripe@18.2.1"
     ]
   }

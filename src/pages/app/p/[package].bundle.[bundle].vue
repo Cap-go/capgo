@@ -720,19 +720,22 @@ async function deleteBundle() {
               {{ version_meta.fails.toLocaleString() }}
             </InfoRow>
             <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
-              <span class="flex justify-end w-full">
-                <span v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center">
+              <div class="flex flex-wrap justify-end w-full gap-3">
+                <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
                   <span
-                    class="pr-2 font-bold text-blue-600 underline cursor-pointer underline-offset-4 active dark:text-blue-500 text-dust"
+                    class="font-bold text-blue-600 underline cursor-pointer underline-offset-4 hover:text-blue-700 dark:text-blue-500 dark:hover:text-blue-400"
                     @click="openChannel(chn)"
                   >
                     {{ chn!.name }}
                   </span>
-                  <button class="btn btn-outline btn-sm ml-3" @click="openChannelSettings(chn)">
-                    <Settings class="w-5 h-5 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                  <button
+                    class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                    @click="openChannelSettings(chn)"
+                  >
+                    <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
                   </button>
-                </span>
-              </span>
+                </div>
+              </div>
             </InfoRow>
             <InfoRow
               v-else id="open-channel" :label="t('channel')" :is-link="true"

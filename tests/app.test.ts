@@ -38,7 +38,7 @@ describe('[DELETE] /app operations', () => {
       method: 'GET',
       headers,
     })
-    expect(checkApp.status).toBe(400)
+    expect(checkApp.status).toBe(401)
 
     // Verify version is deleted
     const checkVersion = await fetch(`${BASE_URL}/bundle/${APPNAME}/1.0.0`, {
@@ -135,8 +135,8 @@ describe('[GET] /app operations with subkey', () => {
       headers: { ...headers, ...subkeyHeaders },
     })
     const data = await getOtherAppWithSubkey.json()
-    expect(data).toHaveProperty('status', 'You can\'t access this app')
-    expect(getOtherAppWithSubkey.status).toBe(400)
+    expect(data).toHaveProperty('error', 'cannot_access_app')
+    expect(getOtherAppWithSubkey.status).toBe(401)
 
     // Clean up the other app
     await resetAppData(OTHER_APPNAME)
@@ -231,7 +231,7 @@ describe('[POST] /app operations with non-owner user', () => {
     })
     expect(createApp.status).toBe(403)
     const responseData = await createApp.json()
-    expect(responseData).toHaveProperty('status', 'You can\'t access this organization')
+    expect(responseData).toHaveProperty('error', 'cannot_access_organization')
   })
 
   it('should allow app creation in an organization where user is not owner but has write access', async () => {

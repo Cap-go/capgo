@@ -61,7 +61,7 @@ describe.concurrent('[GET] /device operations', () => {
       headers,
     })
     await response.arrayBuffer()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
   })
 })
 

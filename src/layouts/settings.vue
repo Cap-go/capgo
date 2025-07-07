@@ -10,11 +10,9 @@ import IconPassword from '~icons/mdi/password'
 import IconAcount from '~icons/mdi/user'
 import IconBilling from '~icons/mingcute/bill-fill'
 import { openPortal } from '~/services/stripe'
-import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
-const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 function getCurrentTab() {
@@ -124,8 +122,6 @@ async function gotoOrgSettings() {
 function gotoMainSettings() {
   type.value = 'user'
 }
-
-displayStore.NavTitle = t('settings')
 </script>
 
 <template>
