@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.11.91 (2025-07-10)
+
+
+### Bug Fixes
+
+* add missing resolve ([faf8bae](https://github.com/Cap-go/capgo/commit/faf8baed3cea310448d613c3b1a797acdb45256f))
+
 ### 12.11.90 (2025-07-10)
 
 ### 12.11.89 (2025-07-10)
