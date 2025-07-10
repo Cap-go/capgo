@@ -13,15 +13,15 @@ import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 
-import Table from '~/components/Table.vue'
-import DeleteOrgDialog from './DeleteOrgDialog.vue'
 import IconSearch from '~icons/ic/round-search?raw'
+import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
-
 import { useMainStore } from '~/stores/main'
+
 import { useOrganizationStore } from '~/stores/organization'
 import { hasExactlyOneMatch } from '~/utils/arrayUtils.ts'
+import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -37,7 +37,6 @@ const dialogStore = useDialogV2Store()
 const emailInput = ref('')
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('members')
-
 
 // Permission modal state
 const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | undefined>()
@@ -429,14 +428,14 @@ async function cannotDeleteOwner() {
                   _changeMemberPermission(selectedUser, 'super_admin')
                   selectedUserToDelegateAdmin.value = null
                   // get current member
-                  const currentMember = members.value.filter(m => m.uid === main.user?.id )[0]
+                  const currentMember = members.value.filter(m => m.uid === main.user?.id)[0]
                   // delete current member from org
                   _deleteMember(currentMember)
                   // redirect to /app
                   router.push('/app')
 
                   return true
-                }
+                },
               },
             ],
           })
@@ -469,7 +468,8 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
         await organizationStore.fetchOrganizations()
         try {
           organizationStore.setCurrentOrganizationToMain()
-        } catch {
+        }
+        catch {
           organizationStore.setCurrentOrganizationToFirst()
         }
       }
@@ -916,7 +916,7 @@ async function handleInviteNewUserSubmit() {
             @input="delegateSuperAdmin"
           />
           <div v-show="membersOptions?.length === 0">
-            {{ t('no-results')  }}
+            {{ t('no-results') }}
           </div>
         </div>
       </div>

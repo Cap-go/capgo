@@ -7,11 +7,11 @@ import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
-import DeleteOrgDialog from './DeleteOrgDialog.vue'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
+import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -19,7 +19,7 @@ const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const isLoading = ref(true)
-const dialogRef = ref();
+const dialogRef = ref()
 
 displayStore.NavTitle = t('organization')
 onMounted(async () => {
@@ -182,7 +182,7 @@ function canDeleteOrg() {
 }
 
 async function deleteOrganization() {
-  dialogRef.value?.open();
+  dialogRef.value?.open()
 }
 
 async function copyOrganizationId() {

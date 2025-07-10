@@ -49,7 +49,7 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
   }
 
   const onDialogDismiss = (): Promise<boolean> => {
-    return new Promise((resolve) => {
+    return new Promise(() => {
       const unwatch = watch(showDialog, (val) => {
         if (!val) {
           closeDialog()

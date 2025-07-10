@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import type { Organization } from '~/stores/organization'
 import { useI18n } from 'petite-vue-i18n'
-import { ref, defineProps, defineExpose } from 'vue'
+import { defineExpose, defineProps, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { Organization, useOrganizationStore } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
+const props = defineProps<Props>()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
@@ -14,9 +16,6 @@ const deleteInput = ref('')
 interface Props {
   org?: Organization
 }
-
-const props = defineProps<Props>()
-
 
 async function open() {
   dialogStore.openDialog({
@@ -37,7 +36,8 @@ async function open() {
           if (props.org) {
             if (deleteInput.value !== (props.org.name ?? '')) {
               toast.error(t('wrong-name-org-del').replace('%1', props.org.name ?? ''))
-            } else {
+            }
+            else {
               const { error } = await organizationStore.deleteOrganization(props.org.gid)
 
               if (error) {
@@ -51,7 +51,6 @@ async function open() {
               }
             }
           }
-
         },
       },
     ],
@@ -59,9 +58,8 @@ async function open() {
 }
 
 defineExpose({
-  open
-});
-
+  open,
+})
 </script>
 
 <template>
