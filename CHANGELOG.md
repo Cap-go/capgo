@@ -2,6 +2,69 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.11.89 (2025-07-10)
+
+### 12.11.88 (2025-07-07)
+
+### 12.11.87 (2025-07-07)
+
+### 12.11.86 (2025-07-07)
+
+### 12.11.85 (2025-07-07)
+
+### 12.11.84 (2025-07-07)
+
+
+### Bug Fixes
+
+* build issues ([4a6ae8d](https://github.com/Cap-go/capgo/commit/4a6ae8db6eaf40d5410ee98c2574ab289071d888))
+
+### 12.11.83 (2025-07-07)
+
+### 12.11.82 (2025-07-07)
+
+### 12.11.81 (2025-07-07)
+
+### 12.11.80 (2025-07-07)
+
+
+### Bug Fixes
+
+* remove useless functions ([b871fca](https://github.com/Cap-go/capgo/commit/b871fca7b2be2ba63bd73575ab64314307b10693))
+
+### 12.11.79 (2025-07-07)
+
+
+### Bug Fixes
+
+* stats return 200 even when fail ([e6d6140](https://github.com/Cap-go/capgo/commit/e6d6140dcfbe4825a173442a24a39e69cd77fda0))
+
+### 12.11.78 (2025-07-07)
+
+
+### Bug Fixes
+
+* typechecks ([1f708a6](https://github.com/Cap-go/capgo/commit/1f708a6d49ea6782f85faa6a811fb2d0cdcaeb96))
+
+### 12.11.77 (2025-07-07)
+
+### 12.11.76 (2025-07-02)
+
+
+### Bug Fixes
+
+* c as any issue ([c0af60f](https://github.com/Cap-go/capgo/commit/c0af60feaf299599eb4fa3afadddec4a28fbf771))
+
+### 12.11.75 (2025-07-01)
+
+### 12.11.74 (2025-07-01)
+
+### 12.11.73 (2025-07-01)
+
+### 12.11.72 (2025-07-01)
+
+### 12.11.71 (2025-07-01)
+
 ### 12.11.70 (2025-07-01)
 
 ### 12.11.69 (2025-07-01)

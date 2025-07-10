@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import { and, eq, or, sql } from 'drizzle-orm'
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { alias as aliasV2 } from 'drizzle-orm/sqlite-core'
@@ -138,6 +138,7 @@ export function requestInfosPostgresV2(
     return parseManifestEntries(c, data, 'channelDevice')
   })
 
+  const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
   const channelQuery = drizzleCient
     .select({
       version: {
@@ -176,7 +177,7 @@ export function requestInfosPostgresV2(
       ? and(
           eq(channelAlias.public, true),
           eq(channelAlias.app_id, app_id),
-          eq(platform === 'android' ? channelAlias.android : channelAlias.ios, true),
+          eq(platformQuery, true),
         )
       : and (
           eq(channelAlias.app_id, app_id),

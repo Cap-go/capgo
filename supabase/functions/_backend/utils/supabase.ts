@@ -1,9 +1,8 @@
-import type { Context } from '@hono/hono'
-
-import type { MiddlewareKeyVariables } from './hono.ts'
+import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import type { Order } from './types.ts'
+import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { type AuthInfo, type MiddlewareKeyVariables, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
@@ -33,16 +32,28 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   old_record: Database['public']['Tables'][T]['Row']
 }
 
-export function supabaseClient(c: Context, auth: string) {
+export function supabaseClient(c: Context, jwt: string) {
   const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
-    global: { headers: { Authorization: auth } },
+    global: { headers: { Authorization: jwt } },
   }
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
+}
+
+export function supabaseWithAuth(c: Context, auth: AuthInfo) {
+  if (auth.authType === 'jwt' && auth.jwt) {
+    return supabaseClient(c, auth.jwt)
+  }
+  else if (auth.authType === 'apikey' && auth.apikey) {
+    return supabaseApikey(c, auth.apikey.key)
+  }
+  else {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
 }
 
 export function emptySupabase(c: Context) {
@@ -145,8 +156,6 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
     cloudlog({ requestId: c.get('requestId'), message: 'missing device_id, channel_id, or app_id' })
     return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
   }
-  update.device_id = update.device_id.toLowerCase()
-
   const { data: existingChannelDevice } = await supabaseAdmin(c)
     .from('channel_devices')
     .select('*')
@@ -685,23 +694,23 @@ export function trackMetaSB(
     })
 }
 
-export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesSB', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
+export function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt) {
+  cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesSB', device })
   return supabaseAdmin(c)
     .from('devices')
     .upsert(
       {
-        app_id,
+        app_id: device.app_id,
         updated_at: new Date().toISOString(),
-        device_id: device_id.toLowerCase(),
-        platform,
-        plugin_version,
-        os_version,
-        version_build,
-        custom_id,
-        version,
-        is_prod,
-        is_emulator,
+        device_id: device.device_id,
+        platform: device.platform,
+        plugin_version: device.plugin_version,
+        os_version: device.os_version,
+        version_build: device.version_build,
+        custom_id: device.custom_id,
+        version: device.version,
+        is_prod: device.is_prod,
+        is_emulator: device.is_emulator,
       },
       { onConflict: 'device_id,app_id' },
     )
@@ -714,7 +723,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
       {
         app_id,
         created_at: new Date().toISOString(),
-        device_id: device_id.toLowerCase(),
+        device_id,
         action,
         version: version_id,
       },
@@ -745,39 +754,39 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
   return data ?? []
 }
 
-export async function readStatsSB(c: Context, app_id: string, period_start?: string, period_end?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
+export async function readStatsSB(c: Context, params: ReadStatsParams) {
   const supabase = supabaseAdmin(c)
 
   let query = supabase
     .from('stats')
     .select('*')
-    .eq('app_id', app_id)
-    .limit(limit)
+    .eq('app_id', params.app_id)
+    .limit(params.limit ?? DEFAULT_LIMIT)
 
-  if (period_start)
-    query = query.gte('created_at', new Date(period_start).toISOString())
+  if (params.start_date)
+    query = query.gte('created_at', new Date(params.start_date).toISOString())
 
-  if (period_end)
-    query = query.lt('created_at', new Date(period_end).toISOString())
+  if (params.end_date)
+    query = query.lt('created_at', new Date(params.end_date).toISOString())
 
-  if (deviceIds?.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
-    if (deviceIds.length === 1)
-      query = query.eq('device_id', deviceIds[0])
+  if (params.deviceIds?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
+    if (params.deviceIds.length === 1)
+      query = query.eq('device_id', params.deviceIds[0])
     else
-      query = query.in('device_id', deviceIds)
+      query = query.in('device_id', params.deviceIds)
   }
 
-  if (search) {
-    cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds?.length)
-      query = query.ilike('version_build', `${search}%`)
+  if (params.search) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    if (params.deviceIds?.length)
+      query = query.ilike('version_build', `${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%`)
   }
 
-  if (order?.length) {
-    order.forEach((col) => {
+  if (params.order?.length) {
+    params.order.forEach((col: Order) => {
       if (col.sortable && typeof col.sortable === 'string') {
         cloudlog({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
@@ -795,42 +804,42 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
   return data ?? []
 }
 
-export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
+export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
   const supabase = supabaseAdmin(c)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', params })
   let query = supabase
     .from('devices')
     .select('*')
-    .eq('app_id', app_id)
-    .range(range_start, range_end)
-    .limit(limit)
+    .eq('app_id', params.app_id)
+    .range(params.rangeStart ?? 0, params.rangeEnd ?? DEFAULT_LIMIT)
+    .limit(params.limit ?? DEFAULT_LIMIT)
 
-  if (deviceIds?.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
-    if (deviceIds.length === 1)
-      query = query.eq('device_id', deviceIds[0])
+  if (params.deviceIds?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
+    if (params.deviceIds.length === 1)
+      query = query.eq('device_id', params.deviceIds[0])
     else
-      query = query.in('device_id', deviceIds)
+      query = query.in('device_id', params.deviceIds)
   }
 
-  if (search) {
-    cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds?.length)
-      query = query.ilike('custom_id', `${search}%`)
+  if (params.search) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    if (params.deviceIds?.length)
+      query = query.ilike('custom_id', `${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%`)
   }
-  if (order?.length) {
-    order.forEach((col) => {
+  if (params.order?.length) {
+    params.order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         cloudlog({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
   }
-  if (version_id)
-    query = query.eq('version_id', version_id)
+  if (params.version_id)
+    query = query.eq('version_id', params.version_id)
 
   const { data, error } = await query
 

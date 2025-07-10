@@ -1,59 +1,41 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../supabase/functions/_backend/utils/utils.ts'
 
 const NO_ERROR = { error: '' }
 
 const updateRequestSchema = z.object({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
-  }),
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
+  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
-  }).max(36),
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
+  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   }),
   version_build: z.string({
-    required_error: MISSING_STRING_VERSION_BUILD,
-    invalid_type_error: NON_STRING_VERSION_BUILD,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
   }),
-  is_emulator: z.boolean().default(false),
-  is_prod: z.boolean().default(true),
-}).refine(data => reverseDomainRegex.test(data.app_id), {
-  message: INVALID_STRING_APP_ID,
-}).refine(data => deviceIdRegex.test(data.device_id), {
-  message: INVALID_STRING_DEVICE_ID,
-}).transform((val) => {
-  if (val.version_name === 'builtin')
-    val.version_name = val.version_build
-
-  return val
+  is_emulator: z.boolean(),
+  is_prod: z.boolean(),
 })
 
 const statsRequestSchema = z.object({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
-  }),
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
+  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
-  }).max(36),
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
+  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   platform: z.string({
-    required_error: MISSING_STRING_PLATFORM,
-    invalid_type_error: NON_STRING_PLATFORM,
+    error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : NON_STRING_PLATFORM,
   }),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
   }),
   version_os: z.string({
-    required_error: MISSING_STRING_VERSION_OS,
-    invalid_type_error: NON_STRING_VERSION_OS,
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_OS : NON_STRING_VERSION_OS,
   }),
   version_code: z.optional(z.string()),
   version_build: z.optional(z.string()),
@@ -61,12 +43,8 @@ const statsRequestSchema = z.object({
   custom_id: z.optional(z.string()),
   channel: z.optional(z.string()),
   plugin_version: z.optional(z.string()),
-  is_emulator: z.boolean().default(false),
-  is_prod: z.boolean().default(true),
-}).refine(data => reverseDomainRegex.test(data.app_id), {
-  message: INVALID_STRING_APP_ID,
-}).refine(data => deviceIdRegex.test(data.device_id), {
-  message: INVALID_STRING_DEVICE_ID,
+  is_emulator: z.boolean(),
+  is_prod: z.boolean(),
 })
 
 interface RequestJSON {
@@ -365,7 +343,7 @@ function getJSON(): RequestJSON {
   return { ...requestJSON }
 }
 
-function parseJSON(body: RequestJSON, jsonRequestSchema: z.ZodSchema) {
+function parseJSON(body: RequestJSON, jsonRequestSchema: z.ZodMiniObject) {
   const parseResult = jsonRequestSchema.safeParse(body)
   if (!parseResult.success)
     return { error: `Cannot parse json: ${parseResult.error}`, nestedError: parseResult.error }

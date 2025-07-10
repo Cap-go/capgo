@@ -79,8 +79,8 @@ describe('[POST] /bundle/metadata operations', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, error: string }
-    expect(data.status).toBe('Missing required fields')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('missing_required_fields')
   })
 
   it('should handle invalid version_id', async () => {
@@ -95,8 +95,8 @@ describe('[POST] /bundle/metadata operations', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find version')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_version')
   })
 
   it('should handle invalid app_id', async () => {
@@ -111,8 +111,8 @@ describe('[POST] /bundle/metadata operations', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find version')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_version')
   })
 })
 
@@ -259,8 +259,8 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string, error: string }
-    expect(data.status).toBe('Missing required fields')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('missing_required_fields')
   })
 
   it('should handle invalid version_id', async () => {
@@ -275,8 +275,8 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find version')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_version')
   })
 
   it('should handle invalid channel_id', async () => {
@@ -291,8 +291,8 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('Cannot find channel')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_find_channel')
   })
 
   it('should handle invalid app_id', async () => {
@@ -307,7 +307,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     })
 
     expect(response.status).toBe(400)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('You can\'t access this app')
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('cannot_access_app')
   })
 })

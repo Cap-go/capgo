@@ -2,20 +2,20 @@
   "version": "5",
   "specifiers": {
     "jsr:@bradenmacdonald/s3-lite-client@0.9.1": "0.9.1",
-    "jsr:@hono/hono@^4.7.11": "4.7.11",
     "jsr:@std/semver@1.0.4": "1.0.4",
     "npm:@cloudflare/workers-types@4.20250303.0": "4.20250303.0",
-    "npm:@hono/sentry@1.2.0": "1.2.0_hono@4.7.11",
+    "npm:@hono/sentry@1.2.0": "1.2.0_hono@4.8.4",
     "npm:@types/node@*": "22.15.15",
+    "npm:discord-api-types@0.38.15": "0.38.15",
+    "npm:hono@^4.7.11": "4.8.4",
+    "npm:hono@^4.8.4": "4.8.4",
     "npm:stripe@18.0.0": "18.0.0",
-    "npm:stripe@18.2.1": "18.2.1_@types+node@22.15.15"
+    "npm:stripe@18.2.1": "18.2.1_@types+node@22.15.15",
+    "npm:zod@3.25.75": "3.25.75"
   },
   "jsr": {
     "@bradenmacdonald/s3-lite-client@0.9.1": {
       "integrity": "158f9da4346bb679fcf4ce0c8895806764880c945b3ef9134cf5d957e3c9c045"
-    },
-    "@hono/hono@4.7.11": {
-      "integrity": "52b9395e4f2448fbaf82a6bd7925d15e59f4055037e74d6c2f657f3618b11193"
     },
     "@std/semver@1.0.4": {
       "integrity": "a62af791917d8fd6c48d6ebbb872f83fad3fc6671ffadbbd39ea229c2d34d175"
@@ -25,7 +25,7 @@
     "@cloudflare/workers-types@4.20250303.0": {
       "integrity": "sha512-O7F7nRT4bbmwHf3gkRBLfJ7R6vHIJ/oZzWdby6obOiw2yavUfp/AIwS7aO2POu5Cv8+h3TXS3oHs3kKCZLraUA=="
     },
-    "@hono/sentry@1.2.0_hono@4.7.11": {
+    "@hono/sentry@1.2.0_hono@4.8.4": {
       "integrity": "sha512-9mS8GrkGtR4YxM1CViL4Ft8LFQ9YhCoXeqKnUA1AUmrvA5PhUU/V+xoo8Autw0nVriin3liX5/lPrwWz3muwiw==",
       "dependencies": [
         "hono",
@@ -67,6 +67,9 @@
         "call-bind-apply-helpers",
         "get-intrinsic"
       ]
+    },
+    "discord-api-types@0.38.15": {
+      "integrity": "sha512-RX3skyRH7p6BlHOW62ztdnIc87+wv4TEJEURMir5k5BbRJ10wK1MCqFEO6USHTol3gkiHLE6wWoHhNQ2pqB4AA=="
     },
     "dunder-proto@1.0.1": {
       "integrity": "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==",
@@ -125,8 +128,8 @@
         "function-bind"
       ]
     },
-    "hono@4.7.11": {
-      "integrity": "sha512-rv0JMwC0KALbbmwJDEnxvQCeJh+xbS3KEWW5PC9cMJ08Ur9xgatI0HmtgYZfOdOSOeYsp5LO2cOhdI8cLEbDEQ=="
+    "hono@4.8.4": {
+      "integrity": "sha512-KOIBp1+iUs0HrKztM4EHiB2UtzZDTBihDtOF5K6+WaJjCPeaW4Q92R8j63jOhvJI5+tZSMuKD9REVEXXY9illg=="
     },
     "math-intrinsics@1.1.0": {
       "integrity": "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="
@@ -203,6 +206,9 @@
     },
     "undici-types@6.21.0": {
       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="
+    },
+    "zod@3.25.75": {
+      "integrity": "sha512-OhpzAmVzabPOL6C3A3gpAifqr9MqihV/Msx3gor2b2kviCgcb+HM9SEOpMWwwNp9MRunWnhtAKUoo0AHhjyPPg=="
     }
   },
   "redirects": {
@@ -532,16 +538,23 @@
     "https://esm.sh/ws@8.18.0/deno/ws.mjs": "e4d1c51cfb776a271718dddf0c080524a4096a2de59c12900399dd4827f0c927",
     "https://esm.sh/ws@8.18.0?target=deno": "d884771dc453f8846d2fa2045f6c5c0272a1504f9b959248e85d2da2f9853e19",
     "https://esm.sh/zod@3.24.3/deno/zod.mjs": "46c4acb1f87caf349962b648f519cbf3999a8746fb40df0331ad2d3b62a197c0",
-    "https://esm.sh/zod@3.24.3?target=deno": "9fca222e4d84f20fa2eadb5b08378cee9ba79f135c6fbdbead2158aafc98fde7"
+    "https://esm.sh/zod@3.24.3?target=deno": "9fca222e4d84f20fa2eadb5b08378cee9ba79f135c6fbdbead2158aafc98fde7",
+    "https://esm.sh/zod@3.25.75/deno/v4-mini.mjs": "80b80c85005008202c2d6666d36e24f0b2197a12f3d5a1a6166f451e417a7453",
+    "https://esm.sh/zod@3.25.75/deno/v4/core.mjs": "dc194f03d75e74a195ec1e1a8bbbda457c39f7c8a4ae7c657cee45411abeb32d",
+    "https://esm.sh/zod@3.25.75/deno/v4/locales.mjs": "fad4870f1ecab0562d1b2b4b290ccb552d24bfe8069fdb26d8adb803755aada8",
+    "https://esm.sh/zod@3.25.75/deno/v4/mini.mjs": "95ac5e50fd9af837362db90334bd8c893822ff08eeec2d6b05307e4f0b808a1f",
+    "https://esm.sh/zod@3.25.75/v4-mini?target=deno": "26cdbfe517926db0d4dcd0b8e3840f282e80f81d4ef841d316f72b86efde9977"
   },
   "workspace": {
     "dependencies": [
       "jsr:@bradenmacdonald/s3-lite-client@0.9.1",
-      "jsr:@hono/hono@^4.7.11",
       "jsr:@std/semver@1.0.4",
       "npm:@cloudflare/workers-types@4.20250303.0",
       "npm:@hono/sentry@1.2.0",
-      "npm:stripe@18.2.1"
+      "npm:discord-api-types@0.38.15",
+      "npm:hono@^4.8.4",
+      "npm:stripe@18.2.1",
+      "npm:zod@3.25.75"
     ]
   }
 }

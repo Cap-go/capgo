@@ -1,11 +1,11 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAPISecret, useCors } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
+import { middlewareAPISecret, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/loggin.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
-interface dataToGet {
+interface DataToGet {
   appId?: string
   orgId?: string
   todayOnly?: boolean
@@ -16,70 +16,75 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareAPISecret, async (c) => {
-  try {
-    const body = await c.req.json<dataToGet>()
-    cloudlog({ requestId: c.get('requestId'), message: 'postcron stats body', body })
-    if (!body.appId || !body.orgId)
-      return c.json({ status: 'No appId' }, 400)
+  const body = await parseBody<DataToGet>(c)
+  cloudlog({ requestId: c.get('requestId'), message: 'post cron_stats body', body })
+  if (!body.appId)
+    throw simpleError('no_appId', 'No appId', { body })
+  if (!body.orgId)
+    throw simpleError('no_orgId', 'No orgId', { body })
 
-    const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
 
-    // get the period of the billing of the organization
-    const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
-    const cycleInfo = cycleInfoData.data
-    if (!cycleInfo?.subscription_anchor_start || !cycleInfo?.subscription_anchor_end)
-      return c.json({ status: 'Cannot get cycle info' }, 400)
+  const app = await supabase.from('apps')
+    .select('*')
+    .eq('id', body.appId)
+    .single()
+  if (!app.data)
+    throw quickError(404, 'app_not_found', 'App not found', { body })
+  if (app.data.owner_org !== body.orgId)
+    throw quickError(401, 'app_not_found', 'This app is not owned by the organization', { body })
 
-    cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })
-    const startDate = cycleInfo.subscription_anchor_start
-    const endDate = cycleInfo.subscription_anchor_end
+  // get the period of the billing of the organization
+  const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
+  const cycleInfo = cycleInfoData.data
+  if (!cycleInfo?.subscription_anchor_start || !cycleInfo?.subscription_anchor_end)
+    throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoData })
 
-    // get mau
-    let mau = await readStatsMau(c as any, body.appId, startDate, endDate)
-    // get bandwidth
-    let bandwidth = await readStatsBandwidth(c as any, body.appId, startDate, endDate)
-    // get storage
-    let storage = await readStatsStorage(c as any, body.appId, startDate, endDate)
-    let versionUsage = await readStatsVersion(c as any, body.appId, startDate, endDate)
+  cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })
+  const startDate = cycleInfo.subscription_anchor_start
+  const endDate = cycleInfo.subscription_anchor_end
 
-    if (body.todayOnly) {
-      // take only the last day
-      mau = mau.slice(-1)
-      bandwidth = bandwidth.slice(-1)
-      storage = storage.slice(-1)
-      versionUsage = versionUsage.slice(-1)
-    }
+  // get mau
+  let mau = await readStatsMau(c, body.appId, startDate, endDate)
+  // get bandwidth
+  let bandwidth = await readStatsBandwidth(c, body.appId, startDate, endDate)
+  // get storage
+  let storage = await readStatsStorage(c, body.appId, startDate, endDate)
+  let versionUsage = await readStatsVersion(c, body.appId, startDate, endDate)
 
-    cloudlog({ requestId: c.get('requestId'), message: 'mau', mauLength: mau.length, mauCount: mau.reduce((acc, curr) => acc + curr.mau, 0), mau: JSON.stringify(mau) })
-    cloudlog({ requestId: c.get('requestId'), message: 'bandwidth', bandwidthLength: bandwidth.length, bandwidthCount: bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), bandwidth: JSON.stringify(bandwidth) })
-    cloudlog({ requestId: c.get('requestId'), message: 'storage', storageLength: storage.length, storageCount: storage.reduce((acc, curr) => acc + curr.storage, 0), storage: JSON.stringify(storage) })
-    cloudlog({ requestId: c.get('requestId'), message: 'versionUsage', versionUsageLength: versionUsage.length, versionUsageCount: versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0), versionUsage: JSON.stringify(versionUsage) })
-
-    // save to daily_mau, daily_bandwidth and daily_storage
-    await Promise.all([
-      supabase.from('daily_mau')
-        .upsert(mau, { onConflict: 'app_id,date' })
-        .eq('app_id', body.appId)
-        .throwOnError(),
-      supabase.from('daily_bandwidth')
-        .upsert(bandwidth, { onConflict: 'app_id,date' })
-        .eq('app_id', body.appId)
-        .throwOnError(),
-      supabase.from('daily_storage')
-        .upsert(storage, { onConflict: 'app_id,date' })
-        .eq('app_id', body.appId)
-        .throwOnError(),
-      supabase.from('daily_version')
-        .upsert(versionUsage, { onConflict: 'app_id,date,version_id' })
-        .eq('app_id', body.appId)
-        .throwOnError(),
-    ])
-
-    cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-    return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
+  if (body.todayOnly) {
+    // take only the last day
+    mau = mau.slice(-1)
+    bandwidth = bandwidth.slice(-1)
+    storage = storage.slice(-1)
+    versionUsage = versionUsage.slice(-1)
   }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting stats', e })
-    return c.json({ status: 'Cannot get stats', error: JSON.stringify(e) }, 500)
-  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'mau', mauLength: mau.length, mauCount: mau.reduce((acc, curr) => acc + curr.mau, 0), mau: JSON.stringify(mau) })
+  cloudlog({ requestId: c.get('requestId'), message: 'bandwidth', bandwidthLength: bandwidth.length, bandwidthCount: bandwidth.reduce((acc, curr) => acc + curr.bandwidth, 0), bandwidth: JSON.stringify(bandwidth) })
+  cloudlog({ requestId: c.get('requestId'), message: 'storage', storageLength: storage.length, storageCount: storage.reduce((acc, curr) => acc + curr.storage, 0), storage: JSON.stringify(storage) })
+  cloudlog({ requestId: c.get('requestId'), message: 'versionUsage', versionUsageLength: versionUsage.length, versionUsageCount: versionUsage.reduce((acc, curr) => acc + curr.get + curr.fail + curr.install + curr.uninstall, 0), versionUsage: JSON.stringify(versionUsage) })
+
+  // save to daily_mau, daily_bandwidth and daily_storage
+  await Promise.all([
+    supabase.from('daily_mau')
+      .upsert(mau, { onConflict: 'app_id,date' })
+      .eq('app_id', body.appId)
+      .throwOnError(),
+    supabase.from('daily_bandwidth')
+      .upsert(bandwidth, { onConflict: 'app_id,date' })
+      .eq('app_id', body.appId)
+      .throwOnError(),
+    supabase.from('daily_storage')
+      .upsert(storage, { onConflict: 'app_id,date' })
+      .eq('app_id', body.appId)
+      .throwOnError(),
+    supabase.from('daily_version')
+      .upsert(versionUsage, { onConflict: 'app_id,date,version_id' })
+      .eq('app_id', body.appId)
+      .throwOnError(),
+  ])
+
+  cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
+  return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
 })

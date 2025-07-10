@@ -1,24 +1,17 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
+import { honoFactory, middlewareKey, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
 
 app.post('/', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  if (!key) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey Unauthorized' })
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
+  const key = c.get('apikey')!
 
-  if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey You cannot do that as a limited API key' })
-    return c.json({ error: 'You cannot do that as a limited API key' }, 401)
+  if (key.limited_to_orgs?.length) {
+    throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
-  const body = await c.req.json()
-  cloudlog({ requestId: c.get('requestId'), message: 'body', data: body })
+  const body = await parseBody<any>(c)
 
   const orgId = body.org_id
   const appId = body.app_id
@@ -28,20 +21,17 @@ app.post('/', middlewareKey(['all']), async (c) => {
 
   const mode = body.mode ?? 'all'
   if (!name) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey Name is required' })
-    return c.json({ error: 'Name is required' }, 400)
+    throw simpleError('name_is_required', 'Name is required')
   }
   if (!mode) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey Mode is required' })
-    return c.json({ error: 'Mode is required' }, 400)
+    throw simpleError('mode_is_required', 'Mode is required')
   }
   const validModes = Constants.public.Enums.key_mode
   if (!validModes.includes(mode)) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey Invalid mode' })
-    return c.json({ error: 'Invalid mode' }, 400)
+    throw simpleError('invalid_mode', 'Invalid mode')
   }
 
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
     user_id: key.user_id,
     key: crypto.randomUUID(),
@@ -53,16 +43,14 @@ app.post('/', middlewareKey(['all']), async (c) => {
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
     if (!org || error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey Org not found', error })
-      return c.json({ error: 'Org not found', supabaseError: error }, 404)
+      throw quickError(404, 'org_not_found', 'Org not found', { supabaseError: error })
     }
     newData.limited_to_orgs = [org.id]
   }
   if (appId) {
     const { data: app, error } = await supabase.from('apps').select('*').eq('id', appId).single()
     if (!app || error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey App not found', error })
-      return c.json({ error: 'App not found', supabaseError: error }, 404)
+      throw quickError(404, 'app_not_found', 'App not found', { supabaseError: error })
     }
     newData.limited_to_apps = [app.app_id]
   }
@@ -72,8 +60,7 @@ app.post('/', middlewareKey(['all']), async (c) => {
     .select()
     .single()
   if (apikeyError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot create apikey Failed to create API key', error: apikeyError })
-    return c.json({ error: 'Failed to create API key', supabaseError: apikeyError }, 500)
+    throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: apikeyError })
   }
   return c.json(apikeyData)
 })

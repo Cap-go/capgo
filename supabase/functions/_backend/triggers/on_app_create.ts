@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -16,42 +16,36 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return c.json(BRES)
+    throw simpleError('no_id', 'No id', { record })
   }
 
-  try {
-    const LogSnag = logsnag(c as any)
-    await backgroundTask(c as any, LogSnag.track({
-      channel: 'app-created',
-      event: 'App Created',
-      icon: '🎉',
-      user_id: record.owner_org,
-      tags: {
-        app_id: record.app_id,
-      },
-      notify: false,
+  const LogSnag = logsnag(c)
+  await backgroundTask(c, LogSnag.track({
+    channel: 'app-created',
+    event: 'App Created',
+    icon: '🎉',
+    user_id: record.owner_org,
+    tags: {
+      app_id: record.app_id,
+    },
+    notify: false,
+  }))
+  const supabase = supabaseAdmin(c)
+  await backgroundTask(c, supabase
+    .from('orgs')
+    .select('*')
+    .eq('id', record.owner_org)
+    .single()
+    .then(({ data, error }) => {
+      if (error || !data) {
+        throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
+      }
+      return trackBentoEvent(c, data.management_email, {
+        org_id: record.owner_org,
+        org_name: data.name,
+        app_name: record.name,
+      }, 'app:created') as any
     }))
-    const supabase = supabaseAdmin(c as any)
-    await backgroundTask(c as any, supabase
-      .from('orgs')
-      .select('*')
-      .eq('id', record.owner_org)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          cloudlog({ requestId: c.get('requestId'), message: 'Error fetching organization', error })
-          return c.json({ status: 'Error fetching organization' }, 500)
-        }
-        return trackBentoEvent(c as any, data.management_email, {
-          org_id: record.owner_org,
-          org_name: data.name,
-          app_name: record.name,
-        }, 'app:created') as any
-      }))
 
-    return c.json(BRES)
-  }
-  catch (e) {
-    return c.json({ status: 'Cannot handle org creation', error: JSON.stringify(e) }, 500)
-  }
+  return c.json(BRES)
 })

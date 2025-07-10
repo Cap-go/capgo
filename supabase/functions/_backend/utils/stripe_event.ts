@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { MeteredData, StripeData } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
@@ -96,7 +96,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     mau_exceeded: false,
     storage_exceeded: false,
     bandwidth_exceeded: false,
-    status: undefined,
+    status: 'succeeded',
   }
   let isUpgrade = false
   let previousProductId: string | undefined

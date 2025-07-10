@@ -35,6 +35,8 @@ const isLoading = ref(false)
 const currentPage = ref(1)
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
+const displayStore = useDisplayStore()
+displayStore.NavTitle = t('members')
 
 
 // Permission modal state
@@ -317,7 +319,6 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
     })
   }
   else if (output === 'NO_EMAIL') {
-    const captchaKey = import.meta.env.VITE_CAPTCHA_KEY
     if (captchaKey.value) {
       await showInviteNewUserDialog(email, type)
     }

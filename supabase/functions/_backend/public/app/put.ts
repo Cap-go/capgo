@@ -1,6 +1,6 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { cloudlogErr } from '../../utils/loggin.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 interface UpdateApp {
@@ -10,37 +10,24 @@ interface UpdateApp {
 }
 
 export async function put(c: Context, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  if (!appId) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app Missing app_id' })
-    return c.json({ status: 'Missing app_id' }, 400)
-  }
-
   if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikey.key))) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app, You can\'t access this app', app_id: appId })
-    return c.json({ status: 'You can\'t access this app', app_id: appId }, 400)
+    throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
 
-  try {
-    const { data, error: dbError } = await supabaseAdmin(c)
-      .from('apps')
-      .update({
-        name: body.name,
-        icon_url: body.icon,
-        retention: body.retention,
-      })
-      .eq('app_id', appId)
-      .select()
-      .single()
+  const { data, error: dbError } = await supabaseAdmin(c)
+    .from('apps')
+    .update({
+      name: body.name,
+      icon_url: body.icon,
+      retention: body.retention,
+    })
+    .eq('app_id', appId)
+    .select()
+    .single()
 
-    if (dbError || !data) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app', error: dbError })
-      return c.json({ status: 'Cannot update app', error: JSON.stringify(dbError) }, 400)
-    }
+  if (dbError || !data) {
+    throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
+  }
 
-    return c.json(data)
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot update app', error: e })
-    return c.json({ status: 'Cannot update app', error: JSON.stringify(e) }, 500)
-  }
+  return c.json(data)
 }

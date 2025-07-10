@@ -1,16 +1,17 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod'
-import { cloudlog, cloudlogErr } from '../../../utils/loggin.ts'
+import { z } from 'zod/v4-mini'
+import { simpleError } from '../../../utils/hono.ts'
+import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseAdmin } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
 })
 
-const memberSchema = z.object({
-  uid: z.string().uuid(),
-  email: z.string().email(),
+const memberSchema = z.array(z.object({
+  uid: z.uuid(),
+  email: z.email(),
   image_url: z.string(),
   role: z.enum([
     'invite_read',
@@ -24,44 +25,34 @@ const memberSchema = z.object({
     'admin',
     'super_admin',
   ]),
-}).array()
+}))
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid body', error: bodyParsed.error })
-    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
   if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'You can\'t access this organization', org_id: body.orgId })
-    return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
-  try {
-    const { data, error } = await supabaseAdmin(c)
-      .rpc('get_org_members', {
-        user_id: apikey.user_id,
-        guild_id: body.orgId,
-      })
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_org_members', {
+      user_id: apikey.user_id,
+      guild_id: body.orgId,
+    })
 
-    cloudlog({ requestId: c.get('requestId'), message: 'data', data, error })
-    if (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get organization members', error })
-      return c.json({ status: 'Cannot get organization members', error: error.message }, 500)
-    }
+  cloudlog({ requestId: c.get('requestId'), message: 'data', data, error })
+  if (error) {
+    throw simpleError('cannot_get_organization_members', 'Cannot get organization members', { error })
+  }
 
-    const parsed = memberSchema.safeParse(data)
-    if (!parsed.success) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot parse members', error: parsed.error })
-      return c.json({ status: 'Cannot get organization members', error: parsed.error.message }, 500)
-    }
-    cloudlog({ requestId: c.get('requestId'), message: 'Members', data: parsed.data })
-    return c.json(parsed.data)
+  const parsed = memberSchema.safeParse(data)
+  if (!parsed.success) {
+    throw simpleError('cannot_parse_members', 'Cannot parse members', { error: parsed.error })
   }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get members', error })
-    return c.json({ status: 'Cannot get members', error: error instanceof Error ? error.message : 'Unknown error' }, 500)
-  }
+  cloudlog({ requestId: c.get('requestId'), message: 'Members', data: parsed.data })
+  return c.json(parsed.data)
 }

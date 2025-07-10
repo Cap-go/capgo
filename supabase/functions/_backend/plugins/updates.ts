@@ -2,9 +2,12 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { AppInfos } from '../utils/types.ts'
 import { canParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod'
+import { z } from 'zod/v4-mini'
+import { BRES, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
+import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { update } from '../utils/update.ts'
+
 import {
   deviceIdRegex,
   INVALID_STRING_APP_ID,
@@ -27,75 +30,41 @@ import {
 
 const jsonRequestSchema = z.object({
   app_id: z.string({
-    required_error: MISSING_STRING_APP_ID,
-    invalid_type_error: NON_STRING_APP_ID,
-  }).min(1, MISSING_STRING_APP_ID),
+    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
+  }).check(z.minLength(1, MISSING_STRING_APP_ID), z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
   device_id: z.string({
-    required_error: MISSING_STRING_DEVICE_ID,
-    invalid_type_error: NON_STRING_DEVICE_ID,
-  }).max(36).min(1, MISSING_STRING_DEVICE_ID).refine(id => deviceIdRegex.test(id), {
-    message: INVALID_STRING_DEVICE_ID,
-  }),
+    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
+  }).check(z.maxLength(36), z.minLength(1, MISSING_STRING_DEVICE_ID), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
   version_name: z.string({
-    required_error: MISSING_STRING_VERSION_NAME,
-    invalid_type_error: NON_STRING_VERSION_NAME,
-  }).min(1, MISSING_STRING_VERSION_NAME),
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
+  }).check(z.minLength(1, MISSING_STRING_VERSION_NAME)),
   version_build: z.string({
-    required_error: MISSING_STRING_VERSION_BUILD,
-    invalid_type_error: NON_STRING_VERSION_BUILD,
-  }).min(1, MISSING_STRING_VERSION_BUILD),
-  is_emulator: z.boolean().default(false),
+    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
+  }).check(z.minLength(1, MISSING_STRING_VERSION_BUILD)),
+  is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),
-  is_prod: z.boolean().default(true),
-  platform: z.string({
-    required_error: MISSING_STRING_PLATFORM,
-    invalid_type_error: INVALID_STRING_PLATFORM,
-  }).refine(platform => ['android', 'ios'].includes(platform), {
-    message: INVALID_STRING_PLATFORM,
+  is_prod: z.boolean(),
+  platform: z.literal(['android', 'ios'], {
+    error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : INVALID_STRING_PLATFORM,
   }),
   plugin_version: z.string({
-    required_error: MISSING_STRING_PLUGIN_VERSION,
-    invalid_type_error: INVALID_STRING_PLUGIN_VERSION,
-  }).refine(version => canParse(version), {
+    error: issue => issue.input === undefined ? MISSING_STRING_PLUGIN_VERSION : INVALID_STRING_PLUGIN_VERSION,
+  }).check(z.refine((version: string) => canParse(version), {
     message: INVALID_STRING_PLUGIN_VERSION,
-  }),
-}).refine(data => reverseDomainRegex.test(data.app_id), {
-  message: INVALID_STRING_APP_ID,
-}).transform((val) => {
-  if (val.version_name === 'builtin')
-    val.version_name = val.version_build
-  return val
+  })),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
-  try {
-    const body = await c.req.json<AppInfos>()
-    cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
-    if (isLimited(c as any, body.app_id)) {
-      return c.json({
-        status: 'Too many requests',
-        error: 'too_many_requests',
-      }, 200)
-    }
-    const parseResult = jsonRequestSchema.safeParse(body)
-    if (!parseResult.success) {
-      const error = parseResult.error.errors[0]
-      cloudlog({ requestId: c.get('requestId'), message: 'parseResult', error: error.message })
-      return c.json({
-        error: `Cannot parse json: ${error.message}`,
-      }, 400)
-    }
-
-    return update(c as any, body)
+  const body = await parseBody<AppInfos>(c)
+  cloudlog({ requestId: c.get('requestId'), message: 'post updates body', body })
+  if (isLimited(c, body.app_id)) {
+    throw simpleError('too_many_requests', 'Too many requests')
   }
-  catch (e) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error', error: JSON.stringify(e) })
-    return c.json({ status: 'Cannot get updates', error: JSON.stringify(e) }, 400)
-  }
+  return update(c, parsePluginBody<AppInfos>(c, body, jsonRequestSchema))
 })
 
 app.get('/', (c) => {
-  return c.json({ status: 'ok' })
+  return c.json(BRES)
 })

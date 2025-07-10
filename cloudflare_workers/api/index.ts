@@ -6,7 +6,6 @@ import { app as deleted_failed_version } from '../../supabase/functions/_backend
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
-import { app as latency_postres } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
@@ -72,7 +71,7 @@ appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/latency', latency)
-appPrivate.route('/latency_postres', latency_postres)
+appPrivate.route('/latency_postres', latency)
 appPrivate.route('/verify_replication', verify_replication)
 appPrivate.route('/create_device', create_device)
 appPrivate.route('/events', events)

@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/loggin.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -51,7 +51,7 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
     const thresholdGreaterThenStat = threshold >= stat
     const lastIndexAndStatGreaterOrEqualThreshold = index === 2 && stat >= threshold
 
-    return thresholdGreaterThenStat || lastIndexAndStatGreaterOrEqualThreshold
+    return thresholdGreaterThenStat ?? lastIndexAndStatGreaterOrEqualThreshold
   })
 
   if (index === -1 || index >= 3)
@@ -63,38 +63,40 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  try {
-    const { email, appId, type } = await c.req.json()
+  const { email, appId, type } = await parseBody<{ email: string, appId: string, type: string }>(c)
 
-    if (!email || !appId || !type) {
-      return c.json({ status: 'Missing email, appId, or type' }, 400)
-    }
-
-    if (type === 'weekly_install_stats') {
-      return await handleWeeklyInstallStats(c, email, appId)
-    }
-    else if (type === 'monthly_create_stats') {
-      return await handleMonthlyCreateStats(c, email, appId)
-    }
-    else {
-      return c.json({ status: 'Invalid email type' }, 400)
-    }
+  if (!email || !appId || !type) {
+    throw simpleError('missing_email_appId_type', 'Missing email, appId, or type', { email, appId, type })
   }
-  catch (e) {
-    return c.json({ status: 'Cannot process email', error: JSON.stringify(e) }, 500)
+  // cherck if email exists
+  const { data: user, error: userError } = await supabaseAdmin(c)
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .single()
+  if (userError || !user)
+    throw simpleError('user_not_found', 'User not found', { email, userError })
+
+  if (type === 'weekly_install_stats') {
+    return await handleWeeklyInstallStats(c, email, appId)
+  }
+  else if (type === 'monthly_create_stats') {
+    return await handleMonthlyCreateStats(c, email, appId)
+  }
+  else {
+    throw simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
   }
 })
 
 async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
-  const supabase = await supabaseAdmin(c as any)
+  const supabase = await supabaseAdmin(c)
 
   const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
     app_id: appId,
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app', appId, error: generateStatsError, email })
-    return c.json({ status: 'Cannot generate stats' }, 500)
+    throw simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
   }
 
   if (weeklyStats.all_updates === 0) {
@@ -122,13 +124,13 @@ async function handleWeeklyInstallStats(c: any, email: string, appId: string) {
     fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
   }
 
-  await trackBentoEvent(c as any, email, metadata, 'user:weekly_stats')
+  await trackBentoEvent(c, email, metadata, 'user:weekly_stats')
 
   return c.json(BRES)
 }
 
 async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
-  const supabase = await supabaseAdmin(c as any)
+  const supabase = await supabaseAdmin(c)
   // Fetch additional stats for bundle creation, channel creation, and publishing
   const { data: appVersions, error: _appVersionsError } = await supabase
     .from('app_versions')
@@ -151,9 +153,9 @@ async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
     .gte('deployed_at', new Date(new Date().setFullYear(new Date().getFullYear(), new Date().getMonth() - 1)).toISOString())
     .lte('deployed_at', new Date().toISOString())
 
-  const bundleCount = appVersions && appVersions.length ? appVersions.length : 0
-  const channelCount = channels && channels.length ? channels.length : 0
-  const publishCount = deployHistory && deployHistory.length ? deployHistory.length : 0
+  const bundleCount = appVersions?.length ?? 0
+  const channelCount = channels?.length ?? 0
+  const publishCount = deployHistory?.length ?? 0
 
   const metadata = {
     app_id: appId,
@@ -162,7 +164,7 @@ async function handleMonthlyCreateStats(c: any, email: string, appId: string) {
     monthly_publishes: publishCount.toString(),
   }
 
-  await trackBentoEvent(c as any, email, metadata, 'org:monthly_create_stats')
+  await trackBentoEvent(c, email, metadata, 'org:monthly_create_stats')
 
   return c.json(BRES)
 }

@@ -383,7 +383,7 @@ async function makeDefault(val = true) {
               .eq('android', false)
               .eq('ios', false)
             if (iosError || hiddenError)
-              console.log('error', iosError || hiddenError)
+              console.log('error', iosError ?? hiddenError)
           }
 
           if (val && channel.value.android) {
@@ -400,7 +400,7 @@ async function makeDefault(val = true) {
               .eq('android', false)
               .eq('ios', false)
             if (androidError || hiddenError)
-              console.log('error', androidError || hiddenError)
+              console.log('error', androidError ?? hiddenError)
           }
 
           if (error) {
@@ -698,10 +698,14 @@ async function handleRevert() {
             </InfoRow>
             <!-- Bundle Number -->
             <InfoRow :label="t('bundle-number')" :is-link="channel && channel.version.name !== 'builtin' && channel.version.name !== 'unknown'">
-              <div class="flex items-center">
+              <div class="flex items-center gap-2">
                 <span @click="openBundle()">{{ channel.version.name }}</span>
-                <button v-if="channel" class="btn btn-outline btn-sm ml-3" @click="openSelectVersion()">
-                  <Settings class="w-5 h-5 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
+                <button
+                  v-if="channel"
+                  class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                  @click="openSelectVersion()"
+                >
+                  <Settings class="w-4 h-4 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400" />
                 </button>
               </div>
             </InfoRow>

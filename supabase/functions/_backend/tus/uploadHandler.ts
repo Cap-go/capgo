@@ -1,5 +1,5 @@
 import type { DurableObjectState, R2UploadedPart } from '@cloudflare/workers-types'
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Digester } from './digest.ts'
@@ -12,6 +12,7 @@ import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { Hono } from 'hono/tiny'
+import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/loggin.ts'
 import { onError } from '../utils/on_error.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
@@ -243,7 +244,7 @@ export class UploadHandler {
       const headResponse = await this.retryBucket.head(r2Key)
       if (headResponse == null) {
         cloudlog({ requestId: c.get('requestId'), message: 'in DO files head headResponse is null' })
-        return c.text('Not Found', 404)
+        throw quickError(404, 'not_found', 'Not Found')
       }
       offset = headResponse.size
       uploadLength = headResponse.size
@@ -322,12 +323,10 @@ export class UploadHandler {
     })
   }
 
-  async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadLength: number | undefined, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
+  async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
     switch (part.kind) {
       case 'intermediate': {
-        if (this.multipart == null) {
-          this.multipart = await this.r2CreateMultipartUpload(r2Key, uploadInfo)
-        }
+        this.multipart ??= await this.r2CreateMultipartUpload(r2Key, uploadInfo)
         this.parts.push({
           part: await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes),
           length: part.bytes.byteLength,
@@ -340,7 +339,7 @@ export class UploadHandler {
       }
       case 'final':
       case 'error': {
-        const finished = uploadLength != null && uploadOffset + part.bytes.byteLength === uploadLength
+        const finished = uploadInfo.uploadLength != null && uploadOffset + part.bytes.byteLength === uploadInfo.uploadLength
         if (!finished) {
           // write the partial part to a temporary object so we can rehydrate it
           // later, and then we're done
@@ -366,6 +365,7 @@ export class UploadHandler {
         break
       }
     }
+    return uploadOffset
   }
 
   // Append body to the upload starting at uploadOffset. Returns the new uploadOffset
@@ -388,8 +388,7 @@ export class UploadHandler {
   // the object in one-shot we calculate the digest as it comes in. Otherwise, after the multipart upload is
   // finished, we retrieve the object from R2 and recompute the digest.
   async appendBody(c: Context, r2Key: string, body: ReadableStream<Uint8Array>, uploadOffset: number, uploadInfo: StoredUploadInfo): Promise<number> {
-    const uploadLength = uploadInfo.uploadLength
-    if ((uploadLength ?? 0) > MAX_UPLOAD_LENGTH_BYTES) {
+    if ((uploadInfo.uploadLength ?? 0) > MAX_UPLOAD_LENGTH_BYTES) {
       await this.cleanup(r2Key)
       cloudlog({ requestId: c.get('requestId'), message: 'files append body Upload-Length exceeds maximum upload size' })
       throw new HTTPException(413, { message: 'Upload-Length exceeds maximum upload size' })
@@ -400,14 +399,14 @@ export class UploadHandler {
 
     uploadOffset = await this.resumeUpload(r2Key, uploadOffset, uploadInfo, mem)
 
-    const isSinglePart = uploadLength != null && uploadLength <= BUFFER_SIZE
+    const isSinglePart = uploadInfo.uploadLength != null && uploadInfo.uploadLength <= BUFFER_SIZE
     const checksum: Uint8Array | undefined = uploadInfo.checksum
     // optimization: only bother calculating the stream's checksum if the client provided it, and we're not resuming
     const digester: Digester = checksum != null && uploadOffset === 0 && !isSinglePart ? sha256Digester() : noopDigester()
 
     for await (const part of generateParts(c, body, mem)) {
       const newLength = uploadOffset + part.bytes.byteLength
-      if (uploadLength != null && newLength > uploadLength) {
+      if (uploadInfo.uploadLength != null && newLength > uploadInfo.uploadLength) {
         await this.cleanup(r2Key)
         cloudlog({ requestId: c.get('requestId'), message: 'files append body body exceeds Upload-Length' })
         throw new HTTPException(413, { message: 'body exceeds Upload-Length' })
@@ -419,7 +418,7 @@ export class UploadHandler {
       }
 
       await digester.update(part.bytes)
-      await this.switchOnPartKind(c, r2Key, uploadOffset, uploadLength, uploadInfo, part, digester, checksum)
+      uploadOffset = await this.switchOnPartKind(c, r2Key, uploadOffset, uploadInfo, part, digester, checksum)
     }
     return uploadOffset
   }
@@ -605,7 +604,7 @@ export class UploadHandler {
         await this.hydrateParts(
           r2Key,
           await this.state.storage.get(UPLOAD_OFFSET_KEY) ?? 0,
-          await this.state.storage.get(UPLOAD_INFO_KEY) || {},
+          await this.state.storage.get(UPLOAD_INFO_KEY) ?? {},
         )
         if (this.multipart != null) {
           await this.multipart.abort()
@@ -637,12 +636,6 @@ export class AttachmentUploadHandler extends UploadHandler {
     super(state, env)
   }
 }
-
-// export class BackupUploadHandler extends UploadHandler {
-//   constructor(state: DurableObjectState, env: Env) {
-//     super(state, env, env.BACKUP_BUCKET)
-//   }
-// }
 
 class UnrecoverableError extends Error {
   r2Key: string

@@ -14,12 +14,14 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
+const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const dialogRef = ref();
 
+displayStore.NavTitle = t('organization')
 onMounted(async () => {
   await organizationStore.dedupFetchOrganizations()
   isLoading.value = false
@@ -233,7 +235,7 @@ async function copyOrganizationId() {
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="cursor-pointer px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -281,7 +283,7 @@ async function copyOrganizationId() {
             <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="btn text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
+                  class="cursor-pointer p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
                   color="secondary"
                   shape="round"
                   type="button"
@@ -297,7 +299,7 @@ async function copyOrganizationId() {
                 </button>
                 <button
                   id="save-changes"
-                  class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+                  class="cursor-pointer p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
                   type="submit"
                   color="secondary"
                   shape="round"

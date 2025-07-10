@@ -53,15 +53,30 @@ const { t } = useI18n()
 
           <!-- Title on desktop -->
           <div class="hidden lg:block">
-            <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white">
-              {{ displayStore.NavTitle }}
+            <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white flex items-center space-x-2">
+              <span v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm text-slate-600 dark:text-slate-400 font-normal">
+                <router-link to="/" class=" first-letter:uppercase hover:underline">
+                  {{ t('home') }}
+                </router-link>
+                <template v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i">
+                  <span> / </span>
+                  <router-link
+                    :to="breadcrumb.path"
+                    class="first-letter:uppercase hover:underline"
+                  >
+                    {{ breadcrumb.name.includes('.') ? breadcrumb.name : t(breadcrumb.name) }}
+                  </router-link>
+                </template>
+                <span v-if="displayStore.NavTitle"> / </span>
+              </span>
+              <span class="first-letter:uppercase">{{ displayStore.NavTitle }}</span>
             </div>
           </div>
         </div>
 
         <!-- Centered title on mobile -->
         <div class="flex-1 px-4 text-center lg:hidden">
-          <div class="font-bold truncate text-md text-dark dark:text-white">
+          <div class="font-bold truncate text-md text-dark dark:text-white first-letter:uppercase">
             {{ displayStore.NavTitle }}
           </div>
         </div>
