@@ -687,5 +687,13 @@
   "your-role-in-org": "Vai trò của bạn trong tổ chức",
   "your-settings": "Cài đặt của bạn",
   "your-ussage": "Sử dụng của bạn:",
-  "zip-bundle": "Gói ứng dụng Zip"
+  "zip-bundle": "Gói ứng dụng Zip",
+  "alert-cannot-delete-owner-body": "You cannot delete this user because they are the last super admin of this organization. \nBạn có thể gán vai trò Super Admin cho người dùng khác hoặc xóa tổ chức khỏi phần ‘Thông tin chung của tổ chức.",
+  "alert-cannot-delete-owner-title": "Không thể xóa người dùng Super Admin cuối cùng",
+  "delegate": "Đại biểu",
+  "delegate-super-admin-title": "Đại biểu Siêu quản trị viên",
+  "no-results": "Không tìm thấy kết quả",
+  "please-select-user": "Vui lòng chọn người dùng",
+  "select-user-delegate-admin": "Chọn người dùng để cung cấp vai trò Siêu quản trị viên cho:",
+  "please-select-permission": "Vui lòng chọn quyền"
 }

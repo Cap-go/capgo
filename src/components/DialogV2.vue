@@ -87,7 +87,7 @@ onMounted(() => {
               :class="{
                 'btn btn-primary': button.role === 'primary',
                 'btn btn-secondary': button.role === 'secondary',
-                'btn btn-error': button.role === 'danger',
+                'btn btn-warning': button.role === 'danger',
                 'btn btn-outline text-black dark:text-white hover:text-white': button.role === 'cancel',
                 'btn': !button.role,
               }"

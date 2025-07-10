@@ -69,8 +69,8 @@ export type Database = {
           id: number
           link: string | null
           manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version: string | null
           name: string
           native_packages: Json[] | null
@@ -91,8 +91,8 @@ export type Database = {
           id?: number
           link?: string | null
           manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version?: string | null
           name: string
           native_packages?: Json[] | null
@@ -113,8 +113,8 @@ export type Database = {
           id?: number
           link?: string | null
           manifest?:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version?: string | null
           name?: string
           native_packages?: Json[] | null
@@ -1481,8 +1481,8 @@ export type Database = {
       }
       get_global_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; start_date: string; end_date: string }
         Returns: {
           date: string
           mau: number
@@ -1496,8 +1496,8 @@ export type Database = {
       }
       get_identity: {
         Args:
-          | Record<PropertyKey, never>
-          | { keymode: Database["public"]["Enums"]["key_mode"][] }
+        | Record<PropertyKey, never>
+        | { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
       get_identity_apikey_only: {
@@ -1583,8 +1583,8 @@ export type Database = {
       }
       get_plan_usage_percent_detailed: {
         Args:
-          | { orgid: string }
-          | { orgid: string; cycle_start: string; cycle_end: string }
+        | { orgid: string }
+        | { orgid: string; cycle_start: string; cycle_end: string }
         Returns: {
           total_percent: number
           mau_percent: number
@@ -1605,8 +1605,8 @@ export type Database = {
       }
       get_total_metrics: {
         Args:
-          | { org_id: string }
-          | { org_id: string; start_date: string; end_date: string }
+        | { org_id: string }
+        | { org_id: string; start_date: string; end_date: string }
         Returns: {
           mau: number
           storage: number
@@ -1656,8 +1656,8 @@ export type Database = {
           id: number
           link: string | null
           manifest:
-            | Database["public"]["CompositeTypes"]["manifest_entry"][]
-            | null
+          | Database["public"]["CompositeTypes"]["manifest_entry"][]
+          | null
           min_update_version: string | null
           name: string
           native_packages: Json[] | null
@@ -1962,52 +1962,52 @@ export type Database = {
       pay_as_you_go_type: "base" | "units"
       platform_os: "ios" | "android"
       stats_action:
-        | "delete"
-        | "reset"
-        | "set"
-        | "get"
-        | "set_fail"
-        | "update_fail"
-        | "download_fail"
-        | "windows_path_fail"
-        | "canonical_path_fail"
-        | "directory_path_fail"
-        | "unzip_fail"
-        | "low_mem_fail"
-        | "download_10"
-        | "download_20"
-        | "download_30"
-        | "download_40"
-        | "download_50"
-        | "download_60"
-        | "download_70"
-        | "download_80"
-        | "download_90"
-        | "download_complete"
-        | "decrypt_fail"
-        | "app_moved_to_foreground"
-        | "app_moved_to_background"
-        | "uninstall"
-        | "needPlanUpgrade"
-        | "missingBundle"
-        | "noNew"
-        | "disablePlatformIos"
-        | "disablePlatformAndroid"
-        | "disableAutoUpdateToMajor"
-        | "cannotUpdateViaPrivateChannel"
-        | "disableAutoUpdateToMinor"
-        | "disableAutoUpdateToPatch"
-        | "channelMisconfigured"
-        | "disableAutoUpdateMetadata"
-        | "disableAutoUpdateUnderNative"
-        | "disableDevBuild"
-        | "disableEmulator"
-        | "cannotGetBundle"
-        | "checksum_fail"
-        | "NoChannelOrOverride"
-        | "setChannel"
-        | "getChannel"
-        | "rateLimited"
+      | "delete"
+      | "reset"
+      | "set"
+      | "get"
+      | "set_fail"
+      | "update_fail"
+      | "download_fail"
+      | "windows_path_fail"
+      | "canonical_path_fail"
+      | "directory_path_fail"
+      | "unzip_fail"
+      | "low_mem_fail"
+      | "download_10"
+      | "download_20"
+      | "download_30"
+      | "download_40"
+      | "download_50"
+      | "download_60"
+      | "download_70"
+      | "download_80"
+      | "download_90"
+      | "download_complete"
+      | "decrypt_fail"
+      | "app_moved_to_foreground"
+      | "app_moved_to_background"
+      | "uninstall"
+      | "needPlanUpgrade"
+      | "missingBundle"
+      | "noNew"
+      | "disablePlatformIos"
+      | "disablePlatformAndroid"
+      | "disableAutoUpdateToMajor"
+      | "cannotUpdateViaPrivateChannel"
+      | "disableAutoUpdateToMinor"
+      | "disableAutoUpdateToPatch"
+      | "channelMisconfigured"
+      | "disableAutoUpdateMetadata"
+      | "disableAutoUpdateUnderNative"
+      | "disableDevBuild"
+      | "disableEmulator"
+      | "cannotGetBundle"
+      | "checksum_fail"
+      | "NoChannelOrOverride"
+      | "setChannel"
+      | "getChannel"
+      | "rateLimited"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2017,16 +2017,16 @@ export type Database = {
         | "canceled"
       usage_mode: "5min" | "day" | "month" | "cycle" | "last_saved"
       user_min_right:
-        | "invite_read"
-        | "invite_upload"
-        | "invite_write"
-        | "invite_admin"
-        | "invite_super_admin"
-        | "read"
-        | "upload"
-        | "write"
-        | "admin"
-        | "super_admin"
+      | "invite_read"
+      | "invite_upload"
+      | "invite_write"
+      | "invite_admin"
+      | "invite_super_admin"
+      | "read"
+      | "upload"
+      | "write"
+      | "admin"
+      | "super_admin"
       user_role: "read" | "upload" | "write" | "admin"
       version_action: "get" | "fail" | "install" | "uninstall"
     }
@@ -2089,17 +2089,17 @@ export type Tables<
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
@@ -2119,12 +2119,12 @@ export type TablesInsert<
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
@@ -2144,12 +2144,12 @@ export type TablesUpdate<
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
@@ -2165,8 +2165,8 @@ export type Enums<
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
@@ -2182,8 +2182,8 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {

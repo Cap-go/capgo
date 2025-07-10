@@ -687,5 +687,13 @@
   "your-role-in-org": "Twoja rola w organizacji",
   "your-settings": "Twoje ustawienia",
   "your-ussage": "Twoje użycie:",
-  "zip-bundle": "Paczka aplikacji Zip"
+  "zip-bundle": "Paczka aplikacji Zip",
+  "alert-cannot-delete-owner-title": "Nie można usunąć ostatniego użytkownika super administratora",
+  "delegate": "Delegat",
+  "delegate-super-admin-title": "Delegować Super Admin",
+  "no-results": "Nie znaleziono żadnych wyników",
+  "please-select-user": "Wybierz użytkownika",
+  "select-user-delegate-admin": "Wybierz użytkownika, aby nadać rolę super administratora:",
+  "please-select-permission": "Wybierz pozwolenie",
+  "alert-cannot-delete-owner-body": "Ten użytkownik jest ostatnim super administratorem tej organizacji, nie można go usunąć. \nMożesz przypisać rolę super administratora innym użytkownikowi lub usunąć organizację."
 }

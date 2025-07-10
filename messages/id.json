@@ -687,5 +687,13 @@
   "your-role-in-org": "Peran Anda dalam organisasi",
   "your-settings": "Pengaturan Anda",
   "your-ussage": "Penggunaan Anda:",
-  "zip-bundle": "Paket bundel aplikasi Zip"
+  "zip-bundle": "Paket bundel aplikasi Zip",
+  "alert-cannot-delete-owner-title": "Tidak dapat menghapus pengguna admin super terakhir",
+  "delegate": "Melimpahkan",
+  "delegate-super-admin-title": "Delegasi Admin Super",
+  "no-results": "Tidak ada hasil yang ditemukan",
+  "please-select-user": "Pilih pengguna",
+  "select-user-delegate-admin": "Pilih pengguna untuk memberikan peran Admin Super ke:",
+  "please-select-permission": "Pilih izin",
+  "alert-cannot-delete-owner-body": "Pengguna ini adalah admin super terakhir dari organisasi ini, Anda tidak dapat menghapusnya. \nAnda dapat menetapkan peran super admin ke pengguna lain atau menghapus organisasi."
 }

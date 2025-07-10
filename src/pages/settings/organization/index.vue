@@ -11,15 +11,15 @@ import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
+import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
-const router = useRouter()
 const isLoading = ref(true)
-const deleteInput = ref('')
+const dialogRef = ref()
 
 displayStore.NavTitle = t('organization')
 onMounted(async () => {
@@ -182,46 +182,7 @@ function canDeleteOrg() {
 }
 
 async function deleteOrganization() {
-  deleteInput.value = ''
-
-  dialogStore.openDialog({
-    title: t('delete-org'),
-    description: `${t('please-confirm-org-del')}`.replace('%1', currentOrganization.value?.name ?? ''),
-    size: 'lg',
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        id: 'confirm-button',
-        role: 'danger',
-        handler: async () => {
-          const typed = deleteInput.value
-          if (typed !== (currentOrganization.value?.name ?? '')) {
-            toast.error(t('wrong-name-org-del').replace('%1', currentOrganization.value?.name ?? ''))
-            return false
-          }
-
-          const { error } = await supabase.from('orgs')
-            .delete()
-            .eq('id', currentOrganization.value?.gid as string)
-
-          if (error) {
-            toast.error(t('cannot-del-org'))
-            console.error('org del err', error)
-            return false
-          }
-
-          toast.success(t('org-deleted'))
-          await organizationStore.fetchOrganizations()
-          await organizationStore.setCurrentOrganizationToFirst()
-          router.push('/app')
-        },
-      },
-    ],
-  })
+  dialogRef.value?.open()
 }
 
 async function copyOrganizationId() {
@@ -312,7 +273,7 @@ async function copyOrganizationId() {
                 {{ t('organization-id') }}
               </p>
               <div class="pt-2 md:pt-0 md:ml-6">
-                <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+                <button type="button" class="btn px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
@@ -354,18 +315,10 @@ async function copyOrganizationId() {
         </div>
       </FormKit>
     </div>
-
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('delete-org')" to="#dialog-v2-content" defer>
-      <div class="w-full">
-        <input
-          v-model="deleteInput"
-          type="text"
-          :placeholder="t('type-organization-name-to-confirm')"
-          class="w-full p-3 border border-gray-300 rounded-lg dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-          @keydown.enter="$event.preventDefault()"
-        >
-      </div>
-    </Teleport>
+    <DeleteOrgDialog
+      ref="dialogRef"
+      :org="currentOrganization"
+    />
   </div>
 </template>
 
