@@ -649,7 +649,7 @@ function handleFormKitPermissionSelection(value: string | undefined) {
   handlePermissionSelection(permission, isInvitePermissionModal.value)
 }
 
-function delegateSuperAdmin(value: string | undefined) {
+function delegateSuperAdmin(value: unknown) {
   if (!value)
     return
   selectedUserToDelegateAdmin.value = value
@@ -908,7 +908,7 @@ async function handleInviteNewUserSubmit() {
         </div>
         <div class="border rounded-lg p-4 dark:border-gray-600">
           <FormKit
-            v-show="membersOptions?.length > 0"
+            v-show="membersOptions?.length && membersOptions.length > 0"
             v-model="selectedUserToDelegateAdmin"
             type="radio"
             name="admin-delegation"
