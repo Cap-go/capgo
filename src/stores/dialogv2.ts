@@ -46,13 +46,16 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
         button.handler()
       }
     }
+    else {
+      // Dialog was dismissed without a button (ESC, backdrop, X button)
+      dialogCanceled.value = true
+    }
   }
 
   const onDialogDismiss = (): Promise<boolean> => {
     return new Promise((resolve) => {
       const unwatch = watch(showDialog, (val) => {
         if (!val) {
-          closeDialog()
           resolve(dialogCanceled.value)
           unwatch()
         }
