@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.11.94 (2025-07-11)
+
+
+### Bug Fixes
+
+* claude config ([39d1a02](https://github.com/Cap-go/capgo/commit/39d1a02032af10782cc31b3dec9ba632cc5afb0d))
+
 ### 12.11.93 (2025-07-11)
 
 ### 12.11.92 (2025-07-10)
