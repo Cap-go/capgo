@@ -9,6 +9,12 @@ on:
   pull_request_review:
     types: [submitted]
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read # Required for CI access
+
 jobs:
   claude-response:
     runs-on: ubuntu-latest
@@ -18,7 +24,6 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Or use OAuth token instead:
           # claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           # Optional: add custom trigger phrase (default: @claude)
           # trigger_phrase: "/claude"
           # Optional: add assignee trigger for issues
@@ -33,5 +38,25 @@ jobs:
           # Optional: limit the number of conversation turns
           # max_turns: "5"
           # Optional: grant additional permissions (requires corresponding GitHub token permissions)
-          # additional_permissions: |
-          #   actions: read
+          additional_permissions: |
+            actions: read
+          mcp_config: |
+            {
+              "mcpServers": {
+                "supabase-local": {
+                  "command": "bunx",
+                  "args": [
+                    "@modelcontextprotocol/server-postgres",
+                    "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+                  ]
+                },
+                "browser": {
+                  "command": "bunx",
+                  "args": [
+                    "@agentdeskai/browser-tools-mcp"
+                  ],
+                  "env": {}
+                }
+              }
+            }
+          allowed_tools: "mcp__supabase-local,mcp__browser" # Important: Each MCP tool from your server must be listed here, comma-separated
