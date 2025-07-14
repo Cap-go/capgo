@@ -229,3 +229,32 @@ export async function getAppOwnerPostgres(
     return null
   }
 }
+
+export async function getAppVersionPostgres(
+  c: Context,
+  appId: string,
+  versionName: string,
+  allowedDeleted: boolean | undefined,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ id: number, owner_org: string } | null> {
+  try {
+    const appVersion = await drizzleCient
+      .select({
+        id: schema.app_versions.id,
+        owner_org: schema.app_versions.owner_org,
+      })
+      .from(schema.app_versions)
+      .where(and(
+        eq(schema.app_versions.app_id, appId), 
+        eq(schema.app_versions.name, versionName),
+        ...(allowedDeleted !== undefined ? [eq(schema.app_versions.deleted, allowedDeleted)] : [])
+      ))
+      .limit(1)
+      .then(data => data[0])
+    return appVersion
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppVersionPostgres', error: e })
+    return null
+  }
+}

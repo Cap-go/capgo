@@ -9,16 +9,17 @@ export interface DeviceLink extends AppInfos {
   channel?: string
 }
 
+function getInvalidCode(c: Context) {
+  return c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
+}
+
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject) {
-  const invalidCode = c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
   if (Object.keys(body ?? {}).length === 0) {
-    throw simpleError(invalidCode, 'Cannot parse body', { body })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
   }
   if (!body.device_id) {
     throw simpleError('missing_device_id', 'Cannot find device_id', { body })
   }
-  // Ensure the device_id is lowercase for compatibility with old plugins below 7.0.0
-  body.device_id = body.device_id.toLowerCase()
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Cannot find app_id', { body })
   }
@@ -33,7 +34,7 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   body.version_name = (body.version_name === 'builtin' || !body.version_name) ? body.version_build : body.version_name
   const parseResult = schema.safeParse(body)
   if (!parseResult.success) {
-    throw simpleError(invalidCode, 'Cannot parse body', { parseResult })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
   }
   return body
 }

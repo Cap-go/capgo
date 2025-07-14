@@ -46,6 +46,7 @@ export const apps = pgTable('apps', {
 })
 export const app_versions = pgTable('app_versions', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: uuid('owner_org').notNull(),
   created_at: timestamp('created_at').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),
   name: varchar('name').notNull(),
@@ -76,6 +77,7 @@ export const manifest = pgTable('manifest', {
 
 export const channels = pgTable('channels', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: uuid('owner_org').notNull(),
   created_at: timestamp('created_at').notNull(),
   name: varchar('name').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),

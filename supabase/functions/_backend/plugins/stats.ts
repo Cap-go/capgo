@@ -1,17 +1,21 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { getDrizzleClientD1 } from '../utils/pg_d1.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
+import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/v4-mini'
 import { appIdToUrl } from '../utils/conversion.ts'
 import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
+import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from '../utils/pg.ts'
+import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1 } from '../utils/pg_d1.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
-import { isAllowedActionOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
+import { getEnv } from '../utils/utils.ts'
 
 const failActions = [
   'set_fail',
@@ -49,7 +53,7 @@ export const jsonRequestSchema = z.object({
   is_prod: z.boolean(),
 })
 
-async function post(c: Context, body: AppStats) {
+async function post(c: Context, drizzleCient: ReturnType<typeof getDrizzleClient> | ReturnType<typeof getDrizzleClientD1Session>, isV2: boolean, body: AppStats) {
   const {
     version_name,
     version_build,
@@ -78,11 +82,7 @@ async function post(c: Context, body: AppStats) {
     custom_id,
     updated_at: new Date().toISOString(),
   }
-  const { data: appOwner } = await supabaseAdmin(c)
-    .from('apps')
-    .select('app_id')
-    .eq('app_id', app_id)
-    .single()
+  const appOwner = isV2 ? await getAppOwnerPostgresV2(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppOwnerPostgres(c, app_id, drizzleCient as ReturnType<typeof getDrizzleClient>)
   if (!appOwner) {
     return opnPremStats(c, app_id, action, device)
   }
@@ -92,29 +92,19 @@ async function post(c: Context, body: AppStats) {
   if (version_name === 'builtin' || version_name === 'unknown') {
     allowedDeleted = true
   }
-  const { data: appVersion } = await supabaseAdmin(c)
-    .from('app_versions')
-    .select('id, owner_org')
-    .eq('app_id', app_id)
-    .or(`name.eq.${version_name}`)
-    .eq('deleted', allowedDeleted)
-    .single()
+  const appVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, version_name, allowedDeleted, drizzleCient as ReturnType<typeof getDrizzleClient>)
   if (!appVersion) {
     throw quickError(404, 'version_not_found', 'Version not found', { app_id, version_name })
   }
-  if (!(await isAllowedActionOrg(c, appVersion.owner_org))) {
+  const planValid = isV2 ? await isAllowedActionOrgActionD1(c, drizzleCient as ReturnType<typeof getDrizzleClientD1>, appOwner.orgs.id, ['mau', 'bandwidth']) : await isAllowedActionOrgActionPg(c, drizzleCient as ReturnType<typeof getDrizzleClient>, appOwner.orgs.id, ['mau', 'bandwidth'])
+  if (!planValid) {
     throw simpleError('action_not_allowed', 'Action not allowed', { appVersion, app_id, owner_org: appVersion.owner_org })
   }
   device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
     await createStatsVersion(c, device.version, app_id, 'install')
     if (old_version_name) {
-      const { data: oldVersion } = await supabaseAdmin(c)
-        .from('app_versions')
-        .select('id')
-        .eq('app_id', app_id)
-        .eq('name', old_version_name)
-        .single()
+      const oldVersion = isV2 ? await getAppVersionPostgresV2(c, app_id, old_version_name, undefined, drizzleCient as ReturnType<typeof getDrizzleClientD1Session>) : await getAppVersionPostgres(c, app_id, old_version_name, undefined, drizzleCient as ReturnType<typeof getDrizzleClient>)
       if (oldVersion && oldVersion.id !== appVersion.id) {
         await createStatsVersion(c, oldVersion.id, app_id, 'uninstall')
         statsActions.push({ action: 'uninstall', versionId: oldVersion.id })
@@ -143,7 +133,32 @@ app.post('/', async (c) => {
   if (isLimited(c, body.app_id)) {
     throw simpleError('too_many_requests', 'Too many requests')
   }
-  return post(c, parsePluginBody<AppStats>(c, body, jsonRequestSchema))
+  // return post(c, parsePluginBody<AppStats>(c, body, jsonRequestSchema))
+  let pgClient
+  let isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
+  if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
+    // force v2 for update v2
+    isV2 = 1.0
+  }
+  if (isV2 && Math.random() < isV2) {
+    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
+    pgClient = null
+  }
+  else {
+    pgClient = getPgClient(c)
+  }
+
+  const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
+  let res
+  try {
+    res = await post(c, isV2 ? getDrizzleClientD1Session(c) : getDrizzleClient(pgClient as any), !!isV2, bodyParsed)
+  }
+  catch (e) {
+    throw simpleError('unknow_error', `Error unknow`, { body }, e)
+  }
+  if (isV2 && pgClient)
+    await closeClient(c, pgClient)
+  return res
 })
 
 app.get('/', (c) => {
