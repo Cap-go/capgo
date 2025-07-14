@@ -52,7 +52,7 @@ onMounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute top-4 right-4 btn btn-sm btn-circle btn-ghost z-10 text-black dark:text-white hover:text-white hover:bg-gray-500 dark:hover:bg-gray-500"
+          class="absolute top-4 right-4 d-btn d-btn-sm d-btn-circle d-btn-ghost z-10 text-black dark:text-white hover:text-white hover:bg-gray-500 dark:hover:bg-gray-500"
           @click="close()"
         >
           ✕
@@ -85,11 +85,11 @@ onMounted(() => {
               v-for="(button, i) in dialogStore.dialogOptions.buttons"
               :key="i"
               :class="{
-                'btn btn-primary': button.role === 'primary',
-                'btn btn-secondary': button.role === 'secondary',
-                'btn btn-warning': button.role === 'danger',
-                'btn btn-outline text-black dark:text-white hover:text-white': button.role === 'cancel',
-                'btn': !button.role,
+                'd-btn d-btn-primary': button.role === 'primary',
+                'd-btn d-btn-secondary': button.role === 'secondary',
+                'd-btn d-btn-warning': button.role === 'danger',
+                'd-btn d-btn-outline text-black dark:text-white hover:text-white': button.role === 'cancel',
+                'd-btn': !button.role,
               }"
               @click="close(button)"
             >

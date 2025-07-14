@@ -9,7 +9,8 @@ layer(base);
 
 @plugin "daisyui" {
   themes: capgotheme --default, dark --prefersdark;
-  logs: false;
+  logs: true;
+  prefix: "d-";
 }
 
 @plugin "daisyui/theme" {

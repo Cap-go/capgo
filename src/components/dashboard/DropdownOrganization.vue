@@ -172,15 +172,15 @@ async function createNewOrg() {
 
 <template>
   <div>
-    <details v-show="currentOrganization" ref="dropdown" class="w-full dropdown dropdown-end">
-      <summary class="justify-between w-full btn btn-outline border-gray-600 btn-sm text-white">
+    <details v-show="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
+      <summary class="justify-between w-full d-btn d-btn-outline border-gray-600 d-btn-sm text-white">
         <div class="flex items-center w-4/5 text-left">
           <span class="truncate">{{ currentOrganization?.name }}</span>
           <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
         <IconDown class="shrink-0 w-6 h-6 ml-1 fill-current text-slate-400" />
       </summary>
-      <ul class="dropdown-content bg-base-200 rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
+      <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-52 p-2 shadow" @click="closeDropdown()">
         <li v-for="org in organizationStore.organizations" :key="org.gid" class="block px-1 rounded-lg hover:bg-gray-600">
           <a
             class="flex items-center justify-center text-center px-3 py-3 hover:bg-gray-600 text-white"
@@ -199,7 +199,7 @@ async function createNewOrg() {
         </li>
       </ul>
     </details>
-    <button v-show="!currentOrganization" class="btn btn-outline border-gray-600 w-full btn-sm text-white" @click="createNewOrg">
+    <button v-show="!currentOrganization" class="d-btn d-btn-outline border-gray-600 w-full d-btn-sm text-white" @click="createNewOrg">
       <Plus class="mx-auto" />
     </button>
 

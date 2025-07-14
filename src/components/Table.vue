@@ -309,7 +309,7 @@ function getSkeletonWidth(columnIndex?: number) {
             <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="dropdown">
+        <div v-if="filterText && filterList.length" class="d-dropdown">
           <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               {{ filterActivated }}
@@ -318,7 +318,7 @@ function getSkeletonWidth(columnIndex?: number) {
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden w-4 h-4 ml-2 md:block" />
           </button>
-          <ul class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
+          <ul class="p-2 bg-white shadow d-dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input

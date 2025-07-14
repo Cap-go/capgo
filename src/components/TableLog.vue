@@ -276,7 +276,7 @@ onMounted(async () => {
         </button>
       </div>
       <div class="flex h-10 mr-2 md:mr-auto text-sm font-medium text-gray-500 border border-gray-200 divide-gray-100 rounded-md dark:divide-gray-300 md:ml-4 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:outline-hidden focus:ring-4">
-        <div ref="dropdown" class="dropdown dropdown-right">
+        <div ref="dropdown" class="d-dropdown d-dropdown-right">
           <button
             tabindex="0"
             class="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-l-md h-full"
@@ -287,7 +287,7 @@ onMounted(async () => {
               {{ currentGeneralTime === 1 ? t('last-hour') : (currentGeneralTime === 3 ? t('last-3-hours') : t('last-12-hours')) }}
             </span>
           </button>
-          <ul class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
+          <ul class="p-2 bg-white shadow d-dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 1 }" @click="setTime(1)">{{ t('last-hour') }}</a></li>
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 3 }" @click="setTime(3)">{{ t('last-3-hours') }}</a></li>
             <li><a :class="{ 'bg-gray-300 dark:bg-gray-400': currentGeneralTime === 12 }" @click="setTime(12)">{{ t('last-12-hours') }}</a></li>
@@ -549,11 +549,11 @@ onMounted(async () => {
 
 /* Custom action buttons styling for Capgo */
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_cancel {
-  @apply btn btn-outline btn-sm;
+  @apply d-btn d-btn-outline d-btn-sm;
   width: 49%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons > .dp__action_select {
-  @apply btn btn-outline btn-primary btn-sm;
+  @apply d-btn d-btn-outline d-btn-primary d-btn-sm;
   width: 49%;
 }
 .custom-timepicker-button > .dp__action_row > .dp__action_buttons {

@@ -89,8 +89,8 @@ function nextRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ props.title }}
         </h2>
-        <div class="tooltip tooltip-bottom">
-          <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
+        <div class="d-tooltip d-tooltip-bottom">
+          <div class="d-tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
             <div class="max-w-xs whitespace-normal">
               {{ lastRunDate() }}
             </div>

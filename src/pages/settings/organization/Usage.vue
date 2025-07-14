@@ -205,10 +205,10 @@ function nextRunDate() {
     <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
       <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="sm:align-center sm:flex sm:flex-col">
-          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center tooltip tooltip-bottom">
+          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center d-tooltip d-tooltip-bottom">
             {{ t('usage') }}
             <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:bg-blue-500 hover:text-white rounded-full" />
-            <div class="tooltip-content font-normal bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
+            <div class="d-tooltip-content font-normal bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
               <div class="max-w-xs whitespace-normal">
                 {{ lastRunDate() }}
               </div>

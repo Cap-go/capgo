@@ -171,7 +171,7 @@ function openPrivacy() {
                   </h2>
                   <div class="flex flex-col items-center mb-4">
                     <img v-if="inviteRow.org_logo" :src="inviteRow.org_logo" alt="organization logo" class="w-16 h-16 mb-2 rounded-sm">
-                    <div v-else class="p-6 mb-3 text-xl bg-gray-700 mask mask-squircle">
+                    <div v-else class="p-6 mb-3 text-xl bg-gray-700 d-mask d-mask-squircle">
                       <span class="font-medium text-gray-300">
                         N/A
                       </span>

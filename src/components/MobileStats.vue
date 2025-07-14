@@ -99,11 +99,11 @@ function nextRunDate() {
         <h2 class="mb-2 mr-2 text-2xl font-semibold text-slate-800 dark:text-white">
           {{ t('active_users_by_version') }}
         </h2>
-        <div class="tooltip">
+        <div class="d-tooltip">
           <div class="flex items-center justify-center w-5 h-5 cursor-pointer">
             <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:text-blue-500 hover:bg-blue-500 hover:text-white rounded-full" />
           </div>
-          <div class="tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
+          <div class="d-tooltip-content bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
             <div class="max-w-xs whitespace-normal">
               {{ lastRunDate() }}
             </div>

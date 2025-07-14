@@ -466,10 +466,10 @@ async function transferAppOwnership() {
           <div class="flex items-center">
             <div class="mr-4">
               <img
-                v-if="appRef?.icon_url" class="object-cover w-20 h-20 mask mask-squircle" :src="appRef?.icon_url"
+                v-if="appRef?.icon_url" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="appRef?.icon_url"
                 width="80" height="80" alt="User upload"
               >
-              <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+              <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                 <span class="font-medium text-gray-300">
                   {{ acronym }}
                 </span>
@@ -575,7 +575,7 @@ async function transferAppOwnership() {
               {{ t('delete-app') }}
             </button>
             <button
-              class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+              class="p-2 ml-3 text-white bg-blue-500 rounded-lg d-btn hover:bg-blue-600"
               type="submit"
               color="secondary"
               shape="round"

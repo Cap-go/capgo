@@ -115,8 +115,8 @@ columns.value = [
     displayFunction: (member: ExtendedOrganizationMember) => `
       <div class="flex items-center">
         ${member.image_url
-            ? `<img src="${member.image_url}" alt="Profile picture for ${member.email}" class="rounded-sm shrink-0 mask mask-squircle" width="42" height="42">`
-            : `<div class="flex items-center justify-center w-10 h-10 text-xl bg-gray-700 mask mask-squircle shrink-0"><span class="font-medium text-gray-300">${acronym(member.email)}</span></div>`
+            ? `<img src="${member.image_url}" alt="Profile picture for ${member.email}" class="rounded-sm shrink-0 d-mask d-mask-squircle" width="42" height="42">`
+            : `<div class="flex items-center justify-center w-10 h-10 text-xl bg-gray-700 d-mask d-mask-squircle shrink-0"><span class="font-medium text-gray-300">${acronym(member.email)}</span></div>`
         }
         <span class="ml-2 hidden sm:inline truncate">${member.email}</span>
       </div>`,
@@ -206,7 +206,9 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
       },
     ],
   })
-  await dialogStore.onDialogDismiss()
+  if (!await dialogStore.onDialogDismiss()) {
+    return undefined
+  }
   return selectedPermission.value
 }
 
@@ -862,7 +864,7 @@ async function handleInviteNewUserSubmit() {
 
               <!-- Tooltip that appears on hover -->
               <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg w-60 text-center pointer-events-none">
-                {{ t('captcha-new-user-org-tooltip') }}
+                {{ t('captcha-new-user-org-d-tooltip') }}
                 <!-- Tooltip arrow -->
                 <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800" />
               </div>

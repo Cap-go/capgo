@@ -830,7 +830,7 @@ async function deleteBundle() {
       <p class="text-muted-foreground mt-2">
         {{ t('bundle-not-found-description') }}
       </p>
-      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles/`)">
+      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/bundles/`)">
         {{ t('back-to-bundles') }}
       </button>
     </div>

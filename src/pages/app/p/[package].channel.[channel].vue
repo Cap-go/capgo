@@ -821,7 +821,7 @@ async function handleRevert() {
           <template v-else-if="!dialogStore.showDialog">
             <div class="text-center">
               <div>{{ t('forced-devices-not-found') }}</div>
-              <div class="btn btn-primary mt-4" @click="AddDevice">
+              <div class="d-btn d-btn-primary mt-4" @click="AddDevice">
                 <plusOutline />
               </div>
             </div>
@@ -850,7 +850,7 @@ async function handleRevert() {
       <p class="text-muted-foreground mt-2">
         {{ t('channel-not-found-description') }}
       </p>
-      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
+      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
         {{ t('back-to-channels') }}
       </button>
     </div>

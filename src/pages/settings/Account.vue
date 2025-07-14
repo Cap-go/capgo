@@ -396,10 +396,10 @@ onMounted(async () => {
             <div class="flex items-center">
               <div class="mr-4">
                 <img
-                  v-if="main.user?.image_url" class="object-cover w-20 h-20 mask mask-squircle" :src="main.user?.image_url"
+                  v-if="main.user?.image_url" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="main.user?.image_url"
                   width="80" height="80" alt="User upload"
                 >
-                <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">
                     {{ acronym }}
                   </span>
@@ -520,7 +520,7 @@ onMounted(async () => {
                 {{ t('delete-account') }}
               </button>
               <button
-                class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+                class="p-2 ml-3 text-white bg-blue-500 rounded-lg d-btn hover:bg-blue-600"
                 type="submit"
                 color="secondary"
                 shape="round"

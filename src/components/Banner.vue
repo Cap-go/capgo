@@ -79,9 +79,9 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
-  const warning = 'btn-warning'
+  const warning = 'd-btn-warning'
   // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
-  const success = 'btn-success'
+  const success = 'd-btn-success'
 
   const org = organizationStore.currentOrganization
   if (!org)
@@ -118,7 +118,7 @@ const bannerColor = computed(() => {
     <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">
       {{ bannerText }}
     </span>
-    <a href="/settings/organization/plans" class="btn btn-sm border-none" :class="bannerColor">
+    <a href="/settings/organization/plans" class="d-btn d-btn-sm border-none" :class="bannerColor">
       {{ t('upgrade') }}
     </a>
   </div>
@@ -132,7 +132,7 @@ const bannerColor = computed(() => {
       <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a href="/settings/organization/plans" class="btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <a href="/settings/organization/plans" class="d-btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
     </div>
   </div>
 </template>

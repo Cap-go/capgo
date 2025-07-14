@@ -389,7 +389,7 @@ function openChannel() {
       <p class="text-muted-foreground mt-2">
         {{ t('device-not-found-description') }}
       </p>
-      <button class="mt-4 btn btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/devices`)">
+      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/devices`)">
         {{ t('back-to-devices') }}
       </button>
     </div>
