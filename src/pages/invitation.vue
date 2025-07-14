@@ -2,12 +2,16 @@
 import type { Database } from '~/types/supabase.types'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref } from 'vue'
+import VueTurnstile from 'vue-turnstile'
 import Toggle from '~/components/Toggle.vue'
 import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
 const route = useRoute('/invitation')
 const router = useRouter()
+const turnstileToken = ref('')
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 // Form data
 const password = ref('')
@@ -97,6 +101,7 @@ async function submitForm() {
         password: password.value,
         magic_invite_string: inviteMagicString.value,
         optForNewsletters: acceptMarketing.value,
+        captchaToken: turnstileToken.value,
       },
     })
 
@@ -252,6 +257,9 @@ function openPrivacy() {
                       {{ t('accept-email-newsletter-and-future-marketing-offers') }}
                     </span>
                   </div>
+                </div>
+                <div v-if="!!captchaKey">
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
 
                 <!-- Submit Button -->

@@ -8,17 +8,20 @@ interface AcceptInvitation {
   password: string
   magic_invite_string: string
   optForNewsletters: boolean
+  captchaToken: string
 }
-const MIN_PASSWORD_LENGTH = 'Password must be at least 12 characters'
+const MIN_PASSWORD_LENGTH = 'Password must be at least 6 characters'
 const MIN_PASSWORD_UPPERCASE = 'Password must contain at least one uppercase letter'
 const MIN_PASSWORD_NUMBER = 'Password must contain at least one number'
-const MIN_PASSWORD_SPECIAL = 'Password must contain at least two special characters'
+const MIN_PASSWORD_SPECIAL = 'Password must contain at least one special character'
 
 // Define the schema for the accept invitation request
 const acceptInvitationSchema = z.object({
-  password: z.string().check(z.minLength(12, MIN_PASSWORD_LENGTH), z.regex(/[A-Z]/, MIN_PASSWORD_UPPERCASE), z.regex(/\d/, MIN_PASSWORD_NUMBER), z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?].*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, MIN_PASSWORD_SPECIAL)),
+  password: z.string()
+    .check(z.minLength(6, MIN_PASSWORD_LENGTH), z.regex(/[A-Z]/, MIN_PASSWORD_UPPERCASE), z.regex(/\d/, MIN_PASSWORD_NUMBER), z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, MIN_PASSWORD_SPECIAL)),
   magic_invite_string: z.string().check(z.minLength(1)),
   optForNewsletters: z.boolean(),
+  captchaToken: z.string().check(z.minLength(1)),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -48,11 +51,11 @@ app.post('/', async (c) => {
     .single()
 
   if (invitationError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: invitationError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation get tmp_users', { error: invitationError.message })
   }
 
   if (!invitation) {
-    throw quickError(404, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: 'Invitation not found' })
+    throw quickError(404, 'failed_to_accept_invitation', 'Invitation not found', { error: 'Invitation not found' })
   }
 
   // here the real magic happens
@@ -72,7 +75,7 @@ app.post('/', async (c) => {
   })
 
   if (userError || !user) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: userError?.message ?? 'Unknown error' })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation createUser', { error: userError?.message ?? 'Unknown error' })
   }
 
   // TODO: improve error handling
@@ -88,7 +91,7 @@ app.post('/', async (c) => {
   })
 
   if (userNormalTableError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: userNormalTableError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert', { error: userNormalTableError.message })
   }
 
   // let's now login the user in. The rough idea is that we will create a session and then return the session to the client
@@ -97,16 +100,19 @@ app.post('/', async (c) => {
   const { data: session, error: sessionError } = await userSupabase.auth.signInWithPassword({
     email: invitation.email,
     password: body.password,
+    options: {
+      captchaToken: body.captchaToken,
+    },
   })
 
   if (sessionError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: sessionError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Sign in failed', { error: sessionError.message })
   }
 
   // We are still not finished. We need to remove from tmp_users and accept the invitation
   const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
   if (tmpUserDeleteError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: tmpUserDeleteError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation delete tmp_users', { error: tmpUserDeleteError.message })
   }
 
   const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
@@ -116,7 +122,7 @@ app.post('/', async (c) => {
   })
 
   if (insertIntoMainTableError) {
-    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: insertIntoMainTableError.message })
+    throw quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert into org_users', { error: insertIntoMainTableError.message })
   }
 
   return c.json({
