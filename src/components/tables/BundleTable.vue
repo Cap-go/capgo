@@ -537,6 +537,10 @@ function selectedElementsFilter(val: boolean[]) {
   selectedElements.value = (elements.value as any).filter((_: any, i: number) => val[i])
 }
 
+async function addOne() {
+  showSteps.value = true
+}
+
 async function openOne(one: Element) {
   if (one.deleted)
     return
@@ -563,7 +567,9 @@ watch(props, async () => {
       :search-placeholder="t('search-by-name')"
       @set-selection="selectedElementsFilter"
       @mass-delete="massDelete()"
-      @reload="reload()" @reset="refreshData()"
+      @add="addOne()"
+      @reload="reload()"
+      @reset="refreshData()"
     />
 
     <StepsBundle v-else :onboarding="!total" :app-id="props.appId" @done="onboardingDone" @close-step="showSteps = !showSteps" />

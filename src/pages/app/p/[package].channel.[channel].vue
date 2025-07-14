@@ -16,6 +16,7 @@ import IconNext from '~icons/ic/round-keyboard-arrow-right'
 import IconSearch from '~icons/ic/round-search?raw'
 import plusOutline from '~icons/ion/add-outline?width=2em&height=2em'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
@@ -47,6 +48,11 @@ const deviceIdInput = ref('')
 const bundleLinkVersions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const bundleLinkSearchVal = ref('')
 const bundleLinkSearchMode = ref(false)
+
+// Auto update dropdown state
+const autoUpdateDropdown = useTemplateRef('autoUpdateDropdown')
+
+onClickOutside(autoUpdateDropdown, () => closeAutoUpdateDropdown())
 
 const currentChannelVersion = computed(() => {
   return channel.value?.version as any
@@ -468,24 +474,34 @@ async function openPannel() {
   return dialogStore.onDialogDismiss()
 }
 
-function guardChangeAutoUpdate(event: Event) {
-  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
-    toast.error(t('no-permission'))
-    event.preventDefault()
-    return false
+function closeAutoUpdateDropdown() {
+  if (autoUpdateDropdown.value) {
+    autoUpdateDropdown.value.removeAttribute('open')
   }
 }
 
-async function onChangeAutoUpdate(event: Event) {
+function getAutoUpdateLabel(value: string) {
+  switch (value) {
+    case 'major':
+      return t('major')
+    case 'minor':
+      return t('minor')
+    case 'patch':
+      return t('patch')
+    case 'version_number':
+      return t('metadata')
+    case 'none':
+      return t('none')
+    default:
+      return t('none')
+  }
+}
+
+async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_update']) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
-    event.preventDefault()
-    if (channel?.value?.disable_auto_update)
-      (event.target as HTMLSelectElement).value = channel.value.disable_auto_update
-
     return false
   }
-  const value = (event.target as HTMLSelectElement).value as Database['public']['Enums']['disable_update']
 
   if (value === 'version_number') {
     if (!channel.value?.version.min_update_version)
@@ -502,6 +518,8 @@ async function onChangeAutoUpdate(event: Event) {
 
   if (channel.value?.disable_auto_update)
     channel.value.disable_auto_update = value
+
+  closeAutoUpdateDropdown()
 }
 
 async function handleRevertToBuiltin() {
@@ -758,23 +776,54 @@ async function handleRevert() {
               />
             </InfoRow>
             <InfoRow :label="t('disableAutoUpdateToMajor')">
-              <select id="selectableDisallow" :value="channel.disable_auto_update" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @mousedown="guardChangeAutoUpdate" @change="(event) => onChangeAutoUpdate(event)">
-                <option value="major">
-                  {{ t('major') }}
-                </option>
-                <option value="minor">
-                  {{ t('minor') }}
-                </option>
-                <option value="patch">
-                  {{ t('patch') }}
-                </option>
-                <option value="version_number">
-                  {{ t('metadata') }}
-                </option>
-                <option value="none">
-                  {{ t('none') }}
-                </option>
-              </select>
+              <details ref="autoUpdateDropdown" class="d-dropdown d-dropdown-end">
+                <summary class="d-btn d-btn-outline d-btn-sm">
+                  <span>{{ getAutoUpdateLabel(channel.disable_auto_update) }}</span>
+                  <IconDown class="w-4 h-4 ml-1 fill-current" />
+                </summary>
+                <ul class="d-dropdown-content bg-base-200 rounded-box z-1 w-48 p-2 shadow">
+                  <li class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectAutoUpdate('major')"
+                    >
+                      {{ t('major') }}
+                    </a>
+                  </li>
+                  <li class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectAutoUpdate('minor')"
+                    >
+                      {{ t('minor') }}
+                    </a>
+                  </li>
+                  <li class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectAutoUpdate('patch')"
+                    >
+                      {{ t('patch') }}
+                    </a>
+                  </li>
+                  <li class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectAutoUpdate('version_number')"
+                    >
+                      {{ t('metadata') }}
+                    </a>
+                  </li>
+                  <li class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectAutoUpdate('none')"
+                    >
+                      {{ t('none') }}
+                    </a>
+                  </li>
+                </ul>
+              </details>
             </InfoRow>
             <InfoRow :label="t('allow-develoment-bui')">
               <Toggle

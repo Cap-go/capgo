@@ -35,6 +35,9 @@ const limitToAppCheckbox = ref(false)
 // State for tracking organization limitation checkbox
 const limitToOrgCheckbox = ref(false)
 
+// State for API key type selection
+const selectedKeyType = ref('')
+
 // Available apps for selection (populated when showing app dialog)
 const availableApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
@@ -493,6 +496,9 @@ async function showDeleteKeyModal() {
 }
 
 async function showAddNewKeyModal() {
+  // Reset selection state
+  selectedKeyType.value = ''
+
   dialogStore.openDialog({
     title: t('alert-add-new-key'),
     description: t('alert-generate-new-key'),
@@ -502,28 +508,15 @@ async function showAddNewKeyModal() {
         role: 'cancel',
       },
       {
-        text: t('key-read'),
-        id: 'read-button',
-        role: 'secondary',
-        handler: () => createApiKey('read'),
-      },
-      {
-        text: t('key-upload'),
-        id: 'upload-button',
-        role: 'secondary',
-        handler: () => createApiKey('upload'),
-      },
-      {
-        text: t('write-key'),
-        id: 'write-button',
-        role: 'secondary',
-        handler: () => createApiKey('write'),
-      },
-      {
-        text: t('key-all'),
-        id: 'all-button',
+        text: t('create'),
         role: 'primary',
-        handler: () => createApiKey('all'),
+        handler: () => {
+          if (!selectedKeyType.value) {
+            toast.error(t('please-select-key-type'))
+            return false
+          }
+          return createApiKey(selectedKeyType.value as 'read' | 'write' | 'all' | 'upload')
+        },
       },
     ],
   })
@@ -623,7 +616,63 @@ getKeys()
 
     <!-- Teleport Content for Add New Key Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
-      <div class="space-y-4 mt-4">
+      <div class="space-y-6">
+        <!-- API Key Type Selection -->
+        <div>
+          <div class="border rounded-lg p-4 dark:border-gray-600">
+            <div class="space-y-3">
+              <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                  <input
+                    v-model="selectedKeyType"
+                    type="radio"
+                    name="key-type"
+                    value="read"
+                    class="radio radio-primary mr-2"
+                  >
+                  <span class="label-text text-base">{{ t('key-read') }}</span>
+                </label>
+              </div>
+              <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                  <input
+                    v-model="selectedKeyType"
+                    type="radio"
+                    name="key-type"
+                    value="upload"
+                    class="radio radio-primary mr-2"
+                  >
+                  <span class="label-text text-base">{{ t('key-upload') }}</span>
+                </label>
+              </div>
+              <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                  <input
+                    v-model="selectedKeyType"
+                    type="radio"
+                    name="key-type"
+                    value="write"
+                    class="radio radio-primary mr-2"
+                  >
+                  <span class="label-text text-base">{{ t('write-key') }}</span>
+                </label>
+              </div>
+              <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                  <input
+                    v-model="selectedKeyType"
+                    type="radio"
+                    name="key-type"
+                    value="all"
+                    class="radio radio-primary mr-2"
+                  >
+                  <span class="label-text text-base">{{ t('key-all') }}</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Limit to Organizations -->
         <div class="flex items-center gap-2">
           <input

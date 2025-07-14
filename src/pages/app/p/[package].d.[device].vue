@@ -3,6 +3,7 @@ import type { Tab } from '~/components/comp_def'
 import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { greaterThan, parse } from '@std/semver'
+import { onClickOutside } from '@vueuse/core'
 import ky from 'ky'
 import { useI18n } from 'petite-vue-i18n'
 import { ref, watchEffect } from 'vue'
@@ -11,6 +12,7 @@ import { toast } from 'vue-sonner'
 import IconLog from '~icons/heroicons/document'
 import IconInformations from '~icons/heroicons/information-circle'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -58,6 +60,11 @@ const role = ref<OrganizationRole | null>(null)
 const reloadCount = ref(0)
 
 const revertToNativeVersion = ref<Database['public']['Functions']['check_revert_to_builtin_version']['Returns'] | null>(null)
+
+// Channel dropdown state
+const channelDropdown = ref<HTMLDetailsElement>()
+
+onClickOutside(channelDropdown, () => closeChannelDropdown())
 
 const tabs: Tab[] = [
   {
@@ -272,9 +279,21 @@ async function delDevChannel(device: string) {
     .eq('app_id', packageId.value)
 }
 
-async function updateChannelOverride(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  console.log('updateChannel', value)
+function closeChannelDropdown() {
+  if (channelDropdown.value) {
+    channelDropdown.value.removeAttribute('open')
+  }
+}
+
+function getChannelLabel(channelId: number | string | null) {
+  if (!channelId || channelId === 'none') {
+    return t('none')
+  }
+  const channel = channels.value.find(ch => ch.id === Number(channelId))
+  return channel?.name || t('none')
+}
+
+async function onSelectChannel(value: string) {
   const hasPerm = organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin', 'write'])
 
   if (!hasPerm) {
@@ -313,6 +332,8 @@ async function updateChannelOverride(event: Event) {
   else {
     toast.error(t('channel-link-fail'))
   }
+
+  closeChannelDropdown()
 }
 
 watchEffect(async () => {
@@ -346,7 +367,7 @@ function openChannel() {
           <br>
           {{ t('device-injected-2') }}
         </div>
-        <div class="flex flex-col overflow-y-auto bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
+        <div class="flex flex-col overflow-visible bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
           <dl :key="reloadCount" class="divide-y dark:divide-slate-500 divide-slate-200">
             <InfoRow :label="t('device-id')" :value="device.device_id" />
             <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
@@ -359,14 +380,30 @@ function openChannel() {
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
             <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
-              <select :value="channelDevice?.id || 'none'" class="dark:text-[#fdfdfd] dark:bg-[#4b5462] rounded-lg border-4 dark:border-[#4b5462]" @click.stop @change="updateChannelOverride">
-                <option value="none">
-                  {{ t('none') }}
-                </option>
-                <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-                  {{ ch.name }}
-                </option>
-              </select>
+              <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
+                <summary class="d-btn d-btn-outline d-btn-sm">
+                  <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
+                  <IconDown class="w-4 h-4 ml-1 fill-current" />
+                </summary>
+                <ul class="d-dropdown-content bg-base-200 rounded-box z-50 w-48 p-2 shadow-lg absolute right-0 top-full mt-1">
+                  <li class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectChannel('none')"
+                    >
+                      {{ t('none') }}
+                    </a>
+                  </li>
+                  <li v-for="ch in channels" :key="ch.id" class="block px-1 rounded-lg hover:bg-gray-600">
+                    <a
+                      class="block px-3 py-2 hover:bg-gray-600 text-white"
+                      @click="onSelectChannel(ch.id.toString())"
+                    >
+                      {{ ch.name }}
+                    </a>
+                  </li>
+                </ul>
+              </details>
             </InfoRow>
           </dl>
         </div>

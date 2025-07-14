@@ -2,7 +2,7 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
-import { FormKit } from '@formkit/vue'
+
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -206,7 +206,7 @@ async function showPermModal(invite: boolean): Promise<Database['public']['Enums
       },
     ],
   })
-  if (!await dialogStore.onDialogDismiss()) {
+  if (await dialogStore.onDialogDismiss()) {
     return undefined
   }
   return selectedPermission.value
@@ -878,13 +878,21 @@ async function handleInviteNewUserSubmit() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-user-perms')" defer to="#dialog-v2-content">
       <div class="w-full">
         <div class="border rounded-lg p-4 dark:border-gray-600">
-          <FormKit
-            v-model="selectedPermissionForm"
-            type="radio"
-            name="permission"
-            :options="permissionOptions"
-            @input="handleFormKitPermissionSelection"
-          />
+          <div class="space-y-3">
+            <div v-for="option in permissionOptions" :key="option.value" class="form-control">
+              <label class="label cursor-pointer justify-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <input
+                  v-model="selectedPermissionForm"
+                  type="radio"
+                  name="permission"
+                  :value="option.value"
+                  class="radio radio-primary mr-2"
+                  @change="handleFormKitPermissionSelection(option.value)"
+                >
+                <span class="label-text text-base">{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -893,27 +901,33 @@ async function handleInviteNewUserSubmit() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('delegate-super-admin-title')" defer to="#dialog-v2-content">
       <div class="w-full">
         <div class="flex md:w-auto overflow-hidden mb-5">
-          <FormKit
-            v-model="searchUserForAdminDelegation"
-            :placeholder="t('search-by-name-or-email')"
-            :prefix-icon="IconSearch"
-            :disabled="isLoading"
-            enterkeyhint="send"
-            :classes="{
-              outer: 'mb-0! md:w-90',
-              inner: 'rounded-full! py-1.5!',
-            }"
-          />
+          <div class="relative w-full">
+            <input
+              v-model="searchUserForAdminDelegation"
+              type="text"
+              :placeholder="t('search-by-name-or-email')"
+              :disabled="isLoading"
+              class="input input-bordered w-full pl-10 rounded-full"
+            >
+            <IconSearch class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          </div>
         </div>
         <div class="border rounded-lg p-4 dark:border-gray-600">
-          <FormKit
-            v-show="membersOptions?.length && membersOptions.length > 0"
-            v-model="selectedUserToDelegateAdmin"
-            type="radio"
-            name="admin-delegation"
-            :options="membersOptions"
-            @input="delegateSuperAdmin"
-          />
+          <div v-show="membersOptions?.length && membersOptions.length > 0" class="space-y-2">
+            <div v-for="option in membersOptions" :key="option.value" class="form-control">
+              <label class="label cursor-pointer justify-start gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg">
+                <input
+                  v-model="selectedUserToDelegateAdmin"
+                  type="radio"
+                  name="admin-delegation"
+                  :value="option.value"
+                  class="radio radio-primary mr-2"
+                  @change="delegateSuperAdmin(option.value)"
+                >
+                <span class="label-text">{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
           <div v-show="membersOptions?.length === 0">
             {{ t('no-results') }}
           </div>
