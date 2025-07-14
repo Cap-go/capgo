@@ -273,7 +273,7 @@ async function copyOrganizationId() {
                 {{ t('organization-id') }}
               </p>
               <div class="pt-2 md:pt-0 md:ml-6">
-                <button type="button" class="btn px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+                <button type="button" class="px-3 cursor-pointer py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
