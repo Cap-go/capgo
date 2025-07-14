@@ -275,12 +275,12 @@ function openPrivacy() {
             </div>
           </div>
         </div>
-        <div v-else>
-          <div class="flex flex-col items-center justify-center h-full mt-12">
+        <div v-else class="bg-white rounded-md shadow-md dark:bg-slate-800 p-6 mt-12">
+          <div class="flex flex-col items-center justify-center h-full">
             <p class="text-xl text-center">
               {{ t('invitation-page-not-found') }}
             </p>
-            <p class="text-md mt-2 text-center">
+            <p class="text-md mt-2 text-center mt-8">
               {{ t('you-can-still-join-capgo') }}
             </p>
             <p v-if="isError" class="text-md mt-2 text-center">
