@@ -385,6 +385,7 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
         password: 'ValidPassword123!!',
         magic_invite_string: 'nonexistent-invitation-id',
         optForNewsletters: false,
+        captchaToken: 'test-captcha-token',
       }),
     })
 
