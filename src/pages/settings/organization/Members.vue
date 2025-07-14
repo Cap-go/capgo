@@ -20,7 +20,6 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 
 import { useOrganizationStore } from '~/stores/organization'
-import { hasExactlyOneMatch } from '~/utils/arrayUtils.ts'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -488,7 +487,8 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
 }
 
 async function deleteMember(member: ExtendedOrganizationMember) {
-  if (hasExactlyOneMatch(members.value, 'role', m => m.role === 'super_admin' && m.uid === member.uid)) {
+  const numberOfSuperAdmins = members.value.filter(m => m.role === 'super_admin').length
+  if (numberOfSuperAdmins === 1) {
     await cannotDeleteOwner()
     return
   }
