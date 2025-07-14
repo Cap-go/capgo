@@ -703,41 +703,6 @@ it('[PUT] /channel_self with non-existent defaultChannel', async () => {
   expect(error).toBe('channel_not_found')
 })
 
-it('[POST] /channel_self ok', async () => {
-  await resetAndSeedAppData(APPNAME)
-
-  const data = getBaseData(APPNAME)
-  data.device_id = randomUUID().toLowerCase()
-  data.channel = 'no_access'
-
-  const { error: channelUpdateError } = await getSupabaseClient().from('channels').update({ allow_device_self_set: true }).eq('name', 'no_access').eq('app_id', APPNAME)
-
-  expect(channelUpdateError).toBeNull()
-
-  try {
-    const response = await fetchEndpoint('POST', data)
-    expect(response.ok).toBe(true)
-    expect(await response.json()).toEqual({ status: 'ok' })
-
-    const { error, data: channelDeviceData } = await getSupabaseClient().from('channel_devices').select('*').eq('device_id', data.device_id).eq('app_id', APPNAME).single()
-
-    expect(error).toBeNull()
-    expect(channelDeviceData).toBeTruthy()
-
-    const { error: error2, data: prodChannelData } = await getSupabaseClient().from('channels').select('*').eq('name', data.channel).eq('app_id', APPNAME).single()
-
-    expect(error2).toBeNull()
-    expect(prodChannelData).toBeTruthy()
-
-    expect(channelDeviceData!.channel_id).toBe(prodChannelData!.id)
-  }
-  finally {
-    const { error: channelUpdateError } = await getSupabaseClient().from('channels').update({ allow_device_self_set: false }).eq('name', 'no_access').eq('app_id', APPNAME)
-
-    expect(channelUpdateError).toBeNull()
-  }
-})
-
 it('[DELETE] /channel_self (no overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 

@@ -245,9 +245,9 @@ export async function getAppVersionPostgres(
       })
       .from(schema.app_versions)
       .where(and(
-        eq(schema.app_versions.app_id, appId), 
+        eq(schema.app_versions.app_id, appId),
         eq(schema.app_versions.name, versionName),
-        ...(allowedDeleted !== undefined ? [eq(schema.app_versions.deleted, allowedDeleted)] : [])
+        ...(allowedDeleted !== undefined ? [eq(schema.app_versions.deleted, allowedDeleted)] : []),
       ))
       .limit(1)
       .then(data => data[0])
@@ -256,5 +256,275 @@ export async function getAppVersionPostgres(
   catch (e: any) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getAppVersionPostgres', error: e })
     return null
+  }
+}
+
+export async function getAppVersionsByAppIdPg(
+  c: Context,
+  appId: string,
+  versionName: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ id: number, owner_org: string, name: string }[]> {
+  try {
+    const versions = await drizzleCient
+      .select({
+        id: schema.app_versions.id,
+        owner_org: schema.app_versions.owner_org,
+        name: schema.app_versions.name,
+      })
+      .from(schema.app_versions)
+      .where(and(
+        eq(schema.app_versions.app_id, appId),
+        or(eq(schema.app_versions.name, versionName), eq(schema.app_versions.name, 'builtin')),
+      ))
+      .limit(2)
+    return versions
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppVersionsByAppIdPg', error: e })
+    return []
+  }
+}
+
+export async function getChannelDeviceOverridePg(
+  c: Context,
+  appId: string,
+  deviceId: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ app_id: string, device_id: string, channel_id: { id: number, allow_device_self_set: boolean, name: string } } | null> {
+  try {
+    const result = await drizzleCient
+      .select({
+        app_id: schema.channel_devices.app_id,
+        device_id: schema.channel_devices.device_id,
+        channel_id: schema.channels.id,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        name: schema.channels.name,
+      })
+      .from(schema.channel_devices)
+      .leftJoin(schema.channels, eq(schema.channel_devices.channel_id, schema.channels.id))
+      .where(and(
+        eq(schema.channel_devices.app_id, appId),
+        eq(schema.channel_devices.device_id, deviceId),
+      ))
+      .limit(1)
+      .then(data => data[0])
+
+    if (!result)
+      return null
+
+    // If channel_devices exists but channel doesn't, return null (orphaned record)
+    if (!result.channel_id || result.allow_device_self_set === null || !result.name)
+      return null
+
+    return {
+      app_id: result.app_id,
+      device_id: result.device_id,
+      channel_id: {
+        id: result.channel_id,
+        allow_device_self_set: result.allow_device_self_set!,
+        name: result.name,
+      },
+    }
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelDeviceOverridePg', error: e })
+    return null
+  }
+}
+
+export async function getChannelByNamePg(
+  c: Context,
+  appId: string,
+  channelName: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ id: number, name: string, allow_device_self_set: boolean, owner_org: string } | null> {
+  try {
+    const channel = await drizzleCient
+      .select({
+        id: schema.channels.id,
+        name: schema.channels.name,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        owner_org: schema.channels.owner_org,
+      })
+      .from(schema.channels)
+      .where(and(
+        eq(schema.channels.app_id, appId),
+        eq(schema.channels.name, channelName),
+      ))
+      .limit(1)
+      .then(data => data[0])
+    return channel
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelByNamePg', error: e })
+    return null
+  }
+}
+
+export async function getMainChannelsPg(
+  c: Context,
+  appId: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ name: string, ios: boolean, android: boolean }[]> {
+  try {
+    const channels = await drizzleCient
+      .select({
+        name: schema.channels.name,
+        ios: schema.channels.ios,
+        android: schema.channels.android,
+      })
+      .from(schema.channels)
+      .where(and(
+        eq(schema.channels.app_id, appId),
+        eq(schema.channels.public, true),
+      ))
+    return channels
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getMainChannelsPg', error: e })
+    return []
+  }
+}
+
+export async function deleteChannelDevicePg(
+  c: Context,
+  appId: string,
+  deviceId: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean> {
+  try {
+    await drizzleCient
+      .delete(schema.channel_devices)
+      .where(and(
+        eq(schema.channel_devices.app_id, appId),
+        eq(schema.channel_devices.device_id, deviceId),
+      ))
+    return true
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'deleteChannelDevicePg', error: e })
+    return false
+  }
+}
+
+export async function upsertChannelDevicePg(
+  c: Context,
+  data: { device_id: string, channel_id: number, app_id: string, owner_org: string },
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean> {
+  try {
+    await drizzleCient
+      .insert(schema.channel_devices)
+      .values({
+        device_id: data.device_id,
+        channel_id: data.channel_id,
+        app_id: data.app_id,
+        created_by: null,
+      })
+      .onConflictDoUpdate({
+        target: [schema.channel_devices.device_id, schema.channel_devices.app_id],
+        set: {
+          channel_id: data.channel_id,
+          updated_at: new Date(),
+        },
+      })
+    return true
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'upsertChannelDevicePg', error: e })
+    return false
+  }
+}
+
+export async function getChannelsPg(
+  c: Context,
+  appId: string,
+  condition: { defaultChannel?: string } | { public: boolean },
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
+  try {
+    const whereConditions = [eq(schema.channels.app_id, appId)]
+
+    if ('defaultChannel' in condition && condition.defaultChannel) {
+      whereConditions.push(eq(schema.channels.name, condition.defaultChannel))
+    }
+    else if ('public' in condition) {
+      whereConditions.push(eq(schema.channels.public, condition.public))
+    }
+
+    const channels = await drizzleCient
+      .select({
+        id: schema.channels.id,
+        name: schema.channels.name,
+        ios: schema.channels.ios,
+        android: schema.channels.android,
+        public: schema.channels.public,
+      })
+      .from(schema.channels)
+      .where(and(...whereConditions))
+    return channels
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getChannelsPg', error: e })
+    return []
+  }
+}
+
+export async function getAppByIdPg(
+  c: Context,
+  appId: string,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ owner_org: string } | null> {
+  try {
+    const app = await drizzleCient
+      .select({
+        owner_org: schema.apps.owner_org,
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+    return app
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getAppByIdPg', error: e })
+    return null
+  }
+}
+
+export async function getCompatibleChannelsPg(
+  c: Context,
+  appId: string,
+  platform: 'ios' | 'android',
+  isEmulator: boolean,
+  isProd: boolean,
+  drizzleCient: ReturnType<typeof getDrizzleClient>,
+): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_dev: boolean, ios: boolean, android: boolean, public: boolean }[]> {
+  try {
+    const channels = await drizzleCient
+      .select({
+        id: schema.channels.id,
+        name: schema.channels.name,
+        allow_device_self_set: schema.channels.allow_device_self_set,
+        allow_emulator: schema.channels.allow_emulator,
+        allow_dev: schema.channels.allow_dev,
+        ios: schema.channels.ios,
+        android: schema.channels.android,
+        public: schema.channels.public,
+      })
+      .from(schema.channels)
+      .where(and(
+        eq(schema.channels.app_id, appId),
+        eq(schema.channels.allow_device_self_set, true),
+        eq(schema.channels.allow_emulator, isEmulator),
+        eq(schema.channels.allow_dev, isProd),
+        eq(platform === 'ios' ? schema.channels.ios : schema.channels.android, true),
+      ))
+    return channels
+  }
+  catch (e: any) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getCompatibleChannelsPg', error: e })
+    return []
   }
 }
