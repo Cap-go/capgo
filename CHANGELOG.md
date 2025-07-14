@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.12.0 (2025-07-14)
+
+
+### Features
+
+* add composite index for manifest table to optimize performance ([6669ce0](https://github.com/Cap-go/capgo/commit/6669ce017e04cb4f46c675a08a5a1eab11908284))
+
 ### 12.11.96 (2025-07-14)
 
 ### 12.11.95 (2025-07-11)
