@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type VueTurnstile from 'vue-turnstile'
 import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember, ExtendedOrganizationMembers } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
@@ -8,6 +7,7 @@ import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 // Import actual components instead of raw svg
 import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
