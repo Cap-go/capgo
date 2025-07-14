@@ -182,7 +182,7 @@
     "@capacitor/core": "^7.3.0",
     "@capgo/cli": "latest",
     "@cloudflare/workers-types": "4.20250614.0",
-    "@iconify-json/carbon": "1.2.9",
+    "@iconify-json/carbon": "1.2.10",
     "@iconify-json/heroicons": "^1.2.2",
     "@iconify-json/ion": "1.2.3",
     "@iconify-json/ls": "1.2.1",
