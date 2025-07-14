@@ -485,7 +485,7 @@ async function _deleteMember(member: ExtendedOrganizationMember) {
 
 async function deleteMember(member: ExtendedOrganizationMember) {
   const numberOfSuperAdmins = members.value.filter(m => m.role === 'super_admin').length
-  if (numberOfSuperAdmins === 1) {
+  if (numberOfSuperAdmins === 1 && member.role === 'super_admin') {
     await cannotDeleteOwner()
     return
   }
