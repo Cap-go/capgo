@@ -8,17 +8,14 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
-// Import actual components instead of raw svg
 import IconInformation from '~icons/heroicons/information-circle'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
-
 import IconSearch from '~icons/ic/round-search?raw'
 import Table from '~/components/Table.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-
 import { useOrganizationStore } from '~/stores/organization'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
