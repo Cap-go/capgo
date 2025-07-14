@@ -23,7 +23,7 @@ const acceptMarketing = ref(false)
 const showTermsError = ref(false)
 
 // Password validation
-const hasMinLength = computed(() => password.value.length >= 12)
+const hasMinLength = computed(() => password.value.length >= 6)
 const hasUppercase = computed(() => /[A-Z]/.test(password.value))
 const hasNumber = computed(() => /\d/.test(password.value))
 const hasSymbols = computed(() => {
@@ -36,7 +36,7 @@ const hasSymbols = computed(() => {
   // Return the count of matches, or 0 if no matches
   symbolCount = matches ? matches.length : 0
 
-  return symbolCount >= 2
+  return symbolCount >= 1
 })
 
 const isPasswordValid = computed(() =>
