@@ -420,7 +420,6 @@ export async function upsertChannelDevicePg(
         device_id: data.device_id,
         channel_id: data.channel_id,
         app_id: data.app_id,
-        created_by: null,
       })
       .onConflictDoUpdate({
         target: [schema.channel_devices.device_id, schema.channel_devices.app_id],

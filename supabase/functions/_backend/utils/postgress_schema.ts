@@ -100,7 +100,6 @@ export const channel_devices = pgTable('channel_devices', {
   device_id: text('device_id').notNull(),
   channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: varchar('app_id').notNull().references(() => apps.name),
-  created_by: uuid('created_by'),
 })
 
 export const orgs = pgTable('orgs', {
