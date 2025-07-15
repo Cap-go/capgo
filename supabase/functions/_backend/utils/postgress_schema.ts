@@ -100,9 +100,25 @@ export const channel_devices = pgTable('channel_devices', {
   device_id: text('device_id').notNull(),
   channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: varchar('app_id').notNull().references(() => apps.name),
+  owner_org: uuid('owner_org').notNull(),
 })
 
 export const orgs = pgTable('orgs', {
   id: uuid('id').notNull(),
   created_by: uuid('created_by').notNull(),
+  logo: text('logo'),
+  name: text('name').notNull(),
+  management_email: text('management_email').notNull(),
+  customer_id: text('customer_id'),
+})
+
+export const stripe_info = pgTable('stripe_info', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  customer_id: text('customer_id'),
+  status: text('status'),
+  trial_at: text('trial_at'),
+  is_good_plan: boolean('is_good_plan'),
+  mau_exceeded: boolean('mau_exceeded'),
+  storage_exceeded: boolean('storage_exceeded'),
+  bandwidth_exceeded: boolean('bandwidth_exceeded'),
 })
