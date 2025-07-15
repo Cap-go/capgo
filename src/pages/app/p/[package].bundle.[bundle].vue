@@ -798,12 +798,17 @@ async function deleteBundle() {
             <InfoRow
               v-if="!version.deleted"
               :label="t('status')"
-              :value="t('bundle-active')"
               :icon="IconTrash"
               :disabled="!organizationStore.hasPermisisonsInRole(role, ['admin', 'write', 'super_admin'])"
             >
-              <span class="text-red-500 dark:text-red-400 cursor-pointer underline underline-offset-4 active font-bold text-dust hover:text-red-600" @click="deleteBundle">
-                {{ t('bundle-delete') }}
+              <span class="">
+                {{ t('bundle-active') }}
+                <button
+                    class="p-1 rounded-md border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                    @click="deleteBundle"
+                  >
+                    <IconTrash class="w-4 h-4 text-red-500 dark:text-red-400 cursor-pointer hover:text-red-600 transition-colors" />
+                  </button>
               </span>
             </InfoRow>
 

@@ -369,19 +369,39 @@ function openChannel() {
         </div>
         <div class="flex flex-col overflow-visible bg-white shadow-lg border-slate-300 md:mx-auto md:mt-5 md:w-2/3 md:border dark:border-slate-900 md:rounded-lg dark:bg-gray-800">
           <dl :key="reloadCount" class="divide-y dark:divide-slate-500 divide-slate-200">
-            <InfoRow :label="t('device-id')" :value="device.device_id" />
-            <InfoRow v-if="device.custom_id" :label="t('custom-id')" :value="device.custom_id" />
-            <InfoRow v-if="device.updated_at" :label="t('last-update')" :value="formatDate(device.updated_at)" />
-            <InfoRow v-if="device.platform" :label="t('platform')" :value="device.platform" />
-            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')" :value="device.plugin_version" />
-            <InfoRow v-if="device.version.name" :label="t('version')" :value="device.version.name" />
-            <InfoRow v-if="device.version_build" :label="t('version-builtin')" :value="device.version_build" />
-            <InfoRow v-if="device.os_version" :label="t('os-version')" :value="device.os_version" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')" :value="device.is_emulator?.toString()" />
-            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')" :value="device.is_prod?.toString()" />
+            <InfoRow :label="t('device-id')">
+              {{ device.device_id }}
+            </InfoRow>
+            <InfoRow v-if="device.custom_id" :label="t('custom-id')">
+              {{ device.custom_id }}
+            </InfoRow>
+            <InfoRow v-if="device.updated_at" :label="t('last-update')">
+              {{ formatDate(device.updated_at) }}
+            </InfoRow>
+            <InfoRow v-if="device.platform" :label="t('platform')">
+              {{ device.platform }}
+            </InfoRow>
+            <InfoRow v-if="device.plugin_version" :label="t('plugin-version')">
+              {{ device.plugin_version }}
+            </InfoRow>
+            <InfoRow v-if="device.version.name" :label="t('version')">
+              {{ device.version.name }}
+            </InfoRow>
+            <InfoRow v-if="device.version_build" :label="t('version-builtin')">
+              {{ device.version_build }}
+            </InfoRow>
+            <InfoRow v-if="device.os_version" :label="t('os-version')">
+              {{ device.os_version }}
+            </InfoRow>
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_emulator" :label="t('is-emulator')">
+              {{ device.is_emulator?.toString() }}
+            </InfoRow>
+            <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
+              {{ device.is_prod?.toString() }}
+            </InfoRow>
             <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
               <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
-                <summary class="d-btn d-btn-outline d-btn-sm">
+                <summary class="d-btn d-btn-outline d-btn-sm text-gray-600">
                   <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
                   <IconDown class="w-4 h-4 ml-1 fill-current" />
                 </summary>
