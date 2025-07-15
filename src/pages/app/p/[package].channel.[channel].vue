@@ -870,7 +870,7 @@ async function handleRevert() {
           <template v-else-if="!dialogStore.showDialog">
             <div class="text-center">
               <div>{{ t('forced-devices-not-found') }}</div>
-              <div class="d-btn d-btn-primary mt-4" @click="AddDevice">
+              <div class="d-btn d-btn-primary mt-4 text-white" @click="AddDevice">
                 <plusOutline />
               </div>
             </div>
