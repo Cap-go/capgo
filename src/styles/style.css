@@ -31,15 +31,14 @@ layer(base);
   --color-success: #88d4a6;
   --color-warning: #ff7211;
   --color-error: #456b9a;
-  --radius-box: 0.5rem;
+  --radius-selector: 1rem;
   --radius-field: 0.5rem;
-  --radius-selector: 0.5rem;
-  --animation-btn: 0.25s;
-  --animation-input: 0.2s;
-  --btn-text-case: uppercase;
-  --btn-focus-scale: 0.95;
-  --border-btn: 1px;
-  --tab-border: 1px;
+  --radius-box: 1rem;
+  --size-selector: 0.3125rem;
+  --size-field: 0.28125rem;
+  --border: 0.5px;
+  --depth: 1;
+  --noise: 0;
 }
 
 @theme {

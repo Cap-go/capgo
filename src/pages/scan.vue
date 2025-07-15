@@ -231,7 +231,7 @@ async function goBack() {
   </div>
 </template>
 
-<style>
+<style scoped>
 /* Make WebView transparent when camera is running */
 body.camera-running {
   visibility: hidden;

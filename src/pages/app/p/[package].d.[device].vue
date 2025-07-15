@@ -399,9 +399,9 @@ function openChannel() {
             <InfoRow v-if="minVersion(device.plugin_version) && device.is_prod" :label="t('is-production-app')">
               {{ device.is_prod?.toString() }}
             </InfoRow>
-            <InfoRow :is-link="true" :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
+            <InfoRow :label="t('channel-link')" :value="channelDevice?.name ?? ''" @click="openChannel()">
               <details ref="channelDropdown" class="d-dropdown d-dropdown-end relative" @click.stop>
-                <summary class="d-btn d-btn-outline d-btn-sm text-gray-600">
+                <summary class="d-btn d-btn-outline d-btn-sm">
                   <span>{{ getChannelLabel(channelDevice?.id || 'none') }}</span>
                   <IconDown class="w-4 h-4 ml-1 fill-current" />
                 </summary>

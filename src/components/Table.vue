@@ -318,7 +318,7 @@ function getSkeletonWidth(columnIndex?: number) {
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden w-4 h-4 ml-2 md:block" />
           </button>
-          <ul class="p-2 bg-white shadow d-dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
+          <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input
