@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.12.22 (2025-07-15)
+
+
+### Bug Fixes
+
+* update SQL procedure call to function and adjust search path in retention test ([88c147f](https://github.com/Cap-go/capgo/commit/88c147fc48b4d10046ff38b4aca4022889290b3e))
+
 ### 12.12.21 (2025-07-15)
 
 ### 12.12.20 (2025-07-15)
