@@ -188,7 +188,7 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <section class="h-full py-12 overflow-y-auto max-h-fit bg-gray-50 dark:bg-gray-900 lg:py-20 sm:py-16">
+  <section class="h-full py-12 overflow-y-auto max-h-fit lg:py-20 sm:py-16">
     <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
       <div class="flex items-center justify-items-center place-content-center">
         <button v-if="!onboarding" class="bg-gray-800 text-white d-btn d-btn-outline mr-6" @click="emit('closeStep')">
