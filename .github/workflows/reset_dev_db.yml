@@ -1,0 +1,60 @@
+name: Reset Dev Database
+
+on:
+  schedule:
+    # Run every night at 2 AM UTC (adjust timezone as needed)
+    - cron: "0 2 * * *"
+  workflow_dispatch: # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  reset_dev_database:
+    runs-on: ubuntu-latest
+    name: Reset capgo-dev database
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Set development environment credentials
+        run: |
+          echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV
+          echo "SUPABASE_PROJECT_ID=${{ secrets.SUPABASE_PROJECT_ID_ALPHA }}" >> $GITHUB_ENV
+
+      - name: Link to development Supabase project
+        run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+
+      - name: Reset development database
+        run: |
+          echo "Resetting capgo-dev database..."
+          supabase db reset --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ capgo-dev database has been successfully reset and seeded"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Failed to reset capgo-dev database"
+          exit 1
