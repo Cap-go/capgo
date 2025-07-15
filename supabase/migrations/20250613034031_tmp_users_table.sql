@@ -17,6 +17,10 @@ CREATE TABLE public.tmp_users (
 -- Create unique index on both org_id and email
 CREATE UNIQUE INDEX tmp_users_org_id_email_idx ON public.tmp_users (org_id, email);
 
+CREATE POLICY "Disable for all" ON "public"."tmp_users" USING (false)
+WITH
+  CHECK (false);
+
 -- Create index on invite_magic_string for faster lookups
 CREATE INDEX tmp_users_invite_magic_string_idx ON public.tmp_users (invite_magic_string);
 
