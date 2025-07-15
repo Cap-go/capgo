@@ -27,8 +27,8 @@ SET version=(select id from app_versions where name='1.0.9839877812xyz' and app_
 where name='production';
 
 PERFORM tests.freeze_time('2035-01-01 00:00:00');
-ALTER PROCEDURE update_app_versions_retention() SET search_path = test_overrides, public, pg_temp, pg_catalog;
-CALL update_app_versions_retention();
+ALTER function update_app_versions_retention() SET search_path = test_overrides, public, pg_temp, pg_catalog;
+PERFORM update_app_versions_retention();
 
 RETURN NEXT IS ((select deleted from app_versions where name='1.0.9839877812abc' and app_id='com.demo.app'), true, 'update_app_versions_retention deleted unused bundle');
 RETURN NEXT IS ((select deleted from app_versions where name='1.0.9839877812xyz' and app_id='com.demo.app'), false, 'update_app_versions_retention did not delete bundle linked to channel');
