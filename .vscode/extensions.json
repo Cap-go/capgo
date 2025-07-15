@@ -6,6 +6,7 @@
     "antfu.iconify",
     "dbaeumer.vscode-eslint",
     "csstools.postcss",
-    "ReneSaarsoo.sql-formatter-vsc"
+    "ReneSaarsoo.sql-formatter-vsc",
+    "vitest.explorer"
   ]
 }
