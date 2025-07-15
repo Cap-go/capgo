@@ -18,8 +18,6 @@ export const apps = sqliteTable('apps', {
   last_version: text('last_version'),
   retention: integer('retention', { mode: 'number' }).notNull().default(2592000),
   owner_org: text('owner_org').notNull(),
-  default_upload_channel: text('default_upload_channel').default('dev').notNull(),
-  transfer_history: text('transfer_history', { mode: 'json' }),
 })
 
 export const app_versions = sqliteTable('app_versions', {
@@ -47,11 +45,11 @@ export const manifest = sqliteTable('manifest', {
 
 export const channels = sqliteTable('channels', {
   id: integer('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: text('owner_org').notNull(),
   name: text('name').notNull(),
   app_id: text('app_id').notNull(),
   version: integer('version', { mode: 'number' }).notNull(),
   created_by: text('created_by'),
-  owner_org: text('owner_org').notNull(),
   public: boolean('public').default(false).notNull(),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').default(true).notNull(),
   disable_auto_update: text('disable_auto_update').default('major').notNull(),

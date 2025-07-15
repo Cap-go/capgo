@@ -44,6 +44,7 @@ export const apps = pgTable('apps', {
   id: uuid('id').primaryKey().unique(),
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
 })
+
 export const app_versions = pgTable('app_versions', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
   owner_org: uuid('owner_org').notNull(),
@@ -95,12 +96,13 @@ export const channels = pgTable('channels', {
 })
 
 export const channel_devices = pgTable('channel_devices', {
+  id: bigint('id', { mode: 'number' }),
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').defaultNow(),
   device_id: text('device_id').notNull(),
   channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: varchar('app_id').notNull().references(() => apps.name),
-  owner_org: uuid('owner_org').notNull(),
+  owner_org: uuid('owner_org'),
 })
 
 export const orgs = pgTable('orgs', {
