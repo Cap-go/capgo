@@ -82,10 +82,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
 WITH
   SCHEMA "extensions";
 
-CREATE EXTENSION IF NOT EXISTS "wrappers"
-WITH
-  SCHEMA "extensions";
-
 CREATE TYPE "public"."action_type" AS ENUM('mau', 'storage', 'bandwidth');
 
 ALTER TYPE "public"."action_type" OWNER TO "postgres";
