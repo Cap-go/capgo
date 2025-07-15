@@ -3284,23 +3284,29 @@ $$;
 
 ALTER FUNCTION "public"."trigger_http_queue_post_to_function_d1" () OWNER TO "postgres";
 
-CREATE PROCEDURE "public"."update_app_versions_retention" () LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention" () RETURNS void LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
 BEGIN
+    -- Use a more efficient approach with direct timestamp comparison
     UPDATE public.app_versions
     SET deleted = true
-    where extract(epoch from now()) - extract(epoch FROM public.app_versions.created_at) > ((select retention FROM public.apps where app_id=app_versions.app_id))
-    AND NOT EXISTS (
-        SELECT 1
-        FROM public.channels
-        WHERE app_id = app_versions.app_id
-          AND app_versions.id = channels.version
-    );
+    WHERE app_versions.deleted = false  -- Filter non-deleted first
+      AND app_versions.created_at < (
+          SELECT now() - make_interval(secs => apps.retention)
+          FROM public.apps
+          WHERE apps.app_id = app_versions.app_id
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM public.channels
+          WHERE channels.app_id = app_versions.app_id
+            AND channels.version = app_versions.id
+      );
 END;
 $$;
 
-ALTER PROCEDURE "public"."update_app_versions_retention" () OWNER TO "postgres";
+ALTER FUNCTION "public"."update_app_versions_retention" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."verify_mfa" () RETURNS boolean LANGUAGE "plpgsql"
 SET
@@ -4026,6 +4032,10 @@ CREATE INDEX "idx_app_versions_created_at" ON "public"."app_versions" USING "btr
 CREATE INDEX "idx_app_versions_created_at_app_id" ON "public"."app_versions" USING "btree" ("created_at", "app_id");
 
 CREATE INDEX "idx_app_versions_deleted" ON "public"."app_versions" USING "btree" ("deleted");
+
+CREATE INDEX "idx_app_versions_retention_cleanup" ON "public"."app_versions" USING "btree" ("deleted", "created_at", "app_id")
+WHERE
+  ("deleted" = false);
 
 CREATE INDEX "idx_app_versions_id" ON "public"."app_versions" USING "btree" ("id");
 
@@ -6502,11 +6512,11 @@ GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "a
 
 GRANT ALL ON FUNCTION "public"."trigger_http_queue_post_to_function_d1" () TO "service_role";
 
-GRANT ALL ON PROCEDURE "public"."update_app_versions_retention" () TO "anon";
+GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "anon";
 
-GRANT ALL ON PROCEDURE "public"."update_app_versions_retention" () TO "authenticated";
+GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "authenticated";
 
-GRANT ALL ON PROCEDURE "public"."update_app_versions_retention" () TO "service_role";
+GRANT ALL ON FUNCTION "public"."update_app_versions_retention" () TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."verify_mfa" () TO "anon";
 
@@ -7084,7 +7094,7 @@ SELECT
   cron.schedule (
     'Delete old app version',
     '40 0 * * *',
-    'CALL update_app_versions_retention();'
+    'SELECT update_app_versions_retention();'
   );
 
 SELECT
