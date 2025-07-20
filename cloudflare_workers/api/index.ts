@@ -1,4 +1,3 @@
-import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
@@ -43,6 +42,7 @@ import { app as on_version_update } from '../../supabase/functions/_backend/trig
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
 const functionName = 'api'

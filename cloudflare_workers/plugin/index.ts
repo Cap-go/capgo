@@ -1,4 +1,3 @@
-import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
@@ -6,6 +5,7 @@ import { app as updates_lite } from '../../supabase/functions/_backend/plugins/u
 import { app as latency_drizzle } from '../../supabase/functions/_backend/private/latency_drizzle.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/tus/uploadHandler.ts'
 
