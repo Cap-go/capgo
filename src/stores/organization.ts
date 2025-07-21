@@ -55,12 +55,16 @@ export const useOrganizationStore = defineStore('organization', () => {
   const currentOrganization = ref<Organization | undefined>(undefined)
   const currentRole = ref<OrganizationRole | null>(null)
 
+  const STORAGE_KEY = 'capgo_current_org_id'
+
   watch(currentOrganization, async (currentOrganizationRaw) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
+      localStorage.removeItem(STORAGE_KEY)
       return
     }
 
+    localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
   })
@@ -204,6 +208,18 @@ export const useOrganizationStore = defineStore('organization', () => {
     })
 
     _organizations.value = new Map(mappedData.map(item => [item.id.toString(), item]))
+
+    // Try to restore from localStorage first
+    if (!currentOrganization.value) {
+      const storedOrgId = localStorage.getItem(STORAGE_KEY)
+      if (storedOrgId) {
+        const storedOrg = data.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        if (storedOrg) {
+          currentOrganization.value = storedOrg
+        }
+      }
+    }
+
     currentOrganization.value ??= organization
 
     // console.log('done', currentOrganization.value)
