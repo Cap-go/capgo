@@ -29,8 +29,8 @@ app.put('/:id', middlewareKey(['all']), async (c) => {
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,
     mode,
-    limited_to_apps,
-    limited_to_orgs,
+    limited_to_apps: limited_to_apps.length > 0 ? limited_to_apps : [],
+    limited_to_orgs: limited_to_orgs.length > 0 ? limited_to_orgs : [],
   }
 
   if (name !== undefined && typeof name !== 'string') {
