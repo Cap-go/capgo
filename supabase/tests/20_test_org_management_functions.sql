@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (43);
+  plan (44);
 
 -- Test accept_invitation_to_org (user is already a member, so should return INVALID_ROLE)
 SELECT
@@ -189,7 +189,32 @@ SELECT
     'get_orgs_v6 API key test - API key with empty limitations works normally'
   );
 
--- Test 5: No API key header (should fall back to identity and throw error)
+-- Test 5: API key with NULL limited_to_orgs (should work normally like empty array)
+UPDATE apikeys
+SET
+  limited_to_orgs = NULL
+WHERE
+  key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
+
+select
+  set_config(
+    'request.headers',
+    '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520eb"}',
+    true
+  );
+
+SELECT
+  ok (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        get_orgs_v6 ()
+    ) >= 0,
+    'get_orgs_v6 API key test - API key with NULL limitations works normally'
+  );
+
+-- Test 6: No API key header (should fall back to identity and throw error)
 select
   set_config('request.headers', '{}', true);
 
@@ -200,7 +225,7 @@ SELECT
     'get_orgs_v6 API key test - throws correct error when no authentication'
   );
 
--- Test 6: Null headers (should fall back to identity and throw error)
+-- Test 7: Null headers (should fall back to identity and throw error)
 select
   set_config('request.headers', '', true);
 

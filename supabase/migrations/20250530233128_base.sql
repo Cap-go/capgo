@@ -1209,7 +1209,7 @@ Begin
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN
+    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN 
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN NULL;
       END IF;
@@ -1255,7 +1255,7 @@ Begin
   limit 1 into api_key;
 
   if api_key IS DISTINCT FROM  NULL THEN
-    IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN
+    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN 
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN NULL;
       END IF;
@@ -1588,7 +1588,7 @@ BEGIN
     user_id := api_key.user_id;
     
     -- Check limited_to_orgs only if api_key exists and has restrictions
-    IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
+    IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN    
       return query select orgs.* FROM public.get_orgs_v6(user_id) orgs 
       where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
       RETURN;
@@ -2107,7 +2107,7 @@ Begin
   org_id := public.get_user_main_org_id_by_app_id(appid);
 
   SELECT * FROM public.apikeys WHERE key = apikey INTO api_key;
-  IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN
+  IF api_key.limited_to_orgs IS NOT NULL AND api_key.limited_to_orgs != '{}' THEN 
       IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
           RETURN false;
       END IF;
