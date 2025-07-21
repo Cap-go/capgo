@@ -1158,8 +1158,8 @@ DECLARE
     api_key_text text;
     api_key record;
 Begin
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
-
+  SELECT "public"."get_apikey_header"() into api_key_text;
+  
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
     RETURN NULL;
@@ -1195,7 +1195,7 @@ Begin
     RETURN auth_uid;
   END IF;
 
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
+  SELECT "public"."get_apikey_header"() into api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1241,7 +1241,7 @@ Begin
     RETURN auth_uid;
   END IF;
 
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
+  SELECT "public"."get_apikey_header"() into api_key_text;
 
   -- No api key found in headers, return
   IF api_key_text IS NULL THEN
@@ -1574,33 +1574,34 @@ DECLARE
   api_key record;
   user_id uuid;
 BEGIN
-  SELECT (("current_setting"('request.headers'::"text", true))::"json" ->> 'capgkey'::"text") into api_key_text;
-  
-  -- Initialize user_id as NULL
+  SELECT "public"."get_apikey_header"() into api_key_text;
   user_id := NULL;
   
   -- Check for API key first
   IF api_key_text IS NOT NULL THEN
     SELECT * FROM public.apikeys WHERE key=api_key_text into api_key;
-    IF api_key IS NOT NULL THEN
-      user_id := api_key.user_id;
-      
-      -- Check limited_to_orgs only if api_key exists and has restrictions
-      IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
-        return query select orgs.* FROM public.get_orgs_v6(user_id) orgs 
-        where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
-        RETURN;
-      END IF;
+    
+    IF api_key IS NULL THEN
+      RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+    
+    user_id := api_key.user_id;
+    
+    -- Check limited_to_orgs only if api_key exists and has restrictions
+    IF api_key.limited_to_orgs IS DISTINCT FROM '{}' THEN    
+      return query select orgs.* FROM public.get_orgs_v6(user_id) orgs 
+      where orgs.gid = ANY(api_key.limited_to_orgs::uuid[]);
+      RETURN;
     END IF;
   END IF;
 
   -- If no valid API key user_id yet, try to get FROM public.identity
   IF user_id IS NULL THEN
     SELECT public.get_identity() into user_id;
-  END IF;
-
-  IF user_id IS NULL THEN
-    RAISE EXCEPTION 'Cannot do that as postgres!';
+    
+    IF user_id IS NULL THEN
+      RAISE EXCEPTION 'No authentication provided - API key or valid session required';
+    END IF;
   END IF;
 
   return query select * FROM public.get_orgs_v6(user_id);
@@ -1997,6 +1998,29 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
 );
 
 ALTER TABLE "public"."app_versions" OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."get_apikey_header" () RETURNS "text" LANGUAGE "plpgsql"
+SET
+  search_path = '' SECURITY DEFINER AS $$
+DECLARE
+  headers_text text;
+BEGIN
+  headers_text := "current_setting"('request.headers'::"text", true);
+  
+  IF headers_text IS NULL OR headers_text = '' THEN
+    RETURN NULL;
+  END IF;
+  
+  BEGIN
+    RETURN (headers_text::"json" ->> 'capgkey'::"text");
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN NULL;
+  END;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_apikey_header" () OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_versions_with_no_metadata" () RETURNS SETOF "public"."app_versions" LANGUAGE "plpgsql"
 SET
@@ -4431,12 +4455,8 @@ SELECT
   TO "anon" USING (
     "public"."is_allowed_capgkey" (
       (
-        (
-          (
-            SELECT
-              "current_setting" ('request.headers'::"text", true) AS "current_setting"
-          )
-        )::"json" ->> 'capgkey'::"text"
+        SELECT
+          "public"."get_apikey_header" ()
       ),
       '{all,write}'::"public"."key_mode" [],
       "app_id"
@@ -6829,7 +6849,7 @@ CREATE POLICY "All all users to act" ON "storage"."objects" USING (true)
 WITH
   CHECK (true);
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objects" FOR DELETE USING (
+CREATE POLICY "Allow user or apikey to delete they own folder in images" ON "storage"."objects" FOR DELETE USING (
   (
     ("bucket_id" = 'images'::"text")
     AND (
@@ -6844,20 +6864,13 @@ CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objec
       OR (
         (
           (
-            "public"."get_user_id" (
-              (
-                (
-                  "current_setting" ('request.headers'::"text", true)
-                )::"json" ->> 'capgkey'::"text"
-              )
-            )
+            "public"."get_user_id" (("public"."get_apikey_header" ()))
           )::"text" = ("storage"."foldername" ("name")) [0]
         )
         AND "public"."is_allowed_capgkey" (
           (
-            (
-              "current_setting" ('request.headers'::"text", true)
-            )::"json" ->> 'capgkey'::"text"
+            SELECT
+              "public"."get_apikey_header" ()
           ),
           '{all}'::"public"."key_mode" [],
           (("storage"."foldername" ("name")) [1])::character varying
@@ -6867,7 +6880,7 @@ CREATE POLICY "All user to manage they own folder 1ffg0oo_0" ON "storage"."objec
   )
 );
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_1" ON "storage"."objects"
+CREATE POLICY "Allow user or apikey to update they own folder in images" ON "storage"."objects"
 FOR UPDATE
   USING (
     (
@@ -6884,20 +6897,13 @@ FOR UPDATE
         OR (
           (
             (
-              "public"."get_user_id" (
-                (
-                  (
-                    "current_setting" ('request.headers'::"text", true)
-                  )::"json" ->> 'capgkey'::"text"
-                )
-              )
+              "public"."get_user_id" (("public"."get_apikey_header" ()))
             )::"text" = ("storage"."foldername" ("name")) [0]
           )
           AND "public"."is_allowed_capgkey" (
             (
-              (
-                "current_setting" ('request.headers'::"text", true)
-              )::"json" ->> 'capgkey'::"text"
+              SELECT
+                "public"."get_apikey_header" ()
             ),
             '{write,all}'::"public"."key_mode" [],
             (("storage"."foldername" ("name")) [1])::character varying
@@ -6907,7 +6913,7 @@ FOR UPDATE
     )
   );
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_2" ON "storage"."objects" FOR INSERT
+CREATE POLICY "Allow user or apikey to insert they own folder in images" ON "storage"."objects" FOR INSERT
 WITH
   CHECK (
     (
@@ -6926,18 +6932,16 @@ WITH
             (
               "public"."get_user_id" (
                 (
-                  (
-                    "current_setting" ('request.headers'::"text", true)
-                  )::"json" ->> 'capgkey'::"text"
+                  SELECT
+                    "public"."get_apikey_header" ()
                 )
               )
             )::"text" = ("storage"."foldername" ("name")) [0]
           )
           AND "public"."is_allowed_capgkey" (
             (
-              (
-                "current_setting" ('request.headers'::"text", true)
-              )::"json" ->> 'capgkey'::"text"
+              SELECT
+                "public"."get_apikey_header" ()
             ),
             '{write,all}'::"public"."key_mode" [],
             (("storage"."foldername" ("name")) [1])::character varying
@@ -6947,7 +6951,7 @@ WITH
     )
   );
 
-CREATE POLICY "All user to manage they own folder 1ffg0oo_3" ON "storage"."objects" FOR
+CREATE POLICY "Allow user or apikey to read they own folder in images" ON "storage"."objects" FOR
 SELECT
   USING (
     (
@@ -6964,20 +6968,13 @@ SELECT
         OR (
           (
             (
-              "public"."get_user_id" (
-                (
-                  (
-                    "current_setting" ('request.headers'::"text", true)
-                  )::"json" ->> 'capgkey'::"text"
-                )
-              )
+              "public"."get_user_id" ("public"."get_apikey_header" ())
             )::"text" = ("storage"."foldername" ("name")) [0]
           )
           AND "public"."is_allowed_capgkey" (
             (
-              (
-                "current_setting" ('request.headers'::"text", true)
-              )::"json" ->> 'capgkey'::"text"
+              SELECT
+                "public"."get_apikey_header" ()
             ),
             '{read,all}'::"public"."key_mode" [],
             (("storage"."foldername" ("name")) [1])::character varying
@@ -6987,32 +6984,137 @@ SELECT
     )
   );
 
-CREATE POLICY "Allow apikey to manage they folder" ON "storage"."objects" FOR
-SELECT
-  TO "anon" USING (
+CREATE POLICY "Allow user or apikey to delete they own folder in apps" ON "storage"."objects" FOR DELETE USING (
+  (
+    ("bucket_id" = 'apps'::"text")
+    AND (
+      (
+        (
+          (
+            SELECT
+              "auth"."uid" () AS "uid"
+          )
+        )::"text" = ("storage"."foldername" ("name")) [0]
+      )
+      OR (
+        (
+          (
+            "public"."get_user_id" (("public"."get_apikey_header" ()))
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        AND "public"."is_allowed_capgkey" (
+          (
+            SELECT
+              "public"."get_apikey_header" ()
+          ),
+          '{all}'::"public"."key_mode" [],
+          (("storage"."foldername" ("name")) [1])::character varying
+        )
+      )
+    )
+  )
+);
+
+CREATE POLICY "Allow user or apikey to update they own folder in apps" ON "storage"."objects"
+FOR UPDATE
+  USING (
     (
       ("bucket_id" = 'apps'::"text")
-      AND "public"."check_min_rights" (
-        'read'::"public"."user_min_right",
-        "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" []),
-        (("storage"."foldername" ("name")) [0])::"uuid",
-        (("storage"."foldername" ("name")) [1])::character varying,
-        NULL::bigint
+      AND (
+        (
+          (
+            (
+              SELECT
+                "auth"."uid" () AS "uid"
+            )
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        OR (
+          (
+            (
+              "public"."get_user_id" (("public"."get_apikey_header" ()))
+            )::"text" = ("storage"."foldername" ("name")) [0]
+          )
+          AND "public"."is_allowed_capgkey" (
+            (
+              SELECT
+                "public"."get_apikey_header" ()
+            ),
+            '{write,all}'::"public"."key_mode" [],
+            (("storage"."foldername" ("name")) [1])::character varying
+          )
+        )
       )
     )
   );
 
-CREATE POLICY "Allow apikey to manage they folder 21" ON "storage"."objects" FOR INSERT TO "anon"
+CREATE POLICY "Allow user or apikey to insert they own folder in apps" ON "storage"."objects" FOR INSERT
 WITH
   CHECK (
     (
-      ("bucket_id" = 'images'::"text")
-      AND "public"."check_min_rights" (
-        'read'::"public"."user_min_right",
-        "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" []),
-        (("storage"."foldername" ("name")) [0])::"uuid",
-        (("storage"."foldername" ("name")) [1])::character varying,
-        NULL::bigint
+      ("bucket_id" = 'apps'::"text")
+      AND (
+        (
+          (
+            (
+              SELECT
+                "auth"."uid" () AS "uid"
+            )
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        OR (
+          (
+            (
+              "public"."get_user_id" (
+                (
+                  SELECT
+                    "public"."get_apikey_header" ()
+                )
+              )
+            )::"text" = ("storage"."foldername" ("name")) [0]
+          )
+          AND "public"."is_allowed_capgkey" (
+            (
+              SELECT
+                "public"."get_apikey_header" ()
+            ),
+            '{write,all}'::"public"."key_mode" [],
+            (("storage"."foldername" ("name")) [1])::character varying
+          )
+        )
+      )
+    )
+  );
+
+CREATE POLICY "Allow user or apikey to read they own folder in apps" ON "storage"."objects" FOR
+SELECT
+  USING (
+    (
+      ("bucket_id" = 'apps'::"text")
+      AND (
+        (
+          (
+            (
+              SELECT
+                "auth"."uid" () AS "uid"
+            )
+          )::"text" = ("storage"."foldername" ("name")) [0]
+        )
+        OR (
+          (
+            (
+              "public"."get_user_id" ("public"."get_apikey_header" ())
+            )::"text" = ("storage"."foldername" ("name")) [0]
+          )
+          AND "public"."is_allowed_capgkey" (
+            (
+              SELECT
+                "public"."get_apikey_header" ()
+            ),
+            '{read,all}'::"public"."key_mode" [],
+            (("storage"."foldername" ("name")) [1])::character varying
+          )
+        )
       )
     )
   );
