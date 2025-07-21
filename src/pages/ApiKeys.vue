@@ -322,8 +322,8 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
         key: newApiKey,
         mode: keyType,
         name: '',
-        limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : null,
-        limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : null,
+        limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
+        limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
       })
       .select()
 
