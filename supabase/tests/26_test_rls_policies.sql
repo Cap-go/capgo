@@ -318,12 +318,14 @@ SELECT
     'objects',
     ARRAY[
       'All all users to act',
-      'All user to manage they own folder 1ffg0oo_0',
-      'All user to manage they own folder 1ffg0oo_1',
-      'All user to manage they own folder 1ffg0oo_2',
-      'All user to manage they own folder 1ffg0oo_3',
-      'Allow apikey to manage they folder',
-      'Allow apikey to manage they folder 21'
+      'Allow user or apikey to delete they own folder in apps',
+      'Allow user or apikey to delete they own folder in images',
+      'Allow user or apikey to insert they own folder in apps',
+      'Allow user or apikey to insert they own folder in images',
+      'Allow user or apikey to read they own folder in apps',
+      'Allow user or apikey to read they own folder in images',
+      'Allow user or apikey to update they own folder in apps',
+      'Allow user or apikey to update they own folder in images'
     ],
     'storage.objects should have correct policies'
   );
