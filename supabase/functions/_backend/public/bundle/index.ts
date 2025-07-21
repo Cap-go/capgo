@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { GetLatest } from './get.ts'
 import { getBodyOrQuery, honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { createBundle } from './create.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
 import { setChannel } from './set_channel.ts'
@@ -27,4 +28,10 @@ app.put('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return setChannel(c, body, apikey)
+})
+
+app.post('/', middlewareKey(['all', 'write']), async (c) => {
+  const body = await getBodyOrQuery<any>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return createBundle(c, body, apikey)
 })
