@@ -21,7 +21,7 @@ import { checkKey, checkKeyById, getEnv } from './utils.ts'
 
 export const useCors = cors({
   origin: '*',
-  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info', ],
+  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
   allowMethods: ['POST', 'GET', 'OPTIONS'],
 })
 
