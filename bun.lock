@@ -103,7 +103,7 @@
         "@capacitor/core": "^7.3.0",
         "@capgo/cli": "latest",
         "@cloudflare/workers-types": "4.20250614.0",
-        "@iconify-json/carbon": "1.2.10",
+        "@iconify-json/carbon": "1.2.11",
         "@iconify-json/heroicons": "^1.2.2",
         "@iconify-json/ion": "1.2.4",
         "@iconify-json/ls": "1.2.1",
@@ -766,7 +766,7 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.2", "", {}, "sha512-xeO57FpIu4p1Ri3Jq/EXq4ClRm86dVF2z/+kvFnyqVYRavTZmaFaUBbWCOuuTh0o/g7DSsk6kc2vrS4Vl5oPOQ=="],
 
-    "@iconify-json/carbon": ["@iconify-json/carbon@1.2.10", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-Z+psKjwGZ9wZu+mVOStmIqHux1OWc8AtDiJ4eHmOkbcW5SMoGVtsQ6LWGJcYguT+9q9YgGihUTvHEnQSPWKGiQ=="],
+    "@iconify-json/carbon": ["@iconify-json/carbon@1.2.11", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-fWcoR0V4dLGLsgUvgjioBcTmj+l8NlMMEP/aMMUwR9PWAr5mCBg52rsTe/bvOnL1zj9PUCNxaj2M4H27GrnO3g=="],
 
     "@iconify-json/heroicons": ["@iconify-json/heroicons@1.2.2", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-qoW4pXr5kTTL6juEjgTs83OJIwpePu7q1tdtKVEdj+i0zyyVHgg/dd9grsXJQnpTpBt6/VwNjrXBvFjRsKPENg=="],
 
