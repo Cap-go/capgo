@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.12.42 (2025-07-22)
+
+
+### Bug Fixes
+
+* add 'apikey' to allowed CORS headers for API requests ([433afaf](https://github.com/Cap-go/capgo/commit/433afafc284c7e3aa28b1dd5becdf6826e335d82))
+
 ### 12.12.41 (2025-07-22)
 
 
