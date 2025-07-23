@@ -1,15 +1,12 @@
 <script setup lang="ts">
-import type { Stat } from '~/components/comp_def'
-import type { ArrayElement } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
-import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
+import { getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -20,43 +17,6 @@ const { t } = useI18n()
 const mainStore = useMainStore()
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('plans')
-
-interface PlansOrgData {
-  stats: {
-    mau: number
-    storage: number
-    bandwidth: number
-  }
-  planSuggest: string
-  planCurrrent: string
-  planPercent: number
-  detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>
-  paying: boolean
-  trialDaysLeft: number
-}
-
-function defaultPlanOrgData(): PlansOrgData {
-  return {
-    stats: {
-      mau: 0,
-      storage: 0,
-      bandwidth: 0,
-    },
-    planCurrrent: '',
-    planPercent: -1,
-    planSuggest: '',
-    paying: false,
-    trialDaysLeft: 0,
-    detailPlanUsage: {
-      total_percent: 0,
-      mau_percent: 0,
-      bandwidth_percent: 0,
-      storage_percent: 0,
-    },
-  }
-}
-
-const orgsHashmap = ref(new Map<string, PlansOrgData>())
 
 // const isUsageLoading = ref(false)
 const initialLoad = ref(false)
@@ -70,8 +30,6 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
-const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -94,6 +52,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
 
     features.push('Dedicated support')
     features.push('Custom Domain')
+    features.push('SOC II')
   }
   return features.filter(Boolean)
 }
@@ -105,17 +64,13 @@ function convertKey(key: string) {
   return key
 }
 
-const currentData = computed(() => orgsHashmap.value.get(currentOrganization.value?.gid ?? ''))
-
+const currentPlan = ref<Database['public']['Tables']['plans']['Row'] | undefined>(undefined)
 const currentPlanSuggest = ref<Database['public']['Tables']['plans']['Row'] | undefined>(undefined)
-watchEffect(() => {
-  currentPlanSuggest.value = mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest)
-})
+
 watch(() => main.bestPlan, (newBestPlan) => {
   currentPlanSuggest.value = mainStore.plans.find(plan => plan.name === newBestPlan)
 })
-// watchEffect(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
-const currentPlan = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planCurrrent))
+
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
@@ -140,13 +95,6 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
   return t === 'y'
 }
 
-function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
-
-  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
-}
-
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -158,40 +106,15 @@ async function loadData(initial: boolean) {
   if (!orgId)
     throw new Error('Cannot get current org id')
 
-  if (orgsHashmap.value.has(orgId))
-    return
-
-  const data = defaultPlanOrgData()
-
-  await Promise.all([
-    getCurrentPlanNameOrg(orgId).then((res) => {
-      data.planCurrrent = res
-      // updateData()
-    }),
-    getPlanUsagePercent(orgId).then((res) => {
-      // console.log('getPlanUsagePercent', res)
-      data.planPercent = res.total_percent
-      data.detailPlanUsage = res
-      // updateData()
-    }).catch(err => console.log(err)),
-    // isPayingOrg(orgId).then(res => {
-    //   data.paying = res
-    // })
-  ])
-  data.stats = main.totalStats
-  data.planSuggest = main.bestPlan
-
-  data.stats = main.totalStats
-  data.planSuggest = main.bestPlan
-  data.paying = orgToLoad.paying
-  data.trialDaysLeft = orgToLoad.trial_left
-
-  orgsHashmap.value.set(orgId, data)
+  getCurrentPlanNameOrg(orgId).then((res) => {
+    console.log('getCurrentPlanNameOrg', res)
+    currentPlan.value = main.plans.find(plan => plan.name === res)
+  })
   initialLoad.value = true
 }
 
 const failed = computed(() => {
-  return !(!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value)
+  return !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
 })
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
@@ -259,7 +182,7 @@ watchEffect(async () => {
 function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isMobile)
     return t('check-on-web')
-  if (currentPlan.value?.name === p.name && currentData.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
+  if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
   if (isTrial.value || failed.value) {
@@ -282,34 +205,6 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     'cursor-not-allowed bg-gray-500 dark:bg-gray-400': isDisabled(p),
   }
 }
-
-const hightLights = computed<Stat[]>(() => ([
-  {
-    label: !failed.value ? t('Current') : t('failed'),
-    value: currentPlan.value?.name,
-  },
-  {
-    label: t('usage'),
-    value: (currentData.value && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
-    informationIcon: () => {
-      if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
-        return
-
-      dialogStore.openDialog({
-        title: t('detailed-usage-plan'),
-        buttons: [
-          {
-            text: t('ok'),
-          },
-        ],
-      })
-    },
-  },
-  {
-    label: t('best-plan'),
-    value: currentPlanSuggest.value?.name,
-  },
-]))
 </script>
 
 <template>
@@ -327,13 +222,6 @@ const hightLights = computed<Stat[]>(() => ([
         <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
           {{ t('plan-failed') }}
         </div>
-        <section class="px-4 md:px-8 pt-4 sm:px-0">
-          <BlurBg :mini="true">
-            <template #default>
-              <StatsBar :mini="true" :stats="hightLights" />
-            </template>
-          </BlurBg>
-        </section>
         <div class="flex items-center justify-center mt-8 space-x-6 sm:mt-12">
           <div class="flex items-center cursor-pointer" @click="segmentVal = 'm'">
             <input
@@ -360,8 +248,8 @@ const hightLights = computed<Stat[]>(() => ([
             </span>
           </div>
         </div>
-        <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
+        <div class="mt-6 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
+          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0 bg-gray-50" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
             <div v-if="isRecommended(p)" class="absolute top-0 right-0 flex items-start -mt-8 border-none">
               <svg
                 class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -549,40 +437,6 @@ const hightLights = computed<Stat[]>(() => ([
         </router-link>
       </div>
     </div>
-
-    <!-- Teleport for Detailed Usage Plan Dialog -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('detailed-usage-plan')" defer to="#dialog-v2-content">
-      <div class="space-y-4">
-        <div class="text-sm">
-          <div class="font-medium text-gray-900 dark:text-white mb-2">
-            {{ t('billing-cycle') }} {{ dayjs(cycleStart).format('YYYY/MM/D') }} {{ t('to') }} {{ dayjs(cycleEnd).format('YYYY/MM/D') }}
-          </div>
-
-          <div class="font-medium text-gray-900 dark:text-white mb-3">
-            {{ t('your-ussage') }}
-          </div>
-
-          <div class="space-y-2 text-gray-600 dark:text-gray-400">
-            <div class="flex justify-between">
-              <span>{{ t('mau-usage') }}</span>
-              <span class="font-medium">{{ currentData?.detailPlanUsage.mau_percent }}%</span>
-            </div>
-            <div class="flex justify-between">
-              <span>{{ t('bandwith-usage') }}</span>
-              <span class="font-medium">{{ currentData?.detailPlanUsage.bandwidth_percent }}%</span>
-            </div>
-            <div class="flex justify-between">
-              <span>{{ t('storage-usage') }}</span>
-              <span class="font-medium">{{ currentData?.detailPlanUsage.storage_percent }}%</span>
-            </div>
-          </div>
-
-          <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-line">
-            {{ lastRunDate() }}
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 

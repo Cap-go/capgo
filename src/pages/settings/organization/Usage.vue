@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ArrayElement } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
@@ -6,9 +7,8 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb } from '~/services/conversion'
-import { getCurrentPlanNameOrg, getPlans, getTotalStorage } from '~/services/supabase'
+import { getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -52,6 +52,21 @@ async function getUsage(orgId: string) {
   const plan = plans.value.find(p => p.name === 'Pay as you go')!
   const planCurrrent = await getCurrentPlanNameOrg(orgId)
   const currentPlan = plans.value.find(p => p.name === planCurrrent)
+
+  // Get usage percentages
+  let detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']> = {
+    total_percent: 0,
+    mau_percent: 0,
+    bandwidth_percent: 0,
+    storage_percent: 0,
+  }
+
+  try {
+    detailPlanUsage = await getPlanUsagePercent(orgId)
+  }
+  catch (err) {
+    console.log('Error getting plan usage percent:', err)
+  }
 
   const payg_base = {
     mau: plan?.mau,
@@ -106,6 +121,7 @@ async function getUsage(orgId: string) {
     totalStorage,
     payg_units,
     plan,
+    detailPlanUsage,
     cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
       subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D'),
@@ -117,8 +133,29 @@ async function getUsage(orgId: string) {
 const planUsageMap = ref(new Map<string, Awaited<ReturnType<typeof getUsage>>>())
 const planUsage = computed(() => planUsageMap.value?.get(currentOrganization.value?.gid ?? ''))
 
+// Similar to Plans.vue - current plan and best plan computed properties
+const currentPlan = computed(() => main.plans.find(plan => plan.name === planUsage.value?.currentPlan?.name))
+const currentPlanSuggest = computed(() => main.plans.find(plan => plan.name === main.bestPlan))
+
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
+}
+
+const shouldShowUpgrade = computed(() => {
+  if (!currentPlanSuggest.value || !currentPlan.value) {
+    return false
+  }
+
+  // Compare based on price - if suggested plan is better (higher features) and price makes sense
+  return currentPlanSuggest.value.price_m > currentPlan.value.price_m
+})
+
+const failed = computed(() => {
+  return !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
+})
+
+function goToPlans() {
+  router.push('/settings/organization/plans')
 }
 
 onMounted(async () => {
@@ -186,8 +223,6 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
   }
 
   await loadData()
-
-  // isSubscribeLoading.value.fill(false, 0, plans.value.length)
 })
 
 function lastRunDate() {
@@ -205,164 +240,241 @@ function nextRunDate() {
     <div v-if="!isLoading" class="w-full h-full bg-white max-h-fit dark:bg-gray-800">
       <div class="px-4 pt-6 mx-auto max-w-7xl lg:px-8 sm:px-6">
         <div class="sm:align-center sm:flex sm:flex-col">
-          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center d-tooltip d-tooltip-bottom">
+          <h1 class="flex mx-auto text-5xl font-extrabold text-gray-900 dark:text-white items-center justify-center">
             {{ t('usage') }}
-            <InformationInfo class="w-4 h-4 text-slate-400 dark:text-white hover:cursor-pointer hover:bg-blue-500 hover:text-white rounded-full" />
-            <div class="d-tooltip-content font-normal bg-slate-800 text-white dark:bg-slate-200 dark:text-black">
-              <div class="max-w-xs whitespace-normal">
-                {{ lastRunDate() }}
-              </div>
-              <div class="max-w-xs whitespace-normal">
-                {{ nextRunDate() }}
-              </div>
-            </div>
           </h1>
 
-          <div class="my-2">
-            <div class="flex justify-between mt-2 row">
-              <div class="text-lg font-bold">
-                {{ t('monthly-active-users') }}
+          <!-- Error Alert for Non-paying Users -->
+          <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444] px-4 py-2">
+            {{ t('plan-failed') }}
+          </div>
+
+          <!-- Last Update Info & Billing Cycle -->
+          <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+              <!-- Last Update Info -->
+              <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                <div class="flex items-center space-x-2">
+                  <div class="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>{{ lastRunDate() }}</span>
+                </div>
+                <div class="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+                <div class="flex items-center space-x-2">
+                  <div class="w-2 h-2 bg-blue-500 rounded-full" />
+                  <span>{{ nextRunDate() }}</span>
+                </div>
               </div>
-              <div>
-                <span class="font-semibold">{{ planUsage?.cycle.subscription_anchor_start
-                }}</span> {{ t('to') }} <span class="font-semibold">{{
-                  planUsage?.cycle.subscription_anchor_end }}</span>
+
+              <!-- Billing Cycle Info -->
+              <div class="flex items-center text-sm font-semibold text-blue-800 dark:text-blue-200">
+                <span class="mr-2 text-gray-600 dark:text-gray-400">{{ t('billing-cycle') }}:</span>
+                <span>{{ planUsage?.cycle.subscription_anchor_start }}</span>
+                <span class="mx-2">{{ t('to') }}</span>
+                <span>{{ planUsage?.cycle.subscription_anchor_end }}</span>
               </div>
             </div>
-            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-            <div class="flex justify-between mt-2 row">
-              <div>
-                {{ t('included-in-plan') }}
+          </div>
+
+          <!-- Plan Information Section -->
+          <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Current Plan -->
+            <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                {{ t('Current') }}
               </div>
-              <div class="font-semibold">
-                {{ planUsage?.currentPlan?.mau.toLocaleString() }}
+              <div class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ currentPlan?.name || t('loading') }}
+              </div>
+              <div v-if="currentPlan" class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                ${{ currentPlan.price_m }}/{{ t('mo') }}
               </div>
             </div>
 
-            <hr class="my-1 border-t border-gray-300 opacity-50">
-            <div class="flex justify-between row">
-              <div>
-                {{ t('used-in-period') }}
+            <!-- Best Plan with Upgrade Button -->
+            <div class="bg-white dark:bg-gray-900 rounded-lg border p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
+              <div class="flex items-center justify-between mb-1">
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('best-plan') }}
+                </div>
+                <div v-if="shouldShowUpgrade" class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded-full font-medium">
+                  {{ t('recommended') }}
+                </div>
               </div>
-              <div class="font-semibold">
-                {{ planUsage?.totalMau.toLocaleString() }}
+              <div class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ currentPlanSuggest?.name || t('loading') }}
+              </div>
+              <div v-if="currentPlanSuggest" class="mt-2">
+                <div class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  ${{ currentPlanSuggest.price_m }}/{{ t('mo') }}
+                </div>
+                <button
+                  v-if="shouldShowUpgrade"
+                  class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                  @click="goToPlans"
+                >
+                  🚀 {{ t('plan-upgrade-v2') }}
+                </button>
               </div>
             </div>
-            <div v-if="planUsage?.isPayAsYouGo">
-              <hr class="my-1 border-t border-gray-300 opacity-50">
-              <div class="flex justify-between row">
-                <div>
-                  {{ t('price-per-unit-above') }}
+          </div>
+
+          <!-- Usage Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <!-- MAU Card -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                  {{ t('monthly-active-users') }}
+                </h3>
+                <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {{ planUsage?.detailPlanUsage?.mau_percent || 0 }}%
                 </div>
-                <div class="font-semibold">
-                  $ {{ planUsage?.payg_units?.mau?.toLocaleString() }}
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
+                <div
+                  class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
+                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }"
+                />
+              </div>
+
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ planUsage?.currentPlan?.mau.toLocaleString() }}
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ planUsage?.totalMau.toLocaleString() }}
+                  </span>
+                </div>
+                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
+                  <span class="font-semibold text-green-600 dark:text-green-400">
+                    ${{ planUsage?.payg_units?.mau?.toLocaleString() }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Storage Card -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                  {{ t('Storage') }}
+                </h3>
+                <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {{ planUsage?.detailPlanUsage?.storage_percent || 0 }}%
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
+                <div
+                  class="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300"
+                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }"
+                />
+              </div>
+
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ planUsage?.currentPlan?.storage.toLocaleString() }} GB
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ planUsage?.totalStorage.toLocaleString() }} GB
+                  </span>
+                </div>
+                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
+                  <span class="font-semibold text-green-600 dark:text-green-400">
+                    ${{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bandwidth Card -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                  {{ t('Bandwidth') }}
+                </h3>
+                <div class="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {{ planUsage?.detailPlanUsage?.bandwidth_percent || 0 }}%
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
+                <div
+                  class="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-300"
+                  :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }"
+                />
+              </div>
+
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('included-in-plan') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('used-in-period') }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-white">
+                    {{ planUsage?.totalBandwidth.toLocaleString() }} GB
+                  </span>
+                </div>
+                <div v-if="planUsage?.isPayAsYouGo" class="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <span class="text-gray-600 dark:text-gray-400">{{ t('price-per-unit-above') }}</span>
+                  <span class="font-semibold text-green-600 dark:text-green-400">
+                    ${{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="my-2">
-            <div class="text-lg font-bold">
-              {{ t('Storage') }}
-            </div>
-            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-            <div class="flex justify-between mt-2 row">
-              <div>
-                {{ t('included-in-plan') }}
-              </div>
-              <div class="font-semibold">
-                {{ planUsage?.currentPlan?.storage.toLocaleString() }} GB
-              </div>
-            </div>
-
-            <hr class="my-1 border-t border-gray-300 opacity-50">
-            <div class="flex justify-between row">
-              <div>
-                {{ t('used-in-period') }}
-              </div>
-              <div class="font-semibold">
-                {{ planUsage?.totalStorage.toLocaleString() }} GB
-              </div>
-            </div>
-            <div v-if="planUsage?.isPayAsYouGo">
-              <hr class="my-1 border-t border-gray-300 opacity-50">
-              <div class="flex justify-between row">
-                <div>
-                  {{ t('price-per-unit-above') }}
-                </div>
-                <div class="font-semibold">
-                  $ {{ planUsage?.payg_units?.storage?.toLocaleString() }} GB
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="my-2">
-            <div class="text-lg font-bold">
-              {{ t('Bandwidth') }}
-            </div>
-            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-            <div class="flex justify-between mt-2 row">
-              <div>
-                {{ t('included-in-plan') }}
-              </div>
-              <div class="font-semibold">
-                {{ planUsage?.currentPlan?.bandwidth.toLocaleString() }} GB
-              </div>
-            </div>
-
-            <hr class="my-1 border-t border-gray-300 opacity-50">
-            <div class="flex justify-between row">
-              <div>
-                {{ t('used-in-period') }}
-              </div>
-              <div class="font-semibold">
-                {{ planUsage?.totalBandwidth.toLocaleString() }} GB
-              </div>
-            </div>
-            <div v-if="planUsage?.isPayAsYouGo">
-              <hr class="my-1 border-t border-gray-300 opacity-50">
-              <div class="flex justify-between row">
-                <div>
-                  {{ t('price-per-unit-above') }}
-                </div>
-                <div class="font-semibold">
-                  $ {{ planUsage?.payg_units?.bandwidth?.toLocaleString() }} GB
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="my-2">
-            <div class="text-lg font-bold">
+          <!-- Pricing Summary Card -->
+          <div class="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
               {{ t('usage-title') }}
-            </div>
-            <hr class="my-1 border-t-2 border-gray-300 opacity-70">
-            <div class="flex justify-between mt-2 row">
-              <div>
-                {{ t('base') }}
-              </div>
-              <div class="font-semibold">
-                $ {{ planUsage?.currentPlan?.price_m.toLocaleString() }}
-              </div>
-            </div>
+            </h3>
 
-            <div v-if="planUsage?.isPayAsYouGo">
-              <hr class="my-1 border-t border-gray-300 opacity-50">
-              <div class="flex justify-between row">
-                <div>
-                  {{ t('used-in-period') }}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="text-center p-4 bg-white dark:bg-gray-800 rounded-lg">
+                <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                  ${{ planUsage?.currentPlan?.price_m.toLocaleString() }}
                 </div>
-                <div class="font-semibold">
-                  $ {{ planUsage?.totalUsagePrice.toLocaleString() }}
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('base') }}
                 </div>
               </div>
-              <hr class="my-1 border-t border-gray-300 opacity-50">
-              <div class="flex justify-between row">
-                <div>
-                  {{ t('usage-title') }}
+
+              <div class="text-center p-4 bg-white dark:bg-gray-800 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  ${{ planUsage?.totalUsagePrice.toLocaleString() }}
                 </div>
-                <div class="font-semibold">
-                  $ {{ planUsage?.totalPrice.toLocaleString() }}
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ t('credits-used-in-period') }}
+                </div>
+              </div>
+
+              <div class="text-center p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg">
+                <div class="text-2xl font-bold">
+                  ${{ planUsage?.totalPrice.toLocaleString() }}
+                </div>
+                <div class="text-sm opacity-90">
+                  {{ t('usage-title') }}
                 </div>
               </div>
             </div>
@@ -370,6 +482,50 @@ function nextRunDate() {
         </div>
       </div>
     </div>
+
+    <!-- Loading State -->
+    <div v-else class="flex items-center justify-center min-h-[60vh]">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+        <p class="text-gray-600 dark:text-gray-400">
+          {{ t('loading') }}...
+        </p>
+      </div>
+    </div>
+
+    <!-- Teleport for Detailed Usage Plan Dialog -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('detailed-usage-plan')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div class="text-sm">
+          <div class="font-medium text-gray-900 dark:text-white mb-2">
+            {{ t('billing-cycle') }} {{ planUsage?.cycle.subscription_anchor_start }} {{ t('to') }} {{ planUsage?.cycle.subscription_anchor_end }}
+          </div>
+
+          <div class="font-medium text-gray-900 dark:text-white mb-3">
+            {{ t('your-ussage') }}
+          </div>
+
+          <div class="space-y-2 text-gray-600 dark:text-gray-400">
+            <div class="flex justify-between">
+              <span>{{ t('mau-usage') }}</span>
+              <span class="font-medium">{{ planUsage?.detailPlanUsage?.mau_percent }}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span>{{ t('bandwith-usage') }}</span>
+              <span class="font-medium">{{ planUsage?.detailPlanUsage?.bandwidth_percent }}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span>{{ t('storage-usage') }}</span>
+              <span class="font-medium">{{ planUsage?.detailPlanUsage?.storage_percent }}%</span>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-line">
+            {{ lastRunDate() }} {{ nextRunDate() }}
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 

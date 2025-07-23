@@ -75,6 +75,18 @@ watch(type, (val) => {
 
 watchEffect(() => {
   if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
+    && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
+    // push it 2 before the last tab
+    organizationTabs.value.push({
+      label: 'usage',
+      icon: shallowRef(IconPlans) as any,
+      key: '/settings/organization/usage',
+    })
+  }
+  else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
+  }
+  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && !organizationTabs.value.find(tab => tab.label === 'plans')) {
     organizationTabs.value.push(
       {
@@ -87,6 +99,7 @@ watchEffect(() => {
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'plans')
   }
+
   if (!Capacitor.isNativePlatform()
     && organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
     && !organizationTabs.value.find(tab => tab.label === 'billing')) {
@@ -99,19 +112,6 @@ watchEffect(() => {
   }
   else if (!organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'billing')
-  }
-
-  if (organizationStore.hasPermisisonsInRole(organizationStore.currentRole, ['super_admin'])
-    && (!organizationTabs.value.find(tab => tab.label === 'usage'))) {
-    // push it 2 before the last tab
-    organizationTabs.value.splice(tabs.value.length - 2, 0, {
-      label: 'usage',
-      icon: shallowRef(IconPlans) as any,
-      key: '/settings/organization/usage',
-    })
-  }
-  else if (organizationTabs.value.find(tab => tab.label === 'usage')) {
-    organizationTabs.value = organizationTabs.value.filter(tab => tab.label !== 'usage')
   }
 })
 
