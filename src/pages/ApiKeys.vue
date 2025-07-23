@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
+import { FormKit } from '@formkit/vue'
 import { useI18n } from 'petite-vue-i18n'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
@@ -321,7 +322,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
         user_id: user.id,
         key: newApiKey,
         mode: keyType,
-        name: '',
+        name: newApiKeyName.value.trim(),
         limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
         limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
       })
@@ -352,6 +353,7 @@ async function addNewApiKey() {
   displayStore.selectedApps = []
   limitToOrgCheckbox.value = false
   limitToAppCheckbox.value = false
+  newApiKeyName.value = ''
 
   // Load all apps for selection
   await loadAllApps()
@@ -617,6 +619,20 @@ getKeys()
     <!-- Teleport Content for Add New Key Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
       <div class="space-y-6">
+        <!-- API Key Name -->
+        <div>
+          <FormKit
+            v-model="newApiKeyName"
+            type="text"
+            :label="t('name')"
+            :placeholder="t('type-new-name')"
+            validation="required|length:1,32"
+            :validation-messages="{
+              length: t('name-length-error'),
+            }"
+          />
+        </div>
+
         <!-- API Key Type Selection -->
         <div>
           <div class="border rounded-lg p-4 dark:border-gray-600">
@@ -736,16 +752,17 @@ getKeys()
     <!-- Teleport Content for Change Name Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('change-api-key-name')" defer to="#dialog-v2-content">
       <div class="space-y-4">
-        <div>
-          <label for="api-key-name" class="block text-sm font-medium mb-2">{{ t('name') }}</label>
-          <input
-            v-model="newApiKeyName"
-            type="text"
-            :placeholder="t('type-new-name')"
-            class="input input-bordered w-full"
-            maxlength="32"
-          >
-        </div>
+        <FormKit
+          v-model="newApiKeyName"
+          type="text"
+          :label="t('name')"
+          :placeholder="t('type-new-name')"
+          validation="required|length:1,32"
+          :validation-messages="{
+            required: t('name-required'),
+            length: t('name-length-error'),
+          }"
+        />
       </div>
     </Teleport>
 
