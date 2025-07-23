@@ -27,7 +27,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   const app = await supabase.from('apps')
     .select('*')
-    .eq('id', body.appId)
+    .eq('app_id', body.appId)
     .single()
   if (!app.data)
     throw quickError(404, 'app_not_found', 'App not found', { body })
