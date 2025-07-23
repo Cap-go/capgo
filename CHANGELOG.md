@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.12.47 (2025-07-23)
+
+
+### Bug Fixes
+
+* correct column name from 'id' to 'app_id' in cron_stats trigger ([c772515](https://github.com/Cap-go/capgo/commit/c772515d7c0679599d7cee1f84b6f82fe3aace92))
+
 ### 12.12.46 (2025-07-23)
 
 ### 12.12.45 (2025-07-23)
