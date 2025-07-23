@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (44);
+  plan (45);
 
 -- Test accept_invitation_to_org (user is already a member, so should return INVALID_ROLE)
 SELECT
@@ -385,6 +385,14 @@ SELECT
     is_paying_and_good_plan_org ('00000000-0000-0000-0000-000000000000'),
     false,
     'is_paying_and_good_plan_org test - non-existent org returns false'
+  );
+
+-- Test is_paying_and_good_plan_org for Demo org (used by statistics tests)
+SELECT
+  is (
+    is_paying_and_good_plan_org ('046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+    true,
+    'is_paying_and_good_plan_org test - Demo org has paying and good plan'
   );
 
 -- Test is_allowed_action_org

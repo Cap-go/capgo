@@ -26,15 +26,15 @@ describe('[GET] /apikey operations', () => {
   })
 
   it('get specific api key by id', async () => {
-    // Using seeded API key ID 4 (test upload key)
-    const response = await fetch(`${BASE_URL}/apikey/4`, {
+    // Using seeded API key ID 10 (dedicated test key)
+    const response = await fetch(`${BASE_URL}/apikey/10`, {
       method: 'GET',
       headers,
     })
 
     const data = await response.json()
     expect(response.status).toBe(200)
-    expect(data).toHaveProperty('id', 4)
+    expect(data).toHaveProperty('id', 10)
   })
 
   it('get api key with invalid id', async () => {
@@ -149,9 +149,9 @@ describe('[POST] /apikey operations', () => {
 
 describe('[PUT] /apikey/:id operations', () => {
   it('update api key name', async () => {
-    // Using seeded API key ID 5 (test read key)
+    // Using seeded API key ID 11 (dedicated test key for update name)
     const newName = 'updated-test-key-name'
-    const response = await fetch(`${BASE_URL}/apikey/5`, {
+    const response = await fetch(`${BASE_URL}/apikey/11`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -164,7 +164,7 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(data).toHaveProperty('name', newName)
 
     // Verify the update
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/5`, { headers })
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/11`, { headers })
     const verifyData = await verifyResponse.json() as { name: string }
     expect(verifyData.name).toBe(newName)
   })
@@ -181,8 +181,8 @@ describe('[PUT] /apikey/:id operations', () => {
   })
 
   it('update api key with invalid mode', async () => {
-    // Using seeded API key ID 6 (test all key)
-    const response = await fetch(`${BASE_URL}/apikey/6`, {
+    // Using seeded API key ID 12 (dedicated test key for update mode)
+    const response = await fetch(`${BASE_URL}/apikey/12`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -195,8 +195,8 @@ describe('[PUT] /apikey/:id operations', () => {
   })
 
   it('update api key with invalid limited_to_apps format', async () => {
-    // Using seeded API key ID 7 (test write key)
-    const response = await fetch(`${BASE_URL}/apikey/7`, {
+    // Using seeded API key ID 13 (dedicated test key for update apps)
+    const response = await fetch(`${BASE_URL}/apikey/13`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({

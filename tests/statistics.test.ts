@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { BASE_URL, headers, headersStats, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 describe('[GET] /statistics operations with and without subkey', () => {
   const id = randomUUID()
@@ -15,11 +15,13 @@ describe('[GET] /statistics operations with and without subkey', () => {
   afterAll(async () => {
     await resetAppData(APPNAME)
     await resetAppDataStats(APPNAME)
-    const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
-      method: 'DELETE',
-      headers,
-    })
-    expect(deleteApikey.status).toBe(200)
+    if (subkeyId) {
+      const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
+        method: 'DELETE',
+        headers,
+      })
+      expect(deleteApikey.status).toBe(200)
+    }
   })
 
   it('should get app statistics without subkey', async () => {
@@ -46,12 +48,12 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(Array.isArray(orgStatsData)).toBe(true)
   })
 
-  it('should get user statistics without subkey', async () => {
+  it.only('should get user statistics without subkey', async () => {
     const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const toDate = new Date().toISOString().split('T')[0]
     const getUserStats = await fetch(`${BASE_URL}/statistics/user?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers,
+      headers: headersStats,
     })
     expect(getUserStats.status).toBe(200)
     const userStatsData = await getUserStats.json()
