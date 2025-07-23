@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.13.0 (2025-07-23)
+
+
+### Features
+
+* add new translations for API key management and validation messages in multiple languages ([5adb8aa](https://github.com/Cap-go/capgo/commit/5adb8aaa29187cdb1486afb80bccdb831c5deb26))
+
 ### 12.12.48 (2025-07-23)
 
 ### 12.12.47 (2025-07-23)
