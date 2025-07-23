@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.15.0 (2025-07-23)
+
+
+### Features
+
+* add checksum and optional session_key to createBundle API; update tests accordingly ([2b665db](https://github.com/Cap-go/capgo/commit/2b665db4e95a9130671febb24bc98fc717d66808))
+
 ### 12.14.5 (2025-07-23)
 
 ### 12.14.4 (2025-07-23)
