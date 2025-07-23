@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.15.2 (2025-07-23)
+
+
+### Bug Fixes
+
+* remove unused import from statistics test file ([4683edc](https://github.com/Cap-go/capgo/commit/4683edc26030bd47cd8485a167a678d66d6d3bcf))
+
 ### 12.15.1 (2025-07-23)
 
 ## 12.15.0 (2025-07-23)
