@@ -177,7 +177,8 @@ watchEffect(() => {
     </div>
     <div v-else>
       <div v-if="ActiveTab === 'overview'" class="mt-4 w-full h-full px-4 pt-8 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
-        <Usage :app-id="id" :show-mobile-stats="canShowMobileStats" />
+        <FailedCard />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" :app-id="id" :show-mobile-stats="canShowMobileStats" />
 
         <BlurBg id="app-stats" class="mb-10">
           <template #default>

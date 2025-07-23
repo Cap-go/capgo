@@ -20,6 +20,7 @@ declare module 'vue' {
     DialogV2: typeof import('./components/DialogV2.vue')['default']
     DropdownOrganization: typeof import('./components/dashboard/DropdownOrganization.vue')['default']
     DropdownProfile: typeof import('./components/dashboard/DropdownProfile.vue')['default']
+    FailedCard: typeof import('./components/FailedCard.vue')['default']
     HistoryTable: typeof import('./components/tables/HistoryTable.vue')['default']
     IIonCopyOutline: typeof import('~icons/ion/copy-outline')['default']
     InfoRow: typeof import('./components/package/InfoRow.vue')['default']

@@ -53,6 +53,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   // }
   //
   const currentOrganization = ref<Organization | undefined>(undefined)
+  const currentOrganizationFailed = ref(false)
   const currentRole = ref<OrganizationRole | null>(null)
 
   const STORAGE_KEY = 'capgo_current_org_id'
@@ -221,6 +222,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     currentOrganization.value ??= organization
+    currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
 
     // console.log('done', currentOrganization.value)
     getProcessCronStatsJobInfo()
@@ -273,6 +275,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   return {
     organizations,
     currentOrganization,
+    currentOrganizationFailed,
     currentRole,
     setCurrentOrganization,
     setCurrentOrganizationFromValue,

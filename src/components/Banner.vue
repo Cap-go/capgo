@@ -61,6 +61,9 @@ const bannerText = computed(() => {
   if (!org)
     return
 
+  if (organizationStore.currentOrganizationFailed)
+    return t('subscription-required')
+
   if (org.is_canceled)
     return t('plan-inactive')
 
@@ -80,12 +83,14 @@ const bannerText = computed(() => {
 })
 const bannerColor = computed(() => {
   const warning = 'd-btn-warning'
-  // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
   const success = 'd-btn-success'
 
   const org = organizationStore.currentOrganization
   if (!org)
     return
+
+  if (organizationStore.currentOrganizationFailed)
+    return warning
 
   if (org.paying && org.can_use_more)
     return ''
@@ -124,7 +129,7 @@ const bannerColor = computed(() => {
   </div>
 
   <!-- Mobile/original version -->
-  <div v-else-if="!props.desktop && bannerText" class="navbar bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
+  <div v-else-if="!props.desktop && bannerText" class="navbar bg-gray-200 dark:bg-gray-800/90">
     <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
       {{ bannerLeftText }}
     </div>

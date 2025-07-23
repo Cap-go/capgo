@@ -113,10 +113,6 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
-const failed = computed(() => {
-  return !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
-})
-
 watch(currentOrganization, async (newOrg, prevOrg) => {
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
     if (!initialLoad.value) {
@@ -185,7 +181,7 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
-  if (isTrial.value || failed.value) {
+  if (isTrial.value || organizationStore.currentOrganizationFailed) {
     return t('plan-upgrade')
   }
   return p.price_m >= (currentPlan.value?.price_m ?? 0) ? (t('plan-upgrade-v2')) : (t('downgrade'))
@@ -219,7 +215,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             {{ t('plan-desc') }}<br>
           </p>
         </div>
-        <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+        <div v-if="organizationStore.currentOrganizationFailed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
           {{ t('plan-failed') }}
         </div>
         <div class="flex items-center justify-center mt-8 space-x-6 sm:mt-12">

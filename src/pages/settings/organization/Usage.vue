@@ -150,10 +150,6 @@ const shouldShowUpgrade = computed(() => {
   return currentPlanSuggest.value.price_m > currentPlan.value.price_m
 })
 
-const failed = computed(() => {
-  return !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
-})
-
 function goToPlans() {
   router.push('/settings/organization/plans')
 }
@@ -203,10 +199,7 @@ function nextRunDate() {
             {{ t('usage') }}
           </h1>
 
-          <!-- Error Alert for Non-paying Users -->
-          <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444] px-4 py-2">
-            {{ t('plan-failed') }}
-          </div>
+          <FailedCard />
 
           <!-- Last Update Info & Billing Cycle -->
           <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
