@@ -1,20 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headersStats, ORG_ID_STATS, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME_STATS, BASE_URL, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
 describe('[GET] /statistics operations with and without subkey', () => {
-  const id = randomUUID()
-  const APPNAME = `com.stats.${id}`
+  const APPNAME = APP_NAME_STATS // Use the seeded stats app
   let subkeyId = 0
 
-  beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
-    await resetAndSeedAppDataStats(APPNAME)
-  })
-
   afterAll(async () => {
-    await resetAppData(APPNAME)
-    await resetAppDataStats(APPNAME)
     if (subkeyId) {
       const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
         method: 'DELETE',
@@ -48,7 +40,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(Array.isArray(orgStatsData)).toBe(true)
   })
 
-  it.only('should get user statistics without subkey', async () => {
+  it('should get user statistics without subkey', async () => {
     const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const toDate = new Date().toISOString().split('T')[0]
     const getUserStats = await fetch(`${BASE_URL}/statistics/user?from=${fromDate}&to=${toDate}`, {

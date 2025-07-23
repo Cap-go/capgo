@@ -16,6 +16,7 @@ export const USER_ID_2 = '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'
 export const USER_ID_STATS = '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d' // Dedicated user for statistics tests
 export const ORG_ID_STATS = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e' // Dedicated org for statistics tests
 export const APIKEY_STATS = '8b2c3d4e-5f6a-4c7b-8d9e-0f1a2b3c4d5e' // Dedicated API key for statistics tests
+export const APP_NAME_STATS = 'com.stats.app' // Dedicated app for statistics tests
 export const USER_EMAIL = 'test@capgo.app'
 export const TEST_EMAIL = 'test@test.com'
 export const PRODUCT_ID = 'prod_LQIregjtNduh4q'

@@ -229,7 +229,8 @@ BEGIN
 
     INSERT INTO "public"."apps" ("created_at", "app_id", "icon_url", "name", "last_version", "updated_at", "owner_org", "user_id") VALUES
     (now(), 'com.demoadmin.app', '', 'Demo Admin app', '1.0.0', now(), '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a'),
-    (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097');
+    (now(), 'com.demo.app', '', 'Demo app', '1.0.0', now(), '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097'),
+    (now(), 'com.stats.app', '', 'Stats Test App', '1.0.0', now(), 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d');
 
     INSERT INTO "public"."app_versions" ("id", "created_at", "app_id", "name", "r2_path", "updated_at", "deleted", "external_url", "checksum", "session_key", "storage_provider", "owner_org", "user_id", "comment", "link") VALUES
     (1, now(), 'com.demo.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', NULL, NULL, NULL),
@@ -241,7 +242,10 @@ BEGIN
     (7, now(), 'com.demo.app', '1.359.0', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/1.359.0.zip', now(), 'f', NULL, '9f74e70a', NULL, 'r2', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'its a test', 'https://capgo.app'),
     (8, now(), 'com.demoadmin.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL, NULL, NULL),
     (9, now(), 'com.demoadmin.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', NULL, NULL, NULL),
-    (10, now(), 'com.demoadmin.app', '1.0.0', 'orgs/22dbad8a-b885-4309-9b3b-a09f8460fb6d/apps/com.demoadmin.app/1.0.0.zip', now(), 'f', NULL, 'admin123', NULL, 'r2', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'admin app test version', 'https://capgo.app');
+    (10, now(), 'com.demoadmin.app', '1.0.0', 'orgs/22dbad8a-b885-4309-9b3b-a09f8460fb6d/apps/com.demoadmin.app/1.0.0.zip', now(), 'f', NULL, 'admin123', NULL, 'r2', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', 'admin app test version', 'https://capgo.app'),
+    (11, now(), 'com.stats.app', 'builtin', NULL, now(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
+    (12, now(), 'com.stats.app', 'unknown', NULL, now(), 't', NULL, NULL, NULL, 'supabase', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', NULL, NULL, NULL),
+    (13, now(), 'com.stats.app', '1.0.0', 'orgs/b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e/apps/com.stats.app/1.0.0.zip', now(), 'f', NULL, 'stats123', NULL, 'r2', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', 'stats test version', 'https://capgo.app');
 
     INSERT INTO "public"."app_versions_meta" ("id", "created_at", "app_id", "updated_at", "checksum", "size", "devices") VALUES
     (3, now(), 'com.demo.app', now(), '3885ee49', 1012506, 10),
@@ -249,31 +253,35 @@ BEGIN
     (5, now(), 'com.demo.app', now(), '9d4f798a', 1012529, 20),
     (6, now(), 'com.demo.app', now(), '44913a9f', 1012541, 30),
     (7, now(), 'com.demo.app', now(), '9f74e70a', 1012548, 40),
-    (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000, 5);
+    (10, now(), 'com.demoadmin.app', now(), 'admin123', 1500000, 5),
+    (13, now(), 'com.stats.app', now(), 'stats123', 850000, 15);
 
     INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "allow_device_self_set", "allow_emulator", "allow_dev", "created_by") VALUES
     (1, now(), 'production', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
     (2, now(), 'no_access', 'com.demo.app', 5, now(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+    (3, now(), 'two_default', 'com.demo.app', 3, now(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (4, now(), 'production', 'com.stats.app', 13, now(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
 
     INSERT INTO "public"."deploy_history" ("id", "created_at", "updated_at", "channel_id", "app_id", "version_id", "deployed_at", "owner_org", "created_by") VALUES
     (1, now() - interval '15 days', now() - interval '15 days', 1, 'com.demo.app', 3, now() - interval '15 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
     (2, now() - interval '10 days', now() - interval '10 days', 1, 'com.demo.app', 5, now() - interval '10 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
+    (3, now() - interval '5 days', now() - interval '5 days', 1, 'com.demo.app', 3, now() - interval '5 days', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid, '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (4, now() - interval '7 days', now() - interval '7 days', 4, 'com.stats.app', 13, now() - interval '7 days', 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'::uuid, '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid);
 
     -- Insert test devices for RLS testing
     INSERT INTO "public"."devices" ("updated_at", "device_id", "version", "app_id", "platform", "plugin_version", "os_version", "version_build", "custom_id", "is_prod", "is_emulator") VALUES
     (now(), '00000000-0000-0000-0000-000000000001', 3, 'com.demo.app', 'ios', '4.15.3', '16.0', '1.0.0', 'test-device-1', 't', 'f'),
     (now(), '00000000-0000-0000-0000-000000000002', 4, 'com.demo.app', 'android', '4.15.3', '13', '1.0.1', 'test-device-2', 't', 'f'),
     (now(), '00000000-0000-0000-0000-000000000003', 5, 'com.demo.app', 'ios', '4.15.3', '15.0', '1.361.0', 'test-device-3', 'f', 't'),
-    (now(), '00000000-0000-0000-0000-000000000004', 10, 'com.demoadmin.app', 'android', '4.15.3', '12', '1.0.0', 'admin-test-device', 't', 'f');
+    (now(), '00000000-0000-0000-0000-000000000004', 10, 'com.demoadmin.app', 'android', '4.15.3', '12', '1.0.0', 'admin-test-device', 't', 'f'),
+    (now(), '00000000-0000-0000-0000-000000000005', 13, 'com.stats.app', 'android', '4.15.3', '11', '1.0.0', 'stats-test-device', 't', 'f');
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
     PERFORM setval('public.apikeys_id_seq', 15, false);
-    PERFORM setval('public.app_versions_id_seq', 11, false);
-    PERFORM setval('public.channel_id_seq', 4, false);
-    PERFORM setval('public.deploy_history_id_seq', 4, false);
+    PERFORM setval('public.app_versions_id_seq', 14, false);
+    PERFORM setval('public.channel_id_seq', 5, false);
+    PERFORM setval('public.deploy_history_id_seq', 5, false);
 END;
 $_$;
 
@@ -723,6 +731,7 @@ BEGIN
     -- Execute seeding functions
     PERFORM public.reset_and_seed_data();
     PERFORM public.reset_and_seed_stats_data();
+    PERFORM public.reset_and_seed_app_stats_data('com.stats.app');
 EXCEPTION WHEN OTHERS THEN
     RAISE NOTICE 'Seeding failed: %', SQLERRM;
     RAISE;
