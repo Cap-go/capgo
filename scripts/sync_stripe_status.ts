@@ -47,10 +47,6 @@ async function updateStripeStatus() {
 
   for (const stripeInfo of stripeInfos) {
     // Retrieve subscription from Stripe
-    if (stripeInfo.subscription_id === 'free') {
-      console.log('this customer is free', stripeInfo.customer_id)
-      continue
-    }
     if (!stripeInfo.subscription_id) {
       // skip this one
       continue

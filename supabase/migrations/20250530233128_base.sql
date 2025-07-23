@@ -2925,7 +2925,7 @@ BEGIN
     SELECT o.id, o.customer_id
     FROM public.orgs o
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
-    WHERE si.status = 'succeeded' AND si.product_id != 'free'
+    WHERE si.status = 'succeeded'
   )
   LOOP
     PERFORM pgmq.send('cron_plan',
