@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { APP_NAME_STATS, BASE_URL, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
 describe('[GET] /statistics operations with and without subkey', () => {
