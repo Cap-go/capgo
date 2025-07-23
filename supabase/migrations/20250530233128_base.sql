@@ -2511,9 +2511,7 @@ Begin
   FROM public.stripe_info
   where customer_id=(SELECT customer_id FROM public.orgs where id=orgid)
   AND (
-    (status = 'succeeded' AND is_good_plan = true) -- is_good_plan = true AND <-- TODO: reenable is_good_plan in the future
-    OR (subscription_id = 'free') -- TODO: allow free plan again
-    -- OR (subscription_id = 'free' or subscription_id is null)
+    (status = 'succeeded' AND is_good_plan = true)
     OR (trial_at::date - (now())::date > 0)
   )
   )
