@@ -297,7 +297,6 @@ const hightLights = computed<Stat[]>(() => ([
 
       dialogStore.openDialog({
         title: t('detailed-usage-plan'),
-        description: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
         buttons: [
           {
             text: t('ok'),
@@ -550,6 +549,40 @@ const hightLights = computed<Stat[]>(() => ([
         </router-link>
       </div>
     </div>
+
+    <!-- Teleport for Detailed Usage Plan Dialog -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('detailed-usage-plan')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div class="text-sm">
+          <div class="font-medium text-gray-900 dark:text-white mb-2">
+            {{ t('billing-cycle') }} {{ dayjs(cycleStart).format('YYYY/MM/D') }} {{ t('to') }} {{ dayjs(cycleEnd).format('YYYY/MM/D') }}
+          </div>
+
+          <div class="font-medium text-gray-900 dark:text-white mb-3">
+            {{ t('your-ussage') }}
+          </div>
+
+          <div class="space-y-2 text-gray-600 dark:text-gray-400">
+            <div class="flex justify-between">
+              <span>{{ t('mau-usage') }}</span>
+              <span class="font-medium">{{ currentData?.detailPlanUsage.mau_percent }}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span>{{ t('bandwith-usage') }}</span>
+              <span class="font-medium">{{ currentData?.detailPlanUsage.bandwidth_percent }}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span>{{ t('storage-usage') }}</span>
+              <span class="font-medium">{{ currentData?.detailPlanUsage.storage_percent }}%</span>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-line">
+            {{ lastRunDate() }}
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
