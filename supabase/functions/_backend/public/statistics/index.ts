@@ -37,6 +37,29 @@ interface AppUsageByVersion {
   uninstall: number | null
 }
 
+async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseAdmin>) {
+  // Use the existing PostgreSQL function to check organization payment and plan status
+  const { data: isPayingAndGoodPlan, error } = await supabase
+    .rpc('is_paying_and_good_plan_org', { orgid: orgId })
+    .single()
+
+  if (error) {
+    throw quickError(404, 'organization_not_found', 'Organization not found or error checking status', {
+      error,
+    })
+  }
+
+  // If organization is not paying or doesn't have a good plan, throw error
+  if (!isPayingAndGoodPlan) {
+    throw quickError(402, 'subscription_required', 'Organization subscription required or plan invalid', {
+      orgId,
+      isPayingAndGoodPlan,
+    })
+  }
+
+  return { isPayingAndGoodPlan }
+}
+
 async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
@@ -345,6 +368,18 @@ app.get('/app/:app_id', async (c) => {
   }
 
   const supabase = supabaseAdmin(c)
+
+  // Get the organization ID for this app and check organization access
+  const { data: app } = await supabase
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (app?.owner_org) {
+    await checkOrganizationAccess(c, app.owner_org, supabase)
+  }
+
   const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
   if (error) {
@@ -381,6 +416,9 @@ app.get('/org/:org_id', async (c) => {
     throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
   }
 
+  // Check organization payment status before returning stats
+  await checkOrganizationAccess(c, orgId, supabase)
+
   const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
 
   if (error) {
@@ -412,6 +450,18 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   }
 
   const supabase = supabaseAdmin(c)
+
+  // Get the organization ID for this app and check organization access
+  const { data: app } = await supabase
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (app?.owner_org) {
+    await checkOrganizationAccess(c, app.owner_org, supabase)
+  }
+
   const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
 
   if (error) {
@@ -449,6 +499,11 @@ app.get('/user', async (c) => {
   )
   if (uniqueOrgs.length === 0) {
     throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
+  }
+
+  // Check organization payment status for each organization before returning stats
+  for (const org of uniqueOrgs) {
+    await checkOrganizationAccess(c, org.org_id, supabase)
   }
 
   let stats: Array<{ data: any, error: any }> = []
