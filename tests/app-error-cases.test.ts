@@ -99,7 +99,8 @@ describe('[GET] /app - Error Cases', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        name: `${APPNAME}.notfound`,
+        name: `App ${APPNAME}.notfound`,
+        app_id: `${APPNAME}.notfound`,
         owner_org: testOrgId,
       }),
     })
@@ -138,7 +139,8 @@ describe('[PUT] /app - Error Cases', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        name: `${APPNAME}.put`,
+        name: `App ${APPNAME}.put`,
+        app_id: `${APPNAME}.put`,
         owner_org: testOrgId,
       }),
     })
@@ -200,7 +202,8 @@ describe('[DELETE] /app - Error Cases', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        name: `${APPNAME}.delete`,
+        name: `App ${APPNAME}.delete`,
+        app_id: `${APPNAME}.delete`,
         owner_org: testOrgId,
       }),
     })

@@ -26,6 +26,7 @@ beforeAll(async () => {
     id: randomUUID(),
     app_id: APPNAME,
     name: `Test Bundle Create App`,
+    checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd', // in sha256
     icon_url: 'https://example.com/icon.png',
     owner_org: testOrgId,
   })
@@ -43,6 +44,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       headers,
       body: JSON.stringify({
         app_id: APPNAME,
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         version: '1.0.0-github-zip',
         external_url: 'https://github.com/Cap-go/capgo/archive/refs/tags/v12.12.32.zip', // Valid ZIP file from GitHub
       }),
@@ -81,6 +83,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         version: '1.0.0',
         external_url: 'https://example.com/test.zip',
         // Missing app_id
@@ -96,6 +99,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         app_id: APPNAME,
         external_url: 'https://example.com/test.zip',
         // Missing version
@@ -111,6 +115,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         app_id: APPNAME,
         version: '1.0.0',
         // Missing external_url
@@ -126,6 +131,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         app_id: APPNAME,
         version: '1.0.0-http',
         external_url: 'http://example.com/test.zip', // HTTP instead of HTTPS
@@ -141,6 +147,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         app_id: 'nonexistent.app',
         version: '1.0.0',
         external_url: 'https://example.com/test.zip',
@@ -157,6 +164,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
     await supabase
       .from('app_versions')
       .insert({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         app_id: APPNAME,
         name: '1.0.0-duplicate',
         owner_org: testOrgId,
@@ -168,6 +176,7 @@ describe('[POST] /bundle - Create Bundle with External URL', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
         app_id: APPNAME,
         version: '1.0.0-duplicate',
         external_url: 'https://example.com/test.zip',

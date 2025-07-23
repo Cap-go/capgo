@@ -114,7 +114,8 @@ describe('app creation permission tests', () => {
         headers,
         body: JSON.stringify({
           owner_org: ORG_ID, // Using the default test org where the test user has permissions
-          name: appName,
+          name: `App ${appName}`,
+          app_id: appName,
           icon: 'test-icon',
         }),
       })

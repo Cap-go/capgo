@@ -8,6 +8,8 @@ interface CreateBundleBody {
   app_id: string
   version: string
   external_url: string
+  checksum: string
+  session_key?: string
 }
 
 function validateUrlFormat(url: string) {
@@ -159,7 +161,9 @@ async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string
     .from('app_versions')
     .insert({
       app_id: body.app_id,
+      checksum: body.checksum,
       name: body.version,
+      ...(body.session_key && { session_key: body.session_key }),
       external_url: body.external_url,
       storage_provider: 'external',
       owner_org: ownerOrg,
@@ -184,6 +188,9 @@ export async function createBundle(c: Context, body: CreateBundleBody, apikey: D
   }
   if (!body.external_url) {
     throw simpleError('missing_external_url', 'Missing required fields: external_url', { external_url: body.external_url })
+  }
+  if (!body.checksum) {
+    throw simpleError('missing_checksum', 'Missing required fields: checksum', { checksum: body.checksum })
   }
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('cannot_create_bundle', 'You can\'t access this app', { app_id: body.app_id })
