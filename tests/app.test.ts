@@ -17,8 +17,9 @@ describe('[DELETE] /app operations', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
+        app_id: APPNAME,
         owner_org: ORG_ID,
-        name: APPNAME,
+        name: `App ${APPNAME}`,
         icon: 'test-icon',
       }),
     })
@@ -80,7 +81,8 @@ describe('[GET] /app operations with subkey', () => {
       headers,
       body: JSON.stringify({
         owner_org: ORG_ID,
-        name: APPNAME,
+        app_id: APPNAME,
+        name: `App ${APPNAME}`,
         icon: 'test-icon',
       }),
     })
@@ -110,7 +112,7 @@ describe('[GET] /app operations with subkey', () => {
     })
     expect(getAppWithSubkey.status).toBe(200)
     const data = await getAppWithSubkey.json() as { name: string }
-    expect(data.name).toBe(APPNAME)
+    expect(data.name).toBe(`App ${APPNAME}`)
   })
 
   it('should not access another app with subkey', async () => {
@@ -122,7 +124,8 @@ describe('[GET] /app operations with subkey', () => {
       headers,
       body: JSON.stringify({
         owner_org: ORG_ID,
-        name: OTHER_APPNAME,
+        app_id: OTHER_APPNAME,
+        name: `App ${OTHER_APPNAME}`,
         icon: 'test-icon',
       }),
     })
@@ -225,6 +228,7 @@ describe('[POST] /app operations with non-owner user', () => {
       headers,
       body: JSON.stringify({
         owner_org: NON_OWNER_ORG_ID,
+        app_id: APPNAME,
         name: `${APPNAME}_no_access`,
         icon: 'test-icon',
       }),
@@ -246,7 +250,8 @@ describe('[POST] /app operations with non-owner user', () => {
       headers,
       body: JSON.stringify({
         owner_org: NON_OWNER_ORG_ID,
-        name: APPNAME,
+        app_id: APPNAME,
+        name: `App ${APPNAME}`,
         icon: 'test-icon',
       }),
     })

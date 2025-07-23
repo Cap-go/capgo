@@ -4,6 +4,7 @@ import { quickError, simpleError } from '../../utils/hono.ts'
 import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
 
 export interface CreateApp {
+  app_id: string
   name: string
   owner_org: string
   icon?: string
@@ -22,7 +23,7 @@ export async function post(c: Context, body: CreateApp, apikey: Database['public
 
   const dataInsert = {
     owner_org: body.owner_org,
-    app_id: body.name,
+    app_id: body.app_id,
     icon_url: body.icon ?? '',
     name: body.name,
     retention: 2592000,
