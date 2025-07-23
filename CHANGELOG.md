@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.14.0 (2025-07-23)
+
+
+### Features
+
+* implement organization access check for subscription status in statistics endpoints ([8c67278](https://github.com/Cap-go/capgo/commit/8c6727890182f2c633a9ccfcf2fd591c44a032a9))
+
 ### 12.13.4 (2025-07-23)
 
 ### 12.13.3 (2025-07-23)
