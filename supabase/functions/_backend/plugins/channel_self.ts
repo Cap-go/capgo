@@ -4,16 +4,15 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { DeviceWithoutCreatedAt } from '../utils/types.ts'
-import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/v4-mini'
-import { BRES, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
+import { BRES, getIsV2, parseBody, quickError, simpleError, simpleError200 } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppVersionsByAppIdPg, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, isAllowedActionOrgPg, upsertChannelDevicePg } from '../utils/pg.ts'
 import { getAppByIdD1, getAppVersionsByAppIdD1, getChannelByNameD1, getChannelDeviceOverrideD1, getChannelsD1, getCompatibleChannelsD1, getDrizzleClientD1Session, getMainChannelsD1, isAllowedActionOrgActionD1 } from '../utils/pg_d1.ts'
 import { convertQueryToBody, parsePluginBody } from '../utils/plugin_parser.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { deviceIdRegex, getEnv, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
 z.config(z.locales.en())
 const devicePlatformScheme = z.literal(['ios', 'android'])
@@ -367,15 +366,8 @@ app.post('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
 
-  let pgClient
-  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
-    pgClient = null
-  }
-  else {
-    pgClient = getPgClient(c)
-  }
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
@@ -394,15 +386,8 @@ app.put('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
 
-  let pgClient
-  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
-    pgClient = null
-  }
-  else {
-    pgClient = getPgClient(c)
-  }
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
   let res
@@ -420,15 +405,8 @@ app.delete('/', async (c) => {
   const query = convertQueryToBody(c.req.query())
   cloudlog({ requestId: c.get('requestId'), message: 'delete body', query })
 
-  let pgClient
-  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
-    pgClient = null
-  }
-  else {
-    pgClient = getPgClient(c)
-  }
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
   let res
@@ -446,15 +424,8 @@ app.get('/', async (c) => {
   const query = convertQueryToBody(c.req.query())
   cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', query })
 
-  let pgClient
-  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
-    pgClient = null
-  }
-  else {
-    pgClient = getPgClient(c)
-  }
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, query, jsonRequestSchema)
   let res

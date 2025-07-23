@@ -10,16 +10,15 @@ import {
   parse,
   tryParse,
 } from '@std/semver'
-import { getRuntimeKey } from 'hono/adapter'
 import { appIdToUrl } from './conversion.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { simpleError, simpleError200 } from './hono.ts'
+import { getIsV2, simpleError, simpleError200 } from './hono.ts'
 import { cloudlog } from './loggin.ts'
 import { sendNotifOrg } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg, requestInfosPostgres } from './pg.ts'
 import { getAppOwnerPostgresV2, getDrizzleClientD1Session, isAllowedActionOrgActionD1, requestInfosPostgresV2 } from './pg_d1.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, opnPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, fixSemver, getEnv } from './utils.ts'
+import { backgroundTask, fixSemver } from './utils.ts'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[]) {
   const res: {
@@ -323,20 +322,8 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
 }
 
 export async function update(c: Context, body: AppInfos) {
-  let pgClient
-  let isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
-  if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
-    // force v2 for update v2
-    isV2 = 1.0
-  }
-  // check if URL ends with update_v2 if yes do not init PG
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
-    pgClient = null
-  }
-  else {
-    pgClient = getPgClient(c)
-  }
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
 
   let res
   try {

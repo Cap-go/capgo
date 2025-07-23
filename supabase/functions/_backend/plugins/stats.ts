@@ -3,11 +3,10 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { getDrizzleClientD1 } from '../utils/pg_d1.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, DeviceWithoutCreatedAt, StatsActions } from '../utils/types.ts'
-import { getRuntimeKey } from 'hono/adapter'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/v4-mini'
 import { appIdToUrl } from '../utils/conversion.ts'
-import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, getIsV2, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient, isAllowedActionOrgActionPg } from '../utils/pg.ts'
@@ -15,7 +14,6 @@ import { getAppOwnerPostgresV2, getAppVersionPostgresV2, getDrizzleClientD1Sessi
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsVersion, opnPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
-import { getEnv } from '../utils/utils.ts'
 
 const failActions = [
   'set_fail',
@@ -133,20 +131,8 @@ app.post('/', async (c) => {
   if (isLimited(c, body.app_id)) {
     throw simpleError('too_many_requests', 'Too many requests')
   }
-  // return post(c, parsePluginBody<AppStats>(c, body, jsonRequestSchema))
-  let pgClient
-  let isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
-  if (c.req.url.endsWith('/updates_v2') && getRuntimeKey() === 'workerd') {
-    // force v2 for update v2
-    isV2 = 1.0
-  }
-  if (isV2 && Math.random() < isV2) {
-    cloudlog({ requestId: c.get('requestId'), message: 'update2', isV2 })
-    pgClient = null
-  }
-  else {
-    pgClient = getPgClient(c)
-  }
+  const isV2 = getIsV2(c)
+  const pgClient = isV2 ? null : getPgClient(c)
 
   const bodyParsed = parsePluginBody<AppStats>(c, body, jsonRequestSchema)
   let res

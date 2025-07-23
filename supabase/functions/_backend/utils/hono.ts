@@ -21,7 +21,7 @@ import { checkKey, checkKeyById, getEnv } from './utils.ts'
 
 export const useCors = cors({
   origin: '*',
-  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info', ],
+  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
   allowMethods: ['POST', 'GET', 'OPTIONS'],
 })
 
@@ -384,4 +384,14 @@ export function parseBody<T>(c: Context) {
       }
       return body
     })
+}
+
+export function getIsV2(c: Context) {
+  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
+  cloudlog({ requestId: c.get('requestId'), message: 'isV2', isV2 })
+  // if (v2Val && Math.random() < v2Val) {
+  //   return true
+  // }
+  cloudlog({ requestId: c.get('requestId'), message: 'isV2 forced to false', isV2 })
+  return false
 }
