@@ -192,7 +192,7 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
-  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value && (currentPlanSuggest.value?.price_m ?? 0) > (currentPlan.value?.price_m ?? 0)
+  return currentPlanSuggest.value?.name === p.name && (currentPlanSuggest.value?.price_m ?? 0) > (currentPlan.value?.price_m ?? 0)
 }
 function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
   return {

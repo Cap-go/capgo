@@ -273,20 +273,44 @@ function nextRunDate() {
           <!-- Usage Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
             <!-- MAU Card -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
                   {{ t('monthly-active-users') }}
                 </h3>
-                <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'">
                   {{ planUsage?.detailPlanUsage?.mau_percent || 0 }}%
+                </div>
+              </div>
+
+              <!-- Limit Exceeded Alert -->
+              <div v-if="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                  <div class="flex-1">
+                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
+                      {{ t('mau-limit-exceeded') }}
+                    </p>
+                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
+                      {{ t('mau-updates-stopped-upgrade-required') }}
+                    </p>
+                    <button
+                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
+                      @click="goToPlans"
+                    >
+                      {{ t('upgrade-now') }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- Progress Bar -->
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
-                  class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
+                  class="h-3 rounded-full transition-all duration-300"
+                  :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.mau_percent || 0, 100)}%` }"
                 />
               </div>
@@ -314,20 +338,44 @@ function nextRunDate() {
             </div>
 
             <!-- Storage Card -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
                   {{ t('Storage') }}
                 </h3>
-                <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'">
                   {{ planUsage?.detailPlanUsage?.storage_percent || 0 }}%
+                </div>
+              </div>
+
+              <!-- Limit Exceeded Alert -->
+              <div v-if="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                  <div class="flex-1">
+                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
+                      {{ t('storage-limit-exceeded') }}
+                    </p>
+                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
+                      {{ t('storage-updates-stopped-upgrade-required') }}
+                    </p>
+                    <button
+                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
+                      @click="goToPlans"
+                    >
+                      {{ t('upgrade-now') }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- Progress Bar -->
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
-                  class="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300"
+                  class="h-3 rounded-full transition-all duration-300"
+                  :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-purple-500 to-purple-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.storage_percent || 0, 100)}%` }"
                 />
               </div>
@@ -355,20 +403,44 @@ function nextRunDate() {
             </div>
 
             <!-- Bandwidth Card -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
                   {{ t('Bandwidth') }}
                 </h3>
-                <div class="text-2xl font-bold text-green-600 dark:text-green-400">
+                <div class="text-2xl font-bold" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
                   {{ planUsage?.detailPlanUsage?.bandwidth_percent || 0 }}%
+                </div>
+              </div>
+
+              <!-- Limit Exceeded Alert -->
+              <div v-if="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                  </svg>
+                  <div class="flex-1">
+                    <p class="text-sm font-semibold text-red-800 dark:text-red-200">
+                      {{ t('bandwidth-limit-exceeded') }}
+                    </p>
+                    <p class="text-xs text-red-700 dark:text-red-300 mt-1">
+                      {{ t('bandwidth-updates-stopped-upgrade-required') }}
+                    </p>
+                    <button
+                      class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors"
+                      @click="goToPlans"
+                    >
+                      {{ t('upgrade-now') }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- Progress Bar -->
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                 <div
-                  class="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-300"
+                  class="h-3 rounded-full transition-all duration-300"
+                  :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-green-500 to-green-600'"
                   :style="{ width: `${Math.min(planUsage?.detailPlanUsage?.bandwidth_percent || 0, 100)}%` }"
                 />
               </div>
