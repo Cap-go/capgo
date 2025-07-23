@@ -184,47 +184,6 @@ async function loadData() {
   initialLoad.value = false
 }
 
-watch(currentOrganization, async (newOrg, prevOrg) => {
-  // isSubscribeLoading.value.fill(true, 0, plans.value.length)
-  if (
-    !organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])
-    || !newOrg?.paying
-  ) {
-    if (!initialLoad.value) {
-      const orgsMap = organizationStore.getAllOrgs()
-      const newOrg = [...orgsMap]
-        .map(([_, a]) => a)
-        .filter(org => org.role.includes('super_admin') && org.paying)
-        .sort((a, b) => b.app_count - a.app_count)[0]
-
-      if (newOrg) {
-        organizationStore.setCurrentOrganization(newOrg.gid)
-        return
-      }
-      router.push('/app')
-    }
-
-    const paying = newOrg?.paying !== undefined ? newOrg?.paying : true
-
-    dialogStore.openDialog({
-      title: paying ? t('cannot-view-usage') : t('cannot-show'),
-      description: paying ? t('usage-super-only') : t('not-paying-org-usage'),
-      buttons: [
-        {
-          text: t('ok'),
-        },
-      ],
-    })
-    await dialogStore.onDialogDismiss()
-    if (!prevOrg)
-      router.push('/app')
-    else
-      organizationStore.setCurrentOrganization(prevOrg.gid)
-  }
-
-  await loadData()
-})
-
 function lastRunDate() {
   const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
   return `${t('last-run')}: ${lastRun}`
