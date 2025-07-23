@@ -154,15 +154,55 @@ async function fetchOrgAndAppNames() {
 }
 
 const searchQuery = ref('')
-const filteredKeys = computed(() => {
-  if (!keys.value || !searchQuery.value)
-    return keys.value ?? []
 
-  const query = searchQuery.value.toLowerCase()
-  return keys.value.filter(key =>
-    key.name?.toLowerCase().includes(query)
-    || key.key.toLowerCase().includes(query),
-  )
+const filteredAndSortedKeys = computed(() => {
+  let result = keys.value ?? []
+
+  // Filter first
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(key =>
+      key.name?.toLowerCase().includes(query)
+      || key.key.toLowerCase().includes(query),
+    )
+  }
+
+  // Then sort based on column state
+  if (columns.value.length) {
+    columns.value.forEach((col) => {
+      if (col.sortable && typeof col.sortable === 'string') {
+        result = [...result].sort((a, b) => {
+          let aValue: any = ''
+          let bValue: any = ''
+
+          switch (col.key) {
+            case 'name':
+              aValue = a.name?.toLowerCase() || ''
+              bValue = b.name?.toLowerCase() || ''
+              break
+            case 'mode':
+              aValue = a.mode.toLowerCase()
+              bValue = b.mode.toLowerCase()
+              break
+            case 'created_at':
+              aValue = new Date(a.created_at || 0)
+              bValue = new Date(b.created_at || 0)
+              break
+            default:
+              return 0
+          }
+
+          if (aValue < bValue)
+            return col.sortable === 'asc' ? -1 : 1
+          if (aValue > bValue)
+            return col.sortable === 'asc' ? 1 : -1
+          return 0
+        })
+      }
+    })
+  }
+
+  return result
 })
 
 // Computed property to filter apps based on selected organizations
@@ -179,6 +219,7 @@ columns.value = [
   {
     key: 'mode',
     label: t('type'),
+    sortable: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       return row.mode.toUpperCase()
     },
@@ -196,6 +237,15 @@ columns.value = [
     label: t('name'),
     head: true,
     mobile: true,
+    sortable: true,
+  },
+  {
+    key: 'created_at',
+    label: t('created'),
+    sortable: true,
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return new Date(row.created_at || '').toLocaleDateString()
+    },
   },
   {
     key: 'limited_to_orgs',
@@ -591,9 +641,9 @@ getKeys()
             v-model:current-page="currentPage"
             show-add
             :columns="columns"
-            :element-list="filteredKeys"
+            :element-list="filteredAndSortedKeys"
             :is-loading="isLoading"
-            :total="filteredKeys.length"
+            :total="filteredAndSortedKeys.length"
             :search-placeholder="t('search-api-keys')"
             :search="searchQuery"
             @add="addNewApiKey"
