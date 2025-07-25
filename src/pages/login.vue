@@ -337,7 +337,7 @@ onMounted(checkLogin)
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
                 <FormKit
-                  type="email" name="email" :disabled="isLoading" enterkeyhint="next"
+                  type="email" name="email" :disabled="isLoading" enterkeyhint="next" :placeholder="t('email')"
                   :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                   validation="required:trim" data-test="email"
                 />

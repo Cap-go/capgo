@@ -45,7 +45,7 @@ function logsnagInsights(c: Context, data: { title: string, value: string | bool
       },
     }).then(res => res.json())
       .catch((e) => {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights', error: e, payload })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', error: e, payload })
         return false
       }),
     )
