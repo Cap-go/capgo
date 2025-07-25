@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.15.5 (2025-07-25)
+
+
+### Bug Fixes
+
+* update organization labels and validation messages in multiple languages ([b184d46](https://github.com/Cap-go/capgo/commit/b184d46961c3f410ff8ffa8f8d63d890b7ab8a1a))
+
 ### 12.15.4 (2025-07-24)
 
 ### 12.15.3 (2025-07-24)
