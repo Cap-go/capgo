@@ -245,7 +245,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </div>
         </div>
         <div class="mt-6 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0 bg-gray-50" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
+          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0 bg-gray-50 dark:bg-gray-900" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
             <div v-if="isRecommended(p)" class="absolute top-0 right-0 flex items-start -mt-8 border-none">
               <svg
                 class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"

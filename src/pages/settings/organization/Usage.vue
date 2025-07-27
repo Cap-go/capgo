@@ -230,7 +230,7 @@ function nextRunDate() {
           <!-- Plan Information Section -->
           <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Current Plan -->
-            <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
               <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">
                 {{ t('Current') }}
               </div>
@@ -243,7 +243,7 @@ function nextRunDate() {
             </div>
 
             <!-- Best Plan with Upgrade Button -->
-            <div class="bg-white dark:bg-gray-900 rounded-lg border p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border p-4" :class="shouldShowUpgrade ? 'border-blue-500 border-2 shadow-lg ring-2 ring-blue-500/20' : 'border-gray-200 dark:border-gray-700'">
               <div class="flex items-center justify-between mb-1">
                 <div class="text-sm text-gray-600 dark:text-gray-400">
                   {{ t('best-plan') }}
@@ -273,7 +273,7 @@ function nextRunDate() {
           <!-- Usage Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
             <!-- MAU Card -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.mau_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
                   {{ t('monthly-active-users') }}
@@ -338,7 +338,7 @@ function nextRunDate() {
             </div>
 
             <!-- Storage Card -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.storage_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
                   {{ t('Storage') }}
@@ -403,7 +403,7 @@ function nextRunDate() {
             </div>
 
             <!-- Bandwidth Card -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6" :class="(planUsage?.detailPlanUsage?.bandwidth_percent || 0) >= 100 ? 'border-red-500 dark:border-red-400' : ''">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
                   {{ t('Bandwidth') }}
@@ -469,7 +469,7 @@ function nextRunDate() {
           </div>
 
           <!-- Pricing Summary Card -->
-          <div class="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div class="mt-8 bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">
               {{ t('usage-title') }}
             </h3>
