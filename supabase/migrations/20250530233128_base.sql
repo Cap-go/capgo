@@ -7251,6 +7251,13 @@ SELECT
 
 SELECT
   cron.schedule (
+    'create_admin_stats',
+    '0 14 1 * *',
+    'SELECT public.process_admin_stats()'
+  );
+
+SELECT
+  cron.schedule (
     'Send stats email every week',
     '0 12 * * 6',
     'SELECT process_stats_email_weekly();'
