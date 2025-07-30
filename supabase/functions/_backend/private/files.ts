@@ -46,13 +46,35 @@ async function getHandler(c: Context): Promise<Response> {
   // disable cache for now TODO: add it back when we understand why it doesn't give file tto download but text
   // @ts-expect-error-next-line
   const cache = caches.default
-  const cacheKey = new Request(new URL(c.req.url), c.req)
+  const cacheUrl = new URL(c.req.url)
+  cacheUrl.searchParams.set('range', c.req.header('range') || '')
+  const cacheKey = new Request(cacheUrl, c.req)
   let response = await cache.match(cacheKey)
   // TODO: move bandwidth tracking here instead of in the updates.ts
   // createStatsBandwidth(c, device_id, app_id, res.size ?? 0)
   if (response != null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
     return response
+  }
+
+  const rangeHeaderFromRequest = c.req.header('range')
+  if (rangeHeaderFromRequest) {
+    const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(requestId)
+    if (objectInfo == null) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
+      return c.json({ error: 'not_found', message: 'Not found' }, 404)
+    }
+    const fileSize = objectInfo.size
+    const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
+    if (rangeMatch) {
+      const rangeStart = Number.parseInt(rangeMatch[1])
+      if (rangeStart >= fileSize) {
+        // Return a 206 Partial Content with an empty body and appropriate Content-Range header for zero-length range
+        const emptyHeaders = new Headers()
+        emptyHeaders.set('Content-Range', `bytes */${fileSize}`)
+        return new Response(new Uint8Array(0), { status: 206, headers: emptyHeaders })
+      }
+    }
   }
 
   const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
