@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.15.8 (2025-07-31)
+
+
+### Bug Fixes
+
+* update Discord link in Sidebar component ([8e22895](https://github.com/Cap-go/capgo/commit/8e22895c19be8378e4c4af66c934570457cabdc5))
+
 ### 12.15.7 (2025-07-29)
 
 ### 12.15.6 (2025-07-27)
