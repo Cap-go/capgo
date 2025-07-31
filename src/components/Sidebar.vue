@@ -62,7 +62,7 @@ const tabs = ref<Tab[]>([
     label: 'discord',
     icon: shallowRef(IconDiscord),
     key: '#',
-    onClick: () => window.open('https://discord.gg/VnYRvBfgA6', '_blank'),
+    onClick: () => window.open('https://discord.capgo.app', '_blank'),
     redirect: true,
   },
 ])
