@@ -1,0 +1,198 @@
+name: Deploy Preview Environment
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, development]
+  pull_request_target:
+    types: [closed]
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
+jobs:
+  preview_deploy:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    name: Deploy Preview Environment
+    outputs:
+      preview_url: ${{ steps.deploy_frontend.outputs.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Lint
+        run: bun lint
+
+      - name: Typecheck
+        run: bun typecheck
+
+      - name: Set preview environment variables
+        run: |
+          echo "PREVIEW_NAME=capgo-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "PREVIEW_DOMAIN=capgo-preview-${{ env.PR_NUMBER }}.pages.dev" >> $GITHUB_ENV
+          echo "API_PREVIEW_NAME=capgo-api-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+
+      - name: Build frontend for preview
+        run: BRANCH=preview bun build
+        env:
+          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+
+      - name: Deploy frontend to Cloudflare Pages
+        id: deploy_frontend
+        run: |
+          # Deploy to a preview project
+          bunx wrangler@latest pages deploy dist \
+            --project-name ${{ env.PREVIEW_NAME }} \
+            --branch preview-${{ env.PR_NUMBER }} \
+            --commit-dirty=true
+          
+          # Set the preview URL as output
+          echo "url=https://${{ env.PREVIEW_DOMAIN }}" >> $GITHUB_OUTPUT
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy API Worker
+        run: |
+          # Generate wrangler config for API worker
+          WORKER_TYPE=api node scripts/generate_preview_config.mjs
+          bunx wrangler deploy --config /tmp/wrangler-api-preview.json --minify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Files Worker  
+        run: |
+          # Generate wrangler config for Files worker
+          WORKER_TYPE=files node scripts/generate_preview_config.mjs
+          bunx wrangler deploy --config /tmp/wrangler-files-preview.json --minify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Plugin Worker
+        run: |
+          # Generate wrangler config for Plugin worker
+          WORKER_TYPE=plugin node scripts/generate_preview_config.mjs
+          bunx wrangler deploy --config /tmp/wrangler-plugin-preview.json --minify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Comment PR with preview URLs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && comment.body.includes('🚀 Preview Environment Deployed')
+            );
+            
+            const commentBody = `🚀 **Preview Environment Deployed**
+
+            Your changes have been deployed to a preview environment:
+
+            **🌐 Frontend Preview:** https://${{ env.PREVIEW_DOMAIN }}
+            **🔧 API Preview:** https://${{ env.API_PREVIEW_NAME }}.workers.dev  
+            **📁 Files Preview:** https://${{ env.FILES_PREVIEW_NAME }}.workers.dev
+            **🔌 Plugin Preview:** https://${{ env.PLUGIN_PREVIEW_NAME }}.workers.dev
+
+            ---
+            **Branch:** \`${{ env.BRANCH_NAME }}\`  
+            **Commit:** \`${{ github.event.pull_request.head.sha }}\`
+            **Build:** [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            > Preview environments are automatically updated when you push new commits to this PR.`;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
+
+  cleanup_preview:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Cleanup Preview Environment
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set preview environment variables
+        run: |
+          echo "PREVIEW_NAME=capgo-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "API_PREVIEW_NAME=capgo-api-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+
+      - name: Delete preview Pages project
+        run: |
+          bunx wrangler@latest pages project delete ${{ env.PREVIEW_NAME }} --yes || echo "Pages project may not exist"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Delete preview Workers
+        run: |
+          bunx wrangler delete ${{ env.API_PREVIEW_NAME }} --force || echo "API worker may not exist"
+          bunx wrangler delete ${{ env.FILES_PREVIEW_NAME }} --force || echo "Files worker may not exist"  
+          bunx wrangler delete ${{ env.PLUGIN_PREVIEW_NAME }} --force || echo "Plugin worker may not exist"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Comment PR with cleanup confirmation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🧹 **Preview Environment Cleaned Up**
+              
+              The preview environment for this PR has been successfully removed from Cloudflare.
+              
+              **Deleted:**
+              - Frontend: \`${{ env.PREVIEW_NAME }}\`
+              - API Worker: \`${{ env.API_PREVIEW_NAME }}\`
+              - Files Worker: \`${{ env.FILES_PREVIEW_NAME }}\`
+              - Plugin Worker: \`${{ env.PLUGIN_PREVIEW_NAME }}\``
+            });

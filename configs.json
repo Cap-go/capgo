@@ -3,30 +3,35 @@
     "prod": "web.capgo.app",
     "preprod": "web-preprod.capgo.app",
     "development": "development.capgo.app",
+    "preview": "capgo-preview.pages.dev",
     "local": "localhost:3332"
   },
   "supa_anon": {
     "prod": "sb_publishable_T8kEcJpf9PbGYLkArVCLHA_lAE0Hb0T",
     "preprod": "sb_publishable_T8kEcJpf9PbGYLkArVCLHA_lAE0Hb0T",
     "development": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1Y3N5YnZuaGF2b2dkbXp3dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTQ1Mzk1MDYsImV4cCI6MTk3MDExNTUwNn0.HyuZmo_EjF5fgZQU3g37bdNardK1CLHgxXmYqtr59bo",
+    "preview": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1Y3N5YnZuaGF2b2dkbXp3dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTQ1Mzk1MDYsImV4cCI6MTk3MDExNTUwNn0.HyuZmo_EjF5fgZQU3g37bdNardK1CLHgxXmYqtr59bo",
     "local": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
   },
   "supa_url": {
     "prod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
     "preprod": "https://xvwzpoazmxkqosrdewyv.supabase.co",
     "development": "https://aucsybvnhavogdmzwtcw.supabase.co",
+    "preview": "https://aucsybvnhavogdmzwtcw.supabase.co",
     "local": "http://localhost:54321"
   },
   "api_domain": {
     "prod": "api.capgo.app",
     "preprod": "api-preprod.capgo.app",
     "development": "api-dev.capgo.app",
+    "preview": "api-preview.workers.dev",
     "local": "localhost:54321/functions/v1"
   },
   "captcha_key": {
     "prod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
     "preprod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
     "development": "0x4AAAAAAAxDbvW2bw7mcEZs",
+    "preview": "0x4AAAAAAAxDbvW2bw7mcEZs",
     "local": ""
   }
 }

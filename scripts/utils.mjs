@@ -15,6 +15,8 @@ export function getRightKey(keyname) {
     return keys[keyname].development
   else if (branch === 'local')
     return keys[keyname].local
+  else if (branch === 'preview')
+    return keys[keyname].preview
   return keys[keyname].prod
 }
 export const supa_url = getRightKey('supa_url')
