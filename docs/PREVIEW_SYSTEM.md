@@ -1,6 +1,6 @@
 # Capgo Preview Deployment System
 
-This document describes the automated preview deployment system for Capgo, which creates isolated preview environments for every pull request using Cloudflare Pages and Workers.
+This document describes the automated preview deployment system for Capgo, which creates isolated preview environments for every pull request using Cloudflare Pages and Workers with **production configuration**.
 
 ## Overview
 
@@ -10,6 +10,7 @@ The preview system automatically:
 - 🧹 Cleans up resources when the PR is closed
 - 💬 Comments on PRs with preview URLs
 - 🔗 Provides isolated environments for testing changes
+- ⚡ Uses production configuration for realistic testing
 
 ## Architecture
 
@@ -19,37 +20,33 @@ Each preview environment consists of:
 - **Project Name**: `capgo-preview-{PR_NUMBER}`
 - **URL**: `https://capgo-preview-{PR_NUMBER}.pages.dev`
 - **Branch**: `preview-{PR_NUMBER}`
+- **Build**: Production build (`bun mobile`)
 
 ### Backend Workers
 - **API Worker**: `capgo-api-preview-{PR_NUMBER}.workers.dev`
 - **Files Worker**: `capgo-files-preview-{PR_NUMBER}.workers.dev`  
 - **Plugin Worker**: `capgo-plugin-preview-{PR_NUMBER}.workers.dev`
+- **Config**: Production configuration with preview names
 
 ## Configuration
 
-### Environment Variables
-The preview environment uses the `preview` configuration from `configs.json`:
+### Production Configuration
+Preview environments use the same configuration as production:
+- Same database connections (production Supabase)
+- Same API endpoints and secrets
+- Same environment variables
+- Same build process
 
-```json
-{
-  "base_domain": {
-    "preview": "capgo-preview.pages.dev"
-  },
-  "supa_url": {
-    "preview": "https://aucsybvnhavogdmzwtcw.supabase.co"
-  },
-  "api_domain": {
-    "preview": "api-preview.workers.dev"
-  }
-}
-```
+The only differences are:
+- Preview-specific naming for Cloudflare resources
+- Workers deployed to `*.workers.dev` instead of custom domains
 
 ### Required Secrets
 The GitHub workflow requires these repository secrets:
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `VITE_VAPID_KEY`
-- `VITE_FIREBASE_CONFIG`
+- `CLOUDFLARE_API_TOKEN` - Token with Pages and Workers permissions
+- `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
+- `VITE_VAPID_KEY` - Vapid key for PWA functionality
+- `VITE_FIREBASE_CONFIG` - Firebase configuration
 
 ## Workflow
 
@@ -59,6 +56,11 @@ The preview system triggers on:
 - New commits pushed to PR
 - Pull request reopened
 
+### Build Process
+1. **Frontend**: Uses `bun mobile` (production build)
+2. **Workers**: Uses existing production `wrangler.json` configs
+3. **Deployment**: Modifies worker names and removes custom domains
+
 ### Automatic Cleanup  
 Resources are cleaned up when:
 - Pull request is closed
@@ -66,97 +68,120 @@ Resources are cleaned up when:
 
 ## Manual Operations
 
-### Deploy Preview Locally
+Since the system uses production configuration, manual operations are simple:
+
+### Build for Preview
+```bash
+# Same as production build
+bun mobile
+```
+
+### Deploy to Preview URLs
 ```bash
 # Set PR number
 export PR_NUMBER=123
 
-# Deploy complete preview environment
-npm run deploy:preview:all
+# Deploy frontend
+bunx wrangler pages deploy dist --project-name capgo-preview-$PR_NUMBER
 
-# Or deploy components individually
-npm run deploy:preview:frontend
-npm run deploy:preview:workers
+# Deploy workers (modify configs and deploy)
+# This is handled automatically by the workflow
 ```
 
-### Cleanup Preview Environment
-```bash
-# Set PR number
-export PR_NUMBER=123
+## Implementation Details
 
-# Clean up all preview resources
-npm run cleanup:preview
+### Worker Configuration
+The workflow automatically:
+1. Takes existing production `wrangler.json` files
+2. Modifies the `name` field to include PR number
+3. Sets `workers_dev: true` to deploy to `*.workers.dev`
+4. Removes custom domain routing
+5. Keeps all other production settings (databases, analytics, etc.)
+
+### Example Configuration Transformation
+```json
+// Production config
+{
+  "name": "capgo_api-prod",
+  "workers_dev": false,
+  "route": { "pattern": "api.capgo.app" },
+  // ... other production settings
+}
+
+// Preview config (auto-generated)
+{
+  "name": "capgo-api-preview-123",
+  "workers_dev": true,
+  // ... same production settings without routing
+}
 ```
 
-### Generate Worker Configurations
-```bash
-# Generate wrangler config for specific worker type
-WORKER_TYPE=api PR_NUMBER=123 node scripts/generate_preview_config.mjs
-WORKER_TYPE=files PR_NUMBER=123 node scripts/generate_preview_config.mjs
-WORKER_TYPE=plugin PR_NUMBER=123 node scripts/generate_preview_config.mjs
-```
+## Benefits
 
-## Scripts
+### Realistic Testing
+- Uses actual production configuration
+- Tests with real database connections
+- Same build process as production
+- Identical environment variables
 
-### `scripts/generate_preview_config.mjs`
-Generates dynamic wrangler configurations for preview workers with PR-specific naming.
+### Simplified Maintenance
+- No duplicate configuration files
+- No custom preview scripts
+- Automatically stays in sync with production
+- Reduced configuration drift
 
-### `scripts/cleanup_preview.mjs`
-Removes all Cloudflare resources associated with a preview environment.
+### Cost Effective
+- Uses Cloudflare's free tier for previews
+- No additional database instances needed
+- Automatic cleanup prevents resource waste
+
+## Security Considerations
+
+**Important**: Preview environments use production configuration, which means:
+- ✅ Realistic testing environment
+- ⚠️ Previews connect to production databases
+- ⚠️ Preview changes can affect production data
+- 🔒 Consider read-only access for sensitive operations
+
+### Best Practices
+- Test carefully on previews as they use production backends
+- Consider implementing preview-specific safeguards in your application
+- Monitor production databases for preview-related activity
+- Use feature flags to disable sensitive operations in preview mode
 
 ## Troubleshooting
 
 ### Common Issues
 
 **Preview deployment fails**
-- Check if Cloudflare API token has sufficient permissions
-- Verify account ID is correct
-- Ensure no resource naming conflicts
-
-**Worker deployment fails**
-- Check if worker files exist in expected locations
-- Verify wrangler configuration is valid
-- Check for syntax errors in worker code
-
-**Cleanup fails**
-- Resources may have already been deleted
 - Check Cloudflare API token permissions
-- Manual cleanup may be required in Cloudflare dashboard
+- Verify account ID is correct
+- Check for worker compilation errors
+
+**Workers not accessible**
+- Verify `*.workers.dev` domains are accessible
+- Check worker logs in Cloudflare dashboard
+- Ensure production config is valid
 
 ### Manual Cleanup
-If automated cleanup fails, manually delete:
-1. Cloudflare Pages project: `capgo-preview-{PR_NUMBER}`
+If automated cleanup fails, manually delete from Cloudflare dashboard:
+1. Pages project: `capgo-preview-{PR_NUMBER}`
 2. Workers:
    - `capgo-api-preview-{PR_NUMBER}`
    - `capgo-files-preview-{PR_NUMBER}`
    - `capgo-plugin-preview-{PR_NUMBER}`
 
-## Cost Considerations
-
-- Each preview environment uses Cloudflare's free tier resources
-- Preview environments are automatically cleaned up to minimize costs
-- Consider implementing additional cleanup strategies for long-running PRs
-
-## Security
-
-- Preview environments use development/staging credentials
-- No production data or secrets are exposed
-- Preview workers have limited permissions
-- Environments are isolated per PR
-
 ## Monitoring
 
 Monitor preview deployments through:
 - GitHub Actions workflow logs
-- Cloudflare Dashboard
+- Cloudflare Dashboard → Workers & Pages
 - PR comments with deployment status
-- Worker analytics in Cloudflare
+- Production database logs (preview activity)
 
-## Future Enhancements
+## Limitations
 
-Potential improvements:
-- Custom domain routing for previews
-- Database preview environments
-- Preview environment health checks
-- Automated testing on preview environments
-- Preview environment metrics and analytics
+- Previews share production database (by design)
+- No environment isolation for backend services
+- Changes in previews may affect production data
+- Custom domains not available for preview workers

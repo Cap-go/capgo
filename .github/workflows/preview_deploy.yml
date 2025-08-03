@@ -48,8 +48,8 @@ jobs:
           echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
           echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
 
-      - name: Build frontend for preview
-        run: BRANCH=preview bun build
+      - name: Build frontend (production build)
+        run: bun mobile
         env:
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
@@ -57,7 +57,7 @@ jobs:
       - name: Deploy frontend to Cloudflare Pages
         id: deploy_frontend
         run: |
-          # Deploy to a preview project
+          # Deploy to a preview project using production build
           bunx wrangler@latest pages deploy dist \
             --project-name ${{ env.PREVIEW_NAME }} \
             --branch preview-${{ env.PR_NUMBER }} \
@@ -69,28 +69,34 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy API Worker
+      - name: Deploy API Worker (production config)
         run: |
-          # Generate wrangler config for API worker
-          WORKER_TYPE=api node scripts/generate_preview_config.mjs
+          # Create preview config from production config
+          jq '.name = "${{ env.API_PREVIEW_NAME }}" | .workers_dev = true | del(.route) | del(.routes)' \
+            cloudflare_workers/api/wrangler.json > /tmp/wrangler-api-preview.json
+          
           bunx wrangler deploy --config /tmp/wrangler-api-preview.json --minify
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy Files Worker  
+      - name: Deploy Files Worker (production config)
         run: |
-          # Generate wrangler config for Files worker
-          WORKER_TYPE=files node scripts/generate_preview_config.mjs
+          # Create preview config from production config
+          jq '.name = "${{ env.FILES_PREVIEW_NAME }}" | .workers_dev = true | del(.route) | del(.routes)' \
+            cloudflare_workers/files/wrangler.json > /tmp/wrangler-files-preview.json
+          
           bunx wrangler deploy --config /tmp/wrangler-files-preview.json --minify
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy Plugin Worker
+      - name: Deploy Plugin Worker (production config)
         run: |
-          # Generate wrangler config for Plugin worker
-          WORKER_TYPE=plugin node scripts/generate_preview_config.mjs
+          # Create preview config from production config
+          jq '.name = "${{ env.PLUGIN_PREVIEW_NAME }}" | .workers_dev = true | del(.route) | del(.routes)' \
+            cloudflare_workers/plugin/wrangler.json > /tmp/wrangler-plugin-preview.json
+          
           bunx wrangler deploy --config /tmp/wrangler-plugin-preview.json --minify
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -112,7 +118,7 @@ jobs:
             
             const commentBody = `🚀 **Preview Environment Deployed**
 
-            Your changes have been deployed to a preview environment:
+            Your changes have been deployed to a preview environment using **production configuration**:
 
             **🌐 Frontend Preview:** https://${{ env.PREVIEW_DOMAIN }}
             **🔧 API Preview:** https://${{ env.API_PREVIEW_NAME }}.workers.dev  
@@ -124,7 +130,7 @@ jobs:
             **Commit:** \`${{ github.event.pull_request.head.sha }}\`
             **Build:** [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
-            > Preview environments are automatically updated when you push new commits to this PR.`;
+            > Preview environments use production configuration and are automatically updated when you push new commits to this PR.`;
 
             if (botComment) {
               await github.rest.issues.updateComment({
