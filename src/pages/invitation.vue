@@ -200,11 +200,11 @@ function openPrivacy() {
                   </h2>
 
                   <div class="mb-4">
-                    <label for="password" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Password:</label>
+                    <label for="password" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('password-colon') }}</label>
                     <input
                       v-model="password"
                       type="password"
-                      placeholder="Enter your password"
+                      :placeholder="t('password-placeholder')"
                       autocomplete="new-password"
                       class="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
                     >
