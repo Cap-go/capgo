@@ -526,7 +526,7 @@ function nextRunDate() {
           </div>
 
           <div class="font-medium text-gray-900 dark:text-white mb-3">
-            {{ t('your-ussage') }}
+            {{ t('your-usage') }}
           </div>
 
           <div class="space-y-2 text-gray-600 dark:text-gray-400">

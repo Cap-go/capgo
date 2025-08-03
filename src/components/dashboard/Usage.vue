@@ -135,7 +135,7 @@ if (main.dashboardFetched)
   >
     <UsageCard
       v-if="!isLoading" id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="false"
-      :datas="datas.mau" :title="`${t('montly-active')}`" unit="Users"
+      :datas="datas.mau" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div
@@ -157,7 +157,7 @@ if (main.dashboardFetched)
     </div>
     <UsageCard
       v-if="!isLoading" :limits="allLimits.bandwidth" :colors="colors.orange" :datas="datas.bandwidth" :accumulated="false"
-      :title="t('Bandwidth')" unit="GB"
+      :title="t('Bandwidth')" :unit="t('units-gb')"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <div

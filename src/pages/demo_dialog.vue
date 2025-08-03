@@ -151,18 +151,18 @@ function readExternalInput() {
         <input
           v-model="externalInputValue"
           type="text"
-          placeholder="Type something here..."
+          :placeholder="t('demo-input-placeholder')"
           class="input input-bordered flex-1"
         >
         <button
           class="d-btn d-btn-outline"
           @click="readExternalInput"
         >
-          Read Value
+          {{ t('read-value') }}
         </button>
       </div>
       <p class="text-sm text-gray-500 mt-2">
-        This demonstrates reading input values from components outside the dialog
+        {{ t('demo-external-input-desc') }}
       </p>
     </div>
 
@@ -170,16 +170,16 @@ function readExternalInput() {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('dialog-with-custom-input')" defer to="#dialog-v2-content">
       <div class="space-y-4">
         <div>
-          <label for="custom-input" class="block text-sm font-medium mb-2">Custom Input Field</label>
+          <label for="custom-input" class="block text-sm font-medium mb-2">{{ t('custom-input-field') }}</label>
           <input
             v-model="customInputValue"
             type="text"
-            placeholder="Enter your text here..."
+            :placeholder="t('demo-text-placeholder')"
             class="input input-bordered w-full"
           >
         </div>
         <div class="text-sm text-gray-500">
-          This input is teleported into the dialog content area
+          {{ t('demo-teleport-desc') }}
         </div>
       </div>
     </Teleport>
@@ -189,41 +189,41 @@ function readExternalInput() {
       <div class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label for="first-name" class="block text-sm font-medium mb-2">First Name</label>
+            <label for="first-name" class="block text-sm font-medium mb-2">{{ t('first-name') }}</label>
             <input
               type="text"
-              placeholder="John"
+              :placeholder="t('demo-fname-placeholder')"
               class="input input-bordered w-full"
             >
           </div>
           <div>
-            <label for="last-name" class="block text-sm font-medium mb-2">Last Name</label>
+            <label for="last-name" class="block text-sm font-medium mb-2">{{ t('last-name') }}</label>
             <input
               type="text"
-              placeholder="Doe"
+              :placeholder="t('demo-lname-placeholder')"
               class="input input-bordered w-full"
             >
           </div>
         </div>
 
         <div>
-          <label for="email" class="block text-sm font-medium mb-2">Email</label>
+          <label for="email" class="block text-sm font-medium mb-2">{{ t('email') }}</label>
           <input
             type="email"
-            placeholder="john.doe@example.com"
+            :placeholder="t('demo-email-placeholder')"
             class="input input-bordered w-full"
           >
         </div>
 
         <div>
-          <label for="role" class="block text-sm font-medium mb-2">Role</label>
+          <label for="role" class="block text-sm font-medium mb-2">{{ t('role') }}</label>
           <select class="select select-bordered w-full">
             <option disabled selected>
-              Select a role
+              {{ t('demo-select-role') }}
             </option>
-            <option>Developer</option>
-            <option>Designer</option>
-            <option>Manager</option>
+            <option>{{ t('demo-role-developer') }}</option>
+            <option>{{ t('demo-role-designer') }}</option>
+            <option>{{ t('demo-role-manager') }}</option>
           </select>
         </div>
 
