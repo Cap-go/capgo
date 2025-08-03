@@ -37,8 +37,8 @@ const { t } = useI18n()
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
-            <button 
-              class="flex p-2 rounded-sm hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" 
+            <button
+              class="flex p-2 rounded-sm hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               :aria-label="t('button-back')"
               @click="back()"
             >
@@ -49,8 +49,8 @@ const { t } = useI18n()
           <!-- Hamburger button -->
           <button
             class="text-slate-500 lg:hidden dark:text-white hover:text-slate-600 dark:hover:text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
-            aria-controls="sidebar" 
-            :aria-expanded="props.sidebarOpen" 
+            aria-controls="sidebar"
+            :aria-expanded="props.sidebarOpen"
             :aria-label="props.sidebarOpen ? t('close-sidebar') : t('open-sidebar')"
             @click.stop="$emit('toggleSidebar')"
           >
@@ -64,8 +64,8 @@ const { t } = useI18n()
               <nav v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm text-slate-600 dark:text-slate-400 font-normal" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
                   <li>
-                    <router-link 
-                      to="/" 
+                    <router-link
+                      to="/"
                       class="first-letter:uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm px-1"
                     >
                       {{ t('home') }}
