@@ -170,7 +170,7 @@ columns.value = [
     class: 'truncate max-w-8',
     sortable: true,
     head: true,
-    onClick: () => window.open(DOC_LOGS, '_blank'),
+    onClick: () => window.open(DOC_LOGS, '_blank', 'noopener,noreferrer'),
   },
   {
     label: t('version'),

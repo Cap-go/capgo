@@ -37,38 +37,54 @@ const { t } = useI18n()
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
-            <button class="flex p-2 rounded-sm hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-500 dark:text-white" @click="back()">
+            <button 
+              class="flex p-2 rounded-sm hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" 
+              :aria-label="t('button-back')"
+              @click="back()"
+            >
               <IconBack class="w-6 h-6 fill-current" />
               <span class="hidden md:block">{{ t('button-back') }}</span>
             </button>
           </div>
           <!-- Hamburger button -->
           <button
-            class="text-slate-500 lg:hidden dark:text-white hover:text-slate-600 dark:hover:text-slate-50"
-            aria-controls="sidebar" :aria-expanded="props.sidebarOpen" @click.stop="$emit('toggleSidebar')"
+            class="text-slate-500 lg:hidden dark:text-white hover:text-slate-600 dark:hover:text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md p-1"
+            aria-controls="sidebar" 
+            :aria-expanded="props.sidebarOpen" 
+            :aria-label="props.sidebarOpen ? t('close-sidebar') : t('open-sidebar')"
+            @click.stop="$emit('toggleSidebar')"
           >
-            <span class="sr-only">{{ t('open-sidebar') }}</span>
+            <span class="sr-only">{{ props.sidebarOpen ? t('close-sidebar') : t('open-sidebar') }}</span>
             <IconMenu class="w-6 h-6 fill-current" />
           </button>
 
           <!-- Title on desktop -->
           <div class="hidden lg:block">
             <div class="font-bold truncate text-md md:text-2xl text-dark dark:text-white flex items-center space-x-2">
-              <span v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm text-slate-600 dark:text-slate-400 font-normal">
-                <router-link to="/" class=" first-letter:uppercase hover:underline">
-                  {{ t('home') }}
-                </router-link>
-                <template v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i">
-                  <span> / </span>
-                  <router-link
-                    :to="breadcrumb.path"
-                    class="first-letter:uppercase hover:underline"
-                  >
-                    {{ breadcrumb.name.includes('.') ? breadcrumb.name : t(breadcrumb.name) }}
-                  </router-link>
-                </template>
-                <span v-if="displayStore.NavTitle"> / </span>
-              </span>
+              <nav v-if="$route.path !== '/' && $route.path !== '/app'" class="text-sm text-slate-600 dark:text-slate-400 font-normal" aria-label="Breadcrumb">
+                <ol class="inline-flex items-center space-x-1">
+                  <li>
+                    <router-link 
+                      to="/" 
+                      class="first-letter:uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm px-1"
+                    >
+                      {{ t('home') }}
+                    </router-link>
+                  </li>
+                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
+                    <span class="mx-1" aria-hidden="true"> / </span>
+                    <router-link
+                      :to="breadcrumb.path"
+                      class="first-letter:uppercase hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm px-1"
+                    >
+                      {{ breadcrumb.name.includes('.') ? breadcrumb.name : t(breadcrumb.name) }}
+                    </router-link>
+                  </li>
+                  <li v-if="displayStore.NavTitle" class="flex items-center">
+                    <span class="mx-1" aria-hidden="true"> / </span>
+                  </li>
+                </ol>
+              </nav>
               <span class="first-letter:uppercase">{{ displayStore.NavTitle }}</span>
             </div>
           </div>
