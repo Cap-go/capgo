@@ -185,7 +185,7 @@ export async function updateWithPG(c: Context, body: AppInfos, drizzleCient: Ret
       })
     }
 
-    if (!channelData.channels.allow_device_self_set && !channelData.channels.public) {
+    if (!channelData.channels.allow_device_self_set && !channelData.channels.public && !channelOverride) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update via a private channel', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel' }])
       return simpleError200(c, 'cannot_update_via_private_channel', 'Cannot update via a private channel. Please ensure your defaultChannel has "Allow devices to self dissociate/associate" set to true')
