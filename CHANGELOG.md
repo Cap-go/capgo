@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.15.12 (2025-08-07)
+
+
+### Bug Fixes
+
+* add channelOverride check to prevent updates via private channels ([a0a6050](https://github.com/Cap-go/capgo/commit/a0a605059453dd6ea0766aa80e350baab2b13a74))
+
 ### 12.15.11 (2025-08-03)
 
 ### 12.15.10 (2025-08-03)
