@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.16.0 (2025-08-07)
+
+
+### Features
+
+* implement channel override logic for device retrieval ([2c00911](https://github.com/Cap-go/capgo/commit/2c00911985d98458f5d875d7d8fc9342ec5f2780))
+
 ### 12.15.12 (2025-08-07)
 
 
