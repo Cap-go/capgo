@@ -55,6 +55,24 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
       throw quickError(404, 'version_not_found', 'Cannot find version', { version: dataDevice.version })
     }
     dataDevice.version = dataVersion as any
+
+    // Check for channel override
+    const { data: channelOverride } = await supabaseAdmin(c)
+      .from('channel_devices')
+      .select(`
+        channel_id,
+        channels (
+          name
+        )
+      `)
+      .eq('device_id', body.device_id.toLowerCase())
+      .eq('app_id', body.app_id)
+      .single()
+
+    if (channelOverride?.channels) {
+      (dataDevice as any).channel = channelOverride.channels.name
+    }
+
     return c.json(dataDevice)
   }
   else {
@@ -90,6 +108,31 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
         device.version = version as any
       }
     })
+
+    // Get channel overrides for all devices
+    const deviceIds = dataDevices.map(device => device.device_id.toLowerCase())
+    const { data: channelOverrides } = await supabaseAdmin(c)
+      .from('channel_devices')
+      .select(`
+        device_id,
+        channel_id,
+        channels (
+          name
+        )
+      `)
+      .in('device_id', deviceIds)
+      .eq('app_id', body.app_id)
+
+    // Add channel override to each device that has one
+    if (channelOverrides?.length) {
+      dataDevices.forEach((device) => {
+        const override = channelOverrides.find(o => o.device_id === device.device_id.toLowerCase())
+        if (override?.channels) {
+          (device as any).channel = override.channels.name
+        }
+      })
+    }
+
     return c.json(dataDevices)
   }
 }
