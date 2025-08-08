@@ -14,94 +14,192 @@ on:
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  SUPA_ENV: PROD
 
 jobs:
-  preview_deploy:
+  supabase_deploy:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
-    name: Deploy Preview Environment
+    name: Deploy Supabase Functions (Production Config)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Set Supabase credentials
+        run: |
+          echo "SUPABASE_DB_PASSWORD=${{ secrets[format('SUPABASE_DB_PASS_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
+          echo "SUPABASE_PROJECT_ID=${{ secrets[format('SUPABASE_PROJECT_ID_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: bun install
+      - name: Lint
+        run: bun lint && bun lint-backend
+      - name: Typecheck
+        run: bun typecheck
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Prepare Supabase
+        run: supabase link --project-ref ${{ env.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+      - name: Update functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+        run: supabase functions deploy
+
+  deploy_webapp:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    name: Deploy Frontend Preview
     outputs:
       preview_url: ${{ steps.deploy_frontend.outputs.url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
       - name: Install dependencies
         run: bun install
-
-      - name: Lint
-        run: bun lint
-
-      - name: Typecheck
-        run: bun typecheck
-
       - name: Set preview environment variables
         run: |
           echo "PREVIEW_NAME=capgo-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
           echo "PREVIEW_DOMAIN=capgo-preview-${{ env.PR_NUMBER }}.pages.dev" >> $GITHUB_ENV
-          echo "API_PREVIEW_NAME=capgo-api-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
-          echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
-          echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
-
       - name: Build frontend (production build)
         run: bun mobile
         env:
           VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-
       - name: Deploy frontend to Cloudflare Pages
         id: deploy_frontend
         run: |
-          # Deploy to a preview project using production build
           bunx wrangler@latest pages deploy dist \
             --project-name ${{ env.PREVIEW_NAME }} \
             --branch preview-${{ env.PR_NUMBER }} \
             --commit-dirty=true
-          
-          # Set the preview URL as output
           echo "url=https://${{ env.PREVIEW_DOMAIN }}" >> $GITHUB_OUTPUT
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy API Worker (production config)
+  deploy_api:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    name: Deploy API Worker Preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set preview environment variables
         run: |
-          # Create preview config from production config
-          jq '.name = "${{ env.API_PREVIEW_NAME }}" | .workers_dev = true | del(.route) | del(.routes)' \
-            cloudflare_workers/api/wrangler.json > /tmp/wrangler-api-preview.json
-          
-          bunx wrangler deploy --config /tmp/wrangler-api-preview.json --minify
+          echo "API_PREVIEW_NAME=capgo-api-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+      - name: Create preview API worker config
+        run: |
+          # Create a temporary wrangler config for preview with production bindings
+          cat cloudflare_workers/api/wrangler.json | \
+          jq --arg name "${{ env.API_PREVIEW_NAME }}" \
+             '.name = $name | .workers_dev = true | del(.route) | del(.routes)' \
+             > /tmp/wrangler-api-preview.json
+      - name: Deploy API Worker (with production config)
+        run: bunx wrangler deploy --config /tmp/wrangler-api-preview.json --minify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy API Worker environment variables
+        run: node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.prod ${{ env.API_PREVIEW_NAME }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy Files Worker (production config)
+  deploy_files:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    name: Deploy Files Worker Preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set preview environment variables
         run: |
-          # Create preview config from production config
-          jq '.name = "${{ env.FILES_PREVIEW_NAME }}" | .workers_dev = true | del(.route) | del(.routes)' \
-            cloudflare_workers/files/wrangler.json > /tmp/wrangler-files-preview.json
-          
-          bunx wrangler deploy --config /tmp/wrangler-files-preview.json --minify
+          echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+      - name: Create preview Files worker config
+        run: |
+          # Create a temporary wrangler config for preview with production bindings
+          cat cloudflare_workers/files/wrangler.json | \
+          jq --arg name "${{ env.FILES_PREVIEW_NAME }}" \
+             '.name = $name | .workers_dev = true | del(.routes)' \
+             > /tmp/wrangler-files-preview.json
+      - name: Deploy Files Worker (with production config)
+        run: bunx wrangler deploy --config /tmp/wrangler-files-preview.json --minify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy Files Worker environment variables
+        run: node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.prod ${{ env.FILES_PREVIEW_NAME }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy Plugin Worker (production config)
+  deploy_plugin:
+    needs: supabase_deploy
+    runs-on: ubuntu-latest
+    name: Deploy Plugin Worker Preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set preview environment variables
         run: |
-          # Create preview config from production config
-          jq '.name = "${{ env.PLUGIN_PREVIEW_NAME }}" | .workers_dev = true | del(.route) | del(.routes)' \
-            cloudflare_workers/plugin/wrangler.json > /tmp/wrangler-plugin-preview.json
-          
-          bunx wrangler deploy --config /tmp/wrangler-plugin-preview.json --minify
+          echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+      - name: Create preview Plugin worker config
+        run: |
+          # Create a temporary wrangler config for preview with production bindings
+          cat cloudflare_workers/plugin/wrangler.json | \
+          jq --arg name "${{ env.PLUGIN_PREVIEW_NAME }}" \
+             '.name = $name | .workers_dev = true | del(.routes)' \
+             > /tmp/wrangler-plugin-preview.json
+      - name: Deploy Plugin Worker (with production config)
+        run: bunx wrangler deploy --config /tmp/wrangler-plugin-preview.json --minify
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy Plugin Worker environment variables
+        run: node scripts/deploy_cf_backend_env.mjs internal/cloudflare/.env.prod ${{ env.PLUGIN_PREVIEW_NAME }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+  comment_pr:
+    needs: [deploy_webapp, deploy_api, deploy_files, deploy_plugin]
+    runs-on: ubuntu-latest
+    name: Comment PR with preview URLs
+    steps:
+      - name: Set preview environment variables
+        run: |
+          echo "PREVIEW_DOMAIN=capgo-preview-${{ env.PR_NUMBER }}.pages.dev" >> $GITHUB_ENV
+          echo "API_PREVIEW_NAME=capgo-api-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
+          echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
       - name: Comment PR with preview URLs
         uses: actions/github-script@v7
         with:
@@ -155,26 +253,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
       - name: Set preview environment variables
         run: |
           echo "PREVIEW_NAME=capgo-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
           echo "API_PREVIEW_NAME=capgo-api-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
           echo "FILES_PREVIEW_NAME=capgo-files-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
           echo "PLUGIN_PREVIEW_NAME=capgo-plugin-preview-${{ env.PR_NUMBER }}" >> $GITHUB_ENV
-
       - name: Delete preview Pages project
         run: |
           bunx wrangler@latest pages project delete ${{ env.PREVIEW_NAME }} --yes || echo "Pages project may not exist"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Delete preview Workers
         run: |
           bunx wrangler delete ${{ env.API_PREVIEW_NAME }} --force || echo "API worker may not exist"
@@ -183,7 +277,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Comment PR with cleanup confirmation
         uses: actions/github-script@v7
         with:
