@@ -250,7 +250,7 @@ export async function createCheckout(c: Context, customerId: string, reccurence:
     billing_address_collection: 'auto',
     mode: 'subscription',
     customer: customerId,
-    success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${successUrl}?success=true`,
     cancel_url: cancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,

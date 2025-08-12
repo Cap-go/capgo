@@ -152,8 +152,8 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
-    // if session_id is in url params show modal success plan setup
-    if (route.query.session_id) {
+    // if success is in url params show modal success plan setup
+    if (route.query.success) {
       // toast.success(t('usage-success'))
       thankYouPage.value = true
     }
