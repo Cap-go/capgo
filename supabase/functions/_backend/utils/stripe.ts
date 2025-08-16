@@ -7,7 +7,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export function getStripe(c: Context) {
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-05-28.basil',
+    apiVersion: '2025-07-30.basil',
     httpClient: Stripe.createFetchHttpClient(),
   })
 }
