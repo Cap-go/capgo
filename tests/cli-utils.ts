@@ -37,6 +37,10 @@ const preparedApps = new Set<string>()
 // Track active processes for cleanup
 const activeProcesses = new Set<ReturnType<typeof spawn>>()
 
+// Global mutex for npm install operations to prevent conflicts
+let installMutex = Promise.resolve()
+const installQueue = new Map<string, Promise<void>>()
+
 // Check if CLI is available locally
 function hasLocalCli(): boolean {
   try {
@@ -94,6 +98,7 @@ export function deleteTempFolders(appId: string) {
     rimrafSync(tempFolder)
   }
   preparedApps.delete(appId)
+  installQueue.delete(appId) // Clean up install queue too
 }
 
 export function getSemver(semver = `1.0.${Date.now()}`) {
@@ -148,17 +153,46 @@ process.on('SIGINT', cleanupAllProcesses)
 process.on('SIGTERM', cleanupAllProcesses)
 
 export async function npmInstall(appId: string) {
-  try {
-    await execAsync('bun install', { cwd: tempFileFolder(appId) })
+  // Check if already in queue or completed
+  if (installQueue.has(appId)) {
+    return await installQueue.get(appId)!
   }
-  catch (error) {
-    console.error('bun install failed', error)
-    throw error
-  }
+
+  // Create installation promise and add to queue
+  const installPromise = (async () => {
+    // Wait for previous installation to complete
+    await installMutex
+    
+    try {
+      const installExecution = execAsync('bun install', { 
+        cwd: tempFileFolder(appId),
+        timeout: 60000 // 60 second timeout
+      })
+      
+      // Update mutex to wait for this installation
+      installMutex = installExecution.then(() => {}, () => {})
+      
+      await installExecution
+    }
+    catch (error) {
+      console.error(`bun install failed for ${appId}:`, error)
+      throw error
+    }
+    finally {
+      // Remove from queue when done
+      installQueue.delete(appId)
+    }
+  })()
+
+  installQueue.set(appId, installPromise)
+  return await installPromise
 }
 
 export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
   const basePath = noFolder ? cwd() : tempFileFolder(appId)
+
+  // Add small delay to avoid simultaneous CLI executions
+  await new Promise(resolve => setTimeout(resolve, Math.random() * 100))
 
   let localCliPath = env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
@@ -181,8 +215,9 @@ export async function runCli(params: string[], appId: string, logOutput = false,
     cliPath = localCliPath
   }
   else if (hasLocalCli()) {
-    executable = 'bunx'
-    cliPath = '@capgo/cli'
+    // Use the main project's CLI installation instead of bunx to avoid global cache conflicts
+    executable = 'node'
+    cliPath = join(cwd(), 'node_modules', '.bin', 'capgo')
   }
   else {
     throw new Error('CLI not available. Install @capgo/cli as devDependency or set LOCAL_CLI_PATH')
