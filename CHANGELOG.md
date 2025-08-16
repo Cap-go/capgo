@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.16.5 (2025-08-16)
+
+
+### Bug Fixes
+
+* update Stripe API version to 2025-07-30.basil ([f7b4f81](https://github.com/Cap-go/capgo/commit/f7b4f817400c0d7c5a7572bd6d025d1b4a157465))
+
 ### 12.16.4 (2025-08-16)
 
 ### 12.16.3 (2025-08-16)
