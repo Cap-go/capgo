@@ -65,7 +65,7 @@ describe.concurrent('[GET] /device operations', () => {
   })
 })
 
-describe.only('[POST] /device operations', () => {
+describe('[POST] /device operations', () => {
   it('link device', async () => {
     const deviceId = '11111111-1111-1111-1111-111111111111'
     const response = await fetch(`${BASE_URL}/device`, {
