@@ -5,7 +5,6 @@ import process, { cwd, env } from 'node:process'
 import { sync as rimrafSync } from 'rimraf'
 import { APIKEY_TEST_ALL, BASE_URL } from './test-utils'
 
-
 export const TEMP_DIR_NAME = 'temp_cli_test'
 export const BASE_PACKAGE_JSON = `{
   "name": "%APPID%",
@@ -34,17 +33,6 @@ const preparedApps = new Set<string>()
 
 // Track active processes for cleanup
 const activeProcesses = new Set<ReturnType<typeof spawn>>()
-
-// Check if CLI is available locally
-function hasLocalCli(): boolean {
-  try {
-    require.resolve('@capgo/cli')
-    return true
-  }
-  catch {
-    return false
-  }
-}
 
 export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
 
@@ -116,18 +104,19 @@ export async function prepareCli(appId: string, old = false, installDeps = false
   mkdirSync(join(tempFileFolder(appId), 'dist'), { recursive: true })
   writeFileSync(join(tempFileFolder(appId), 'dist', 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();')
   writeFileSync(join(tempFileFolder(appId), 'dist', 'index.html'), '')
-  
+
   // Create package.json for reference
   setDependencies(old ? BASE_DEPENDENCIES_OLD : BASE_DEPENDENCIES, appId)
 
   if (installDeps) {
     // Only install dependencies for tests that specifically need them (like metadata tests)
     await npmInstallMinimal(appId)
-  } else {
+  }
+  else {
     // Create empty node_modules folder to satisfy CLI checks without installing
     const nodeModulesPath = join(tempFileFolder(appId), 'node_modules')
     mkdirSync(nodeModulesPath, { recursive: true })
-    
+
     // Create a minimal package.json in node_modules to indicate it's "installed"
     writeFileSync(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
   }
@@ -142,25 +131,25 @@ async function npmInstallMinimal(appId: string) {
     const { exec } = await import('node:child_process')
     const { promisify } = await import('node:util')
     const execAsync = promisify(exec)
-    
+
     // First try bun install
-    await execAsync('bun install', { 
+    await execAsync('bun install', {
       cwd: tempFileFolder(appId),
-      timeout: 60000
+      timeout: 60000,
     })
   }
   catch (error) {
     console.error(`bun install failed for ${appId}, trying npm:`, error)
-    
+
     try {
       const { exec } = await import('node:child_process')
       const { promisify } = await import('node:util')
       const execAsync = promisify(exec)
-      
+
       // Fallback to npm
-      await execAsync('npm install --silent --no-audit --no-fund', { 
+      await execAsync('npm install --silent --no-audit --no-fund', {
         cwd: tempFileFolder(appId),
-        timeout: 60000
+        timeout: 60000,
       })
     }
     catch (npmError) {
@@ -197,13 +186,12 @@ process.on('exit', cleanupAllProcesses)
 process.on('SIGINT', cleanupAllProcesses)
 process.on('SIGTERM', cleanupAllProcesses)
 
-
 export async function runCli(params: string[], appId: string, logOutput = false, overwriteApiKey?: string, overwriteSupaHost?: boolean, noFolder?: boolean): Promise<string> {
   const basePath = noFolder ? cwd() : tempFileFolder(appId)
 
   // Use the main project's CLI directly - most reliable approach
   const mainProjectCliPath = join(cwd(), 'node_modules', '@capgo', 'cli', 'dist', 'index.js')
-  
+
   let localCliPath = env.LOCAL_CLI_PATH
   if (localCliPath === 'true') {
     // For easy local testing, we can set the LOCAL_CLI_PATH to true and the CLI folder will be used
