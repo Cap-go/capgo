@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.16.15 (2025-08-18)
+
+
+### Bug Fixes
+
+* correct plan number in identity functions test and remove obsolete error test ([cf482c6](https://github.com/Cap-go/capgo/commit/cf482c6b4bcf3c8cfaff27028a3ac3262d42907a))
+
 ### 12.16.14 (2025-08-18)
 
 ### 12.16.13 (2025-08-18)
