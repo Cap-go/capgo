@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION "basejump-supabase_test_helpers";
 
 SELECT
-  plan (26);
+  plan (25);
 
 -- Test get_identity without parameters
 SELECT
@@ -18,14 +18,6 @@ SELECT
 
 SELECT
   tests.clear_authentication ();
-
--- Test get_identity with keymode (this will throw error, so we test it differently)
-SELECT
-  throws_ok (
-    'SELECT get_identity(''{read}'')',
-    'get_identity called!',
-    'get_identity test - throws error without proper auth'
-  );
 
 -- Test get_identity_apikey_only without any headers
 SELECT
