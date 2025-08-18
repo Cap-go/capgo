@@ -7178,12 +7178,6 @@ SELECT
   pgmq.create ('on_manifest_create');
 
 SELECT
-  pgmq.create ('cron_plan_queue');
-
-SELECT
-  pgmq.create ('cron_email_queue');
-
-SELECT
   pgmq.create ('on_deploy_history_create');
 
 SELECT
@@ -7348,14 +7342,14 @@ SELECT
   cron.schedule (
     'process_cron_plan_queue',
     '0 */2 * * *',
-    'SELECT public.process_function_queue(''cron_plan_queue'')'
+    'SELECT public.process_function_queue(''cron_plan'')'
   );
 
 SELECT
   cron.schedule (
     'process_cron_email_queue',
     '0 */2 * * *',
-    'SELECT public.process_function_queue(''cron_email_queue'')'
+    'SELECT public.process_function_queue(''cron_email'')'
   );
 
 SELECT
