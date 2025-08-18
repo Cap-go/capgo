@@ -1137,20 +1137,6 @@ $$;
 
 ALTER FUNCTION "public"."get_identity" () OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
-SET
-  search_path = '' SECURITY DEFINER AS $$
-DECLARE
-    auth_uid uuid;
-    api_key_text text;
-    api_key record;
-Begin
-  RAISE EXCEPTION 'get_identity called!';  
-End;
-$$;
-
-ALTER FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
@@ -5749,12 +5735,6 @@ GRANT ALL ON FUNCTION "public"."get_identity" () TO "anon";
 GRANT ALL ON FUNCTION "public"."get_identity" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_identity" () TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) TO "anon";
-
-GRANT ALL ON FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) TO "authenticated";
-
-GRANT ALL ON FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "anon";
 
