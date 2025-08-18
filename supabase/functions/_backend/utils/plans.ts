@@ -92,11 +92,11 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     const prices = data.subscription_metered as any as Prices
     const get_metered_usage = await getMeterdUsage(c, orgId)
     if (get_metered_usage.mau && get_metered_usage.mau > 0 && prices.mau)
-      await recordUsage(c, prices.mau, get_metered_usage.mau)
+      await recordUsage(c, customer_id, prices.mau, get_metered_usage.mau)
     if (get_metered_usage.storage && get_metered_usage.storage > 0)
-      await recordUsage(c, prices.storage, get_metered_usage.storage)
+      await recordUsage(c, customer_id, prices.storage, get_metered_usage.storage)
     if (get_metered_usage.bandwidth && get_metered_usage.bandwidth > 0)
-      await recordUsage(c, prices.bandwidth, get_metered_usage.bandwidth)
+      await recordUsage(c, customer_id, prices.bandwidth, get_metered_usage.bandwidth)
   }
 }
 

@@ -312,7 +312,7 @@ export async function setThreshold(c: Context, subscriptionId: string) {
       amount_gte: 5000,
       reset_billing_cycle_anchor: false,
     },
-  } as any) // Use type assertion to bypass linter error
+  })
   return subscription
 }
 
@@ -330,14 +330,44 @@ export async function updateCustomer(c: Context, customerId: string, email: stri
   return customer
 }
 
-export async function recordUsage(c: Context, subscriptionItemId: string, quantity: number) {
+export async function recordUsage(c: Context, customerId: string, eventName: string, value: number, meterId?: string) {
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
-  const usageRecord = await (getStripe(c).subscriptionItems as any).createUsageRecord(subscriptionItemId, { // Use type assertion to bypass linter error
-    quantity,
-    action: 'set',
-  })
-  return usageRecord
+
+  try {
+    // Create a meter event for usage tracking
+    const meterEvent = await getStripe(c).billing.meterEvents.create({
+      event_name: eventName,
+      payload: {
+        value: value.toString(),
+        stripe_customer_id: customerId,
+      },
+      // Optional: specify meter ID if you have multiple meters
+      ...(meterId && { meter: meterId }),
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Meter event recorded',
+      customerId,
+      eventName,
+      value,
+      meterEventId: meterEvent.identifier,
+    })
+
+    return meterEvent
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to record meter usage',
+      customerId,
+      eventName,
+      value,
+      error,
+    })
+    throw error
+  }
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
