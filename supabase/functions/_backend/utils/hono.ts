@@ -393,10 +393,9 @@ export function getIsV2(c: Context) {
     // allow to force v2 for update_v2 or update_lite_v2 or stats_v2
     return true
   }
-  // TODO: re enable this when Cloduflare D1 is stable again
-  // if (v2Val && Math.random() < v2Val) {
-  //   return true
-  // }
+  if (isV2 && Math.random() < isV2) {
+    return true
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'isV2 forced to false', isV2 })
   return false
 }
