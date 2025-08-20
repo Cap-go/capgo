@@ -899,7 +899,7 @@ async function handleRevert() {
       <p class="text-muted-foreground mt-2">
         {{ t('channel-not-found-description') }}
       </p>
-      <button class="mt-4 d-btn d-btn-primary" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app/p/${appIdToUrl(packageId)}/channels`)">
         {{ t('back-to-channels') }}
       </button>
     </div>
