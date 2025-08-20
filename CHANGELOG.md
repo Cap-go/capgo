@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.17.0 (2025-08-20)
+
+
+### Features
+
+* add Memory Bank documentation and project brief for Capgo; update VSCode settings and adjust Deno imports ([f45c356](https://github.com/Cap-go/capgo/commit/f45c35618ee2297f6bd6bf9af899e1fea6fb3f6e))
+
 ### 12.16.16 (2025-08-18)
 
 ### 12.16.15 (2025-08-18)
