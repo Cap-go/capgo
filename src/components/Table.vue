@@ -397,7 +397,7 @@ function getSkeletonWidth(columnIndex?: number) {
                         v-show="!action.visible || action.visible(elem)"
                         :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
+                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
                         @click.stop="action.onClick(elem)"
                       >
                         <component :is="action.icon" />
@@ -405,7 +405,7 @@ function getSkeletonWidth(columnIndex?: number) {
                     </template>
                     <template v-else-if="col.icon">
                       <button
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
                         @click.stop="col.onClick ? col.onClick(elem) : () => {}"
                         v-html="col.icon"
                       />
