@@ -190,11 +190,11 @@ async function createNewOrg() {
             <div v-if="org.role.startsWith('invite')" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
           </a>
         </li>
-        <li class="block px-1 rounded-lg hover:bg-gray-600">
+        <li class="block p-px rounded-lg hover:bg-gray-600 from-cyan-500 to-purple-500 bg-linear-to-r">
           <a
-            class="block px-4 py-2 hover:bg-gray-600 text-white"
+            class="flex items-center justify-center text-center px-3 py-3 hover:bg-gray-600 bg-base-200 rounded-lg text-white"
             @click="createNewOrg"
-          ><Plus class="mx-auto " />
+          >{{ t('add-organization') }}
           </a>
         </li>
       </ul>
