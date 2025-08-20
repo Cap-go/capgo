@@ -67,6 +67,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
+    currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
     await main.updateDashboard(currentOrganizationRaw.gid, currentOrganizationRaw.subscription_start, currentOrganizationRaw.subscription_end)
   })
 
@@ -118,16 +119,12 @@ export const useOrganizationStore = defineStore('organization', () => {
     return org.role as OrganizationRole
   }
 
-  const setCurrentOrganization = (id: string) => {
-    currentOrganization.value = organizations.value.find(org => org.gid === id)
-  }
-
-  const setCurrentOrganizationFromValue = (value: Organization) => {
-    currentOrganization.value = value
-  }
-
   const hasPermisisonsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
     return (perm && perms.includes(perm)) ?? false
+  }
+
+  const setCurrentOrganization = (id: string) => {
+    currentOrganization.value = organizations.value.find(org => org.gid === id)
   }
 
   const setCurrentOrganizationToMain = () => {
@@ -135,13 +132,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!organization)
       throw new Error('User has no main organization')
 
-    currentOrganization.value = organization
+    setCurrentOrganization(organization.gid)
   }
   const setCurrentOrganizationToFirst = () => {
     if (organizations.value.length === 0)
       return
     const organization = organizations.value[0]
-    currentOrganization.value = organization
+    setCurrentOrganization(organization.gid)
   }
 
   const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
@@ -278,7 +275,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     currentOrganizationFailed,
     currentRole,
     setCurrentOrganization,
-    setCurrentOrganizationFromValue,
     setCurrentOrganizationToMain,
     setCurrentOrganizationToFirst,
     getMembers,
