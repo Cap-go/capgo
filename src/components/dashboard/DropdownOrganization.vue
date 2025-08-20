@@ -199,9 +199,11 @@ async function createNewOrg() {
         </li>
       </ul>
     </details>
-    <button v-show="!currentOrganization" class="d-btn d-btn-outline border-gray-600 w-full d-btn-sm text-white" @click="createNewOrg">
-      <Plus class="mx-auto" />
-    </button>
+    <div v-show="!currentOrganization" class="p-px from-cyan-500 to-purple-500 bg-linear-to-r rounded-lg">
+      <button class="d-btn d-btn-outline bg-slate-800 block w-full d-btn-sm text-white" @click="createNewOrg">
+        {{ t('add-organization') }}
+      </button>
+    </div>
 
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('create-new-org')" to="#dialog-v2-content" defer>
       <div class="w-full">

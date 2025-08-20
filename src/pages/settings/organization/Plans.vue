@@ -74,6 +74,30 @@ watch(() => main.bestPlan, (newBestPlan) => {
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
+  // Check if user has apps in this organization
+  if (currentOrganization.value?.app_count === 0) {
+    dialogStore.openDialog({
+      title: t('no-apps-found'),
+      description: t('add-app-first-to-change-plan'),
+      buttons: [
+        {
+          text: t('cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('add-another-app'),
+          id: 'add-app-button',
+          handler: () => {
+            router.push('/app')
+            return true
+          },
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+    return
+  }
+
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id)
