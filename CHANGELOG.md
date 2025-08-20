@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.18.4 (2025-08-20)
+
+
+### Bug Fixes
+
+* update button classes in Table.vue and remove unused import in DropdownOrganization.vue ([3c26953](https://github.com/Cap-go/capgo/commit/3c2695335e94aad4e1816ed7996572bfa127ba56))
+
 ### 12.18.3 (2025-08-20)
 
 ### 12.18.2 (2025-08-20)
