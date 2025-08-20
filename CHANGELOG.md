@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.18.0 (2025-08-20)
+
+
+### Features
+
+* add modal to prevent pay for plan if no apps ([db550a0](https://github.com/Cap-go/capgo/commit/db550a0566395e971279e131af79a1a622fea209))
+
 ### 12.17.4 (2025-08-20)
 
 ### 12.17.3 (2025-08-20)
