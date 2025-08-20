@@ -17,5 +17,24 @@
     "vue-router"
   ],
   "SQL-Formatter-VSCode.dialect": "postgresql",
-  "SQL-Formatter-VSCode.linesBetweenQueries": 1
+  "SQL-Formatter-VSCode.linesBetweenQueries": 1,
+  "deno.enablePaths": [
+    "supabase/functions"
+  ],
+  "deno.lint": true,
+  "deno.unstable": [
+    "bare-node-builtins",
+    "byonm",
+    "sloppy-imports",
+    "unsafe-proto",
+    "webgpu",
+    "broadcast-channel",
+    "worker-options",
+    "cron",
+    "kv",
+    "ffi",
+    "fs",
+    "http",
+    "net"
+  ]
 }

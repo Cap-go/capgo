@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { ZodMiniObject } from 'zod/v4-mini'
+import type { ZodMiniObject } from 'zod/mini'
 import type { AppInfos, AppStats } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { fixSemver } from '../utils/utils.ts'

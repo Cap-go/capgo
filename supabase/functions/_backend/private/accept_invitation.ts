@@ -1,5 +1,5 @@
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/v4-mini'
+import { z } from 'zod/mini'
 import { type MiddlewareKeyVariables, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/loggin.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
