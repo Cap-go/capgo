@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.18.9 (2025-08-21)
+
+
+### Bug Fixes
+
+* update localization strings for development build and demo placeholders in multiple languages ([2b86e42](https://github.com/Cap-go/capgo/commit/2b86e42be168e71e3b7464e0cf285ffb0c2aae9d))
+
 ### 12.18.8 (2025-08-21)
 
 ### 12.18.7 (2025-08-21)
