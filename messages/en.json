@@ -68,7 +68,7 @@
   "alert-not-reverse-message": "This action is not reversible",
   "alert-regenerate-key": "Are you sure you want to regenerate this key",
   "alert-unknown-error": "Unknown error, see dev console",
-  "allow-develoment-bui": "",
+  "allow-develoment-bui": "Allow development devices",
   "allow-development-bui": "Allow development build",
   "allow-device-to-self": "Allow devices to self dissociate/associate",
   "allow-emulator": "Allow Emulators",
