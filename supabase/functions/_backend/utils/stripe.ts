@@ -334,6 +334,10 @@ export async function recordUsage(c: Context, customerId: string, eventName: str
   if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
     return Promise.resolve()
 
+  if (!eventName) {
+    cloudlog({ requestId: c.get('requestId'), message: 'recordUsage no eventName', customerId, eventName, value, meterId })
+    return Promise.reject(new Error('No event name'))
+  }
   try {
     // Create a meter event for usage tracking
     const meterEvent = await getStripe(c).billing.meterEvents.create({

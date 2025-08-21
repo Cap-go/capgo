@@ -82,7 +82,7 @@ async function setMetered(c: Context, customer_id: string | null, orgId: string)
     .select()
     .eq('customer_id', customer_id)
     .single()
-  if (data?.subscription_metered) {
+  if (data?.subscription_metered && Object.keys(data.subscription_metered).length > 0) {
     try {
       await setThreshold(c, customer_id)
     }
