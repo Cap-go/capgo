@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.19.0 (2025-08-21)
+
+
+### Features
+
+* add table_counts for tracking record counts and triggers for app_versions, manifest, channels, channel_devices, apps, orgs, and stripe_info ([c19d9a8](https://github.com/Cap-go/capgo/commit/c19d9a81012d583aa27f7c8ceeec0f419c4b3798))
+
 ### 12.18.10 (2025-08-21)
 
 ### 12.18.9 (2025-08-21)
