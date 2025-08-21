@@ -212,3 +212,194 @@ CREATE INDEX IF NOT EXISTS idx_stripe_info_exceeded ON stripe_info (
     storage_exceeded,
     bandwidth_exceeded
 );
+
+-- Create table to store counts of all tables
+CREATE TABLE IF NOT EXISTS table_counts (
+    table_name TEXT PRIMARY KEY,
+    record_count INTEGER NOT NULL DEFAULT 0,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Single trigger function to handle all table count updates
+CREATE TRIGGER IF NOT EXISTS update_table_count_on_change
+AFTER INSERT ON table_counts
+BEGIN
+UPDATE table_counts
+SET
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = NEW.table_name;
+
+END;
+
+-- Simple triggers for each table using a generic approach
+CREATE TRIGGER IF NOT EXISTS app_versions_count_insert
+AFTER INSERT ON app_versions
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'app_versions';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS app_versions_count_delete
+AFTER DELETE ON app_versions
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'app_versions';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS manifest_count_insert
+AFTER INSERT ON manifest
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'manifest';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS manifest_count_delete
+AFTER DELETE ON manifest
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'manifest';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS channels_count_insert
+AFTER INSERT ON channels
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'channels';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS channels_count_delete
+AFTER DELETE ON channels
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'channels';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS channel_devices_count_insert
+AFTER INSERT ON channel_devices
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'channel_devices';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS channel_devices_count_delete
+AFTER DELETE ON channel_devices
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'channel_devices';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS apps_count_insert
+AFTER INSERT ON apps
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'apps';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS apps_count_delete
+AFTER DELETE ON apps
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'apps';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS orgs_count_insert
+AFTER INSERT ON orgs
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'orgs';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS orgs_count_delete
+AFTER DELETE ON orgs
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'orgs';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS stripe_info_count_insert
+AFTER INSERT ON stripe_info
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count + 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'stripe_info';
+
+END;
+
+CREATE TRIGGER IF NOT EXISTS stripe_info_count_delete
+AFTER DELETE ON stripe_info
+BEGIN
+UPDATE table_counts
+SET
+    record_count = record_count - 1,
+    last_updated = CURRENT_TIMESTAMP
+WHERE
+    table_name = 'stripe_info';
+
+END;
+
+-- Index for better performance
+CREATE INDEX IF NOT EXISTS idx_table_counts_record_count ON table_counts (table_name);
