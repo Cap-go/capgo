@@ -208,7 +208,7 @@
     "husky": "^9.1.7",
     "sass": "1.89.2",
     "tailwindcss": "^4.1.11",
-    "typescript": "5.8.3",
+    "typescript": "5.9.2",
     "unplugin-auto-import": "^20.0.0",
     "unplugin-formkit": "^0.3.0",
     "unplugin-icons": "22.1.0",
