@@ -3,6 +3,7 @@
   "type": "module",
   "version": "12.19.0",
   "private": true,
+  "license": "GPL-3.0",
   "scripts": {
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
     "build": "vite build",

@@ -36,5 +36,6 @@
     "fs",
     "http",
     "net"
-  ]
+  ],
+  "claudeCodeChat.permissions.yoloMode": true
 }
