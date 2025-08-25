@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.19.1 (2025-08-25)
+
+
+### Bug Fixes
+
+* licence missing ([c5a7353](https://github.com/Cap-go/capgo/commit/c5a7353e445de0a0a443f1a6d6ae7cfa24495529))
+
 ## 12.19.0 (2025-08-21)
 
 
