@@ -176,7 +176,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
 
   return supabaseAdmin(c)
     .from('channel_devices')
-    .upsert(update, { onConflict: 'device_id, channel_id, app_id' })
+    .upsert(update, { onConflict: 'app_id, device_id' })
 }
 
 export async function checkAppOwner(c: Context, userId: string | undefined, appId: string | undefined): Promise<boolean> {
