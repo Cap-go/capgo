@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.19.2 (2025-08-29)
+
+
+### Bug Fixes
+
+* better logging for device POST endpoint ([b7941b3](https://github.com/Cap-go/capgo/commit/b7941b3139e58007de79d207c2c26f31f82e2d91))
+
 ### 12.19.1 (2025-08-25)
 
 
