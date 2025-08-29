@@ -34,12 +34,15 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
     if (dataChannel.public) {
       throw simpleError('public_channel_override', 'Cannot set channel override for public channel')
     }
-    await updateOrCreateChannelDevice(c, {
+    const { error: channelDeviceError } = await updateOrCreateChannelDevice(c, {
       device_id: body.device_id,
       channel_id: dataChannel.id,
       app_id: body.app_id,
       owner_org: dataChannel.owner_org,
     })
+    if (channelDeviceError) {
+      throw quickError(500, 'channel_device_error', 'Error setting channel override', { channelDeviceError })
+    }
   }
   return c.json(BRES)
 }

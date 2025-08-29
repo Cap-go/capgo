@@ -154,7 +154,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannelDevice', update })
   if (!update.device_id || !update.channel_id || !update.app_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing device_id, channel_id, or app_id' })
-    return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
+    return Promise.resolve({ error: new Error('missing device_id, channel_id, or app_id') })
   }
   const { data: existingChannelDevice } = await supabaseAdmin(c)
     .from('channel_devices')
@@ -170,7 +170,7 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
     )
     if (!fieldsDiffer) {
       cloudlog({ requestId: c.get('requestId'), message: 'No fields differ, no update needed' })
-      return Promise.resolve()
+      return Promise.resolve({ error: null })
     }
   }
 
