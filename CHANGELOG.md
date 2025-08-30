@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.19.5 (2025-08-30)
+
+
+### Bug Fixes
+
+* account deletion ([321c209](https://github.com/Cap-go/capgo/commit/321c209cf26e675c58c0afd8291129d499aae9bf))
+
 ### 12.19.4 (2025-08-30)
 
 
