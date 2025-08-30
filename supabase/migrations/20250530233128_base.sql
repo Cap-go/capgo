@@ -631,7 +631,7 @@ BEGIN
   SELECT email INTO user_email FROM auth.users WHERE id = user_id;
   
   -- Hash the email and store it in deleted_account table
-  hashed_email := encode(digest(user_email::text, 'sha256'::text)::bytea, 'hex'::text);
+  hashed_email := encode(digset(user_email::text, 'sha256'::text)::bytea, 'hex'::text);
   
   INSERT INTO public.deleted_account (email)
   VALUES (hashed_email);
