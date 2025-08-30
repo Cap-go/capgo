@@ -174,6 +174,8 @@ async function getDevice() {
       })
 
     const data = dataD[0]
+    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
+    device.value = deviceValue
     if (!data?.version) {
       return
     }
@@ -185,11 +187,8 @@ async function getDevice() {
       .eq('id', data!.version)
       .single()
 
-    const deviceValue = data as Database['public']['Tables']['devices']['Row'] & Device
     if (dataVersion)
       deviceValue.version = dataVersion! as any as typeof deviceValue.version
-    device.value = deviceValue
-    // console.log('device', device.value)
   }
   catch (error) {
     console.error('no devices', error)
