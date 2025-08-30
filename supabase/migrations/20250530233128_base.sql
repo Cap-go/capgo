@@ -631,15 +631,15 @@ BEGIN
   SELECT email INTO user_email FROM auth.users WHERE id = user_id;
   
   -- Hash the email and store it in deleted_account table
-  hashed_email := encode(digset(user_email::text, 'sha256'::text)::bytea, 'hex'::text);
+  hashed_email := encode(extensions.digest(user_email::text, 'sha256'::text), 'hex'::text);
   
   INSERT INTO public.deleted_account (email)
   VALUES (hashed_email);
   
   -- Trigger the queue-based deletion process
   PERFORM pgmq.send(
-    'on_user_delete',
-    json_build_object(
+    'on_user_delete'::text,
+    jsonb_build_object(
       'user_id', user_id,
       'email', user_email
     )
@@ -3327,7 +3327,10 @@ Begin
         where (select auth.uid()) = user_id and status = 'verified'
     )
   ) OR (
-    select array(select jsonb_path_query_array((select auth.jwt()), '$.amr[*].method')) @> ARRAY['"otp"'::jsonb]
+    EXISTS(
+      SELECT 1 FROM jsonb_array_elements((select auth.jwt())->'amr') AS amr_elem
+      WHERE amr_elem->>'method' = 'otp'
+    )
   );
 End;  
 $_$;
