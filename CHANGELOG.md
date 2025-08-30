@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.19.4 (2025-08-30)
+
+
+### Bug Fixes
+
+* update device value assignment in getDevice function ([579b0ed](https://github.com/Cap-go/capgo/commit/579b0ed5bc044258e4bfbf8c14ec9dbe4d5bc2f2))
+
 ### 12.19.3 (2025-08-29)
 
 
