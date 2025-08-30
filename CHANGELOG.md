@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.19.6 (2025-08-30)
+
+
+### Bug Fixes
+
+* 2fa for admins && semi-fix account deletion ([292ad27](https://github.com/Cap-go/capgo/commit/292ad27411ce3467d4697184f4a9c2ead2dc230b))
+
 ### 12.19.5 (2025-08-30)
 
 
