@@ -89,13 +89,6 @@ async function deleteAccount() {
               return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
             }
 
-            // Delete auth user
-            const { error: authError } = await supabase.auth.admin.deleteUser(authUser.data.user.id)
-            if (authError) {
-              console.error('Auth delete error:', authError)
-              return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
-            }
-
             await main.logout()
             router.replace('/login')
           }

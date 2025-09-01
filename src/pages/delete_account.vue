@@ -94,7 +94,7 @@ async function submit(form: { email: string, password: string }) {
   isLoading.value = false
   if (error) {
     console.error('error', error)
-    setErrors('login-account', [error.message], {})
+    setErrors('delete-account', [error.message], {})
     toast.error(t('invalid-auth'))
   }
   else {

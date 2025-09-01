@@ -14,6 +14,7 @@ import { app as on_organization_create } from '../_backend/triggers/on_organizat
 import { app as on_organization_delete } from '../_backend/triggers/on_organization_delete.ts'
 import { app as on_user_create } from '../_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../_backend/triggers/on_user_delete.ts'
+import { app as on_user_soft_delete } from '../_backend/triggers/on_user_soft_delete.ts'
 import { app as on_user_update } from '../_backend/triggers/on_user_update.ts'
 import { app as on_version_create } from '../_backend/triggers/on_version_create.ts'
 import { app as on_version_delete } from '../_backend/triggers/on_version_delete.ts'
@@ -34,6 +35,7 @@ appGlobal.route('/on_channel_update', on_channel_update)
 appGlobal.route('/on_user_create', on_user_create)
 appGlobal.route('/on_user_update', on_user_update)
 appGlobal.route('/on_user_delete', on_user_delete)
+appGlobal.route('/on_user_soft_delete', on_user_soft_delete)
 appGlobal.route('/on_app_create', on_app_create)
 appGlobal.route('/on_app_delete', on_app_delete)
 appGlobal.route('/on_version_create', on_version_create)
