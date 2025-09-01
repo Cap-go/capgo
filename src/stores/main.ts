@@ -13,16 +13,18 @@ import {
   unspoofUser,
 } from './../services/supabase'
 
+interface TotalStats {
+  mau: number
+  storage: number
+  bandwidth: number
+}
+
 export const useMainStore = defineStore('main', () => {
   const auth = ref<User | undefined>()
   const path = ref('')
   const user = ref<Database['public']['Tables']['users']['Row']>()
   const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
-  const totalStats = ref<{
-    mau: number
-    storage: number
-    bandwidth: number
-  }>({
+  const totalStats = ref<TotalStats>({
     mau: 0,
     storage: 0,
     bandwidth: 0,
@@ -64,8 +66,8 @@ export const useMainStore = defineStore('main', () => {
     })
   }
 
-  const getTotalStats = () => {
-    return dashboard.value.reduce((acc: any, cur: any) => {
+  const getTotalStats: () => TotalStats = () => {
+    return dashboard.value.reduce((acc: TotalStats, cur: TotalStats) => {
       acc.mau += cur.mau
       acc.bandwidth += cur.bandwidth
       acc.storage += cur.storage

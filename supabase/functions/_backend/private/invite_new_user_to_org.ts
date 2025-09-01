@@ -165,7 +165,7 @@ app.post('/', middlewareAuth, async (c) => {
 })
 
 // Function to verify Cloudflare Turnstile token
-async function verifyCaptchaToken(c: any, token: string) {
+async function verifyCaptchaToken(c: Context, token: string) {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (!captchaSecret) {
     throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
