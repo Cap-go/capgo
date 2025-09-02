@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.19.6",
+  "version": "12.20.1",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -183,9 +183,9 @@
     "@capacitor/core": "^7.4.2",
     "@capgo/cli": "latest",
     "@cloudflare/workers-types": "4.20250614.0",
-    "@iconify-json/carbon": "1.2.11",
+    "@iconify-json/carbon": "1.2.13",
     "@iconify-json/heroicons": "^1.2.2",
-    "@iconify-json/ion": "1.2.4",
+    "@iconify-json/ion": "1.2.6",
     "@iconify-json/ls": "1.2.1",
     "@iconify/json": "^2.2.371",
     "@playwright/test": "1.53.0",

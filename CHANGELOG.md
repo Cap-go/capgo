@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.20.1 (2025-09-01)
+
+## 12.20.0 (2025-09-01)
+
+
+### Features
+
+* add @types/bun dependency and refactor environment variable access in multiple scripts ([ba6ee30](https://github.com/Cap-go/capgo/commit/ba6ee303e3bd67b8ba76bbe44c2b6623a6893778))
+
 ### 12.19.6 (2025-08-30)
 
 
