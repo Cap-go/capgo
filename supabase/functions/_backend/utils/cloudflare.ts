@@ -194,7 +194,7 @@ async function runQueryToCFA<T>(c: Context, query: string) {
   }).catch(async (e) => {
     if (e.name === 'HTTPError') {
       const errorJson = await e.response.json()
-      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: errorJson })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA HTTPError', error: errorJson })
     }
     else {
       cloudlogErr({ requestId: c.get('requestId'), message: 'runQueryToCFA error', error: JSON.stringify(e) })
