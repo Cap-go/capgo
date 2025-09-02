@@ -101,6 +101,8 @@ CREATE INDEX "idx_store_apps_react_native" ON store_apps (
     "react_native", "installs" DESC
 );
 
+CREATE INDEX idx_store_apps_c_c_installs_desc ON store_apps(cordova, capacitor, installs DESC);
+
 CREATE INDEX "idx_store_capgo" ON store_apps ("capgo");
 
 CREATE INDEX "idx_store_on_prem" ON store_apps ("onprem");
