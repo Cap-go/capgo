@@ -38,9 +38,6 @@ interface AppUsageByVersion {
 }
 
 async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseAdmin>) {
-  if (true)
-    return { isPayingAndGoodPlan: true }
-
   // Use the existing PostgreSQL function to check organization payment and plan status
   const { data: isPayingAndGoodPlan, error } = await supabase
     .rpc('is_paying_and_good_plan_org', { orgid: orgId })

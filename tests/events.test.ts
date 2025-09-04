@@ -111,8 +111,8 @@ describe('[POST] /private/events operations', () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
-        ...headers,
-        capgkey: 'invalid_key',
+        'Content-Type': 'application/json',
+        'capgkey': 'invalid_key',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -125,7 +125,7 @@ describe('[POST] /private/events operations', () => {
     })
 
     await response.json()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
   })
 
   it('track event with invalid authorization', async () => {
