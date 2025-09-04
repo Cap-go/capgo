@@ -10,6 +10,7 @@ const sizeClasses = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-xl',
+  'max-w-3xl': 'max-w-3xl',
 }
 
 function close(button?: any) {

@@ -14,13 +14,22 @@ export async function get(c: Context, appId: string, apikey: Database['public'][
 
   const { data, error: dbError } = await supabaseAdmin(c)
     .from('apps')
-    .select('*')
+    .select('*, default_channel_android (name), default_channel_ios (name)')
     .eq('app_id', appId)
     .single()
 
   if (dbError || !data) {
     throw quickError(404, 'cannot_find_app', 'Cannot find app', { supabaseError: dbError })
   }
+
+  // Make this work: convert default_channel_android and default_channel_ios to just the channel id (or null) instead of the object or name
+  (data as any).default_channel_android = (typeof data.default_channel_android === 'object' && data.default_channel_android !== null)
+    ? (data.default_channel_android as any).name
+    : null;
+
+  (data as any).default_channel_ios = (typeof data.default_channel_ios === 'object' && data.default_channel_ios !== null)
+    ? (data.default_channel_ios as any).name
+    : null;
 
   return c.json(data)
 }
@@ -80,10 +89,43 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
   // Apply pagination after filtering
   query = query.range(offset, offset + itemsPerPage - 1)
 
-  const { data, error: dbError } = await query
+  var { data, error: dbError } = await query
 
   if (dbError) {
     throw simpleError('cannot_get_apps', 'Cannot get apps', { supabaseError: dbError })
+  }
+
+  if (data!.find(app => !!app.default_channel_android || !!app.default_channel_ios)) {
+    data = await Promise.all(data!.map(async app => {
+      const requests = []
+
+      if (app.default_channel_android) {
+        requests.push(supabaseAdmin(c).from('channels').select('name').eq('id', app.default_channel_android).single())
+      } else {
+        requests.push(Promise.resolve({ data: { name: null }, error: null }))
+      }
+      if (app.default_channel_ios) {
+        requests.push(supabaseAdmin(c).from('channels').select('name').eq('id', app.default_channel_ios).single())
+      } else {
+        requests.push(Promise.resolve({ data: { name: null }, error: null }))
+      }
+
+      const [default_channel_android, default_channel_ios] = await Promise.all(requests)
+
+      if (default_channel_android.error) {
+        throw simpleError('cannot_get_channels', 'Cannot get channels (default_channel_android.error)', { supabaseError: default_channel_android.error })
+      }
+
+      if (default_channel_ios.error) {
+        throw simpleError('cannot_get_channels', 'Cannot get channels (default_channel_ios.error)', { supabaseError: default_channel_ios.error })
+      }
+
+      return {
+        ...app,
+        default_channel_android: default_channel_android.data?.name,
+        default_channel_ios: default_channel_ios.data?.name,
+      }
+    })) as any[]
   }
 
   return c.json(data)

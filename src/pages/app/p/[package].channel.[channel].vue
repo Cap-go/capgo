@@ -626,7 +626,7 @@ async function handleRevert() {
 function redirectToAppSettings() {
   if (!channel.value)
     return
-  router.push(`/app/p/${appIdToUrl(packageId.value)}/settings`)
+  router.push(`/app/p/${appIdToUrl(packageId.value)}?tab=info`)
 }
 </script>
 

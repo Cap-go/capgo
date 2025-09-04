@@ -91,16 +91,21 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+    -- If default_channel_ios or default_channel_android is set, mark all channels as not public
+    -- This helps to avoid having multiple public channels for the same app
+    -- Also, it's important to test what happens when the user tries to update the app_id.
+    IF NEW.default_channel_ios IS NOT NULL OR NEW.default_channel_android IS NOT NULL THEN
+        UPDATE public.channels
+        SET public = FALSE
+        WHERE app_id = NEW.app_id;
+    END IF;
+
+
     -- If default_channel_ios is set, mark the corresponding channel as public
     IF NEW.default_channel_ios IS NOT NULL THEN
         UPDATE public.channels
         SET public = TRUE
         WHERE id = NEW.default_channel_ios
-        AND app_id = NEW.app_id;
-    ELSIF OLD.default_channel_ios IS NOT NULL THEN
-        UPDATE public.channels 
-        SET public = FALSE
-        WHERE id = OLD.default_channel_ios
         AND app_id = NEW.app_id;
     END IF;
     
@@ -109,11 +114,6 @@ BEGIN
         UPDATE public.channels
         SET public = TRUE
         WHERE id = NEW.default_channel_android
-        AND app_id = NEW.app_id;
-    ELSIF OLD.default_channel_android IS NOT NULL THEN
-        UPDATE public.channels
-        SET public = FALSE
-        WHERE id = OLD.default_channel_android
         AND app_id = NEW.app_id;
     END IF;
     

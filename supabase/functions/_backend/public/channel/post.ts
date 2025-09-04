@@ -102,6 +102,9 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
           return c.json({ status: 'Cannot update default channel', error: JSON.stringify(dbError) }, 400)
         }
       }
+      if (!channel.android && !channel.ios) {
+        return c.json({ status: 'error', error: 'Cannot mark channel as public, as it\' not marked as either android or ios' }, 400)
+      }
     }
     else {
       const { data: appData, error: appError } = await supabaseAdmin(c).from('apps').select('default_channel_android, default_channel_ios').eq('app_id', body.app_id).single()

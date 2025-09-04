@@ -274,7 +274,7 @@ async function updateAppRetention(newRetention: number) {
     appRef.value.retention = newRetention
 }
 
-async function setDefaultChannel() {
+async function setDefaultUploadChannel() {
   const { data: channels, error } = await supabase.from('channels')
     .select('name')
     .eq('app_id', appRef.value?.app_id ?? '')
@@ -343,6 +343,7 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
   const buttons = channels.map((chann) => {
     return {
       text: chann.name,
+      role: 'secondary' as const,
       handler: async () => {
         let appError: any
         if (type !== 'both') {
@@ -735,7 +736,7 @@ async function transferAppOwnership() {
                   }"
                 >
                   <template #suffix>
-                    <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultChannel">
+                    <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultUploadChannel">
                       <Pencil width="24px" height="24px" />
                     </button>
                   </template>

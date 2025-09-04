@@ -682,7 +682,7 @@
   "type-new-name": "Please type the new api key name",
   "type-new-org-name": "Please type the new name for the organization",
   "type-organization-name-to-confirm": "Type organization name to confirm",
-  "undefined": "At least 6 characters",
+  "undefined": "Undefined",
   "undefined-fail": "Undefined (updates will fail)",
   "unexpected-invitation-response": "Unexpected invitation response",
   "unexpected-rescind-response": "Unexpected rescind response",

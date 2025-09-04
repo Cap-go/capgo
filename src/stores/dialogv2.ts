@@ -11,7 +11,7 @@ export interface DialogV2Button {
 export interface DialogV2Options {
   title?: string
   description?: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'max-w-3xl'
   buttons?: DialogV2Button[]
   preventAccidentalClose?: boolean
 }
