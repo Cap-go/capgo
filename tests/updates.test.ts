@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
 import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
@@ -35,7 +34,8 @@ describe('[POST] /updates', () => {
     const response = await postUpdate(baseData)
 
     expect(response.status).toBe(200)
-    expect(await response.json<UpdateRes>()).toEqual({ message: 'No new version available' })
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toEqual('no_new_version_available')
   })
 
   it('new version available', async () => {
@@ -74,7 +74,7 @@ describe('[POST] /updates parallel tests', () => {
     const response2 = await postUpdate(getBaseData(APP_NAME_UPDATE))
     expect(response2.status).toBe(200)
     const json = await response2.json<UpdateRes>()
-    expect(json).toEqual({ message: 'No new version available' })
+    expect(json.error).toEqual('no_new_version_available')
 
     // Clean up
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
@@ -127,7 +127,7 @@ describe('[POST] /updates invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe(`Cannot parse json: ${INVALID_STRING_PLATFORM}`)
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('invalid device_id', async () => {
@@ -141,7 +141,7 @@ describe('[POST] /updates invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe(`Cannot parse json: ${INVALID_STRING_DEVICE_ID}`)
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('invalid plugin_version', async () => {
@@ -152,7 +152,7 @@ describe('[POST] /updates invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe(`Cannot parse json: ${INVALID_STRING_PLUGIN_VERSION}`)
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('missing fields', async () => {
@@ -162,7 +162,7 @@ describe('[POST] /updates invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('Cannot parse json: App ID is required')
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('only platform field', async () => {
@@ -172,7 +172,7 @@ describe('[POST] /updates invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('Cannot parse json: App ID is required')
+    expect(json.error).toBe('missing_device_id')
   })
 
   it('device_id and app_id combination not found', async () => {
@@ -284,5 +284,101 @@ describe('update scenarios', () => {
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('no_channel')
+  })
+
+  it('cannot update via private channel', async () => {
+    // First reset the channel to ensure it's working properly
+    await getSupabaseClient().from('channels').update({
+      public: true,
+      allow_device_self_set: true,
+    }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+
+    // Now set both conditions for the error
+    await getSupabaseClient().from('channels').update({
+      public: false,
+      allow_device_self_set: false,
+    }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.version_name = '1.1.0';
+    // Need to specify defaultChannel so the non-public channel can be found
+    (baseData as any).defaultChannel = 'production'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toBe('cannot_update_via_private_channel')
+    expect(json.message).toContain('Cannot update via a private channel')
+
+    // Clean up - restore channel to default state
+    await getSupabaseClient().from('channels').update({
+      public: true,
+      allow_device_self_set: true,
+    }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+  })
+
+  it('private channel with device override should succeed', async () => {
+    const uuid = randomUUID().toLowerCase()
+
+    // Reset the production channel to default version first
+    const { data: defaultVersion } = await getSupabaseClient()
+      .from('app_versions')
+      .select('id')
+      .eq('name', '1.0.0')
+      .eq('app_id', APP_NAME_UPDATE)
+      .single()
+
+    // Set up the channel as private and not allowing device self-set
+    await getSupabaseClient().from('channels').update({
+      public: false,
+      allow_device_self_set: false,
+      version: defaultVersion?.id,
+    }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
+
+    // Get the channel id
+    const { data: channelData, error: channelError } = await getSupabaseClient()
+      .from('channels')
+      .select('id')
+      .eq('name', 'production')
+      .eq('app_id', APP_NAME_UPDATE)
+      .single()
+
+    expect(channelError).toBeNull()
+    expect(channelData).toBeTruthy()
+
+    // Create a device override
+    const { error: overrideError } = await getSupabaseClient()
+      .from('channel_devices')
+      .insert({
+        device_id: uuid,
+        channel_id: channelData!.id,
+        app_id: APP_NAME_UPDATE,
+        owner_org: ORG_ID,
+      })
+
+    expect(overrideError).toBeNull()
+
+    // Test that update succeeds with device override
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = uuid
+    baseData.version_name = '1.1.0';
+    (baseData as any).defaultChannel = 'production'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    // Should succeed with the new version, not error
+    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(json.version).toBe('1.0.0')
+    expect(json.error).toBeUndefined()
+
+    // Clean up
+    await getSupabaseClient().from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+    await getSupabaseClient().from('channels').update({
+      public: true,
+      allow_device_self_set: true,
+      version: defaultVersion?.id,
+    }).eq('name', 'production').eq('app_id', APP_NAME_UPDATE)
   })
 })

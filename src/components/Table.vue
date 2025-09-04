@@ -51,7 +51,7 @@ const emit = defineEmits([
   'massDelete',
 ])
 const { t } = useI18n()
-const searchVal = ref(props.search || '')
+const searchVal = ref(props.search ?? '')
 // const sorts = ref<TableSort>({})
 // get columns from elementList
 
@@ -118,7 +118,8 @@ function updateUrlParams() {
     else
       params.delete(`sort_${col.key}`)
   })
-  window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 }
 
 function loadFromUrlParams() {
@@ -168,7 +169,8 @@ onUnmounted(() => {
   props.columns.forEach((col) => {
     params.delete(`sort_${col.key}`)
   })
-  window.history.pushState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`)
+  const paramsString = params.toString() ? `?${params.toString()}` : ''
+  window.history.pushState({}, '', `${window.location.pathname}${paramsString}`)
 })
 
 onMounted(() => {
@@ -259,7 +261,6 @@ watch(props.elementList, () => {
 })
 async function handleCheckboxClick(i: number, e: MouseEvent) {
   if (e.shiftKey && previousSelectedRow.value !== null) {
-    console.log((e as MouseEvent).shiftKey && true, i, previousSelectedRow)
     for (let y = Math.min(previousSelectedRow.value, i); y <= Math.max(previousSelectedRow.value, i); y++) {
       if (i > previousSelectedRow.value && y === previousSelectedRow.value)
         continue
@@ -308,7 +309,7 @@ function getSkeletonWidth(columnIndex?: number) {
             <span class="hidden text-sm md:block">{{ t('add-one') }}</span>
           </button>
         </div>
-        <div v-if="filterText && filterList.length" class="dropdown">
+        <div v-if="filterText && filterList.length" class="d-dropdown">
           <button tabindex="0" class="mr-2 inline-flex items-center border border-gray-300 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-500 dark:border-gray-600 dark:bg-gray-800 hover:bg-gray-100 dark:text-white focus:outline-hidden focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 cursor-pointer">
             <div v-if="filterActivated" class="absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 border-2 border-white rounded-full -right-2 -top-2 dark:border-gray-900">
               {{ filterActivated }}
@@ -317,7 +318,7 @@ function getSkeletonWidth(columnIndex?: number) {
             <span class="hidden md:block">{{ t(filterText) }}</span>
             <IconDown class="hidden w-4 h-4 ml-2 md:block" />
           </button>
-          <ul tabindex="0" class="p-2 bg-white shadow dropdown-content menu dark:bg-base-200 rounded-box z-1 w-52">
+          <ul class="p-2 bg-white shadow d-dropdown-content d-menu dark:bg-base-200 rounded-box z-1 w-52">
             <li v-for="(f, i) in filterList" :key="i">
               <div class="flex items-center p-2 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600">
                 <input
@@ -396,7 +397,7 @@ function getSkeletonWidth(columnIndex?: number) {
                         v-show="!action.visible || action.visible(elem)"
                         :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
+                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
                         @click.stop="action.onClick(elem)"
                       >
                         <component :is="action.icon" />
@@ -404,7 +405,7 @@ function getSkeletonWidth(columnIndex?: number) {
                     </template>
                     <template v-else-if="col.icon">
                       <button
-                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
+                        class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 rounded-md cursor-pointer"
                         @click.stop="col.onClick ? col.onClick(elem) : () => {}"
                         v-html="col.icon"
                       />

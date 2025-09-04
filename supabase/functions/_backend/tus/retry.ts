@@ -25,7 +25,6 @@ export async function retry<T>(retryableFunc: () => Promise<T>, options: RetryOp
       return await retryableFunc()
     }
     catch (e) {
-      console.debug(`failure in retryable function: ${e}`)
       if (count === options.params.maxRetries || !shouldRetry(e)) {
         throw e
       }

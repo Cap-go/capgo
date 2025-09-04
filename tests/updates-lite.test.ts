@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { INVALID_STRING_DEVICE_ID, INVALID_STRING_PLATFORM, INVALID_STRING_PLUGIN_VERSION } from '../supabase/functions/_backend/utils/utils.ts'
 import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
@@ -36,7 +35,8 @@ describe('[POST] /updates-lite', () => {
     const response = await postUpdate(baseData)
 
     expect(response.status).toBe(200)
-    expect(await response.json<UpdateRes>()).toEqual({ message: 'No new version available' })
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toEqual('no_new_version_available')
   })
 
   it('new version available', async () => {
@@ -75,7 +75,7 @@ describe('[POST] /updates-lite parallel tests', () => {
     const response2 = await postUpdate(getBaseData(APP_NAME_UPDATE))
     expect(response2.status).toBe(200)
     const json = await response2.json<UpdateRes>()
-    expect(json).toEqual({ message: 'No new version available' })
+    expect(json.error).toEqual('no_new_version_available')
 
     // Clean up
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
@@ -113,7 +113,7 @@ describe('[POST] /updates-lite invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe(`Cannot parse json: ${INVALID_STRING_PLATFORM}`)
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('invalid device_id', async () => {
@@ -127,7 +127,7 @@ describe('[POST] /updates-lite invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe(`Cannot parse json: ${INVALID_STRING_DEVICE_ID}`)
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('invalid plugin_version', async () => {
@@ -138,7 +138,7 @@ describe('[POST] /updates-lite invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe(`Cannot parse json: ${INVALID_STRING_PLUGIN_VERSION}`)
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('missing fields', async () => {
@@ -148,7 +148,7 @@ describe('[POST] /updates-lite invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('Cannot parse json: App ID is required')
+    expect(json.error).toBe('invalid_json_body')
   })
 
   it('only platform field', async () => {
@@ -158,7 +158,7 @@ describe('[POST] /updates-lite invalid data', () => {
     expect(response.status).toBe(400)
 
     const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('Cannot parse json: App ID is required')
+    expect(json.error).toBe('missing_device_id')
   })
 
   it('device_id and app_id combination not found', async () => {

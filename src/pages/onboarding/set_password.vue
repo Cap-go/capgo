@@ -29,7 +29,7 @@ async function signInUser() {
     return
   }
   await supabase.auth.refreshSession({
-    refresh_token: refresh_token || '',
+    refresh_token: refresh_token ?? '',
   })
 }
 

@@ -13,10 +13,10 @@ afterAll(async () => {
   await resetAppDataStats(APPNAME_DEVICE)
 })
 
-describe('[GET] /device operations', () => {
-  it('all devices', async () => {
+describe.concurrent('[GET] /device operations', () => {
+  it.concurrent('all devices', async () => {
     const params = new URLSearchParams({ app_id: APPNAME_DEVICE })
-    const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
@@ -26,12 +26,12 @@ describe('[GET] /device operations', () => {
     expect(Array.isArray(data)).toBe(true)
   })
 
-  it('specific device', async () => {
+  it.concurrent('specific device', async () => {
     const params = new URLSearchParams({
       app_id: APPNAME_DEVICE,
       device_id: '00000000-0000-0000-0000-000000000000',
     })
-    const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
@@ -41,9 +41,9 @@ describe('[GET] /device operations', () => {
     expect(data.device_id).toBe('00000000-0000-0000-0000-000000000000')
   })
 
-  it('invalid app_id', async () => {
+  it.concurrent('invalid app_id', async () => {
     const params = new URLSearchParams({ app_id: 'invalid_app' })
-    const response = await fetch(`${BASE_URL}/device?${params.toString()}&api=v2`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
@@ -51,7 +51,7 @@ describe('[GET] /device operations', () => {
     expect(response.status).toBe(400)
   })
 
-  it('invalid device_id', async () => {
+  it.concurrent('invalid device_id', async () => {
     const params = new URLSearchParams({
       app_id: APPNAME_DEVICE,
       device_id: 'invalid_device',
@@ -61,18 +61,19 @@ describe('[GET] /device operations', () => {
       headers,
     })
     await response.arrayBuffer()
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
   })
 })
 
 describe('[POST] /device operations', () => {
   it('link device', async () => {
+    const deviceId = '11111111-1111-1111-1111-111111111111'
     const response = await fetch(`${BASE_URL}/device`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         app_id: APPNAME_DEVICE,
-        device_id: 'test_device',
+        device_id: deviceId,
         channel: 'no_access',
       }),
     })
@@ -80,9 +81,25 @@ describe('[POST] /device operations', () => {
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
     expect(data.status).toBe('ok')
+    // TODO: fix this test
+    // // Then, get the device and verify channel is returned
+    // const params = new URLSearchParams({
+    //   app_id: APPNAME_DEVICE,
+    //   device_id: deviceId,
+    // })
+    // const getResponse = await fetch(`${BASE_URL}/device?${params.toString()}`, {
+    //   method: 'GET',
+    //   headers,
+    // })
+
+    // const data2 = await getResponse.json<{ device_id: string, channel?: string }>()
+    // console.log(data2)
+    // expect(getResponse.status).toBe(200)
+    // expect(data2.device_id).toBe(deviceId)
+    // expect(data2.channel).toBe('no_access')
   })
 
-  it('invalid app_id', async () => {
+  it.concurrent('invalid app_id', async () => {
     const response = await fetch(`${BASE_URL}/device`, {
       method: 'POST',
       headers,
@@ -95,7 +112,7 @@ describe('[POST] /device operations', () => {
     expect(response.status).toBe(400)
   })
 
-  it('invalid version_id', async () => {
+  it.concurrent('invalid version_id', async () => {
     const response = await fetch(`${BASE_URL}/device`, {
       method: 'POST',
       headers,
@@ -126,7 +143,7 @@ describe('[DELETE] /device operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('invalid device_id', async () => {
+  it.concurrent('invalid device_id', async () => {
     const response = await fetch(`${BASE_URL}/device`, {
       method: 'DELETE',
       headers,

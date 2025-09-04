@@ -148,7 +148,7 @@ export async function pickPhoto(formId: string, isLoading: Ref<boolean>, type: '
     let contents
     if (photos[0].path) {
       contents = await Filesystem.readFile({
-        path: photos[0].path || photos[0].webPath,
+        path: photos[0].path ?? photos[0].webPath,
       })
     }
     else {

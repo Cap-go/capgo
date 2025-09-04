@@ -1,6 +1,7 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { BRES } from '../../utils/hono.ts'
+import { BRES, simpleError } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 interface ChannelSet {
@@ -17,15 +18,29 @@ interface ChannelSet {
   allow_dev?: boolean
 }
 
+async function findVersion(c: Context, appID: string, version: string, ownerOrg: string) {
+  const { data, error: vError } = await supabaseAdmin(c)
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appID)
+    .eq('name', version)
+    .eq('owner_org', ownerOrg)
+    .eq('deleted', version === 'unknown')
+    .single()
+  if (vError || !data) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', data: { appID, version, ownerOrg, vError } })
+    return Promise.reject(new Error(vError?.message ?? 'Cannot find version'))
+  }
+  return data.id
+}
+
 export async function post(c: Context, body: ChannelSet, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
-    console.log('You can\'t access this app', body.app_id)
-    return c.json({ status: 'You can\'t access this app', app_id: body.app_id }, 400)
+    throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
   const { data: org, error } = await supabaseAdmin(c).from('apps').select('owner_org').eq('app_id', body.app_id).single()
   if (error || !org) {
-    console.log('Cannot find app', error)
-    return c.json({ status: 'Cannot find app', error: JSON.stringify(error) }, 400)
+    throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
@@ -42,46 +57,32 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     owner_org: org.owner_org,
   }
 
-  if (body.version) {
-    const { data, error: vError } = await supabaseAdmin(c)
-      .from('app_versions')
-      .select()
-      .eq('app_id', body.app_id)
-      .eq('name', body.version)
-      .eq('owner_org', org.owner_org)
-      .eq('deleted', false)
-      .single()
-    if (vError || !data) {
-      console.log('Cannot find version', body, org, vError)
-      return c.json({ status: 'Cannot find version', error: JSON.stringify(vError) }, 400)
-    }
-
-    channel.version = data.id
-  }
-  else {
-    // find the unknown version
-    const { data: dataVersion, error: dbError } = await supabaseAdmin(c)
-      .from('app_versions')
-      .select('id')
-      .eq('app_id', body.app_id)
-      .eq('owner_org', org.owner_org)
-      .eq('name', 'unknown')
-      .eq('deleted', true)
-      .single()
-    if (dbError || !dataVersion) {
-      console.log('Cannot find unknown version', body, org, dbError)
-      return c.json({ status: 'Cannot find version', error: JSON.stringify(dbError) }, 400)
-    }
-
-    channel.version = dataVersion.id
-  }
   try {
+    // Use the existing findVersion function from main
+    channel.version = await findVersion(c, body.app_id, body.version ?? 'unknown', org.owner_org)
+
     const rawUpdateInfo = await updateOrCreateChannel(c, channel)
     if (rawUpdateInfo.error) {
       console.log('Cannot create channel', rawUpdateInfo.error)
       return c.json({ status: 'Cannot create channel', error: JSON.stringify(rawUpdateInfo.error) }, 400)
     }
-    const channelId = rawUpdateInfo.id
+
+    // Handle public channel logic from HEAD
+    // Get the channel ID from the created/updated channel
+    const { data: channelData, error: channelError } = await supabaseAdmin(c)
+      .from('channels')
+      .select('id')
+      .eq('app_id', body.app_id)
+      .eq('name', body.channel)
+      .single()
+
+    if (channelError || !channelData) {
+      console.log('Cannot find created channel', channelError)
+      return c.json({ status: 'Cannot find created channel', error: JSON.stringify(channelError) }, 400)
+    }
+
+    const channelId = channelData.id
+
     if (body.public) {
       if (channel.ios) {
         const { error: dbError } = await supabaseAdmin(c).from('apps').update({

@@ -71,9 +71,9 @@ const transaction = db.transaction((data) => {
     for (const field of boolFields) {
       item[field] = (item[field] === '1' || item[field] === 1 || item[field] === true) ? 1 : 0
     }
-    item.installs = Number.parseInt(item.installs, 10) || 0
-    item.updates = Number.parseInt(item.updates, 10) || 0
-    item.score = Number.parseFloat(item.score) || 0.0
+    item.installs = Number.parseInt(item.installs, 10)?? 0
+    item.updates = Number.parseInt(item.updates, 10)?? 0
+    item.score = Number.parseFloat(item.score)?? 0.0
 
     insertStmt.run(item)
   }

@@ -1,9 +1,8 @@
-import type { Context } from '@hono/hono'
-
-import type { MiddlewareKeyVariables } from './hono.ts'
+import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
-import type { Order } from './types.ts'
+import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
+import { type AuthInfo, type MiddlewareKeyVariables, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv } from './utils.ts'
@@ -33,16 +32,28 @@ export interface DeletePayload<T extends keyof Database['public']['Tables']> {
   old_record: Database['public']['Tables'][T]['Row']
 }
 
-export function supabaseClient(c: Context, auth: string) {
+export function supabaseClient(c: Context, jwt: string) {
   const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
-    global: { headers: { Authorization: auth } },
+    global: { headers: { Authorization: jwt } },
   }
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
+}
+
+export function supabaseWithAuth(c: Context, auth: AuthInfo) {
+  if (auth.authType === 'jwt' && auth.jwt) {
+    return supabaseClient(c, auth.jwt)
+  }
+  else if (auth.authType === 'apikey' && auth.apikey) {
+    return supabaseApikey(c, auth.apikey.key)
+  }
+  else {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
 }
 
 export function emptySupabase(c: Context) {
@@ -112,7 +123,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannel', update })
   if (!update.app_id || !update.name || !update.created_by) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing app_id, name, or created_by' })
-    return Promise.resolve({ error: new Error('missing app_id, name, or created_by'), requestId: c.get('requestId') })
+    return Promise.reject(new Error('missing app_id, name, or created_by'))
   }
 
   const { data: existingChannel } = await supabaseAdmin(c)
@@ -151,10 +162,8 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
   cloudlog({ requestId: c.get('requestId'), message: 'updateOrCreateChannelDevice', update })
   if (!update.device_id || !update.channel_id || !update.app_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing device_id, channel_id, or app_id' })
-    return Promise.reject(new Error('missing device_id, channel_id, or app_id'))
+    return Promise.resolve({ error: new Error('missing device_id, channel_id, or app_id') })
   }
-  update.device_id = update.device_id.toLowerCase()
-
   const { data: existingChannelDevice } = await supabaseAdmin(c)
     .from('channel_devices')
     .select('*')
@@ -169,13 +178,13 @@ export async function updateOrCreateChannelDevice(c: Context, update: Database['
     )
     if (!fieldsDiffer) {
       cloudlog({ requestId: c.get('requestId'), message: 'No fields differ, no update needed' })
-      return Promise.resolve()
+      return Promise.resolve({ error: null })
     }
   }
 
   return supabaseAdmin(c)
     .from('channel_devices')
-    .upsert(update, { onConflict: 'device_id, channel_id, app_id' })
+    .upsert(update, { onConflict: 'app_id, device_id' })
 }
 
 export async function checkAppOwner(c: Context, userId: string | undefined, appId: string | undefined): Promise<boolean> {
@@ -187,12 +196,12 @@ export async function checkAppOwner(c: Context, userId: string | undefined, appI
       .select()
       .eq('user_id', userId)
       .eq('app_id', appId)
-    if (!data || !data.length || error)
+    if (!data?.length || error)
       return false
     return true
   }
   catch (error) {
-    console.error(error)
+    cloudlogErr(error)
     return false
   }
 }
@@ -303,7 +312,7 @@ export async function getTotalStats(c: Context, orgId?: string): Promise<PlanTot
   return data
 }
 
-interface PlanUsage {
+export interface PlanUsage {
   total_percent: number
   mau_percent: number
   bandwidth_percent: number
@@ -333,7 +342,7 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
       .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isGoodPlan error', orgId, error })
@@ -347,7 +356,7 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
       .rpc('is_onboarded_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isOnboarded error', orgId, error })
@@ -388,7 +397,7 @@ export async function isOnboardingNeeded(c: Context, userId: string): Promise<bo
       .rpc('is_onboarding_needed_org', { orgid: userId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isOnboardingNeeded error', userId, error })
@@ -402,7 +411,7 @@ export async function isCanceledOrg(c: Context, orgId: string): Promise<boolean>
       .rpc('is_canceled_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isCanceled error', orgId, error })
@@ -416,7 +425,7 @@ export async function isPayingOrg(c: Context, orgId: string): Promise<boolean> {
       .rpc('is_paying_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isPayingOrg error', orgId, error })
@@ -430,7 +439,7 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
       .rpc('is_trial_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || 0
+    return data ?? 0
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isTrialOrg error', orgId, error })
@@ -445,7 +454,7 @@ export async function isAdmin(c: Context, userId: string): Promise<boolean> {
   if (error)
     throw new Error(error.message)
 
-  return data || false
+  return data ?? false
 }
 
 export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boolean> {
@@ -454,7 +463,7 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
       .rpc('is_allowed_action_org', { orgid: orgId })
       .single()
       .throwOnError()
-    return data || false
+    return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isAllowedActionOrg error', orgId, error })
@@ -472,7 +481,7 @@ export async function createApiKey(c: Context, userId: string) {
     .from('apikeys')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .then(res => res.count || null)
+    .then(res => res.count ?? null)
   if (total === null) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is null' })
     return
@@ -508,7 +517,7 @@ export async function createApiKey(c: Context, userId: string) {
 export async function customerToSegmentOrg(
   c: Context,
   orgId: string,
-  price_id: string,
+  price_id?: string | null,
   plan?: Database['public']['Tables']['plans']['Row'] | null,
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
   const segmentsObj = {
@@ -686,33 +695,30 @@ export function trackMetaSB(
 ) {
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
   return supabaseAdmin(c)
-    .from('version_meta')
-    .insert([
-      {
-        app_id,
-        version_id,
-        size,
-      },
-    ])
+    .rpc('upsert_version_meta', {
+      p_app_id: app_id,
+      p_version_id: version_id,
+      p_size: size,
+    })
 }
 
-export function trackDevicesSB(c: Context, app_id: string, device_id: string, version: number, platform: Database['public']['Enums']['platform_os'], plugin_version: string, os_version: string, version_build: string, custom_id: string, is_prod: boolean, is_emulator: boolean) {
-  cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesSB', app_id, device_id, version, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator })
+export function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt) {
+  cloudlog({ requestId: c.get('requestId'), message: 'trackDevicesSB', device })
   return supabaseAdmin(c)
     .from('devices')
     .upsert(
       {
-        app_id,
+        app_id: device.app_id,
         updated_at: new Date().toISOString(),
-        device_id: device_id.toLowerCase(),
-        platform,
-        plugin_version,
-        os_version,
-        version_build,
-        custom_id,
-        version,
-        is_prod,
-        is_emulator,
+        device_id: device.device_id,
+        platform: device.platform,
+        plugin_version: device.plugin_version,
+        os_version: device.os_version,
+        version_build: device.version_build,
+        custom_id: device.custom_id,
+        version: device.version,
+        is_prod: device.is_prod,
+        is_emulator: device.is_emulator,
       },
       { onConflict: 'device_id,app_id' },
     )
@@ -725,7 +731,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
       {
         app_id,
         created_at: new Date().toISOString(),
-        device_id: device_id.toLowerCase(),
+        device_id,
         action,
         version: version_id,
       },
@@ -735,60 +741,60 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
 export async function readDeviceUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_device_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readBandwidthUsageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_bandwidth_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readStatsStorageSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_storage_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
 export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string) {
   const { data } = await supabaseAdmin(c)
     .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data || []
+  return data ?? []
 }
 
-export async function readStatsSB(c: Context, app_id: string, period_start?: string, period_end?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
+export async function readStatsSB(c: Context, params: ReadStatsParams) {
   const supabase = supabaseAdmin(c)
 
   let query = supabase
     .from('stats')
     .select('*')
-    .eq('app_id', app_id)
-    .limit(limit)
+    .eq('app_id', params.app_id)
+    .limit(params.limit ?? DEFAULT_LIMIT)
 
-  if (period_start)
-    query = query.gte('created_at', new Date(period_start).toISOString())
+  if (params.start_date)
+    query = query.gte('created_at', new Date(params.start_date).toISOString())
 
-  if (period_end)
-    query = query.lt('created_at', new Date(period_end).toISOString())
+  if (params.end_date)
+    query = query.lt('created_at', new Date(params.end_date).toISOString())
 
-  if (deviceIds && deviceIds.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
-    if (deviceIds.length === 1)
-      query = query.eq('device_id', deviceIds[0])
+  if (params.deviceIds?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
+    if (params.deviceIds.length === 1)
+      query = query.eq('device_id', params.deviceIds[0])
     else
-      query = query.in('device_id', deviceIds)
+      query = query.in('device_id', params.deviceIds)
   }
 
-  if (search) {
-    cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds && deviceIds.length)
-      query = query.ilike('version_build', `${search}%`)
+  if (params.search) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    if (params.deviceIds?.length)
+      query = query.ilike('version_build', `${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${search}%,version_build.ilike.${search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%`)
   }
 
-  if (order?.length) {
-    order.forEach((col) => {
+  if (params.order?.length) {
+    params.order.forEach((col: Order) => {
       if (col.sortable && typeof col.sortable === 'string') {
         cloudlog({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
@@ -803,45 +809,45 @@ export async function readStatsSB(c: Context, app_id: string, period_start?: str
     return []
   }
 
-  return data || []
+  return data ?? []
 }
 
-export async function readDevicesSB(c: Context, app_id: string, range_start: number, range_end: number, version_id?: string, deviceIds?: string[], search?: string, order?: Order[], limit = DEFAULT_LIMIT) {
+export async function readDevicesSB(c: Context, params: ReadDevicesParams) {
   const supabase = supabaseAdmin(c)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', app_id, range_start, range_end, version_id, deviceIds, search })
+  cloudlog({ requestId: c.get('requestId'), message: 'readDevicesSB', params })
   let query = supabase
     .from('devices')
     .select('*')
-    .eq('app_id', app_id)
-    .range(range_start, range_end)
-    .limit(limit)
+    .eq('app_id', params.app_id)
+    .range(params.rangeStart ?? 0, params.rangeEnd ?? DEFAULT_LIMIT)
+    .limit(params.limit ?? DEFAULT_LIMIT)
 
-  if (deviceIds && deviceIds.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds })
-    if (deviceIds.length === 1)
-      query = query.eq('device_id', deviceIds[0])
+  if (params.deviceIds?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
+    if (params.deviceIds.length === 1)
+      query = query.eq('device_id', params.deviceIds[0])
     else
-      query = query.in('device_id', deviceIds)
+      query = query.in('device_id', params.deviceIds)
   }
 
-  if (search) {
-    cloudlog({ requestId: c.get('requestId'), message: 'search', search })
-    if (deviceIds && deviceIds.length)
-      query = query.ilike('custom_id', `${search}%`)
+  if (params.search) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    if (params.deviceIds?.length)
+      query = query.ilike('custom_id', `${params.search}%`)
     else
-      query = query.or(`device_id.ilike.${search}%,custom_id.ilike.${search}%`)
+      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%`)
   }
-  if (order?.length) {
-    order.forEach((col) => {
+  if (params.order?.length) {
+    params.order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
         cloudlog({ requestId: c.get('requestId'), message: 'order', key: col.key, sortable: col.sortable })
         query = query.order(col.key as string, { ascending: col.sortable === 'asc' })
       }
     })
   }
-  if (version_id)
-    query = query.eq('version_id', version_id)
+  if (params.version_id)
+    query = query.eq('version_id', params.version_id)
 
   const { data, error } = await query
 
@@ -850,7 +856,7 @@ export async function readDevicesSB(c: Context, app_id: string, range_start: num
     return []
   }
 
-  return data || []
+  return data ?? []
 }
 
 export async function countDevicesSB(c: Context, app_id: string) {
@@ -858,7 +864,7 @@ export async function countDevicesSB(c: Context, app_id: string) {
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
-  return count || 0
+  return count ?? 0
 }
 
 const DEFAUL_PLAN_NAME = 'Solo'
@@ -872,7 +878,7 @@ export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise
   if (error)
     throw new Error(error.message)
 
-  return data || DEFAUL_PLAN_NAME
+  return data ?? DEFAUL_PLAN_NAME
 }
 
 interface UpdateStats {

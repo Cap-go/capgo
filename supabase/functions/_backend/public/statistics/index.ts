@@ -1,8 +1,10 @@
+import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import { z } from 'zod'
-import { honoFactory, middlewareV2, useCors } from '../../utils/hono.ts'
+import { z } from 'zod/mini'
+import { honoFactory, middlewareV2, quickError, simpleError, useCors } from '../../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../../utils/loggin.ts'
 import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
@@ -27,7 +29,7 @@ interface VersionName {
   created_at: string | null
 }
 
-interface appUsageByVersion {
+interface AppUsageByVersion {
   date: string
   app_id: string
   version_id: number
@@ -35,197 +37,33 @@ interface appUsageByVersion {
   uninstall: number | null
 }
 
-app.get('/app/:app_id', async (c) => {
-  try {
-    const appId = c.req.param('app_id')
-    const query = c.req.query()
-    const bodyParsed = normalStatsSchema.safeParse(query)
-    if (!bodyParsed.success) {
-      console.log('Invalid body', bodyParsed.error)
-      return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
-    }
-    const body = bodyParsed.data
+async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseAdmin>) {
+  if (true)
+    return { isPayingAndGoodPlan: true }
 
-    const auth = c.get('auth') as AuthInfo
-    if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
-        console.log('Invalid apikey', auth)
-        return c.json({ status: 'You can\'t access this app' }, 400)
-      }
-    }
-    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
-      console.log('Invalid jwt', auth.userId)
-      return c.json({ status: 'You can\'t access this app' }, 400)
-    }
+  // Use the existing PostgreSQL function to check organization payment and plan status
+  const { data: isPayingAndGoodPlan, error } = await supabase
+    .rpc('is_paying_and_good_plan_org', { orgid: orgId })
+    .single()
 
-    const supabase = supabaseAdmin(c as any)
-    const { data: finalStats, error } = await getNormalStats(appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
-
-    if (error) {
-      console.log('Cannot get app statistics', error)
-      return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(error) }, 500)
-    }
-
-    return c.json(finalStats)
-  }
-  catch (e) {
-    console.error('Error in app statistics', e)
-    return c.json({ status: 'Cannot get app statistics', error: JSON.stringify(e) }, 500)
-  }
-})
-
-app.get('/org/:org_id', async (c) => {
-  try {
-    const orgId = c.req.param('org_id')
-    const query = c.req.query()
-
-    // Check if user has access to this organization
-    const supabase = supabaseAdmin(c as any)
-
-    const bodyParsed = normalStatsSchema.safeParse(query)
-    if (!bodyParsed.success) {
-      console.log('Invalid body', bodyParsed.error)
-      return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
-    }
-    const body = bodyParsed.data
-
-    const auth = c.get('auth') as AuthInfo
-    if (!(await hasOrgRight(c as any, orgId, auth.userId, 'read'))) {
-      console.log('Invalid jwt', auth.userId)
-      return c.json({ status: 'You can\'t access this organization' }, 400)
-    }
-    if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-      if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
-        console.log('Invalid apikey', auth.apikey!.key)
-        return c.json({ status: 'You can\'t access this organization' }, 400)
-      }
-    }
-
-    if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-      console.log('Invalid apikey', auth.apikey!.key)
-      return c.json({ status: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}`, error: `You can't access this organization. This API key is limited to these apps: ${auth.apikey!.limited_to_apps.join(', ')}` }, 401)
-    }
-
-    const { data: finalStats, error } = await getNormalStats(null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
-
-    if (error) {
-      console.log('Cannot get organization statistics', error)
-      return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(error) }, 500)
-    }
-
-    return c.json(finalStats)
-  }
-  catch (e) {
-    console.error('Error in organization statistics', e)
-    return c.json({ status: 'Cannot get organization statistics', error: JSON.stringify(e) }, 500)
-  }
-})
-
-app.get('/app/:app_id/bundle_usage', async (c) => {
-  try {
-    const appId = c.req.param('app_id')
-    const query = c.req.query()
-    const useDashbord = false
-
-    const bodyParsed = bundleUsageSchema.safeParse(query)
-    if (!bodyParsed.success) {
-      console.log('Invalid body', bodyParsed.error)
-      return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
-    }
-    const body = bodyParsed.data
-
-    const auth = c.get('auth') as AuthInfo
-    if (auth.authType === 'apikey') {
-      if (!await hasAppRightApikey(c as any, appId, auth.userId, 'read', auth.apikey!.key)) {
-        console.log('Invalid apikey', auth.apikey!.key)
-        return c.json({ status: 'You can\'t access this app' }, 400)
-      }
-    }
-    else if (!await hasAppRight(c as any, appId, auth.userId, 'read')) {
-      console.log('Invalid jwt', auth.userId)
-      return c.json({ status: 'You can\'t access this app' }, 400)
-    }
-
-    const supabase = supabaseAdmin(c as any)
-    const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
-
-    if (error) {
-      console.log('Cannot get app statistics. Cannot get bundle usage', error)
-      return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(error) }, 500)
-    }
-
-    return c.json(data)
-  }
-  catch (e) {
-    console.error('Error in app statistics. Cannot get bundle usage', e)
-    return c.json({ status: 'Cannot get app statistics. Cannot get bundle usage', error: JSON.stringify(e) }, 500)
-  }
-})
-
-app.get('/user', async (c) => {
-  const auth = c.get('auth') as AuthInfo
-  const supabase = supabaseAdmin(c as any)
-
-  const query = c.req.query()
-  const bodyParsed = normalStatsSchema.safeParse(query)
-  if (!bodyParsed.success) {
-    console.log('Invalid body', bodyParsed.error)
-    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
-  }
-  const body = bodyParsed.data
-
-  const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-    orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
-  }
-  const orgs = await orgsReq
-  if (orgs.error) {
-    console.log('Cannot get user statistics', orgs.error)
-    return c.json({ status: 'User not found', error: JSON.stringify(orgs.error) }, 404)
+  if (error) {
+    throw quickError(404, 'organization_not_found', 'Organization not found or error checking status', {
+      error,
+    })
   }
 
-  console.log('orgs', orgs.data)
-
-  // Deduplicate organizations by org_id using Set for better performance
-  const uniqueOrgs = Array.from(
-    new Map(orgs.data.map(org => [org.org_id, org])).values(),
-  )
-  if (uniqueOrgs.length === 0) {
-    console.log('No organizations found', auth.userId)
-    return c.json({ status: 'No organizations found', error: 'No organizations found' }, 401)
+  // If organization is not paying or doesn't have a good plan, throw error
+  if (!isPayingAndGoodPlan) {
+    throw quickError(402, 'subscription_required', 'Organization subscription required or plan invalid', {
+      orgId,
+      isPayingAndGoodPlan,
+    })
   }
 
-  let stats: Array<{ data: any, error: any }> = []
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
-  }
-  else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
-  }
+  return { isPayingAndGoodPlan }
+}
 
-  const errors = stats.filter(stat => stat.error).map(stat => stat.error)
-  if (errors.length > 0) {
-    console.log('Cannot get user statistics', errors)
-    return c.json({ status: 'Cannot get user statistics', error: JSON.stringify(errors) }, 500)
-  }
-
-  const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
-    const current = acc.get(curr.date)
-    if (current) {
-      current.mau += curr.mau
-      current.storage += curr.storage
-      current.bandwidth += curr.bandwidth
-    }
-    else {
-      acc.set(curr.date, curr)
-    }
-    return acc
-  }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
-
-  return c.json(finalStats)
-})
-
-async function getNormalStats(appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
+async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseAdmin>, isDashboard: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
@@ -269,11 +107,15 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
     metricsByApp = { [appId]: metricsByApp[appId] }
   }
 
+  for (const key in metricsByApp) {
+    metricsByApp[key] ??= []
+  }
+
   Object.values(metricsByApp)
     .forEach((arrItem) => {
       const sortedArrItem = arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      console.log(sortedArrItem)
-      arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
+      cloudlog({ requestId: c.get('requestId'), message: 'sortedArrItem', data: sortedArrItem })
+      arrItem?.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).forEach((item, i) => {
         if (item.date) {
           const dayNumber = i
           if (mau[dayNumber])
@@ -307,7 +149,7 @@ async function getNormalStats(appId: string | null, ownerOrg: string | null, fro
     if (storageError)
       return { data: null, error: storageError }
 
-    const storageVariance = storage.reduce((p, c) => (p + (c || 0)), 0)
+    const storageVariance = storage.reduce((p, c) => (p + (c ?? 0)), 0)
     const currentStorage = currentStorageBytes
     const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
     storage[0] = initValue
@@ -402,7 +244,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
 }
 
 // Calculate cumulative installs for each version over time
-function calculateAccumulatedData(usage: appUsageByVersion[], dates: string[], versions: number[]) {
+function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], versions: number[]) {
   const accumulated: { [date: string]: { [version: number]: number } } = {}
 
   // Initialize with zeros
@@ -414,12 +256,12 @@ function calculateAccumulatedData(usage: appUsageByVersion[], dates: string[], v
   // Process data day by day
   dates.forEach((date, index) => {
     const dailyUsage = usage.filter(u => u.date === date)
-    const totalNewInstalls = dailyUsage.reduce((sum, u) => sum + (u.install || 0), 0)
+    const totalNewInstalls = dailyUsage.reduce((sum, u) => sum + (u.install ?? 0), 0)
 
     if (index === 0) {
       // First day: just add installs
       dailyUsage.forEach(({ version_id, install }) => {
-        accumulated[date][version_id] = install || 0
+        accumulated[date][version_id] = install ?? 0
       })
     }
     else {
@@ -430,7 +272,7 @@ function calculateAccumulatedData(usage: appUsageByVersion[], dates: string[], v
         const change = dailyUsage.find(u => u.version_id === version)
         const prevValue = accumulated[prevDate][version]
 
-        if (change && change.install) {
+        if (change?.install) {
           // Version has new installs: add them
           accumulated[date][version] = prevValue + change.install
         }
@@ -441,7 +283,7 @@ function calculateAccumulatedData(usage: appUsageByVersion[], dates: string[], v
         }
 
         // Subtract uninstalls if any
-        if (change && change.uninstall) {
+        if (change?.uninstall) {
           accumulated[date][version] = Math.max(0, accumulated[date][version] - change.uninstall)
         }
       })
@@ -473,16 +315,16 @@ function convertToPercentages(accumulated: { [date: string]: { [version: number]
 // Filter out versions with no usage
 function getActiveVersions(versions: number[], percentages: { [date: string]: { [version: number]: number } }) {
   return versions.filter(version =>
-    Object.values(percentages).some(dayData => (dayData[version] || 0) > 0),
+    Object.values(percentages).some(dayData => (dayData[version] ?? 0) > 0),
   )
 }
 
 // Create datasets for Chart.js
 function createDatasets(versions: number[], dates: string[], percentages: { [date: string]: { [version: number]: number } }, versionNames: VersionName[]) {
   return versions.map((version) => {
-    const percentageData = dates.map(date => percentages[date][version] || 0)
+    const percentageData = dates.map(date => percentages[date][version] ?? 0)
     // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
-    const versionName = versionNames.find(v => v.id === version)?.name || version
+    const versionName = versionNames.find(v => v.id === version)?.name ?? version
 
     return {
       label: versionName,
@@ -508,3 +350,192 @@ function getDaysBetweenDates(firstDate: Date, secondDate: Date) {
   const res = Math.round(Math.abs((firstDate.valueOf() - secondDate.valueOf()) / oneDay))
   return res
 }
+
+app.get('/app/:app_id', async (c) => {
+  const appId = c.req.param('app_id')
+  const query = c.req.query()
+  const bodyParsed = normalStatsSchema.safeParse(query)
+  if (!bodyParsed.success) {
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+  }
+  const body = bodyParsed.data
+
+  const auth = c.get('auth') as AuthInfo
+  if (auth.authType === 'apikey') {
+    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
+      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth })
+    }
+  }
+  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+  }
+
+  const supabase = supabaseAdmin(c)
+
+  // Get the organization ID for this app and check organization access
+  const { data: app } = await supabase
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (app?.owner_org && auth.authType !== 'jwt') {
+    await checkOrganizationAccess(c, app.owner_org, supabase)
+  }
+
+  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+
+  if (error) {
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
+  }
+
+  return c.json(finalStats)
+})
+
+app.get('/org/:org_id', async (c) => {
+  const orgId = c.req.param('org_id')
+  const query = c.req.query()
+
+  // Check if user has access to this organization
+  const supabase = supabaseAdmin(c)
+
+  const bodyParsed = normalStatsSchema.safeParse(query)
+  if (!bodyParsed.success) {
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+  }
+  const body = bodyParsed.data
+
+  const auth = c.get('auth') as AuthInfo
+  if (!(await hasOrgRight(c, orgId, auth.userId, 'read'))) {
+    throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth.userId })
+  }
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
+    if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
+      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
+    }
+  }
+
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+    throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
+  }
+
+  // Check organization payment status before returning stats
+  if (auth.authType !== 'jwt')
+    await checkOrganizationAccess(c, orgId, supabase)
+
+  const { data: finalStats, error } = await getNormalStats(c, null, orgId, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt')
+
+  if (error) {
+    throw quickError(500, 'cannot_get_organization_statistics', 'Cannot get organization statistics', { error })
+  }
+
+  return c.json(finalStats)
+})
+
+app.get('/app/:app_id/bundle_usage', async (c) => {
+  const appId = c.req.param('app_id')
+  const query = c.req.query()
+  const useDashbord = false
+
+  const bodyParsed = bundleUsageSchema.safeParse(query)
+  if (!bodyParsed.success) {
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+  }
+  const body = bodyParsed.data
+
+  const auth = c.get('auth') as AuthInfo
+  if (auth.authType === 'apikey') {
+    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
+      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth.apikey!.key })
+    }
+  }
+  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+  }
+
+  const supabase = supabaseAdmin(c)
+
+  // Get the organization ID for this app and check organization access
+  const { data: app } = await supabase
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (app?.owner_org && auth.authType !== 'jwt') {
+    await checkOrganizationAccess(c, app.owner_org, supabase)
+  }
+
+  const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashbord, supabase)
+
+  if (error) {
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
+  }
+
+  return c.json(data)
+})
+
+app.get('/user', async (c) => {
+  const auth = c.get('auth') as AuthInfo
+  const supabase = supabaseAdmin(c)
+
+  const query = c.req.query()
+  const bodyParsed = normalStatsSchema.safeParse(query)
+  if (!bodyParsed.success) {
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+  }
+  const body = bodyParsed.data
+
+  const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
+    orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
+  }
+  const orgs = await orgsReq
+  if (orgs.error) {
+    throw quickError(404, 'user_not_found', 'User not found', { error: orgs.error })
+  }
+
+  cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgs.data })
+
+  // Deduplicate organizations by org_id using Set for better performance
+  const uniqueOrgs = Array.from(
+    new Map(orgs.data.map(org => [org.org_id, org])).values(),
+  )
+  if (uniqueOrgs.length === 0) {
+    throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
+  }
+
+  // Check organization payment status for each organization before returning stats
+  for (const org of uniqueOrgs) {
+    if (auth.authType !== 'jwt')
+      await checkOrganizationAccess(c, org.org_id, supabase)
+  }
+
+  let stats: Array<{ data: any, error: any }> = []
+  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
+    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt')))
+  }
+  else {
+    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt')))
+  }
+
+  const errors = stats.filter(stat => stat.error).map(stat => stat.error)
+  if (errors.length > 0) {
+    throw quickError(500, 'cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
+  }
+
+  const finalStats = Array.from(stats.map(stat => stat.data!).flat().reduce((acc, curr) => {
+    const current = acc.get(curr.date)
+    if (current) {
+      current.mau += curr.mau
+      current.storage += curr.storage
+      current.bandwidth += curr.bandwidth
+    }
+    else {
+      acc.set(curr.date, curr)
+    }
+    return acc
+  }, new Map<string, NonNullable<Awaited<ReturnType<typeof getNormalStats>>['data']>[number]>()).values())
+
+  return c.json(finalStats)
+})

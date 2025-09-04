@@ -43,12 +43,6 @@ const range = ref<[Date, Date]>([dayjs().subtract(3, 'minute').toDate(), new Dat
 const filters = ref()
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
 
-// const actionLinks = {
-//   update: '/app/p/{{appId}}/update',
-//   download: '/app/p/{{appId}}/download',
-//   error: '/app/p/{{appId}}/error',
-// }
-
 function findVersion(id: number, versions: { name: string, id: number }[]) {
   return versions.find(elem => elem.id === id)
 }
@@ -113,7 +107,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/stats`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt || ''}`,
+          'authorization': `Bearer ${currentJwt ?? ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,
@@ -158,7 +152,7 @@ columns.value = [
     mobile: true,
     class: 'truncate max-w-8',
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.created_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.created_at ?? ''),
   },
   {
     label: t('device-id'),

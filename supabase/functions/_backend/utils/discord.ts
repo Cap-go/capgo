@@ -1,54 +1,15 @@
-import type { Context } from '@hono/hono'
-import { cloudlogErr } from './loggin.ts'
+import type {
+  RESTPostAPIWebhookWithTokenJSONBody,
+} from 'discord-api-types/v10'
+import type { Context } from 'hono'
+import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
-interface DiscordEmbed {
-  title?: string
-  description?: string
-  url?: string
-  timestamp?: string
-  color?: number
-  footer?: {
-    text: string
-    icon_url?: string
-  }
-  image?: {
-    url: string
-  }
-  thumbnail?: {
-    url: string
-  }
-  author?: {
-    name: string
-    url?: string
-    icon_url?: string
-  }
-  fields?: {
-    name: string
-    value: string
-    inline?: boolean
-  }[]
-}
-
-interface DiscordWebhookPayload {
-  content?: string
-  username?: string
-  avatar_url?: string
-  tts?: boolean
-  embeds?: DiscordEmbed[]
-  allowed_mentions?: {
-    parse?: ('everyone' | 'users' | 'roles')[]
-    roles?: string[]
-    users?: string[]
-    replied_user?: boolean
-  }
-}
-
-export async function sendDiscordAlert(c: Context, payload: DiscordWebhookPayload): Promise<boolean> {
+export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWithTokenJSONBody): Promise<boolean> {
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
 
   if (!webhookUrl) {
-    console.log({ requestId: c.get('requestId'), message: payload })
+    cloudlog({ requestId: c.get('requestId'), message: 'Discord not set' })
     return true
   }
 
@@ -75,4 +36,65 @@ export async function sendDiscordAlert(c: Context, payload: DiscordWebhookPayloa
     cloudlogErr({ requestId: c.get('requestId'), message: 'Discord webhook error', error })
     return true
   }
+}
+
+export function sendDiscordAlert500(c: Context, functionName: string, body: string, e: Error) {
+  const requestId = c.get('requestId') ?? 'unknown'
+  const timestamp = new Date().toISOString()
+  const userAgent = c.req.header('user-agent') ?? 'unknown'
+  const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
+  const method = c.req.method
+  const url = c.req.url
+  const headers = Object.fromEntries((c.req.raw.headers as any).entries())
+  const errorMessage = e?.message ?? 'Unknown error'
+  const errorStack = e?.stack ?? 'No stack trace'
+  const errorName = e?.name ?? 'Error'
+  return sendDiscordAlert(c, {
+    content: `🚨 **${functionName}** Error Alert`,
+    embeds: [
+      {
+        title: `❌ ${functionName} Function Failed`,
+        description: `**Error:** ${errorName}\n**Message:** ${errorMessage}`,
+        color: 0xFF0000, // Red color
+        timestamp,
+        fields: [
+          {
+            name: '🔍 Request Details',
+            value: `**Method:** ${method}\n**URL:** ${url}\n**Request ID:** ${requestId}`,
+            inline: false,
+          },
+          {
+            name: '🌐 Client Info',
+            value: `**IP:** ${ip}\n**User-Agent:** ${userAgent}`,
+            inline: false,
+          },
+          {
+            name: '📝 Request Body',
+            value: `\`\`\`\n${body}\n\`\`\``,
+            inline: false,
+          },
+          {
+            name: '🔧 Headers',
+            value: `\`\`\`json\n${JSON.stringify(headers, null, 2).substring(0, 1000)}\n\`\`\``,
+            inline: false,
+          },
+          {
+            name: '💥 Error Stack',
+            value: `\`\`\`\n${errorStack.substring(0, 1000)}\n\`\`\``,
+            inline: false,
+          },
+          {
+            name: '🔍 Full Error Object',
+            value: `\`\`\`json\n${JSON.stringify(e, Object.getOwnPropertyNames(e), 2).substring(0, 1000)}\n\`\`\``,
+            inline: false,
+          },
+        ],
+        footer: {
+          text: `Function: ${functionName} | Environment: ${getEnv(c, 'ENVIRONMENT') || 'unknown'}`,
+        },
+      },
+    ],
+  }).catch((e: any) => {
+    cloudlogErr({ requestId, functionName, message: 'sendDiscordAlert500 failed', error: e })
+  })
 }

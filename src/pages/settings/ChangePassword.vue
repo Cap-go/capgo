@@ -6,14 +6,16 @@ import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import iconPassword from '~icons/ph/key?raw'
 import { useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 
 const isLoading = ref(false)
+const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const supabase = useSupabase()
-
+const mfaCode = ref('')
 const { t } = useI18n()
+displayStore.NavTitle = t('password')
 
-// https://xvwzpoazmxkqosrdewyv.supabase.co/auth/v1/verify?token=69af7abb6508b17c05fec3ac963d335eafee0e5802a7977fc9b7aa35&type=recovery&redirect_to=http%3A%2F%2Flocalhost:5173%2Fforgot_password%3Fstep%3D2
 async function submit(form: { password: string, password_confirm: string }) {
   console.log('submitting', form)
   if (isLoading.value)
@@ -43,31 +45,30 @@ async function submit(form: { password: string, password_confirm: string }) {
       return
     }
 
-    displayStore.dialogOption = {
-      header: t('alert-2fa-required'),
-      message: t('alert-2fa-required-message'),
+    mfaCode.value = ''
+    dialogStore.openDialog({
+      title: t('alert-2fa-required'),
+      description: t('alert-2fa-required-message'),
       preventAccidentalClose: true,
-      input: true,
       buttons: [
         {
           text: t('button-confirm'),
-          role: 'confirm',
+          role: 'primary',
           handler: async () => {
             const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
               factorId: factor.id,
               challengeId: challenge.id,
-              code: displayStore.dialogInputText.replace(' ', ''),
+              code: mfaCode.value.replace(' ', ''),
             })
             if (errorVerify) {
-              displayStore.showDialog = true
               toast.error(t('invalid-mfa-code'))
+              return false // Prevent dialog from closing
             }
           },
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
 
@@ -84,9 +85,6 @@ async function submit(form: { password: string, password_confirm: string }) {
 <template>
   <div>
     <div class="h-full pb-8 max-h-fit grow md:pb-0">
-      <!-- <form
-      @submit.prevent="submit"
-    > -->
       <FormKit id="change-pass" type="form" :actions="false" @submit="submit">
         <!-- Panel body -->
         <div class="p-6 space-y-6">
@@ -123,10 +121,10 @@ async function submit(form: { password: string, password_confirm: string }) {
         </div>
         <!-- Panel footer -->
         <footer>
-          <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+          <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
             <div class="flex self-end">
               <button
-                class="p-2 ml-3 text-white bg-blue-500 rounded-sm btn hover:bg-blue-600"
+                class="p-2 ml-3 text-white bg-blue-500 rounded-sm d-btn hover:bg-blue-600"
                 type="submit"
                 color="secondary"
                 shape="round"
@@ -139,13 +137,32 @@ async function submit(form: { password: string, password_confirm: string }) {
             </div>
           </div>
         </footer>
-        <!-- </form> -->
       </FormKit>
     </div>
+
+    <!-- Teleport Content for 2FA Input -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-2fa-required')" defer to="#dialog-v2-content">
+      <div class="space-y-4">
+        <div>
+          <label for="mfa-code" class="block text-sm font-medium mb-2">{{ t('enter-2fa-code') }}</label>
+          <input
+            v-model="mfaCode"
+            type="text"
+            placeholder="123456"
+            class="input input-bordered w-full"
+            maxlength="6"
+            inputmode="numeric"
+          >
+        </div>
+        <div class="text-sm text-gray-500">
+          {{ t('enter-the-6-digit-code-from-your-authenticator-app') }}
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <route lang="yaml">
 meta:
   layout: settings
-    </route>
+</route>

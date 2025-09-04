@@ -44,7 +44,7 @@ const accumulateData = computed(() => {
   if (!props.accumulated)
     return props.data as number[]
   return (props.data as number[]).reduce((acc: number[], val: number, i: number) => {
-    const last = acc[acc.length - 1] || 0
+    const last = acc[acc.length - 1] ?? 0
     let newVal
     if (val !== undefined)
       newVal = last + val
@@ -60,7 +60,7 @@ const evolution = computed(() => {
   const arrWithoutUndefined = accumulateData.value.filter((val: any) => val !== undefined)
   // calculate evolution of all value except the first one
   const res = arrWithoutUndefined.map((val: number, i: number) => {
-    const last = arrWithoutUndefined[i - 1] || 0
+    const last = arrWithoutUndefined[i - 1] ?? 0
     return i > 0 ? val - last : 0
   })
   const median = res.reduce((a, b) => a + b, 0.0) / accumulateData.value.length
@@ -85,7 +85,7 @@ const projectionData = computed(() => {
   let res = new Array(getDaysInCurrentMonth()).fill(undefined)
   res = res.reduce((acc: number[], val: number, i: number) => {
     let newVal
-    const last = acc[acc.length - 1] || 0
+    const last = acc[acc.length - 1] ?? 0
     // randomize Evolution from (half evolutio) to full evolution
     const randomizedEvolution = getRandomArbitrary((evolution.value[0] + evolution.value[2]) / 2, (evolution.value[1] + evolution.value[2]) / 2)
     if (i === monthDay - 1)

@@ -61,6 +61,9 @@ const bannerText = computed(() => {
   if (!org)
     return
 
+  if (organizationStore.currentOrganizationFailed)
+    return t('subscription-required')
+
   if (org.is_canceled)
     return t('plan-inactive')
 
@@ -79,13 +82,15 @@ const bannerText = computed(() => {
   return null
 })
 const bannerColor = computed(() => {
-  const warning = 'btn-warning'
-  // bg-ios-light-surface-2 dark:bg-ios-dark-surface-2
-  const success = 'btn-success'
+  const warning = 'd-btn-warning'
+  const success = 'd-btn-success'
 
   const org = organizationStore.currentOrganization
   if (!org)
     return
+
+  if (organizationStore.currentOrganizationFailed)
+    return warning
 
   if (org.paying && org.can_use_more)
     return ''
@@ -118,13 +123,13 @@ const bannerColor = computed(() => {
     <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">
       {{ bannerText }}
     </span>
-    <a href="/settings/organization/plans" class="btn btn-sm border-none" :class="bannerColor">
+    <a href="/settings/organization/plans" class="d-btn d-btn-sm border-none" :class="bannerColor">
       {{ t('upgrade') }}
     </a>
   </div>
 
   <!-- Mobile/original version -->
-  <div v-else-if="!props.desktop && bannerText" class="navbar bg-gray-200 dark:bg-gray-100 dark:bg-gray-800/90">
+  <div v-else-if="!props.desktop && bannerText" class="navbar bg-gray-200 dark:bg-gray-800/90">
     <div class="text-xl navbar-start font-bold text-black dark:text-white md:pl-4 line-clamp-1">
       {{ bannerLeftText }}
     </div>
@@ -132,7 +137,7 @@ const bannerColor = computed(() => {
       <a class="text-xl font-bold text-black dark:text-white normal-case ">{{ bannerText }}</a>
     </div>
     <div class="navbar-end">
-      <a href="/settings/organization/plans" class="btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
+      <a href="/settings/organization/plans" class="d-btn border-none" :class="bannerColor">{{ isMobile ? t('see-usage') : t('upgrade') }}</a>
     </div>
   </div>
 </template>

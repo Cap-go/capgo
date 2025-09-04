@@ -1,20 +1,14 @@
-import type { Database } from '../../utils/supabase.types.ts'
-import { honoFactory, middlewareKey } from '../../utils/hono.ts'
+import { honoFactory, middlewareKey, quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()
 
 app.get('/', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  if (!key) {
-    console.error('Cannot list apikeys', 'Unauthorized')
-    return c.json({ error: 'Unauthorized' }, 401)
+  const key = c.get('apikey')!
+  if (key.limited_to_orgs?.length) {
+    throw quickError(401, 'cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
-  if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
-    console.error('Cannot create apikey', 'You cannot do that as a limited API key')
-    return c.json({ error: 'You cannot do that as a limited API key' }, 401)
-  }
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
 
   const { data: apikeys, error } = await supabase
     .from('apikeys')
@@ -22,29 +16,22 @@ app.get('/', middlewareKey(['all']), async (c) => {
     .eq('user_id', key.user_id)
 
   if (error) {
-    console.error('Cannot list apikeys', 'Failed to list API keys', error)
-    return c.json({ error: 'Failed to list API keys', supabaseError: error }, 500)
+    throw quickError(500, 'failed_to_list_apikeys', 'Failed to list API keys', { supabaseError: error })
   }
 
   return c.json(apikeys)
 })
 
 app.get('/:id', middlewareKey(['all']), async (c) => {
-  const key = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  if (!key) {
-    console.error('Cannot list apikeys', 'Unauthorized')
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
-    console.error('Cannot create apikey', 'You cannot do that as a limited API key')
-    return c.json({ error: 'You cannot do that as a limited API key' }, 401)
+  const key = c.get('apikey')!
+  if (key.limited_to_orgs?.length) {
+    throw quickError(401, 'cannot_create_apikey', 'You cannot do that as a limited API key', { key })
   }
   const id = c.req.param('id')
   if (!id) {
-    console.error('Cannot update apikey', 'API key ID is required')
-    return c.json({ error: 'API key ID is required' }, 400)
+    throw simpleError('api_key_id_required', 'API key ID is required', { id })
   }
-  const supabase = supabaseAdmin(c as any)
+  const supabase = supabaseAdmin(c)
   const { data: apikey, error } = await supabase
     .from('apikeys')
     .select('*')
@@ -52,8 +39,7 @@ app.get('/:id', middlewareKey(['all']), async (c) => {
     .eq('user_id', key.user_id)
     .single()
   if (error) {
-    console.error('Cannot get apikey', 'Failed to get API key', error)
-    return c.json({ error: 'Failed to get API key', supabaseError: error }, 404)
+    throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
   return c.json(apikey)
 })

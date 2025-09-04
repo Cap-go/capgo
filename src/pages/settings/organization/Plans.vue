@@ -1,61 +1,22 @@
 <script setup lang="ts">
-import type { Stat } from '~/components/comp_def'
-import type { ArrayElement } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import dayjs from 'dayjs'
 import { useI18n } from 'petite-vue-i18n'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { openCheckout } from '~/services/stripe'
-import { getCurrentPlanNameOrg, getPlanUsagePercent } from '~/services/supabase'
+import { getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
-
 const displayStore = useDisplayStore()
-
-interface PlansOrgData {
-  stats: {
-    mau: number
-    storage: number
-    bandwidth: number
-  }
-  planSuggest: string
-  planCurrrent: string
-  planPercent: number
-  detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>
-  paying: boolean
-  trialDaysLeft: number
-}
-
-function defaultPlanOrgData(): PlansOrgData {
-  return {
-    stats: {
-      mau: 0,
-      storage: 0,
-      bandwidth: 0,
-    },
-    planCurrrent: '',
-    planPercent: -1,
-    planSuggest: '',
-    paying: false,
-    trialDaysLeft: 0,
-    detailPlanUsage: {
-      total_percent: 0,
-      mau_percent: 0,
-      bandwidth_percent: 0,
-      storage_percent: 0,
-    },
-  }
-}
-
-const orgsHashmap = ref(new Map<string, PlansOrgData>())
+displayStore.NavTitle = t('plans')
 
 // const isUsageLoading = ref(false)
 const initialLoad = ref(false)
@@ -67,9 +28,8 @@ const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
+const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
-const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -92,6 +52,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
 
     features.push('Dedicated support')
     features.push('Custom Domain')
+    features.push('SOC II')
   }
   return features.filter(Boolean)
 }
@@ -103,20 +64,40 @@ function convertKey(key: string) {
   return key
 }
 
-const currentData = computed(() => orgsHashmap.value.get(currentOrganization.value?.gid ?? ''))
-
+const currentPlan = ref<Database['public']['Tables']['plans']['Row'] | undefined>(undefined)
 const currentPlanSuggest = ref<Database['public']['Tables']['plans']['Row'] | undefined>(undefined)
-watchEffect(() => {
-  currentPlanSuggest.value = mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest)
-})
+
 watch(() => main.bestPlan, (newBestPlan) => {
   currentPlanSuggest.value = mainStore.plans.find(plan => plan.name === newBestPlan)
 })
-// watchEffect(() => mainStore.plans.find(plan => plan.name === currentData.value?.planSuggest))
-const currentPlan = computed(() => mainStore.plans.find(plan => plan.name === currentData.value?.planCurrrent))
+
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
+  // Check if user has apps in this organization
+  if (currentOrganization.value?.app_count === 0) {
+    dialogStore.openDialog({
+      title: t('no-apps-found'),
+      description: t('add-app-first-to-change-plan'),
+      buttons: [
+        {
+          text: t('cancel'),
+          role: 'cancel',
+        },
+        {
+          text: t('add-another-app'),
+          id: 'add-app-button',
+          handler: () => {
+            router.push('/app')
+            return true
+          },
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+    return
+  }
+
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id)
@@ -138,17 +119,6 @@ function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm'
   return t === 'y'
 }
 
-// function getSale(plan: Database['public']['Tables']['plans']['Row']): string {
-//   return `- ${100 - Math.round(plan.price_y * 100 / (plan.price_m * 12))} %`
-// }
-
-function lastRunDate() {
-  const lastRun = dayjs(main.statsTime.last_run).format('MMMM D, YYYY HH:mm')
-  const nextRun = dayjs(main.statsTime.next_run).format('MMMM D, YYYY HH:mm')
-
-  return `${t('last-run')}: ${lastRun}\n${t('next-run')}: ${nextRun}`
-}
-
 async function loadData(initial: boolean) {
   if (!initialLoad.value && !initial)
     return
@@ -160,41 +130,12 @@ async function loadData(initial: boolean) {
   if (!orgId)
     throw new Error('Cannot get current org id')
 
-  if (orgsHashmap.value.has(orgId))
-    return
-
-  const data = defaultPlanOrgData()
-
-  await Promise.all([
-    getCurrentPlanNameOrg(orgId).then((res) => {
-      data.planCurrrent = res
-      // updateData()
-    }),
-    getPlanUsagePercent(orgId).then((res) => {
-      // console.log('getPlanUsagePercent', res)
-      data.planPercent = res.total_percent
-      data.detailPlanUsage = res
-      // updateData()
-    }).catch(err => console.log(err)),
-    // isPayingOrg(orgId).then(res => {
-    //   data.paying = res
-    // })
-  ])
-  data.stats = main.totalStats
-  data.planSuggest = main.bestPlan
-
-  data.stats = main.totalStats
-  data.planSuggest = main.bestPlan
-  data.paying = orgToLoad.paying
-  data.trialDaysLeft = orgToLoad.trial_left
-
-  orgsHashmap.value.set(orgId, data)
+  getCurrentPlanNameOrg(orgId).then((res) => {
+    console.log('getCurrentPlanNameOrg', res)
+    currentPlan.value = main.plans.find(plan => plan.name === res)
+  })
   initialLoad.value = true
 }
-
-const failed = computed(() => {
-  return !(!!currentData.value?.paying || (currentData.value?.trialDaysLeft ?? 0) > 0 || isTrial.value)
-})
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
   if (!organizationStore.hasPermisisonsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
@@ -211,17 +152,16 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
       }
     }
 
-    displayStore.dialogOption = {
-      header: t('cannot-view-plans'),
-      message: `${t('plans-super-only')}`,
+    dialogStore.openDialog({
+      title: t('cannot-view-plans'),
+      description: `${t('plans-super-only')}`,
       buttons: [
         {
           text: t('ok'),
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
     if (!prevOrg)
       router.push('/app')
     else
@@ -236,8 +176,8 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
 watchEffect(async () => {
   if (route.path === '/settings/organization/plans') {
-    // if session_id is in url params show modal success plan setup
-    if (route.query.session_id) {
+    // if success is in url params show modal success plan setup
+    if (route.query.success) {
       // toast.success(t('usage-success'))
       thankYouPage.value = true
     }
@@ -262,10 +202,10 @@ watchEffect(async () => {
 function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isMobile)
     return t('check-on-web')
-  if (currentPlan.value?.name === p.name && currentData.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
+  if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
     return t('Current')
   }
-  if (isTrial.value || failed.value) {
+  if (isTrial.value || organizationStore.currentOrganizationFailed) {
     return t('plan-upgrade')
   }
   return p.price_m >= (currentPlan.value?.price_m ?? 0) ? (t('plan-upgrade-v2')) : (t('downgrade'))
@@ -276,7 +216,7 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
-  return currentPlanSuggest.value?.name === p.name && currentOrganization.value?.is_yearly !== isYearly.value && (currentPlanSuggest.value?.price_m ?? 0) > (currentPlan.value?.price_m ?? 0)
+  return currentPlanSuggest.value?.name === p.name && (currentPlanSuggest.value?.price_m ?? 0) > (currentPlan.value?.price_m ?? 0)
 }
 function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
   return {
@@ -285,36 +225,6 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     'cursor-not-allowed bg-gray-500 dark:bg-gray-400': isDisabled(p),
   }
 }
-
-const hightLights = computed<Stat[]>(() => ([
-  {
-    label: !failed.value ? t('Current') : t('failed'),
-    value: currentPlan.value?.name,
-  },
-  {
-    label: t('usage'),
-    value: (currentData.value && currentData.value.planPercent !== undefined && currentData.value.planPercent > -1) ? `${currentData.value?.planPercent.toLocaleString()}%` : undefined,
-    informationIcon: () => {
-      if (!currentData.value?.detailPlanUsage.mau_percent && !currentData.value?.detailPlanUsage.storage_percent && !currentData.value?.detailPlanUsage.bandwidth_percent)
-        return
-
-      displayStore.dialogOption = {
-        header: t('detailed-usage-plan'),
-        message: `${t('billing-cycle')} ${dayjs(cycleStart).format('YYYY/MM/D')} ${t('to')} ${dayjs(cycleEnd).format('YYYY/MM/D')}\n${t('your-ussage')}\n${t('mau-usage')}${currentData.value?.detailPlanUsage.mau_percent}%\n${t('bandwith-usage')}${currentData.value?.detailPlanUsage.bandwidth_percent}%\n${t('storage-usage')}${currentData.value?.detailPlanUsage.storage_percent}%\n${lastRunDate()}`,
-        buttons: [
-          {
-            text: t('ok'),
-          },
-        ],
-      }
-      displayStore.showDialog = true
-    },
-  },
-  {
-    label: t('best-plan'),
-    value: currentPlanSuggest.value?.name,
-  },
-]))
 </script>
 
 <template>
@@ -329,18 +239,11 @@ const hightLights = computed<Stat[]>(() => ([
             {{ t('plan-desc') }}<br>
           </p>
         </div>
-        <div v-if="failed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
+        <div v-if="organizationStore.currentOrganizationFailed" id="error-missconfig" class="mt-4 mb-0 bg-[#ef4444] text-white w-fit ml-auto mr-auto border-8 rounded-2xl border-[#ef4444]">
           {{ t('plan-failed') }}
         </div>
-        <section class="px-8 pt-4 sm:px-0">
-          <BlurBg :mini="true">
-            <template #default>
-              <StatsBar :mini="true" :stats="hightLights" />
-            </template>
-          </BlurBg>
-        </section>
         <div class="flex items-center justify-center mt-8 space-x-6 sm:mt-12">
-          <div class="flex items-center" @click="segmentVal = 'm'">
+          <div class="flex items-center cursor-pointer" @click="segmentVal = 'm'">
             <input
               id="monthly" type="radio" name="pricing-plans"
               class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
@@ -351,7 +254,7 @@ const hightLights = computed<Stat[]>(() => ([
             </label>
           </div>
 
-          <div class="flex items-center" @click="segmentVal = 'y'">
+          <div class="flex items-center cursor-pointer" @click="segmentVal = 'y'">
             <input
               id="yearly" type="radio" name="pricing-plans"
               class="w-4 h-4 text-blue-300 border border-gray-200 dark:text-blue-600 focus:outline-hidden focus:ring-1 focus:ring-blue-600"
@@ -365,8 +268,8 @@ const hightLights = computed<Stat[]>(() => ([
             </span>
           </div>
         </div>
-        <div class="mt-12 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
-          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
+        <div class="mt-6 space-y-12 sm:grid sm:grid-cols-2 xl:grid-cols-4 lg:mx-auto xl:mx-0 lg:max-w-4xl xl:max-w-none sm:gap-6 sm:space-y-0">
+          <div v-for="(p, index) in mainStore.plans" :key="p.price_m" class="relative mt-12 border border-gray-200 divide-y divide-gray-200 rounded-lg shadow-xs md:mt-0 bg-gray-50 dark:bg-gray-900" :class="{ 'border-4 border-muted-blue-600': p.name === currentPlan?.name }">
             <div v-if="isRecommended(p)" class="absolute top-0 right-0 flex items-start -mt-8 border-none">
               <svg
                 class="w-auto h-16 text-blue-600 dark:text-red-500" viewBox="0 0 83 64" fill="currentColor"
@@ -400,7 +303,7 @@ const hightLights = computed<Stat[]>(() => ([
               </p>
               <button
                 :class="buttonStyle(p)"
-                class="block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
+                class="cursor-pointer block w-full py-2 mt-8 text-sm font-semibold text-center text-white border border-gray-800 rounded-md"
                 :disabled="isDisabled(p)" @click="openChangePlan(p, index)"
               >
                 <svg v-if="isSubscribeLoading[index]" class="inline-block w-5 h-5 mr-3 -ml-1 text-white align-middle dark:text-gray-900 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -442,37 +345,37 @@ const hightLights = computed<Stat[]>(() => ([
             <br>
           </p>
         </div>
-        <section v-if="!isMobile" class="py-12 lg:py-20 sm:py-16">
+        <section class="py-8 lg:py-20 sm:py-12">
           <div class="px-4 mx-auto max-w-7xl lg:px-8 sm:px-6">
             <div class="max-w-2xl mx-auto text-center">
-              <h2 class="text-3xl font-bold text-white-900 font-pj sm:text-4xl xl:text-5xl dark:text-white">
+              <h2 class="text-2xl font-bold text-white-900 font-pj sm:text-3xl xl:text-4xl dark:text-white">
                 {{ t('need-more-contact-us') }}
               </h2>
             </div>
 
             <BlurBg background="">
               <template #default>
-                <div class="w-full px-16 py-8 lg:px-16 lg:py-14 sm:px-8 bg-blue-50">
+                <div class="w-full px-4 py-6 lg:px-16 lg:py-14 sm:px-8 bg-blue-50">
                   <div class="w-full md:flex md:items-center lg:space-x-6 md:space-x-4">
-                    <div class="grid grid-cols-1 gap-x-12 gap-y-3 sm:grid-cols-2 xl:gap-x-24">
+                    <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:gap-x-12">
                       <div>
-                        <ul class="space-y-3 text-base font-medium text-black font-pj">
+                        <ul class="space-y-3 text-sm sm:text-base font-medium text-black font-pj">
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('unlimited-updates') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('bigger-app-size') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('more-version-storage') }}
@@ -481,23 +384,23 @@ const hightLights = computed<Stat[]>(() => ([
                       </div>
 
                       <div>
-                        <ul class="space-y-3 text-base font-medium text-black font-pj">
+                        <ul class="space-y-3 text-sm sm:text-base font-medium text-black font-pj">
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('custom-domain') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('special-api-access') }}
                           </li>
 
                           <li class="flex items-center">
-                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                             {{ t('bulk-upload') }}
@@ -506,62 +409,31 @@ const hightLights = computed<Stat[]>(() => ([
                       </div>
                     </div>
 
-                    <div class="block lg:block md:hidden">
-                      <div class="hidden lg:block">
-                        <svg class="w-4 h-auto dark:text-gray-600" viewBox="0 0 16 123" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 11)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 46)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 81)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 116)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 18)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 53)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 88)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 123)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 25)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 60)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 95)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 32)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 67)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 102)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 39)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 74)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 109)" />
-                        </svg>
-                      </div>
-
-                      <div class="block mt-10 md:hidden">
-                        <svg class="w-auto h-4 dark:text-gray-600" viewBox="0 0 172 16" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 11 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 46 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 81 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 116 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 151 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 18 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 53 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 88 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 123 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 158 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 25 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 60 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 95 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 130 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 165 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 32 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 67 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 102 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 137 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 172 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 39 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 74 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 109 1)" />
-                          <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.5547 0.83205 0.83205 0.5547 144 1)" />
-                        </svg>
-                      </div>
+                    <div class="hidden lg:block">
+                      <svg class="w-4 h-auto dark:text-gray-600" viewBox="0 0 16 123" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 11)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 46)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 81)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 116)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 18)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 53)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 88)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 123)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 25)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 60)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 95)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 32)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 67)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 102)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 39)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 74)" />
+                        <line y1="-0.5" x2="18.0278" y2="-0.5" transform="matrix(-0.83205 -0.5547 -0.5547 0.83205 15 109)" />
+                      </svg>
                     </div>
 
-                    <div class="mx-auto! mt-10 md:mt-0">
+                    <div class="w-full sm:w-auto mt-6 md:mt-0 text-center">
                       <button
-                        class="inline-flex items-center justify-center p-6 mt-5 text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black"
+                        class="cursor-pointer inline-flex items-center justify-center px-6 py-3 text-sm sm:text-base font-bold text-gray-300 transition-all duration-200 bg-black border font-pj rounded-xl hover:bg-black/50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-black w-full sm:w-auto"
                         @click="openSupport()"
                       >
                         Get quote now
@@ -577,7 +449,7 @@ const hightLights = computed<Stat[]>(() => ([
     </div>
     <div v-else class="relative w-full overflow-hidden ">
       <div class="absolute z-10 right-0 left-0 ml-auto mt-[5vh] text-2xl mr-auto text-center w-fit flex flex-col">
-        <img src="/capgo.webp" alt="logo" class="h-[4rem]  w-[4rem] ml-auto mr-auto mb-[4rem]">
+        <img src="/capgo.webp" alt="logo" class="h-16  w-16 ml-auto mr-auto mb-16">
         {{ t('thank-you-for-sub') }}
         <span class=" mt-[2.5vh] text-[3.5rem]">🎉</span>
         <router-link class="mt-[40vh]" to="/app">

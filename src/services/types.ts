@@ -7,16 +7,16 @@ type OptionalKeys<T> = {
 
 type RequiredKeys<T> = {
   [K in keyof T]-?: T extends Record<K, T[K]> ? K : never;
-}[keyof T] &
-keyof T
+}[keyof T]
+& keyof T
 
 type RequiredMergeKeys<T, U> = RequiredKeys<T> & RequiredKeys<U>
 
-type OptionalMergeKeys<T, U> =
-  | OptionalKeys<T>
-  | OptionalKeys<U>
-  | Exclude<RequiredKeys<T>, RequiredKeys<U>>
-  | Exclude<RequiredKeys<U>, RequiredKeys<T>>
+type OptionalMergeKeys<T, U>
+  = | OptionalKeys<T>
+    | OptionalKeys<U>
+    | Exclude<RequiredKeys<T>, RequiredKeys<U>>
+    | Exclude<RequiredKeys<U>, RequiredKeys<T>>
 
 type MergeNonUnionObjects<T, U> = Expand<
   {
@@ -65,13 +65,13 @@ type MergeObjects<T, U> = [T] extends [never]
           : never
         : never
 
-export type Merge<T, U> =
-  | Extract<T | U, Primitive>
-  | MergeArrays<Extract<T, readonly any[]>, Extract<U, readonly any[]>>
-  | MergeObjects<Exclude<T, Primitive | readonly any[]>, Exclude<U, Primitive | readonly any[]>>
+export type Merge<T, U>
+  = | Extract<T | U, Primitive>
+    | MergeArrays<Extract<T, readonly any[]>, Extract<U, readonly any[]>>
+    | MergeObjects<Exclude<T, Primitive | readonly any[]>, Exclude<U, Primitive | readonly any[]>>
 
-export type ArrayElement<ArrayType extends readonly unknown[]> =
-  ArrayType extends readonly (infer ElementType)[] ? ElementType : never
+export type ArrayElement<ArrayType extends readonly unknown[]>
+  = ArrayType extends readonly (infer ElementType)[] ? ElementType : never
 
 export type Concrete<Type> = {
   [Property in keyof Type]-?: Type[Property];

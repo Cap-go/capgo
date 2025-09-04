@@ -1,25 +1,18 @@
-import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { afterAll, describe, expect, it } from 'vitest'
+import { APP_NAME_STATS, BASE_URL, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
 describe('[GET] /statistics operations with and without subkey', () => {
-  const id = randomUUID()
-  const APPNAME = `com.stats.${id}`
+  const APPNAME = APP_NAME_STATS // Use the seeded stats app
   let subkeyId = 0
 
-  beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
-    await resetAndSeedAppDataStats(APPNAME)
-  })
-
   afterAll(async () => {
-    await resetAppData(APPNAME)
-    await resetAppDataStats(APPNAME)
-    const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
-      method: 'DELETE',
-      headers,
-    })
-    expect(deleteApikey.status).toBe(200)
+    if (subkeyId) {
+      const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
+        method: 'DELETE',
+        headers: headersStats,
+      })
+      expect(deleteApikey.status).toBe(200)
+    }
   })
 
   it('should get app statistics without subkey', async () => {
@@ -27,7 +20,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getStats = await fetch(`${BASE_URL}/statistics/app/${APPNAME}?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers,
+      headers: headersStats,
     })
     expect(getStats.status).toBe(200)
     const statsData = await getStats.json()
@@ -37,9 +30,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
   it('should get organization statistics without subkey', async () => {
     const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const toDate = new Date().toISOString().split('T')[0]
-    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${ORG_ID}?from=${fromDate}&to=${toDate}`, {
+    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${ORG_ID_STATS}?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers,
+      headers: headersStats,
     })
     expect(getOrgStats.status).toBe(200)
     const orgStatsData = await getOrgStats.json()
@@ -51,7 +44,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getUserStats = await fetch(`${BASE_URL}/statistics/user?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers,
+      headers: headersStats,
     })
     expect(getUserStats.status).toBe(200)
     const userStatsData = await getUserStats.json()
@@ -63,7 +56,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getBundleUsage = await fetch(`${BASE_URL}/statistics/app/${APPNAME}/bundle_usage?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers,
+      headers: headersStats,
     })
     expect(getBundleUsage.status).toBe(200)
     const bundleUsageData = await getBundleUsage.json()
@@ -75,7 +68,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     // Create a subkey with limited rights to this app
     const createSubkey = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: headersStats,
       body: JSON.stringify({
         name: 'Limited Stats Subkey',
         mode: 'read',
@@ -93,7 +86,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getStats = await fetch(`${BASE_URL}/statistics/app/${APPNAME}?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
     expect(getStats.status).toBe(200)
     const statsData = await getStats.json()
@@ -104,9 +97,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
     const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const toDate = new Date().toISOString().split('T')[0]
-    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${ORG_ID}?from=${fromDate}&to=${toDate}`, {
+    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${ORG_ID_STATS}?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
     expect(getOrgStats.status).toBe(401)
   })
@@ -117,7 +110,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getUserStats = await fetch(`${BASE_URL}/statistics/user?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
     expect(getUserStats.status).toBe(200)
     const userStatsData = await getUserStats.json()
@@ -130,7 +123,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getBundleUsage = await fetch(`${BASE_URL}/statistics/app/${APPNAME}/bundle_usage?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
     expect(getBundleUsage.status).toBe(200)
     const bundleUsageData = await getBundleUsage.json()
@@ -145,11 +138,11 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const nonUserApp = 'com.nonuser.app'
     const getStats = await fetch(`${BASE_URL}/statistics/app/${nonUserApp}?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
-    expect(getStats.status).toBe(400)
+    expect(getStats.status).toBe(401)
     const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('status', 'You can\'t access this app')
+    expect(statsData).toHaveProperty('error', 'no_access_to_app')
   })
 
   it('should fail to get organization statistics with subkey for org not belonging to user', async () => {
@@ -159,18 +152,18 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const nonUserOrg = 'non-user-org-id'
     const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${nonUserOrg}?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
-    expect(getOrgStats.status).toBe(400)
-    const orgStatsData = await getOrgStats.json()
-    expect(orgStatsData).toHaveProperty('status', 'You can\'t access this organization')
+    expect(getOrgStats.status).toBe(401)
+    const orgStatsData = await getOrgStats.json<{ error: string }>()
+    expect(orgStatsData.error).toBe('no_access_to_organization')
   })
 
   it('should create subkey with non-accessible org and fail to get org statistics', async () => {
     // Create a subkey with limited rights to a non-accessible org
     const createSubkey = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: headersStats,
       body: JSON.stringify({
         name: 'Non-Accessible Org Subkey',
         mode: 'read',
@@ -186,16 +179,16 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getOrgStats = await fetch(`${BASE_URL}/statistics/org/22dbad8a-b885-4309-9b3b-a09f8460fb6d?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
-    expect(getOrgStats.status).toBe(400)
-    const orgStatsData = await getOrgStats.json()
-    expect(orgStatsData).toHaveProperty('status', 'You can\'t access this organization')
+    expect(getOrgStats.status).toBe(401)
+    const orgStatsData = await getOrgStats.json<{ error: string }>()
+    expect(orgStatsData.error).toBe('no_access_to_organization')
 
     // Clean up
     const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleOrgSubkeyId}`, {
       method: 'DELETE',
-      headers,
+      headers: headersStats,
     })
     expect(deleteApikey.status).toBe(200)
   })
@@ -204,7 +197,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     // Create a subkey with limited rights to a non-accessible app
     const createSubkey = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: headersStats,
       body: JSON.stringify({
         name: 'Non-Accessible App Subkey',
         mode: 'read',
@@ -220,16 +213,16 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const toDate = new Date().toISOString().split('T')[0]
     const getStats = await fetch(`${BASE_URL}/statistics/app/com.demoadmin.app?from=${fromDate}&to=${toDate}`, {
       method: 'GET',
-      headers: { ...headers, ...subkeyHeaders },
+      headers: { ...headersStats, ...subkeyHeaders },
     })
-    expect(getStats.status).toBe(400)
-    const statsData = await getStats.json()
-    expect(statsData).toHaveProperty('status', 'You can\'t access this app')
+    expect(getStats.status).toBe(401)
+    const statsData = await getStats.json<{ error: string }>()
+    expect(statsData.error).toBe('no_access_to_app')
 
     // Clean up
     const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleAppSubkeyId}`, {
       method: 'DELETE',
-      headers,
+      headers: headersStats,
     })
     expect(deleteApikey.status).toBe(200)
   })

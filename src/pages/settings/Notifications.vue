@@ -10,9 +10,11 @@ const supabase = useSupabase()
 const isLoading = ref(false)
 const enableNotifications = ref(false)
 const optForNewsletters = ref(false)
+const displayStore = useDisplayStore()
+displayStore.NavTitle = t('notifications')
 
-enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications || false
-optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters || false
+enableNotifications.value = main.auth?.user_metadata?.activation?.enableNotifications ?? false
+optForNewsletters.value = main.auth?.user_metadata?.activation?.optForNewsletters ?? false
 
 async function submitNotif() {
   isLoading.value = true

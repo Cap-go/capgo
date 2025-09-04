@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 
 import type { Database } from './supabase.types.ts'
 import { parseCronExpression } from 'cron-schedule'
@@ -98,4 +98,4 @@ export async function sendNotifOrg(c: Context, eventName: string, eventData: Eve
 
 // dayjs substract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
-// console.log(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))
+// cloudlog(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))

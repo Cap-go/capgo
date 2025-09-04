@@ -28,13 +28,13 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.23.4
+          version: latest
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Set edge runtime policy to per_worker
-        run: sed -i 's/policy = "oneshot"/policy = "per_worker"/g' supabase/config.toml
+        run: sed -i 's/policy = "oneshot"/policy = "per_worker"/g' supabase/config.toml && grep -q 'policy = "per_worker"' supabase/config.toml || exit 1
       - name: Run Supabase Start
-        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector
+        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime,gotrue
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Setup bun
@@ -45,6 +45,14 @@ jobs:
         run: bun --version
       - name: Show capgo version
         run: bunx @capgo/cli@latest -v
+      - name: Check for console statements
+        run: |
+          if grep -r --exclude="loggin.ts" "console\." supabase/functions/; then
+            echo "❌ Found console statements in supabase/functions directory, use cloudlog instead"
+            exit 1
+          else
+            echo "✅ No console statements found in supabase/functions directory"
+          fi
       - name: Install dependencies
         run: bun install
       # - name: Install playwright

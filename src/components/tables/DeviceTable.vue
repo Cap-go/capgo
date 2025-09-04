@@ -50,7 +50,7 @@ const columns = ref<TableColumn[]>([
     key: 'updated_at',
     mobile: false,
     sortable: 'desc',
-    displayFunction: (elem: Element) => formatDate(elem.updated_at || ''),
+    displayFunction: (elem: Element) => formatDate(elem.updated_at ?? ''),
   },
   {
     label: t('platform'),
@@ -82,7 +82,7 @@ async function getDevicesID() {
 
   const { data } = await req
 
-  const channelDev = data?.map(d => d.device_id) || []
+  const channelDev = data?.map(d => d.device_id) ?? []
   return [...channelDev]
 }
 
@@ -105,7 +105,7 @@ async function countDevices() {
     .post(`${defaultApiHost}/private/devices`, {
       headers: {
         'Content-Type': 'application/json',
-        'authorization': `Bearer ${currentJwt || ''}`,
+        'authorization': `Bearer ${currentJwt ?? ''}`,
       },
       body: JSON.stringify({
         count: true,
@@ -138,7 +138,7 @@ async function getData() {
       .post(`${defaultApiHost}/private/devices`, {
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt || ''}`,
+          'authorization': `Bearer ${currentJwt ?? ''}`,
         },
         body: JSON.stringify({
           appId: props.appId,
@@ -188,6 +188,7 @@ async function getData() {
 async function reload() {
   try {
     elements.value.length = 0
+    total.value = await countDevices()
     await getData()
   }
   catch (error) {

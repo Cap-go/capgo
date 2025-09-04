@@ -1,16 +1,27 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
+import type Stripe from 'stripe'
 import type { Bindings } from './cloudflare.ts'
+import type { StripeData } from './stripe.ts'
+import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
+import { sentry } from '@hono/sentry'
+import { getRuntimeKey } from 'hono/adapter'
 import { cors } from 'hono/cors'
-import { createFactory, createMiddleware } from 'hono/factory'
+import { createFactory } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
+import { logger } from 'hono/logger'
+import { requestId } from 'hono/request-id'
+import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
+import { cloudlog, cloudlogErr } from './loggin.ts'
+import { onError } from './on_error.ts'
+import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
 import { supabaseAdmin, supabaseClient } from './supabase.ts'
 import { checkKey, checkKeyById, getEnv } from './utils.ts'
 
 export const useCors = cors({
   origin: '*',
-  allowHeaders: ['*'],
+  allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
   allowMethods: ['POST', 'GET', 'OPTIONS'],
 })
 
@@ -18,6 +29,7 @@ export interface AuthInfo {
   userId: string
   authType: 'apikey' | 'jwt'
   apikey: Database['public']['Tables']['apikeys']['Row'] | null
+  jwt: string | null
 }
 
 export interface MiddlewareKeyVariables {
@@ -31,6 +43,10 @@ export interface MiddlewareKeyVariables {
     APISecret?: string
     auth?: AuthInfo
     subkey?: Database['public']['Tables']['apikeys']['Row']
+    webhookBody?: any
+    oldRecord?: any
+    stripeEvent?: Stripe.Event
+    stripeData?: StripeData
   }
 }
 
@@ -54,105 +70,177 @@ function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 }
 
+async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
+  const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyString })
+  const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, capgkeyString, supabaseAdmin(c), rights)
+  if (!apikey) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyString, rights })
+    throw quickError(401, 'invalid_apikey', 'Invalid apikey')
+  }
+  c.set('auth', {
+    userId: apikey.user_id,
+    authType: 'apikey',
+    apikey,
+  } as AuthInfo)
+  c.set('apikey', apikey)
+  if (subkey_id) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
+    const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
+    cloudlog({ requestId: c.get('requestId'), message: 'Subkey', subkey })
+    if (!subkey) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
+      throw quickError(401, 'invalid_subkey', 'Invalid subkey')
+    }
+    if (subkey && subkey.user_id !== apikey.user_id) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Subkey user_id does not match apikey user_id', subkey, apikey })
+      throw quickError(401, 'invalid_subkey', 'Invalid subkey')
+    }
+    if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
+      throw quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
+    }
+    if (subkey) {
+      c.set('auth', {
+        userId: apikey.user_id,
+        authType: 'apikey',
+        apikey: subkey,
+      } as AuthInfo)
+      c.set('subkey', subkey)
+    }
+  }
+}
+
+async function foundJWT(c: Context, jwt: string) {
+  cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwt })
+  const supabaseJWT = supabaseClient(c, jwt)
+  const { data: user, error: userError } = await supabaseJWT.auth.getUser()
+  if (userError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', userError })
+    throw quickError(401, 'invalid_jwt', 'Invalid JWT')
+  }
+  c.set('auth', {
+    userId: user.user?.id,
+    authType: 'jwt',
+    jwt,
+  } as AuthInfo)
+}
+
 export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) {
-  return createMiddleware(async (c, next) => {
+  return honoFactory.createMiddleware(async (c, next) => {
     let jwt = c.req.header('authorization')
-    let capgkey_string = c.req.header('capgkey') || c.req.header('x-api-key')
-    const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
+    let capgkey = c.req.header('capgkey') ?? c.req.header('x-api-key')
 
     // make sure jwt is valid otherwise it means it was an apikey and you need to set it in capgkey_string
     // if jwt is uuid, it means it was an apikey and you need to set it in capgkey_string
     if (jwt && isUUID(jwt)) {
-      console.log('Setting apikey in capgkey_string', jwt)
-      capgkey_string = jwt
+      cloudlog({ requestId: c.get('requestId'), message: 'Setting apikey in capgkey_string', jwt })
+      capgkey = jwt
       jwt = undefined
     }
     if (jwt) {
-      console.log('JWT provided', jwt)
-      const supabaseJWT = supabaseClient(c as any, jwt)
-      const { data: user, error: userError } = await supabaseJWT.auth.getUser()
-      if (userError) {
-        console.log('Invalid JWT', userError)
-        throw new HTTPException(401, { message: 'Invalid JWT' })
-      }
-      c.set('auth', {
-        userId: user.user?.id,
-        authType: 'jwt',
-      } as AuthInfo)
+      await foundJWT(c, jwt)
     }
-    else if (capgkey_string) {
-      console.log('Capgkey provided', capgkey_string)
-      const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, capgkey_string, supabaseAdmin(c as any), rights)
-      if (!apikey) {
-        console.log('Invalid apikey', capgkey_string, rights)
-        throw new HTTPException(401, { message: 'Invalid apikey' })
-      }
-      c.set('auth', {
-        userId: apikey.user_id,
-        authType: 'apikey',
-        apikey,
-      } as AuthInfo)
-      c.set('apikey', apikey)
-      if (subkey_id) {
-        console.log('Subkey id provided', subkey_id)
-        const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
-        console.log('Subkey', subkey)
-        if (!subkey && subkey_id) {
-          console.log('Invalid subkey', subkey_id)
-          throw new HTTPException(401, { message: 'Invalid subkey' })
-        }
-        if (subkey && subkey.user_id !== apikey.user_id) {
-          console.log('Subkey user_id does not match apikey user_id', subkey, apikey)
-          throw new HTTPException(401, { message: 'Invalid subkey' })
-        }
-        if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
-          console.log('Invalid subkey, no limited apps or orgs', subkey)
-          throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
-        }
-        if (subkey) {
-          c.set('auth', {
-            userId: apikey.user_id,
-            authType: 'apikey',
-            apikey: subkey,
-          } as AuthInfo)
-          c.set('subkey', subkey)
-        }
-      }
+    else if (capgkey) {
+      await foundAPIKey(c, capgkey, rights)
     }
     else {
-      console.log('No apikey or subkey provided')
-      throw new HTTPException(401, { message: 'No apikey or subkey provided' })
+      cloudlog('No apikey or subkey provided')
+      throw quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
     }
     await next()
   })
 }
 
+export function triggerValidator(
+  table: keyof Database['public']['Tables'],
+  type: 'DELETE' | 'INSERT' | 'UPDATE',
+) {
+  return honoFactory.createMiddleware(async (c, next) => {
+    const body = await c.req.json<DeletePayload<typeof table> | InsertPayload<typeof table> | UpdatePayload<typeof table>>()
+
+    if (body.table !== String(table)) {
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
+      throw simpleError('table_not_match', 'Not table', { body })
+    }
+
+    if (body.type !== type) {
+      cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
+      throw simpleError('type_not_match', 'Not type', { body })
+    }
+
+    // Store the validated body in context for next middleware
+    if (body.type === 'DELETE' && body.old_record) {
+      c.set('webhookBody', body.old_record)
+    }
+    else if (body.type === 'INSERT' && body.record) {
+      c.set('webhookBody', body.record)
+    }
+    else if (body.type === 'UPDATE' && body.record) {
+      c.set('webhookBody', body.record)
+      c.set('oldRecord', body.old_record)
+    }
+    else {
+      throw simpleError('invalid_payload', 'Invalid payload', { body })
+    }
+
+    await next()
+  })
+}
+
+export function middlewareStripeWebhook() {
+  return honoFactory.createMiddleware(async (c, next) => {
+    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
+      throw simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
+    }
+
+    const signature = c.req.raw.headers.get('stripe-signature')
+    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
+      throw simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
+    }
+    const body = await c.req.text()
+    const stripeEvent = await parseStripeEvent(c, body, signature)
+    const stripeDataEvent = extractDataEvent(c, stripeEvent)
+    const stripeData = stripeDataEvent.data
+    if (stripeData.customer_id === '') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no customer found' })
+      throw simpleError('webhook_error_no_customer', 'Webhook Error: no customer found')
+    }
+    c.set('stripeEvent', stripeEvent)
+    c.set('stripeData', stripeDataEvent)
+    await next()
+  })
+}
+
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][]) {
-  const subMiddlewareKey = createMiddleware(async (c, next) => {
+  const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     const capgkey_string = c.req.header('capgkey')
     const apikey_string = c.req.header('authorization')
     const subkey_id = c.req.header('x-limited-key-id') ? Number(c.req.header('x-limited-key-id')) : null
-    const key = capgkey_string || apikey_string
+    const key = capgkey_string ?? apikey_string
     if (!key) {
-      console.log('No key provided')
-      throw new HTTPException(401, { message: 'No key provided' })
+      cloudlog('No key provided')
+      throw quickError(401, 'no_key_provided', 'No key provided')
     }
-    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c as any, key, supabaseAdmin(c as any), rights)
+    const apikey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKey(c, key, supabaseAdmin(c), rights)
     if (!apikey) {
-      console.log('Invalid apikey', key)
-      throw new HTTPException(401, { message: 'Invalid apikey' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', key })
+      throw quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
     c.set('apikey', apikey)
     c.set('capgkey', key)
     if (subkey_id) {
-      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c as any, subkey_id, supabaseAdmin(c as any), rights)
-      if (!subkey && subkey_id) {
-        console.log('Invalid subkey', subkey_id)
-        throw new HTTPException(401, { message: 'Invalid subkey' })
+      const subkey: Database['public']['Tables']['apikeys']['Row'] | null = await checkKeyById(c, subkey_id, supabaseAdmin(c), rights)
+      if (!subkey) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
+        throw quickError(401, 'invalid_subkey', 'Invalid subkey')
       }
-      if (subkey && subkey.limited_to_apps && subkey.limited_to_apps.length === 0 && subkey.limited_to_orgs && subkey.limited_to_orgs.length === 0) {
-        console.log('Invalid subkey, no limited apps or orgs', subkey)
-        throw new HTTPException(401, { message: 'Invalid subkey, no limited apps or orgs' })
+      if (subkey?.limited_to_apps && subkey?.limited_to_apps.length === 0 && subkey?.limited_to_orgs && subkey?.limited_to_orgs.length === 0) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey, no limited apps or orgs', subkey })
+        throw quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
       }
       if (subkey)
         c.set('subkey', subkey)
@@ -162,47 +250,152 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][])
   return subMiddlewareKey
 }
 
-export async function getBody<T>(c: Context<MiddlewareKeyVariables, '/' | '/:path*'>) {
+export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, any>) {
   let body: T
   try {
     body = await c.req.json<T>()
   }
-  catch (error) {
-    console.error(error)
-    body = c.req.query() as any as T
+  catch {
+    body = c.req.query() as unknown as T
+    if (c.req.method === 'GET') {
+      return body
+    }
   }
-  if (!body) {
-    console.log('Cannot find body', c.req.query())
-    throw new HTTPException(400, { message: 'Cannot find body' })
+  if (!body || Object.keys(body).length === 0) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
+    throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
+  }
+  if ((body as any).device_id) {
+    (body as any).device_id = (body as any).device_id.toLowerCase()
   }
   return body
 }
 
-export const middlewareAuth = createMiddleware(async (c, next) => {
+export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
-    console.log('Cannot find authorization', c.req.query())
-    throw new HTTPException(400, { message: 'Cannot find authorization' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
+    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
   }
   c.set('authorization', authorization)
   await next()
 })
 
-export const middlewareAPISecret = createMiddleware(async (c, next) => {
+export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) => {
   const authorizationSecret = c.req.header('apisecret')
-  const API_SECRET = getEnv(c as any, 'API_SECRET')
+  const API_SECRET = getEnv(c, 'API_SECRET')
 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
-    console.log('Cannot find authorizationSecret or API_SECRET', c.req.query())
-    throw new HTTPException(400, { message: 'Cannot find authorization' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorizationSecret or API_SECRET', query: c.req.query() })
+    throw simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
   }
   if (!await timingSafeEqual(authorizationSecret, API_SECRET)) {
-    console.log('Invalid API secret', c.req.query())
-    throw new HTTPException(400, { message: 'Invalid API secret' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid API secret', query: c.req.query() })
+    throw simpleError('invalid_api_secret', 'Invalid API secret')
   }
   c.set('APISecret', authorizationSecret)
   await next()
 })
 
 export const BRES = { status: 'ok' }
+
+export function createHono(functionName: string, version: string, sentryDsn?: string) {
+  let appGlobal
+  if (getRuntimeKey() === 'deno') {
+    appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
+  }
+  else {
+    appGlobal = new Hono<MiddlewareKeyVariables>()
+  }
+
+  if (sentryDsn) {
+    appGlobal.use('*', sentry({
+      dsn: sentryDsn,
+      release: version,
+    }) as any)
+  }
+
+  appGlobal.use('*', logger())
+  appGlobal.use('*', requestId())
+
+  appGlobal.post('/ok', (c) => {
+    return c.json(BRES)
+  })
+  appGlobal.post('/ko', (c) => {
+    const defaultResponse: SimpleErrorResponse = {
+      error: 'unknown_error',
+      message: 'KO',
+      moreInfo: {},
+    }
+    return c.json(defaultResponse, 500)
+  })
+
+  return appGlobal
+}
+
+export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) {
+  appGlobal.all('*', (c) => {
+    cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
+  })
+  appGlobal.onError(onError(functionName))
+}
+
+export interface SimpleErrorResponse {
+  error: string
+  message: string
+  cause?: any
+  moreInfo?: any
+}
+
+export function simpleError200(c: Context, errorCode: string, message: string, moreInfo: any = {}) {
+  const status = 200
+  const res: SimpleErrorResponse = {
+    error: errorCode,
+    message,
+    ...moreInfo,
+  }
+  cloudlogErr({ requestId: c.get('requestId'), message, errorCode, moreInfo })
+  return c.json(res, status)
+}
+
+export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
+  const res: SimpleErrorResponse = {
+    error: errorCode,
+    message,
+    moreInfo,
+  }
+  return new HTTPException(status as any, { res: new Response(JSON.stringify(res), { status }), cause })
+}
+
+export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any) {
+  return quickError(400, errorCode, message, moreInfo, cause)
+}
+
+export function parseBody<T>(c: Context) {
+  return c.req.json<T>()
+    .catch((e) => {
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+    })
+    .then((body) => {
+      if ((body as any).device_id) {
+        (body as any).device_id = (body as any).device_id.toLowerCase()
+      }
+      return body
+    })
+}
+
+export function getIsV2(c: Context) {
+  const isV2 = getRuntimeKey() === 'workerd' ? Number.parseFloat(getEnv(c, 'IS_V2') ?? '0') : 0.0
+  cloudlog({ requestId: c.get('requestId'), message: 'isV2', isV2 })
+  if (c.req.url.endsWith('_v2')) {
+    // allow to force v2 for update_v2 or update_lite_v2 or stats_v2
+    return true
+  }
+  if (isV2 && Math.random() < isV2) {
+    return true
+  }
+  cloudlog({ requestId: c.get('requestId'), message: 'isV2 forced to false', isV2 })
+  return false
+}

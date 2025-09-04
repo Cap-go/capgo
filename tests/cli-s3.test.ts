@@ -11,7 +11,7 @@ describe('upload_link', async () => {
   const API_URL = process.env.API_URL ?? 'http://127.0.0.1:54321'
   const id = randomUUID()
   const fileId = '1.0.42'
-  const APPNAME = `com.demo.app.cli_${id}`
+  const APPNAME = `com.cli_s3_${id}`
   beforeAll(async () => {
     await resetAndSeedAppData(APPNAME)
   })

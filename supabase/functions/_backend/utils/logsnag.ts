@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import { LogSnag } from '@logsnag/node'
 
 import ky from 'ky'
@@ -45,7 +45,7 @@ function logsnagInsights(c: Context, data: { title: string, value: string | bool
       },
     }).then(res => res.json())
       .catch((e) => {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights', error: e, payload })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', error: e, payload })
         return false
       }),
     )

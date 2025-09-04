@@ -1,11 +1,13 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod'
+import { z } from 'zod/mini'
+import { simpleError } from '../../../utils/hono.ts'
+import { cloudlog } from '../../../utils/loggin.ts'
 import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../../utils/supabase.ts'
 
 const inviteBodySchema = z.object({
   orgId: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   invite_type: z.enum([
     'read',
     'upload',
@@ -18,14 +20,12 @@ const inviteBodySchema = z.object({
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']) {
   const bodyParsed = inviteBodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
-    console.error('Invalid body', bodyParsed.error)
-    return c.json({ status: 'Invalid body', error: bodyParsed.error.message }, 400)
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
   if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'admin', apikey.key)) || !(apikeyHasOrgRight(apikey, body.orgId))) {
-    console.error('You can\'t access this organization', body.orgId)
-    return c.json({ status: 'You can\'t access this organization', orgId: body.orgId }, 400)
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
   const supabase = supabaseApikey(c, c.get('capgkey') as string)
@@ -37,13 +37,11 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     })
 
   if (error) {
-    console.error('Error inviting user to organization', error)
-    return c.json({ error, status: 'KO' }, 400)
+    throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { error })
   }
   if (data && data !== 'OK') {
-    console.error('Error inviting user to organization', data)
-    return c.json({ error, status: data }, 400)
+    throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { data })
   }
-  console.log('User invited to organization', body.email, body.orgId)
+  cloudlog({ requestId: c.get('requestId'), message: 'User invited to organization', data: { email: body.email, org_id: body.orgId } })
   return c.json({ status: data }, 200)
 }

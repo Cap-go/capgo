@@ -44,8 +44,10 @@ export const apps = pgTable('apps', {
   id: uuid('id').primaryKey().unique(),
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
 })
+
 export const app_versions = pgTable('app_versions', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: uuid('owner_org').notNull(),
   created_at: timestamp('created_at').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),
   name: varchar('name').notNull(),
@@ -76,6 +78,7 @@ export const manifest = pgTable('manifest', {
 
 export const channels = pgTable('channels', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  owner_org: uuid('owner_org').notNull(),
   created_at: timestamp('created_at').notNull(),
   name: varchar('name').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),
@@ -92,15 +95,31 @@ export const channels = pgTable('channels', {
 })
 
 export const channel_devices = pgTable('channel_devices', {
+  id: bigint('id', { mode: 'number' }),
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').defaultNow(),
   device_id: text('device_id').notNull(),
   channel_id: bigint('channel_id', { mode: 'number' }).notNull().references(() => channels.id),
   app_id: varchar('app_id').notNull().references(() => apps.name),
-  created_by: uuid('created_by'),
+  owner_org: uuid('owner_org'),
 })
 
 export const orgs = pgTable('orgs', {
   id: uuid('id').notNull(),
   created_by: uuid('created_by').notNull(),
+  logo: text('logo'),
+  name: text('name').notNull(),
+  management_email: text('management_email').notNull(),
+  customer_id: text('customer_id'),
+})
+
+export const stripe_info = pgTable('stripe_info', {
+  id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
+  customer_id: text('customer_id'),
+  status: text('status'),
+  trial_at: text('trial_at'),
+  is_good_plan: boolean('is_good_plan'),
+  mau_exceeded: boolean('mau_exceeded'),
+  storage_exceeded: boolean('storage_exceeded'),
+  bandwidth_exceeded: boolean('bandwidth_exceeded'),
 })

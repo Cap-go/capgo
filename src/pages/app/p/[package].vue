@@ -10,6 +10,7 @@ import IconCog from '~icons/heroicons/cog-6-tooth'
 import IconCube from '~icons/heroicons/cube'
 import IconDevice from '~icons/heroicons/device-phone-mobile'
 import IconChannel from '~icons/heroicons/signal'
+import IconAlertCircle from '~icons/lucide/alert-circle'
 import AppSetting from '~/components/dashboard/AppSetting.vue'
 import { appIdToUrl, urlToAppId } from '~/services/conversion'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
@@ -159,7 +160,7 @@ watchEffect(async () => {
     id.value = route.params.package as string
     id.value = urlToAppId(id.value)
     await refreshData()
-    displayStore.NavTitle = app.value?.name || ''
+    displayStore.NavTitle = app.value?.name ?? ''
     displayStore.defaultBack = '/app'
   }
 })
@@ -175,9 +176,10 @@ watchEffect(() => {
     <div v-if="isLoading" class="flex flex-col items-center justify-center h-full">
       <Spinner size="w-40 h-40" />
     </div>
-    <div v-else>
+    <div v-else-if="app">
       <div v-if="ActiveTab === 'overview'" class="mt-4 w-full h-full px-4 pt-8 mb-8 overflow-y-auto max-h-fit lg:px-8 sm:px-6 overflow-x-hidden">
-        <Usage :app-id="id" :show-mobile-stats="canShowMobileStats" />
+        <FailedCard />
+        <Usage v-if="!organizationStore.currentOrganizationFailed" :app-id="id" :show-mobile-stats="canShowMobileStats" />
 
         <BlurBg id="app-stats" class="mb-10">
           <template #default>
@@ -215,6 +217,18 @@ watchEffect(() => {
           <LogTable :app-id="id" />
         </div>
       </div>
+    </div>
+    <div v-else class="flex flex-col items-center justify-center min-h-[50vh]">
+      <IconAlertCircle class="w-16 h-16 text-destructive mb-4" />
+      <h2 class="text-xl font-semibold text-foreground">
+        {{ t('app-not-found') }}
+      </h2>
+      <p class="text-muted-foreground mt-2">
+        {{ t('app-not-found-description') }}
+      </p>
+      <button class="mt-4 d-btn d-btn-primary text-white" @click="router.push(`/app`)">
+        {{ t('back-to-apps') }}
+      </button>
     </div>
   </div>
 </template>

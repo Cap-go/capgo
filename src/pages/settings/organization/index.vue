@@ -9,16 +9,19 @@ import iconEmail from '~icons/oui/email?raw'
 import iconName from '~icons/ph/user?raw'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
+import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
-const organizationStore = useOrganizationStore()
 const displayStore = useDisplayStore()
+const organizationStore = useOrganizationStore()
+const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
-const router = useRouter()
 const isLoading = ref(true)
+const dialogRef = ref()
 
+displayStore.NavTitle = t('organization')
 onMounted(async () => {
   await organizationStore.dedupFetchOrganizations()
   isLoading.value = false
@@ -41,8 +44,8 @@ async function presentActionSheet() {
     return
   }
 
-  displayStore.dialogOption = {
-    header: t('change-your-picture'),
+  dialogStore.openDialog({
+    title: t('change-your-picture'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -50,22 +53,63 @@ async function presentActionSheet() {
       },
       {
         text: t('button-camera'),
+        role: 'primary',
         id: 'camera-button',
         handler: async () => {
           takePhoto('update-org', isLoading, 'org', '')
         },
       },
       {
-        id: 'browse-button',
         text: t('button-browse'),
+        role: 'secondary',
+        id: 'browse-button',
         handler: () => {
           pickPhoto('update-org', isLoading, 'org', '')
         },
       },
     ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+async function toastError(error: any) {
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    const json = await error.context.json<{ status: string }>()
+    if (json.status && typeof json.status === 'string') {
+      if (json.status === 'email_not_unique')
+        toast.error(t('org-changes-set-email-not-unique'))
+      else
+        toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
+    }
+    else {
+      toast.error(t('org-changes-set-email-other-error'))
+    }
   }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  else {
+    toast.error(t('org-changes-set-email-other-error'))
+  }
+}
+
+async function updateEmail(form: { email: string }) {
+  if (!currentOrganization.value)
+    return false
+  const orgCopy = { ...currentOrganization.value }
+
+  const { error } = await supabase.functions.invoke('private/set_org_email', {
+    body: {
+      emial: form.email,
+      org_id: orgCopy.gid,
+    },
+  })
+
+  if (error) {
+    await toastError(error)
+    // Revert the optimistic update
+    currentOrganization.value.management_email = orgCopy.management_email
+    return true
+  }
+
+  return false
 }
 
 async function saveChanges(form: { orgName: string, email: string }) {
@@ -81,7 +125,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
     return
   }
 
-  const orgCopy = Object.assign({}, currentOrganization.value)
+  const orgCopy = { ...currentOrganization.value }
 
   // Optimistic update
   currentOrganization.value.name = form.orgName
@@ -106,39 +150,8 @@ async function saveChanges(form: { orgName: string, email: string }) {
 
   let hasErrored = false
   if (orgCopy.management_email !== form.email) {
-    // The management emial has changed, call the edge function
-    console.log('Edge fn')
-
-    const { error } = await supabase.functions.invoke('private/set_org_email', {
-      body: {
-        emial: form.email,
-        org_id: orgCopy.gid,
-      },
-    })
-
-    if (error) {
-      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
-        const json = await error.context.json<{ status: string }>()
-        if (json.status && typeof json.status === 'string') {
-          if (json.status === 'email_not_unique')
-            toast.error(t('org-changes-set-email-not-unique'))
-          else
-            toast.error(`${t('org-changes-set-email-other-error')}. ${t('error')}: ${json.status}`)
-        }
-        else {
-          toast.error(t('org-changes-set-email-other-error'))
-        }
-      }
-      else {
-        toast.error(t('org-changes-set-email-other-error'))
-      }
-
-      // Revert the optimistic update
-      currentOrganization.value.management_email = orgCopy.management_email
-      hasErrored = true
-    }
-
-    console.log(error)
+    // The management email has changed, call the edge function
+    hasErrored = await updateEmail(form)
   }
 
   isLoading.value = false
@@ -151,15 +164,15 @@ const hasOrgPerm = computed(() => {
 })
 
 const acronym = computed(() => {
-  const res = 'N/A'
+  let res = 'N/A'
   // use currentOrganization.value?.name first letter of 2 first words or first 2 letter of first word or N/A
-  // if (currentOrganization.value?.name) {
-  //   const words = currentOrganization.value.name.split(' ')
-  //   if (words.length > 1)
-  //     res = words[0][0] + words[1][0]
-  //   else
-  //     res = words[0].slice(0, 2)
-  // }
+  if (currentOrganization.value?.name) {
+    const words = currentOrganization.value.name.split(' ')
+    if (words.length > 1)
+      res = words[0][0] + words[1][0]
+    else
+      res = words[0].slice(0, 2)
+  }
   return res.toUpperCase()
 })
 
@@ -169,49 +182,7 @@ function canDeleteOrg() {
 }
 
 async function deleteOrganization() {
-  displayStore.dialogOption = {
-    header: t('delete-org'),
-    message: `${t('please-confirm-org-del')}`.replace('%1', currentOrganization.value?.name ?? ''),
-    input: true,
-    headerStyle: 'w-full text-center',
-    textStyle: 'w-full text-center',
-    size: 'max-w-lg',
-    buttonCenter: true,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        id: 'confirm-button',
-        handler: async () => {
-          const typed = displayStore.dialogInputText
-          if (typed !== (currentOrganization.value?.name ?? '')) {
-            toast.error(t('wrong-name-org-del').replace('%1', currentOrganization.value?.name ?? ''))
-            return
-          }
-
-          const { error } = await supabase.from('orgs')
-            .delete()
-            .eq('id', currentOrganization.value?.gid as string)
-
-          if (error) {
-            toast.error(t('cannot-del-org'))
-            console.error('org del err', error)
-            return
-          }
-
-          toast.success(t('org-deleted'))
-          await organizationStore.fetchOrganizations()
-          await organizationStore.setCurrentOrganizationToFirst()
-          router.push('/app')
-        },
-      },
-    ],
-  }
-
-  displayStore.showDialog = true
+  dialogRef.value?.open()
 }
 
 async function copyOrganizationId() {
@@ -224,18 +195,17 @@ async function copyOrganizationId() {
   catch (err) {
     console.error('Failed to copy: ', err)
     // Display a modal with the copied key
-    displayStore.dialogOption = {
-      header: t('cannot-copy'),
-      message: currentOrganization.value.gid.toString(),
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: currentOrganization.value.gid.toString(),
       buttons: [
         {
           text: t('button-cancel'),
           role: 'cancel',
         },
       ],
-    }
-    displayStore.showDialog = true
-    await displayStore.onDialogDismiss()
+    })
+    await dialogStore.onDialogDismiss()
   }
 }
 </script>
@@ -256,16 +226,16 @@ async function copyOrganizationId() {
               <div class="mr-4">
                 <img
                   v-if="!!currentOrganization?.logo"
-                  id="org-avatar" class="object-cover w-20 h-20 mask mask-squircle" :src="currentOrganization.logo"
+                  id="org-avatar" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="currentOrganization.logo"
                   width="80" height="80" alt="User upload"
                 >
-                <div v-else class="p-6 text-xl bg-gray-700 mask mask-squircle">
+                <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">
                     {{ acronym }}
                   </span>
                 </div>
               </div>
-              <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
+              <button id="change-org-pic" type="button" class="cursor-pointer px-3 py-2 text-xs font-medium text-center text-black border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click="presentActionSheet">
                 {{ t('change') }}
               </button>
             </div>
@@ -302,18 +272,18 @@ async function copyOrganizationId() {
               <p class="text-slate-800 dark:text-white">
                 {{ t('organization-id') }}
               </p>
-              <div class="md:ml-6">
-                <button type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
+              <div class="pt-2 md:pt-0 md:ml-6">
+                <button type="button" class="px-3 cursor-pointer py-2 text-xs font-medium text-center text-gray-700 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-white border-slate-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 dark:focus:ring-blue-800" @click.prevent="copyOrganizationId()">
                   {{ t('copy-organization-id') }}
                 </button>
               </div>
             </div>
           </div>
           <footer style="margin-top: auto">
-            <div class="flex flex-col px-6 py-5 border-t border-slate-300">
+            <div class="flex flex-col px-2 md:px-6 py-5 border-t border-slate-300">
               <div class="flex self-end">
                 <button
-                  class="p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
+                  class="cursor-pointer p-2 text-red-600 border border-red-400 rounded-lg hover:bg-red-600 hover:text-white"
                   color="secondary"
                   shape="round"
                   type="button"
@@ -322,20 +292,20 @@ async function copyOrganizationId() {
                   }"
                   @click="() => deleteOrganization()"
                 >
-                  <span v-if="!isLoading" class="rounded-4xl">
+                  <span v-if="!isLoading" class="rounded-4xl truncate">
                     {{ t('delete-org') }}
                   </span>
                   <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
                 </button>
                 <button
                   id="save-changes"
-                  class="p-2 ml-3 text-white bg-blue-500 rounded-lg btn hover:bg-blue-600"
+                  class="cursor-pointer p-2 ml-3 text-white bg-blue-500 rounded-lg d-btn hover:bg-blue-600"
                   type="submit"
                   color="secondary"
                   shape="round"
                 >
                   <span v-if="!isLoading" class="rounded-4xl">
-                    {{ t('save-changes') }}
+                    {{ t('update') }}
                   </span>
                   <Spinner v-else size="w-4 h-4" class="px-4 pt-0 pb-0" color="fill-gray-100 text-gray-200 dark:text-gray-600" />
                 </button>
@@ -345,6 +315,10 @@ async function copyOrganizationId() {
         </div>
       </FormKit>
     </div>
+    <DeleteOrgDialog
+      ref="dialogRef"
+      :org="currentOrganization"
+    />
   </div>
 </template>
 

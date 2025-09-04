@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import ky from 'ky'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
@@ -9,6 +9,7 @@ function hasBento(c: Context) {
 
 function initBentoKy(c: Context) {
   if (!hasBento(c)) {
+    cloudlog({ requestId: c.get('requestId'), context: 'initBentoKy', error: 'Bento is not enabled' })
     return null
   }
 

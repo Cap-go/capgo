@@ -1,4 +1,4 @@
-import type { Context } from '@hono/hono'
+import type { Context } from 'hono'
 import { cloudlog, cloudlogErr } from './loggin.ts'
 import { getEnv } from './utils.ts'
 
@@ -98,35 +98,17 @@ export function getCpu(c: Context) {
     .then((lines) => {
       const cpuInfo = getCpuInfo(getOneMetrics('node_cpu_seconds_total', lines))
       const cpuUsage = Math.round(cpuInfo.cpuUsage * 100) / 100
-      // console.log(c.get('requestId'), 'CPU cores info: ', cpuInfo.cores)
-      // console.log(c.get('requestId'), 'CPU cores: ', cpuInfo.numberOfCores)
-      // console.log(c.get('requestId'), 'CPU total: ', cpuInfo.total)
-      // console.log(c.get('requestId'), 'CPU used: ', cpuInfo.used)
-      // console.log(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
+      // cloudlog(c.get('requestId'), 'CPU cores info: ', cpuInfo.cores)
+      // cloudlog(c.get('requestId'), 'CPU cores: ', cpuInfo.numberOfCores)
+      // cloudlog(c.get('requestId'), 'CPU total: ', cpuInfo.total)
+      // cloudlog(c.get('requestId'), 'CPU used: ', cpuInfo.used)
+      // cloudlog(c.get('requestId'), 'CPU idle: ', cpuInfo.idle)
       cloudlog({ requestId: c.get('requestId'), message: 'CPU %', cpu: cpuUsage })
       return cpuUsage
     })
 }
 
-export function getMemTotal(lines: string[]) {
-  const total = lines.reduce((acc, line) => {
-    const parts = line.split(' ')
-    const value = Number.parseFloat(parts[1])
-    return acc + value
-  }, 0)
-  return total
-}
-
-export function getMemAvailable(lines: string[]) {
-  const total = lines.reduce((acc, line) => {
-    const parts = line.split(' ')
-    const value = Number.parseFloat(parts[1])
-    return acc + value
-  }, 0)
-  return total
-}
-
-export function getMemFree(lines: string[]) {
+export function getMemFromLines(lines: string[]) {
   const total = lines.reduce((acc, line) => {
     const parts = line.split(' ')
     const value = Number.parseFloat(parts[1])
@@ -138,16 +120,13 @@ export function getMemFree(lines: string[]) {
 export function getMem(c: Context) {
   return getAllMetrics(c)
     .then((lines) => {
-      const available = getMemAvailable(getOneMetrics('node_memory_MemAvailable_bytes', lines))
-      const total = getMemTotal(getOneMetrics('node_memory_MemTotal_bytes', lines))
+      const total = getMemFromLines(getOneMetrics('node_memory_MemTotal_bytes', lines))
+      const available = getMemFromLines(getOneMetrics('node_memory_MemAvailable_bytes', lines))
       const percentUsed = 100 - ((available * 100) / total)
       const usedPercentageRound = Math.round(percentUsed * 100) / 100
-      // console.log(c.get('requestId'), 'Memory available: ', available)
-      // console.log(c.get('requestId'), 'Memory free: ', total)
+      // cloudlog(c.get('requestId'), 'Memory available: ', available)
+      // cloudlog(c.get('requestId'), 'Memory free: ', total)
       cloudlog({ requestId: c.get('requestId'), message: 'Memory %', memory: usedPercentageRound })
       return usedPercentageRound
     })
 }
-
-// getMem()
-// getCpu()

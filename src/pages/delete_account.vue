@@ -9,11 +9,11 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
-import { useDisplayStore } from '~/stores/display'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { registerWebsiteDomain } from '~/utils/Utils'
 
 const supabase = useSupabase()
-const displayStore = useDisplayStore()
+const dialogStore = useDialogV2Store()
 const isLoading = ref(false)
 const { t } = useI18n()
 const router = useRouter()
@@ -21,8 +21,8 @@ const router = useRouter()
 const version = import.meta.env.VITE_APP_VERSION
 
 async function deleteAccount() {
-  displayStore.dialogOption = {
-    header: t('are-u-sure'),
+  dialogStore.openDialog({
+    title: t('are-u-sure'),
     buttons: [
       {
         text: t('button-remove'),
@@ -81,9 +81,8 @@ async function deleteAccount() {
         },
       },
     ],
-  }
-  displayStore.showDialog = true
-  return displayStore.onDialogDismiss()
+  })
+  return dialogStore.onDialogDismiss()
 }
 
 async function submit(form: { email: string, password: string }) {
