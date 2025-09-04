@@ -179,7 +179,9 @@ CREATE TYPE "public"."stats_action" AS ENUM(
   'NoChannelOrOverride',
   'setChannel',
   'getChannel',
-  'rateLimited'
+  'rateLimited',
+  'disableAutoUpdate',
+  'InvalidIp',
 );
 
 ALTER TYPE "public"."stats_action" OWNER TO "postgres";
@@ -4919,9 +4921,11 @@ FOR UPDATE
   "anon" USING (
     "public"."check_min_rights" (
       'write'::"public"."user_min_right",
-      "public"."get_identity_org_appid" ('{write,all}'::"public"."key_mode" [],
+      "public"."get_identity_org_appid" (
+        '{write,all}'::"public"."key_mode" [],
         "owner_org",
-        "app_id"),
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
@@ -4931,9 +4935,11 @@ WITH
   CHECK (
     "public"."check_min_rights" (
       'write'::"public"."user_min_right",
-      "public"."get_identity_org_appid" ('{write,all}'::"public"."key_mode" [],
+      "public"."get_identity_org_appid" (
+        '{write,all}'::"public"."key_mode" [],
         "owner_org",
-        "app_id"),
+        "app_id"
+      ),
       "owner_org",
       "app_id",
       NULL::bigint
