@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, middlewareKey, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -31,7 +31,8 @@ app.post('/', middlewareKey(['all']), async (c) => {
     throw simpleError('invalid_mode', 'Invalid mode')
   }
 
-  const supabase = supabaseAdmin(c)
+  // Use anon client with capgkey header; RLS enforces ownership via user_id
+  const supabase = supabaseApikey(c, key.key)
   const newData: Database['public']['Tables']['apikeys']['Insert'] = {
     user_id: key.user_id,
     key: crypto.randomUUID(),

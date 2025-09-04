@@ -1167,6 +1167,43 @@ $$;
 
 ALTER FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
 
+CREATE OR REPLACE FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) RETURNS "uuid" LANGUAGE "plpgsql"
+SET
+  search_path = '' SECURITY DEFINER AS $$
+DECLARE
+    auth_uid uuid;
+    api_key_text text;
+    api_key record;
+Begin
+  SELECT auth.uid() into auth_uid;
+
+  IF auth_uid IS NOT NULL THEN
+    RETURN auth_uid;
+  END IF;
+
+  SELECT "public"."get_apikey_header"() into api_key_text;
+
+  -- No api key found in headers, return
+  IF api_key_text IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Fetch the api key
+  select * FROM public.apikeys 
+  where key=api_key_text AND
+  mode=ANY(keymode)
+  limit 1 into api_key;
+
+  if api_key IS DISTINCT FROM  NULL THEN
+    RETURN api_key.user_id;
+  END IF;
+
+  RETURN NULL;
+End;
+$$;
+
+ALTER FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) OWNER TO "postgres";
+
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode" [], "org_id" "uuid") RETURNS "uuid" LANGUAGE "plpgsql"
 SET
   search_path = '' SECURITY DEFINER AS $$
@@ -5738,6 +5775,12 @@ GRANT ALL ON FUNCTION "public"."get_identity" () TO "anon";
 GRANT ALL ON FUNCTION "public"."get_identity" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_identity" () TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) TO "anon";
+
+GRANT ALL ON FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) TO "authenticated";
+
+GRANT ALL ON FUNCTION "public"."get_identity" ("keymode" "public"."key_mode" []) TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "anon";
 
