@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 12.22.0 (2025-09-04)
+
+
+### Features
+
+* add new enum values to stats_action and update get_identity_org_appid calls ([2dd5c0b](https://github.com/Cap-go/capgo/commit/2dd5c0b72e4a092d4eba5f05112a79b587365ad0))
+
+### 12.21.1 (2025-09-04)
+
+## 12.21.0 (2025-09-04)
+
+
+### Features
+
+* add error handling tests for /private/stats endpoint ([ff0a955](https://github.com/Cap-go/capgo/commit/ff0a9553bc7a30a07d6f4b86168504ae417949e5))
+
+### 12.20.5 (2025-09-04)
+
+### 12.20.4 (2025-09-04)
+
+### 12.20.3 (2025-09-02)
+
 ### 12.20.2 (2025-09-02)
 
 ### 12.20.1 (2025-09-01)

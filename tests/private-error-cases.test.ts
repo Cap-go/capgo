@@ -489,12 +489,10 @@ describe('[POST] /private/stats - Error Cases', () => {
         appId: APPNAME,
       }),
     })
-
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('app_access_denied')
   })
-
   it('should return 401 when no auth', async () => {
     const response = await fetch(`${BASE_URL}/private/stats`, {
       method: 'POST',
