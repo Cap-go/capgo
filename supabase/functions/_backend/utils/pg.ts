@@ -179,14 +179,14 @@ export function requestInfosPostgres(
     .leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     .where(!defaultChannel
       ? and(
-        sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
-        eq(channelAlias.app_id, app_id),
-        eq(platformQuery, true),
-      )
+          sql`(SELECT (apps.default_channel_android = ${channelAlias.id} OR apps.default_channel_ios = ${channelAlias.id}) FROM ${schema.apps} WHERE app_id = ${app_id}) = true`,
+          eq(channelAlias.app_id, app_id),
+          eq(platformQuery, true),
+        )
       : and(
-        eq(channelAlias.app_id, app_id),
-        eq(channelAlias.name, defaultChannel),
-      ),
+          eq(channelAlias.app_id, app_id),
+          eq(channelAlias.name, defaultChannel),
+        ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -379,7 +379,7 @@ export async function getMainChannelsPg(
         eq(schema.channels.app_id, appId),
         or(
           eq(schema.channels.id, schema.apps.default_channel_android),
-          eq(schema.channels.id, schema.apps.default_channel_ios)
+          eq(schema.channels.id, schema.apps.default_channel_ios),
         ),
       ))
     return channels
@@ -458,7 +458,7 @@ export async function getChannelsPg(
         .from(schema.channels)
         .where(and(
           eq(schema.channels.app_id, appId),
-          eq(schema.channels.name, condition.defaultChannel)
+          eq(schema.channels.name, condition.defaultChannel),
         ))
 
       return channels.map(channel => ({ ...channel, public: false })) // Computed later if needed
@@ -480,7 +480,7 @@ export async function getChannelsPg(
 
       const channels = await query
       return channels
-        .filter(channel => {
+        .filter((channel) => {
           const isPublic = channel.id === channel.default_channel_android || channel.id === channel.default_channel_ios
           return condition.public ? isPublic : !isPublic
         })

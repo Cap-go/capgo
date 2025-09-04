@@ -98,7 +98,7 @@ async function setUpdateChannelSync(value: boolean) {
       return
     }
     let selectedChannelId = null as string | null
-    
+
     const buttons = [
       ...channels.data.map(channel => ({
         text: channel.name,
@@ -121,7 +121,7 @@ async function setUpdateChannelSync(value: boolean) {
         role: 'cancel' as const,
       },
     ]
-    
+
     dialogStore.openDialog({
       title: t('select-default-update-channel-header-before-sync-change'),
       description: t('select-default-update-channel-header-before-sync-change-message'),
@@ -129,7 +129,7 @@ async function setUpdateChannelSync(value: boolean) {
       preventAccidentalClose: true,
       buttons,
     })
-    
+
     const cancelled = await dialogStore.onDialogDismiss()
     if (cancelled) {
       console.log('Dialog dismissed')
