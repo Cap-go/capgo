@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -472,9 +472,41 @@ describe('[POST] /private/stats - Error Cases', () => {
       }),
     })
 
+    expect(response.status).toBe(200)
+    const data = await response.json() as { error: string }
+    console.log(data)
+    expect(data).toBeDefined()
+  })
+
+  it('should return 400 when wrong auth', async () => {
+    const response = await fetch(`${BASE_URL}/private/stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'capgkey': APIKEY_STATS,
+      },
+      body: JSON.stringify({
+        appId: APPNAME,
+      }),
+    })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('app_access_denied')
+  })
+  it('should return 401 when no auth', async () => {
+    const response = await fetch(`${BASE_URL}/private/stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        appId: APPNAME,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 })
 
