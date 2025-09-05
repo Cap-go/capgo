@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.22.1 (2025-09-05)
+
+
+### Bug Fixes
+
+* update notifications primary key constraint to include owner_org ([dad0de1](https://github.com/Cap-go/capgo/commit/dad0de1be3145c559574babad050d952ddfd6e11))
+
 ## 12.22.0 (2025-09-04)
 
 
