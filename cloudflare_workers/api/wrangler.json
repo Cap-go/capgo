@@ -1,9 +1,15 @@
 {
   "name": "capgo_api-prod",
-  "route": {
-    "pattern": "api.capgo.app",
-    "custom_domain": true
-  },
+  "routes": [
+    {
+      "pattern": "api.capgo.app",
+      "custom_domain": true
+    },
+    {
+      "pattern": "api.usecapgo.com",
+      "custom_domain": true
+    }
+  ],
   "compatibility_date": "2025-04-01",
   "main": "./index.ts",
   "compatibility_flags": [

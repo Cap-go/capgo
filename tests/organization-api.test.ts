@@ -251,13 +251,14 @@ describe('[DELETE] /organization/members', () => {
 })
 
 describe('[POST] /organization', () => {
-  it('create organization', async () => {
+  it.only('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'POST',
       body: JSON.stringify({ name }),
     })
+    console.log(await response.json())
     expect(response.status).toBe(200)
     const type = z.object({
       status: z.string(),

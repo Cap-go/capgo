@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 // import ky from 'ky'
 import { simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface CreateBundleBody {
   app_id: string
@@ -128,8 +128,8 @@ function validateUrlFormat(url: string) {
 //   }
 // }
 
-async function getAppOrganization(c: Context, appId: string): Promise<string> {
-  const { data: app, error: appError } = await supabaseAdmin(c)
+async function getAppOrganization(c: Context, apikey: Database['public']['Tables']['apikeys']['Row'], appId: string): Promise<string> {
+  const { data: app, error: appError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .select('owner_org')
     .eq('app_id', appId)
@@ -142,8 +142,8 @@ async function getAppOrganization(c: Context, appId: string): Promise<string> {
   return app.owner_org
 }
 
-async function checkVersionExists(c: Context, appId: string, version: string): Promise<void> {
-  const { data: existingVersion } = await supabaseAdmin(c)
+async function checkVersionExists(c: Context, appId: string, apikey: Database['public']['Tables']['apikeys']['Row'], version: string): Promise<void> {
+  const { data: existingVersion } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .select('id')
     .eq('app_id', appId)
@@ -156,8 +156,8 @@ async function checkVersionExists(c: Context, appId: string, version: string): P
   }
 }
 
-async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string, userId: string): Promise<any> {
-  const { data: newBundle, error: createError } = await supabaseAdmin(c)
+async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<any> {
+  const { data: newBundle, error: createError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .insert({
       app_id: body.app_id,
@@ -167,7 +167,7 @@ async function insertBundle(c: Context, body: CreateBundleBody, ownerOrg: string
       external_url: body.external_url,
       storage_provider: 'external',
       owner_org: ownerOrg,
-      user_id: userId,
+      user_id: apikey.user_id,
     })
     .select()
     .single()
@@ -199,10 +199,10 @@ export async function createBundle(c: Context, body: CreateBundleBody, apikey: D
   validateUrlFormat(body.external_url)
   // await verifyUrlAccessibility(body.external_url)
 
-  const ownerOrg = await getAppOrganization(c, body.app_id)
-  await checkVersionExists(c, body.app_id, body.version)
+  const ownerOrg = await getAppOrganization(c, apikey, body.app_id)
+  await checkVersionExists(c, body.app_id, apikey, body.version)
 
-  const newBundle = await insertBundle(c, body, ownerOrg, apikey.user_id)
+  const newBundle = await insertBundle(c, body, ownerOrg, apikey)
 
   return c.json({
     status: 'success',

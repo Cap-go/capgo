@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { hasOrgRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface DeleteOrganizationParams {
   orgId?: string
@@ -20,7 +20,7 @@ export async function deleteOrg(c: Context, body: DeleteOrganizationParams, apik
     throw quickError(403, 'invalid_org_id', 'You can\'t delete this organization', { org_id: orgId })
   }
 
-  const { error } = await supabaseAdmin(c)
+  const { error } = await supabaseApikey(c, apikey.key)
     .from('orgs')
     .delete()
     .eq('id', orgId)

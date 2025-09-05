@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/loggin.ts'
-import { hasAppRightApikey, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 interface ChannelSet {
   app_id: string
@@ -18,8 +18,8 @@ interface ChannelSet {
   allow_dev?: boolean
 }
 
-async function findVersion(c: Context, appID: string, version: string, ownerOrg: string) {
-  const { data, error: vError } = await supabaseAdmin(c)
+async function findVersion(c: Context, appID: string, version: string, ownerOrg: string, apikey: Database['public']['Tables']['apikeys']['Row']) {
+  const { data, error: vError } = await supabaseApikey(c, apikey.key)
     .from('app_versions')
     .select('id')
     .eq('app_id', appID)
@@ -38,7 +38,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
   if (!(await hasAppRightApikey(c, body.app_id, apikey.user_id, 'write', apikey.key))) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
-  const { data: org, error } = await supabaseAdmin(c).from('apps').select('owner_org').eq('app_id', body.app_id).single()
+  const { data: org, error } = await supabaseApikey(c, apikey.key).from('apps').select('owner_org').eq('app_id', body.app_id).single()
   if (error || !org) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
@@ -58,7 +58,7 @@ export async function post(c: Context, body: ChannelSet, apikey: Database['publi
     owner_org: org.owner_org,
   }
 
-  channel.version = await findVersion(c, body.app_id, body.version ?? 'unknown', org.owner_org)
+  channel.version = await findVersion(c, body.app_id, body.version ?? 'unknown', org.owner_org, apikey)
   await updateOrCreateChannel(c, channel)
   return c.json(BRES)
 }

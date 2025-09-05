@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 export interface DeviceLink {
   app_id: string
@@ -14,7 +14,7 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
 
-  const { error: errorChannel } = await supabaseAdmin(c)
+  const { error: errorChannel } = await supabaseApikey(c, apikey.key)
     .from('channel_devices')
     .delete()
     .eq('app_id', body.app_id)

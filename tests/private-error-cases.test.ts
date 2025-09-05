@@ -463,7 +463,7 @@ describe('[POST] /private/stats - Error Cases', () => {
     expect(data.error).toBe('app_access_denied')
   })
 
-  it('should return 400 when auth not found', async () => {
+  it('should work when used with APIKEY', async () => {
     const response = await fetch(`${BASE_URL}/private/stats`, {
       method: 'POST',
       headers,

@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 export interface ChannelSet {
   app_id: string
@@ -26,7 +26,7 @@ export async function deleteChannel(c: Context, body: ChannelSet, apikey: Databa
   }
 
   // search if that exist first
-  const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
+  const { data: dataChannel, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('channels')
     .select('id')
     .eq('app_id', body.app_id)
@@ -35,7 +35,7 @@ export async function deleteChannel(c: Context, body: ChannelSet, apikey: Databa
   if (dbError || !dataChannel) {
     throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: dbError })
   }
-  await supabaseAdmin(c)
+  await supabaseApikey(c, apikey.key)
     .from('channels')
     .delete()
     .eq('app_id', body.app_id)

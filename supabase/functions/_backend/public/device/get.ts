@@ -3,7 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/loggin.ts'
 import { readDevices } from '../../utils/stats.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 interface GetDevice {
@@ -46,7 +46,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     }
     const dataDevice = filterDeviceKeys(res as any)[0]
     // get version from device
-    const { data: dataVersion, error: dbErrorVersion } = await supabaseAdmin(c)
+    const { data: dataVersion, error: dbErrorVersion } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .select('id, name')
       .eq('id', dataDevice.version)
@@ -57,7 +57,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     dataDevice.version = dataVersion as any
 
     // Check for channel override
-    const { data: channelOverride } = await supabaseAdmin(c)
+    const { data: channelOverride } = await supabaseApikey(c, apikey.key)
       .from('channel_devices')
       .select(`
         channel_id,
@@ -91,7 +91,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     const dataDevices = filterDeviceKeys(res as any)
     // get versions from all devices
     const versionIds = dataDevices.map(device => device.version)
-    const { data: dataVersions, error: dbErrorVersions } = await supabaseAdmin(c)
+    const { data: dataVersions, error: dbErrorVersions } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .select(`
               id,
@@ -111,7 +111,7 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
 
     // Get channel overrides for all devices
     const deviceIds = dataDevices.map(device => device.device_id.toLowerCase())
-    const { data: channelOverrides } = await supabaseAdmin(c)
+    const { data: channelOverrides } = await supabaseApikey(c, apikey.key)
       .from('channel_devices')
       .select(`
         device_id,
