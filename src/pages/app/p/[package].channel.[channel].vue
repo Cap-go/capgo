@@ -54,6 +54,12 @@ const bundleLinkSearchMode = ref(false)
 // Auto update dropdown state
 const autoUpdateDropdown = useTemplateRef('autoUpdateDropdown')
 
+// Platform change confirmation state
+const currentDefaultChannelName = ref('')
+const pendingPlatformChange = ref<'ios' | 'android' | null>(null)
+const localIosState = ref(false)
+const localAndroidState = ref(false)
+
 onClickOutside(autoUpdateDropdown, () => closeAutoUpdateDropdown())
 
 const currentChannelVersion = computed(() => {
@@ -201,8 +207,12 @@ watch(channel, async (channel) => {
     return
   }
 
+  // Sync local toggle states with actual channel data
+  localIosState.value = channel.ios
+  localAndroidState.value = channel.android
+
   await organizationStore.awaitInitialLoad()
-  role.value = await organizationStore.getCurrentRoleForApp(channel.app_id)
+  role.value = await organizationStore.getCurrentRoleForApp((channel.app_id as any).app_id)
   console.log(role.value)
 })
 
@@ -273,6 +283,7 @@ async function getChannel() {
           created_at,
           app_id (
             id,
+            app_id,
             default_channel_android,
             default_channel_ios
           ),
@@ -304,6 +315,162 @@ async function reload() {
   await getDeviceIds()
 }
 
+async function confirmPlatformChange(platform: 'ios' | 'android', newValue: boolean): Promise<boolean> {
+  if (!channel.value || !newValue) {
+    return true // No confirmation needed if disabling or no channel
+  }
+
+  // Check if this channel is already the default for this platform
+  const appData = channel.value.app_id as any
+  const currentDefaultChannelId = platform === 'ios' 
+    ? appData.default_channel_ios 
+    : appData.default_channel_android
+
+  if (currentDefaultChannelId === id.value) {
+    return true // Already the default, no confirmation needed
+  }
+
+  // Get current default channel name if it exists
+  currentDefaultChannelName.value = t('none')
+  if (currentDefaultChannelId) {
+    try {
+      const { data: currentDefaultChannel } = await supabase
+        .from('channels')
+        .select('name')
+        .eq('id', currentDefaultChannelId)
+        .single()
+      
+      if (currentDefaultChannel) {
+        currentDefaultChannelName.value = currentDefaultChannel.name
+      }
+    }
+    catch (error) {
+      console.error('Error fetching current default channel:', error)
+    }
+  }
+
+  // Store the pending platform change
+  pendingPlatformChange.value = platform
+
+  // Show confirmation dialog
+  dialogStore.openDialog({
+    title: t('confirm-platform-change'),
+    description: platform === 'ios' 
+      ? t('confirm-platform-change-ios-message')
+      : t('confirm-platform-change-android-message'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        role: 'primary',
+      },
+    ],
+  })
+
+  const cancelled = await dialogStore.onDialogDismiss()
+  
+  // Clear the pending platform change
+  pendingPlatformChange.value = null
+  
+  return !cancelled
+}
+
+function getCurrentDefaultChannelName(): string {
+  return currentDefaultChannelName.value
+}
+
+async function confirmPlatformDisable(platform: 'ios' | 'android'): Promise<boolean> {
+  if (!channel.value) {
+    return true
+  }
+
+  // Show confirmation dialog
+  dialogStore.openDialog({
+    title: t('confirm-platform-disable'),
+    description: platform === 'ios' 
+      ? t('confirm-platform-disable-ios-message')
+      : t('confirm-platform-disable-android-message'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        role: 'primary',
+      },
+    ],
+  })
+
+  const cancelled = await dialogStore.onDialogDismiss()
+  return !cancelled
+}
+
+async function handlePlatformToggle(platform: 'ios' | 'android') {
+  if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  if (!channel.value) return
+
+  const currentValue = platform === 'ios' ? channel.value.ios : channel.value.android
+  const newValue = !currentValue
+
+  // Optimistically update local state for immediate visual feedback
+  if (platform === 'ios') {
+    localIosState.value = newValue
+  } else {
+    localAndroidState.value = newValue
+  }
+
+  try {
+    // Show confirmation dialog for both enabling and disabling
+    let confirmed = true
+    if (newValue) {
+      // Enabling platform
+      confirmed = await confirmPlatformChange(platform, newValue)
+    } else {
+      // Disabling platform - check if this channel is currently the default
+      const appData = channel.value.app_id as any
+      const currentDefaultChannelId = platform === 'ios' 
+        ? appData.default_channel_ios 
+        : appData.default_channel_android
+      
+      if (currentDefaultChannelId === id.value) {
+        // This channel is the current default, show confirmation
+        confirmed = await confirmPlatformDisable(platform)
+      }
+    }
+    
+    if (!confirmed) {
+      // User cancelled - revert local state
+      if (platform === 'ios') {
+        localIosState.value = currentValue
+      } else {
+        localAndroidState.value = currentValue
+      }
+      return
+    }
+
+    // Proceed with the change - saveChannelChange will update local state on success
+    await saveChannelChange(platform, newValue)
+  } catch (error) {
+    console.error(error)
+    // On error, revert local state
+    if (platform === 'ios') {
+      localIosState.value = currentValue
+    } else {
+      localAndroidState.value = currentValue
+    }
+  }
+}
+
 async function saveChannelChange(key: string, val: any) {
   if (!organizationStore.hasPermisisonsInRole(role.value, ['admin', 'super_admin'])) {
     toast.error(t('no-permission'))
@@ -314,6 +481,42 @@ async function saveChannelChange(key: string, val: any) {
   if (!id.value || !channel.value)
     return
   try {
+    // Special handling for enabling/disabling iOS/Android platform support
+    if (key === 'ios' || key === 'android') {
+      const appData = channel.value.app_id as any
+      const defaultChannelColumn = key === 'ios' ? 'default_channel_ios' : 'default_channel_android'
+      
+      if (val === true) {
+        // Enabling: Set this channel as the new default
+        const { error: appUpdateError } = await supabase
+          .from('apps')
+          .update({ [defaultChannelColumn]: id.value })
+          .eq('id', appData.id)
+        
+        if (appUpdateError) {
+          toast.error(t('error-update-channel'))
+          console.error('Failed to update app default channel:', appUpdateError)
+          return
+        }
+      } else {
+        // Disabling: Unset the default channel if this channel is currently the default
+        const currentDefaultChannelId = appData[defaultChannelColumn]
+        if (currentDefaultChannelId === id.value) {
+          const { error: appUpdateError } = await supabase
+            .from('apps')
+            .update({ [defaultChannelColumn]: null })
+            .eq('id', appData.id)
+          
+          if (appUpdateError) {
+            toast.error(t('error-update-channel'))
+            console.error('Failed to unset app default channel:', appUpdateError)
+            return
+          }
+        }
+      }
+    }
+
+    // Then update the channel
     const update = {
       [key]: val,
     }
@@ -321,10 +524,19 @@ async function saveChannelChange(key: string, val: any) {
       .from('channels')
       .update(update)
       .eq('id', id.value)
-    reload()
+    
     if (error) {
       toast.error(t('error-update-channel'))
       console.error('no channel update', error)
+      return
+    }
+    
+    await reload()
+    
+    // Sync local state with updated channel data
+    if (channel.value) {
+      localIosState.value = channel.value.ios
+      localAndroidState.value = channel.value.android
     }
   }
   catch (error) {
@@ -340,6 +552,13 @@ watchEffect(async () => {
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
+    
+    // Initialize local states after channel is loaded
+    if (channel.value) {
+      localIosState.value = channel.value.ios
+      localAndroidState.value = channel.value.android
+    }
+    
     loading.value = false
     displayStore.NavTitle = t('channel')
     displayStore.defaultBack = `/app/p/${route.params.package}/channels`
@@ -689,16 +908,40 @@ function redirectToAppSettings() {
               </div>
             </InfoRow>
             <InfoRow label="iOS">
-              <Toggle
-                :value="channel?.ios"
-                @change="saveChannelChange('ios', !channel?.ios)"
-              />
+              <label class="relative inline-flex items-center cursor-pointer" @click="handlePlatformToggle('ios')">
+                <input 
+                  :checked="localIosState" 
+                  type="checkbox" 
+                  class="sr-only peer"
+                  readonly
+                >
+                <div 
+                  class="h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:rounded-full after:bg-white after:transition-all after:content-['']"
+                  :class="[
+                    localIosState 
+                      ? 'bg-blue-600 after:translate-x-full after:border-white' 
+                      : 'bg-gray-200 after:translate-x-0 after:border-gray-300 dark:after:border-gray-600 dark:bg-gray-700'
+                  ]"
+                />
+              </label>
             </InfoRow>
             <InfoRow label="Android">
-              <Toggle
-                :value="channel?.android"
-                @change="saveChannelChange('android', !channel?.android)"
-              />
+              <label class="relative inline-flex items-center cursor-pointer" @click="handlePlatformToggle('android')">
+                <input 
+                  :checked="localAndroidState" 
+                  type="checkbox" 
+                  class="sr-only peer"
+                  readonly
+                >
+                <div 
+                  class="h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:rounded-full after:bg-white after:transition-all after:content-['']"
+                  :class="[
+                    localAndroidState 
+                      ? 'bg-blue-600 after:translate-x-full after:border-white' 
+                      : 'bg-gray-200 after:translate-x-0 after:border-gray-300 dark:after:border-gray-600 dark:bg-gray-700'
+                  ]"
+                />
+              </label>
             </InfoRow>
             <InfoRow :label="t('disable-auto-downgra')">
               <Toggle
@@ -845,6 +1088,16 @@ function redirectToAppSettings() {
           :label="t('device-id')"
           validation="required|uuid"
         />
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Platform Change Confirmation -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('confirm-platform-change')" defer to="#dialog-v2-content">
+      <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <p class="text-sm text-blue-800 dark:text-blue-200">
+          <strong>{{ t('current-default-channel') }}:</strong>
+          <span class="ml-2">{{ getCurrentDefaultChannelName() }}</span>
+        </p>
       </div>
     </Teleport>
 
