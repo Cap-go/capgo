@@ -3924,7 +3924,7 @@ ALTER TABLE ONLY "public"."manifest"
 ADD CONSTRAINT "manifest_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."notifications"
-ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("event", "uniq_id");
+ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("owner_org", "event", "uniq_id");
 
 ALTER TABLE ONLY "public"."org_users"
 ADD CONSTRAINT "org_users_pkey" PRIMARY KEY ("id");
