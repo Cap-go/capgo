@@ -337,7 +337,8 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
   // Filter channels based on platform support (only when not synced)
   if (type === 'ios') {
     query = query.eq('ios', true)
-  } else if (type === 'android') {
+  }
+  else if (type === 'android') {
     query = query.eq('android', true)
   }
   // For 'both', we don't filter here as we'll handle it in the UI
@@ -354,10 +355,12 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
   if (type === 'ios' && channels.length === 0) {
     toast.error(t('no-ios-channels-available'))
     return
-  } else if (type === 'android' && channels.length === 0) {
+  }
+  else if (type === 'android' && channels.length === 0) {
     toast.error(t('no-android-channels-available'))
     return
-  } else if (type === 'both') {
+  }
+  else if (type === 'both') {
     // For 'both', we need channels that support both platforms
     const bothPlatformChannels = channels.filter(ch => ch.ios && ch.android)
     if (bothPlatformChannels.length === 0) {
@@ -417,44 +420,44 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
 
   const allButtons = [
     ...buttons,
-            {
-          text: t('unset'),
-          role: 'danger' as const,
-          handler: async () => {
-            // Check if channels are synced but sync toggle is off, and if we're unsetting individual platforms
-            const channelsAreSynced = appRef.value?.default_channel_ios && appRef.value?.default_channel_android && 
-              (appRef.value.default_channel_ios as any)?.id === (appRef.value.default_channel_android as any)?.id
-            const syncIsOff = !appRef.value?.default_channel_sync
-            
-            if (channelsAreSynced && syncIsOff && type !== 'both') {
-              // Show confirmation dialog
-              dialogStore.openDialog({
-                title: t('confirm-unset-synced-channel'),
-                description: type === 'ios' 
-                  ? t('confirm-unset-synced-channel-ios-message')
-                  : t('confirm-unset-synced-channel-android-message'),
-                size: 'lg',
-                buttons: [
-                  {
-                    text: t('button-cancel'),
-                    role: 'cancel',
-                  },
-                  {
-                    text: t('button-confirm'),
-                    role: 'danger',
-                    handler: async () => {
-                      await handleUnsetWithChannelUpdate(type)
-                    },
-                  },
-                ],
-              })
-              return
-            }
-            
-            // Normal unset behavior
-            await handleNormalUnset(type)
-          },
-        },
+    {
+      text: t('unset'),
+      role: 'danger' as const,
+      handler: async () => {
+        // Check if channels are synced but sync toggle is off, and if we're unsetting individual platforms
+        const channelsAreSynced = appRef.value?.default_channel_ios && appRef.value?.default_channel_android
+          && (appRef.value.default_channel_ios as any)?.id === (appRef.value.default_channel_android as any)?.id
+        const syncIsOff = !appRef.value?.default_channel_sync
+
+        if (channelsAreSynced && syncIsOff && type !== 'both') {
+          // Show confirmation dialog
+          dialogStore.openDialog({
+            title: t('confirm-unset-synced-channel'),
+            description: type === 'ios'
+              ? t('confirm-unset-synced-channel-ios-message')
+              : t('confirm-unset-synced-channel-android-message'),
+            size: 'lg',
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('button-confirm'),
+                role: 'danger',
+                handler: async () => {
+                  await handleUnsetWithChannelUpdate(type)
+                },
+              },
+            ],
+          })
+          return
+        }
+
+        // Normal unset behavior
+        await handleNormalUnset(type)
+      },
+    },
     {
       text: t('button-cancel'),
       role: 'cancel' as const,
@@ -636,25 +639,27 @@ function navigateToChannel(channelId: number | null, channelName: string) {
   if (!channelId || channelName === t('undefined')) {
     return
   }
-  
+
   const appId = appRef.value?.app_id
   if (!appId) {
     return
   }
-  
+
   // Navigate to the channel page
   router.push(`/app/p/${appId}/channel/${channelId}`)
 }
 
 async function handleUnsetWithChannelUpdate(type: 'ios' | 'android') {
-  if (!appRef.value) return
-  
-  const currentChannelId = type === 'ios' 
-    ? (appRef.value.default_channel_ios as any)?.id 
+  if (!appRef.value)
+    return
+
+  const currentChannelId = type === 'ios'
+    ? (appRef.value.default_channel_ios as any)?.id
     : (appRef.value.default_channel_android as any)?.id
-  
-  if (!currentChannelId) return
-  
+
+  if (!currentChannelId)
+    return
+
   try {
     // First, update the channel to disable the platform
     const channelUpdate = { [type]: false }
@@ -662,38 +667,39 @@ async function handleUnsetWithChannelUpdate(type: 'ios' | 'android') {
       .from('channels')
       .update(channelUpdate)
       .eq('id', currentChannelId)
-    
+
     if (channelError) {
       toast.error(t('cannot-change-update-channel'))
       console.error('Channel update error:', channelError)
       return
     }
-    
+
     // Then, unset the default channel in apps table
     const { error: appError } = await supabase.from('apps')
       .update({ [`default_channel_${type}`]: null })
       .eq('app_id', appRef.value.app_id ?? '')
-    
+
     if (appError) {
       toast.error(t('cannot-change-update-channel'))
       console.error('App update error:', appError)
       return
     }
-    
+
     // Update local state
     appRef.value[`default_channel_${type}`] = null
     forceBump.value += 1
     toast.success(t('updated-default-update-channel'))
-    
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error in handleUnsetWithChannelUpdate:', error)
     toast.error(t('cannot-change-update-channel'))
   }
 }
 
 async function handleNormalUnset(type: 'android' | 'ios' | 'both') {
-  if (!appRef.value) return
-  
+  if (!appRef.value)
+    return
+
   try {
     let appError: any = null
     if (type === 'both') {
@@ -708,13 +714,13 @@ async function handleNormalUnset(type: 'android' | 'ios' | 'both') {
         .eq('app_id', appRef.value.app_id ?? '')
         .then(x => x.error)
     }
-    
+
     if (appError) {
       toast.error(t('cannot-change-update-channel'))
       console.error(appError)
       return
     }
-    
+
     if (appRef.value && type !== 'both') {
       appRef.value[`default_channel_${type}`] = null
       forceBump.value += 1
@@ -725,8 +731,8 @@ async function handleNormalUnset(type: 'android' | 'ios' | 'both') {
       forceBump.value += 1
     }
     toast.success(t('updated-default-update-channel'))
-    
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error in handleNormalUnset:', error)
     toast.error(t('cannot-change-update-channel'))
   }
@@ -907,8 +913,8 @@ async function transferAppOwnership() {
                         },
                         input: {
                           'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 select-none': (appRef?.default_channel_ios as any)?.name && (appRef?.default_channel_ios as any)?.name !== t('undefined'),
-                          'cursor-default select-none': !(appRef?.default_channel_ios as any)?.name || (appRef?.default_channel_ios as any)?.name === t('undefined')
-                        }
+                          'cursor-default select-none': !(appRef?.default_channel_ios as any)?.name || (appRef?.default_channel_ios as any)?.name === t('undefined'),
+                        },
                       }"
                       @click="navigateToChannel((appRef?.default_channel_ios as any)?.id, (appRef?.default_channel_ios as any)?.name ?? t('undefined'))"
                     >
@@ -941,8 +947,8 @@ async function transferAppOwnership() {
                         },
                         input: {
                           'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 select-none': (appRef?.default_channel_android as any)?.name && (appRef?.default_channel_android as any)?.name !== t('undefined'),
-                          'cursor-default select-none': !(appRef?.default_channel_android as any)?.name || (appRef?.default_channel_android as any)?.name === t('undefined')
-                        }
+                          'cursor-default select-none': !(appRef?.default_channel_android as any)?.name || (appRef?.default_channel_android as any)?.name === t('undefined'),
+                        },
                       }"
                       @click="navigateToChannel((appRef?.default_channel_android as any)?.id, (appRef?.default_channel_android as any)?.name ?? t('undefined'))"
                     >
@@ -978,8 +984,8 @@ async function transferAppOwnership() {
                       },
                       input: {
                         'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 select-none': (appRef?.default_channel_ios as any)?.name && (appRef?.default_channel_ios as any)?.name !== t('undefined'),
-                        'cursor-default select-none': !(appRef?.default_channel_ios as any)?.name || (appRef?.default_channel_ios as any)?.name === t('undefined')
-                      }
+                        'cursor-default select-none': !(appRef?.default_channel_ios as any)?.name || (appRef?.default_channel_ios as any)?.name === t('undefined'),
+                      },
                     }"
                     @click="navigateToChannel((appRef?.default_channel_ios as any)?.id, (appRef?.default_channel_ios as any)?.name ?? t('undefined'))"
                   >
