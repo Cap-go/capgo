@@ -22,6 +22,10 @@
       "zone_name": "capgo.app"
     },
     {
+      "pattern": "plugin.usecapgo.com",
+      "custom_domain": true
+    },
+    {
       "pattern": "updater.spencer.co/*",
       "zone_name": "capgo.app"
     }

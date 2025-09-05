@@ -6,6 +6,7 @@ import { supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   name: z.string().check(z.minLength(3)),
+  email: z.optional(z.email()),
 })
 
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -20,12 +21,14 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
+  const newOrg = { name: body.name, created_by: apikey.user_id, management_email: body.email ?? self.email }
   const { data: dataOrg, error: errorOrg } = await supabase
     .from('orgs')
-    .insert({ name: body.name, created_by: apikey.user_id, management_email: self.email })
+    .insert(newOrg)
     .select('id')
     .single()
   if (errorOrg || !dataOrg?.id) {
+    console.log('errorOrg', errorOrg, newOrg)
     throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg?.message })
   }
   return c.json({ status: 'Organization created', id: dataOrg.id }, 200)

@@ -8,7 +8,7 @@ import { backgroundTask } from './utils.ts'
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     c.get('sentry')?.captureException(e)
-    cloudlogErr({ requestId: c.get('requestId'), functionName, message: e?.message ?? 'app onError', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), functionName, message: e?.message ?? 'app onError', error: JSON.stringify(e) })
 
     let body = 'N/A'
     try {

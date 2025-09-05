@@ -5,16 +5,22 @@ ALTER POLICY "Allow insert for apikey (write,all) (admin+)" ON "public"."apps" T
 "authenticated"
 WITH
   CHECK (
-    "public"."check_min_rights" (
-      'write'::"public"."user_min_right",
-      "public"."get_identity_org_appid" (
-        '{write,all}'::"public"."key_mode" [],
-        owner_org,
-        app_id
-      ),
-      owner_org,
-      app_id,
-      NULL::bigint
+    (
+      select
+        "public"."check_min_rights" (
+          'write'::"public"."user_min_right",
+          (
+            select
+              "public"."get_identity_org_appid" (
+                '{write,all}'::"public"."key_mode" [],
+                owner_org,
+                app_id
+              )
+          ),
+          owner_org,
+          app_id,
+          NULL::bigint
+        )
     )
   );
 
@@ -26,28 +32,49 @@ CREATE POLICY "Allow owner to select own apikeys" ON "public"."apikeys" FOR
 SELECT
   TO "anon",
   "authenticated" USING (
-    user_id = "public"."get_identity" ('{read,upload,write,all}')
+    user_id = (
+      select
+        "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" [])
+    )
   );
 
 -- Allow owner to INSERT own keys (subkeys)
 CREATE POLICY "Allow owner to insert own apikeys" ON "public"."apikeys" FOR INSERT TO "anon",
 "authenticated"
 WITH
-  CHECK (user_id = "public"."get_identity" ('{write,all}'));
+  CHECK (
+    user_id = (
+      select
+        "public"."get_identity" ('{write,all}'::"public"."key_mode" [])
+    )
+  );
 
 -- Allow owner to UPDATE own keys
 CREATE POLICY "Allow owner to update own apikeys" ON "public"."apikeys"
 FOR UPDATE
   TO "anon",
   "authenticated" USING (
-    user_id = "public"."get_identity" ('{read,upload,write,all}')
+    user_id = (
+      select
+        "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" [])
+    )
   )
 WITH
-  CHECK (user_id = "public"."get_identity" ('{write,all}'));
+  CHECK (
+    user_id = (
+      select
+        "public"."get_identity" ('{write,all}'::"public"."key_mode" [])
+    )
+  );
 
 -- Allow owner to DELETE own keys
 CREATE POLICY "Allow owner to delete own apikeys" ON "public"."apikeys" FOR DELETE TO "anon",
-"authenticated" USING (user_id = "public"."get_identity" ('{write,all}'));
+"authenticated" USING (
+  user_id = (
+    select
+      "public"."get_identity" ('{write,all}'::"public"."key_mode" [])
+  )
+);
 
 DROP POLICY "Allow webapp to insert" ON "public"."orgs";
 
@@ -56,7 +83,10 @@ CREATE POLICY "Allow insert org for apikey or user" ON "public"."orgs" FOR INSER
 "authenticated"
 WITH
   CHECK (
-    created_by = "public"."get_identity" ('{write,all}')
+    created_by = (
+      select
+        "public"."get_identity" ('{write,all}'::"public"."key_mode" [])
+    )
   );
 
 DROP POLICY "Allow org delete for super_admin" ON "public"."orgs";
@@ -64,15 +94,21 @@ DROP POLICY "Allow org delete for super_admin" ON "public"."orgs";
 -- Allow deleting orgs with apikey when caller has super_admin rights
 CREATE POLICY "Allow org delete for super_admin" ON "public"."orgs" FOR DELETE TO "anon",
 "authenticated" USING (
-  "public"."check_min_rights" (
-    'super_admin'::"public"."user_min_right",
-    "public"."get_identity_org_allowed" (
-      '{read,upload,write,all}'::"public"."key_mode" [],
-      "id"
-    ),
-    "id",
-    NULL::character varying,
-    NULL::bigint
+  (
+    select
+      "public"."check_min_rights" (
+        'super_admin'::"public"."user_min_right",
+        (
+          select
+            "public"."get_identity_org_allowed" (
+              '{read,upload,write,all}'::"public"."key_mode" [],
+              "id"
+            )
+        ),
+        "id",
+        NULL::character varying,
+        NULL::bigint
+      )
   )
 );
 
@@ -84,9 +120,15 @@ SELECT
   TO "anon",
   "authenticated" USING (
     (
-      id = "public"."get_identity" ('{read,upload,write,all}')
+      id = (
+        select
+          "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" [])
+      )
     )
-    AND ("public"."is_not_deleted" (email))
+    AND (
+      select
+        "public"."is_not_deleted" (email)
+    )
   );
 
 -- Allow owner to INSERT own user
@@ -94,8 +136,16 @@ CREATE POLICY "Allow owner to insert own users" ON "public"."users" FOR INSERT T
 "authenticated"
 WITH
   CHECK (
-    (id = "public"."get_identity" ('{write,all}'))
-    AND ("public"."is_not_deleted" (email))
+    (
+      id = (
+        select
+          "public"."get_identity" ('{write,all}'::"public"."key_mode" [])
+      )
+    )
+    AND (
+      select
+        "public"."is_not_deleted" (email)
+    )
   );
 
 -- Allow owner to UPDATE own user
@@ -104,14 +154,28 @@ FOR UPDATE
   TO "anon",
   "authenticated" USING (
     (
-      id = "public"."get_identity" ('{read,upload,write,all}')
+      id = (
+        select
+          "public"."get_identity" ('{read,upload,write,all}'::"public"."key_mode" [])
+      )
     )
-    AND ("public"."is_not_deleted" (email))
+    AND (
+      select
+        "public"."is_not_deleted" (email)
+    )
   )
 WITH
   CHECK (
-    (id = "public"."get_identity" ('{write,all}'))
-    AND ("public"."is_not_deleted" (email))
+    (
+      id = (
+        select
+          "public"."get_identity" ('{write,all}'::"public"."key_mode" [])
+      )
+    )
+    AND (
+      select
+        "public"."is_not_deleted" (email)
+    )
   );
 
 -- Allow owner to DELETE own user
@@ -134,15 +198,21 @@ SELECT
         public.orgs o
       WHERE
         o.customer_id = stripe_info.customer_id
-        AND public.check_min_rights (
-          'read'::public.user_min_right,
-          public.get_identity_org_allowed (
-            '{read,upload,write,all}'::public.key_mode[],
-            o.id
-          ),
-          o.id,
-          NULL::character varying,
-          NULL::bigint
+        AND (
+          select
+            public.check_min_rights (
+              'read'::public.user_min_right,
+              (
+                select
+                  public.get_identity_org_allowed (
+                    '{read,upload,write,all}'::public.key_mode[],
+                    o.id
+                  )
+              ),
+              o.id,
+              NULL::character varying,
+              NULL::bigint
+            )
         )
     )
   );
@@ -154,30 +224,48 @@ CREATE POLICY "Allow org member to update devices" ON "public"."devices"
 FOR UPDATE
   TO "anon",
   "authenticated" USING (
-    public.check_min_rights (
-      'write'::public.user_min_right,
-      public.get_identity_org_appid (
-        '{write,all}'::public.key_mode[],
-        public.get_user_main_org_id_by_app_id (app_id),
-        app_id
-      ),
-      public.get_user_main_org_id_by_app_id (app_id),
-      app_id,
-      NULL::bigint
+    (
+      select
+        public.check_min_rights (
+          'write'::public.user_min_right,
+          (
+            select
+              public.get_identity_org_appid (
+                '{write,all}'::public.key_mode[],
+                public.get_user_main_org_id_by_app_id (app_id),
+                app_id
+              )
+          ),
+          (
+            select
+              public.get_user_main_org_id_by_app_id (app_id)
+          ),
+          app_id,
+          NULL::bigint
+        )
     )
   )
 WITH
   CHECK (
-    public.check_min_rights (
-      'write'::public.user_min_right,
-      public.get_identity_org_appid (
-        '{write,all}'::public.key_mode[],
-        public.get_user_main_org_id_by_app_id (app_id),
-        app_id
-      ),
-      public.get_user_main_org_id_by_app_id (app_id),
-      app_id,
-      NULL::bigint
+    (
+      select
+        public.check_min_rights (
+          'write'::public.user_min_right,
+          (
+            select
+              public.get_identity_org_appid (
+                '{write,all}'::public.key_mode[],
+                public.get_user_main_org_id_by_app_id (app_id),
+                app_id
+              )
+          ),
+          (
+            select
+              public.get_user_main_org_id_by_app_id (app_id)
+          ),
+          app_id,
+          NULL::bigint
+        )
     )
   );
 
@@ -188,16 +276,28 @@ CREATE POLICY "Allow org member to select devices" ON "public"."devices" FOR
 SELECT
   TO "anon",
   "authenticated" USING (
-    public.check_min_rights (
-      'read'::public.user_min_right,
-      public.get_identity_org_appid (
-        '{read,upload,write,all}'::public.key_mode[],
-        public.get_user_main_org_id_by_app_id (app_id),
-        app_id
-      ),
-      public.get_user_main_org_id_by_app_id (app_id),
-      app_id,
-      NULL::bigint
+    (
+      select
+        public.check_min_rights (
+          'read'::public.user_min_right,
+          (
+            select
+              public.get_identity_org_appid (
+                '{read,upload,write,all}'::public.key_mode[],
+                (
+                  select
+                    public.get_user_main_org_id_by_app_id (app_id)
+                ),
+                app_id
+              )
+          ),
+          (
+            select
+              public.get_user_main_org_id_by_app_id (app_id)
+          ),
+          app_id,
+          NULL::bigint
+        )
     )
   );
 
@@ -206,15 +306,27 @@ CREATE POLICY "Allow org member to insert devices" ON "public"."devices" FOR INS
 "authenticated"
 WITH
   CHECK (
-    public.check_min_rights (
-      'write'::public.user_min_right,
-      public.get_identity_org_appid (
-        '{write,all}'::public.key_mode[],
-        public.get_user_main_org_id_by_app_id (app_id),
-        app_id
-      ),
-      public.get_user_main_org_id_by_app_id (app_id),
-      app_id,
-      NULL::bigint
+    (
+      select
+        public.check_min_rights (
+          'write'::public.user_min_right,
+          (
+            select
+              public.get_identity_org_appid (
+                '{write,all}'::public.key_mode[],
+                (
+                  select
+                    public.get_user_main_org_id_by_app_id (app_id)
+                ),
+                app_id
+              )
+          ),
+          (
+            select
+              public.get_user_main_org_id_by_app_id (app_id)
+          ),
+          app_id,
+          NULL::bigint
+        )
     )
   );
