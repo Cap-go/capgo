@@ -322,8 +322,8 @@ async function confirmPlatformChange(platform: 'ios' | 'android', newValue: bool
 
   // Check if this channel is already the default for this platform
   const appData = channel.value.app_id as any
-  const currentDefaultChannelId = platform === 'ios' 
-    ? appData.default_channel_ios 
+  const currentDefaultChannelId = platform === 'ios'
+    ? appData.default_channel_ios
     : appData.default_channel_android
 
   if (currentDefaultChannelId === id.value) {
@@ -339,7 +339,7 @@ async function confirmPlatformChange(platform: 'ios' | 'android', newValue: bool
         .select('name')
         .eq('id', currentDefaultChannelId)
         .single()
-      
+
       if (currentDefaultChannel) {
         currentDefaultChannelName.value = currentDefaultChannel.name
       }
@@ -355,7 +355,7 @@ async function confirmPlatformChange(platform: 'ios' | 'android', newValue: bool
   // Show confirmation dialog
   dialogStore.openDialog({
     title: t('confirm-platform-change'),
-    description: platform === 'ios' 
+    description: platform === 'ios'
       ? t('confirm-platform-change-ios-message')
       : t('confirm-platform-change-android-message'),
     size: 'lg',
@@ -372,10 +372,10 @@ async function confirmPlatformChange(platform: 'ios' | 'android', newValue: bool
   })
 
   const cancelled = await dialogStore.onDialogDismiss()
-  
+
   // Clear the pending platform change
   pendingPlatformChange.value = null
-  
+
   return !cancelled
 }
 
@@ -391,7 +391,7 @@ async function confirmPlatformDisable(platform: 'ios' | 'android'): Promise<bool
   // Show confirmation dialog
   dialogStore.openDialog({
     title: t('confirm-platform-disable'),
-    description: platform === 'ios' 
+    description: platform === 'ios'
       ? t('confirm-platform-disable-ios-message')
       : t('confirm-platform-disable-android-message'),
     size: 'lg',
@@ -417,7 +417,8 @@ async function handlePlatformToggle(platform: 'ios' | 'android') {
     return
   }
 
-  if (!channel.value) return
+  if (!channel.value)
+    return
 
   const currentValue = platform === 'ios' ? channel.value.ios : channel.value.android
   const newValue = !currentValue
@@ -425,7 +426,8 @@ async function handlePlatformToggle(platform: 'ios' | 'android') {
   // Optimistically update local state for immediate visual feedback
   if (platform === 'ios') {
     localIosState.value = newValue
-  } else {
+  }
+  else {
     localAndroidState.value = newValue
   }
 
@@ -435,24 +437,26 @@ async function handlePlatformToggle(platform: 'ios' | 'android') {
     if (newValue) {
       // Enabling platform
       confirmed = await confirmPlatformChange(platform, newValue)
-    } else {
+    }
+    else {
       // Disabling platform - check if this channel is currently the default
       const appData = channel.value.app_id as any
-      const currentDefaultChannelId = platform === 'ios' 
-        ? appData.default_channel_ios 
+      const currentDefaultChannelId = platform === 'ios'
+        ? appData.default_channel_ios
         : appData.default_channel_android
-      
+
       if (currentDefaultChannelId === id.value) {
         // This channel is the current default, show confirmation
         confirmed = await confirmPlatformDisable(platform)
       }
     }
-    
+
     if (!confirmed) {
       // User cancelled - revert local state
       if (platform === 'ios') {
         localIosState.value = currentValue
-      } else {
+      }
+      else {
         localAndroidState.value = currentValue
       }
       return
@@ -460,12 +464,14 @@ async function handlePlatformToggle(platform: 'ios' | 'android') {
 
     // Proceed with the change - saveChannelChange will update local state on success
     await saveChannelChange(platform, newValue)
-  } catch (error) {
+  }
+  catch (error) {
     console.error(error)
     // On error, revert local state
     if (platform === 'ios') {
       localIosState.value = currentValue
-    } else {
+    }
+    else {
       localAndroidState.value = currentValue
     }
   }
@@ -485,20 +491,21 @@ async function saveChannelChange(key: string, val: any) {
     if (key === 'ios' || key === 'android') {
       const appData = channel.value.app_id as any
       const defaultChannelColumn = key === 'ios' ? 'default_channel_ios' : 'default_channel_android'
-      
+
       if (val === true) {
         // Enabling: Set this channel as the new default
         const { error: appUpdateError } = await supabase
           .from('apps')
           .update({ [defaultChannelColumn]: id.value })
           .eq('id', appData.id)
-        
+
         if (appUpdateError) {
           toast.error(t('error-update-channel'))
           console.error('Failed to update app default channel:', appUpdateError)
           return
         }
-      } else {
+      }
+      else {
         // Disabling: Unset the default channel if this channel is currently the default
         const currentDefaultChannelId = appData[defaultChannelColumn]
         if (currentDefaultChannelId === id.value) {
@@ -506,7 +513,7 @@ async function saveChannelChange(key: string, val: any) {
             .from('apps')
             .update({ [defaultChannelColumn]: null })
             .eq('id', appData.id)
-          
+
           if (appUpdateError) {
             toast.error(t('error-update-channel'))
             console.error('Failed to unset app default channel:', appUpdateError)
@@ -524,15 +531,15 @@ async function saveChannelChange(key: string, val: any) {
       .from('channels')
       .update(update)
       .eq('id', id.value)
-    
+
     if (error) {
       toast.error(t('error-update-channel'))
       console.error('no channel update', error)
       return
     }
-    
+
     await reload()
-    
+
     // Sync local state with updated channel data
     if (channel.value) {
       localIosState.value = channel.value.ios
@@ -552,13 +559,13 @@ watchEffect(async () => {
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
-    
+
     // Initialize local states after channel is loaded
     if (channel.value) {
       localIosState.value = channel.value.ios
       localAndroidState.value = channel.value.android
     }
-    
+
     loading.value = false
     displayStore.NavTitle = t('channel')
     displayStore.defaultBack = `/app/p/${route.params.package}/channels`
@@ -909,36 +916,36 @@ function redirectToAppSettings() {
             </InfoRow>
             <InfoRow label="iOS">
               <label class="relative inline-flex items-center cursor-pointer" @click="handlePlatformToggle('ios')">
-                <input 
-                  :checked="localIosState" 
-                  type="checkbox" 
+                <input
+                  :checked="localIosState"
+                  type="checkbox"
                   class="sr-only peer"
                   readonly
                 >
-                <div 
+                <div
                   class="h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:rounded-full after:bg-white after:transition-all after:content-['']"
                   :class="[
-                    localIosState 
-                      ? 'bg-blue-600 after:translate-x-full after:border-white' 
-                      : 'bg-gray-200 after:translate-x-0 after:border-gray-300 dark:after:border-gray-600 dark:bg-gray-700'
+                    localIosState
+                      ? 'bg-blue-600 after:translate-x-full after:border-white'
+                      : 'bg-gray-200 after:translate-x-0 after:border-gray-300 dark:after:border-gray-600 dark:bg-gray-700',
                   ]"
                 />
               </label>
             </InfoRow>
             <InfoRow label="Android">
               <label class="relative inline-flex items-center cursor-pointer" @click="handlePlatformToggle('android')">
-                <input 
-                  :checked="localAndroidState" 
-                  type="checkbox" 
+                <input
+                  :checked="localAndroidState"
+                  type="checkbox"
                   class="sr-only peer"
                   readonly
                 >
-                <div 
+                <div
                   class="h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:rounded-full after:bg-white after:transition-all after:content-['']"
                   :class="[
-                    localAndroidState 
-                      ? 'bg-blue-600 after:translate-x-full after:border-white' 
-                      : 'bg-gray-200 after:translate-x-0 after:border-gray-300 dark:after:border-gray-600 dark:bg-gray-700'
+                    localAndroidState
+                      ? 'bg-blue-600 after:translate-x-full after:border-white'
+                      : 'bg-gray-200 after:translate-x-0 after:border-gray-300 dark:after:border-gray-600 dark:bg-gray-700',
                   ]"
                 />
               </label>
