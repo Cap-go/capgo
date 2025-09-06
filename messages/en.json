@@ -333,6 +333,8 @@
   "email": "Email",
   "enable": "Enable",
   "enable-2FA": "Enable 2FA",
+  "enable-platform-support": "Enable platform support",
+  "enable-platform-support-message": "The channel '$CHANNEL' does not currently support $PLATFORMS. Do you want to enable $PLATFORMS support for this channel? Note: Platform support will remain enabled even if this channel is later unset as the default for this platform.",
   "enabled": "Enabled",
   "enabled-ab-testing": "Enabled AB testing",
   "enabled-progressive-deploy": "Enabled progressive deploy",

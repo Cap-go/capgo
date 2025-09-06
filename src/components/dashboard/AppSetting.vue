@@ -330,19 +330,9 @@ async function setDefaultUploadChannel() {
 }
 
 async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
-  let query = supabase.from('channels')
+  const { data: channels, error } = await supabase.from('channels')
     .select('name, id, ios, android')
     .eq('app_id', appRef.value?.app_id ?? '')
-
-  // Filter channels based on platform support (only when not synced)
-  if (type === 'ios') {
-    query = query.eq('ios', true)
-  } else if (type === 'android') {
-    query = query.eq('android', true)
-  }
-  // For 'both', we don't filter here as we'll handle it in the UI
-
-  const { data: channels, error } = await query
 
   if (error) {
     toast.error(t('cannot-change-update-channel'))
@@ -350,22 +340,9 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
     return
   }
 
-  // Check if no channels meet the platform requirements
-  if (type === 'ios' && channels.length === 0) {
-    toast.error(t('no-ios-channels-available'))
+  if (!channels || channels.length === 0) {
+    toast.error(t('no-channels-available'))
     return
-  } else if (type === 'android' && channels.length === 0) {
-    toast.error(t('no-android-channels-available'))
-    return
-  } else if (type === 'both') {
-    // For 'both', we need channels that support both platforms
-    const bothPlatformChannels = channels.filter(ch => ch.ios && ch.android)
-    if (bothPlatformChannels.length === 0) {
-      toast.error(t('no-both-platform-channels-available'))
-      return
-    }
-    // Update channels to only include those that support both platforms
-    channels.splice(0, channels.length, ...bothPlatformChannels)
   }
 
   const buttons = channels.map((chann) => {
@@ -373,44 +350,40 @@ async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
       text: chann.name,
       role: 'secondary' as const,
       handler: async () => {
-        let appError: any
-        if (type !== 'both') {
-          appError = await supabase.from('apps')
-            .update({ [`default_channel_${type}`]: chann.id })
-            .eq('app_id', appRef.value?.app_id ?? '')
-            .then(x => x.error)
+        // Check if channel supports the required platform(s)
+        const needsIosSupport = (type === 'ios' || type === 'both') && !chann.ios
+        const needsAndroidSupport = (type === 'android' || type === 'both') && !chann.android
+        
+        if (needsIosSupport || needsAndroidSupport) {
+          // Show confirmation dialog for enabling platform support
+          const platformNames = []
+          if (needsIosSupport) platformNames.push('iOS')
+          if (needsAndroidSupport) platformNames.push('Android')
+          
+          dialogStore.openDialog({
+            title: t('enable-platform-support'),
+            description: t('enable-platform-support-message')
+              .replaceAll('$CHANNEL', chann.name)
+              .replaceAll('$PLATFORMS', platformNames.join(' and ')),
+            size: 'lg',
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('button-confirm'),
+                role: 'primary',
+                handler: async () => {
+                  await handleChannelSelectionWithPlatformEnable(chann, type, needsIosSupport, needsAndroidSupport)
+                },
+              },
+            ],
+          })
+        } else {
+          // Channel already supports the required platform(s)
+          await handleChannelSelection(chann, type)
         }
-        else {
-          appError = await supabase.from('apps')
-            .update({ default_channel_ios: chann.id, default_channel_android: chann.id })
-            .eq('app_id', appRef.value?.app_id ?? '')
-            .then(x => x.error)
-        }
-
-        if (appError) {
-          toast.error(t('cannot-change-update-channel'))
-          console.error(error)
-          return
-        }
-        if (appRef.value && type !== 'both') {
-          appRef.value[`default_channel_${type}`] = {
-            id: chann.id,
-            name: chann.name,
-          } as any
-          forceBump.value += 1
-        }
-        else if (appRef.value && type === 'both') {
-          appRef.value.default_channel_android = {
-            id: chann.id,
-            name: chann.name,
-          } as any
-          appRef.value.default_channel_ios = {
-            id: chann.id,
-            name: chann.name,
-          } as any
-          forceBump.value += 1
-        }
-        toast.success(t('updated-default-update-channel'))
       },
     }
   })
@@ -728,6 +701,85 @@ async function handleNormalUnset(type: 'android' | 'ios' | 'both') {
     
   } catch (error) {
     console.error('Error in handleNormalUnset:', error)
+    toast.error(t('cannot-change-update-channel'))
+  }
+}
+
+async function handleChannelSelectionWithPlatformEnable(chann: any, type: 'android' | 'ios' | 'both', needsIosSupport: boolean, needsAndroidSupport: boolean) {
+  if (!appRef.value) return
+  
+  try {
+    // First, enable platform support on the channel
+    const channelUpdate: any = {}
+    if (needsIosSupport) channelUpdate.ios = true
+    if (needsAndroidSupport) channelUpdate.android = true
+    
+    const { error: channelError } = await supabase
+      .from('channels')
+      .update(channelUpdate)
+      .eq('id', chann.id)
+    
+    if (channelError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error('Channel platform enable error:', channelError)
+      return
+    }
+    
+    // Then set as default channel
+    await handleChannelSelection(chann, type)
+    
+  } catch (error) {
+    console.error('Error in handleChannelSelectionWithPlatformEnable:', error)
+    toast.error(t('cannot-change-update-channel'))
+  }
+}
+
+async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'both') {
+  if (!appRef.value) return
+  
+  try {
+    let appError: any
+    if (type !== 'both') {
+      appError = await supabase.from('apps')
+        .update({ [`default_channel_${type}`]: chann.id })
+        .eq('app_id', appRef.value.app_id ?? '')
+        .then(x => x.error)
+    }
+    else {
+      appError = await supabase.from('apps')
+        .update({ default_channel_ios: chann.id, default_channel_android: chann.id })
+        .eq('app_id', appRef.value.app_id ?? '')
+        .then(x => x.error)
+    }
+
+    if (appError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error('App update error:', appError)
+      return
+    }
+    
+    if (appRef.value && type !== 'both') {
+      appRef.value[`default_channel_${type}`] = {
+        id: chann.id,
+        name: chann.name,
+      } as any
+      forceBump.value += 1
+    }
+    else if (appRef.value && type === 'both') {
+      appRef.value.default_channel_android = {
+        id: chann.id,
+        name: chann.name,
+      } as any
+      appRef.value.default_channel_ios = {
+        id: chann.id,
+        name: chann.name,
+      } as any
+      forceBump.value += 1
+    }
+    toast.success(t('updated-default-update-channel'))
+    
+  } catch (error) {
+    console.error('Error in handleChannelSelection:', error)
     toast.error(t('cannot-change-update-channel'))
   }
 }

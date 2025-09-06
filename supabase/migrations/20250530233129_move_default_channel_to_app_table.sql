@@ -151,7 +151,7 @@ ON public.apps
 FOR EACH ROW
 EXECUTE FUNCTION public.update_channel_public_from_app();
 
--- Create a trigger function that syncs channels.public changes to apps table
+-- Create a trigger function that syncs channels.public changes to apps table and validates platform changes
 CREATE OR REPLACE FUNCTION public.sync_channel_public_to_apps()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -160,16 +160,39 @@ AS $$
 DECLARE
     old_public BOOLEAN;
     new_public BOOLEAN;
+    old_ios BOOLEAN;
+    new_ios BOOLEAN;
+    old_android BOOLEAN;
+    new_android BOOLEAN;
     channel_ios BOOLEAN;
     channel_android BOOLEAN;
     current_ios_default BIGINT;
     current_android_default BIGINT;
 BEGIN
-    -- Get the old and new public values
+    -- Get the old and new values
     old_public := COALESCE(OLD.public, FALSE);
     new_public := COALESCE(NEW.public, FALSE);
+    old_ios := COALESCE(OLD.ios, FALSE);
+    new_ios := COALESCE(NEW.ios, FALSE);
+    old_android := COALESCE(OLD.android, FALSE);
+    new_android := COALESCE(NEW.android, FALSE);
     
-    -- Only proceed if public status actually changed
+    -- Check current apps table state
+    SELECT default_channel_ios, default_channel_android 
+    INTO current_ios_default, current_android_default
+    FROM public.apps
+    WHERE app_id = NEW.app_id;
+    
+    -- Validate platform changes: prevent disabling platform support for default channels
+    IF old_ios = TRUE AND new_ios = FALSE AND current_ios_default = NEW.id THEN
+        RAISE EXCEPTION 'Cannot remove iOS platform support from channel "%" as it is assigned as default_channel_ios in the apps table. Remove the channel from default_channel_ios first.', NEW.name;
+    END IF;
+    
+    IF old_android = TRUE AND new_android = FALSE AND current_android_default = NEW.id THEN
+        RAISE EXCEPTION 'Cannot remove Android platform support from channel "%" as it is assigned as default_channel_android in the apps table. Remove the channel from default_channel_android first.', NEW.name;
+    END IF;
+    
+    -- Only proceed with public status changes if public status actually changed
     IF old_public = new_public THEN
         RETURN NEW;
     END IF;
@@ -252,8 +275,9 @@ $$;
 
 -- Create triggers for the channels table
 DROP TRIGGER IF EXISTS manage_channel_public_status_trigger ON public.channels;
+DROP TRIGGER IF EXISTS sync_channel_public_to_apps_trigger ON public.channels;
 CREATE TRIGGER sync_channel_public_to_apps_trigger
-AFTER UPDATE OF public
+AFTER UPDATE OF public, ios, android
 ON public.channels
 FOR EACH ROW
 EXECUTE FUNCTION public.sync_channel_public_to_apps();
