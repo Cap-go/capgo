@@ -450,7 +450,7 @@ DECLARE
 BEGIN
     -- Clean up messages older than 7 days from all queues
     FOR queue_name IN (
-        SELECT name FROM pgmq.list_queues()
+        SELECT q.queue_name FROM pgmq.list_queues() q
     ) LOOP
         -- Delete archived messages older than 7 days
         EXECUTE format('DELETE FROM pgmq.a_%I WHERE archived_at < $1', queue_name)
