@@ -434,7 +434,7 @@ BEGIN
     WHERE job_pid IN (
         SELECT jobid 
         FROM cron.job 
-        WHERE schedule = '5 seconds' OR schedule = '1 seconds'
+        WHERE schedule = '5 seconds' OR schedule = '1 seconds' OR schedule = '10 seconds'
     ) 
     AND end_time < now() - interval '1 hour';
 END;
