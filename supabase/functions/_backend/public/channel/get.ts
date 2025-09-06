@@ -10,7 +10,7 @@ interface GetDevice {
   page?: number
 }
 
-async function getAll(c: Context, body: GetDevice) {
+async function getAll(c: Context, body: GetDevice, dataApp: { default_channel_android: number | null, default_channel_ios: number | null }) {
   const fetchOffset = body.page ?? 0
   const from = fetchOffset * fetchLimit
   const to = (fetchOffset + 1) * fetchLimit - 1
@@ -23,7 +23,6 @@ async function getAll(c: Context, body: GetDevice) {
       app_id,
       created_by,
       updated_at,
-      public,
       disable_auto_update_under_native,
       disable_auto_update,
       allow_device_self_set,
@@ -46,11 +45,12 @@ async function getAll(c: Context, body: GetDevice) {
       ...rest,
       disableAutoUpdateUnderNative: disable_auto_update_under_native,
       disableAutoUpdate: disable_auto_update,
+      public: o.id === dataApp.default_channel_android || o.id === dataApp.default_channel_ios,
     }
   }))
 }
 
-async function getOne(c: Context, body: GetDevice) {
+async function getOne(c: Context, body: GetDevice, dataApp: { default_channel_android: number | null, default_channel_ios: number | null }) {
   const { data: dataChannel, error: dbError } = await supabaseAdmin(c)
     .from('channels')
     .select(`
@@ -60,12 +60,11 @@ async function getOne(c: Context, body: GetDevice) {
     app_id,
     created_by,
     updated_at,
-    public,
     disable_auto_update_under_native,
     disable_auto_update,
     allow_device_self_set,
     allow_emulator,
-    public,
+    allow_dev,
     version (
       name,
       id
@@ -83,6 +82,7 @@ async function getOne(c: Context, body: GetDevice) {
     ...rest,
     disableAutoUpdateUnderNative: disable_auto_update_under_native,
     disableAutoUpdate: disable_auto_update,
+    public: dataChannel.id === dataApp.default_channel_android || dataChannel.id === dataApp.default_channel_ios,
   }
 
   return c.json(newObject)
@@ -93,9 +93,19 @@ export async function get(c: Context, body: GetDevice, apikey: Database['public'
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 
+  const { data: dataApp, error: dbError } = await supabaseAdmin(c)
+    .from('apps')
+    .select('default_channel_android, default_channel_ios')
+    .eq('app_id', body.app_id)
+    .single()
+  if (dbError || !dataApp) {
+    console.log('Cannot find app', dbError)
+    return c.json({ status: 'Cannot find app', error: JSON.stringify(dbError) }, 400)
+  }
+
   // get one channel or all channels
   if (body.channel) {
-    return getOne(c, body)
+    return getOne(c, body, dataApp)
   }
-  return getAll(c, body)
+  return getAll(c, body, dataApp)
 }

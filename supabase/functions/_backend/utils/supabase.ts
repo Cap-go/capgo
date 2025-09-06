@@ -144,10 +144,18 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     }
   }
 
-  return supabaseAdmin(c)
+  const { data, error } = await supabaseAdmin(c)
     .from('channels')
     .upsert(update, { onConflict: 'app_id, name' })
-    .throwOnError()
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error({ requestId: c.get('requestId'), context: 'Error upserting channel', error })
+    return Promise.reject(new Error(error.message))
+  }
+
+  return Promise.resolve({ error: null, requestId: c.get('requestId'), id: data.id })
 }
 
 export async function updateOrCreateChannelDevice(c: Context, update: Database['public']['Tables']['channel_devices']['Insert']) {

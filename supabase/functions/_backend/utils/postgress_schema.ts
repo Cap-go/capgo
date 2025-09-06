@@ -6,7 +6,7 @@ import { bigint, boolean, customType, pgEnum, pgTable, serial, text, timestamp, 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 
 // Keeping this for backward compatibility but marking as deprecated
-const manfiestType = customType <{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
+const manfiestType = customType<{ data: Database['public']['CompositeTypes']['manifest_entry'][] }>({
   dataType() {
     return 'manifest_entry[]'
   },
@@ -42,7 +42,12 @@ export const apps = pgTable('apps', {
   last_version: varchar('last_version'),
   updated_at: timestamp('updated_at'),
   id: uuid('id').primaryKey().unique(),
+  user_id: uuid('user_id'),
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
+  default_upload_channel: varchar('default_upload_channel'),
+  default_channel_android: bigint('default_channel_android', { mode: 'number' }),
+  default_channel_ios: bigint('default_channel_ios', { mode: 'number' }),
+  default_channel_sync: boolean('default_channel_sync').default(false).notNull(),
 })
 
 export const app_versions = pgTable('app_versions', {
@@ -85,7 +90,6 @@ export const channels = pgTable('channels', {
   version: bigint('version', { mode: 'number' }).notNull().references(() => app_versions.id),
   created_by: uuid('created_by').notNull(),
   updated_at: timestamp('updated_at').defaultNow().notNull(),
-  public: boolean('public').notNull().default(false),
   disable_auto_update_under_native: boolean('disable_auto_update_under_native').notNull().default(true),
   disable_auto_update: disableUpdatePgEnum('disable_auto_update').default('major').notNull(),
   ios: boolean('ios').default(true).notNull(),

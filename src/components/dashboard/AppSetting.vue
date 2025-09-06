@@ -6,9 +6,11 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import mime from 'mime'
 import { useI18n } from 'petite-vue-i18n'
 import { toast } from 'vue-sonner'
-import ArrowUpTray from '~icons/heroicons/arrow-up-tray?raw'
 import Pencil from '~icons/heroicons/pencil-square'
+import Android from '~icons/mingcute/android-line?raw&width=48&height=48'
+import Apple from '~icons/mingcute/apple-line?raw&width=48&height=48'
 import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&height=36'
+import ArrowUpTray from '~icons/mingcute/upload-2-fill?raw'
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import { useSupabase } from '~/services/supabase'
@@ -25,6 +27,7 @@ const dialogStore = useDialogV2Store()
 const role = ref<OrganizationRole | null>(null)
 const forceBump = ref(0)
 const organizationStore = useOrganizationStore()
+const defaultChannelSync = ref(false)
 const transferAppIdInput = ref('')
 const selectedChannel = ref('')
 const availableChannels = ref<{ name: string }[]>([])
@@ -35,7 +38,7 @@ onMounted(async () => {
   const [{ error, data }] = await Promise.all([
     supabase
       .from('apps')
-      .select('*, owner_org ( name, id )')
+      .select('*, owner_org ( name, id ), default_channel_android ( name, id ), default_channel_ios ( name, id )')
       .eq('app_id', props.appId)
       .single(),
   ])
@@ -48,6 +51,7 @@ onMounted(async () => {
   await organizationStore.awaitInitialLoad()
   role.value = organizationStore.getCurrentRoleForApp(props.appId)
   appRef.value = data as any
+  defaultChannelSync.value = data.default_channel_sync
   isLoading.value = false
   isFirstLoading.value = false
 })
@@ -77,6 +81,105 @@ async function didCancel(name: string) {
     ],
   })
   return dialogStore.onDialogDismiss()
+}
+
+async function setUpdateChannelSync(value: boolean) {
+  if (value === true && appRef.value && ((appRef.value.default_channel_ios && appRef.value.default_channel_android && (appRef.value.default_channel_ios as any)?.id !== (appRef.value.default_channel_android as any)?.id) || (!appRef.value?.default_channel_ios && !!appRef.value?.default_channel_android) || (!appRef.value?.default_channel_android && !!appRef.value?.default_channel_ios))) {
+    const channels = await supabase
+      .from('channels')
+      .select('*')
+      .eq('app_id', props.appId)
+      .in('id', [
+        ...(appRef.value.default_channel_ios ? [(appRef.value.default_channel_ios as any).id] : []),
+        ...(appRef.value.default_channel_android ? [(appRef.value.default_channel_android as any).id] : []),
+      ])
+    if (channels.error) {
+      toast.error(t('cannot-change-update-channel-sync'))
+      return
+    }
+    let selectedChannelId = null as string | null
+
+    const buttons = [
+      ...channels.data.map(channel => ({
+        text: channel.name,
+        role: 'secondary' as const,
+        handler: () => {
+          selectedChannelId = channel.id.toString()
+        },
+      })),
+      ...(!appRef.value.default_channel_ios || !appRef.value.default_channel_android
+        ? [{
+            text: t('undefined'),
+            role: 'danger' as const,
+            handler: () => {
+              selectedChannelId = 'empty'
+            },
+          }]
+        : []),
+      {
+        text: t('button-cancel'),
+        role: 'cancel' as const,
+      },
+    ]
+
+    dialogStore.openDialog({
+      title: t('select-default-update-channel-header-before-sync-change'),
+      description: t('select-default-update-channel-header-before-sync-change-message'),
+      size: 'xl',
+      preventAccidentalClose: true,
+      buttons,
+    })
+
+    const cancelled = await dialogStore.onDialogDismiss()
+    if (cancelled) {
+      console.log('Dialog dismissed')
+      defaultChannelSync.value = !value
+      return
+    }
+    if (!selectedChannelId) {
+      console.error('No channel selected')
+      defaultChannelSync.value = !value
+      return
+    }
+    const channel = selectedChannelId === 'empty' ? { id: null, name: null } : channels.data.find(chann => chann.id.toString() === selectedChannelId)
+    if (!channel) {
+      console.error('Channel not found')
+      defaultChannelSync.value = !value
+      return
+    }
+    const { error: appError } = await supabase.from('apps')
+      .update({ default_channel_ios: channel.id, default_channel_android: channel.id })
+      .eq('app_id', props.appId)
+    if (appError) {
+      toast.error(t('cannot-change-update-channel-sync'))
+      console.error(appError)
+      return
+    }
+    defaultChannelSync.value = value
+    if (appRef.value) {
+      if (channel) {
+        appRef.value.default_channel_ios = channel as any
+        appRef.value.default_channel_android = channel as any
+      }
+      else {
+        appRef.value.default_channel_ios = null
+        appRef.value.default_channel_android = null
+      }
+    }
+    forceBump.value += 1
+    toast.success(t('updated-default-update-channel-sync'))
+  }
+  const { error } = await supabase.from('apps')
+    .update({ default_channel_sync: value })
+    .eq('app_id', props.appId)
+  if (error) {
+    toast.error(t('cannot-change-update-channel-sync'))
+    console.error(error)
+  }
+  if (appRef.value) {
+    appRef.value.default_channel_sync = value
+    forceBump.value += 1
+  }
 }
 
 async function deleteApp() {
@@ -171,7 +274,7 @@ async function updateAppRetention(newRetention: number) {
     appRef.value.retention = newRetention
 }
 
-async function setDefaultChannel() {
+async function setDefaultUploadChannel() {
   const { data: channels, error } = await supabase.from('channels')
     .select('name')
     .eq('app_id', appRef.value?.app_id ?? '')
@@ -223,6 +326,123 @@ async function setDefaultChannel() {
         },
       },
     ],
+  })
+}
+
+async function setDefaultUpdateChannel(type: 'android' | 'ios' | 'both') {
+  const { data: channels, error } = await supabase.from('channels')
+    .select('name, id, ios, android')
+    .eq('app_id', appRef.value?.app_id ?? '')
+
+  if (error) {
+    toast.error(t('cannot-change-update-channel'))
+    console.error(error)
+    return
+  }
+
+  if (!channels || channels.length === 0) {
+    toast.error(t('no-channels-available'))
+    return
+  }
+
+  const buttons = channels.map((chann) => {
+    return {
+      text: chann.name,
+      role: 'secondary' as const,
+      handler: async () => {
+        // Check if channel supports the required platform(s)
+        const needsIosSupport = (type === 'ios' || type === 'both') && !chann.ios
+        const needsAndroidSupport = (type === 'android' || type === 'both') && !chann.android
+
+        if (needsIosSupport || needsAndroidSupport) {
+          // Show confirmation dialog for enabling platform support
+          const platformNames = []
+          if (needsIosSupport)
+            platformNames.push('iOS')
+          if (needsAndroidSupport)
+            platformNames.push('Android')
+
+          dialogStore.openDialog({
+            title: t('enable-platform-support'),
+            description: t('enable-platform-support-message')
+              .replaceAll('$CHANNEL', chann.name)
+              .replaceAll('$PLATFORMS', platformNames.join(' and ')),
+            size: 'lg',
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('button-confirm'),
+                role: 'primary',
+                handler: async () => {
+                  await handleChannelSelectionWithPlatformEnable(chann, type, needsIosSupport, needsAndroidSupport)
+                },
+              },
+            ],
+          })
+        }
+        else {
+          // Channel already supports the required platform(s)
+          await handleChannelSelection(chann, type)
+        }
+      },
+    }
+  })
+
+  const allButtons = [
+    ...buttons,
+    {
+      text: t('unset'),
+      role: 'danger' as const,
+      handler: async () => {
+        // Check if channels are synced but sync toggle is off, and if we're unsetting individual platforms
+        const channelsAreSynced = appRef.value?.default_channel_ios && appRef.value?.default_channel_android
+          && (appRef.value.default_channel_ios as any)?.id === (appRef.value.default_channel_android as any)?.id
+        const syncIsOff = !appRef.value?.default_channel_sync
+
+        if (channelsAreSynced && syncIsOff && type !== 'both') {
+          // Show confirmation dialog
+          dialogStore.openDialog({
+            title: t('confirm-unset-synced-channel'),
+            description: type === 'ios'
+              ? t('confirm-unset-synced-channel-ios-message')
+              : t('confirm-unset-synced-channel-android-message'),
+            size: 'lg',
+            buttons: [
+              {
+                text: t('button-cancel'),
+                role: 'cancel',
+              },
+              {
+                text: t('button-confirm'),
+                role: 'danger',
+                handler: async () => {
+                  await handleUnsetWithChannelUpdate(type)
+                },
+              },
+            ],
+          })
+          return
+        }
+
+        // Normal unset behavior
+        await handleNormalUnset(type)
+      },
+    },
+    {
+      text: t('button-cancel'),
+      role: 'cancel' as const,
+    },
+  ]
+
+  dialogStore.openDialog({
+    title: t('select-default-update-channel-header').replace('$1', type === 'android' ? 'Android' : type === 'ios' ? 'iOS' : 'Android & iOS'),
+    description: t('select-default-update-channel'),
+    size: 'xl',
+    preventAccidentalClose: true,
+    buttons: allButtons,
   })
 }
 
@@ -388,6 +608,192 @@ function confirmTransferAppOwnership(org: Organization) {
   })
 }
 
+function navigateToChannel(channelId: number | null, channelName: string) {
+  if (!channelId || channelName === t('undefined')) {
+    return
+  }
+
+  const appId = appRef.value?.app_id
+  if (!appId) {
+    return
+  }
+
+  // Navigate to the channel page
+  router.push(`/app/p/${appId}/channel/${channelId}`)
+}
+
+async function handleUnsetWithChannelUpdate(type: 'ios' | 'android') {
+  if (!appRef.value)
+    return
+
+  const currentChannelId = type === 'ios'
+    ? (appRef.value.default_channel_ios as any)?.id
+    : (appRef.value.default_channel_android as any)?.id
+
+  if (!currentChannelId)
+    return
+
+  try {
+    // First, update the channel to disable the platform
+    const channelUpdate = { [type]: false }
+    const { error: channelError } = await supabase
+      .from('channels')
+      .update(channelUpdate)
+      .eq('id', currentChannelId)
+
+    if (channelError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error('Channel update error:', channelError)
+      return
+    }
+
+    // Then, unset the default channel in apps table
+    const { error: appError } = await supabase.from('apps')
+      .update({ [`default_channel_${type}`]: null })
+      .eq('app_id', appRef.value.app_id ?? '')
+
+    if (appError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error('App update error:', appError)
+      return
+    }
+
+    // Update local state
+    appRef.value[`default_channel_${type}`] = null
+    forceBump.value += 1
+    toast.success(t('updated-default-update-channel'))
+  }
+  catch (error) {
+    console.error('Error in handleUnsetWithChannelUpdate:', error)
+    toast.error(t('cannot-change-update-channel'))
+  }
+}
+
+async function handleNormalUnset(type: 'android' | 'ios' | 'both') {
+  if (!appRef.value)
+    return
+
+  try {
+    let appError: any = null
+    if (type === 'both') {
+      appError = await supabase.from('apps')
+        .update({ default_channel_android: null, default_channel_ios: null })
+        .eq('app_id', appRef.value.app_id ?? '')
+        .then(x => x.error)
+    }
+    else {
+      appError = await supabase.from('apps')
+        .update({ [`default_channel_${type}`]: null })
+        .eq('app_id', appRef.value.app_id ?? '')
+        .then(x => x.error)
+    }
+
+    if (appError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error(appError)
+      return
+    }
+
+    if (appRef.value && type !== 'both') {
+      appRef.value[`default_channel_${type}`] = null
+      forceBump.value += 1
+    }
+    else if (appRef.value && type === 'both') {
+      appRef.value.default_channel_android = null
+      appRef.value.default_channel_ios = null
+      forceBump.value += 1
+    }
+    toast.success(t('updated-default-update-channel'))
+  }
+  catch (error) {
+    console.error('Error in handleNormalUnset:', error)
+    toast.error(t('cannot-change-update-channel'))
+  }
+}
+
+async function handleChannelSelectionWithPlatformEnable(chann: any, type: 'android' | 'ios' | 'both', needsIosSupport: boolean, needsAndroidSupport: boolean) {
+  if (!appRef.value)
+    return
+
+  try {
+    // First, enable platform support on the channel
+    const channelUpdate: any = {}
+    if (needsIosSupport)
+      channelUpdate.ios = true
+    if (needsAndroidSupport)
+      channelUpdate.android = true
+
+    const { error: channelError } = await supabase
+      .from('channels')
+      .update(channelUpdate)
+      .eq('id', chann.id)
+
+    if (channelError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error('Channel platform enable error:', channelError)
+      return
+    }
+
+    // Then set as default channel
+    await handleChannelSelection(chann, type)
+  }
+  catch (error) {
+    console.error('Error in handleChannelSelectionWithPlatformEnable:', error)
+    toast.error(t('cannot-change-update-channel'))
+  }
+}
+
+async function handleChannelSelection(chann: any, type: 'android' | 'ios' | 'both') {
+  if (!appRef.value)
+    return
+
+  try {
+    let appError: any
+    if (type !== 'both') {
+      appError = await supabase.from('apps')
+        .update({ [`default_channel_${type}`]: chann.id })
+        .eq('app_id', appRef.value.app_id ?? '')
+        .then(x => x.error)
+    }
+    else {
+      appError = await supabase.from('apps')
+        .update({ default_channel_ios: chann.id, default_channel_android: chann.id })
+        .eq('app_id', appRef.value.app_id ?? '')
+        .then(x => x.error)
+    }
+
+    if (appError) {
+      toast.error(t('cannot-change-update-channel'))
+      console.error('App update error:', appError)
+      return
+    }
+
+    if (appRef.value && type !== 'both') {
+      appRef.value[`default_channel_${type}`] = {
+        id: chann.id,
+        name: chann.name,
+      } as any
+      forceBump.value += 1
+    }
+    else if (appRef.value && type === 'both') {
+      appRef.value.default_channel_android = {
+        id: chann.id,
+        name: chann.name,
+      } as any
+      appRef.value.default_channel_ios = {
+        id: chann.id,
+        name: chann.name,
+      } as any
+      forceBump.value += 1
+    }
+    toast.success(t('updated-default-update-channel'))
+  }
+  catch (error) {
+    console.error('Error in handleChannelSelection:', error)
+    toast.error(t('cannot-change-update-channel'))
+  }
+}
+
 async function transferAppOwnership() {
   const transferHistory: { transferred_at: string }[] = (appRef.value as any) ?? []
   if (!transferHistory || transferHistory.length === 0)
@@ -516,13 +922,136 @@ async function transferAppOwnership() {
                     },
                   }"
                   :disabled="true"
+                  :classes="{
+                    outer: {
+                      '$reset': true,
+                      'mb-4': true,
+                    },
+                  }"
                 >
                   <template #suffix>
-                    <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultChannel">
+                    <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click="setDefaultUploadChannel">
                       <Pencil width="24px" height="24px" />
                     </button>
                   </template>
                 </FormKit>
+              </div>
+              <div class="flex flex-col mb-4">
+                <label class="text-neutral-700 text-sm font-bold dark:text-neutral-300 inline-flex! mb-1 formkit-label">
+                  {{ t('default-channel-sync') }}
+                </label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input v-model="defaultChannelSync" type="checkbox" class="sr-only peer" @change="setUpdateChannelSync(defaultChannelSync)">
+                  <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:border after:border-gray-300 dark:border-gray-600 after:rounded-full after:bg-white dark:bg-gray-700 peer-checked:bg-blue-600 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                </label>
+              </div>
+              <div v-if="!appRef?.default_channel_sync" class="flex flex-row">
+                <div class="flex flex-col">
+                  <div :key="forceBump" class="flex flex-row">
+                    <FormKit
+                      type="text"
+                      name="default_ios_channel"
+                      :prefix-icon="Apple"
+                      :value="(appRef?.default_channel_ios as any)?.name ?? t('undefined')"
+                      :label="t('default-ios-channel')"
+                      :sections-schema="{
+                        suffix: {
+                          children: [
+                            '$slots.suffix',
+                          ],
+                        },
+                      }"
+                      readonly
+                      :classes="{
+                        outer: {
+                          '$reset': true,
+                          'mb-4': true,
+                        },
+                        input: {
+                          'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 select-none': (appRef?.default_channel_ios as any)?.name && (appRef?.default_channel_ios as any)?.name !== t('undefined'),
+                          'cursor-default select-none': !(appRef?.default_channel_ios as any)?.name || (appRef?.default_channel_ios as any)?.name === t('undefined'),
+                        },
+                      }"
+                      @click="navigateToChannel((appRef?.default_channel_ios as any)?.id, (appRef?.default_channel_ios as any)?.name ?? t('undefined'))"
+                    >
+                      <template #suffix>
+                        <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click.stop="setDefaultUpdateChannel('ios')">
+                          <Pencil width="24px" height="24px" />
+                        </button>
+                      </template>
+                    </FormKit>
+                  </div>
+                  <div :key="forceBump" class="flex flex-row">
+                    <FormKit
+                      type="text"
+                      name="default_android_channel"
+                      :prefix-icon="Android"
+                      :value="(appRef?.default_channel_android as any)?.name ?? t('undefined')"
+                      :label="t('default-android-channel')"
+                      :sections-schema="{
+                        suffix: {
+                          children: [
+                            '$slots.suffix',
+                          ],
+                        },
+                      }"
+                      readonly
+                      :classes="{
+                        outer: {
+                          '$reset': true,
+                          'mb-4': true,
+                        },
+                        input: {
+                          'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 select-none': (appRef?.default_channel_android as any)?.name && (appRef?.default_channel_android as any)?.name !== t('undefined'),
+                          'cursor-default select-none': !(appRef?.default_channel_android as any)?.name || (appRef?.default_channel_android as any)?.name === t('undefined'),
+                        },
+                      }"
+                      @click="navigateToChannel((appRef?.default_channel_android as any)?.id, (appRef?.default_channel_android as any)?.name ?? t('undefined'))"
+                    >
+                      <template #suffix>
+                        <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click.stop="setDefaultUpdateChannel('android')">
+                          <Pencil width="24px" height="24px" />
+                        </button>
+                      </template>
+                    </FormKit>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="flex flex-row">
+                <div :key="forceBump" class="flex flex-row">
+                  <FormKit
+                    type="text"
+                    name="default_update_channel"
+                    :prefix-icon="ArrowUpTray"
+                    :value="(appRef?.default_channel_ios as any)?.name ?? t('undefined')"
+                    :label="t('default-update-channel')"
+                    :sections-schema="{
+                      suffix: {
+                        children: [
+                          '$slots.suffix',
+                        ],
+                      },
+                    }"
+                    readonly
+                    :classes="{
+                      outer: {
+                        '$reset': true,
+                        'mb-4': true,
+                      },
+                      input: {
+                        'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 select-none': (appRef?.default_channel_ios as any)?.name && (appRef?.default_channel_ios as any)?.name !== t('undefined'),
+                        'cursor-default select-none': !(appRef?.default_channel_ios as any)?.name || (appRef?.default_channel_ios as any)?.name === t('undefined'),
+                      },
+                    }"
+                    @click="navigateToChannel((appRef?.default_channel_ios as any)?.id, (appRef?.default_channel_ios as any)?.name ?? t('undefined'))"
+                  >
+                    <template #suffix>
+                      <button type="button" class="ml-auto w-[24px] h-[24px] mr-1" @click.stop="setDefaultUpdateChannel('both')">
+                        <Pencil width="24px" height="24px" />
+                      </button>
+                    </template>
+                  </FormKit>
+                </div>
               </div>
               <FormKit
                 type="number"
