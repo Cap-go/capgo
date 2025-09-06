@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 12.22.2 (2025-09-06)
+
+
+### Bug Fixes
+
+* update cron job calls from CALL to SELECT for proper execution ([b64d49a](https://github.com/Cap-go/capgo/commit/b64d49ab302618e51628feab79df7031bad01f7e))
+
 ### 12.22.1 (2025-09-05)
 
 
