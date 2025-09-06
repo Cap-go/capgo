@@ -7261,14 +7261,14 @@ SELECT
   cron.schedule (
     'Cleanup frequent job details',
     '0 * * * *',
-    'CALL cleanup_frequent_job_details()'
+    'SELECT cleanup_frequent_job_details()'
   );
 
 SELECT
   cron.schedule (
     'Remove old jobs',
     '0 0 * * *',
-    'CALL remove_old_jobs()'
+    'SELECT remove_old_jobs()'
   );
 
 SELECT
