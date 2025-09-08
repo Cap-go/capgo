@@ -21,7 +21,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
-  const newOrg = { name: body.name, created_by: apikey.user_id, management_email: body.email ?? self.email }
+  const newOrg = { name: body.name, created_by: apikey.user_id, management_email: body.email ?? self.email ?? '' }
   const { data: dataOrg, error: errorOrg } = await supabase
     .from('orgs')
     .insert(newOrg)
