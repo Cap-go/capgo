@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { hasAppRightApikey, supabaseAdmin } from '../../utils/supabase.ts'
+import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 
 interface GetLatest {
   app_id: string
@@ -15,7 +15,7 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
   }
 
   if (body.version) {
-    const { data, error: dbError } = await supabaseAdmin(c)
+    const { data, error: dbError } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .update({
         deleted: true,
@@ -29,7 +29,7 @@ export async function deleteBundle(c: Context, body: GetLatest, apikey: Database
     }
   }
   else {
-    const { error: dbError } = await supabaseAdmin(c)
+    const { error: dbError } = await supabaseApikey(c, apikey.key)
       .from('app_versions')
       .update({
         deleted: true,

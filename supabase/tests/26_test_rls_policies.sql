@@ -79,10 +79,10 @@ SELECT
     'public',
     'orgs',
     ARRAY[
+      'Allow insert org for apikey or user',
       'Allow org delete for super_admin',
       'Allow select for auth, api keys (read+)',
       'Allow update for auth (admin+)',
-      'Allow webapp to insert',
       'Prevent non 2FA access'
     ],
     'orgs should have correct policies'
@@ -93,7 +93,11 @@ SELECT
   policies_are (
     'public',
     'devices',
-    ARRAY['Allow owner to update', 'Allow devices select'],
+    ARRAY[
+      'Allow org member to insert devices',
+      'Allow org member to select devices',
+      'Allow org member to update devices'
+    ],
     'devices should have correct policies'
   );
 
@@ -147,7 +151,12 @@ SELECT
   policies_are (
     'public',
     'users',
-    ARRAY['Allow self to modify self'],
+    ARRAY[
+      'Allow owner to insert own users',
+      'Allow owner to select own user',
+      'Allow owner to update own users',
+      'Disallow owner to delete own users'
+    ],
     'users should have correct policies'
   );
 
@@ -186,7 +195,7 @@ SELECT
   policies_are (
     'public',
     'stripe_info',
-    ARRAY['Allow user to self get'],
+    ARRAY['Allow org member to select stripe_info'],
     'stripe_info should have correct policies'
   );
 
@@ -278,7 +287,10 @@ SELECT
     'public',
     'apikeys',
     ARRAY[
-      'Enable all for user based on user_id',
+      'Allow owner to delete own apikeys',
+      'Allow owner to insert own apikeys',
+      'Allow owner to select own apikeys',
+      'Allow owner to update own apikeys',
       'Prevent non 2FA access'
     ],
     'apikeys should have correct policies'

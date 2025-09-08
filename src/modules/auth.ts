@@ -8,7 +8,11 @@ import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { getPlans, isAdmin } from './../services/supabase'
 
-async function updateUser(main: ReturnType<typeof useMainStore>, supabase: SupabaseClient, next: NavigationGuardNext) {
+async function updateUser(
+  main: ReturnType<typeof useMainStore>,
+  supabase: SupabaseClient,
+  next: NavigationGuardNext,
+) {
   const config = getLocalConfig()
   // console.log('set auth', auth)
   try {
@@ -30,11 +34,15 @@ async function updateUser(main: ReturnType<typeof useMainStore>, supabase: Supab
         data.email = main.auth?.email
       }
       main.user = data
-      setUser(main.auth?.id ?? '', {
-        email: main.auth?.email,
-        nickname: main.auth?.user_metadata?.nickname,
-        avatar: main.auth?.user_metadata?.avatar_url,
-      }, config.supaHost)
+      setUser(
+        main.auth?.id ?? '',
+        {
+          email: main.auth?.email,
+          nickname: main.auth?.user_metadata?.nickname,
+          avatar: main.auth?.user_metadata?.avatar_url,
+        },
+        config.supaHost,
+      )
     }
     else {
       return next('/onboarding/verify_email')
@@ -46,7 +54,11 @@ async function updateUser(main: ReturnType<typeof useMainStore>, supabase: Supab
   }
 }
 
-async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, from: RouteLocationNormalized) {
+async function guard(
+  next: NavigationGuardNext,
+  to: RouteLocationNormalized,
+  from: RouteLocationNormalized,
+) {
   const supabase = useSupabase()
   const { data: auth } = await supabase.auth.getUser()
 
@@ -54,16 +66,23 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
 
   // TOTP means the user was force logged using the "email" tactic
   // In practice this means the user is beeing spoofed by an admin
-  const isAdminForced = !!auth.user?.factors?.find(f => f.factor_type === 'totp') || false
+  const isAdminForced
+    = !!auth.user?.factors?.find(f => f.factor_type === 'totp') || false
 
-  const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  const { data: mfaData, error: mfaError }
+    = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   if (mfaError) {
     console.error('Cannot guard auth', mfaError)
     return
   }
 
-  if (mfaData.currentLevel === 'aal1' && mfaData.nextLevel === 'aal2' && !isAdminForced)
+  if (
+    mfaData.currentLevel === 'aal1'
+    && mfaData.nextLevel === 'aal2'
+    && !isAdminForced
+  ) {
     return next(`/login?to=${to.path}`)
+  }
 
   if (auth.user && !main.auth) {
     main.auth = auth.user
@@ -75,8 +94,6 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
       main.plans = pls
     })
 
-    // TODO: fix stunning to work with orgs custiner id
-    // initStunning(main.user?.customer_id)
     isAdmin(main.auth?.id).then((res) => {
       main.isAdmin = res
     })
@@ -89,10 +106,16 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
       notify: false,
     }).catch()
 
-    if ((!main.auth?.user_metadata?.activation?.legal) && !to.path.includes('/onboarding') && !from.path.includes('/onboarding'))
+    if (
+      !main.auth?.user_metadata?.activation?.legal
+      && !to.path.includes('/onboarding')
+      && !from.path.includes('/onboarding')
+    ) {
       next('/onboarding/activation')
-    else
+    }
+    else {
       next()
+    }
     hideLoader()
   }
   else if (from.path !== 'login' && !auth.user) {

@@ -20,7 +20,6 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-// No middleware applied to this route, as we allow both authorization and capgkey for CLI and webapp access
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<DataStats>(c)
   const auth = c.get('auth') as AuthInfo
