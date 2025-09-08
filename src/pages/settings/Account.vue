@@ -41,39 +41,39 @@ async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
   await Promise.all([
     organizationStore.awaitInitialLoad(),
-    main.awaitInitialLoad()
+    main.awaitInitialLoad(),
   ])
-  
+
   // Get all organizations where user is super_admin
   const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin')
-  
+
   if (superAdminOrgs.length === 0) {
     return { orgsToBeDeleted: [], paidOrgsToBeDeleted: [], canProceed: true }
   }
-  
+
   const orgsToBeDeleted: string[] = []
   const paidOrgsToBeDeleted: Array<{ name: string, planName: string, orgId: string }> = []
-  
+
   // Check each organization to see if user is the only super_admin
   for (const org of superAdminOrgs) {
     try {
       const { data: members, error } = await supabase
         .rpc('get_org_members', { guild_id: org.gid })
-      
+
       if (error) {
         console.error('Error getting org members:', error)
         continue
       }
-      
+
       // Count super_admins (excluding temporary users)
-      const superAdminCount = members.filter(member => 
-        member.role === 'super_admin' && !member.is_tmp
+      const superAdminCount = members.filter(member =>
+        member.role === 'super_admin' && !member.is_tmp,
       ).length
-      
+
       // If user is the only super_admin, this org will be deleted
       if (superAdminCount === 1) {
         orgsToBeDeleted.push(org.name)
-        
+
         // Check if this organization has a paid subscription
         try {
           const isPaying = await isPayingOrg(org.gid)
@@ -82,39 +82,41 @@ async function checkOrganizationImpact() {
             // Get the actual plan object to get the real plan name
             const actualPlan = main.plans.find(p => p.name === planNameFromDb)
             const planName = actualPlan?.name || planNameFromDb || 'Unknown Plan'
-            
+
             paidOrgsToBeDeleted.push({
               name: org.name,
               planName,
-              orgId: org.gid
+              orgId: org.gid,
             })
           }
-        } catch (error) {
+        }
+        catch (error) {
           console.error('Error checking payment status for org:', org.name, error)
         }
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error checking organization:', org.name, error)
     }
   }
-  
+
   return { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed: true }
 }
 
 async function deleteAccount() {
   // First, check organization impact
   const { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed } = await checkOrganizationImpact()
-  
+
   if (!canProceed) {
     toast.error(t('something-went-wrong-try-again-later'))
     return
   }
-  
+
   // Show warning if organizations will be deleted
   if (orgsToBeDeleted.length > 0) {
     // Store the organizations list for the teleport
     organizationsToDelete.value = orgsToBeDeleted
-    
+
     dialogStore.openDialog({
       title: t('warning-organizations-will-be-deleted'),
       description: t('warning-organizations-will-be-deleted-message'),
@@ -130,7 +132,7 @@ async function deleteAccount() {
         },
       ],
     })
-    
+
     const cancelled = await dialogStore.onDialogDismiss()
     if (cancelled) {
       organizationsToDelete.value = []
@@ -138,15 +140,15 @@ async function deleteAccount() {
     }
     organizationsToDelete.value = []
   }
-  
+
   // Show subscription cancellation warning if there are paid organizations
   if (paidOrgsToBeDeleted.length > 0) {
     // Store the paid organizations list for the teleport
     paidOrganizationsToDelete.value = paidOrgsToBeDeleted.map(org => ({
       name: org.name,
-      planName: org.planName
+      planName: org.planName,
     }))
-    
+
     dialogStore.openDialog({
       title: t('warning-paid-subscriptions'),
       description: t('warning-paid-subscriptions-message'),
@@ -162,18 +164,18 @@ async function deleteAccount() {
         },
       ],
     })
-    
+
     const cancelled = await dialogStore.onDialogDismiss()
     if (cancelled) {
       paidOrganizationsToDelete.value = []
       return
     }
     paidOrganizationsToDelete.value = []
-    
+
     // TODO: Here we would implement subscription cancellation logic
     // For now, we just continue to the final confirmation
   }
-  
+
   // Show final confirmation
   dialogStore.openDialog({
     title: t('are-u-sure'),
@@ -698,7 +700,7 @@ onMounted(async () => {
         </h4>
         <ul class="space-y-2">
           <li v-for="orgName in organizationsToDelete" :key="orgName" class="flex items-center text-red-700 dark:text-red-300">
-            <span class="w-2 h-2 bg-red-500 rounded-full mr-3"></span>
+            <span class="w-2 h-2 bg-red-500 rounded-full mr-3" />
             <span class="font-medium">{{ orgName }}</span>
           </li>
         </ul>
@@ -714,7 +716,7 @@ onMounted(async () => {
         <ul class="space-y-3">
           <li v-for="org in paidOrganizationsToDelete" :key="org.name" class="flex items-center justify-between text-orange-700 dark:text-orange-300">
             <div class="flex items-center">
-              <span class="w-2 h-2 bg-orange-500 rounded-full mr-3"></span>
+              <span class="w-2 h-2 bg-orange-500 rounded-full mr-3" />
               <span class="font-medium">{{ org.name }}</span>
             </div>
             <span class="text-sm bg-orange-100 dark:bg-orange-800 px-2 py-1 rounded-full">

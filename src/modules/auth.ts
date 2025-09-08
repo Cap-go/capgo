@@ -75,11 +75,13 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
 
       if (disabledError) {
         console.error('Error checking account status:', disabledError)
-      } else if (isDisabled) {
+      }
+      else if (isDisabled) {
         // Account is disabled, redirect to account disabled page
         return next('/accountDisabled')
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error checking if account is disabled:', error)
     }
 
@@ -125,11 +127,13 @@ async function guard(next: NavigationGuardNext, to: RouteLocationNormalized, fro
 
         if (disabledError) {
           console.error('Error checking account status:', disabledError)
-        } else if (isDisabled) {
+        }
+        else if (isDisabled) {
           // Account is disabled, redirect to account disabled page
           return next('/accountDisabled')
         }
-      } catch (error) {
+      }
+      catch (error) {
         console.error('Error checking if account is disabled:', error)
       }
     }
