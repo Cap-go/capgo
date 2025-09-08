@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
@@ -737,6 +737,7 @@ export type Database = {
           paying_monthly: number | null
           paying_yearly: number | null
           stars: number
+          success_rate: number | null
           trial: number | null
           updates: number
           updates_external: number | null
@@ -757,6 +758,7 @@ export type Database = {
           paying_monthly?: number | null
           paying_yearly?: number | null
           stars: number
+          success_rate?: number | null
           trial?: number | null
           updates: number
           updates_external?: number | null
@@ -777,6 +779,7 @@ export type Database = {
           paying_monthly?: number | null
           paying_yearly?: number | null
           stars?: number
+          success_rate?: number | null
           trial?: number | null
           updates?: number
           updates_external?: number | null
@@ -2014,6 +2017,8 @@ export type Database = {
         | "setChannel"
         | "getChannel"
         | "rateLimited"
+        | "disableAutoUpdate"
+        | "InvalidIp"
       stripe_status:
         | "created"
         | "succeeded"
@@ -2247,6 +2252,8 @@ export const Constants = {
         "setChannel",
         "getChannel",
         "rateLimited",
+        "disableAutoUpdate",
+        "InvalidIp",
       ],
       stripe_status: [
         "created",
